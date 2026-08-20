@@ -722,47 +722,216 @@ impl fmt::Display for HostDiscoveredModuleKey {
     }
 }
 
-fn host_discovered_module_error(
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)] // Private observed sibling stays callerless until selected-graph activation.
+pub(crate) struct HostDiscoveredModuleObservationKey(HostDiscoveredModuleKey);
+
+#[allow(dead_code)]
+impl HostDiscoveredModuleObservationKey {
+    pub(crate) fn try_new(
+        workspace: NormalizedAbsolutePath,
+        module: NonrootModuleKey,
+    ) -> Result<Self, BazelModuleVersionParseError> {
+        HostDiscoveredModuleKey::try_new(workspace, module).map(Self)
+    }
+}
+
+impl fmt::Display for HostDiscoveredModuleObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+type HostDiscoveredModuleResult = Arc<Result<HostDiscoveredModule, HostDiscoveredModuleError>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+#[allow(dead_code)]
+pub(crate) struct ObservedHostDiscoveredModule {
+    result: HostDiscoveredModuleResult,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)]
+impl ObservedHostDiscoveredModule {
+    pub(crate) fn result(&self) -> &HostDiscoveredModuleResult {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct HostDiscoveredModuleClosureFrontier(HostNonregistryModuleClosureObservationError);
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) enum HostDiscoveredModuleObservationError {
+    EffectiveFrontier(ObservedPathFrontierError),
+    ClosureFrontier(HostDiscoveredModuleClosureFrontier),
+    PreparationFrontier(ObservedPathFrontierError),
+    MergeFrontier(ObservedPathFrontierError),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+enum HostDiscoveredModuleMode {
+    Legacy,
+    Observed,
+}
+
+type HostDiscoveredModuleDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (
+            HostDiscoveredModuleResult,
+            PathObservationEpoch,
+            Option<EventBatch>,
+        ),
+        HostDiscoveredModuleObservationError,
+    >,
+>;
+
+fn discovered_complete(
+    result: Result<HostDiscoveredModule, HostDiscoveredModuleError>,
+    observations: PathObservationEpoch,
+    events: Option<EventBatch>,
+) -> HostDiscoveredModuleDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations, events)))
+}
+
+fn discovered_error(
     error: HostDiscoveredModuleError,
-) -> <HostDiscoveredModuleKey as Key>::Value {
-    SourcePreparationOutcome::Complete(Arc::new(Err(error)))
+    observations: PathObservationEpoch,
+) -> HostDiscoveredModuleDriverOutcome {
+    discovered_complete(Err(error), observations, None)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HostDiscoveredComputeStage {
+    Effective,
+    Closure,
+    Preparation,
+}
+
+fn discovered_compute_error(
+    stage: HostDiscoveredComputeStage,
+    message: Arc<str>,
+    observations: PathObservationEpoch,
+) -> HostDiscoveredModuleDriverOutcome {
+    let error = match stage {
+        HostDiscoveredComputeStage::Effective => {
+            HostDiscoveredModuleError::RootModuleFiles(CompactString::new(message.as_ref()))
+        }
+        HostDiscoveredComputeStage::Closure => {
+            HostDiscoveredModuleError::NonRegistryClosureCompute(message)
+        }
+        HostDiscoveredComputeStage::Preparation => {
+            HostDiscoveredModuleError::SourcePreparationCompute(message)
+        }
+    };
+    discovered_error(error, observations)
+}
+
+fn finish_discovered_observed_child<T, E>(
+    outcome: SourcePreparationOutcome<Result<T, E>>,
+    outer: impl FnOnce(E) -> HostDiscoveredModuleObservationError,
+) -> ControlFlow<HostDiscoveredModuleDriverOutcome, T> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => {
+            ControlFlow::Break(SourcePreparationOutcome::Need(need))
+        }
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            ControlFlow::Break(SourcePreparationOutcome::Complete(Err(outer(error))))
+        }
+        SourcePreparationOutcome::Complete(Ok(value)) => ControlFlow::Continue(value),
+    }
+}
+
+fn merge_discovered_prefix(
+    prefix: &PathObservationEpoch,
+    incoming: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, HostDiscoveredModuleDriverOutcome> {
+    merge_path_observations(prefix, incoming).map_err(|error| {
+        SourcePreparationOutcome::Complete(Err(
+            HostDiscoveredModuleObservationError::MergeFrontier(error),
+        ))
+    })
 }
 
 impl HostDiscoveredModuleKey {
-    async fn discover_nonregistry(&self, ctx: &mut DiceComputations<'_>) -> <Self as Key>::Value {
-        let closure = match ctx
-            .compute(&HostNonregistryModuleClosureKey::new(
-                self.workspace.dupe(),
-                self.module.clone(),
-            ))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
+    async fn discover_nonregistry(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        mode: HostDiscoveredModuleMode,
+        observations: PathObservationEpoch,
+    ) -> HostDiscoveredModuleDriverOutcome {
+        let key = HostNonregistryModuleClosureKey::new(self.workspace.dupe(), self.module.clone());
+        let (result, incoming) = if mode == HostDiscoveredModuleMode::Legacy {
+            let outcome = match ctx.compute(&key).await {
+                Ok(outcome) => outcome,
+                Err(error) => {
+                    return discovered_compute_error(
+                        HostDiscoveredComputeStage::Closure,
+                        Arc::from(error.to_string()),
+                        observations,
+                    );
+                }
+            };
+            match outcome {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(result) => {
+                    (result, PathObservationEpoch::empty())
+                }
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => value,
-            Err(error) => {
-                return host_discovered_module_error(
-                    HostDiscoveredModuleError::NonRegistryClosureCompute(Arc::from(
-                        error.to_string(),
-                    )),
-                );
+        } else {
+            let outcome = match ctx
+                .compute(&HostNonregistryModuleClosureObservationKey(key))
+                .await
+            {
+                Ok(outcome) => outcome,
+                Err(error) => {
+                    return discovered_compute_error(
+                        HostDiscoveredComputeStage::Closure,
+                        Arc::from(error.to_string()),
+                        observations,
+                    );
+                }
+            };
+            match finish_discovered_observed_child(outcome, |error| {
+                HostDiscoveredModuleObservationError::ClosureFrontier(
+                    HostDiscoveredModuleClosureFrontier(error),
+                )
+            }) {
+                ControlFlow::Break(outcome) => return outcome,
+                ControlFlow::Continue(observed) => {
+                    (observed.result().dupe(), observed.observations().dupe())
+                }
             }
         };
-        let closure = match closure.as_ref() {
+        let observations = match merge_discovered_prefix(&observations, &incoming) {
+            Ok(observations) => observations,
+            Err(outcome) => return outcome,
+        };
+        let closure = match result.as_ref() {
             Ok(HostNonregistryModuleClosure::Supported(closure)) => closure.clone(),
             Ok(HostNonregistryModuleClosure::UnsupportedCycle {
                 closure,
                 capability,
             }) => {
-                return host_discovered_module_error(HostDiscoveredModuleError::NonRegistryCycle {
-                    closure: closure.clone(),
-                    capability: capability.clone(),
-                });
+                return discovered_error(
+                    HostDiscoveredModuleError::NonRegistryCycle {
+                        closure: closure.clone(),
+                        capability: capability.clone(),
+                    },
+                    observations,
+                );
             }
             Err(error) => {
-                return host_discovered_module_error(
+                return discovered_error(
                     HostDiscoveredModuleError::NonRegistryClosure(error.clone()),
+                    observations,
                 );
             }
         };
@@ -797,53 +966,94 @@ impl HostDiscoveredModuleKey {
                 provenance: HostDiscoveredModuleProvenance::NonRegistry { closure },
             })
             .map_err(HostDiscoveredModuleError::Evaluation);
-        if capture_events {
-            ctx.store_evaluation_data(events.unwrap_or_else(EventBatch::empty))
-                .expect("Host discovered MODULE stores exactly one event batch");
-        }
-        SourcePreparationOutcome::Complete(Arc::new(value))
+        let events = capture_events.then(|| events.unwrap_or_else(EventBatch::empty));
+        discovered_complete(value, observations, events)
     }
 }
-#[async_trait]
-impl Key for HostDiscoveredModuleKey {
-    type Value =
-        SourcePreparationOutcome<Arc<Result<HostDiscoveredModule, HostDiscoveredModuleError>>>;
-
-    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let effective = match ctx
-            .compute(&HostEffectiveModuleOverrideKey::new(
+impl HostDiscoveredModuleKey {
+    async fn discover_effective(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        mode: HostDiscoveredModuleMode,
+    ) -> Result<
+        (
+            <HostEffectiveModuleOverrideKey as Key>::Value,
+            PathObservationEpoch,
+        ),
+        HostDiscoveredModuleDriverOutcome,
+    > {
+        if mode == HostDiscoveredModuleMode::Legacy {
+            return match ctx
+                .compute(&HostEffectiveModuleOverrideKey::new(
+                    self.workspace.dupe(),
+                    self.module.name.clone(),
+                ))
+                .await
+            {
+                Ok(result) => Ok((result, PathObservationEpoch::empty())),
+                Err(error) => Err(discovered_compute_error(
+                    HostDiscoveredComputeStage::Effective,
+                    Arc::from(error.to_string()),
+                    PathObservationEpoch::empty(),
+                )),
+            };
+        }
+        match ctx
+            .compute(&HostEffectiveModuleOverrideObservationKey::new(
                 self.workspace.dupe(),
                 self.module.name.clone(),
             ))
             .await
         {
-            Ok(effective) => effective,
-            Err(error) => {
-                return host_discovered_module_error(HostDiscoveredModuleError::RootModuleFiles(
-                    error.to_string().into(),
-                ));
+            Err(error) => Err(discovered_compute_error(
+                HostDiscoveredComputeStage::Effective,
+                Arc::from(error.to_string()),
+                PathObservationEpoch::empty(),
+            )),
+            Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                Err(SourcePreparationOutcome::Complete(Err(
+                    HostDiscoveredModuleObservationError::EffectiveFrontier(error),
+                )))
             }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                Ok((observed.result().dupe(), observed.observations().dupe()))
+            }
+        }
+    }
+
+    async fn drive(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        mode: HostDiscoveredModuleMode,
+    ) -> HostDiscoveredModuleDriverOutcome {
+        let (effective_result, observations) = match self.discover_effective(ctx, mode).await {
+            Ok(complete) => complete,
+            Err(outcome) => return outcome,
         };
-        let effective = match effective.as_ref() {
+        let effective = match effective_result.as_ref() {
             Ok(effective) => effective,
             Err(error) => {
-                return host_discovered_module_error(HostDiscoveredModuleError::RootModuleFiles(
-                    error.to_string().into(),
-                ));
+                return discovered_error(
+                    HostDiscoveredModuleError::RootModuleFiles(error.to_string().into()),
+                    observations,
+                );
             }
         };
         let override_ = effective.override_();
         if self.module.name == "bazel_tools" && !effective.is_command() {
             if override_.is_some() {
-                return host_discovered_module_error(
+                return discovered_error(
                     HostDiscoveredModuleError::ExplicitBuiltinOverride,
+                    observations,
                 );
             }
             if !self.module.version.is_empty() {
-                return host_discovered_module_error(
+                return discovered_error(
                     HostDiscoveredModuleError::InvalidBuiltinVersion {
                         version: self.module.version.clone(),
                     },
+                    observations,
                 );
             }
             let value = match ctx
@@ -854,64 +1064,105 @@ impl Key for HostDiscoveredModuleKey {
             {
                 Ok(value) => value,
                 Err(error) => {
-                    return host_discovered_module_error(
+                    return discovered_error(
                         HostDiscoveredModuleError::BuiltinCompute(Arc::from(error.to_string())),
+                        observations,
                     );
                 }
             };
-            return SourcePreparationOutcome::Complete(Arc::new(match value.as_ref() {
-                Ok(value) => Ok(HostDiscoveredModule {
-                    module: value.module.clone(),
-                    provenance: HostDiscoveredModuleProvenance::BuiltinBazelTools {
-                        route_identity: value.route_identity.clone(),
-                        module_sha256: value.module_sha256,
-                    },
-                }),
-                Err(error) => Err(HostDiscoveredModuleError::Builtin(error.clone())),
-            }));
+            return discovered_complete(
+                match value.as_ref() {
+                    Ok(value) => Ok(HostDiscoveredModule {
+                        module: value.module.clone(),
+                        provenance: HostDiscoveredModuleProvenance::BuiltinBazelTools {
+                            route_identity: value.route_identity.clone(),
+                            module_sha256: value.module_sha256,
+                        },
+                    }),
+                    Err(error) => Err(HostDiscoveredModuleError::Builtin(error.clone())),
+                },
+                observations,
+                None,
+            );
         }
         if matches!(override_, Some(RootModuleOverride::NonRegistry(_))) {
             if !self.module.version.is_empty() {
-                return host_discovered_module_error(
+                return discovered_error(
                     HostDiscoveredModuleError::InvalidNonRegistryVersion {
                         module_name: self.module.name.clone(),
                         version: self.module.version.clone(),
                     },
+                    observations,
                 );
             }
-            return self.discover_nonregistry(ctx).await;
+            return self.discover_nonregistry(ctx, mode, observations).await;
         }
         if self.module.version.is_empty() {
-            return host_discovered_module_error(HostDiscoveredModuleError::MissingVersion {
-                module_name: self.module.name.clone(),
-            });
+            return discovered_error(
+                HostDiscoveredModuleError::MissingVersion {
+                    module_name: self.module.name.clone(),
+                },
+                observations,
+            );
         }
-        let preparation = match ctx
-            .compute(&ModuleSourcePreparationKey {
-                workspace: self.workspace.as_path().to_path_buf(),
-                module_name: self.module.name.clone(),
-                version: self.module.version.clone(),
-            })
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
+        let preparation_key = ModuleSourcePreparationKey {
+            workspace: self.workspace.as_path().to_path_buf(),
+            module_name: self.module.name.clone(),
+            version: self.module.version.clone(),
+        };
+        let (preparation_result, incoming) = if mode == HostDiscoveredModuleMode::Legacy {
+            let outcome = match ctx.compute(&preparation_key).await {
+                Ok(outcome) => outcome,
+                Err(error) => {
+                    return discovered_compute_error(
+                        HostDiscoveredComputeStage::Preparation,
+                        Arc::from(error.to_string()),
+                        observations,
+                    );
+                }
+            };
+            match outcome {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(result) => {
+                    (result, PathObservationEpoch::empty())
+                }
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => value,
-            Err(error) => {
-                return host_discovered_module_error(
-                    HostDiscoveredModuleError::SourcePreparationCompute(Arc::from(
-                        error.to_string(),
-                    )),
-                );
+        } else {
+            let outcome = match ctx
+                .compute(&ModuleSourcePreparationObservationKey(preparation_key))
+                .await
+            {
+                Ok(outcome) => outcome,
+                Err(error) => {
+                    return discovered_compute_error(
+                        HostDiscoveredComputeStage::Preparation,
+                        Arc::from(error.to_string()),
+                        observations,
+                    );
+                }
+            };
+            match finish_discovered_observed_child(outcome, |error| {
+                HostDiscoveredModuleObservationError::PreparationFrontier(error)
+            }) {
+                ControlFlow::Break(outcome) => return outcome,
+                ControlFlow::Continue(observed) => {
+                    (observed.result().dupe(), observed.observations().dupe())
+                }
             }
         };
-        let preparation = match preparation.as_ref() {
+        let observations = match merge_discovered_prefix(&observations, &incoming) {
+            Ok(observations) => observations,
+            Err(outcome) => return outcome,
+        };
+        let preparation = match preparation_result.as_ref() {
             Ok(preparation) => preparation,
             Err(error) => {
-                return host_discovered_module_error(HostDiscoveredModuleError::SourcePreparation(
-                    error.clone(),
-                ));
+                return discovered_error(
+                    HostDiscoveredModuleError::SourcePreparation(error.clone()),
+                    observations,
+                );
             }
         };
         let ModuleSourcePreparation::Registry {
@@ -920,10 +1171,11 @@ impl Key for HostDiscoveredModuleKey {
             module_file_attempts,
         } = preparation
         else {
-            return host_discovered_module_error(
+            return discovered_error(
                 HostDiscoveredModuleError::NonRegistryUnsupported {
                     module_name: self.module.name.clone(),
                 },
+                observations,
             );
         };
         let capture_events = ctx
@@ -944,21 +1196,78 @@ impl Key for HostDiscoveredModuleKey {
             &[],
             capture_events,
         );
-        let value = match module {
-            Ok(module) => Ok(HostDiscoveredModule {
+        let value = module
+            .map(|module| HostDiscoveredModule {
                 module,
                 provenance: HostDiscoveredModuleProvenance::Registry {
                     selected_registry: selected_registry.clone(),
                     module_file_attempts: module_file_attempts.clone(),
                 },
-            }),
-            Err(error) => Err(HostDiscoveredModuleError::Evaluation(error)),
-        };
-        if capture_events {
-            ctx.store_evaluation_data(events.unwrap_or_else(EventBatch::empty))
-                .expect("Host discovered MODULE stores exactly one event batch");
+            })
+            .map_err(HostDiscoveredModuleError::Evaluation);
+        let events = capture_events.then(|| events.unwrap_or_else(EventBatch::empty));
+        discovered_complete(value, observations, events)
+    }
+}
+
+fn store_discovered_events(ctx: &mut DiceComputations<'_>, events: Option<EventBatch>) {
+    if let Some(events) = events {
+        ctx.store_evaluation_data(events)
+            .expect("Host discovered MODULE stores exactly one event batch");
+    }
+}
+fn project_legacy_discovered(
+    result: HostDiscoveredModuleResult,
+) -> SourcePreparationOutcome<HostDiscoveredModuleResult> {
+    SourcePreparationOutcome::Complete(result)
+}
+
+#[async_trait]
+impl Key for HostDiscoveredModuleKey {
+    type Value = SourcePreparationOutcome<HostDiscoveredModuleResult>;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match self.drive(ctx, HostDiscoveredModuleMode::Legacy).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, _, events))) => {
+                store_discovered_events(ctx, events);
+                project_legacy_discovered(result)
+            }
+            SourcePreparationOutcome::Complete(Err(_)) => {
+                unreachable!("legacy discovery has no observed frontier")
+            }
         }
-        SourcePreparationOutcome::Complete(Arc::new(value))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostDiscoveredModuleObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedHostDiscoveredModule, HostDiscoveredModuleObservationError>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match self.0.drive(ctx, HostDiscoveredModuleMode::Observed).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations, events))) => {
+                store_discovered_events(ctx, events);
+                SourcePreparationOutcome::Complete(Ok(ObservedHostDiscoveredModule {
+                    result,
+                    observations,
+                }))
+            }
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

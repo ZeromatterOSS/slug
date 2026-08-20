@@ -7229,3 +7229,1178 @@ async fn observed_module_source_poll_drop_publishes_no_parent_and_recovers_same_
         owner != &key.to_string() || batch.is_none()
     }));
 }
+
+fn observed_discovered_key(name: &str, version: &str) -> HostDiscoveredModuleObservationKey {
+    HostDiscoveredModuleObservationKey::try_new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        NonrootModuleKey::new(name, version),
+    )
+    .unwrap()
+}
+
+fn complete_observed_discovered(
+    value: &<HostDiscoveredModuleObservationKey as Key>::Value,
+) -> &ObservedHostDiscoveredModule {
+    let SourcePreparationOutcome::Complete(Ok(value)) = value else {
+        panic!("observed discovered module must complete: {value:?}")
+    };
+    value
+}
+
+fn discovered_parent_batch(
+    tracker: &NonregistryPreflightTracker,
+    key: &HostDiscoveredModuleObservationKey,
+) -> Option<EventBatch> {
+    tracker
+        .batches
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, kind, _)| owner == &key.to_string() && *kind == ActivationKind::Evaluated)
+        .and_then(|(_, _, batch)| batch.dupe())
+}
+
+fn discovered_eventful(tracker: &NonregistryPreflightTracker) -> Vec<(String, EventBatch)> {
+    tracker
+        .batches
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(_, kind, batch)| *kind == ActivationKind::Evaluated && batch.is_some())
+        .map(|(owner, _, batch)| (owner.clone(), batch.dupe().unwrap()))
+        .collect()
+}
+
+fn discovered_event_values(found: &[(String, EventBatch)]) -> Vec<EventBatch> { found.iter().map(|(_, batch)| batch.dupe()).collect() }
+#[test]
+fn observed_discovered_identity_projection_and_terminal_algebra_are_exact() {
+    use std::hash::Hash;
+    use std::hash::Hasher;
+
+    let key = observed_discovered_key("dep", "1");
+    let other = observed_discovered_key("other", "1");
+    assert_ne!(key, other);
+    assert_eq!(key.to_string(), "observed-host-discovered-module:\"/workspace\":dep@1");
+    let hash = |key: &HostDiscoveredModuleObservationKey| {
+        let mut hasher = DefaultHasher::new();
+        key.hash(&mut hasher);
+        hasher.finish()
+    };
+    assert_ne!(hash(&key), hash(&other));
+
+    let (_, _, epoch) = observed_horizon_epoch("discovered");
+    let result = Arc::new(Err(HostDiscoveredModuleError::MissingVersion {
+        module_name: "dep".into(),
+    }));
+    let complete = SourcePreparationOutcome::Complete(Ok(ObservedHostDiscoveredModule {
+        result: result.dupe(),
+        observations: epoch.dupe(),
+    }));
+    let observed = complete_observed_discovered(&complete);
+    assert!(Arc::ptr_eq(observed.result(), &result));
+    assert_exact_epoch(&epoch, observed.observations());
+    assert!(HostDiscoveredModuleObservationKey::validity(&complete));
+    assert!(HostDiscoveredModuleObservationKey::equality(
+        &complete, &complete
+    ));
+    let SourcePreparationOutcome::Complete(projected) =
+        project_legacy_discovered(result.dupe())
+    else {
+        panic!("legacy projection must complete")
+    };
+    assert!(Arc::ptr_eq(&result, &projected));
+
+    let need = SourcePreparationOutcome::Need(preflight_need("discovered-need"));
+    assert!(!HostDiscoveredModuleObservationKey::validity(&need));
+    assert!(!HostDiscoveredModuleObservationKey::equality(&need, &need));
+    let demand = observed_horizon_epoch("discovered-outer").0;
+    let outer = SourcePreparationOutcome::Complete(Err(
+        HostDiscoveredModuleObservationError::EffectiveFrontier(
+            ObservedPathFrontierError::Epoch(
+                slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+                    demand,
+                    result_operation: PathObservationOperation::FileBytes,
+                },
+            ),
+        ),
+    ));
+    assert!(HostDiscoveredModuleObservationKey::validity(&outer));
+    assert!(HostDiscoveredModuleObservationKey::equality(&outer, &outer));
+
+    let (demand, first, prefix) = observed_horizon_epoch("discovered-merge");
+    let duplicate = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+    let merged = merge_discovered_prefix(&prefix, &duplicate).unwrap();
+    assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first));
+    let conflict = PathObservationEpoch::from_shared([(
+        demand,
+        Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+            PathLstat::new(PathNodeKind::RegularFile, 1, 2, 3, 4, 0o644),
+        ))),
+    )])
+    .unwrap();
+    assert!(matches!(
+        merge_discovered_prefix(&prefix, &conflict),
+        Err(SourcePreparationOutcome::Complete(Err(
+            HostDiscoveredModuleObservationError::MergeFrontier(
+                ObservedPathFrontierError::Epoch(
+                    slug_workspace_v2::PathObservationEpochError::ConflictingDemand(_)
+                )
+            )
+        )))
+    ));
+
+    let need = preflight_need("discovered-finisher");
+    assert!(matches!(
+        finish_discovered_observed_child::<(), ObservedPathFrontierError>(
+            SourcePreparationOutcome::Need(need.dupe()),
+            HostDiscoveredModuleObservationError::EffectiveFrontier,
+        ),
+        ControlFlow::Break(SourcePreparationOutcome::Need(found)) if found == need
+    ));
+    let demand = observed_horizon_epoch("discovered-mismatch").0;
+    let frontier = ObservedPathFrontierError::Epoch(
+        slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+            demand,
+            result_operation: PathObservationOperation::FileBytes,
+        },
+    );
+    let effective = finish_discovered_observed_child::<(), _>(
+        SourcePreparationOutcome::Complete(Err(frontier.dupe())),
+        HostDiscoveredModuleObservationError::EffectiveFrontier,
+    );
+    assert!(matches!(
+        effective,
+        ControlFlow::Break(SourcePreparationOutcome::Complete(Err(
+            HostDiscoveredModuleObservationError::EffectiveFrontier(_)
+        )))
+    ));
+    let closure = finish_discovered_observed_child::<(), _>(
+        SourcePreparationOutcome::Complete(Err(
+            HostNonregistryModuleClosureObservationError::EffectiveFrontier(frontier.dupe()),
+        )),
+        |error| {
+            HostDiscoveredModuleObservationError::ClosureFrontier(
+                HostDiscoveredModuleClosureFrontier(error),
+            )
+        },
+    );
+    assert!(matches!(
+        closure,
+        ControlFlow::Break(SourcePreparationOutcome::Complete(Err(
+            HostDiscoveredModuleObservationError::ClosureFrontier(_)
+        )))
+    ));
+    let preparation = finish_discovered_observed_child::<(), _>(
+        SourcePreparationOutcome::Complete(Err(frontier)),
+        HostDiscoveredModuleObservationError::PreparationFrontier,
+    );
+    assert!(matches!(
+        preparation,
+        ControlFlow::Break(SourcePreparationOutcome::Complete(Err(
+            HostDiscoveredModuleObservationError::PreparationFrontier(_)
+        )))
+    ));
+
+    for stage in [
+        HostDiscoveredComputeStage::Effective,
+        HostDiscoveredComputeStage::Closure,
+        HostDiscoveredComputeStage::Preparation,
+    ] {
+        let observations = (stage != HostDiscoveredComputeStage::Effective)
+            .then(|| prefix.dupe())
+            .unwrap_or_else(PathObservationEpoch::empty);
+        let SourcePreparationOutcome::Complete(Ok((result, found, events))) =
+            discovered_compute_error(stage, Arc::from("compute"), observations.dupe())
+        else {
+            panic!("compute failures remain semantic")
+        };
+        assert_eq!(found, observations);
+        assert!(events.is_none());
+        assert!(matches!(
+            (stage, result.as_ref()),
+            (HostDiscoveredComputeStage::Effective, Err(HostDiscoveredModuleError::RootModuleFiles(_)))
+                | (HostDiscoveredComputeStage::Closure, Err(HostDiscoveredModuleError::NonRegistryClosureCompute(_)))
+                | (HostDiscoveredComputeStage::Preparation, Err(HostDiscoveredModuleError::SourcePreparationCompute(_)))
+        ));
+    }
+
+    let SourcePreparationOutcome::Complete(Ok((unsupported, found, events))) = discovered_error(
+        HostDiscoveredModuleError::NonRegistryUnsupported {
+            module_name: "dep".into(),
+        },
+        prefix.dupe(),
+    ) else { panic!("invariant failure remains semantic") };
+    assert!(matches!(unsupported.as_ref(), Err(HostDiscoveredModuleError::NonRegistryUnsupported { .. })));
+    assert_eq!(found, prefix);
+    assert!(events.is_none());
+
+}
+#[tokio::test]
+async fn observed_discovered_builtin_matches_legacy_family_and_neutral_events() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let mut transaction = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        "module(name='root')\n",
+        &[],
+        800,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let observed_key = observed_discovered_key("bazel_tools", "");
+    let observed_value = transaction.compute(&observed_key).await.unwrap();
+    let observed = complete_observed_discovered(&observed_value);
+    let observed_row = tracker.rows.lock().unwrap().iter()
+        .find(|(owner, _)| owner == &observed_key.to_string()).unwrap().1.clone();
+    assert_eq!(observed_row.len(), 2);
+    assert!(observed_row[0].starts_with("observed-host-effective-module-override:"));
+    assert!(observed_row[1].starts_with("builtin-bazel-tools-module:"));
+    let observed_events = discovered_eventful(&tracker);
+    assert_eq!(observed_events.len(), 1);
+    assert!(observed_events[0].0.starts_with("bzlmod-observed-host-root-module-file:"));
+    assert!(observed_events[0].1.events().is_empty());
+
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let legacy_key = HostDiscoveredModuleKey::try_new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        NonrootModuleKey::new("bazel_tools", ""),
+    ).unwrap();
+    let SourcePreparationOutcome::Complete(legacy) = transaction.compute(&legacy_key).await.unwrap()
+    else { panic!("legacy builtin discovery") };
+    assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    let legacy_row = tracker.rows.lock().unwrap().iter()
+        .find(|(owner, _)| owner == &legacy_key.to_string()).unwrap().1.clone();
+    assert_eq!(legacy_row, vec![
+        HostEffectiveModuleOverrideKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            "bazel_tools".into(),
+        ).to_string(),
+        observed_row[1].clone(),
+    ]);
+    let legacy_events = discovered_eventful(&tracker);
+    assert!(legacy_events[0].0.starts_with("root-module-evaluation:"));
+    assert_eq!(discovered_event_values(&observed_events), discovered_event_values(&legacy_events));
+}
+
+#[tokio::test]
+async fn observed_discovered_builtin_and_registry_own_exact_prefix_rows_and_events() {
+    let url = "https://registry.invalid/modules/dep/1/MODULE.bazel";
+    let io = Arc::new(ModuleSourceRegistryIo::new([(
+        url,
+        ModuleSourceRegistryResponse::Found(Arc::from(
+            b"module(name='dep',version='1')\nprint('registry')\n".as_slice(),
+        )),
+    )]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = "module(name='root')\nbazel_dep(name='dep',version='1')\n";
+    let mut transaction = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://registry.invalid"],
+        801,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+
+
+    tracker.rows.lock().unwrap().clear();
+    let key = observed_discovered_key("dep", "1");
+    let cold = transaction.compute(&key).await.unwrap();
+    let observed = complete_observed_discovered(&cold);
+    assert!(matches!(
+        observed.result().as_ref(),
+        Ok(HostDiscoveredModule {
+            provenance: HostDiscoveredModuleProvenance::Registry { .. },
+            ..
+        })
+    ));
+    let effective_key = HostEffectiveModuleOverrideObservationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        "dep".into(),
+    );
+    let preparation_key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+        "1".into(),
+    );
+    let SourcePreparationOutcome::Complete(Ok(effective)) =
+        transaction.compute(&effective_key).await.unwrap()
+    else {
+        panic!("effective carrier")
+    };
+    let SourcePreparationOutcome::Complete(Ok(preparation)) =
+        transaction.compute(&preparation_key).await.unwrap()
+    else {
+        panic!("preparation carrier")
+    };
+    let expected =
+        merge_path_observations(effective.observations(), preparation.observations()).unwrap();
+    assert_exact_epoch(&expected, observed.observations());
+    let row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(
+        row,
+        vec![effective_key.to_string(), preparation_key.to_string()]
+    );
+    let batch = discovered_parent_batch(&tracker, &key).unwrap();
+    assert!(matches!(
+        batch.events(),
+        [EvaluationEvent::StarlarkPrint { text, .. }] if text == "registry"
+    ));
+    let eventful = discovered_eventful(&tracker);
+    assert_eq!(eventful.len(), 2);
+    assert!(eventful[0].0.starts_with("bzlmod-observed-host-root-module-file:"));
+    assert!(eventful[0].1.events().is_empty());
+    assert_eq!(eventful[1], (key.to_string(), batch.dupe()));
+    assert_eq!(eventful.last().unwrap(), &(key.to_string(), batch.dupe()));
+
+    tracker.batches.lock().unwrap().clear();
+    let warm = transaction.compute(&key).await.unwrap();
+    assert!(HostDiscoveredModuleObservationKey::equality(&cold, &warm));
+    assert!(tracker
+        .batches
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|(owner, _, batch)| owner != &key.to_string() || batch.is_none()));
+
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let mut legacy_tx = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://registry.invalid"],
+        801,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let legacy_key = HostDiscoveredModuleKey::try_new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        NonrootModuleKey::new("dep", "1"),
+    )
+    .unwrap();
+    let legacy = legacy_tx.compute(&legacy_key).await.unwrap();
+    let SourcePreparationOutcome::Complete(legacy) = legacy else {
+        panic!("legacy discovered module")
+    };
+    assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    let legacy_batch = tracker
+        .batches
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, kind, _)| owner == &legacy_key.to_string() && *kind == ActivationKind::Evaluated)
+        .and_then(|(_, _, batch)| batch.dupe())
+        .unwrap();
+    assert_eq!(legacy_batch, batch);
+    let legacy_eventful = discovered_eventful(&tracker);
+    assert_eq!(legacy_eventful.len(), 2);
+    assert!(legacy_eventful[0].0.starts_with("root-module-evaluation:"));
+    assert!(legacy_eventful[0].1.events().is_empty());
+    assert_eq!(legacy_eventful[1], (legacy_key.to_string(), legacy_batch.dupe()));
+    assert_eq!(discovered_event_values(&eventful), discovered_event_values(&legacy_eventful));
+    let legacy_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &legacy_key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(legacy_row, vec![
+        HostEffectiveModuleOverrideKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            "dep".into(),
+        ).to_string(),
+        ModuleSourcePreparationKey {
+            workspace: PathBuf::from("/workspace"),
+            module_name: "dep".into(),
+            version: "1".into(),
+        }.to_string(),
+    ]);
+}
+
+
+#[tokio::test]
+async fn observed_discovered_validation_semantic_and_evaluation_prefixes_are_exact() {
+    let wrong_url = "https://wrong.invalid/modules/dep/1/MODULE.bazel";
+    let mut builder = Dice::builder();
+    crate::install_registry_io(
+        &mut builder,
+        Arc::new(ModuleSourceRegistryIo::new([(
+            wrong_url,
+            ModuleSourceRegistryResponse::Found(Arc::from(
+                b"module(name='wrong',version='1')\n".as_slice(),
+            )),
+        )])),
+    );
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let effective_key = HostEffectiveModuleOverrideObservationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        "dep".into(),
+    );
+
+    let transaction = host_nonregistry_transaction(
+        &dice,
+        Some(b"module(name='dep')\n"),
+        None,
+        &[],
+        &[],
+        821,
+        None,
+        Some(tracker.dupe()),
+        None,
+        true,
+    )
+    .await;
+    let mut transaction = complete_preflight_transaction(transaction, false).await;
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let invalid_key = observed_discovered_key("dep", "1");
+    let invalid = transaction.compute(&invalid_key).await.unwrap();
+    let invalid = complete_observed_discovered(&invalid);
+    assert!(matches!(
+        invalid.result().as_ref(),
+        Err(HostDiscoveredModuleError::InvalidNonRegistryVersion { .. })
+    ));
+    let SourcePreparationOutcome::Complete(Ok(effective)) =
+        transaction.compute(&effective_key).await.unwrap()
+    else {
+        panic!("effective carrier")
+    };
+    assert_exact_epoch(effective.observations(), invalid.observations());
+    assert!(discovered_parent_batch(&tracker, &invalid_key).is_none());
+    assert_eq!(
+        tracker
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(owner, _)| owner == &invalid_key.to_string())
+            .unwrap()
+            .1,
+        vec![effective_key.to_string()]
+    );
+
+    let transaction = host_nonregistry_transaction(
+        &dice,
+        Some(b"module(name='wrong')\n"),
+        None,
+        &[],
+        &[],
+        822,
+        None,
+        Some(tracker.dupe()),
+        None,
+        true,
+    )
+    .await;
+    let mut transaction = complete_preflight_transaction(transaction, false).await;
+    tracker.batches.lock().unwrap().clear();
+    let key = observed_discovered_key("dep", "");
+    let evaluation = transaction.compute(&key).await.unwrap();
+    let evaluation = complete_observed_discovered(&evaluation);
+    assert!(matches!(
+        evaluation.result().as_ref(),
+        Err(HostDiscoveredModuleError::Evaluation(_))
+    ));
+    let closure_key = HostNonregistryModuleClosureObservationKey(
+        HostNonregistryModuleClosureKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            NonrootModuleKey::new("dep", ""),
+        ),
+    );
+    let SourcePreparationOutcome::Complete(Ok(effective)) =
+        transaction.compute(&effective_key).await.unwrap()
+    else {
+        panic!("effective carrier")
+    };
+    let SourcePreparationOutcome::Complete(Ok(closure)) =
+        transaction.compute(&closure_key).await.unwrap()
+    else {
+        panic!("closure carrier")
+    };
+    assert_exact_epoch(
+        &merge_path_observations(effective.observations(), closure.observations()).unwrap(),
+        evaluation.observations(),
+    );
+    assert!(discovered_parent_batch(&tracker, &key)
+        .is_some_and(|batch| batch.events().is_empty()));
+
+    let root = "module(name='root')\nbazel_dep(name='dep',version='1')\n";
+    let mut missing_tx = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://missing.invalid"],
+        823,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    tracker.batches.lock().unwrap().clear();
+    let registry_key = observed_discovered_key("dep", "1");
+    let missing = missing_tx.compute(&registry_key).await.unwrap();
+    let missing = complete_observed_discovered(&missing);
+    assert!(matches!(
+        missing.result().as_ref(),
+        Err(HostDiscoveredModuleError::SourcePreparation(_))
+    ));
+    let preparation_key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+        "1".into(),
+    );
+    let SourcePreparationOutcome::Complete(Ok(effective)) =
+        missing_tx.compute(&effective_key).await.unwrap()
+    else {
+        panic!("effective carrier")
+    };
+    let SourcePreparationOutcome::Complete(Ok(preparation)) =
+        missing_tx.compute(&preparation_key).await.unwrap()
+    else {
+        panic!("preparation carrier")
+    };
+    assert_exact_epoch(
+        &merge_path_observations(effective.observations(), preparation.observations()).unwrap(),
+        missing.observations(),
+    );
+    assert!(discovered_parent_batch(&tracker, &registry_key).is_none());
+
+    let mut wrong_tx = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://wrong.invalid"],
+        824,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    tracker.batches.lock().unwrap().clear();
+    let wrong = wrong_tx.compute(&registry_key).await.unwrap();
+    let wrong = complete_observed_discovered(&wrong);
+    assert!(matches!(
+        wrong.result().as_ref(),
+        Err(HostDiscoveredModuleError::Evaluation(_))
+    ));
+    assert!(discovered_parent_batch(&tracker, &registry_key)
+        .is_some_and(|batch| batch.events().is_empty()));
+
+    tracker.batches.lock().unwrap().clear();
+    let builtin_version = observed_discovered_key("bazel_tools", "1");
+    let invalid_builtin = wrong_tx.compute(&builtin_version).await.unwrap();
+    let invalid_builtin = complete_observed_discovered(&invalid_builtin);
+    assert!(matches!(
+        invalid_builtin.result().as_ref(),
+        Err(HostDiscoveredModuleError::InvalidBuiltinVersion { .. })
+    ));
+    assert!(discovered_parent_batch(&tracker, &builtin_version).is_none());
+}
+#[tokio::test]
+async fn observed_discovered_error_batches_match_legacy_families() {
+    let wrong_url = "https://wrong.invalid/modules/dep/1/MODULE.bazel";
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, Arc::new(ModuleSourceRegistryIo::new([(
+        wrong_url,
+        ModuleSourceRegistryResponse::Found(Arc::from(b"module(name='wrong',version='1')\n".as_slice())),
+    )])));
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let transaction = host_nonregistry_transaction(
+        &dice, Some(b"module(name='wrong')\n"), None, &[], &[], 859, None,
+        Some(tracker.dupe()), None, true,
+    ).await;
+    let mut transaction = complete_preflight_transaction(transaction, false).await;
+    tracker.rows.lock().unwrap().clear(); tracker.batches.lock().unwrap().clear();
+    let observed_key = observed_discovered_key("dep", "");
+    let observed_value = transaction.compute(&observed_key).await.unwrap();
+    let observed = complete_observed_discovered(&observed_value);
+    let observed_events = discovered_eventful(&tracker);
+    assert!(observed_events.last().unwrap().1.events().is_empty());
+    tracker.rows.lock().unwrap().clear(); tracker.batches.lock().unwrap().clear();
+    let legacy_key = HostDiscoveredModuleKey::try_new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(), NonrootModuleKey::new("dep", ""),
+    ).unwrap();
+    let SourcePreparationOutcome::Complete(legacy) = transaction.compute(&legacy_key).await.unwrap()
+    else { panic!("legacy nonregistry error") };
+    assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    let legacy_events = discovered_eventful(&tracker);
+    assert_eq!(discovered_event_values(&observed_events), discovered_event_values(&legacy_events));
+    assert_eq!(legacy_events.last().unwrap().0, legacy_key.to_string());
+
+    let root = "module(name='root')\nbazel_dep(name='dep',version='1')\n";
+    let mut transaction = module_source_registry_transaction(
+        &dice, tracker.dupe(), root, &["https://wrong.invalid"], 860,
+        PathObservationEpoch::empty(),
+    ).await;
+    tracker.rows.lock().unwrap().clear(); tracker.batches.lock().unwrap().clear();
+    let observed_key = observed_discovered_key("dep", "1");
+    let observed_value = transaction.compute(&observed_key).await.unwrap();
+    let observed = complete_observed_discovered(&observed_value);
+    let observed_events = discovered_eventful(&tracker);
+    assert!(observed_events.last().unwrap().1.events().is_empty());
+    tracker.rows.lock().unwrap().clear(); tracker.batches.lock().unwrap().clear();
+    let legacy_key = HostDiscoveredModuleKey::try_new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(), NonrootModuleKey::new("dep", "1"),
+    ).unwrap();
+    let SourcePreparationOutcome::Complete(legacy) = transaction.compute(&legacy_key).await.unwrap()
+    else { panic!("legacy registry error") };
+    assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    let legacy_events = discovered_eventful(&tracker);
+    assert_eq!(discovered_event_values(&observed_events), discovered_event_values(&legacy_events));
+    assert_eq!(legacy_events.last().unwrap().0, legacy_key.to_string());
+}
+
+#[tokio::test]
+async fn observed_discovered_reachable_branch_terminals_are_exact() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+
+    let builtin_effective =
+        HostEffectiveModuleOverrideObservationKey::new(workspace.dupe(), "bazel_tools".into());
+    let override_root =
+        "module(name='root')\nlocal_path_override(module_name='bazel_tools',path='tools')\n";
+    let mut transaction = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        override_root,
+        &[],
+        861,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let key = observed_discovered_key("bazel_tools", "");
+    let value = transaction.compute(&key).await.unwrap();
+    let observed = complete_observed_discovered(&value);
+    assert!(matches!(
+        observed.result().as_ref(),
+        Err(HostDiscoveredModuleError::ExplicitBuiltinOverride)
+    ));
+    let SourcePreparationOutcome::Complete(Ok(effective)) =
+        transaction.compute(&builtin_effective).await.unwrap()
+    else {
+        panic!("builtin effective carrier")
+    };
+    assert_exact_epoch(effective.observations(), observed.observations());
+    assert_eq!(
+        tracker.rows.lock().unwrap().iter()
+            .find(|(owner, _)| owner == &key.to_string()).unwrap().1,
+        vec![builtin_effective.to_string()]
+    );
+    assert!(discovered_parent_batch(&tracker, &key).is_none());
+
+    let root = "module(name='root')\n";
+    let mut transaction = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://unused.invalid"],
+        862,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let key = observed_discovered_key("dep", "");
+    let value = transaction.compute(&key).await.unwrap();
+    let observed = complete_observed_discovered(&value);
+    assert!(matches!(
+        observed.result().as_ref(),
+        Err(HostDiscoveredModuleError::MissingVersion { module_name })
+            if module_name == "dep"
+    ));
+    let effective_key =
+        HostEffectiveModuleOverrideObservationKey::new(workspace.dupe(), "dep".into());
+    let SourcePreparationOutcome::Complete(Ok(effective)) =
+        transaction.compute(&effective_key).await.unwrap()
+    else {
+        panic!("missing-version effective carrier")
+    };
+    assert_exact_epoch(effective.observations(), observed.observations());
+    assert_eq!(
+        tracker.rows.lock().unwrap().iter()
+            .find(|(owner, _)| owner == &key.to_string()).unwrap().1,
+        vec![effective_key.to_string()]
+    );
+    assert!(discovered_parent_batch(&tracker, &key).is_none());
+
+    for (source, fragments, variant, cycle) in [
+        (
+            &b"module(name='dep')\ninclude('bad')\n"[..],
+            Vec::new(),
+            863,
+            false,
+        ),
+        (
+            &b"module(name='dep')\ninclude('//pkg:a.MODULE.bazel')\n"[..],
+            vec![(
+                "pkg/a.MODULE.bazel",
+                Some(&b"include('//pkg:a.MODULE.bazel')\n"[..]),
+            )],
+            864,
+            true,
+        ),
+    ] {
+        let transaction = host_nonregistry_transaction(
+            &dice,
+            Some(source),
+            None,
+            &fragments,
+            &[],
+            variant,
+            None,
+            Some(tracker.dupe()),
+            None,
+            true,
+        )
+        .await;
+        let mut transaction = complete_preflight_transaction(transaction, false).await;
+        tracker.rows.lock().unwrap().clear();
+        tracker.batches.lock().unwrap().clear();
+        let key = observed_discovered_key("dep", "");
+        let value = transaction.compute(&key).await.unwrap();
+        let observed = complete_observed_discovered(&value);
+        assert!(matches!(
+            (cycle, observed.result().as_ref()),
+            (false, Err(HostDiscoveredModuleError::NonRegistryClosure(_)))
+                | (true, Err(HostDiscoveredModuleError::NonRegistryCycle { .. }))
+        ));
+        let closure_key = HostNonregistryModuleClosureObservationKey(
+            HostNonregistryModuleClosureKey::new(
+                workspace.dupe(),
+                NonrootModuleKey::new("dep", ""),
+            ),
+        );
+        let SourcePreparationOutcome::Complete(Ok(effective)) =
+            transaction.compute(&effective_key).await.unwrap()
+        else {
+            panic!("nonregistry effective carrier")
+        };
+        let SourcePreparationOutcome::Complete(Ok(closure)) =
+            transaction.compute(&closure_key).await.unwrap()
+        else {
+            panic!("nonregistry closure carrier")
+        };
+        let expected =
+            merge_path_observations(effective.observations(), closure.observations()).unwrap();
+        assert_exact_epoch(&expected, observed.observations());
+        assert_eq!(
+            tracker.rows.lock().unwrap().iter()
+                .find(|(owner, _)| owner == &key.to_string()).unwrap().1,
+            vec![effective_key.to_string(), closure_key.to_string()]
+        );
+        assert!(discovered_parent_batch(&tracker, &key).is_none());
+    }
+}
+
+
+#[tokio::test]
+async fn observed_discovered_nonregistry_prefix_need_and_restoration_are_exact() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let key = observed_discovered_key("dep", "");
+    let source_a = b"module(name='dep')\nprint('a')\n";
+    let source_b = b"module(name='dep')\nprint('b')\n";
+    let mut values = Vec::new();
+    for (source, variant) in [
+        (source_a.as_slice(), 811),
+        (source_b.as_slice(), 812),
+        (source_a.as_slice(), 811),
+    ] {
+        let transaction = host_nonregistry_transaction(
+            &dice,
+            Some(source),
+            None,
+            &[],
+            &[],
+            variant,
+            None,
+            Some(tracker.dupe()),
+            None,
+            true,
+        )
+        .await;
+        let mut transaction = complete_preflight_transaction(transaction, false).await;
+        tracker.rows.lock().unwrap().clear();
+        tracker.batches.lock().unwrap().clear();
+        let value = transaction.compute(&key).await.unwrap();
+        let observed = complete_observed_discovered(&value);
+        let effective_key = HostEffectiveModuleOverrideObservationKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            "dep".into(),
+        );
+        let closure_key = HostNonregistryModuleClosureObservationKey(HostNonregistryModuleClosureKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            NonrootModuleKey::new("dep", ""),
+        ));
+        let SourcePreparationOutcome::Complete(Ok(effective)) =
+            transaction.compute(&effective_key).await.unwrap()
+        else {
+            panic!("effective carrier")
+        };
+        let SourcePreparationOutcome::Complete(Ok(closure)) =
+            transaction.compute(&closure_key).await.unwrap()
+        else {
+            panic!("closure carrier")
+        };
+        assert_exact_epoch(
+            &merge_path_observations(effective.observations(), closure.observations()).unwrap(),
+            observed.observations(),
+        );
+        let row = tracker
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(owner, _)| owner == &key.to_string())
+            .unwrap()
+            .1
+            .clone();
+        assert_eq!(
+            row,
+            vec![effective_key.to_string(), closure_key.to_string()]
+        );
+        let expected = if source == source_a { "a" } else { "b" };
+        assert!(matches!(
+            discovered_parent_batch(&tracker, &key).unwrap().events(),
+            [EvaluationEvent::StarlarkPrint { text, .. }] if text == expected
+        ));
+        if values.is_empty() {
+            let observed_eventful = discovered_eventful(&tracker);
+            assert_eq!(observed_eventful.last().unwrap().0, key.to_string());
+            tracker.rows.lock().unwrap().clear();
+            tracker.batches.lock().unwrap().clear();
+            let legacy_key = HostDiscoveredModuleKey::try_new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                NonrootModuleKey::new("dep", ""),
+            )
+            .unwrap();
+            let legacy = transaction.compute(&legacy_key).await.unwrap();
+            let SourcePreparationOutcome::Complete(legacy) = legacy else {
+                panic!("legacy nonregistry discovery")
+            };
+            assert_eq!(legacy.as_ref(), observed.result().as_ref());
+            let legacy_eventful = discovered_eventful(&tracker);
+            assert_eq!(legacy_eventful.last().unwrap().0, legacy_key.to_string());
+            assert_eq!(discovered_event_values(&observed_eventful), discovered_event_values(&legacy_eventful));
+            assert_eq!(
+                tracker
+                    .rows
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .find(|(owner, _)| owner == &legacy_key.to_string())
+                    .unwrap()
+                    .1,
+                vec![
+                    HostEffectiveModuleOverrideKey::new(
+                        NormalizedAbsolutePath::new("/workspace").unwrap(),
+                        "dep".into(),
+                    )
+                    .to_string(),
+                    HostNonregistryModuleClosureKey::new(
+                        NormalizedAbsolutePath::new("/workspace").unwrap(),
+                        NonrootModuleKey::new("dep", ""),
+                    )
+                    .to_string(),
+                ]
+            );
+        }
+        values.push(value);
+    }
+    assert!(!HostDiscoveredModuleObservationKey::equality(
+        &values[0], &values[1]
+    ));
+    assert!(HostDiscoveredModuleObservationKey::equality(
+        &values[0], &values[2]
+    ));
+    let held = complete_observed_discovered(&values[0]);
+    let restored = complete_observed_discovered(&values[2]);
+    assert_eq!(held.observations(), restored.observations());
+    assert!(matches!(
+        held.result().as_ref(),
+        Ok(HostDiscoveredModule { .. })
+    ));
+
+    let need_root = b"module(name='dep')\ninclude('//pkg:a.MODULE.bazel')\n";
+    let transaction = host_nonregistry_transaction(
+        &dice,
+        Some(need_root),
+        None,
+        &[],
+        &["pkg/a.MODULE.bazel"],
+        813,
+        None,
+        Some(tracker.dupe()),
+        None,
+        true,
+    )
+    .await;
+    let mut transaction = complete_preflight_transaction(transaction, false).await;
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let need = transaction.compute(&key).await.unwrap();
+    assert!(!HostDiscoveredModuleObservationKey::validity(&need));
+    assert!(!HostDiscoveredModuleObservationKey::equality(&need, &need));
+    assert!(discovered_parent_batch(&tracker, &key).is_none());
+    for forbidden in [
+        "host-selected-module-graph:",
+        "host-selected-repo",
+        "host-selected-extension",
+    ] {
+        assert!(tracker.rows.lock().unwrap().iter().all(|(owner, dependencies)| {
+            !owner.starts_with(forbidden)
+                && dependencies
+                    .iter()
+                    .all(|dependency| !dependency.starts_with(forbidden))
+        }));
+    }
+}
+
+#[tokio::test]
+async fn observed_discovered_effective_and_preparation_restore_independently() {
+    let url = "https://lifecycle.invalid/modules/dep/1/MODULE.bazel";
+    let source_a: Arc<[u8]> = Arc::from(
+        b"module(name='dep',version='1')\nbazel_dep(name='a',version='1')\nprint('a')\n"
+            .as_slice(),
+    );
+    let source_b: Arc<[u8]> = Arc::from(
+        b"module(name='dep',version='1')\nbazel_dep(name='b',version='1')\nprint('b')\n"
+            .as_slice(),
+    );
+    let io = Arc::new(ModuleSourceRegistryIo::new([(
+        url,
+        ModuleSourceRegistryResponse::Found(source_a.dupe()),
+    )]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io.dupe());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let key = observed_discovered_key("dep", "1");
+    let roots = [
+        "module(name='root')\nbazel_dep(name='dep',version='1')\n",
+        "module(name='root')\nbazel_dep(name='dep',version='1+changed')\n",
+        "module(name='root')\nbazel_dep(name='dep',version='1')\n",
+    ];
+    let mut effective_values = Vec::new();
+    for root in roots {
+        let mut transaction = module_source_registry_transaction(
+            &dice,
+            tracker.dupe(),
+            root,
+            &["https://lifecycle.invalid"],
+            831,
+            PathObservationEpoch::empty(),
+        )
+        .await;
+        effective_values.push(transaction.compute(&key).await.unwrap());
+    }
+    assert!(!HostDiscoveredModuleObservationKey::equality(
+        &effective_values[0],
+        &effective_values[1],
+    ));
+    assert!(HostDiscoveredModuleObservationKey::equality(
+        &effective_values[0],
+        &effective_values[2],
+    ));
+    let held_effective = complete_observed_discovered(&effective_values[0]);
+    let restored_effective = complete_observed_discovered(&effective_values[2]);
+    assert_eq!(held_effective, restored_effective);
+    assert_eq!(held_effective.observations(), restored_effective.observations());
+    assert!(matches!(
+        held_effective.result().as_ref(),
+        Ok(HostDiscoveredModule { .. })
+    ));
+    assert!(!held_effective.observations().observations().is_empty());
+
+    let root = roots[0];
+    let mut preparation_values = Vec::new();
+    for (slot, source) in [source_a.dupe(), source_b, source_a].into_iter().enumerate() {
+        io.responses.lock().unwrap().insert(
+            url.to_owned(),
+            ModuleSourceRegistryResponse::Found(source),
+        );
+        let mut transaction = module_source_registry_transaction(
+            &dice,
+            tracker.dupe(),
+            root,
+            &["https://lifecycle.invalid"],
+            840 + u64::try_from(slot).unwrap(),
+            PathObservationEpoch::empty(),
+        )
+        .await;
+        preparation_values.push(transaction.compute(&key).await.unwrap());
+    }
+    assert!(!HostDiscoveredModuleObservationKey::equality(
+        &preparation_values[0],
+        &preparation_values[1],
+    ));
+    assert!(HostDiscoveredModuleObservationKey::equality(
+        &preparation_values[0],
+        &preparation_values[2],
+    ));
+    let held_preparation = complete_observed_discovered(&preparation_values[0]);
+    let changed_preparation = complete_observed_discovered(&preparation_values[1]);
+    assert_ne!(held_preparation.result(), changed_preparation.result());
+    assert_eq!(
+        held_preparation.observations(), changed_preparation.observations()
+    );
+    let restored = complete_observed_discovered(&preparation_values[2]);
+    assert_eq!(held_preparation.result(), restored.result());
+    assert_eq!(held_preparation.observations(), restored.observations());
+}
+
+#[tokio::test]
+async fn observed_discovered_lockfile_preparation_epoch_restores_independently() {
+    let url = "https://lock.invalid/modules/dep/1/MODULE.bazel";
+    let io = Arc::new(ModuleSourceRegistryIo::new([(
+        url,
+        ModuleSourceRegistryResponse::Found(Arc::from(
+            b"module(name='dep',version='1')\nprint('same')\n".as_slice(),
+        )),
+    )]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let root = "module(name='root')\nbazel_dep(name='dep',version='1')\n";
+    let key = observed_discovered_key("dep", "1");
+    let lockfile = br#"{"lockFileVersion":28}"#;
+    let mut values = Vec::new();
+    for (generation, mode, bytes) in [
+        (871, crate::LockfileMode::Update, None),
+        (872, crate::LockfileMode::Error, None),
+        (873, crate::LockfileMode::Update, None),
+        (874, crate::LockfileMode::Update, Some(lockfile.as_slice())),
+        (875, crate::LockfileMode::Update, None),
+    ] {
+        let transaction = module_source_registry_transaction(
+            &dice,
+            Arc::new(NonregistryPreflightTracker::default()),
+            root,
+            &["https://lock.invalid"],
+            generation,
+            PathObservationEpoch::empty(),
+        )
+        .await;
+        let mut transaction = module_source_lockfile_transaction(transaction, mode, bytes).await;
+        values.push(transaction.compute(&key).await.unwrap());
+    }
+    assert!(!HostDiscoveredModuleObservationKey::equality(
+        &values[0], &values[1]
+    ));
+    assert!(HostDiscoveredModuleObservationKey::equality(
+        &values[0], &values[2]
+    ));
+    assert!(!HostDiscoveredModuleObservationKey::equality(
+        &values[2], &values[3]
+    ));
+    assert!(HostDiscoveredModuleObservationKey::equality(
+        &values[2], &values[4]
+    ));
+    let held = complete_observed_discovered(&values[0]);
+    let restored = complete_observed_discovered(&values[4]);
+    assert_eq!(held.result(), restored.result());
+    assert_eq!(held.observations(), restored.observations());
+}
+
+
+#[tokio::test]
+async fn observed_discovered_poll_drop_publishes_nothing_and_recovers_same_dice() {
+    let io = Arc::new(CancelOnceRegistryIo {
+        calls: AtomicUsize::new(0),
+        bytes: Arc::from(
+            b"module(name='dep',version='1')\nprint('recovered')\n".as_slice(),
+        ),
+    });
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io.dupe());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = "module(name='root')\nbazel_dep(name='dep',version='1')\n";
+    let mut cancelled = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://cancel.invalid"],
+        851,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let key = observed_discovered_key("dep", "1");
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        while io.calls.load(Ordering::SeqCst) == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    drop(future);
+    drop(cancelled);
+    assert!(tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|(owner, _)| owner != &key.to_string()));
+    assert!(discovered_parent_batch(&tracker, &key).is_none());
+
+    let mut recovered = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://cancel.invalid"],
+        851,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let recovered = recovered.compute(&key).await.unwrap();
+    assert!(matches!(
+        complete_observed_discovered(&recovered).result().as_ref(),
+        Ok(HostDiscoveredModule { .. })
+    ));
+    assert_eq!(io.calls.load(Ordering::SeqCst), 2);
+    assert!(matches!(
+        discovered_parent_batch(&tracker, &key).unwrap().events(),
+        [EvaluationEvent::StarlarkPrint { text, .. }] if text == "recovered"
+    ));
+    for forbidden in [
+        "host-selected-module-graph:",
+        "host-selected-repo",
+        "host-selected-extension",
+    ] {
+        assert!(tracker.rows.lock().unwrap().iter().all(|(owner, dependencies)| {
+            !owner.starts_with(forbidden)
+                && dependencies
+                    .iter()
+                    .all(|dependency| !dependency.starts_with(forbidden))
+        }));
+    }
+}
