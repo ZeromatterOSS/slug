@@ -44,6 +44,8 @@ use slug_bzlmod_v2::HostSelectedExtensionEvaluationInput;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequests;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsError;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsKey;
+use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsObservationError;
+use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsObservationKey;
 use slug_bzlmod_v2::LogicalSpan;
 use slug_bzlmod_v2::RepositoryPackageSource;
 use slug_bzlmod_v2::RepositoryPackageSourceError;
@@ -3041,10 +3043,304 @@ type HostPreparedModuleExtensionInputsOutcome = SourcePreparationOutcome<
     Arc<Result<HostPreparedModuleExtensionInputs, HostPreparedModuleExtensionInputsError>>,
 >;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)] // Private observed sibling; a later packet owns consumer activation.
+struct HostPreparedModuleExtensionInputsObservationKey(HostPreparedModuleExtensionInputsKey);
+
+#[allow(dead_code)]
+impl HostPreparedModuleExtensionInputsObservationKey {
+    fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self(HostPreparedModuleExtensionInputsKey::new(workspace))
+    }
+}
+
+impl fmt::Display for HostPreparedModuleExtensionInputsObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+#[allow(dead_code)] // Retained only by the callerless observed sibling.
+struct ObservedHostPreparedModuleExtensionInputs {
+    result: PreparedModuleExtensionInputsResult,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)]
+impl ObservedHostPreparedModuleExtensionInputs {
+    fn result(&self) -> &PreparedModuleExtensionInputsResult {
+        &self.result
+    }
+
+    fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+enum PreparedModuleExtensionInputsObservationError {
+    Raw(HostSelectedExtensionEvaluationInputRequestsObservationError),
+    Definitions {
+        raw: Arc<HostSelectedExtensionEvaluationInputRequests>,
+        error: LoadedModuleExtensionDefinitionsObservationError,
+    },
+    Merge {
+        raw: Arc<HostSelectedExtensionEvaluationInputRequests>,
+        error: ObservedPathFrontierError,
+    },
+}
+
+type PreparedModuleExtensionInputsResult =
+    Arc<Result<HostPreparedModuleExtensionInputs, HostPreparedModuleExtensionInputsError>>;
+type PreparedModuleExtensionInputsDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (PreparedModuleExtensionInputsResult, PathObservationEpoch),
+        PreparedModuleExtensionInputsObservationError,
+    >,
+>;
+type PreparedChildOutcome<T, E, O> =
+    SourcePreparationOutcome<Result<(Arc<Result<T, E>>, PathObservationEpoch), O>>;
+
+#[derive(Clone, Copy)]
+enum PreparedModuleExtensionInputsMode {
+    Legacy,
+    Observed,
+}
+
 fn prepared_module_extension_inputs_complete(
     value: Result<HostPreparedModuleExtensionInputs, HostPreparedModuleExtensionInputsError>,
-) -> HostPreparedModuleExtensionInputsOutcome {
-    SourcePreparationOutcome::Complete(Arc::new(value))
+    observations: PathObservationEpoch,
+) -> PreparedModuleExtensionInputsDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(value), observations)))
+}
+
+fn finish_prepared_module_extension_raw(
+    child: PreparedChildOutcome<
+        HostSelectedExtensionEvaluationInputRequests,
+        HostSelectedExtensionEvaluationInputRequestsError,
+        HostSelectedExtensionEvaluationInputRequestsObservationError,
+    >,
+) -> Result<
+    (
+        Arc<HostSelectedExtensionEvaluationInputRequests>,
+        PathObservationEpoch,
+    ),
+    PreparedModuleExtensionInputsDriverOutcome,
+> {
+    let (result, observations) = match child {
+        SourcePreparationOutcome::Need(need) => {
+            return Err(SourcePreparationOutcome::Need(need));
+        }
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            return Err(SourcePreparationOutcome::Complete(Err(
+                PreparedModuleExtensionInputsObservationError::Raw(error),
+            )));
+        }
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+    };
+    match result.as_ref() {
+        Ok(raw) => Ok((Arc::new(raw.clone()), observations)),
+        Err(error) => Err(prepared_module_extension_inputs_complete(
+            Err(HostPreparedModuleExtensionInputsError::Raw(error.clone())),
+            observations,
+        )),
+    }
+}
+
+async fn prepared_module_extension_raw(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    mode: PreparedModuleExtensionInputsMode,
+) -> Result<
+    (
+        Arc<HostSelectedExtensionEvaluationInputRequests>,
+        PathObservationEpoch,
+    ),
+    PreparedModuleExtensionInputsDriverOutcome,
+> {
+    let child = match mode {
+        PreparedModuleExtensionInputsMode::Legacy => match ctx
+            .compute(&HostSelectedExtensionEvaluationInputRequestsKey::new(
+                workspace.dupe(),
+            ))
+            .await
+        {
+            Err(error) => {
+                return Err(prepared_module_extension_inputs_complete(
+                    Err(HostPreparedModuleExtensionInputsError::RawCompute(
+                        error.to_string().into(),
+                    )),
+                    PathObservationEpoch::empty(),
+                ));
+            }
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(result)) => {
+                SourcePreparationOutcome::Complete(Ok((result, PathObservationEpoch::empty())))
+            }
+        },
+        PreparedModuleExtensionInputsMode::Observed => match ctx
+            .compute(
+                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace.dupe()),
+            )
+            .await
+        {
+            Err(error) => {
+                return Err(prepared_module_extension_inputs_complete(
+                    Err(HostPreparedModuleExtensionInputsError::RawCompute(
+                        error.to_string().into(),
+                    )),
+                    PathObservationEpoch::empty(),
+                ));
+            }
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                SourcePreparationOutcome::Complete(Ok((
+                    observed.result().dupe(),
+                    observed.observations().dupe(),
+                )))
+            }
+        },
+    };
+    finish_prepared_module_extension_raw(child)
+}
+
+fn finish_prepared_module_extension_definitions(
+    raw: &Arc<HostSelectedExtensionEvaluationInputRequests>,
+    observations: PathObservationEpoch,
+    child: PreparedChildOutcome<
+        HostLoadedModuleExtensionDefinitions,
+        HostLoadedModuleExtensionDefinitionsError,
+        LoadedModuleExtensionDefinitionsObservationError,
+    >,
+) -> Result<
+    (
+        Arc<HostLoadedModuleExtensionDefinitions>,
+        PathObservationEpoch,
+    ),
+    PreparedModuleExtensionInputsDriverOutcome,
+> {
+    let (result, incoming) = match child {
+        SourcePreparationOutcome::Need(need) => {
+            return Err(SourcePreparationOutcome::Need(need));
+        }
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            return Err(SourcePreparationOutcome::Complete(Err(
+                PreparedModuleExtensionInputsObservationError::Definitions {
+                    raw: raw.dupe(),
+                    error,
+                },
+            )));
+        }
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+    };
+    let merged = union_host_observations(&observations, &incoming).map_err(|error| {
+        SourcePreparationOutcome::Complete(Err(
+            PreparedModuleExtensionInputsObservationError::Merge {
+                raw: raw.dupe(),
+                error,
+            },
+        ))
+    })?;
+    match result.as_ref() {
+        Ok(definitions) => Ok((Arc::new(definitions.clone()), merged)),
+        Err(error) => Err(prepared_module_extension_inputs_complete(
+            Err(HostPreparedModuleExtensionInputsError::Definitions {
+                raw: raw.dupe(),
+                error: Ok(error.clone()),
+            }),
+            merged,
+        )),
+    }
+}
+
+async fn prepared_module_extension_definitions(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    raw: &Arc<HostSelectedExtensionEvaluationInputRequests>,
+    observations: PathObservationEpoch,
+    mode: PreparedModuleExtensionInputsMode,
+) -> Result<
+    (
+        Arc<HostLoadedModuleExtensionDefinitions>,
+        PathObservationEpoch,
+    ),
+    PreparedModuleExtensionInputsDriverOutcome,
+> {
+    let child = match mode {
+        PreparedModuleExtensionInputsMode::Legacy => match ctx
+            .compute(&HostLoadedModuleExtensionDefinitionsKey::new(
+                workspace.dupe(),
+            ))
+            .await
+        {
+            Err(error) => {
+                return Err(prepared_module_extension_inputs_complete(
+                    Err(HostPreparedModuleExtensionInputsError::Definitions {
+                        raw: raw.dupe(),
+                        error: Err(error.to_string().into()),
+                    }),
+                    observations,
+                ));
+            }
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(result)) => {
+                SourcePreparationOutcome::Complete(Ok((result, PathObservationEpoch::empty())))
+            }
+        },
+        PreparedModuleExtensionInputsMode::Observed => match ctx
+            .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
+                workspace.dupe(),
+            ))
+            .await
+        {
+            Err(error) => {
+                return Err(prepared_module_extension_inputs_complete(
+                    Err(HostPreparedModuleExtensionInputsError::Definitions {
+                        raw: raw.dupe(),
+                        error: Err(error.to_string().into()),
+                    }),
+                    observations,
+                ));
+            }
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                SourcePreparationOutcome::Complete(Ok((
+                    observed.result().dupe(),
+                    observed.observations().dupe(),
+                )))
+            }
+        },
+    };
+    finish_prepared_module_extension_definitions(raw, observations, child)
+}
+
+async fn drive_prepared_module_extension_inputs(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostPreparedModuleExtensionInputsKey,
+    mode: PreparedModuleExtensionInputsMode,
+) -> PreparedModuleExtensionInputsDriverOutcome {
+    let (raw, observations) = match prepared_module_extension_raw(ctx, &key.workspace, mode).await {
+        Ok(value) => value,
+        Err(terminal) => return terminal,
+    };
+    let (definitions, observations) =
+        match prepared_module_extension_definitions(ctx, &key.workspace, &raw, observations, mode)
+            .await
+        {
+            Ok(value) => value,
+            Err(terminal) => return terminal,
+        };
+    prepared_module_extension_inputs_complete(
+        prepare_module_extension_inputs(raw, definitions),
+        observations,
+    )
 }
 
 #[async_trait]
@@ -3052,59 +3348,61 @@ impl Key for HostPreparedModuleExtensionInputsKey {
     type Value = HostPreparedModuleExtensionInputsOutcome;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let raw = match ctx
-            .compute(&HostSelectedExtensionEvaluationInputRequestsKey::new(
-                self.workspace.dupe(),
-            ))
-            .await
+        match drive_prepared_module_extension_inputs(
+            ctx,
+            self,
+            PreparedModuleExtensionInputsMode::Legacy,
+        )
+        .await
         {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                debug_assert!(observations.observations().is_empty());
+                SourcePreparationOutcome::Complete(result)
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(value) => Arc::new(value.clone()),
-                Err(error) => {
-                    return prepared_module_extension_inputs_complete(Err(
-                        HostPreparedModuleExtensionInputsError::Raw(error.clone()),
-                    ));
-                }
-            },
-            Err(error) => {
-                return prepared_module_extension_inputs_complete(Err(
-                    HostPreparedModuleExtensionInputsError::RawCompute(error.to_string().into()),
-                ));
+            SourcePreparationOutcome::Complete(Err(_)) => {
+                unreachable!("legacy prepared module extension inputs have no observed frontier")
             }
-        };
-        let definitions = match ctx
-            .compute(&HostLoadedModuleExtensionDefinitionsKey::new(
-                self.workspace.dupe(),
-            ))
-            .await
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostPreparedModuleExtensionInputsObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostPreparedModuleExtensionInputs,
+            PreparedModuleExtensionInputsObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match drive_prepared_module_extension_inputs(
+            ctx,
+            &self.0,
+            PreparedModuleExtensionInputsMode::Observed,
+        )
+        .await
         {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(value) => Arc::new(value.clone()),
-                Err(error) => {
-                    return prepared_module_extension_inputs_complete(Err(
-                        HostPreparedModuleExtensionInputsError::Definitions {
-                            raw,
-                            error: Ok(error.clone()),
-                        },
-                    ));
-                }
-            },
-            Err(error) => {
-                return prepared_module_extension_inputs_complete(Err(
-                    HostPreparedModuleExtensionInputsError::Definitions {
-                        raw,
-                        error: Err(error.to_string().into()),
-                    },
-                ));
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostPreparedModuleExtensionInputs {
+                    result,
+                    observations,
+                }))
             }
-        };
-        prepared_module_extension_inputs_complete(prepare_module_extension_inputs(raw, definitions))
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -6453,6 +6751,528 @@ mod module_extension_definition_loading_tests {
                     })
                 )
         ));
+    }
+
+    #[tokio::test]
+    async fn observed_prepared_identity_and_finisher_algebra() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostPreparedModuleExtensionInputsObservationKey::new(workspace.dupe());
+        let other = HostPreparedModuleExtensionInputsObservationKey::new(
+            NormalizedAbsolutePath::new("/other").unwrap(),
+        );
+        let mut left_hash = DefaultHasher::new();
+        let mut right_hash = DefaultHasher::new();
+        key.hash(&mut left_hash);
+        other.hash(&mut right_hash);
+        assert_eq!(
+            key.to_string(),
+            "observed-host-prepared-module-extension-inputs:\"/extension-definition-loading\""
+        );
+        assert_ne!(key, other);
+        assert_ne!(left_hash.finish(), right_hash.finish());
+
+        let module = prepared_module(Some("A"));
+        let extension = prepared_source("default");
+        let mut transaction = case_transaction(&dice, &module, &extension, "", true, None).await;
+        let raw_child = transaction
+            .compute(
+                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace.dupe()),
+            )
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(raw_child)) = raw_child else {
+            panic!("raw observation must complete")
+        };
+        let raw = Arc::new(raw_child.result().as_ref().as_ref().unwrap().clone());
+        let definitions_child = transaction
+            .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
+                workspace.dupe(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(definitions_child)) = definitions_child else {
+            panic!("definition observation must complete")
+        };
+        let definition_result = definitions_child.result().dupe();
+
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/observed-prepared").unwrap(),
+            PathObservationOperation::Lstat,
+        );
+        let first = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let current = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+        let duplicate = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+        let (_, merged) = finish_prepared_module_extension_definitions(
+            &raw,
+            current.dupe(),
+            SourcePreparationOutcome::Complete(Ok((definition_result.dupe(), duplicate))),
+        )
+        .unwrap();
+        assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first));
+
+        let conflicting = PathObservationEpoch::from_shared([(
+            demand.dupe(),
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                PathLstat::new(PathNodeKind::RegularFile, 1, 1, 1, 1, 0o644),
+            ))),
+        )])
+        .unwrap();
+        let merge = finish_prepared_module_extension_definitions(
+            &raw,
+            current.dupe(),
+            SourcePreparationOutcome::Complete(Ok((definition_result.dupe(), conflicting.dupe()))),
+        )
+        .unwrap_err();
+        let outer: <HostPreparedModuleExtensionInputsObservationKey as Key>::Value = match &merge {
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error.dupe()))
+            }
+            _ => panic!("prepared merge must be a typed outer"),
+        };
+        assert!(HostPreparedModuleExtensionInputsObservationKey::validity(
+            &outer
+        ));
+        assert!(HostPreparedModuleExtensionInputsObservationKey::equality(
+            &outer, &outer
+        ));
+        assert!(matches!(merge, SourcePreparationOutcome::Complete(Err(
+            PreparedModuleExtensionInputsObservationError::Merge { raw: actual, .. }
+        )) if Arc::ptr_eq(&actual, &raw)));
+
+        let definitions = definition_result.as_ref().as_ref().unwrap();
+        let request = definitions.definitions[0].request.clone();
+        let requests = definitions.requests.dupe();
+        let conflict = union_host_observations(&current, &conflicting).unwrap_err();
+        let operation =
+            ObservedPathFrontierError::from(PathObservationEpochError::OperationMismatch {
+                demand,
+                result_operation: PathObservationOperation::FileBytes,
+            });
+        for error in [conflict, operation] {
+            let outer = finish_prepared_module_extension_definitions(
+                &raw,
+                current.dupe(),
+                SourcePreparationOutcome::Complete(Err(
+                    LoadedModuleExtensionDefinitionsObservationError::Request {
+                        requests: requests.dupe(),
+                        request: request.clone(),
+                        stage: LoadedModuleExtensionDefinitionsObservationStage::Bzl,
+                        error,
+                    },
+                )),
+            )
+            .unwrap_err();
+            assert!(matches!(outer, SourcePreparationOutcome::Complete(Err(
+                PreparedModuleExtensionInputsObservationError::Definitions {
+                    raw: actual,
+                    error: LoadedModuleExtensionDefinitionsObservationError::Request {
+                        stage: LoadedModuleExtensionDefinitionsObservationStage::Bzl,
+                        ..
+                    },
+                }
+            )) if Arc::ptr_eq(&actual, &raw)));
+        }
+
+        let parent = transaction.compute(&key).await.unwrap();
+        assert!(HostPreparedModuleExtensionInputsObservationKey::validity(
+            &parent
+        ));
+        assert!(HostPreparedModuleExtensionInputsObservationKey::equality(
+            &parent, &parent
+        ));
+        let SourcePreparationOutcome::Complete(Ok(parent)) = &parent else {
+            panic!("prepared observation must complete")
+        };
+        assert!(parent.result().as_ref().is_ok());
+        assert!(!parent.observations().observations().is_empty());
+        for (case_module, case_extension, expected) in [
+            ("module(".to_owned(), extension.clone(), "raw"),
+            (module.clone(), "ext=1\n".to_owned(), "definitions"),
+            (
+                module.clone(),
+                "def implementation(ctx):\n    pass\next=module_extension(implementation=implementation)\n".to_owned(),
+                "local",
+            ),
+        ] {
+            let case_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let legacy = compute_prepared_case(
+                &case_dice,
+                &case_module,
+                &case_extension,
+                None,
+            )
+            .await;
+            let mut observed_tx =
+                case_transaction(&case_dice, &case_module, &case_extension, "", true, None).await;
+            let observed = observed_tx.compute(&key).await.unwrap();
+            let SourcePreparationOutcome::Complete(legacy) = legacy else {
+                panic!("{expected} legacy result must complete")
+            };
+            let SourcePreparationOutcome::Complete(Ok(observed)) = observed else {
+                panic!("{expected} observed result must retain a carrier")
+            };
+            assert_eq!(legacy.as_ref(), observed.result().as_ref());
+            assert!(match (expected, observed.result().as_ref()) {
+                ("raw", Err(HostPreparedModuleExtensionInputsError::Raw(_))) => true,
+                ("definitions", Err(HostPreparedModuleExtensionInputsError::Definitions { .. })) => true,
+                ("local", Err(HostPreparedModuleExtensionInputsError::AfterInputs { .. })) => true,
+                _ => false,
+            });
+        }
+        let source = include_str!("bzl_module.rs");
+        assert!(source.contains("PreparedModuleExtensionInputsObservationError::Raw(error)"));
+        assert!(source.contains("PreparedModuleExtensionInputsObservationError::Definitions"));
+    }
+
+    #[tokio::test]
+    async fn observed_prepared_real_order_terminals_events_and_parity() {
+        let module = prepared_module(Some("A"));
+        let extension = prepared_source("default");
+        let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let legacy = compute_prepared_case(&legacy_dice, &module, &extension, None).await;
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(BzlEventTracker::default());
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostPreparedModuleExtensionInputsObservationKey::new(workspace.dupe());
+        let mut transaction =
+            case_transaction(&dice, &module, &extension, "", true, Some(tracker.clone())).await;
+        let observed = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(legacy) = legacy else {
+            panic!("legacy prepared inputs must complete")
+        };
+        let SourcePreparationOutcome::Complete(Ok(observed_value)) = &observed else {
+            panic!("observed prepared inputs must complete")
+        };
+        assert_eq!(legacy.as_ref(), observed_value.result().as_ref());
+        let raw = transaction
+            .compute(
+                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace.dupe()),
+            )
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(raw)) = raw else {
+            panic!("raw carrier must complete")
+        };
+        let definitions = transaction
+            .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
+                workspace.dupe(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(definitions)) = definitions else {
+            panic!("definitions carrier must complete")
+        };
+        for epoch in [raw.observations(), definitions.observations()] {
+            for (demand, result) in epoch.observations() {
+                assert_eq!(
+                    observed_value.observations().get(demand).unwrap().as_ref(),
+                    result.as_ref()
+                );
+            }
+        }
+        let (rows, dependencies) = tracker.take_rows();
+        let parent = dependencies
+            .iter()
+            .find(|row| row.key == key.to_string())
+            .unwrap();
+        assert_eq!(
+            parent.dependencies,
+            [
+                HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace.dupe())
+                    .to_string(),
+                HostLoadedModuleExtensionDefinitionsObservationKey::new(workspace.dupe())
+                    .to_string(),
+            ]
+        );
+        assert!(rows.iter().any(|row| {
+            row.key == key.to_string()
+                && row.kind == ActivationKind::Evaluated
+                && row.batch.is_none()
+        }));
+        let batches = rows
+            .iter()
+            .filter(|row| row.batch.is_some())
+            .collect::<Vec<_>>();
+        assert!(
+            matches!(batches.as_slice(), [root, repo, bzl]
+            if root.key.starts_with("bzlmod-observed-host-root-module-file:")
+                && repo.key.starts_with("bzlmod-observed-host-repo-file:")
+                && [root, repo].iter().all(|row|
+                    row.kind == ActivationKind::Evaluated
+                        && matches!(row.batch.as_ref().map(EventBatch::events), Some([])))
+                && bzl.key.ends_with("//:ext.bzl")
+                && bzl.kind == ActivationKind::Evaluated
+                && matches!(bzl.batch.as_ref().map(EventBatch::events),
+                    Some([slug_events_v2::EvaluationEvent::StarlarkPrint { text, .. }])
+                        if text == "extension")),
+            "{batches:?}"
+        );
+
+        tracker.take();
+        tracker.take_rows();
+        let mut warm_tx =
+            case_transaction(&dice, &module, &extension, "", true, Some(tracker.clone())).await;
+        let warm = warm_tx.compute(&key).await.unwrap();
+        assert!(HostPreparedModuleExtensionInputsObservationKey::equality(
+            &observed, &warm
+        ));
+        assert!(tracker.take().is_empty());
+        let (warm_rows, _) = tracker.take_rows();
+        let warm_parent = warm_rows
+            .iter()
+            .filter(|row| row.key == key.to_string())
+            .collect::<Vec<_>>();
+        assert!(matches!(warm_parent.as_slice(), [row]
+            if row.kind == ActivationKind::Reused && row.batch.is_none()));
+        assert!(warm_rows.iter().all(|row| row.batch.is_none()));
+
+        let mut changed_tx = case_transaction(
+            &dice,
+            &prepared_module(Some("B")),
+            &extension,
+            "",
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        let changed = changed_tx.compute(&key).await.unwrap();
+        assert!(!HostPreparedModuleExtensionInputsObservationKey::equality(
+            &observed, &changed
+        ));
+        let changed_raw = changed_tx
+            .compute(
+                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace.dupe()),
+            )
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(changed_raw)) = changed_raw else {
+            panic!("changed raw child must complete")
+        };
+        assert_ne!(raw.result(), changed_raw.result());
+        let (changed_rows, _) = tracker.take_rows();
+        let reused = changed_rows
+            .iter()
+            .filter(|row| row.key.starts_with("observed-host-bzl-module:"))
+            .collect::<Vec<_>>();
+        assert!(matches!(reused.as_slice(), [row]
+            if row.key.ends_with("//:ext.bzl")
+                && row.kind == ActivationKind::Reused
+                && row.batch.is_none()));
+
+        tracker.take();
+        tracker.take_rows();
+        let mut raw_error_tx = case_transaction(
+            &dice,
+            "module(",
+            &extension,
+            "",
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        let raw_error = raw_error_tx.compute(&key).await.unwrap();
+        assert!(
+            matches!(raw_error, SourcePreparationOutcome::Complete(Ok(value))
+            if matches!(value.result().as_ref(), Err(HostPreparedModuleExtensionInputsError::Raw(_))))
+        );
+        assert!(tracker.take().is_empty());
+        let (_, raw_dependencies) = tracker.take_rows();
+        let parent = raw_dependencies
+            .iter()
+            .find(|row| row.key == key.to_string())
+            .unwrap();
+        assert_eq!(parent.dependencies.len(), 1);
+
+        let need_module = "module(name='bazel_tools')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n";
+        let need_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut need_tx =
+            case_transaction(&need_dice, need_module, &extension, "", true, None).await;
+        let need = need_tx.compute(&key).await.unwrap();
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostPreparedModuleExtensionInputsObservationKey::validity(
+            &need
+        ));
+        assert!(!HostPreparedModuleExtensionInputsObservationKey::equality(
+            &need, &need
+        ));
+    }
+
+    #[tokio::test]
+    async fn observed_prepared_lifecycle_cancellation_and_nonactivation() {
+        macro_rules! carrier {
+            ($value:expr) => {
+                match $value {
+                    SourcePreparationOutcome::Complete(Ok(value)) => value,
+                    value => panic!("expected observation carrier: {value:?}"),
+                }
+            };
+        }
+        macro_rules! snapshot {
+            ($transaction:ident, $workspace:ident, $key:ident) => {{
+                let global = $transaction
+                    .compute(&PathObservationEpochKey)
+                    .await
+                    .unwrap();
+                let parent = carrier!($transaction.compute(&$key).await.unwrap());
+                let raw = carrier!(
+                    $transaction
+                        .compute(
+                            &HostSelectedExtensionEvaluationInputRequestsObservationKey::new(
+                                $workspace.dupe(),
+                            ),
+                        )
+                        .await
+                        .unwrap()
+                );
+                let definitions = carrier!(
+                    $transaction
+                        .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
+                            $workspace.dupe()
+                        ),)
+                        .await
+                        .unwrap()
+                );
+                for epoch in [
+                    parent.observations(),
+                    raw.observations(),
+                    definitions.observations(),
+                ] {
+                    for (demand, result) in epoch.observations() {
+                        assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref());
+                    }
+                }
+                (parent.dupe(), raw.dupe(), definitions.dupe())
+            }};
+        }
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(BzlEventTracker::default());
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostPreparedModuleExtensionInputsObservationKey::new(workspace.dupe());
+        let root_a = prepared_module(None);
+        let root_b = root_a.replace("//:item", "//:changed");
+        let ext_a = prepared_source("default-a");
+        let ext_b = prepared_source("default-b");
+
+        let mut first_tx =
+            case_transaction(&dice, &root_a, &ext_a, "", true, Some(tracker.clone())).await;
+        let first = snapshot!(first_tx, workspace, key);
+        let retained = first.clone();
+
+        let mut raw_b_tx =
+            case_transaction(&dice, &root_b, &ext_a, "", true, Some(tracker.clone())).await;
+        let raw_b = snapshot!(raw_b_tx, workspace, key);
+        assert_ne!(first.0.result(), raw_b.0.result());
+        assert_ne!(first.1.result(), raw_b.1.result());
+        assert_ne!(first.2.result(), raw_b.2.result());
+
+        let mut raw_a_tx =
+            case_transaction(&dice, &root_a, &ext_a, "", true, Some(tracker.clone())).await;
+        let raw_a = snapshot!(raw_a_tx, workspace, key);
+        assert_eq!(first.0.result(), raw_a.0.result());
+        assert_eq!(first.1.result(), raw_a.1.result());
+        assert_eq!(first.2.result(), raw_a.2.result());
+
+        let mut definitions_b_tx =
+            case_transaction(&dice, &root_a, &ext_b, "", true, Some(tracker.clone())).await;
+        let definitions_b = snapshot!(definitions_b_tx, workspace, key);
+        assert_ne!(first.0.result(), definitions_b.0.result());
+        assert_eq!(first.1.result(), definitions_b.1.result());
+        assert_ne!(first.2.result(), definitions_b.2.result());
+
+        let mut definitions_a_tx =
+            case_transaction(&dice, &root_a, &ext_a, "", true, Some(tracker.clone())).await;
+        let definitions_a = snapshot!(definitions_a_tx, workspace, key);
+        assert_eq!(first.0.result(), definitions_a.0.result());
+        assert_eq!(first.1.result(), definitions_a.1.result());
+        assert_eq!(first.2.result(), definitions_a.2.result());
+        assert!(Arc::ptr_eq(first.0.result(), retained.0.result()));
+        assert!(Arc::ptr_eq(first.1.result(), retained.1.result()));
+        assert!(Arc::ptr_eq(first.2.result(), retained.2.result()));
+        assert_eq!(first.0.observations(), retained.0.observations());
+        assert_eq!(first.1.observations(), retained.1.observations());
+        assert_eq!(first.2.observations(), retained.2.observations());
+
+        let (rows, dependencies) = tracker.take_rows();
+        for active in rows
+            .iter()
+            .map(|row| row.key.as_str())
+            .chain(dependencies.iter().flat_map(|row| {
+                std::iter::once(row.key.as_str()).chain(row.dependencies.iter().map(String::as_str))
+            }))
+        {
+            assert!(
+                ![
+                    "host-selected-extension-evaluation-input-requests:",
+                    "host-loaded-module-extension-definitions:",
+                    "host-prepared-module-extension-inputs:",
+                    "host-pure-module-extension-invocations:",
+                    "host-instantiated-module-extension-repositories:",
+                    "host-validated-module-extension-repositories:",
+                    "host-root-repository-mapping:",
+                    "host-canonical-selected-module-definition:",
+                    "host-generated-repository-definition:",
+                    "slug-command:",
+                ]
+                .iter()
+                .any(|prefix| active.starts_with(prefix)),
+                "unexpected activation: {active}"
+            );
+        }
+
+        tracker.take();
+        tracker.take_rows();
+        let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut cancelled = case_transaction(
+            &cancel_dice,
+            &root_a,
+            &ext_a,
+            "",
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        assert!(tracker.take().is_empty());
+        let (cancelled_rows, cancelled_dependencies) = tracker.take_rows();
+        assert!(cancelled_rows.is_empty() && cancelled_dependencies.is_empty());
+        let mut recovered_tx = case_transaction(
+            &cancel_dice,
+            &root_a,
+            &ext_a,
+            "",
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        let recovered = snapshot!(recovered_tx, workspace, key);
+        assert_eq!(first.0.result(), recovered.0.result());
+        assert_eq!(first.1.result(), recovered.1.result());
+        assert_eq!(first.2.result(), recovered.2.result());
+        let source = include_str!("bzl_module.rs");
+        let start = source
+            .find("type HostPreparedModuleExtensionInputsOutcome")
+            .unwrap();
+        let end = source.find("type ExternalBzlModuleCarrier").unwrap();
+        let slice = &source[start..end];
+        for upper in [
+            "HostPureModuleExtensionInvocationsKey",
+            "HostInstantiatedModuleExtensionRepositoriesKey",
+            "HostValidatedModuleExtensionRepositoriesKey",
+            "HostRootRepositoryMappingKey",
+            "HostCanonicalSelectedModuleDefinitionKey",
+            "HostGeneratedRepositoryDefinitionKey",
+            "slug-command:",
+        ] {
+            assert!(!slice.contains(upper), "unexpected upper owner: {upper}");
+        }
     }
 
     #[tokio::test]
