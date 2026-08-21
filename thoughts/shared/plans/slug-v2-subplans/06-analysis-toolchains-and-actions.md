@@ -12402,6 +12402,111 @@ fixture/oracle, cap waiver, upper activation, milestone closure, M8/M7B or
 identity-byte work. REPLAN before widening. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Canonical selected-definition observation-owner design accepted (2026-08-21)
+
+Audit `1f93f448` over Rust base `7f9325e1` accepts one private one-file owner.
+Add `HostCanonicalSelectedModuleDefinitionObservationKey` as a newtype over
+the legacy workspace/canonical key,
+`ObservedHostCanonicalSelectedModuleDefinition` retaining exactly the
+concrete selected Result Arc plus `PathObservationEpoch`, and
+`HostCanonicalSelectedModuleDefinitionObservationError::Routes` over the
+private observed-routes outer. All are private. The key and carrier have private
+`new` and borrowed concrete `result()`/`observations()` accessors. Add no
+export, adapter or caller.
+
+Preserve the legacy key's Debug/Clone/PartialEq/Eq/Hash/Allocative derives on
+the observed key. Carrier and outer use
+Debug/Clone/PartialEq/Eq/Allocative/Dupe. The observed Value is
+`SourcePreparationOutcome<Result<carrier, outer>>`; both keys use
+`complete_eq` and Complete-only validity. Display is `observed-{legacy}`;
+`/workspace` plus canonical `dep+` renders
+`observed-host-canonical-selected-module-definition:"/workspace":@@dep+`.
+
+Factor only the existing selected-definition compute into
+`compute_canonical_selected_module_definition`, driven by private
+`CanonicalSelectedModuleDefinitionMode::{Legacy, Observed}`, one selected
+Result alias, one driver-outcome alias and
+`complete_canonical_selected_definition_driver`. Legacy computes only
+`HostSelectedModuleRoutesKey` with empty epoch. Observed computes only
+`HostSelectedModuleRoutesObservationKey` and carries its Result Arc and epoch
+unchanged.
+
+Need returns immediately. DICE child compute failure remains
+`RoutesCompute(message, canonical)` with empty epoch. Observed routes outer
+becomes the carrierless typed Routes outer. Complete semantic routes failure
+remains `Routes(predecessor, canonical)` with child epoch. Successful routes
+run the existing full `find_canonical_route_ordinal` scan exactly once:
+Missing retains predecessor/canonical, Duplicate retains predecessor/canonical/
+first/conflicting ordinals, and Unique either publishes predecessor+ordinal or
+retains them in BuiltinDeferred. Every complete semantic result carries the
+unchanged route epoch. There is one child and no merge/rebuild/union/epoch
+validation.
+
+The owner emits no batch. Require exact dependency rows from the observed
+parent to only observed routes and legacy parent to only legacy routes. For the
+real protected fixture, preserve observed lower batch owners in order:
+`bzlmod-observed-host-root-module-file:"/selected-repo-spec-test"`, then
+`host-discovered-module:"/selected-repo-spec-test":dep@1`; legacy uses
+`root-module-evaluation:/selected-repo-spec-test`, then the same discovered
+module. Their batch payload vectors remain equal. Parent and every warm/Reused
+row are batchless; Need, outer, first terminal and poll-drop publish neither
+carrier nor batch.
+
+DICE retains only the selected Result Arc and epoch. Existing selected values
+already retain exactly routes+ordinal or the existing error fields. Route
+carrier, scan scratch, evaluator, event, mode, cache, task and lock die before
+publication. DICE owns serialization and no manual lock/task crosses compute.
+
+Add exactly
+`observed_canonical_selected_definition_identity_scan_and_terminal_algebra`,
+`observed_canonical_selected_definition_real_order_events_and_parity`, and
+`observed_canonical_selected_definition_lifecycle_cancellation_and_nonactivation`.
+Together prove identity/hash/Display/accessors/equality/validity, one-child/no-
+merge, all stages and exhaustive first/conflicting scan; real root/registry/
+nonregistry/Missing/BuiltinDeferred/Routes legacy parity, family-correct rows,
+exact lower event vectors, batchless/warm behavior and terminal suppression;
+held A-B-A over registry source, selected version, mapping/order and local path,
+metadata-only equal Result/legacy value but different epoch/observed value with
+no observed equality cutoff, each carrier epoch as a subset of its own
+transaction global, Arc identity only for proven Reused, poll-drop recovery
+and zero legacy-selected/root-mapping/selected-extension/canonical/generated/
+root/route/source/public/command/bootstrap activation. Use real tracker types
+where accessible and bounded private-producer/dependency-direction scans for
+inaccessible upper crates; add no malformed hook.
+
+Implementation authority is exactly
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 11,687 physical with
+tests at 4,510. Caps remain <=230 production, <=680 proof, <=910 aggregate
+semantic and <=12,600 physical; at most six production/six test helpers,
+exactly three tests, driver below 120 and every helper/test below 200. The large
+file remains cohesive because it already owns observed routes, selected
+reducer/value/error/view and the real fixture; splitting would expose private
+state only to evade the size trigger.
+
+Reuse Bazel 9.2 `BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
+`BazelDepGraphValue.getRepositoryMapping`, `ModuleKey` canonical naming and
+`BazelDepGraphFunctionTest`. Buck2-derived
+`dice/dice/docs/incrementality.md`, `cancellations.md`,
+`dice_tests/src/linear_recompute.rs` and activation-tracker tests remain
+concept/test evidence only. Add no fixture or oracle.
+
+Validate focused observed-selected, protected pure/real selected and observed-
+routes tests, full bzlmod, direct core check, formatting and diff hygiene
+serially. Selected values/errors/dispositions/full scan/order/views/equality/
+invalidation/lower batches remain exact Bazel 9 compatibility. The private
+Result-Arc/transaction-local epoch is Slug-native. Cross-crate promotion,
+canonical/generated composition, upper activation and exact Bazel identity
+bytes remain unsupported/deferred.
+
+Activate only
+`WP-6-7A-host-canonical-selected-module-definition-observation-implementation`.
+ACCEPT returns to a docs-only selected-carrier visibility audit. STOP a second
+file/key/owner/adapter, export/caller, core edit, canonical/generated compute,
+semantic/order/disposition/event/equality/retention drift, epoch merge, retained
+scratch, task/lock, fixture/oracle, cap/helper/test waiver, upper activation,
+milestone closure, M8/M7B or identity-byte work. REPLAN before widening. M7
+remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`

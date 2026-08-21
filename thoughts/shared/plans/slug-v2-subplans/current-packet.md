@@ -1,130 +1,169 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-canonical-selected-module-definition-observation-owner-design`
+Packet: `WP-6-7A-host-canonical-selected-module-definition-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling and Rust base: canonical selected/generated frontier audit / `7f9325e1`
+Scheduling/design and Rust base: docs-only owner design / `7f9325e1`
 
-## Goal and docs authority
+## Goal and authority
 
-Design exactly one private observation owner for
-`HostCanonicalSelectedModuleDefinitionKey`. Freeze its reuse of the existing
-private selected-routes observation, exact route scan and terminal algebra,
-Result/epoch retention, lifecycle/cancellation proof and upper nonactivation.
-Do not implement Rust or expose the new carrier to `slug_core_v2`.
+Implement only the accepted private observation owner for
+`HostCanonicalSelectedModuleDefinitionKey`. Preserve the legacy selected-
+routes scan, values/errors/dispositions and lower event ownership. Do not expose
+the carrier, edit core, or activate canonical/generated/root/publication.
 
-Docs write authority is exactly the canonical plan, this packet, Stage 6 and
-the orchestration routing log at net caps <=40/<=180/<=220/<=30 and <=470
-aggregate. Every Rust file, test, fixture, oracle, Cargo/BUILD target, API,
-export and caller is read-only.
+Write authority is exactly
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 11,687 physical lines
+with tests at 4,510. Every other Rust file, test, fixture, oracle, Cargo/BUILD
+target, API, export, caller and plan is read-only. Production is <=230 lines,
+proof <=680, aggregate semantic authority <=910 and physical size <=12,600.
+Add at most six production and six test helpers, exactly three tests, one shared
+driver below 120 lines, and keep every changed helper/test below 200. Retain the
+one-file owner: this file already owns the private routes observation/result/
+outer, selected reducer, public value/error/view and real fixture; a sibling
+would expose private state only to evade the size trigger.
 
-## Learned frontier
+## Exact private surface
 
-The accepted `7f9325e1` generated observation key, Result-Arc/epoch carrier and
-opaque validation outer are private in
-`generated_repository_definition.rs`, the same module as the future canonical
-owner. They need no visibility prerequisite.
+Add exactly these private nominal types:
 
-The canonical legacy owner at lines 518-605 computes public
-`HostCanonicalSelectedModuleDefinitionKey` first. Selected success, Need,
-non-Missing terminal and compute failure return without requesting generated.
-Only selected `Missing` is retained and followed by the generated request;
-generated success publishes Generated, generated Missing combines both
-missing certificates, and other generated failures preserve the selected
-Missing. This order and suppression are exact and must remain inactive during
-the present design.
+1. `HostCanonicalSelectedModuleDefinitionObservationKey(
+   HostCanonicalSelectedModuleDefinitionKey)`, with private `new`, identical
+   workspace/canonical identity and Display `observed-{legacy Display}`.
+   For `/workspace` and canonical `dep+`, assert
+   `observed-host-canonical-selected-module-definition:"/workspace":@@dep+`.
+2. `ObservedHostCanonicalSelectedModuleDefinition`, retaining exactly
+   `Arc<Result<HostCanonicalSelectedModuleDefinition,
+   HostCanonicalSelectedModuleDefinitionError>>` and one
+   `PathObservationEpoch`, with private borrowed `result()` and
+   `observations()` accessors.
+3. `HostCanonicalSelectedModuleDefinitionObservationError::Routes(
+   HostSelectedModuleRoutesObservationError)`.
 
-No selected-definition observation exists. The legacy selected key at
-`selected_repo_spec.rs:2324-2449` has exactly one child,
-`HostSelectedModuleRoutesKey`; its private observed sibling, carrier and outer
-already exist in the same file at 1582-2083. Therefore a private selected-
-definition owner is uniquely smaller than canonical ownership or cross-crate
-promotion. After implementation, a separate visibility audit must decide the
-minimal bzlmod -> core surface.
+The key derives Debug/Clone/PartialEq/Eq/Hash/Allocative. Carrier and outer
+derive Debug/Clone/PartialEq/Eq/Allocative/Dupe. Narrow dead-code attributes are
+allowed only where the callerless private surface requires them. Add no alias,
+reexport, adapter or caller beyond private driver aliases.
 
-Canonical definition has exactly two production upper consumers: non-root
-apparent mapping at generated-definition line 799 and root apparent definition
-at its line 310. Root apparent route then source-input/source-path/public
-repository and command/bootstrap form later branches. None is a prerequisite.
+The observed Key Value is
+`SourcePreparationOutcome<Result<
+ObservedHostCanonicalSelectedModuleDefinition,
+HostCanonicalSelectedModuleDefinitionObservationError>>`. Both legacy and
+observed keys use `complete_eq` equality and Complete-only validity.
 
-## Design decisions to freeze
+## Shared driver and terminals
 
-Choose or REPLAN exactly one private Legacy/Observed owner in
-`selected_repo_spec.rs`:
+Add `CanonicalSelectedModuleDefinitionMode::{Legacy, Observed}`, one private
+selected Result alias, one driver-outcome alias,
+`complete_canonical_selected_definition_driver`, and
+`compute_canonical_selected_module_definition`. Refactor the legacy key to
+project this driver; the observed key projects its carrier. No other producer
+or helper owns semantic selection.
 
-- an observed key with the same workspace/canonical identity and
-  `observed-{legacy Display}`;
-- a carrier holding only the exact
-  `Arc<Result<HostCanonicalSelectedModuleDefinition,
-  HostCanonicalSelectedModuleDefinitionError>>` plus one
-  `PathObservationEpoch`; and
-- a typed outer over `HostSelectedModuleRoutesObservationError`.
+Legacy requests only `HostSelectedModuleRoutesKey` and associates an empty
+epoch. Observed requests only `HostSelectedModuleRoutesObservationKey`; a
+successful carrier contributes its Result Arc and epoch unchanged. Exact
+terminal law is:
 
-Freeze one shared driver. Legacy must request only legacy routes and use an
-empty epoch; Observed must request only observed routes and carry its epoch
-unchanged. Specify immediate Need, carrierless observed outer, DICE compute
-failure, semantic Routes failure, full Missing/Unique/Duplicate scan, builtin-
-deferred rejection and exact first/conflicting ordinal behavior. The scan must
-consume every route even after a duplicate is known. One child requires no
-epoch merge, rebuild, union or validation.
+- child Need returns Need immediately, with no parent carrier;
+- DICE child compute failure produces existing
+  `PrivateCanonicalSelectedModuleDefinitionError::RoutesCompute(message,
+  canonical_repo)` with empty epoch;
+- observed route outer produces carrierless
+  `HostCanonicalSelectedModuleDefinitionObservationError::Routes(error)`;
+- complete route semantic failure produces existing `Routes(predecessor,
+  canonical_repo)` with the child epoch;
+- successful routes run `find_canonical_route_ordinal` exactly once across
+  every entry: Missing retains predecessor+canonical; Duplicate retains
+  predecessor+canonical+first/conflicting ordinals; Unique then rejects
+  BuiltinBazelTools as BuiltinDeferred retaining predecessor+ordinal+canonical,
+  otherwise publishes the existing selected value with predecessor+ordinal.
 
-Freeze exact event ownership: the new owner is batchless, preserves every
-accepted lower batch/order, never replays a warm child and publishes no carrier
-or batch for Need, outer or cancellation. Retain only the selected Result Arc
-and child epoch; route carrier, iterator/scan scratch, evaluator, event, mode,
-cache, task and lock die before publication.
+Every complete semantic success/failure carries the unchanged child epoch.
+This one-child owner performs no merge, rebuild, union or epoch validation.
+Legacy projection debug-asserts the epoch is empty and treats an outer as
+unreachable. Observed projection adds no unwrap/inspection path.
 
-Freeze three tests covering:
+## Event, retention and lifecycle proof
 
-1. identity/Display, Need/outer algebra and the complete scan/terminal matrix;
-2. real legacy/observed semantic parity, exact single child rows, lower event
-   parity, batchless/warm behavior and first-terminal suppression; and
-3. held Result/carrier/epoch A-B-A, same-semantic/different-epoch metadata,
-   per-transaction epoch subsets, conditional Reused Arc identity, poll-drop
-   recovery and zero canonical/generated/root/route/source/public/command
-   activation.
+The new owner is batchless. Its observed dependency row is exactly the observed
+routes key and its legacy row exactly the legacy routes key. For the protected
+real fixture, preserve the observed lower batch-owner order
+`bzlmod-observed-host-root-module-file:"/selected-repo-spec-test"`, then
+`host-discovered-module:"/selected-repo-spec-test":dep@1`; preserve legacy
+`root-module-evaluation:/selected-repo-spec-test`, then the same discovered
+module, with identical batch payload vectors. Every parent and warm/Reused row
+is batchless. Need, outer, first terminal and cancellation publish no parent
+carrier/batch, and no lower batch is replayed.
 
-Reuse the accepted selected-routes observation proof and existing
-`pure_canonical_selected_definition_exhausts_and_retains_identity` plus real
-selected-definition lifecycle coverage. Name the applicable Bazel 9.2
-selection/resolution source tests and Buck2 DICE incrementality/cancellation
-concept evidence. Add no oracle absent a demonstrated observable gap.
+DICE retains only the selected Result Arc and route epoch. The Result already
+retains exactly routes+ordinal or the existing error fields. Route carrier,
+iterator/scan counters, evaluator, event, mode, cache, task and lock are
+compute scratch. DICE owns serialization; no lock/task crosses compute.
 
-## Prospective implementation boundary
+Add exactly:
 
-Prospective Rust authority is exactly
-`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 11,687 physical
-lines with tests at 4,510. Cap production at <=230, proof at <=680, aggregate
-semantic authority at <=910 and physical size at <=12,600. Permit at most six
-production and six test helpers, exactly three tests, a shared driver below 120
-lines and every helper/test below 200. The design must either retain this
-one-file authority with a concrete cohesion finding or REPLAN; a sibling file
-cannot expose private routes state merely to avoid the size trigger.
+1. `observed_canonical_selected_definition_identity_scan_and_terminal_algebra`
+   for key/hash/Display/accessors/equality/validity, single-child/no-merge,
+   Need/outer/RoutesCompute/Routes/Missing/Duplicate/BuiltinDeferred stages and
+   the protected exhaustive first/conflicting scan;
+2. `observed_canonical_selected_definition_real_order_events_and_parity` for
+   real root/registry/nonregistry/Missing/BuiltinDeferred/Routes parity, exact
+   family child rows, lower batch owner/payload vectors, parent/warm
+   eventlessness and first-terminal suppression; and
+3. `observed_canonical_selected_definition_lifecycle_cancellation_and_nonactivation`
+   for held Result/carrier/epoch A-B-A across registry source, selected
+   version, route/mapping order and local-path changes; metadata-only revision
+   with equal Result/legacy value, different epoch/observed value and therefore
+   no observed equality cutoff; every carrier epoch a subset of its own
+   transaction `PathObservationEpochKey`; Arc identity only for a proven
+   Reused value; poll-drop absence and recovery; and zero legacy-selected,
+   root-mapping, selected-extension, canonical/generated/root/route/source/
+   public/command/bootstrap activation.
 
-Prospective serial validation is focused `observed_canonical_selected_`,
-protected selected-definition and observed-routes tests, full
-`cargo test -p slug_bzlmod_v2`, direct dependent
-`cargo check -p slug_core_v2`, formatting and `git diff --check`.
+Use real tracker rows where types are available and a bounded private-producer/
+dependency-direction source scan for inaccessible core/command denylist types.
+Do not add malformed production hooks. Reuse
+`pure_canonical_selected_definition_exhausts_and_retains_identity`, real
+selected lifecycle and accepted observed-routes tests.
 
-## Compatibility and terminal
+## Evidence, validation and terminal
 
-Existing selected definition values/errors, route order/scan, public views,
-dispositions, equality/invalidation and lower events are exact Bazel 9
-compatibility. The private observation carrier and transaction-local epoch are
-Slug-native. Cross-crate promotion, canonical/generated observation
-composition, root/route/source/public/command/bootstrap activation and exact
-Bazel configuration/output/ActionKey bytes remain unsupported/deferred.
+Bazel 9.2 `BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
+`BazelDepGraphValue.getRepositoryMapping`, `ModuleKey` canonical-name rules
+and `BazelDepGraphFunctionTest` are accepted exact source/test evidence.
+`dice/dice/docs/incrementality.md`, `cancellations.md`,
+`dice_tests/src/linear_recompute.rs` and
+`dice/src/impls/tests/activation_tracker.rs` are concept/test evidence only.
+No oracle or fixture is needed.
 
-Design ACCEPT may schedule exactly one private implementation, then return only
-to a selected-carrier visibility audit. STOP implementation in this packet,
-second Rust file/key/owner/adapter, public API/export/caller, canonical or
-generated compute, changed selected semantics/order/disposition/event/equality/
-retention, epoch merge, task/lock, fixture/oracle, cap waiver, upper activation,
-milestone closure, M8/M7B or identity-byte work. REPLAN before widening. M7
-remains partial and M7A -> M8 -> M7B remains.
+Run serially:
+
+- `cargo test -p slug_bzlmod_v2 observed_canonical_selected_definition_`;
+- protected `cargo test -p slug_bzlmod_v2 pure_canonical_selected_definition_`;
+- protected `cargo test -p slug_bzlmod_v2 real_canonical_selected_definition_`;
+- protected `cargo test -p slug_bzlmod_v2 observed_routes_`;
+- full `cargo test -p slug_bzlmod_v2`;
+- direct dependent `cargo check -p slug_core_v2`;
+- `cargo fmt --all -- --check`; and
+- `git diff --check`.
+
+Existing selected values/errors, dispositions, full scan/order, views,
+equality/invalidation and lower batches remain exact Bazel 9 compatibility.
+The private Result-Arc/transaction-local epoch carrier is Slug-native.
+Cross-crate promotion, canonical/generated observation composition, root/
+publication/command/bootstrap activation and exact Bazel configuration/output/
+ActionKey bytes remain unsupported/deferred.
+
+ACCEPT returns only to a docs-only selected-carrier visibility audit. STOP a
+second Rust file/key/owner/adapter, export/reexport/caller, core edit, canonical/
+generated compute, selected semantic/order/disposition/event/equality/retention
+drift, epoch merge, retained scratch, task/lock, fixture/oracle, cap/helper/test
+waiver, upper activation, milestone closure, M8/M7B or identity-byte work.
+REPLAN before widening. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Commit `7f9325e1` accepted the private generated-definition observation owner
-at +658/-182 in one file. It deliberately proved zero selected/canonical/root/
-route/source/public activation and returned to this frontier audit.
+Audit `1f93f448` proves the private selected owner is the uniquely smallest
+prerequisite. Rust base `7f9325e1` already supplies the later same-module
+generated observation branch and proves it remains inactive here.
