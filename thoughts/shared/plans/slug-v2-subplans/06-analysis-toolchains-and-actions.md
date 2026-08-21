@@ -11063,6 +11063,41 @@ fixture/oracle work, proof/cap waiver, prepared activation, milestone closure,
 M8/M7B or exact identity work. REPLAN before widening. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Evaluation-input observation carrier promotion accepted; prepared owner design (2026-08-20)
+
+Implementation `50881fc0`, from audit/design bases `d17637fd` and `a6abf250`,
+exposes only the accepted evaluation-input observation key/carrier and one
+opaque typed outer through Bzlmod's doc-hidden API.
+
+Only the key constructor and borrowed carrier Result/epoch accessors are public.
+Exactly three hidden crate-root reexports exist. The key wraps the private outer
+only at `Complete(Err)`; private driver, finishers, stage/kinds, Need/success,
+equality/validity, events, retention and callers remain unchanged. The external
+smoke proves cross-crate construction, exact Display and borrowed accessor/
+opaque-error typing without computing or inspecting values.
+
+Accounting is 30/-13 tracked plus 29 external proof, 59 semantic lines total,
+at 11,687/415/29 physical. Four focused tests, external smoke, the full Bzlmod
+suite, direct loading check, formatting and diff hygiene pass. Independent
+terminal review returned `ACCEPT`.
+
+Activate only
+`WP-6-7A-host-prepared-module-extension-inputs-observation-design`.
+`HostPreparedModuleExtensionInputsKey` is now the smallest complete owner above
+accepted observed evaluation inputs and loaded definitions. Design one private
+matching-family Result-Arc+transaction-local-epoch sibling. Freeze exact child
+order, Complete merge/error/Need algebra, local prepared joins/coercion,
+eventlessness, compact retention, lifecycle/cancellation and upper
+nonactivation. Pure invocations and all later owners remain inactive.
+
+Design write authority is exactly canonical/current/this Stage/routing at net
+caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures, oracles,
+Cargo/BUILD, APIs, exports, callers and other plans are read-only. It may
+authorize at most one implementation successor. STOP a second key/adapter/
+owner, reverse dependency, retained Starlark heap, event movement, pure/upper
+activation, proof waiver, milestone closure, M8/M7B or exact identity work.
+M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`

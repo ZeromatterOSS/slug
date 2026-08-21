@@ -1,113 +1,112 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-extension-evaluation-input-requests-observation-carrier-promotion-implementation`
+Packet: `WP-6-7A-host-prepared-module-extension-inputs-observation-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling/design base: `d17637fd`
-Rust base: `3a68afa5`
+Scheduling and Rust base: `50881fc0`
 
 ## Goal and authority
 
-Implement only the accepted doc-hidden Bzlmod -> loading visibility surface for
-the existing evaluation-input observation key/carrier/opaque outer. Do not add
-a semantic consumer or change the accepted driver, Result/epoch association,
-Need/outer/error algebra, equality, validity, events, retention or lifecycle.
+Design only the private observed sibling for
+`HostPreparedModuleExtensionInputsKey`, now that its two immediate semantic
+children have accepted cross-crate Result/epoch carriers. Do not implement or
+activate the sibling, pure invocations or any upper owner.
+
+Audit Rust and tests read-only. Preserve the existing prepared-input owner and
+trace its exact legacy child order, local join/coercion semantics, errors,
+events, retained value and sole production consumer. Specify one bounded
+matching-family Result-Arc+transaction-local-epoch sibling and its proof; add no
+adapter, umbrella owner or public caller.
 
 Write authority is exactly:
 
-- `app/slug_bzlmod_v2/src/selected_repo_spec.rs`;
-- `app/slug_bzlmod_v2/src/lib.rs`; and
-- new `app/slug_bzlmod_v2/tests/evaluation_input_request_observation_api.rs`.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- this Stage 6 subplan;
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
 
-Every other Rust file, test, fixture, oracle, Cargo/BUILD target, API and plan is
-read-only. Production is <=70 lines, colocated proof <=40, external proof <=60
-and aggregate semantic authority <=170. Physical caps are 11,750 lines for
-`selected_repo_spec.rs`, 425 for `lib.rs` and 60 for the new smoke. Every
-changed helper/test remains below 100 lines.
+Net caps are <=40/<=220/<=180/<=30 respectively and <=470 aggregate. Every
+Rust file, test, fixture, oracle, Cargo/BUILD target, API and other plan is
+read-only. The design may authorize at most one implementation successor.
 
-## Frozen nominal surface
+## Accepted children and owner boundary
 
-Promote exactly these three `#[doc(hidden)]` nominal types from
-`selected_repo_spec.rs`:
+Treat these as accepted and non-writable:
 
-- existing `HostSelectedExtensionEvaluationInputRequestsObservationKey`;
-- existing `ObservedHostSelectedExtensionEvaluationInputRequests`; and
-- new `HostSelectedExtensionEvaluationInputRequestsObservationError`, an
-  opaque public tuple wrapper around private
-  `EvaluationInputRequestsObservationError`.
+- `e82057f2` plus `50881fc0`: selected evaluation-input requests and their
+  doc-hidden observation key/carrier/opaque outer;
+- `3a68afa5`: loaded module-extension definitions observation; and
+- all lower request, root-file and Host-Bzl observation/event owners.
 
-Make only the observation key's `new(NormalizedAbsolutePath) -> Self`
-constructor and the observed carrier's two borrowed accessors public. Spell
-`result()` with the public concrete return type:
-`&Arc<Result<HostSelectedExtensionEvaluationInputRequests,
-HostSelectedExtensionEvaluationInputRequestsError>>`. Keep
-`observations() -> &PathObservationEpoch`. Keep tuple/struct fields, the private
-result alias, observation-stage enum and Requests/RootFiles/Merge error kinds
-private.
+The frontier audit proves `HostPreparedModuleExtensionInputsKey` is the first
+and sole production semantic join of evaluation inputs and loaded definitions.
+It owns request/count/order alignment, tag-schema/class validation,
+repository-aware attribute coercion and prepared tag grouping/order. Its sole
+production consumer is `HostPureModuleExtensionInvocationsKey`.
 
-Add exactly three `#[doc(hidden)]` crate-root reexports with those names. Add no
-fourth type, public alias, field, constructor, error inspector or adapter key.
+Pure invocation remains a later owner: it reacquires and validates the
+implementation, builds evaluation context, runs Starlark, owns print events and
+repository-rule call/result validation. Instantiated/validated repositories,
+root mapping, generated/public publication, commands and bootstrap are later or
+parallel and remain inactive.
 
-## Wrapper and DICE boundary
+## Design questions
 
-Change only the observation key's associated `Key::Value` error from private
-`EvaluationInputRequestsObservationError` to the public opaque wrapper. Wrap
-the private error only in the key's `Complete(Err(...))` projection. Leave the
-private driver/finishers and their typed stage errors unchanged.
+Resolve from the live prepared key/consumer/tests:
 
-There is no current production unwrapping consumer. Same-module proof may keep
-inspecting the private driver/finisher error algebra directly; it must not add a
-public unwrap path. The later loading prepared-input owner will carry the opaque
-child outer without inspecting its internals. Preserve Display/key identity,
-Complete-only equality/validity, carrierless Need/outer, the exact local Result
-Arc and transaction-local epoch, eventlessness, warm/cancel behavior and
-retained lifetime.
+1. Freeze exact child order: observed evaluation-input requests first and
+   observed loaded definitions second. Specify where each Complete epoch merges
+   left-first relative to compute, child semantic and local prepared semantics.
+2. Classify every reachable Need, child outer, child semantic and local
+   prepared terminal. Decide the minimum typed opaque outer stages and exact
+   carrierless/prefixed behavior without exposing Bzlmod or loading internals.
+3. Preserve legacy semantic values/errors/order exactly while sharing one
+   Legacy/Observed driver and moving the exact local Result Arc into the legacy
+   projection.
+4. Prove duplicate-Arc preference, conflict/operation mismatch, exact child
+   family/order, first-terminal suppression, warm/cancel recovery and held
+   semantic A -> B -> A with transaction-local frontier association.
+5. Confirm the prepared parent owns no event batch; accepted child events remain
+   at request/root/Bzl owners and warm reuse does not replay them.
+6. Bound retained lifetime to one local prepared Result Arc plus compact epoch.
+   Child carriers/results, loaded modules, frozen Starlark heap, coercion/join
+   scratch, event data, locks and tasks must remain compute-local.
+7. Define exact all-key/source nonactivation for pure, instantiated, validated,
+   root-mapping, canonical/generated/public and command owners.
+8. Set one-file implementation/proof caps from the live loading source and keep
+   every helper/test below 200. Reuse accepted Bazel 9.2 evidence; add no oracle
+   unless a demonstrated exact-compatibility gap exists.
 
-## External smoke and evidence
+## Compatibility and evidence
 
-The new external-crate smoke imports the three hidden reexports and
-`NormalizedAbsolutePath`, constructs the key for `/workspace`, and asserts the
-exact existing Display:
-`observed-host-selected-extension-evaluation-inputs:"/workspace"`. A typed
-inspection function must accept borrowed carrier/error values and call both
-borrowed carrier accessors from outside the crate.
+Existing prepared-input values/errors/order, schema/class validation, attribute
+coercion and child events remain exact Bazel 9 compatibility. The private
+observed key/carrier/typed outer and transaction-local Result/epoch association
+are Slug-native. Pure/instantiated/validated/root-mapping/generated/public/
+bootstrap activation, M8/M7B and exact identity bytes remain deferred.
 
-The smoke must not construct the carrier or error, compute the key, add a
-semantic caller, inspect the opaque error, name private aliases/stages/kinds or
-depend on mapping/root-file internals. Reuse the accepted evaluation-input
-observation proof; add no oracle because no Bazel-visible behavior changes.
+Read `docs/developers/dice.md` before freezing key ownership, retention or event
+behavior. Reuse accepted lower tests and source evidence; add no docs-only
+oracle or proof code. Run `git diff --check` on the four records before terminal
+review.
 
-Run:
+## Terminal and stops
 
-- `cargo test -p slug_bzlmod_v2 observed_evaluation_inputs_ --lib`;
-- `cargo test -p slug_bzlmod_v2 --test evaluation_input_request_observation_api`;
-- full `cargo test -p slug_bzlmod_v2`;
-- direct dependent `cargo check -p slug_loading_v2`;
-- `cargo fmt --all -- --check`; and
-- `git diff --check`.
+Terminate with exactly one bounded prepared-observation implementation packet
+or formal `REPLAN` if a private Result/epoch sibling cannot preserve the owner
+without widening semantics.
 
-Do not run Cargo commands concurrently in the shared target directory.
-
-## Compatibility and terminal
-
-Existing evaluation-input values/errors/order/root metadata/tags and child
-events remain exact Bazel 9 compatibility. The hidden observation API, opaque
-typed outer and shared-Arc transaction-local epoch association are Slug-native.
-Prepared/pure/instantiated/validated/root-mapping/generated/public/bootstrap
-activation, M8/M7B and exact identity bytes remain deferred.
-
-Implementation ACCEPT returns only to one docs-only prepared-input owner design
-packet. STOP semantic/event/equality/retention change, public field/alias/error
-inspection, a second key/adapter/type, loading/caller change, Cargo/BUILD,
-fixture/oracle work, cap/proof waiver, prepared activation, milestone closure,
-M8/M7B or exact identity work. REPLAN before widening. M7 remains partial and
-M7A -> M8 -> M7B remains.
+STOP Rust/test/API/export/caller implementation, pure/upper activation, a
+second key/adapter/owner, reverse crate dependency, event movement, retained
+Starlark heap, lock across DICE, proof waiver, milestone closure, M8/M7B and
+exact identity-byte work. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Design `d17637fd` proves the existing evaluation-input observation key, carrier
-and private outer are the sole unavailable cross-crate inputs before prepared
-ownership. The accepted definition-request promotion supplies an exact bounded
-precedent: one key constructor, two borrowed carrier accessors, one opaque
-wrapper at `Key::Value`, exactly three reexports and one external compile smoke,
-with no semantic, event, retention or DICE dependency change.
+Implementation `50881fc0`, from audit/design bases `d17637fd` and `a6abf250`,
+exposes only the existing evaluation-input observation key/carrier and one
+opaque outer through three doc-hidden Bzlmod reexports. The private driver and
+typed errors remain unchanged; the key wraps only `Complete(Err)`. Accounting
+is 59 semantic lines at 11,687/415/29 physical. Focused/smoke/full Bzlmod,
+direct loading, formatting and diff gates pass; independent review returned
+`ACCEPT`. No prepared-input caller has been added.
