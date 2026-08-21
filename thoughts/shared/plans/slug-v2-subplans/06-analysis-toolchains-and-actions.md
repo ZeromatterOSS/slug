@@ -12507,6 +12507,52 @@ scratch, task/lock, fixture/oracle, cap/helper/test waiver, upper activation,
 milestone closure, M8/M7B or identity-byte work. REPLAN before widening. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Selected-definition carrier final identity-layout REPLAN (2026-08-21)
+
+The three-file carrier draft is fully formatted and green, but final size audit
+finds the identity/scan/terminal function is exactly 200 physical lines rather
+than below 200. Schedule only
+`WP-6-7A-host-canonical-selected-module-definition-observation-carrier-promotion-identity-test-layout-correction-implementation`.
+
+Freeze the formatted selected/lib/smoke hashes at selected
+`78a202a4a72b5a49cc6b052234ff95f2813dfbd3b1a1634b9a78102dd71185f5`,
+with lib
+`3fdd3d81d94ce7d3618f356114505d7c30515596a3adbe0f14fb7add30c5cea0`
+and smoke
+`c8ee92e0c7ca1aee1dfcb1fa75e07decda0d2bf084e8baffe434a22608bc5e33`.
+Current accounting/physical is selected +61/-20 at 12,565, lib +6 at 421
+and smoke 47.
+
+Temporary-copy preflight deletes only the blank line after the Missing
+assertion and before `let mut duplicate_routes = routes.clone();`; rustfmt
+remains clean. The selected target is
+`70bfee696f637543ca1e830ebb780d961c0bacffc85a1940eb41bd229b5ce31e`
+at +61/-21 and 12,564. The identity function changes from 200 lines/hash
+`3e4fc30b33b2d125bca9cd448915defe3e1fb17b64da4cc716269ac329b3a18d`
+to 199 lines/hash
+`ab3ad14719d015c5744a4c1a29aa39fb9d6f4a8793859435691247aeb4ff6901`.
+
+Production stays +24/-14, proof becomes +37/-7 and aggregate becomes
++114/-21. Original semantic/physical/proof/helper caps remain unchanged and
+green. There is no test-size or formatter waiver.
+
+Authorize only deletion of that blank separator. Lib/smoke, all production and
+carrier API/types/projection, Error/Key/Observed export membership/order/
+adjacency, external smoke, every identity token/assertion and the corrected
+lifecycle/tracker/nonactivation/cancellation proof are frozen.
+
+Validation requires frozen input hashes, exact one-line deletion, formatting,
+target hashes/accounting/physical/allowlist, focused owner, new/protected
+smokes, full Bzlmod, direct core check and diff hygiene, serially. Compatibility
+classes are unchanged.
+
+STOP any other byte/file change, hash/accounting/physical/fmt mismatch,
+semantic/API/type/reexport/assertion/lifecycle drift, loading/core edit,
+Cargo/BUILD, fixture/oracle, cap/proof/test-size/fmt waiver, upper activation,
+milestone closure, M8/M7B or identity work. REPLAN before widening. ACCEPT
+returns only to canonical selected/generated owner design. M7 remains partial
+and M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier formatter REPLAN (2026-08-21)
 
 The proof-corrected semantic draft is retained, but
