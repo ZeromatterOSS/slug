@@ -10936,6 +10936,73 @@ Cargo/BUILD, APIs, exports, callers and other plans are read-only. STOP
 implementation, event/retention movement, milestone closure, M8/M7B or exact
 identity work. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Prepared/evaluation frontier selects evaluation-input carrier promotion (2026-08-20)
+
+The read-only
+`WP-6-7A-extension-definition-evaluation-observation-frontier-audit-resume`
+selects one uniquely smaller visibility prerequisite before prepared-input
+ownership. `HostPreparedModuleExtensionInputsKey` is the first and only
+production semantic consumer of both legacy
+`HostSelectedExtensionEvaluationInputRequestsKey` and
+`HostLoadedModuleExtensionDefinitionsKey`. It is therefore the smallest
+complete semantic join, but loading cannot yet construct or inspect the
+accepted evaluation-input observation sibling: its key, carrier and typed outer
+remain private to `slug_bzlmod_v2`. The loaded-definition observation sibling
+is already private in the same `bzl_module.rs` module as prepared inputs, so it
+needs no promotion.
+
+The consumer chain is strictly serial above that join: pure invocations are the
+sole production consumer of prepared inputs, instantiation is the sole
+production consumer of pure receipts, validation is the sole production
+consumer of instantiation, and generated repository definition is the sole
+non-test consumer of validated specs. Root repository mapping instead consumes
+selected extension mappings directly; canonical selected definitions are the
+parallel first branch of canonical repository publication. Generated/public/
+command/bootstrap work is therefore strictly later or parallel, not a
+prerequisite.
+
+Prepared inputs alone own raw/definition request-count and order joins,
+definition tag-schema validation, tag-class lookup, repository-aware attribute
+coercion, and prepared tag grouping/order. Pure invocations separately own
+unsupported evaluation factors, implementation reacquisition/drift checks,
+`module_ctx`, Starlark execution and print batches, repository-rule call
+capture, and the required `None` result. Do not combine these owners.
+
+Activate only
+`WP-6-7A-host-selected-extension-evaluation-input-requests-observation-carrier-promotion-design`.
+Design the minimum doc-hidden Bzlmod -> loading surface: make the existing
+evaluation-input observation key/carrier usable cross-crate, preserve its exact
+Result Arc and transaction-local epoch access, and add one opaque public outer
+wrapper without exposing request/root-file/merge internals. Preserve the
+existing key identity, equality/validity, Need/outer behavior, eventlessness,
+retention and lifecycle proof exactly; add no adapter key or semantic owner.
+
+The later prepared-input design must consume observed evaluation inputs first,
+then observed loaded definitions, merging each Complete epoch left-first before
+child semantics and the existing join/coercion semantics. Need and typed child
+outer remain carrierless; compute/semantic terminals retain only the completed
+prefix permitted by their existing semantic context. The prepared parent owns
+no event batch and retains only its local semantic Result Arc plus compact
+cumulative epoch; child carriers and join/coercion/event scratch stay
+compute-local.
+
+Exact compatibility remains prepared values/errors/order/tag coercion and
+child event behavior. The hidden carrier/API, typed outer and shared-Arc epoch
+association are Slug-native. Pure/instantiated/validated/root-mapping/
+generated/public/bootstrap activation, M8/M7B and exact identity bytes remain
+deferred.
+
+The promotion design is docs-only. Write authority is exactly canonical/
+current/this Stage/routing at net caps <=40/<=220/<=180/<=30 and <=470
+aggregate. Rust, tests, fixtures, oracles, Cargo/BUILD, APIs, exports and
+callers remain read-only. It may authorize at most one bounded visibility-only
+implementation successor. STOP prepared-input design/implementation, a second
+key/adapter/owner, mapping/root-file internal exposure, reverse crate
+dependency, event or retention movement, upper activation, proof waiver,
+milestone closure, M8/M7B and exact identity work. REPLAN only if the opaque
+carrier requires a new semantic owner or unbounded transitive API. M7 remains
+partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
