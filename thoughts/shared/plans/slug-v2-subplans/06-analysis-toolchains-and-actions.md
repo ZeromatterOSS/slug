@@ -12322,6 +12322,86 @@ order/event/equality/retention drift, epoch merge, task/lock, fixture/oracle,
 cap/helper/test waiver, milestone closure, M8/M7B or identity-byte work. REPLAN
 before widening. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Canonical selected/generated frontier selects selected-definition observation (2026-08-21)
+
+Accepted implementation `7f9325e1` completes the private generated-definition
+observation owner at +658/-182 in one core file. The generated observed key,
+Result-Arc/epoch carrier and opaque validation outer are private in
+`generated_repository_definition.rs`, beside their future canonical consumer;
+no visibility prerequisite remains on that branch.
+
+Live canonical composition at lines 518-605 is exact and asymmetric. It
+computes `HostCanonicalSelectedModuleDefinitionKey` first. Selected success,
+Need, non-Missing semantic failure and DICE compute failure return immediately
+without generated activation. Only selected Missing continues to generated.
+Generated success publishes Generated; generated Missing combines both retained
+missing certificates; other generated semantic/compute failures retain selected
+Missing in the canonical error. This canonical owner remains inactive.
+
+The selected branch is not observation-ready. The public legacy selected-
+definition key at `selected_repo_spec.rs:2324-2449` has no observation sibling.
+It computes exactly one private `HostSelectedModuleRoutesKey`. The accepted
+private routes observation key, carrier and typed outer already occupy the same
+file at 1582-2083, so a private selected-definition owner requires no visibility
+or earlier semantic prerequisite. Combining it with cross-crate promotion or
+canonical composition would widen ownership.
+
+Canonical definition has two production upper consumers: non-root apparent
+mapping at generated-definition line 799 and root apparent definition at line
+310 of its module. Root apparent route, source-input/source-path, public
+repository and command/bootstrap are later. Source and command scans contain no
+direct selected/generated key consumer. They cannot be prerequisites.
+
+Activate only
+`WP-6-7A-host-canonical-selected-module-definition-observation-owner-design`.
+Freeze one private Legacy/Observed owner in `selected_repo_spec.rs`: observed
+key with unchanged workspace/canonical identity and prefixed Display, exact
+selected Result Arc plus one epoch carrier, and typed routes-observation outer.
+Legacy requests only legacy routes with empty epoch; Observed requests only
+observed routes and carries its epoch unchanged. Freeze immediate Need,
+carrierless outer, Routes/RoutesCompute staging, full Missing/Unique/Duplicate
+scan and first/conflicting ordinals, BuiltinDeferred rejection, and exact
+success/error retention. The scan consumes every route; a one-child owner adds
+no merge/rebuild/union/validation.
+
+The selected-definition owner is batchless. Preserve all accepted child event
+order, warm nonreplay and cancellation behavior. Retain only the selected
+Result Arc and epoch; route carrier, scan scratch, evaluator, mode, event,
+cache, task and lock do not escape. Require exactly three future tests for
+identity/terminal/full-scan algebra, real legacy/observed parity/dependency/
+event behavior, and held A-B-A/metadata/cancellation/nonactivation. Reuse
+accepted routes proof and existing pure/real selected-definition tests; name
+applicable Bazel 9.2 selection/resolution sources and Buck2 DICE concept
+evidence, adding no oracle without an observable gap.
+
+Prospective authority is exactly
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 11,687 physical with
+tests at 4,510. Caps are <=230 production, <=680 proof, <=910 aggregate
+semantic and <=12,600 physical; at most six production and six test helpers,
+exactly three tests, shared driver below 120 and every helper/test below 200.
+The design must record a one-file cohesion decision or REPLAN: routes state,
+selected reducer, public value/error/view and real fixture already live
+together, while a sibling would expose private state solely to avoid the size
+trigger.
+
+Prospective validation is focused observed-selected, protected selected/
+observed-routes, full bzlmod, direct core check, formatting and diff hygiene
+serially. Exact compatibility remains selected values/errors, route scan/order,
+views/dispositions, equality/invalidation and lower events. The private
+Result-Arc/transaction-local epoch is Slug-native. Cross-crate promotion,
+canonical/root/route/source/public/command/bootstrap observation and exact Bazel
+identity bytes remain unsupported/deferred.
+
+Docs-only authority is canonical/current/this Stage/routing at net caps
+<=40/<=180/<=220/<=30 and <=470 aggregate. Rust/tests/fixtures/oracles/API are
+read-only. Design ACCEPT may schedule one private implementation, then return
+only to selected-carrier visibility. STOP implementation, second Rust file/key/
+owner/adapter, export/caller, canonical/generated compute, selected semantic/
+order/disposition/event/equality/retention drift, epoch merge, task/lock,
+fixture/oracle, cap waiver, upper activation, milestone closure, M8/M7B or
+identity-byte work. REPLAN before widening. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`

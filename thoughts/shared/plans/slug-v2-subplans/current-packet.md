@@ -1,130 +1,130 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-generated-repository-definition-observation-implementation`
+Packet: `WP-6-7A-host-canonical-selected-module-definition-observation-owner-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling/design and Rust base: docs-only owner design / `8990cf43`
+Scheduling and Rust base: canonical selected/generated frontier audit / `7f9325e1`
 
-## Goal and authority
+## Goal and docs authority
 
-Implement only the accepted private observation owner for
-`HostGeneratedRepositoryDefinitionKey`. Reuse the accepted observed validation
-child and preserve the legacy certificate scan, value/error algebra and lower
-event ownership. Do not activate the later canonical-selected, canonical
-definition, root-mapping, publication, command or bootstrap graph.
+Design exactly one private observation owner for
+`HostCanonicalSelectedModuleDefinitionKey`. Freeze its reuse of the existing
+private selected-routes observation, exact route scan and terminal algebra,
+Result/epoch retention, lifecycle/cancellation proof and upper nonactivation.
+Do not implement Rust or expose the new carrier to `slug_core_v2`.
 
-Write authority is exactly
-`app/slug_core_v2/src/runtime/generated_repository_definition.rs`, baseline
-2,426 physical lines with tests at 777. Every other Rust file, test, fixture,
-oracle, Cargo/BUILD target, API, caller and plan is read-only. Production is
-<=210 lines, proof is <=680, aggregate semantic authority is <=890 and the
-file remains <=3,320 physical lines. Add at most six production and six test
-helpers, one shared driver below 120 lines, exactly three tests, and keep every
-helper/test below 200 lines. The file remains cohesive: before its test module
-it already owns the generated reducer, sole canonical consumer, result/view,
-errors, tracker plumbing and certificate fixtures; splitting would expose a
-private result/view/error or duplicate that proof plumbing.
+Docs write authority is exactly the canonical plan, this packet, Stage 6 and
+the orchestration routing log at net caps <=40/<=180/<=220/<=30 and <=470
+aggregate. Every Rust file, test, fixture, oracle, Cargo/BUILD target, API,
+export and caller is read-only.
 
-## Frozen owner and driver
+## Learned frontier
 
-Add exactly three private nominal types:
+The accepted `7f9325e1` generated observation key, Result-Arc/epoch carrier and
+opaque validation outer are private in
+`generated_repository_definition.rs`, the same module as the future canonical
+owner. They need no visibility prerequisite.
 
-1. `HostGeneratedRepositoryDefinitionObservationKey`, a newtype over the
-   legacy key with the same workspace/canonical-repository identity,
-   `new(...)`, and Display `observed-{legacy Display}`. For `/workspace` and
-   `CanonicalRepoName::new("generated")`, assert
-   `observed-host-generated-repository-definition:"/workspace":@@generated`.
-2. `ObservedHostGeneratedRepositoryDefinition`, retaining exactly an
-   `Arc<Result<HostGeneratedRepositoryDefinition,
-   HostGeneratedRepositoryDefinitionError>>` and one `PathObservationEpoch`.
-3. `HostGeneratedRepositoryDefinitionObservationError::Validation(
-   HostValidatedModuleExtensionRepositoriesObservationError)`.
+The canonical legacy owner at lines 518-605 computes public
+`HostCanonicalSelectedModuleDefinitionKey` first. Selected success, Need,
+non-Missing terminal and compute failure return without requesting generated.
+Only selected `Missing` is retained and followed by the generated request;
+generated success publishes Generated, generated Missing combines both
+missing certificates, and other generated failures preserve the selected
+Missing. This order and suppression are exact and must remain inactive during
+the present design.
 
-Keep every type, field, constructor and accessor private. Add no alias,
-reexport or caller. Factor the legacy compute into one private Legacy/Observed
-driver. Legacy requests only `HostValidatedModuleExtensionRepositoriesKey` and
-uses an empty epoch. Observed requests only
-`HostValidatedModuleExtensionRepositoriesObservationKey` and carries its
-epoch unchanged; this one-child owner performs no merge, rebuild, union or
-epoch validation.
+No selected-definition observation exists. The legacy selected key at
+`selected_repo_spec.rs:2324-2449` has exactly one child,
+`HostSelectedModuleRoutesKey`; its private observed sibling, carrier and outer
+already exist in the same file at 1582-2083. Therefore a private selected-
+definition owner is uniquely smaller than canonical ownership or cross-crate
+promotion. After implementation, a separate visibility audit must decide the
+minimal bzlmod -> core surface.
 
-For either mode, child `Need` returns `Need` immediately. DICE compute failure
-is the existing semantic `LoadingCompute(message)` with an empty epoch. A
-complete semantic validation failure becomes the existing `Loading(error)` and
-retains the observed child epoch. An observed opaque validation outer becomes
-the carrierless parent `Validation(...)` outer. Child success clones the
-certificate Arc once and runs the exact existing complete flattened scan: keep
-the first matching ordinal, record the first conflicting ordinal, continue
-through all remaining entries, then return `Duplicate`, success, or `Missing`
-in that order. Success retains certificate plus ordinal; Missing/Duplicate
-retain the certificate; Loading retains the validation error; LoadingCompute
-retains only its message.
+Canonical definition has exactly two production upper consumers: non-root
+apparent mapping at generated-definition line 799 and root apparent definition
+at its line 310. Root apparent route then source-input/source-path/public
+repository and command/bootstrap form later branches. None is a prerequisite.
 
-`HostCanonicalSelectedModuleDefinitionKey` is not a child. The later canonical
-owner computes selected first and reaches generated only for selected
-`Missing`; it and every upper key remain inactive here.
+## Design decisions to freeze
 
-## Exact proof
+Choose or REPLAN exactly one private Legacy/Observed owner in
+`selected_repo_spec.rs`:
 
-Add exactly these tests:
+- an observed key with the same workspace/canonical identity and
+  `observed-{legacy Display}`;
+- a carrier holding only the exact
+  `Arc<Result<HostCanonicalSelectedModuleDefinition,
+  HostCanonicalSelectedModuleDefinitionError>>` plus one
+  `PathObservationEpoch`; and
+- a typed outer over `HostSelectedModuleRoutesObservationError`.
 
-1. `observed_generated_definition_identity_scan_and_terminal_algebra`: exact
-   key identity/hash/Display/validity, single-child/no-merge, Need/outer and
-   stage mappings; retain the protected full-scan Missing/Duplicate proof.
-2. `observed_generated_definition_real_order_events_and_parity`: real
-   legacy/observed success, Loading and Missing parity, defensive Duplicate and
-   LoadingCompute source-stage proof, exact tracker edges to only the matching
-   validation child, zero selected activation, lower HostBzl-load then pure-
-   invocation print order, batchless instantiation/validation/generated rows,
-   warm silence and first-terminal suppression.
-3. `observed_generated_definition_lifecycle_cancellation_and_nonactivation`:
-   held A-B-A over definition/order/mapping changes, same-semantic/different-
-   epoch metadata, each recovery carrier epoch a subset of its own transaction
-   global, Arc identity only on exact `Reused`, poll-drop recovery, and an upper
-   denylist covering legacy generated, selected/canonical definition, apparent
-   and root mappings, root apparent definition, route/source, public command
-   and bootstrap keys.
+Freeze one shared driver. Legacy must request only legacy routes and use an
+empty epoch; Observed must request only observed routes and carry its epoch
+unchanged. Specify immediate Need, carrierless observed outer, DICE compute
+failure, semantic Routes failure, full Missing/Unique/Duplicate scan, builtin-
+deferred rejection and exact first/conflicting ordinal behavior. The scan must
+consume every route even after a duplicate is known. One child requires no
+epoch merge, rebuild, union or validation.
 
-Reuse the accepted validation wrapper proof; do not inspect or construct that
-opaque outer. Prove its branch by source scan plus a real dependency row. Need,
-outer and cancellation produce no carrier or print batch. Warm/Reused children
-never replay lower prints. Retain only the generated Result Arc and child
-epoch: no validation carrier, iterator/scan scratch, mode, evaluator, event,
-duplicate certificate, cache, task or lock may escape compute.
+Freeze exact event ownership: the new owner is batchless, preserves every
+accepted lower batch/order, never replays a warm child and publishes no carrier
+or batch for Need, outer or cancellation. Retain only the selected Result Arc
+and child epoch; route carrier, iterator/scan scratch, evaluator, event, mode,
+cache, task and lock die before publication.
 
-Run serially:
+Freeze three tests covering:
 
-- `cargo test -p slug_core_v2 observed_generated_definition_`;
-- protected `cargo test -p slug_core_v2 generated_repository_definition::tests::`;
-- full `cargo test -p slug_core_v2`;
-- protected `cargo test -p slug_loading_v2 --test validated_repository_observation_api`;
-- direct dependent `cargo check -p slug_commands_v2`;
-- `cargo fmt --all -- --check`; and
-- `git diff --check`.
+1. identity/Display, Need/outer algebra and the complete scan/terminal matrix;
+2. real legacy/observed semantic parity, exact single child rows, lower event
+   parity, batchless/warm behavior and first-terminal suppression; and
+3. held Result/carrier/epoch A-B-A, same-semantic/different-epoch metadata,
+   per-transaction epoch subsets, conditional Reused Arc identity, poll-drop
+   recovery and zero canonical/generated/root/route/source/public/command
+   activation.
+
+Reuse the accepted selected-routes observation proof and existing
+`pure_canonical_selected_definition_exhausts_and_retains_identity` plus real
+selected-definition lifecycle coverage. Name the applicable Bazel 9.2
+selection/resolution source tests and Buck2 DICE incrementality/cancellation
+concept evidence. Add no oracle absent a demonstrated observable gap.
+
+## Prospective implementation boundary
+
+Prospective Rust authority is exactly
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 11,687 physical
+lines with tests at 4,510. Cap production at <=230, proof at <=680, aggregate
+semantic authority at <=910 and physical size at <=12,600. Permit at most six
+production and six test helpers, exactly three tests, a shared driver below 120
+lines and every helper/test below 200. The design must either retain this
+one-file authority with a concrete cohesion finding or REPLAN; a sibling file
+cannot expose private routes state merely to avoid the size trigger.
+
+Prospective serial validation is focused `observed_canonical_selected_`,
+protected selected-definition and observed-routes tests, full
+`cargo test -p slug_bzlmod_v2`, direct dependent
+`cargo check -p slug_core_v2`, formatting and `git diff --check`.
 
 ## Compatibility and terminal
 
-Existing generated values/errors, flattened certificate scan/order, ordinal,
-equality, invalidation and lower Bzl/invocation events remain exact Bazel 9
-compatibility. The private observation key/carrier/outer and shared-Arc
-transaction-local epoch association are Slug-native. Canonical/root/publication
-observation, command/bootstrap activation and exact Bazel configuration/output/
-ActionKey bytes remain unsupported/deferred. Existing Bazel 9.2
-`SingleExtensionFunction`, `SingleExtensionEvalFunction` and
-`ModuleExtensionResolutionTest` source evidence plus Buck2 DICE incrementality/
-cancellation concepts suffice; add no oracle.
+Existing selected definition values/errors, route order/scan, public views,
+dispositions, equality/invalidation and lower events are exact Bazel 9
+compatibility. The private observation carrier and transaction-local epoch are
+Slug-native. Cross-crate promotion, canonical/generated observation
+composition, root/route/source/public/command/bootstrap activation and exact
+Bazel configuration/output/ActionKey bytes remain unsupported/deferred.
 
-ACCEPT returns only to a docs-only
-`HostCanonicalRepositoryDefinitionKey` selected/generated frontier audit.
-STOP a second file/key/owner/adapter, export/reexport/caller, selected child,
-canonical/root/route/source/public/command/bootstrap activation, semantic/
-scan/order/event/equality/retention drift, epoch merge, task/lock, fixture/oracle,
-cap/helper/test waiver, milestone closure, M8/M7B or identity-byte work. REPLAN
-before widening. M7 remains partial and M7A -> M8 -> M7B remains.
+Design ACCEPT may schedule exactly one private implementation, then return only
+to a selected-carrier visibility audit. STOP implementation in this packet,
+second Rust file/key/owner/adapter, public API/export/caller, canonical or
+generated compute, changed selected semantics/order/disposition/event/equality/
+retention, epoch merge, task/lock, fixture/oracle, cap waiver, upper activation,
+milestone closure, M8/M7B or identity-byte work. REPLAN before widening. M7
+remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Commit `8990cf43` exposes exactly the observed validation child and opaque outer.
-The live generated owner has one production consumer, the later canonical owner;
-its selected-definition request is an upper missing-only branch, not a generated
-dependency.
+Commit `7f9325e1` accepted the private generated-definition observation owner
+at +658/-182 in one file. It deliberately proved zero selected/canonical/root/
+route/source/public activation and returned to this frontier audit.
