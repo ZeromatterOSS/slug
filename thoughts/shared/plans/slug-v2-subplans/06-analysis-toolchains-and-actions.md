@@ -11693,6 +11693,127 @@ validation/generated/root-mapping/public/bootstrap activation, milestone
 closure, M8/M7B or exact identity work. REPLAN before widening. M7 remains
 partial and M7A -> M8 -> M7B remains.
 
+### Instantiated module-extension repositories observation design (2026-08-21)
+
+Visibility implementation `0dcf2eea` closes the last prerequisite. The live
+one-file design activates only
+`WP-6-7A-host-instantiated-module-extension-repositories-observation-implementation`
+over Rust base `0dcf2eea`. `HostInstantiatedModuleExtensionRepositoriesKey`
+has one production child, the legacy pure key at line 191, and one production
+consumer, validation at
+`module_extension_repository_validation.rs:208`. Validation then feeds the
+public generated-definition key, so it is later rather than an observation
+prerequisite.
+
+Add private `HostInstantiatedModuleExtensionRepositoriesObservationKey` as a
+newtype over the legacy key, private
+`ObservedHostInstantiatedModuleExtensionRepositories` retaining the exact
+local semantic Result Arc plus transaction-local epoch, and private
+`HostInstantiatedModuleExtensionRepositoriesObservationError` with exactly one
+`Pure(HostPureModuleExtensionInvocationsObservationError)` variant. Preserve
+legacy workspace identity, derive sets and `observed-{legacy Display}`. Both
+keys retain Complete-only equality and validity. Keep every field, alias and
+accessor private; add no export or sibling visibility.
+
+Use one Legacy/Observed driver. Legacy computes only
+`HostPureModuleExtensionInvocationsKey`; Observed computes only
+`HostPureModuleExtensionInvocationsObservationKey`. After successful pure
+semantics, both call the existing `instantiate_repositories` exactly once and
+project the same local semantic Result. Do not duplicate, reorder or parallelize the pure-request receipt join,
+generated canonical namespace, base/call/override mapping precedence,
+repository-rule schema lookup, explicit supplied-attribute order, legacy/None
+omission, mandatory/default validation, label resolution/visibility or ordered
+`RepoSpec` construction.
+
+Pure DICE compute failure remains existing semantic `InvocationsCompute` with
+an empty epoch. Pure Need remains immediate Need. An observed pure opaque outer
+becomes the one carrierless Pure outer; do not inspect or rewrap its private
+terminal. A Complete pure carrier is accepted before its semantics: semantic
+failure remains existing `Invocations` and retains the complete child epoch;
+success passes the cloned pure value and the same epoch to local instantiation.
+There is exactly one observed child, so this parent has no merge stage and must
+not rebuild, union or validate the epoch.
+
+Every local count/request Join, Namespace and Attribute terminal retains the
+full pure epoch and preserves the existing `AfterInvocations` predecessor,
+completed-request, current-repository, request and call prefixes. Success
+retains that same epoch. First terminal wins in prepared-input/request/call
+order. No local terminal may become a typed outer, and no existing semantic
+error may become carrierless.
+
+Instantiation stores no evaluation event data. Fresh pure-child load and
+invocation-print batches remain owned and ordered by the pure subtree; the
+instantiation activation row is batchless on success and every semantic
+terminal. Need, opaque outer and cancellation publish no parent carrier or
+batch. Warm parent reuse is silent, and an unchanged pure child reached during
+parent recomputation is Reused without replay. Do not copy child events into a
+new parent batch.
+
+The only new DICE-retained state is the instantiation Result Arc plus its
+transaction-local pure epoch. The Result already owns the predecessor,
+completed/current repository projections and `RepoSpec`s required by existing
+semantics. Repository-rule definitions/calls are those already reachable from
+that Result. Driver mode, temporary pure projection and local construction
+vectors remain compute scratch and drop at terminal. No evaluator heap,
+event batch, side cache, task, lock or command state is retained. Equality
+cutoff, invalidation and eviction remain ordinary DICE ownership; future drop
+propagates cancellation through the single child compute, and recovery creates
+no partially published carrier.
+
+Implementation authority is exactly
+`app/slug_loading_v2/src/module_extension_repository_instantiation.rs`,
+baseline 1,380 physical lines with the owning test module at 532. Caps are
+<=220 production, <=700 proof, <=920 aggregate semantic and <=2,300 physical.
+Add at most six production and five test helpers plus three observed-owner
+tests; keep the shared driver below 120 and every changed helper/test below
+200. The file remains cohesive despite the prospective >2,000-line trigger:
+it already owns the legacy key, instantiation functions, exact schema/label
+helpers, real transaction fixture and sole validation boundary. Splitting a
+private sibling would expose its retained types or duplicate proof plumbing.
+
+Require exactly three tests named
+`observed_instantiation_identity_finisher_and_terminal_algebra`,
+`observed_instantiation_real_order_events_and_parity`, and
+`observed_instantiation_lifecycle_cancellation_and_nonactivation`. Together
+prove key/hash/Display/equality/validity; one-child/no-merge Result+epoch
+projection; existing Join/Namespace/Attribute prefixes; exact legacy/observed
+semantic parity for success, pure failure and local failures; exact family and
+single-child dependency rows; Need and first-terminal suppression; child-only
+print batches, batchless parent rows and warm silence; held Result/carrier/epoch
+A -> B -> A across call/schema/mapping changes; same-semantic/different-epoch
+metadata, per-transaction global-epoch subset, poll-drop recovery and zero
+validation activation. Compare separate transactions semantically, reserving
+Arc identity for an exact cached value proven Reused.
+
+The pure outer is intentionally opaque in this sibling. Reuse the accepted
+same-module pure HostBzl/Merge outer proof and require a static private-producer
+scan plus the real observed-parent dependency row; do not add an accessor,
+construct malformed epochs or expose the wrapper. Reuse pinned Bazel 9.2
+`RegularRunnableExtension.run`, `SingleExtensionEvalFunction.compute` and
+`ModuleExtensionResolutionTest` evidence. Buck2 DICE incrementality,
+cancellation and activation-tracker tests are concept/test evidence only; no
+donor scheduler, side store or fallback is admitted. Add no oracle.
+
+Validate focused `observed_instantiation_`, protected `pure_instantiation_`,
+`real_key_`, `observed_pure_` and validation `real_validation_` tests; full
+`cargo test -p slug_loading_v2`; direct `cargo check -p slug_core_v2`;
+`cargo fmt --all -- --check`; and `git diff --check`, serially.
+
+Existing instantiation values/errors/order, namespaces, attribute and label
+semantics, `RepoSpec` projections, DICE equality and pure-owned events remain
+exact Bazel 9 compatibility. The private observation key/carrier/outer and
+Result-Arc/epoch association are Slug-native. Validation observation,
+generated/public/root-mapping/bootstrap activation and exact Bazel
+configuration/output/ActionKey bytes remain unsupported/deferred. ACCEPT
+returns only to a docs-only validation frontier audit.
+
+STOP a second file/key/owner/adapter, any visibility/lib export or caller,
+changed legacy or pure semantics, a parent event batch, epoch merge/rebuild,
+retained evaluator state, lock/task across DICE, validation/generated/public/
+root-mapping/bootstrap activation, fixture/oracle work, proof or cap waiver,
+milestone closure, M8/M7B or exact identity work. REPLAN before widening. M7
+remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`

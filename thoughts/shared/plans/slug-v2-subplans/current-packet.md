@@ -1,157 +1,148 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-pure-module-extension-invocations-observation-carrier-visibility-implementation`
+Packet: `WP-6-7A-host-instantiated-module-extension-repositories-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling/design and Rust base: `9bab80b3`
+Scheduling and Rust base: `0dcf2eea`
 
 ## Goal and authority
 
-Expose only the accepted observed pure-invocation key/carrier/opaque outer to
-its instantiation sibling. Preserve the private driver and every semantic,
-event, equality, retention and lifecycle behavior. Add one compile-only sibling
-proof; do not compute the key or activate instantiation.
+Add one private observed sibling for
+`HostInstantiatedModuleExtensionRepositoriesKey`. Preserve all legacy
+instantiation semantics, order, errors and pure-child event ownership. Retain
+only the exact local semantic Result Arc plus the pure child transaction-local
+epoch. Do not activate its sole upper consumer, validation.
 
-Write authority is exactly:
+Write authority is exactly
+`app/slug_loading_v2/src/module_extension_repository_instantiation.rs`,
+baseline 1,380 physical lines with the owning test module at 532. Caps are
+<=220 production, <=700 proof, <=920 aggregate semantic and <=2,300 physical.
+Add at most six production and five test helpers plus three observed tests; the
+shared driver stays below 120 lines and every changed helper/test below 200.
+Every other Rust file, test, fixture, oracle, Cargo/BUILD target, API, export and
+caller is read-only. The owner remains cohesive because this file already owns
+the legacy key, instantiation/schema/label functions, real fixture and sole
+validation boundary; splitting would expose private retained values or
+duplicate proof plumbing.
 
-- `app/slug_loading_v2/src/module_extension.rs`, baseline 2,232 physical lines
-  with first `#[cfg(test)]` at 895; and
-- `app/slug_loading_v2/src/module_extension_repository_instantiation.rs`,
-  baseline 1,363 physical lines with tests at 532, test-only.
+## Exact owner and driver
 
-Caps are <=60 production, <=50 proof and <=110 aggregate semantic; physical
-caps are 2,290 and 1,415. Every changed helper/test remains below 100 lines.
-Every other Rust file, test, fixture, oracle, Cargo/BUILD target, lib export,
-API and caller is read-only. This pair is cohesive because
-`module_extension.rs` owns the private pure driver and representation while
-the instantiation sibling is its sole future consumer and natural visibility
-witness.
+Add exactly these private types:
 
-## Exact crate-internal surface
+1. `HostInstantiatedModuleExtensionRepositoriesObservationKey`, a newtype over
+   `HostInstantiatedModuleExtensionRepositoriesKey` with the same workspace
+   identity and `observed-{legacy Display}`;
+2. `ObservedHostInstantiatedModuleExtensionRepositories`, holding the exact
+   local `Arc<Result<HostInstantiatedModuleExtensionRepositories,
+   HostInstantiatedModuleExtensionRepositoriesError>>` and one
+   `PathObservationEpoch`; and
+3. `HostInstantiatedModuleExtensionRepositoriesObservationError`, with exactly
+   `Pure(HostPureModuleExtensionInvocationsObservationError)`.
 
-Promote exactly these existing items to `pub(crate)`:
+Keep all fields, result aliases and accessors private. Preserve the legacy key.
+Use matching Debug/Clone/PartialEq/Eq/Hash/Allocative derives for the key and
+Debug/Clone/PartialEq/Eq/Allocative/Dupe for carrier and outer as their fields
+permit. Both keys use Complete-only equality and validity.
 
-1. `HostPureModuleExtensionInvocationsObservationKey` and its existing `new`;
-2. `ObservedHostPureModuleExtensionInvocations`; and
-3. its `result()` and `observations()` methods.
+Refactor one Legacy/Observed driver. Legacy computes only
+`HostPureModuleExtensionInvocationsKey`; Observed computes only
+`HostPureModuleExtensionInvocationsObservationKey`. After successful pure
+semantics, both invoke the existing `instantiate_repositories` exactly once
+and project the same semantic Result.
+Do not duplicate or reorder the prepared/request receipt join, generated
+canonical namespace, base/call/override mapping precedence, repository-rule
+schema lookup, supplied attribute order, legacy/None omission,
+mandatory/default validation, label resolution/visibility or ordered
+`RepoSpec` construction.
 
-Keep key and carrier fields private. Preserve the key's
-Debug/Clone/PartialEq/Eq/Hash/Allocative derives, legacy workspace identity,
-`observed-{legacy Display}`, Complete-only equality and validity. Preserve the
-carrier's Debug/Clone/PartialEq/Eq/Allocative/Dupe derives and exact retained
-Result Arc plus transaction-local `PathObservationEpoch`.
+## Terminal, epoch and event law
 
-Spell `result()` concretely as:
+- Pure DICE compute failure remains semantic `InvocationsCompute` with an empty
+  epoch. Need remains immediate Need.
+- Observed pure opaque error maps only to the carrierless `Pure` outer. Do not
+  inspect or rewrap its private terminal.
+- Accept a Complete pure carrier before semantics. Pure semantic failure remains
+  existing `Invocations` and retains the complete child epoch. Success passes
+  the cloned pure value and the same epoch into local instantiation.
+- This parent has one observed child: add no merge stage and do not rebuild,
+  union or validate the epoch.
+- Local count/request Join, Namespace and Attribute terminals retain the full
+  pure epoch and exact `AfterInvocations` predecessor/completed/request/current/
+  call prefixes. Success retains the same epoch. First terminal wins in exact
+  request and call order.
 
-```rust
-pub(crate) fn result(
-    &self,
-) -> &Arc<Result<HostPureModuleExtensionInvocations,
-                 HostPureModuleExtensionInvocationsError>>
-```
+Instantiation stores no evaluation event data. Fresh pure load and
+invocation-print batches stay on the pure subtree; every instantiation parent
+row is batchless. Need, opaque outer and cancellation publish no parent carrier
+or batch. Warm parent reuse is silent, and a Reused pure child never replays a
+batch.
 
-Keep `observations()` returning `&PathObservationEpoch`. Keep
-`PureInvocationsResult` private; expose no alias, field or constructor.
+The carrier's Result already owns the predecessor, completed/current repository
+projections and `RepoSpec`s. Driver mode, child projection and construction
+vectors are compute scratch. Retain no evaluator heap, duplicate request state,
+event batch, side cache, task, lock or command state. Ordinary DICE owns
+equality cutoff, invalidation, eviction and cancellation; dropped work cannot
+publish a partial carrier, and recovery recomputes normally.
 
-## Required opaque wrapper projection
+## Proof and validation
 
-Rename the current private terminal enum to
-`PureModuleExtensionInvocationsObservationError`. Preserve exactly its three
-variants and all fields:
+Add exactly:
 
-- `Prepared(HostPreparedModuleExtensionInputsObservationError)`;
-- `HostBzl { prepared, index, error }`; and
-- `Merge { prepared, index, error }`.
+- `observed_instantiation_identity_finisher_and_terminal_algebra`;
+- `observed_instantiation_real_order_events_and_parity`; and
+- `observed_instantiation_lifecycle_cancellation_and_nonactivation`.
 
-The private driver, helpers and `PureInvocationsDriverOutcome` continue to use
-that private enum. Add exactly one crate-visible nominal wrapper:
+Together prove key/hash/Display/equality/validity; one-child/no-merge projection;
+Join/Namespace/Attribute prefixes; legacy/observed semantic parity for success,
+pure failure and local failures; exact legacy/observed family and single-child
+dependency rows; Need and first-terminal suppression; child-only exact print
+batches, batchless parents and warm silence; held Result/carrier/epoch A -> B ->
+A for call/schema/mapping changes; same-semantic/different-epoch observation
+metadata; each carrier epoch as a subset of its own transaction global epoch;
+poll-drop recovery; and zero
+`HostValidatedModuleExtensionRepositoriesKey` activation. Compare separate
+transactions semantically and require Arc identity only for an exact cached
+value proven Reused.
 
-```rust
-#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-pub(crate) struct HostPureModuleExtensionInvocationsObservationError(
-    PureModuleExtensionInvocationsObservationError,
-);
-```
+The pure outer stays opaque. Reuse its accepted same-module HostBzl/Merge proof
+and add only a static private-producer scan plus the real observed dependency
+row; do not expose an accessor, construct invalid epochs or edit
+`module_extension.rs`.
 
-The tuple field stays private. Add no accessor, inspector, conversion trait or
-reexport. The associated `Key::Value` is exactly:
+Reuse Bazel 9.2 `RegularRunnableExtension.run`,
+`SingleExtensionEvalFunction.compute` and `ModuleExtensionResolutionTest`
+evidence; add no oracle. Buck2 DICE incrementality/cancellation/activation tests
+are concept/test evidence only. Run serially:
 
-```rust
-SourcePreparationOutcome<Result<
-    ObservedHostPureModuleExtensionInvocations,
-    HostPureModuleExtensionInvocationsObservationError,
->>
-```
-
-Wrap only the private driver's `Complete(Err(error))` in the observed key's
-compute projection. Need and successful Complete projection remain unchanged.
-No other production function wraps or unwraps the outer. Same-module proof may
-match the wrapper's private inner to preserve HostBzl-vs-Merge stage/prefix
-coverage; sibling code may only treat it as opaque.
-
-Do not change the legacy key/value/error, private driver modes/helpers,
-Prepared/HostBzl/Merge contents, Result/epoch association, event predicate,
-key Display/hash/equality/validity, or any DICE dependency.
-
-## Exact sibling compile proof
-
-Add exactly one test in the existing instantiation test module:
-`pure_observation_surface_is_instantiation_sibling_usable`.
-
-It may import only the crate-internal observed pure key, carrier and opaque
-wrapper needed from `crate::module_extension`. It must:
-
-- construct the key with `NormalizedAbsolutePath::new("/workspace")` and
-  assert unchanged Display;
-- define one nonexecuted local `inspect` function taking
-  `&<HostPureModuleExtensionInvocationsObservationKey as Key>::Value`,
-  `&ObservedHostPureModuleExtensionInvocations`, and
-  `&HostPureModuleExtensionInvocationsObservationError`;
-- inside `inspect`, type-check `result()` against the concrete
-  `Arc<Result<HostPureModuleExtensionInvocations,
-  HostPureModuleExtensionInvocationsError>>` and `observations()` against
-  `PathObservationEpoch`; and
-- cast `inspect` to the explicit
-  `SourcePreparationOutcome<Result<carrier, opaque outer>>` function-pointer
-  shape, following the accepted prepared-carrier sibling smoke.
-
-It must not construct a carrier or outer, inspect wrapper contents, compute a
-key, add a DICE driver, observe dependencies/events, or activate the existing
-instantiation key. Adjust same-module pure outer assertions only as required by
-the wrapper; preserve every accepted pure test discriminator.
-
-## Validation, compatibility and terminal
-
-Reuse accepted Bazel 9.2 and pure/instantiation evidence; add no oracle. Run
-serially:
-
-- the named `pure_observation_surface_is_instantiation_sibling_usable` test;
-- focused `observed_pure_` tests;
-- protected `pure_instantiation_` and `real_key_` tests;
+- focused `observed_instantiation_` tests;
+- protected `pure_instantiation_`, `real_key_`, `observed_pure_` and validation
+  `real_validation_` tests;
 - full `cargo test -p slug_loading_v2`;
 - direct dependent `cargo check -p slug_core_v2`;
 - `cargo fmt --all -- --check`; and
 - `git diff --check`.
 
-Existing pure and instantiation values, errors, order, namespace/attribute/
-label semantics, DICE equality and event behavior remain exact Bazel 9
-compatibility. The crate-internal key/carrier/opaque wrapper and Result-Arc/
-epoch handoff are Slug-native. Instantiation observation, validation,
-generated/public/root-mapping/bootstrap activation and exact Bazel
-configuration/output/ActionKey bytes remain unsupported/deferred.
+## Compatibility and terminal
 
-Implementation ACCEPT returns only to a docs-only
-`HostInstantiatedModuleExtensionRepositoriesKey` observation-owner design.
-STOP a public/lib reexport, exposed alias/field/variant/inspector, second key/
-carrier/adapter, caller or compute activation, instantiation semantic change,
-event/equality/retention drift, third file, oracle/fixture work, cap waiver,
-validation/generated/root-mapping/public/bootstrap activation, milestone
-closure, M8/M7B or exact identity work. REPLAN before widening. M7 remains
-partial and M7A -> M8 -> M7B remains.
+Existing values/errors/order, namespaces, attribute/label semantics, `RepoSpec`
+projections, DICE equality and pure-owned events remain exact Bazel 9
+compatibility. The private key/carrier/outer and Result-Arc/epoch association
+are Slug-native. Validation observation, generated/public/root-mapping/bootstrap
+activation and exact Bazel configuration/output/ActionKey bytes remain
+unsupported/deferred.
+
+ACCEPT returns only to a docs-only
+`HostValidatedModuleExtensionRepositoriesKey` observation-frontier audit. STOP
+a second file/key/owner/adapter, visibility/lib export/caller, legacy or pure
+semantic drift, parent event batch, epoch merge/rebuild, retained evaluator
+state, lock/task across DICE, validation/generated/public/root-mapping/bootstrap
+activation, fixture/oracle work, proof/cap waiver, milestone closure, M8/M7B or
+exact identity work. REPLAN before widening. M7 remains partial and M7A -> M8
+-> M7B remains.
 
 ## Immediate predecessor
 
-Audit `a8482660` proves the accepted pure carrier is the only missing input to
-the instantiation owner: validation/generated publication is later and root
-mapping/canonical selection is parallel. No public surface or semantic
-prerequisite remains.
+`0dcf2eea` exposes exactly the accepted opaque pure observation key, carrier,
+concrete Result accessor and epoch accessor to this sibling without a caller.
+Live trace proves instantiation has no other semantic child and validation is
+its sole production consumer.
