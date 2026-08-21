@@ -1,85 +1,94 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-extension-evaluation-input-requests-observation-carrier-promotion-design`
+Packet: `WP-6-7A-host-selected-extension-evaluation-input-requests-observation-carrier-promotion-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `87256749`
+Scheduling/design base: `d17637fd`
 Rust base: `3a68afa5`
 
 ## Goal and authority
 
-Design only the uniquely smaller visibility prerequisite selected by the
-prepared/evaluation frontier audit. Make the accepted evaluation-input
-observation carrier usable by its natural prepared-input consumer in
-`slug_loading_v2` without changing semantics or activating that consumer.
-
-Audit Rust and tests read-only. Freeze the existing evaluation-input driver,
-legacy key, Result/epoch association, Need/outer/error algebra, equality,
-validity, eventlessness, retention and lifecycle behavior. Specify the minimum
-doc-hidden Bzlmod -> loading API and one external-crate compile smoke. Do not
-implement it.
+Implement only the accepted doc-hidden Bzlmod -> loading visibility surface for
+the existing evaluation-input observation key/carrier/opaque outer. Do not add
+a semantic consumer or change the accepted driver, Result/epoch association,
+Need/outer/error algebra, equality, validity, events, retention or lifecycle.
 
 Write authority is exactly:
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- this Stage 6 subplan;
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
-- `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
+- `app/slug_bzlmod_v2/src/selected_repo_spec.rs`;
+- `app/slug_bzlmod_v2/src/lib.rs`; and
+- new `app/slug_bzlmod_v2/tests/evaluation_input_request_observation_api.rs`.
 
-Net caps are <=40/<=220/<=180/<=30 respectively and <=470 aggregate. Every
-Rust file, test, fixture, oracle, Cargo/BUILD target, API and other plan is
-read-only. The design may authorize at most one visibility-only implementation
-successor.
+Every other Rust file, test, fixture, oracle, Cargo/BUILD target, API and plan is
+read-only. Production is <=70 lines, colocated proof <=40, external proof <=60
+and aggregate semantic authority <=170. Physical caps are 11,750 lines for
+`selected_repo_spec.rs`, 425 for `lib.rs` and 60 for the new smoke. Every
+changed helper/test remains below 100 lines.
 
-## Accepted frontier and audit finding
+## Frozen nominal surface
 
-Treat `e82057f2`'s evaluation-input observation,
-`99c23033`'s definition-request carrier promotion and `3a68afa5`'s loaded-
-definition observation as accepted and non-writable.
+Promote exactly these three `#[doc(hidden)]` nominal types from
+`selected_repo_spec.rs`:
 
-`HostPreparedModuleExtensionInputsKey` is the first and only production
-semantic consumer of both legacy carriers. Its observed loaded-definition
-sibling is already in the same loading module, but the evaluation-input
-observation key, carrier and typed outer are private to `slug_bzlmod_v2`.
-Therefore a visibility-only promotion is uniquely smaller than prepared-input
-ownership. Pure invocation, repository instantiation, validation, root mapping,
-generated publication, commands and bootstrap remain later or parallel.
+- existing `HostSelectedExtensionEvaluationInputRequestsObservationKey`;
+- existing `ObservedHostSelectedExtensionEvaluationInputRequests`; and
+- new `HostSelectedExtensionEvaluationInputRequestsObservationError`, an
+  opaque public tuple wrapper around private
+  `EvaluationInputRequestsObservationError`.
 
-## Design questions
+Make only the observation key's `new(NormalizedAbsolutePath) -> Self`
+constructor and the observed carrier's two borrowed accessors public. Spell
+`result()` with the public concrete return type:
+`&Arc<Result<HostSelectedExtensionEvaluationInputRequests,
+HostSelectedExtensionEvaluationInputRequestsError>>`. Keep
+`observations() -> &PathObservationEpoch`. Keep tuple/struct fields, the private
+result alias, observation-stage enum and Requests/RootFiles/Merge error kinds
+private.
 
-1. Confirm the minimum nominal surface: the existing observation key, observed
-   carrier and one opaque public observation-error wrapper, with only the key
-   constructor and carrier `result()`/`observations()` accessors public.
-2. Decide the exact three doc-hidden crate-root reexports and external-crate API
-   smoke needed to prove loading can construct the key and inspect the public
-   Result Arc/epoch/opaque outer without exposing private observation stages.
-3. Freeze the associated `Key::Value` wrapping boundary so same-module Bzlmod
-   tests/children can unwrap locally while external consumers see only the
-   opaque wrapper. Add no adapter key, copied carrier or reverse dependency.
-4. Preserve exact Display/key identity, Complete-only validity/equality,
-   Result-Arc/transaction-local-epoch association, carrierless Need/outer,
-   child event ownership, warm/cancel behavior and retained lifetime.
-5. Bound future implementation authority and proof caps from the live
-   11,676-line `selected_repo_spec.rs`, 409-line `lib.rs` and the existing
-   definition-request promotion smoke pattern. Require a dependent loading
-   compile check and unchanged focused/full Bzlmod evidence; add no oracle.
+Add exactly three `#[doc(hidden)]` crate-root reexports with those names. Add no
+fourth type, public alias, field, constructor, error inspector or adapter key.
 
-## Later prepared boundary, not active
+## Wrapper and DICE boundary
 
-The later prepared owner consumes observed evaluation inputs first and observed
-loaded definitions second. It owns only request aggregate/count/order joins,
-tag-schema/class validation, repository-aware attribute coercion and prepared
-tag grouping/order. Pure invocation separately owns implementation
-reacquisition/drift checks, evaluation context and Starlark execution,
-repository-rule call capture, print events and result validation.
+Change only the observation key's associated `Key::Value` error from private
+`EvaluationInputRequestsObservationError` to the public opaque wrapper. Wrap
+the private error only in the key's `Complete(Err(...))` projection. Leave the
+private driver/finishers and their typed stage errors unchanged.
 
-For that later owner, each Complete child epoch merges left-first before child
-semantics and join/coercion. Need and typed child outer are carrierless;
-semantic terminals retain the completed prefix appropriate to their context.
-The parent remains eventless and retains only its local semantic Result Arc plus
-compact cumulative epoch. This packet neither designs nor activates it.
+There is no current production unwrapping consumer. Same-module proof may keep
+inspecting the private driver/finisher error algebra directly; it must not add a
+public unwrap path. The later loading prepared-input owner will carry the opaque
+child outer without inspecting its internals. Preserve Display/key identity,
+Complete-only equality/validity, carrierless Need/outer, the exact local Result
+Arc and transaction-local epoch, eventlessness, warm/cancel behavior and
+retained lifetime.
 
-## Compatibility and evidence
+## External smoke and evidence
+
+The new external-crate smoke imports the three hidden reexports and
+`NormalizedAbsolutePath`, constructs the key for `/workspace`, and asserts the
+exact existing Display:
+`observed-host-selected-extension-evaluation-inputs:"/workspace"`. A typed
+inspection function must accept borrowed carrier/error values and call both
+borrowed carrier accessors from outside the crate.
+
+The smoke must not construct the carrier or error, compute the key, add a
+semantic caller, inspect the opaque error, name private aliases/stages/kinds or
+depend on mapping/root-file internals. Reuse the accepted evaluation-input
+observation proof; add no oracle because no Bazel-visible behavior changes.
+
+Run:
+
+- `cargo test -p slug_bzlmod_v2 observed_evaluation_inputs_ --lib`;
+- `cargo test -p slug_bzlmod_v2 --test evaluation_input_request_observation_api`;
+- full `cargo test -p slug_bzlmod_v2`;
+- direct dependent `cargo check -p slug_loading_v2`;
+- `cargo fmt --all -- --check`; and
+- `git diff --check`.
+
+Do not run Cargo commands concurrently in the shared target directory.
+
+## Compatibility and terminal
 
 Existing evaluation-input values/errors/order/root metadata/tags and child
 events remain exact Bazel 9 compatibility. The hidden observation API, opaque
@@ -87,28 +96,18 @@ typed outer and shared-Arc transaction-local epoch association are Slug-native.
 Prepared/pure/instantiated/validated/root-mapping/generated/public/bootstrap
 activation, M8/M7B and exact identity bytes remain deferred.
 
-Reuse the accepted evaluation-input observation tests and the prior
-definition-request external API-smoke pattern. Add no oracle or proof code in
-this docs-only packet. Read `docs/developers/dice.md` before fixing the DICE
-surface. Check `git diff --check` on the four records before terminal review.
-
-## Terminal and stops
-
-Terminate with exactly one bounded visibility-only implementation packet or
-formal `REPLAN` if the opaque usable carrier requires a new semantic owner or
-unbounded transitive API.
-
-STOP Rust/API/export/caller/test implementation, prepared-input design or
-activation, a second key/adapter/owner, mapping/root-file internal exposure,
-event or retention movement, proof waiver, milestone closure, M8/M7B and exact
-identity-byte work. M7 remains partial and M7A -> M8 -> M7B remains.
+Implementation ACCEPT returns only to one docs-only prepared-input owner design
+packet. STOP semantic/event/equality/retention change, public field/alias/error
+inspection, a second key/adapter/type, loading/caller change, Cargo/BUILD,
+fixture/oracle work, cap/proof waiver, prepared activation, milestone closure,
+M8/M7B or exact identity work. REPLAN before widening. M7 remains partial and
+M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-The audit at scheduling base `87256749` traced one production direct consumer
-for each accepted legacy carrier: `HostPreparedModuleExtensionInputsKey`.
-Prepared then has one production consumer (`HostPureModuleExtensionInvocationsKey`),
-followed one-to-one by instantiation and validation; generated repository
-definition is the sole non-test validated-spec consumer. Root mapping consumes
-selected extension mappings independently. The missing cross-crate
-evaluation-input observation surface is therefore the sole smaller prerequisite.
+Design `d17637fd` proves the existing evaluation-input observation key, carrier
+and private outer are the sole unavailable cross-crate inputs before prepared
+ownership. The accepted definition-request promotion supplies an exact bounded
+precedent: one key constructor, two borrowed carrier accessors, one opaque
+wrapper at `Key::Value`, exactly three reexports and one external compile smoke,
+with no semantic, event, retention or DICE dependency change.

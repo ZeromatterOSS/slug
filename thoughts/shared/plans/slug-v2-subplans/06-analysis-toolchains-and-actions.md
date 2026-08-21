@@ -11003,6 +11003,66 @@ milestone closure, M8/M7B and exact identity work. REPLAN only if the opaque
 carrier requires a new semantic owner or unbounded transitive API. M7 remains
 partial and M7A -> M8 -> M7B remains.
 
+### Evaluation-input observation carrier-promotion design (2026-08-20)
+
+The bounded design from scheduling base `d17637fd` activates only
+`WP-6-7A-host-selected-extension-evaluation-input-requests-observation-carrier-promotion-implementation`
+over unchanged Rust base `3a68afa5`.
+
+Promote exactly three doc-hidden nominal types in `selected_repo_spec.rs`: the
+existing `HostSelectedExtensionEvaluationInputRequestsObservationKey`, the
+existing `ObservedHostSelectedExtensionEvaluationInputRequests`, and one new
+opaque public `HostSelectedExtensionEvaluationInputRequestsObservationError`
+wrapper around private `EvaluationInputRequestsObservationError`. Make only the
+key constructor and carrier `result()`/`observations()` accessors public. Spell
+`result()` as the public concrete
+`&Arc<Result<HostSelectedExtensionEvaluationInputRequests,
+HostSelectedExtensionEvaluationInputRequestsError>>`; keep the result alias,
+fields, observation stage and Requests/RootFiles/Merge kinds private.
+
+Change only the observation key's associated `Key::Value` error to the public
+wrapper and construct it at the key's Complete-error projection. The private
+driver and finishers retain their current error type. There is no production
+unwrapper: same-module proof may continue to inspect private driver/finisher
+errors, while the later cross-crate prepared owner must carry the public child
+outer opaquely. Add exactly the key/carrier/error crate-root reexports; no
+adapter key, fourth type, public alias/field/error inspector or reverse edge.
+
+Future Rust authority is exactly
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 11,676 physical with
+first `#[cfg(test)]` at 4,499; `app/slug_bzlmod_v2/src/lib.rs`, baseline 409;
+and new external smoke
+`app/slug_bzlmod_v2/tests/evaluation_input_request_observation_api.rs`.
+Caps are <=70 production, <=40 colocated proof, <=60 external proof and <=170
+aggregate semantic; physical caps are 11,750/425/60 and every changed helper/
+test remains below 100.
+
+The smoke imports exactly the three hidden reexports plus
+`NormalizedAbsolutePath`, constructs `/workspace`, asserts
+`observed-host-selected-extension-evaluation-inputs:"/workspace"`, and
+type-checks borrowed carrier `result()`/`observations()` access with the opaque
+error in an external crate. It must not construct carrier/error, compute the
+key, add a semantic caller or name private aliases/stages/error kinds.
+
+Preserve exact Display/key identity, Complete-only equality/validity,
+carrierless Need/outer behavior, exact Result Arc and transaction-local epoch,
+eventlessness, warm/cancel behavior and retention. Reuse accepted focused/full
+Bzlmod proof; add no oracle. Validate focused `observed_evaluation_inputs_`,
+the external smoke, full `slug_bzlmod_v2`, direct dependent
+`cargo check -p slug_loading_v2`, formatting and diff hygiene serially.
+
+Existing evaluation-input values/errors/order/root metadata/tags and child
+events remain exact Bazel 9 compatibility. The hidden API, opaque typed outer
+and shared-Arc epoch association are Slug-native. There is no new DICE
+dependency, event owner, lifecycle state or retained semantic value.
+
+Implementation ACCEPT returns only to one docs-only prepared-input owner
+design. STOP semantic/event/equality/retention drift, public field/alias/error
+inspection, second key/adapter/type, loading/caller/Cargo/BUILD change,
+fixture/oracle work, proof/cap waiver, prepared activation, milestone closure,
+M8/M7B or exact identity work. REPLAN before widening. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
