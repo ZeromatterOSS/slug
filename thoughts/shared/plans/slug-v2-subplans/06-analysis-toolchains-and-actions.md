@@ -12507,6 +12507,93 @@ scratch, task/lock, fixture/oracle, cap/helper/test waiver, upper activation,
 milestone closure, M8/M7B or identity-byte work. REPLAN before widening. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Selected-definition carrier visibility audit selects promotion design (2026-08-21)
+
+Accepted implementation `a7d9ffcc` completes the callerless private selected-
+definition owner at +909/-72 in one Bzlmod file. Live source shows a uniquely
+smaller cross-crate prerequisite before canonical composition.
+
+At `selected_repo_spec.rs:2386-2606`, the observed key/constructor, carrier/
+accessors and typed Routes outer are private. The Result accessor names private
+`SelectedDefinitionResult`, and the outer directly exposes private
+`HostSelectedModuleRoutesObservationError`. Bzlmod's crate root exports only
+the legacy selected value/error/view/key surface, so core cannot name the
+observed associated Value or carrier.
+
+Core's canonical owner imports and computes only the legacy selected key at
+`generated_repository_definition.rs:21,523`; only selected Missing reaches
+generated at 562. The accepted generated observed surface is already private in
+that same core module. Canonical composition therefore needs only the selected
+Bzlmod handoff, not generated promotion or an adapter.
+
+Canonical definition still has exactly two production upper consumers:
+non-root apparent mapping at generated-definition line 799 and root apparent
+definition at line 310 of its module. Root route/source/public/command/bootstrap
+remain later and contain no direct observed-selected/generated consumer. Core's
+one-way dependency on Bzlmod makes a hidden Bzlmod -> core surface natural;
+moving the owner or adding a reverse dependency is forbidden.
+
+Activate only
+`WP-6-7A-host-canonical-selected-module-definition-observation-carrier-promotion-design`.
+Freeze exactly three doc-hidden public nominal types and three crate-root
+reexports: the existing observed key with public constructor, the existing
+carrier with concrete public borrowed selected Result-Arc and epoch accessors,
+and one field-private opaque public outer. Keep fields and
+`SelectedDefinitionResult` private; add no public Result/outcome alias,
+inspector, constructor, conversion, adapter, caller or fourth reexport.
+
+Effective visibility requires projection. Rename the current private outer to
+`CanonicalSelectedModuleDefinitionObservationError`, preserving its sole
+private Routes variant and derives; keep the driver on this inner enum. Add
+public
+`HostCanonicalSelectedModuleDefinitionObservationError(inner)` as a tuple
+struct with a private field and matching derives. Wrap only observed
+`Complete(Err(inner))` at Key projection. Need and success are unchanged; the
+future core owner must carry rather than inspect the outer.
+
+Freeze one external API smoke
+`canonical_selected_definition_observation_surface_is_cross_crate_usable`.
+It constructs only `/workspace` plus canonical `dep+` and asserts
+`observed-host-canonical-selected-module-definition:"/workspace":@@dep+`;
+nonexecuted function pointers prove the exact associated
+`SourcePreparationOutcome<Result<carrier, opaque outer>>` and concrete
+borrowed Result-Arc/epoch accessors. It cannot construct/inspect the carrier or
+outer, compute a key, name private routes/aliases, import core or activate
+semantics.
+
+Prospective authority is exactly selected production/colocated proof at
+12,524 physical with tests at 4,668, `lib.rs` at 415, and new
+`tests/canonical_selected_definition_observation_api.rs`. Caps are <=80
+production, <=40 colocated proof, <=10 lib and <=70 external proof; aggregate
+semantic <=200 and physical <=12,645/425/70. Allow only a semantic-neutral
+wrapper adjustment to existing
+`observed_canonical_selected_definition_identity_scan_and_terminal_algebra`
+under 200 lines; every new smoke/helper remains below 100. The selected file
+remains cohesive because it owns the inner driver/carrier/projection; a
+visibility-only split would expose or duplicate private state. No hot-path
+measurement applies.
+
+Reuse accepted selected-owner proof and existing Bzlmod definition/evaluation
+observation API smokes. Add no oracle. Prospective validation is focused owner,
+new and protected external smokes, full bzlmod, direct core check, formatting
+and diff hygiene serially.
+
+Selected values/errors/dispositions/scan/order/views/equality/invalidation and
+events remain exact. The hidden cross-crate carrier/opaque outer and Result-
+Arc/transaction-local epoch handoff are Slug-native. Canonical/generated
+composition, upper activation and exact Bazel identity bytes remain
+unsupported/deferred.
+
+Docs-only authority is canonical/current/this Stage/routing at net caps
+<=40/<=180/<=220/<=30 and <=470 aggregate. Rust/tests/fixtures/oracles/API are
+read-only. Design ACCEPT may schedule one visibility-only implementation, then
+return to canonical selected/generated owner design. STOP implementation,
+compute/core edit, public field/alias/terminal, fourth type/reexport, second
+key/carrier/adapter, reverse dependency, semantic/event/equality/retention
+drift, Cargo/BUILD, fixture/oracle, third production file, cap waiver, upper
+activation, milestone closure, M8/M7B or identity-byte work. REPLAN before
+widening. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
