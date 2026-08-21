@@ -11560,6 +11560,79 @@ upper activation, semantic/event/retention drift, fixture/oracle work,
 milestone closure, M8/M7B or exact identity work. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Instantiation frontier selects pure-carrier visibility (2026-08-21)
+
+Implementation `9bab80b3` accepts the private observed pure-invocation owner at
++301/-171 production and +600/-127 proof, 2,232 physical lines. Its exact
+ordered dependency row is observed prepared followed by the ordered observed
+Host-Bzl children; it retains one pure semantic Result Arc plus the cumulative
+transaction-local Host epoch and remains callerless in production.
+
+The live frontier has one visibility stop. The legacy
+`HostPureModuleExtensionInvocationsKey` has exactly one production consumer,
+`HostInstantiatedModuleExtensionRepositoriesKey` at
+`module_extension_repository_instantiation.rs:191`. The observed pure key,
+carrier and outer remain private in `module_extension.rs:108-145`; its borrowed
+Result accessor also returns the private `PureInvocationsResult` alias. The
+sibling instantiation module therefore cannot name the Key Value or unwrap a
+Complete carrier without widening private pure terminal details.
+
+Instantiation is otherwise the next semantic owner. It is the sole owner of
+the pure-receipt count/request join, generated canonical namespace, base/call/
+override mapping precedence, repository-rule schema lookup, explicit supplied
+attribute order, legacy/None omission, mandatory/default validation, label
+resolution/visibility and ordered `RepoSpec` projections. Existing pure helper
+tests and the two real key tests already discriminate raw order, two-phase
+errors, namespace/label behavior, prefix retention, Need, eventlessness and
+A -> B -> A identity. No new oracle is needed for a visibility-only step.
+
+The consumer chain rejects upper prerequisites. Instantiation has exactly one
+production consumer, validation at
+`module_extension_repository_validation.rs:208`; validation is the direct
+loading predecessor of generated repository definition at
+`generated_repository_definition.rs:168`. Root repository mapping instead
+consumes selected extension mappings directly at
+`selected_repo_spec.rs:4466-4469`, and canonical selected module definitions
+consume selected module routes at 2365-2368. Validation/generated/public
+publication is serially later; root mapping and canonical selection are
+parallel. None can supply or replace the missing pure carrier surface.
+
+Activate only
+`WP-6-7A-host-pure-module-extension-invocations-observation-carrier-visibility-design`.
+The design must freeze the smallest crate-internal key/constructor,
+carrier/concrete borrowed Result+epoch accessors and field-private nominal
+outer. It must decide the required wrapper projection because the current
+outer enum variants and private result alias cannot cross effective visibility
+unchanged. No variant, field, alias, prepared/Host-Bzl/Merge detail, public/lib
+export, compute caller or instantiation semantic may be exposed or activated.
+
+Prospective implementation authority is exactly production
+`module_extension.rs` plus test-only sibling compile proof in
+`module_extension_repository_instantiation.rs`. Baselines are 2,232 physical
+with first `#[cfg(test)]` at 895, and 1,363 physical with tests at 532. The
+design must stay within <=60 production, <=50 proof, <=110 aggregate semantic;
+physical caps are 2,290/1,415, with every changed helper/test below 100. The
+sibling proof may name the associated Key Value and borrowed accessors only;
+it must not construct or compute the key, inspect the outer, or activate
+instantiation.
+
+Design write authority is only canonical/current/this Stage/routing at net
+caps <=40/<=180/<=220/<=30 and <=470 aggregate. Rust, tests, fixtures,
+oracles, Cargo/BUILD, APIs, exports and callers are read-only. Design ACCEPT may
+schedule exactly one carrier-visibility implementation, after which work
+returns to a docs-only instantiation owner design.
+
+Exact compatibility remains all accepted pure/instantiation values, errors,
+order, namespace/attribute/label semantics and event behavior. The
+crate-internal key/carrier/opaque outer and Result-Arc/epoch handoff are
+Slug-native. Instantiation observation, validation, generated/public/root-
+mapping/bootstrap activation and exact Bazel identity bytes remain
+unsupported/deferred. STOP a public/lib export, exposed alias/field/variant,
+second key/carrier/adapter, instantiation semantic or caller change, event/
+equality/retention drift, third file, oracle/fixture work, cap waiver, upper or
+parallel activation, milestone closure, M8/M7B or exact identity work. REPLAN
+before widening. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
