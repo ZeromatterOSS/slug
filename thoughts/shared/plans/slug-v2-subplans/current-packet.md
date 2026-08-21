@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-loaded-module-extension-definitions-real-order-event-proof-repair-retry`
+Packet: `WP-6-7A-loaded-module-extension-definitions-real-order-event-proof-repair-retry-2`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
 Scheduling base: `ab4db01f`
@@ -9,10 +9,11 @@ Accepted predecessor: `99c23033`
 ## Goal and authority
 
 Repair only the real-order/parity/event proof for the retained loaded-definition
-observation candidate. The first split attempt reached `REPLAN` because its
-blanket command-key exclusion rejected required lower Bzlmod policy inputs.
-Correct that exact family boundary; do not reopen the independent lifecycle
-slice or any accepted production/finisher decision.
+observation candidate. The first retry replaced its blanket command-key ban,
+but reached `REPLAN` because it required `DynKey` downcasts to two Bzlmod policy
+value structs which are not DICE keys. Classify the actual injected root-module
+policy keys instead; do not reopen the independent lifecycle slice or any
+accepted production/finisher decision.
 
 Write exactly the `#[cfg(test)] module_extension_definition_loading_tests`
 module in `app/slug_loading_v2/src/bzl_module.rs`. Production, the accepted
@@ -98,14 +99,16 @@ The dependency rows must show the loaded observed parent depends on the
 observed request child and exactly the reached observed Host-Bzl roots in
 source order. Use exact key-family prefixes, never substring vocabulary.
 
-Classify the two injected lower policy keys by tracker-side
-`DynKey::downcast_ref::<BzlmodCommandPolicyKey>()` and
-`DynKey::downcast_ref::<BzlmodEnvironmentPolicyKey>()`, storing an explicit
-test-only family tag because their Display is only the serialized policy value.
-Allow and require those tags where reached. Also allow the exact lower Display
-prefixes `root-module-command-policy:*`, `root-module-environment-policy:*`,
+Classify the actual injected lower policy keys by tracker-side
+`DynKey::downcast_ref::<RootModuleCommandPolicyKey>()` and
+`DynKey::downcast_ref::<RootModuleEnvironmentPolicyKey>()`, or equivalently by
+their exact `root-module-command-policy:*` and
+`root-module-environment-policy:*` Displays. Allow and require those families
+where reached. Also allow the exact lower Display prefixes
 `root-module-lockfile-mode:*` and `visible-lockfile:*` (plus a separately
-reached Host-visible-lockfile family). Exclude the reverse legacy families
+reached `host-visible-lockfile:*` family). `BzlmodCommandPolicyKey` and
+`BzlmodEnvironmentPolicyKey` are policy values, not DICE keys: never require
+them as activation/dependency rows. Exclude the reverse legacy families
 `host-selected-extension-definition-load-requests:*`,
 `host-bzl-module:*` and `host-loaded-module-extension-definitions:*`. Exclude
 the exact upper/public families `host-prepared-module-extension-inputs:*`,
@@ -148,9 +151,12 @@ and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Scheduling `ab4db01f` split real-order/events from lifecycle. Its test-only
-draft reached a real three-root fresh evaluation, then the blanket
-`contains("command")` assertion rejected required lower
-`BzlmodCommandPolicyKey`/`RootModuleCommandPolicyKey` rows. Reserved review
-returned `REPLAN` and froze the exact lower allowlist/upper denylist above; no
-production or lifecycle decision changed.
+The retry scheduled by `1d511576` retained a passing three-root focused draft,
+but its accepted family contract required `DynKey` downcasts to
+`BzlmodCommandPolicyKey` and `BzlmodEnvironmentPolicyKey`. Both are policy value
+structs with no `Key`/`InjectedKey` implementation, so they cannot inhabit a
+`DynKey`; the worker stopped rather than fabricate activation rows. The actual
+injected rows are `RootModuleCommandPolicyKey` and
+`RootModuleEnvironmentPolicyKey`. Exact legacy/observed parity and exact event
+batch assertions also remain unfinished. Production, identity/finisher and
+lifecycle decisions did not change.

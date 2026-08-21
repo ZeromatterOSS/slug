@@ -10707,6 +10707,33 @@ upper activation, tracker conflation, cap waiver, M8/M7B or exact identity
 work. After ACCEPT schedule only the lifecycle/cancellation proof repair. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Loaded-definition policy-value DynKey REPLAN (2026-08-20)
+
+The retry scheduled by `1d511576` reached `REPLAN` on an impossible tracker
+contract. `BzlmodCommandPolicyKey` and `BzlmodEnvironmentPolicyKey` are policy
+value structs with Display implementations but no DICE `Key`/`InjectedKey`, so
+they cannot appear in `DynKey` activation or dependency rows. The passing draft
+lawfully observes the actual injected `RootModuleCommandPolicyKey` and
+`RootModuleEnvironmentPolicyKey` rows. Production, identity/finisher and
+lifecycle proof remain frozen at the retained 7,753-line, `+981/-110` candidate.
+
+Activate only
+`WP-6-7A-loaded-module-extension-definitions-real-order-event-proof-repair-retry-2`.
+Tag or admit the two actual root-module policy key types by `DynKey` downcast or
+their exact `root-module-command-policy:*` and
+`root-module-environment-policy:*` Displays. Allow exact lower peers
+`root-module-lockfile-mode:*`, `visible-lockfile:*` and separately reached
+`host-visible-lockfile:*`; never require the Bzlmod policy values as graph rows.
+Preserve the exact reverse-legacy and named upper/public/`slug-command:*`
+prefix denylist without substring vocabulary.
+
+The successor must still add exact separate-transaction legacy/observed Result,
+request aggregate, manifest and frozen-projection parity, plus exact ordered
+fresh batches, warm silence, isolated Reused/None and decisive semantic-failure
+batch ownership. The nine positional terminal rows and later suppression remain
+required. Caps, validation, stops and the single lifecycle/cancellation
+successor are unchanged. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
