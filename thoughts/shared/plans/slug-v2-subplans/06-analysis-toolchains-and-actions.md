@@ -13003,6 +13003,104 @@ waiver, upper activation, milestone closure, M8/M7B or exact identity work.
 REPLAN before widening or baseline-hash drift. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Canonical apparent-mapping observation-owner design accepted (2026-08-21)
+
+Accepted `e27974c8` promotes the observed root-mapping handoff at +93/-16
+across three Bzlmod files without activation. Core apparent mapping is now the
+uniquely smallest complete owner; no visibility prerequisite remains.
+
+The legacy mapping key has one production consumer, root apparent definition
+at its line 266. For root context it computes root mapping at generated-
+definition line 879; for nonroot context it computes canonical definition at
+905. The promoted observed root child is now nameable, and the private observed
+canonical child already shares this module. Root apparent definition later
+computes canonical definition again for the resolved target at line 310, then
+feeds its sole route consumer and route/source/public/bootstrap chain. Keep all
+of those later layers inactive.
+
+Implement only
+`WP-6-7A-host-canonical-repository-apparent-mapping-observation-implementation`.
+Add a private observed-key newtype, private carrier with one local apparent-
+mapping Result Arc plus epoch, and private typed outer with exactly
+`RootMapping(HostRootRepositoryMappingObservationError)` and
+`Definition(HostCanonicalRepositoryDefinitionObservationError)`. Add no
+visibility/export/caller.
+
+Share Legacy/Observed computation through one mode, one child outcome, root and
+canonical child adapters, finisher/driver and legacy projector. Preserve the
+nonroot-context/root-apparent preflight before any child. Root context selects
+only root mapping; nonroot selects only canonical definition. DICE compute
+failure remains semantic branch-specific Compute with empty epoch; Need is
+immediate; observed child outer is carrierless typed outer; complete child
+semantic error retains the child epoch.
+
+After child success preserve context/view validation before target lookup,
+then exact ContextMismatch, Missing and success construction with the same
+predecessor. Forward the single chosen epoch unchanged on every complete local
+semantic result. There is no second child, merge/rebuild/union/validation or
+empty substitution after child completion. Legacy moves the local Result Arc.
+Use complete equality and Complete-only validity.
+
+The parent owns no batch. Exact observed direct rows are zero child for
+RootApparent preflight, observed root mapping for root context, and observed
+canonical definition for nonroot; legacy uses corresponding legacy children.
+Require matching-family exclusion, unchanged lower event owner/payloads,
+batchless parent and warm rows, and no replay. Need/outer/cancel publish no
+parent carrier or batch.
+
+Retain only the local mapping Result Arc and compact chosen epoch. Existing
+success/ContextMismatch/Missing retain the same predecessor value and child
+semantic terminals the same cloned error. Drop child carrier/Result Arc,
+unchosen branch, view/iterator/lookup, mode, event/tracker, cache/task/lock
+scratch before publication. DICE alone serializes compute.
+
+Add exactly
+`observed_canonical_repository_apparent_mapping_identity_branch_and_terminal_algebra`,
+`observed_canonical_repository_apparent_mapping_real_branches_events_and_parity`
+and
+`observed_canonical_repository_apparent_mapping_lifecycle_cancellation_and_nonactivation`.
+Prove identity/accessors/equality/validity, preflight, both compute/semantic
+families, Definition outer, ContextMismatch/Missing/success, exact forwarding
+and zero merge. For opaque root outer, reuse accepted lower proof plus bounded
+parent source/dependency evidence; never access its private field or inject
+malformed state.
+
+Real proof covers both branches' legacy parity, exact dependency rows, target/
+order retention, lower events, warm silence and family exclusion. Hold root
+and nonroot Result/epoch handles through semantic A-B-A and comment-only equal-
+Result/different-epoch changes; require own-transaction global subsets, Arc
+identity only on Reused, poll-drop/no publication and same-DICE recovery for
+both branches. Deny legacy parent, unchosen child, root definition/route/source,
+repository publication/materialization and public/bootstrap activation.
+
+Authority is exactly core `generated_repository_definition.rs`, baseline 3,328
+physical/tests 978 and SHA-256
+`06eb23895ba637cc9146f968974c9eee626a4ccbdf02a5bbbc8a5fea26ecd268`.
+Caps are <=260 production, <=720 proof, <=980 aggregate and <=4,310 physical;
+at most six production/seven test helpers, exactly three tests, driver below
+140 and every helper/test below 200. The file remains cohesive because it owns
+both children, predecessor/value/error/reducer, trackers and fixtures; no hot-
+path or retained-container change applies.
+
+Validate focused observed mapping, protected observed canonical and legacy
+mapping tests, full core, direct commands check, protected Bzlmod root-carrier
+smoke, formatting and exact allowlist/SHA/caps/test-size/diff checks serially.
+Reuse Bazel 9.2 canonical-name lookup/repository-mapping source and tests plus
+accepted child proof; add no fixture or oracle.
+
+Branch/order/target/error/predecessor/equality/invalidation/event behavior
+remains exact. The private Result-Arc+epoch carrier/typed outer is Slug-native.
+Promotion/caller, root definition/route/source/public/bootstrap observation and
+exact identity bytes remain unsupported/deferred.
+
+ACCEPT returns only to a docs-only apparent-mapping carrier-visibility audit.
+STOP second file/key/owner/adapter, visibility/export/caller, upper compute,
+branch/order/semantic/event/equality/retention drift, second-child/merge,
+private root-outer access, malformed injection, retained scratch/task/lock,
+fixture/oracle, cap/test/format waiver, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening or hash drift. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier formatter REPLAN (2026-08-21)
 
 The proof-corrected semantic draft is retained, but
