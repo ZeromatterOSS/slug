@@ -12074,6 +12074,88 @@ DICE, generated/canonical/public/root-mapping/bootstrap activation, fixture/
 oracle work, proof or cap waiver, milestone closure, M8/M7B or exact identity
 work. REPLAN before widening. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated repository publication frontier selects validation carrier promotion (2026-08-21)
+
+Accepted implementation `b8459b4e` completes the callerless private validation
+observation owner at +666/-29 total and 1,810 physical lines. Live source proves
+that generated publication is the next semantic owner, but one cross-crate
+visibility prerequisite is uniquely smaller.
+
+The accepted observation key/constructor at
+`module_extension_repository_validation.rs:178-192`, carrier and borrowed
+accessors at 220-235, and observation outer at 237 remain private to
+`slug_loading_v2`. The Result accessor also names private alias
+`ValidatedRepositoriesResult`, and the outer directly exposes the
+crate-internal instantiation outer. Loading's crate root reexports only the
+legacy validation certificate, error, outcome and key at `lib.rs:63-72`; core
+cannot name the observed Key Value or carrier.
+
+`HostGeneratedRepositoryDefinitionKey` at
+`generated_repository_definition.rs:101-206` is the first and only production
+consumer of the legacy validation key. Its compute at 168 retains the validated
+certificate, searches exact flattened order for the requested canonical name,
+and owns existing Loading/LoadingCompute/Missing/Duplicate results with exact
+first/conflicting ordinals. It owns no event batch. Core already depends one way
+on loading, so a hidden loading -> core API is natural; moving this owner or
+adding a reverse dependency is forbidden.
+
+Generated definition has one production consumer, canonical repository
+definition at line 467. Canonical definition checks the parallel selected
+definition first at 428 and reaches generated only after selected Missing. Root
+apparent mapping independently computes root repository mapping at 678 and
+computes canonical definition only for non-root contexts at 704. Root apparent
+definition later consumes root mapping and canonical definition at 266/310,
+then route, source-input and source-path form the remaining production chain.
+The private source-observation key is callerless, and command/bootstrap scans
+contain no validation or generated-definition key. These later, parallel or
+inactive owners cannot close the core visibility gap and are not prerequisites.
+
+Activate only
+`WP-6-7A-host-validated-module-extension-repositories-observation-carrier-promotion-design`.
+Freeze the existing observed validation key and constructor, existing carrier
+with borrowed concrete
+`Arc<Result<HostValidatedGeneratedRepositorySpecs,
+HostValidatedGeneratedRepositorySpecsError>>` and epoch accessors, and one
+opaque doc-hidden public observation-error wrapper. Decide the exact private-
+inner/public-wrapper projection at the observed Key boundary. Keep the result
+alias, fields, instantiation outer and terminal variants private. Add exactly
+three doc-hidden crate-root reexports; add no fourth type, inspector, adapter,
+copied carrier or semantic caller.
+
+Freeze one external loading-package API smoke that constructs only the key for
+unchanged Display and type-checks associated Value, carrier accessors and opaque
+outer through a nonexecuted function pointer. It must not construct a carrier/
+outer, inspect a terminal, compute a key or activate core. Prospective authority
+is exactly validation production/colocated proof at baseline 1,810 with tests at
+437, `lib.rs` at 86, and new
+`tests/validated_repository_observation_api.rs`. Caps are <=70 production, <=40
+colocated proof, <=60 external proof and <=170 aggregate semantic; physical
+caps are 1,880/95/60 and each changed helper/test remains below 100.
+
+Preserve exact key identity/Display, Complete-only equality/validity, Result
+Arc/transaction-local epoch association, carrierless Need/outer behavior,
+lower-only print batches, batchless validation rows, warm silence, cancellation
+recovery and retained lifetime. Add no DICE edge, event owner, cache, task, lock
+or command state. Reuse the accepted validation proof and earlier doc-hidden
+carrier-promotion smoke pattern; visibility has no Bazel-visible oracle gap.
+
+Exact compatibility remains validation/generated values, errors, order,
+certificate iteration, equality and lower event ownership. The doc-hidden
+cross-crate carrier API and opaque outer are Slug-native. Generated observation,
+canonical/root-mapping/publication/command/bootstrap activation and exact Bazel
+identity bytes remain unsupported/deferred.
+
+The docs-only design authority is canonical/current/this Stage/routing at net
+caps <=40/<=180/<=220/<=30 and <=470 aggregate. Rust, tests, fixtures, oracles,
+Cargo/BUILD, APIs, exports and callers are read-only. Design ACCEPT may schedule
+exactly one visibility-only implementation, then return to generated-definition
+ownership. STOP implementation or compute activation, public field/alias/error
+inspection, fourth type/reexport, second key/carrier/adapter, core edits, reverse
+dependency, semantic/event/equality/retention drift, third production file,
+fixture/oracle work, cap/proof waiver, upper activation, milestone closure,
+M8/M7B or exact identity work. REPLAN before widening. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`

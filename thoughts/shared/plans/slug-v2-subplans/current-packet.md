@@ -1,154 +1,151 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-validated-module-extension-repositories-observation-implementation`
+Packet: `WP-6-7A-host-validated-module-extension-repositories-observation-carrier-promotion-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling and Rust base: `4b5e9d05`
+Scheduling and Rust base: `b8459b4e`
 
-## Goal and authority
+## Goal and design authority
 
-Add one private observed sibling for
-`HostValidatedModuleExtensionRepositoriesKey`. Preserve every public legacy
-validation value, error, order, iterator and lower event. Retain only the exact
-local semantic Result Arc plus the instantiation child transaction-local epoch.
-Do not activate generated, canonical or public repository publication.
+Design only the smallest loading -> core visibility surface that lets
+`HostGeneratedRepositoryDefinitionKey` name the accepted observed validation
+Key Value and borrowed carrier. Freeze an opaque public outer projection,
+exactly three doc-hidden reexports, one external-crate API smoke and bounded
+implementation authority. Do not edit Rust or activate generated, canonical,
+root-mapping, publication, command or bootstrap computation.
 
-Write authority is exactly
-`app/slug_loading_v2/src/module_extension_repository_validation.rs`, baseline
-1,173 physical lines with the owning test module at 332. Caps are <=220
-production, <=700 proof, <=920 aggregate semantic and <=2,100 physical. Add at
-most six production and five test helpers plus three observed tests; the shared
-driver stays below 120 and every changed helper/test below 200. Every other Rust
-file, test, fixture, oracle, Cargo/BUILD target, public API/export and caller is
-read-only. The owner remains cohesive because this file already owns the public
-legacy key/value/error, validation reducer, certificate iterator, real fixture
-and sole generated-publication boundary; splitting would expose retained
-internals or duplicate proof plumbing.
+Design write authority is exactly:
 
-## Exact owner and driver
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`, net <=40;
+- this manifest, net <=180;
+- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`,
+  net <=220; and
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md`, net <=30.
 
-Add exactly these private types:
+Aggregate net growth is <=470. Every Rust file, test, fixture, oracle,
+Cargo/BUILD target, API/export and caller is read-only. Schedule exactly one
+visibility-only implementation successor on ACCEPT or one narrower
+prerequisite/REPLAN.
 
-1. `HostValidatedModuleExtensionRepositoriesObservationKey`, a newtype over the
-   legacy key with the same workspace identity and `observed-{legacy Display}`;
-2. `ObservedHostValidatedGeneratedRepositorySpecs`, holding the exact local
+## Live visibility and ownership facts
+
+Accepted commit `b8459b4e` adds a callerless private validation observation at
+`module_extension_repository_validation.rs:178-343`. The key and constructor
+are private at 178-192, the carrier and borrowed accessors are private at
+220-235, `result()` names private alias `ValidatedRepositoriesResult`, and the
+private outer at 237 exposes the crate-internal instantiation outer directly.
+`lib.rs:63-72` reexports only the legacy validation certificate, error, outcome
+and key; it exports none of the three observed nominal types.
+
+`HostGeneratedRepositoryDefinitionKey` at
+`app/slug_core_v2/src/runtime/generated_repository_definition.rs:101-206` is
+the first and only production consumer of the legacy validation key. At 168 it
+computes that key, retains the validated certificate, scans its exact flattened
+order for the requested canonical name, and returns the existing Loading,
+LoadingCompute, Missing or Duplicate result with exact first/conflicting
+ordinals. It owns no event batch. Core already depends one way on loading; no
+reverse dependency or owner move is needed.
+
+The generated-definition key has one production consumer: canonical
+repository definition at line 467. Canonical definition first computes the
+parallel selected-module definition at 428 and consults generated definition
+only after an exact selected Missing. Root apparent mapping separately computes
+the root repository mapping at 678; only non-root contexts compute canonical
+definition at 704. Root apparent definition later resolves a root mapping
+target and computes canonical definition at
+`root_apparent_repository_definition.rs:310`. Root route, source-input and
+source-path are the remaining production chain; the private source-observation
+key is callerless, and command/bootstrap scans contain no validation or
+generated-definition key. Those serial/parallel or inactive boundaries cannot
+make the private validation carrier nameable in core and are false prerequisites.
+
+## Selected prerequisite and design questions
+
+The uniquely smaller successor is a carrier-promotion design, not generated
+publication ownership. Freeze exactly the minimum nominal surface:
+
+1. the existing validation observation key and public constructor;
+2. the existing observed validation carrier with public borrowed accessors
+   spelled using concrete
    `Arc<Result<HostValidatedGeneratedRepositorySpecs,
-   HostValidatedGeneratedRepositorySpecsError>>` and one
+   HostValidatedGeneratedRepositorySpecsError>>` and
    `PathObservationEpoch`; and
-3. `HostValidatedModuleExtensionRepositoriesObservationError`, with exactly
-   `Instantiation(HostInstantiatedModuleExtensionRepositoriesObservationError)`.
+3. one opaque doc-hidden public observation-error wrapper whose field and
+   instantiation terminal remain private.
 
-Keep every new field, Result alias and accessor private. Preserve the public
-legacy key, value, error and outcome alias unchanged. Use matching
-Debug/Clone/PartialEq/Eq/Hash/Allocative derives for the observed key and
-Debug/Clone/PartialEq/Eq/Allocative/Dupe for carrier and outer as their fields
-permit. Both keys retain Complete-only equality and validity.
+Determine the exact wrapper boundary required by Rust effective visibility.
+The expected precedent renames the current private outer to an inner enum and
+wraps only at the observed key's associated `Key::Value` boundary. Same-module
+validation proof may inspect the inner algebra; an external consumer must only
+carry the public opaque wrapper. Keep `ValidatedRepositoriesResult`, all fields,
+the instantiation outer and its Pure terminal private. Add no inspector,
+conversion trait, adapter key, copied carrier, reverse dependency or fourth
+nominal type.
 
-Refactor one Legacy/Observed driver. Legacy computes only
-`HostInstantiatedModuleExtensionRepositoriesKey`; Observed computes only
-`HostInstantiatedModuleExtensionRepositoriesObservationKey`. After successful
-instantiation semantics both call the existing `validate_repositories` exactly
-once and project the same public semantic Result. Do not duplicate, reorder or
-parallelize any validation or iterator behavior.
+Freeze exactly three `#[doc(hidden)]` crate-root reexports and one new external
+API smoke in the loading package. The smoke may construct only the observed key
+to assert its existing Display and type-check the associated Value, borrowed
+concrete Result/epoch accessors and opaque outer through a nonexecuted function
+pointer. It must not construct a carrier/outer, compute any key, inspect a
+terminal, add a semantic caller or activate core.
 
-## Exact terminal, order, epoch and event law
+## Prospective implementation boundary
 
-- Instantiation DICE compute failure remains existing semantic
-  `PrivateValidationError::InstantiationCompute` with an empty epoch.
-- Instantiation Need remains immediate Need. An observed opaque instantiation
-  outer maps only to the carrierless `Instantiation` outer; do not inspect or
-  rewrap its private terminal.
-- Accept a Complete instantiation carrier before semantics. Instantiation
-  semantic failure remains existing `PrivateValidationError::Instantiation`
-  inside `HostValidatedGeneratedRepositorySpecsError` and retains the complete
-  child epoch. Success passes the cloned instantiated value and same epoch into
-  local validation.
-- This parent has one observed child: add no merge stage and do not rebuild,
-  union or validate the epoch.
+Prospective Rust authority is exactly:
 
-Preserve exact local order. Count mismatch is first. For each paired receipt and
-instantiated request in extension order, full request mismatch precedes
-generated-name membership. Check imports in declaration order before overrides;
-a missing import passes only when generated or named by an override. Check
-overrides in declaration order: `must_exist && !exists` is MissingOverride,
-then `!must_exist && exists` is InjectCollision. First terminal wins.
+- production and colocated proof
+  `app/slug_loading_v2/src/module_extension_repository_validation.rs`, baseline
+  1,810 physical lines with tests at 437;
+- production reexports `app/slug_loading_v2/src/lib.rs`, baseline 86 physical
+  lines; and
+- one new external smoke
+  `app/slug_loading_v2/tests/validated_repository_observation_api.rs`.
 
-Join terminals retain the full predecessor. Validation terminals retain the
-predecessor, validated prefix count, current request, exact Import/Override
-offender and exact error. Success retains that predecessor through the existing
-public flattened exact-size certificate iterator. Every semantic result keeps
-the complete child epoch.
+The design must hold <=70 production, <=40 colocated proof, <=60 external proof
+and <=170 aggregate semantic lines; physical caps are 1,880/95/60. Every
+changed helper/test stays below 100. The large validation file remains cohesive
+because it owns the private driver, carrier and terminal representation; the
+external smoke is the narrow public-visibility witness. No split or hot-path
+measurement is warranted for a visibility-only change.
 
-Validation stores no evaluation event data. Fresh load/invocation batches stay
-owned by the pure subtree; instantiation and validation rows are batchless on
-success and every semantic terminal. Need, opaque outer and cancellation
-publish no parent carrier or batch. Warm validation reuse is silent, and a
-Reused instantiation child never replays a batch.
+Preserve the accepted validation key identity and Display, Complete-only
+equality/validity, exact Result Arc and transaction-local epoch association,
+carrierless Need/outer behavior, lower-only print ownership, batchless
+validation rows, warm silence, cancellation recovery and retained lifetime.
+Add no DICE dependency, event owner, cache, lock, task or command state.
 
-The only new DICE-retained state is the validation Result Arc plus accepted
-instantiation epoch. The Result already owns the predecessor and all public
-certificate projections. Generated-name set, paired iterators, driver mode and
-child projection remain compute scratch. Retain no duplicate certificate,
-evaluator heap, event batch, side cache, task, lock or command state. Ordinary
-DICE owns equality cutoff, invalidation, eviction and cancellation; dropping
-the compute cannot publish a partial carrier, and recovery recomputes normally.
-
-## Proof and validation
-
-Add exactly:
-
-- `observed_validation_identity_finisher_and_terminal_algebra`;
-- `observed_validation_real_order_events_and_parity`; and
-- `observed_validation_lifecycle_cancellation_and_nonactivation`.
-
-Together prove key/hash/Display/equality/validity; one-child/no-merge projection;
-count/request Join and Import/Override offender prefixes; legacy/observed
-semantic parity for success, instantiation error, MissingImport,
-MissingOverride and InjectCollision; exact legacy/observed family and
-single-child dependency rows; Need and first-terminal suppression; exact lower
-print batches, batchless validation and warm silence; held Result/carrier/epoch
-A -> B -> A for import/override and generated-repository changes; one
-same-semantic/different-epoch observation-metadata axis; each carrier epoch as a
-subset of its own transaction global epoch; poll-drop recovery; and zero
-legacy-validation/generated/canonical/public/root-mapping activation. Compare
-separate transactions semantically and require Arc identity only for an exact
-cached value proven Reused.
-
-The instantiation outer stays opaque. Reuse its accepted same-module Pure proof
-and add only a static private-producer scan plus the real observed dependency
-row; do not expose an accessor or construct invalid epochs. Reuse Bazel 9.2
-`SingleExtensionFunction`, `SingleExtensionEvalFunction` and
-`ModuleExtensionResolutionTest` evidence; add no oracle or fixture. Buck2 DICE
-incrementality/cancellation/activation tests are concept/test evidence only.
-
-Run serially:
-
-- focused `observed_validation_` tests;
-- protected `real_validation_`, `observed_instantiation_` and `real_key_` tests;
-- full `cargo test -p slug_loading_v2`;
-- direct dependent `cargo check -p slug_core_v2`;
-- `cargo fmt --all -- --check`; and
-- `git diff --check`.
+Reuse accepted validation identity/family/order/error/event/lifecycle/
+cancellation/nonactivation proof and the prior Bzlmod carrier-promotion smoke
+pattern. Add no oracle because visibility changes no Bazel-visible behavior.
+The implementation design must require focused `observed_validation_`, the
+external smoke, protected `real_validation_` and generated-definition tests,
+full `cargo test -p slug_loading_v2`, direct dependent
+`cargo check -p slug_core_v2`, formatting and `git diff --check`.
 
 ## Compatibility and terminal
 
-Existing validation values/errors/order, import/override polarity, public
-certificate iteration, DICE equality and pure-owned events remain exact Bazel 9
-compatibility. The private observation key/carrier/outer and Result-Arc/epoch
-association are Slug-native. Generated/public/root-mapping/bootstrap observation
-activation and exact Bazel configuration/output/ActionKey bytes remain
-unsupported/deferred.
+Existing validation/generated values, errors, order, iterator projection,
+DICE equality and lower event ownership remain exact Bazel 9 compatibility.
+The doc-hidden cross-crate observation key/carrier/opaque outer and shared-Arc
+transaction-local epoch association are Slug-native. Generated observation and
+canonical/root-mapping/publication/command/bootstrap activation plus exact
+Bazel configuration/output/ActionKey bytes remain unsupported/deferred.
 
-ACCEPT returns only to a docs-only generated repository publication frontier
-audit. STOP a second file/key/owner/adapter, public API/lib export/caller change,
-legacy/instantiation/validation semantic drift, parent event batch, epoch
-merge/rebuild, retained scratch/evaluator state, lock/task across DICE,
-generated/canonical/public/root-mapping/bootstrap activation, fixture/oracle
-work, proof/cap waiver, milestone closure, M8/M7B or exact identity work. REPLAN
-before widening. M7 remains partial and M7A -> M8 -> M7B remains.
+Design ACCEPT schedules exactly
+`WP-6-7A-host-validated-module-extension-repositories-observation-carrier-promotion-implementation`.
+After implementation ACCEPT, return only to a docs-only
+`HostGeneratedRepositoryDefinitionKey` observation-owner design. STOP any
+semantic consumer or compute activation, public field/alias/error inspector,
+fourth type/reexport, second key/carrier/adapter, validation/generated semantic
+or event/equality/retention change, core source change, reverse dependency,
+fixture/oracle or Cargo/BUILD work, third production file, cap/proof waiver,
+canonical/root-mapping/publication/command/bootstrap activation, milestone
+closure, M8/M7B or exact identity work. REPLAN before widening. M7 remains
+partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-`4b5e9d05` exposes exactly the accepted opaque instantiation observation key,
-carrier, concrete Result accessor and epoch accessor to validation without a
-caller. Live trace proves validation has no other semantic child.
+`b8459b4e` accepts the one-child observed validation owner at +666/-29 total
+and 1,810 physical lines. Its sole missing input to generated publication is
+cross-crate effective visibility; canonical selection, root mapping and all
+public/runtime boundaries are later or parallel.
