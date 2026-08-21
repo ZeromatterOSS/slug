@@ -25,7 +25,10 @@ use slug_bzlmod_v2::HostRepositoryLocalPathPolicy;
 use slug_bzlmod_v2::HostRootRepositoryMapping;
 use slug_bzlmod_v2::HostRootRepositoryMappingError;
 use slug_bzlmod_v2::HostRootRepositoryMappingKey;
+use slug_bzlmod_v2::HostRootRepositoryMappingObservationError;
+use slug_bzlmod_v2::HostRootRepositoryMappingObservationKey;
 use slug_bzlmod_v2::RepoSpec;
+use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalRepoName;
@@ -827,13 +830,133 @@ impl fmt::Display for HostCanonicalRepositoryApparentMappingKey {
     }
 }
 
-fn complete_mapping(
+#[rustfmt::skip]
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct HostCanonicalRepositoryApparentMappingObservationKey(HostCanonicalRepositoryApparentMappingKey);
+
+#[rustfmt::skip]
+#[allow(dead_code)]
+impl HostCanonicalRepositoryApparentMappingObservationKey {
+    fn new(workspace: NormalizedAbsolutePath, context_repo: CanonicalRepoName, apparent_repo: ApparentRepoName) -> Self { Self(HostCanonicalRepositoryApparentMappingKey::new(workspace, context_repo, apparent_repo)) }
+}
+
+impl fmt::Display for HostCanonicalRepositoryApparentMappingObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[rustfmt::skip]
+type CanonicalRepositoryApparentMappingResult = Arc<Result<HostCanonicalRepositoryApparentMapping, HostCanonicalRepositoryApparentMappingError>>;
+
+#[rustfmt::skip]
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedHostCanonicalRepositoryApparentMapping { result: CanonicalRepositoryApparentMappingResult, observations: PathObservationEpoch }
+
+#[rustfmt::skip]
+#[allow(dead_code)]
+impl ObservedHostCanonicalRepositoryApparentMapping {
+    fn result(&self) -> &CanonicalRepositoryApparentMappingResult { &self.result }
+    fn observations(&self) -> &PathObservationEpoch { &self.observations }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+enum HostCanonicalRepositoryApparentMappingObservationError {
+    RootMapping(HostRootRepositoryMappingObservationError),
+    Definition(HostCanonicalRepositoryDefinitionObservationError),
+}
+
+#[rustfmt::skip]
+#[allow(dead_code)]
+#[derive(Clone, Copy)]
+enum CanonicalRepositoryApparentMappingMode { Legacy, Observed }
+
+enum CanonicalRepositoryApparentMappingChildOutcome {
+    Need(SourcePreparationNeeds),
+    Outer(HostCanonicalRepositoryApparentMappingObservationError),
+    Complete {
+        result: Result<ApparentMappingPredecessor, HostCanonicalRepositoryApparentMappingErrorKind>,
+        observations: PathObservationEpoch,
+    },
+}
+
+#[rustfmt::skip]
+type CanonicalRepositoryApparentMappingDriverOutcome = SourcePreparationOutcome<Result<(CanonicalRepositoryApparentMappingResult, PathObservationEpoch), HostCanonicalRepositoryApparentMappingObservationError>>;
+
+fn complete_canonical_apparent_mapping_driver(
+    key: &HostCanonicalRepositoryApparentMappingKey,
     value: Result<
         HostCanonicalRepositoryApparentMapping,
-        HostCanonicalRepositoryApparentMappingError,
+        HostCanonicalRepositoryApparentMappingErrorKind,
     >,
-) -> HostCanonicalRepositoryApparentMappingOutcome {
-    SourcePreparationOutcome::Complete(Arc::new(value))
+    observations: PathObservationEpoch,
+) -> CanonicalRepositoryApparentMappingDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((
+        Arc::new(
+            value.map_err(|kind| HostCanonicalRepositoryApparentMappingError {
+                context_repo: key.context_repo.clone(),
+                apparent_repo: key.apparent_repo.clone(),
+                kind,
+            }),
+        ),
+        observations,
+    )))
+}
+
+#[rustfmt::skip]
+async fn root_mapping_apparent_mapping_child(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostCanonicalRepositoryApparentMappingKey,
+    mode: CanonicalRepositoryApparentMappingMode,
+) -> CanonicalRepositoryApparentMappingChildOutcome {
+    let (result, observations) = match mode {
+        CanonicalRepositoryApparentMappingMode::Legacy => match ctx.compute(&HostRootRepositoryMappingKey::new(key.workspace.clone())).await {
+            Err(error) => return CanonicalRepositoryApparentMappingChildOutcome::Complete { result: Err(HostCanonicalRepositoryApparentMappingErrorKind::RootMappingCompute(error.to_string().into())), observations: PathObservationEpoch::empty() },
+            Ok(SourcePreparationOutcome::Need(need)) => return CanonicalRepositoryApparentMappingChildOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(result)) => (result, PathObservationEpoch::empty()),
+        },
+        CanonicalRepositoryApparentMappingMode::Observed => match ctx.compute(&HostRootRepositoryMappingObservationKey::new(key.workspace.clone())).await {
+            Err(error) => return CanonicalRepositoryApparentMappingChildOutcome::Complete { result: Err(HostCanonicalRepositoryApparentMappingErrorKind::RootMappingCompute(error.to_string().into())), observations: PathObservationEpoch::empty() },
+            Ok(SourcePreparationOutcome::Need(need)) => return CanonicalRepositoryApparentMappingChildOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return CanonicalRepositoryApparentMappingChildOutcome::Outer(HostCanonicalRepositoryApparentMappingObservationError::RootMapping(error)),
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().clone(), observed.observations().clone()),
+        },
+    };
+    let result = match result.as_ref() {
+        Ok(value) => Ok(ApparentMappingPredecessor::Root(value.clone())),
+        Err(error) => Err(HostCanonicalRepositoryApparentMappingErrorKind::RootMapping(error.clone())),
+    };
+    CanonicalRepositoryApparentMappingChildOutcome::Complete { result, observations }
+}
+
+#[rustfmt::skip]
+async fn canonical_definition_apparent_mapping_child(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostCanonicalRepositoryApparentMappingKey,
+    mode: CanonicalRepositoryApparentMappingMode,
+) -> CanonicalRepositoryApparentMappingChildOutcome {
+    let (result, observations) = match mode {
+        CanonicalRepositoryApparentMappingMode::Legacy => match ctx.compute(&HostCanonicalRepositoryDefinitionKey::new(key.workspace.clone(), key.context_repo.clone())).await {
+            Err(error) => return CanonicalRepositoryApparentMappingChildOutcome::Complete { result: Err(HostCanonicalRepositoryApparentMappingErrorKind::DefinitionCompute(error.to_string().into())), observations: PathObservationEpoch::empty() },
+            Ok(SourcePreparationOutcome::Need(need)) => return CanonicalRepositoryApparentMappingChildOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(result)) => (result, PathObservationEpoch::empty()),
+        },
+        CanonicalRepositoryApparentMappingMode::Observed => match ctx.compute(&HostCanonicalRepositoryDefinitionObservationKey::new(key.workspace.clone(), key.context_repo.clone())).await {
+            Err(error) => return CanonicalRepositoryApparentMappingChildOutcome::Complete { result: Err(HostCanonicalRepositoryApparentMappingErrorKind::DefinitionCompute(error.to_string().into())), observations: PathObservationEpoch::empty() },
+            Ok(SourcePreparationOutcome::Need(need)) => return CanonicalRepositoryApparentMappingChildOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return CanonicalRepositoryApparentMappingChildOutcome::Outer(HostCanonicalRepositoryApparentMappingObservationError::Definition(error)),
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().clone(), observed.observations().clone()),
+        },
+    };
+    let result = match result.as_ref() {
+        Ok(value) => Ok(ApparentMappingPredecessor::Canonical(value.clone())),
+        Err(error) => Err(HostCanonicalRepositoryApparentMappingErrorKind::Definition(
+            error.clone(),
+        )),
+    };
+    CanonicalRepositoryApparentMappingChildOutcome::Complete { result, observations }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -858,112 +981,149 @@ fn mapping_lookup_status(
     }
 }
 
+fn finish_canonical_repository_apparent_mapping(
+    key: &HostCanonicalRepositoryApparentMappingKey,
+    child: CanonicalRepositoryApparentMappingChildOutcome,
+) -> CanonicalRepositoryApparentMappingDriverOutcome {
+    let (predecessor, observations) = match child {
+        CanonicalRepositoryApparentMappingChildOutcome::Need(need) => {
+            return SourcePreparationOutcome::Need(need);
+        }
+        CanonicalRepositoryApparentMappingChildOutcome::Outer(error) => {
+            return SourcePreparationOutcome::Complete(Err(error));
+        }
+        CanonicalRepositoryApparentMappingChildOutcome::Complete {
+            result: Err(kind),
+            observations,
+        } => {
+            return complete_canonical_apparent_mapping_driver(key, Err(kind), observations);
+        }
+        CanonicalRepositoryApparentMappingChildOutcome::Complete {
+            result: Ok(predecessor),
+            observations,
+        } => (predecessor, observations),
+    };
+    let Some((canonical_repo, mapping_context)) = predecessor.contexts() else {
+        return complete_canonical_apparent_mapping_driver(
+            key,
+            Err(HostCanonicalRepositoryApparentMappingErrorKind::ContextMismatch { predecessor }),
+            observations,
+        );
+    };
+    let status = mapping_lookup_status(&key.context_repo, canonical_repo, mapping_context, || {
+        match &predecessor {
+            ApparentMappingPredecessor::Root(value) => value
+                .view()
+                .is_some_and(|view| view.mapping().any(|(name, _)| name == &key.apparent_repo)),
+            ApparentMappingPredecessor::Canonical(value) => {
+                value.mapping_target(&key.apparent_repo).is_some()
+            }
+        }
+    });
+    let value = match status {
+        MappingLookupStatus::ContextMismatch => {
+            Err(HostCanonicalRepositoryApparentMappingErrorKind::ContextMismatch { predecessor })
+        }
+        MappingLookupStatus::Missing => {
+            Err(HostCanonicalRepositoryApparentMappingErrorKind::Missing { predecessor })
+        }
+        MappingLookupStatus::Found => Ok(HostCanonicalRepositoryApparentMapping {
+            predecessor,
+            apparent_repo: key.apparent_repo.clone(),
+        }),
+    };
+    complete_canonical_apparent_mapping_driver(key, value, observations)
+}
+
+async fn compute_canonical_repository_apparent_mapping(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostCanonicalRepositoryApparentMappingKey,
+    mode: CanonicalRepositoryApparentMappingMode,
+) -> CanonicalRepositoryApparentMappingDriverOutcome {
+    if key.apparent_repo.is_root() && !key.context_repo.is_root() {
+        return complete_canonical_apparent_mapping_driver(
+            key,
+            Err(HostCanonicalRepositoryApparentMappingErrorKind::RootApparent),
+            PathObservationEpoch::empty(),
+        );
+    }
+    let child = if key.context_repo.is_root() {
+        root_mapping_apparent_mapping_child(ctx, key, mode).await
+    } else {
+        canonical_definition_apparent_mapping_child(ctx, key, mode).await
+    };
+    finish_canonical_repository_apparent_mapping(key, child)
+}
+
+fn project_legacy_canonical_repository_apparent_mapping(
+    outcome: CanonicalRepositoryApparentMappingDriverOutcome,
+) -> HostCanonicalRepositoryApparentMappingOutcome {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+            debug_assert!(observations.observations().is_empty());
+            SourcePreparationOutcome::Complete(result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy canonical apparent mapping has no observed outer")
+        }
+    }
+}
+
 #[async_trait]
 impl Key for HostCanonicalRepositoryApparentMappingKey {
     type Value = HostCanonicalRepositoryApparentMappingOutcome;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let terminal = |kind| {
-            complete_mapping(Err(HostCanonicalRepositoryApparentMappingError {
-                context_repo: self.context_repo.clone(),
-                apparent_repo: self.apparent_repo.clone(),
-                kind,
-            }))
-        };
-        if self.apparent_repo.is_root() && !self.context_repo.is_root() {
-            return terminal(HostCanonicalRepositoryApparentMappingErrorKind::RootApparent);
-        }
+        project_legacy_canonical_repository_apparent_mapping(
+            compute_canonical_repository_apparent_mapping(
+                ctx,
+                self,
+                CanonicalRepositoryApparentMappingMode::Legacy,
+            )
+            .await,
+        )
+    }
 
-        let predecessor = if self.context_repo.is_root() {
-            match ctx
-                .compute(&HostRootRepositoryMappingKey::new(self.workspace.clone()))
-                .await
-            {
-                Ok(SourcePreparationOutcome::Need(need)) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                    Ok(value) => ApparentMappingPredecessor::Root(value.clone()),
-                    Err(error) => {
-                        return terminal(
-                            HostCanonicalRepositoryApparentMappingErrorKind::RootMapping(
-                                error.clone(),
-                            ),
-                        );
-                    }
-                },
-                Err(error) => {
-                    return terminal(
-                        HostCanonicalRepositoryApparentMappingErrorKind::RootMappingCompute(
-                            error.to_string().into(),
-                        ),
-                    );
-                }
-            }
-        } else {
-            match ctx
-                .compute(&HostCanonicalRepositoryDefinitionKey::new(
-                    self.workspace.clone(),
-                    self.context_repo.clone(),
-                ))
-                .await
-            {
-                Ok(SourcePreparationOutcome::Need(need)) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                    Ok(value) => ApparentMappingPredecessor::Canonical(value.clone()),
-                    Err(error) => {
-                        return terminal(
-                            HostCanonicalRepositoryApparentMappingErrorKind::Definition(
-                                error.clone(),
-                            ),
-                        );
-                    }
-                },
-                Err(error) => {
-                    return terminal(
-                        HostCanonicalRepositoryApparentMappingErrorKind::DefinitionCompute(
-                            error.to_string().into(),
-                        ),
-                    );
-                }
-            }
-        };
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
 
-        let Some((canonical_repo, mapping_context)) = predecessor.contexts() else {
-            return terminal(
-                HostCanonicalRepositoryApparentMappingErrorKind::ContextMismatch { predecessor },
-            );
-        };
-        match mapping_lookup_status(&self.context_repo, canonical_repo, mapping_context, || {
-            match &predecessor {
-                ApparentMappingPredecessor::Root(value) => value.view().is_some_and(|view| {
-                    view.mapping().any(|(name, _)| name == &self.apparent_repo)
-                }),
-                ApparentMappingPredecessor::Canonical(value) => {
-                    value.mapping_target(&self.apparent_repo).is_some()
-                }
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostCanonicalRepositoryApparentMappingObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostCanonicalRepositoryApparentMapping,
+            HostCanonicalRepositoryApparentMappingObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match compute_canonical_repository_apparent_mapping(
+            ctx,
+            &self.0,
+            CanonicalRepositoryApparentMappingMode::Observed,
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
             }
-        }) {
-            MappingLookupStatus::ContextMismatch => {
-                return terminal(
-                    HostCanonicalRepositoryApparentMappingErrorKind::ContextMismatch {
-                        predecessor,
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(
+                    ObservedHostCanonicalRepositoryApparentMapping {
+                        result,
+                        observations,
                     },
-                );
+                ))
             }
-            MappingLookupStatus::Missing => {
-                return terminal(HostCanonicalRepositoryApparentMappingErrorKind::Missing {
-                    predecessor,
-                });
-            }
-            MappingLookupStatus::Found => {}
         }
-        complete_mapping(Ok(HostCanonicalRepositoryApparentMapping {
-            predecessor,
-            apparent_repo: self.apparent_repo.clone(),
-        }))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1470,6 +1630,68 @@ ext=module_extension(implementation=impl)
         match value {
             SourcePreparationOutcome::Complete(Ok(value)) => value,
             value => panic!("expected observed canonical definition carrier: {value:?}"),
+        }
+    }
+
+    fn observed_apparent_mapping_carrier(
+        value: &<HostCanonicalRepositoryApparentMappingObservationKey as Key>::Value,
+    ) -> &ObservedHostCanonicalRepositoryApparentMapping {
+        match value {
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+            value => panic!("expected observed apparent mapping carrier: {value:?}"),
+        }
+    }
+
+    fn assert_apparent_epoch_current(epoch: &PathObservationEpoch, global: &PathObservationEpoch) {
+        for (demand, result) in epoch.observations() {
+            assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref());
+        }
+    }
+
+    fn activation_dependencies(tracker: &LookupTracker, key: &str) -> Vec<String> {
+        tracker
+            .dependencies
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(name, _)| name == key)
+            .unwrap_or_else(|| panic!("missing dependency row for {key}"))
+            .1
+            .clone()
+    }
+
+    fn starlark_print_owners(tracker: &LookupTracker) -> Vec<(String, String)> {
+        tracker
+            .activations
+            .lock()
+            .unwrap()
+            .iter()
+            .flat_map(|(name, _, batch)| {
+                batch
+                    .iter()
+                    .flat_map(EventBatch::events)
+                    .filter_map(|event| match event {
+                        EvaluationEvent::StarlarkPrint { text, .. } => {
+                            Some((name.clone(), text.to_string()))
+                        }
+                        _ => None,
+                    })
+            })
+            .collect()
+    }
+
+    fn assert_activation_families_absent(tracker: &LookupTracker, families: &[&str]) {
+        let activations = tracker.activations.lock().unwrap();
+        let dependencies = tracker.dependencies.lock().unwrap();
+        for family in families {
+            assert!(
+                activations
+                    .iter()
+                    .all(|(name, _, _)| !name.starts_with(family))
+            );
+            assert!(dependencies.iter().all(|(name, children)| {
+                !name.starts_with(family) && children.iter().all(|child| !child.starts_with(family))
+            }));
         }
     }
 
@@ -3217,6 +3439,284 @@ second=module_extension(implementation=second_impl)
         assert!(!producer.contains("HostRootRepositoryMappingKey"));
         assert!(!producer.contains("RootModuleBootstrap"));
         assert!(!producer.contains("CaptureEvaluationEvents"));
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_canonical_repository_apparent_mapping_identity_branch_and_terminal_algebra() {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let root = CanonicalRepoName::root();
+        let first = ApparentRepoName::new("first").unwrap();
+        let key = HostCanonicalRepositoryApparentMappingObservationKey::new(workspace.clone(), root.clone(), first.clone());
+        let same = HostCanonicalRepositoryApparentMappingObservationKey::new(workspace.clone(), root.clone(), first.clone());
+        let other = HostCanonicalRepositoryApparentMappingObservationKey::new(workspace.clone(), root.clone(), ApparentRepoName::new("second").unwrap());
+        let hash = |value: &HostCanonicalRepositoryApparentMappingObservationKey| { let mut state = DefaultHasher::new(); value.hash(&mut state); state.finish() };
+        assert_eq!(key, same); assert_ne!(key, other); assert_eq!(hash(&key), hash(&same)); assert_ne!(hash(&key), hash(&other));
+        assert_eq!(key.to_string(), "observed-host-canonical-repository-apparent-mapping:\"/generated-repository-definition\":@@:@first");
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(LookupTracker::default());
+        let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+        let generated = names(&validated(&mut tx).await).remove(0);
+        tracker.dependencies.lock().unwrap().clear();
+        let root_value = tx.compute(&key).await.unwrap();
+        let root_carrier = observed_apparent_mapping_carrier(&root_value);
+        let root_child_key = HostRootRepositoryMappingObservationKey::new(workspace.clone());
+        let root_child_value = tx.compute(&root_child_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(root_child)) = root_child_value else { panic!("root child must complete") };
+        assert_eq!(root_carrier.observations(), root_child.observations());
+        assert_eq!(activation_dependencies(&tracker, &key.to_string()), [root_child_key.to_string()]);
+        assert!(matches!(root_carrier.result().as_ref(), Ok(HostCanonicalRepositoryApparentMapping { predecessor: ApparentMappingPredecessor::Root(_), .. })));
+
+        let nonroot_key = HostCanonicalRepositoryApparentMappingObservationKey::new(workspace.clone(), generated.clone(), first.clone());
+        let nonroot_value = tx.compute(&nonroot_key).await.unwrap();
+        let nonroot_carrier = observed_apparent_mapping_carrier(&nonroot_value);
+        let definition_child_key = HostCanonicalRepositoryDefinitionObservationKey::new(workspace.clone(), generated.clone());
+        let definition_child_value = tx.compute(&definition_child_key).await.unwrap();
+        let definition_child = observed_canonical_carrier(&definition_child_value);
+        assert_eq!(nonroot_carrier.observations(), definition_child.observations());
+        assert_eq!(activation_dependencies(&tracker, &nonroot_key.to_string()), [definition_child_key.to_string()]);
+        assert!(matches!(nonroot_carrier.result().as_ref(), Ok(HostCanonicalRepositoryApparentMapping { predecessor: ApparentMappingPredecessor::Canonical(_), .. })));
+        assert!(HostCanonicalRepositoryApparentMappingObservationKey::validity(&nonroot_value));
+        assert!(HostCanonicalRepositoryApparentMappingObservationKey::equality(&nonroot_value, &nonroot_value));
+
+        let epoch_only = SourcePreparationOutcome::Complete(Ok(ObservedHostCanonicalRepositoryApparentMapping { result: nonroot_carrier.result().clone(), observations: PathObservationEpoch::empty() }));
+        assert!(!HostCanonicalRepositoryApparentMappingObservationKey::equality(&nonroot_value, &epoch_only));
+        let root_apparent_key = HostCanonicalRepositoryApparentMappingObservationKey::new(workspace.clone(), generated.clone(), ApparentRepoName::root());
+        let root_apparent = tx.compute(&root_apparent_key).await.unwrap();
+        assert!(matches!(observed_apparent_mapping_carrier(&root_apparent).result().as_ref(), Err(HostCanonicalRepositoryApparentMappingError { kind: HostCanonicalRepositoryApparentMappingErrorKind::RootApparent, .. })));
+        assert!(observed_apparent_mapping_carrier(&root_apparent).observations().observations().is_empty());
+        assert!(activation_dependencies(&tracker, &root_apparent_key.to_string()).is_empty());
+
+        let need_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let _ = transaction(&need_dice, MODULE, EXTENSION_A, true, None).await;
+        let mut updater = need_dice.updater();
+        updater.changed_to(vec![(PathObservationEpochKey, PathObservationEpoch::empty())]).unwrap();
+        let need = updater.commit().await.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Need(needs) = &need else { panic!("observed parent must need") };
+        assert!(!HostCanonicalRepositoryApparentMappingObservationKey::validity(&need));
+        assert!(!HostCanonicalRepositoryApparentMappingObservationKey::equality(&need, &need));
+        assert!(matches!(finish_canonical_repository_apparent_mapping(&key.0, CanonicalRepositoryApparentMappingChildOutcome::Need(needs.clone())), SourcePreparationOutcome::Need(_)));
+
+        for kind in [HostCanonicalRepositoryApparentMappingErrorKind::RootMappingCompute("root-dice".into()), HostCanonicalRepositoryApparentMappingErrorKind::DefinitionCompute("definition-dice".into())] {
+            let complete = finish_canonical_repository_apparent_mapping(&key.0, CanonicalRepositoryApparentMappingChildOutcome::Complete { result: Err(kind), observations: PathObservationEpoch::empty() });
+            assert!(matches!(complete, SourcePreparationOutcome::Complete(Ok((result, observations))) if result.is_err() && observations.observations().is_empty()));
+        }
+        let mismatch_key = HostCanonicalRepositoryApparentMappingKey::new(workspace.clone(), root.clone(), first.clone());
+        let predecessor = definition_child.result().as_ref().as_ref().unwrap().clone();
+        let mismatch = finish_canonical_repository_apparent_mapping(&mismatch_key, CanonicalRepositoryApparentMappingChildOutcome::Complete { result: Ok(ApparentMappingPredecessor::Canonical(predecessor.clone())), observations: definition_child.observations().clone() });
+        assert!(matches!(mismatch, SourcePreparationOutcome::Complete(Ok((result, observations))) if matches!(result.as_ref(), Err(HostCanonicalRepositoryApparentMappingError { kind: HostCanonicalRepositoryApparentMappingErrorKind::ContextMismatch { predecessor: ApparentMappingPredecessor::Canonical(_) }, .. })) && observations == *definition_child.observations()));
+        let missing_key = HostCanonicalRepositoryApparentMappingKey::new(workspace.clone(), generated.clone(), ApparentRepoName::new("missing").unwrap());
+        let missing = finish_canonical_repository_apparent_mapping(&missing_key, CanonicalRepositoryApparentMappingChildOutcome::Complete { result: Ok(ApparentMappingPredecessor::Canonical(predecessor.clone())), observations: definition_child.observations().clone() });
+        assert!(matches!(missing, SourcePreparationOutcome::Complete(Ok((result, observations))) if matches!(result.as_ref(), Err(HostCanonicalRepositoryApparentMappingError { kind: HostCanonicalRepositoryApparentMappingErrorKind::Missing { predecessor: ApparentMappingPredecessor::Canonical(_) }, .. })) && observations == *definition_child.observations()));
+        let success = finish_canonical_repository_apparent_mapping(&nonroot_key.0, CanonicalRepositoryApparentMappingChildOutcome::Complete { result: Ok(ApparentMappingPredecessor::Canonical(predecessor)), observations: definition_child.observations().clone() });
+        assert!(matches!(success, SourcePreparationOutcome::Complete(Ok((result, observations))) if result.as_ref().as_ref().unwrap().resolved_target() == nonroot_carrier.result().as_ref().as_ref().unwrap().resolved_target() && observations == *definition_child.observations()));
+
+        let bad_root_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut bad_root_tx = transaction(&bad_root_dice, "this is not valid Starlark\n", EXTENSION_A, true, None).await;
+        let bad_root = bad_root_tx.compute(&key).await.unwrap();
+        assert!(matches!(observed_apparent_mapping_carrier(&bad_root).result().as_ref(), Err(HostCanonicalRepositoryApparentMappingError { kind: HostCanonicalRepositoryApparentMappingErrorKind::RootMapping(_), .. })));
+        let bad_definition_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut bad_definition_tx = transaction(&bad_definition_dice, MODULE, EXTENSION_A, false, None).await;
+        let bad_definition = bad_definition_tx.compute(&nonroot_key).await.unwrap();
+        assert!(matches!(observed_apparent_mapping_carrier(&bad_definition).result().as_ref(), Err(HostCanonicalRepositoryApparentMappingError { kind: HostCanonicalRepositoryApparentMappingErrorKind::Definition(_), .. })));
+
+        let missing_definition = tx.compute(&HostCanonicalRepositoryDefinitionKey::new(workspace.clone(), CanonicalRepoName::new("missing").unwrap())).await.unwrap();
+        let SourcePreparationOutcome::Complete(missing_definition) = missing_definition else { panic!("missing definition must complete") };
+        let HostCanonicalRepositoryDefinitionErrorKind::Missing { selected_missing, .. } = &missing_definition.as_ref().as_ref().unwrap_err().kind else { panic!("missing definition terminal expected") };
+        let conflict = merge_canonical_observations(&generated_definition_observation_epoch(MODULE, EXTENSION_A, true), &generated_definition_observation_epoch(&format!("{MODULE}\n"), EXTENSION_A, true)).unwrap_err();
+        let outer = finish_canonical_repository_apparent_mapping(&nonroot_key.0, CanonicalRepositoryApparentMappingChildOutcome::Outer(HostCanonicalRepositoryApparentMappingObservationError::Definition(HostCanonicalRepositoryDefinitionObservationError::Merge { selected_missing: selected_missing.clone(), error: conflict })));
+        let outer_value: <HostCanonicalRepositoryApparentMappingObservationKey as Key>::Value = match outer { SourcePreparationOutcome::Complete(Err(error @ HostCanonicalRepositoryApparentMappingObservationError::Definition(_))) => SourcePreparationOutcome::Complete(Err(error)), _ => panic!("definition outer expected") };
+        assert!(HostCanonicalRepositoryApparentMappingObservationKey::validity(&outer_value));
+        assert!(HostCanonicalRepositoryApparentMappingObservationKey::equality(&outer_value, &outer_value));
+
+        let source = include_str!("generated_repository_definition.rs");
+        let producer = &source[source.find("type CanonicalRepositoryApparentMappingResult").unwrap()..source.find("#[cfg(test)]").unwrap()];
+        assert_eq!(producer.matches("HostRootRepositoryMappingObservationKey::new").count(), 1);
+        assert_eq!(producer.matches("HostCanonicalRepositoryDefinitionObservationKey::new").count(), 1);
+        assert!(producer.contains("HostCanonicalRepositoryApparentMappingObservationError::RootMapping(error)"));
+        assert!(producer.contains("HostCanonicalRepositoryApparentMappingObservationError::Definition(error)"));
+        for forbidden in ["merge_canonical_observations", "union_", "store_evaluation_data", "HostRootApparentRepositoryDefinitionKey"] { assert!(!producer.contains(forbidden)); }
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_canonical_repository_apparent_mapping_real_branches_events_and_parity() {
+        let extension = r#"print('load')
+repo=repository_rule(implementation=lambda ctx: None)
+def first_impl(ctx):
+    print('invoke-first')
+    repo(name='first')
+def second_impl(ctx):
+    print('invoke-second')
+    repo(name='second')
+first=module_extension(implementation=first_impl)
+second=module_extension(implementation=second_impl)
+"#;
+        let module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, second='second')\n";
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let prep = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut prep_tx = transaction(&prep, module, extension, true, None).await;
+        let generated = names(&validated(&mut prep_tx).await);
+        for (case, case_module, present, context, expected) in [
+            ("root-success", module, true, CanonicalRepoName::root(), "success"),
+            ("root-error", "this is not valid Starlark\n", true, CanonicalRepoName::root(), "root-error"),
+            ("nonroot-success", module, true, generated[0].clone(), "success"),
+            ("nonroot-error", module, false, generated[0].clone(), "definition-error"),
+        ] {
+            let observed_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let observed_tracker = Arc::new(LookupTracker::default());
+            let mut observed_tx = transaction(&observed_dice, case_module, extension, present, Some(observed_tracker.clone())).await;
+            let observed_key = HostCanonicalRepositoryApparentMappingObservationKey::new(workspace.clone(), context.clone(), ApparentRepoName::new("first").unwrap());
+            let observed_value = observed_tx.compute(&observed_key).await.unwrap();
+            let carrier = observed_apparent_mapping_carrier(&observed_value);
+            let (observed_child, legacy_child) = if context.is_root() {
+                (HostRootRepositoryMappingObservationKey::new(workspace.clone()).to_string(), HostRootRepositoryMappingKey::new(workspace.clone()).to_string())
+            } else {
+                (HostCanonicalRepositoryDefinitionObservationKey::new(workspace.clone(), context.clone()).to_string(), HostCanonicalRepositoryDefinitionKey::new(workspace.clone(), context.clone()).to_string())
+            };
+            assert_eq!(activation_dependencies(&observed_tracker, &observed_key.to_string()), [observed_child.clone()], "{case}");
+            assert!(observed_tracker.dependencies.lock().unwrap().iter().find(|(name, _)| name == &observed_key.to_string()).unwrap().1.iter().all(|child| child == &observed_child));
+            let observed_parent = observed_tracker.activations.lock().unwrap().iter().find(|(name, _, _)| name == &observed_key.to_string()).cloned().unwrap();
+            assert_eq!(observed_parent.1, ActivationKind::Evaluated); assert!(observed_parent.2.is_none());
+            let observed_prints = starlark_print_owners(&observed_tracker);
+
+            let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let legacy_tracker = Arc::new(LookupTracker::default());
+            let mut legacy_tx = transaction(&legacy_dice, case_module, extension, present, Some(legacy_tracker.clone())).await;
+            let legacy_key = HostCanonicalRepositoryApparentMappingKey::new(workspace.clone(), context.clone(), ApparentRepoName::new("first").unwrap());
+            let legacy_value = legacy_tx.compute(&legacy_key).await.unwrap();
+            assert_eq!(activation_dependencies(&legacy_tracker, &legacy_key.to_string()), [legacy_child], "{case}");
+            let SourcePreparationOutcome::Complete(legacy_result) = &legacy_value else { panic!("{case}: legacy must complete") };
+            assert_eq!(legacy_result.as_ref(), carrier.result().as_ref(), "{case}");
+            let child_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let child_tracker = Arc::new(LookupTracker::default());
+            let mut child_tx = transaction(&child_dice, case_module, extension, present, Some(child_tracker.clone())).await;
+            if context.is_root() {
+                let _ = child_tx.compute(&HostRootRepositoryMappingObservationKey::new(workspace.clone())).await.unwrap();
+            } else {
+                let _ = child_tx.compute(&HostCanonicalRepositoryDefinitionObservationKey::new(workspace.clone(), context.clone())).await.unwrap();
+            }
+            assert_eq!(observed_prints, starlark_print_owners(&child_tracker), "{case}: lower event owner/payload");
+            match expected {
+                "success" => {
+                    let value = carrier.result().as_ref().as_ref().unwrap();
+                    assert_eq!(value.resolved_target(), Some(&generated[0]), "{case}");
+                    let borrowed = match &value.predecessor {
+                        ApparentMappingPredecessor::Root(predecessor) => predecessor.view().unwrap().mapping().find_map(|(name, target)| (name.as_str() == "first").then_some(target)).unwrap(),
+                        ApparentMappingPredecessor::Canonical(predecessor) => predecessor.mapping_target(&ApparentRepoName::new("first").unwrap()).unwrap(),
+                    };
+                    assert!(std::ptr::eq(borrowed, value.resolved_target().unwrap()), "{case}");
+                }
+                "root-error" => assert!(matches!(carrier.result().as_ref(), Err(HostCanonicalRepositoryApparentMappingError { kind: HostCanonicalRepositoryApparentMappingErrorKind::RootMapping(_), .. }))),
+                "definition-error" => assert!(matches!(carrier.result().as_ref(), Err(HostCanonicalRepositoryApparentMappingError { kind: HostCanonicalRepositoryApparentMappingErrorKind::Definition(_), .. }))),
+                _ => unreachable!(),
+            }
+            observed_tracker.activations.lock().unwrap().clear();
+            let warm = observed_tx.compute(&observed_key).await.unwrap();
+            assert!(HostCanonicalRepositoryApparentMappingObservationKey::equality(&observed_value, &warm));
+            assert!(Arc::ptr_eq(carrier.result(), observed_apparent_mapping_carrier(&warm).result()));
+            let warm_rows = observed_tracker.activations.lock().unwrap();
+            assert!(warm_rows.iter().any(|(name, kind, batch)| name == &observed_key.to_string() && *kind == ActivationKind::Reused && batch.is_none()), "{case}");
+            assert!(warm_rows.iter().all(|(_, _, batch)| batch.is_none()), "{case}");
+            drop(warm_rows);
+            assert!(starlark_print_owners(&observed_tracker).is_empty(), "{case}: warm replay");
+            let unchosen = if context.is_root() { "observed-host-canonical-repository-definition:" } else { "observed-host-root-repository-mapping:" };
+            assert_activation_families_absent(&observed_tracker, &[unchosen, "host-root-apparent-repository-definition:", "build-command-root:"]);
+        }
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_canonical_repository_apparent_mapping_lifecycle_cancellation_and_nonactivation() {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let prep = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut prep_tx = transaction(&prep, MODULE, EXTENSION_A, true, None).await;
+        let generated = names(&validated(&mut prep_tx).await).remove(0);
+        let root_key = HostCanonicalRepositoryApparentMappingObservationKey::new(workspace.clone(), CanonicalRepoName::root(), ApparentRepoName::new("first").unwrap());
+        let nonroot_key = HostCanonicalRepositoryApparentMappingObservationKey::new(workspace.clone(), generated.clone(), ApparentRepoName::new("first").unwrap());
+        let root_b = format!("{MODULE}override_repo(e, first='bazel_tools')\n");
+        let same_semantic = format!("{MODULE}\n");
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+
+        let mut root_held = Vec::new();
+        for module in [MODULE, root_b.as_str(), MODULE, same_semantic.as_str()] {
+            let mut tx = transaction(&dice, module, EXTENSION_A, true, None).await;
+            let global = tx.compute(&PathObservationEpochKey).await.unwrap();
+            let parent = observed_apparent_mapping_carrier(&tx.compute(&root_key).await.unwrap()).clone();
+            let child_value = tx.compute(&HostRootRepositoryMappingObservationKey::new(workspace.clone())).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(child)) = child_value else { panic!("root child must complete") };
+            assert_eq!(parent.observations(), child.observations());
+            assert_apparent_epoch_current(parent.observations(), &global);
+            assert_apparent_epoch_current(child.observations(), &global);
+            root_held.push((parent, child));
+        }
+        assert_ne!(root_held[0].0.result(), root_held[1].0.result()); assert_eq!(root_held[0].0.result(), root_held[2].0.result());
+        assert_ne!(root_held[0].1.result(), root_held[1].1.result()); assert_eq!(root_held[0].1.result(), root_held[2].1.result());
+        assert_eq!(root_held[0].0.result(), root_held[3].0.result()); assert_ne!(root_held[0].0.observations(), root_held[3].0.observations());
+        assert_eq!(root_held[0].1.result(), root_held[3].1.result()); assert_ne!(root_held[0].1.observations(), root_held[3].1.observations());
+
+        let mut nonroot_held = Vec::new();
+        for (module, extension) in [(MODULE, EXTENSION_A), (MODULE, EXTENSION_B), (MODULE, EXTENSION_A), (same_semantic.as_str(), EXTENSION_A)] {
+            let mut tx = transaction(&dice, module, extension, true, None).await;
+            let global = tx.compute(&PathObservationEpochKey).await.unwrap();
+            let parent = observed_apparent_mapping_carrier(&tx.compute(&nonroot_key).await.unwrap()).clone();
+            let child_value = tx.compute(&HostCanonicalRepositoryDefinitionObservationKey::new(workspace.clone(), generated.clone())).await.unwrap();
+            let child = observed_canonical_carrier(&child_value).clone();
+            assert_eq!(parent.observations(), child.observations());
+            assert_apparent_epoch_current(parent.observations(), &global);
+            assert_apparent_epoch_current(child.observations(), &global);
+            nonroot_held.push((parent, child));
+        }
+        assert_ne!(nonroot_held[0].0.result(), nonroot_held[1].0.result()); assert_eq!(nonroot_held[0].0.result(), nonroot_held[2].0.result());
+        assert_ne!(nonroot_held[0].1.result(), nonroot_held[1].1.result()); assert_eq!(nonroot_held[0].1.result(), nonroot_held[2].1.result());
+        assert_eq!(nonroot_held[0].0.result(), nonroot_held[3].0.result()); assert_ne!(nonroot_held[0].0.observations(), nonroot_held[3].0.observations());
+        assert_eq!(nonroot_held[0].1.result(), nonroot_held[3].1.result()); assert_ne!(nonroot_held[0].1.observations(), nonroot_held[3].1.observations());
+
+        for key in [&root_key, &nonroot_key] {
+            let tracker = Arc::new(LookupTracker::default());
+            let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+            let first = observed_apparent_mapping_carrier(&tx.compute(key).await.unwrap()).clone();
+            tracker.activations.lock().unwrap().clear();
+            let reused = observed_apparent_mapping_carrier(&tx.compute(key).await.unwrap()).clone();
+            assert!(Arc::ptr_eq(first.result(), reused.result()));
+            assert!(tracker.activations.lock().unwrap().iter().any(|(name, kind, batch)| name == &key.to_string() && *kind == ActivationKind::Reused && batch.is_none()));
+        }
+
+        let mut lifecycle_trackers = Vec::new();
+        for (case, key, child) in [
+            ("root", root_key.clone(), HostRootRepositoryMappingObservationKey::new(workspace.clone()).to_string()),
+            ("nonroot", nonroot_key.clone(), HostCanonicalRepositoryDefinitionObservationKey::new(workspace.clone(), generated.clone()).to_string()),
+        ] {
+            let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let tracker = Arc::new(LookupTracker::default());
+            let mut cancelled = transaction(&cancel_dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+            let mut future = Box::pin(cancelled.compute(&key));
+            std::future::poll_fn(|context| { assert!(std::future::Future::poll(future.as_mut(), context).is_pending()); std::task::Poll::Ready(()) }).await;
+            drop(future); drop(cancelled);
+            assert!(tracker.activations.lock().unwrap().iter().all(|(name, _, _)| name != &key.to_string()), "{case}");
+            assert!(tracker.dependencies.lock().unwrap().iter().all(|(name, _)| name != &key.to_string()), "{case}");
+
+            let mut recovery = transaction(&cancel_dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+            let global = recovery.compute(&PathObservationEpochKey).await.unwrap();
+            let recovered = observed_apparent_mapping_carrier(&recovery.compute(&key).await.unwrap()).clone();
+            let expected = if case == "root" { root_held[0].0.result() } else { nonroot_held[0].0.result() };
+            assert_eq!(recovered.result(), expected, "{case}");
+            assert_apparent_epoch_current(recovered.observations(), &global);
+            assert_eq!(activation_dependencies(&tracker, &key.to_string()), [child]);
+            assert!(tracker.activations.lock().unwrap().iter().any(|(name, kind, batch)| name == &key.to_string() && *kind == ActivationKind::Evaluated && batch.is_none()));
+            lifecycle_trackers.push((case, tracker));
+        }
+
+        let inactive = ["host-canonical-repository-apparent-mapping:", "host-root-apparent-repository-definition:", "HostRootApparentRepositoryRouteKey", "HostRootApparentRepositorySourceInputKey", "HostRootApparentRepositorySourceObservationKey", "HostRootApparentRepositorySourcePathInputKey", "root-repository-route:", "repository-package-source:", "repository-source-file:", "host-repository-source-file:", "repository-materialization:", "build-command-root:"];
+        for (case, tracker) in lifecycle_trackers {
+            assert_activation_families_absent(&tracker, &inactive);
+            let unchosen = if case == "root" { "observed-host-canonical-repository-definition:" } else { "observed-host-root-repository-mapping:" };
+            assert_activation_families_absent(&tracker, &[unchosen]);
+        }
+        let source = include_str!("generated_repository_definition.rs");
+        let producer = &source[source.find("type CanonicalRepositoryApparentMappingResult").unwrap()..source.find("#[cfg(test)]").unwrap()];
+        for forbidden in ["HostRootApparentRepositoryDefinitionKey", "HostRootApparentRepositoryRouteKey", "HostRootApparentRepositorySourceInputKey", "HostRootApparentRepositorySourceObservationKey", "HostRootApparentRepositorySourcePathInputKey", "RepositoryMaterializationKey", "BuildCommandRootKey", "RootModuleBootstrap", "store_evaluation_data", "Mutex", "spawn"] { assert!(!producer.contains(forbidden)); }
     }
 
     #[tokio::test]
