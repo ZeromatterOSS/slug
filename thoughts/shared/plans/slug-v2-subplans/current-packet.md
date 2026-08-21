@@ -1,184 +1,105 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-loaded-module-extension-definitions-lifecycle-cancellation-proof-repair-retry-2`
+Packet: `WP-6-7A-extension-definition-evaluation-observation-frontier-audit-resume`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `f36e5586`
-Accepted predecessor: `99c23033`
+Scheduling and Rust base: `3a68afa5`
 
 ## Goal and authority
 
-Finish only the held-handle lifecycle, cancellation/recovery and upper-
-nonactivation proof for the retained loaded-definition observation candidate.
-The first lifecycle retry corrected inner-Arc identity, then reached `REPLAN`
-because it treated observation frontiers as canonical across transactions.
-Request reordering lawfully added a nondispositive Host workspace `BUILD`
-Lstat(Missing) demand while the ext Bzl Result stayed equal. Correct that proof
-law. The exact real-order/parity/terminal/event slice, production and identity/
-finisher algebra remain frozen.
+Resume the read-only extension definition/evaluation frontier after accepting
+both parallel immediate carriers: selected evaluation-input requests in Bzlmod
+and loaded module-extension definitions in loading. Identify the uniquely
+smallest next reusable semantic owner or one uniquely smaller carrier-
+visibility/evidence prerequisite. Do not implement or activate it.
 
-Write only the `#[cfg(test)] module_extension_definition_loading_tests` module
-in `app/slug_loading_v2/src/bzl_module.rs`. Replace
-`observed_loaded_lifecycle_cancellation_and_nonactivation` plus at most four
-directly used lifecycle helpers and existing tracker records. Do not add a
-fourth parent test. Every changed helper/test remains below 200 lines. Rustfmt-
-only layout in the test module is allowed; assertions, values and control flow
-outside this lifecycle slice remain unchanged. Every other file, fixture,
-oracle, Cargo/BUILD target, caller and plan is read-only until rollover.
+Audit Rust and tests read-only. Trace the exact first consumers of
+`HostSelectedExtensionEvaluationInputRequestsKey` and
+`HostLoadedModuleExtensionDefinitionsKey`, beginning with
+`HostPreparedModuleExtensionInputsKey`, then pure invocations, instantiated and
+validated repositories. Inspect root mapping, canonical/generated repository
+definitions, command/publication and bootstrap only far enough to reject false
+prerequisites or umbrella ownership.
 
-The retained unaccepted lifecycle candidate is 8,235 physical lines and
-`+1,464/-111` versus `0a8e1220`; it preserves production and contains the real
-four-axis harness. Its 219-line lifecycle test must be extracted below 200
-using at most the four lifecycle helpers. Final caps stay
-<=`+1,800/-350` and <=8,450 physical. The shared driver stays 130 lines and
-production remains byte-for-byte unchanged.
+Write authority is exactly:
 
-## Frozen decisions
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- this Stage 6 subplan;
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
 
-Preserve the accepted matching-family driver, request-compute/Host-Bzl-
-invariant error asymmetry, one request-value clone and child Arc drop,
-left-first Complete epoch merge, first terminal, child-only event batches,
-compact retention and Complete-only equality/validity. Preserve the accepted
-finisher algebra and exact three-request legacy parity, nine terminal rows,
-prefix/suppression, RootModule policy family boundary, fresh/warm/reused/failure
-events and exact upper/legacy key-family denylist.
+Net caps are <=40/<=220/<=180/<=30 respectively and <=470 aggregate. Every
+Rust file, test, fixture, oracle, Cargo/BUILD target, API and other plan is
+read-only. The audit may authorize at most one bounded design successor.
 
-## Independent held-handle lifecycles
+## Accepted frontier
 
-Use normal in-memory fixtures and real observed keys, with no hook or fake key.
-Before each transition retain independent handles to every relevant layer:
+Treat these as accepted and non-writable:
 
-- the loaded parent Result Arc and cumulative `PathObservationEpoch`;
-- the observed request child's Result Arc and request epoch;
-- each decisive `HostBzlModuleObservationKey` Result Arc and epoch; and
-- the loaded manifest plus frozen exported-definition projection selected by
-  the parent.
+- `094ba075` selected extension definition-load-request observation;
+- `e82057f2` selected extension evaluation-input-request observation;
+- `99c23033` doc-hidden request-carrier promotion; and
+- `3a68afa5` loaded module-extension-definition observation.
 
-On one same-DICE fixture drive four independent A -> B -> A axes. Isolate one
-axis at a time and restore it before the next:
+The loaded-definition owner preserves request -> root Bzl label -> observed
+Host-Bzl module -> named export order, left-first Complete epoch merging,
+first-terminal suppression, child-only event batches, compact Result/epoch
+retention and semantic lifecycle/cancellation/nonactivation proof. The
+evaluation-input owner preserves request -> root-files -> pure input projection
+and its own exact epoch/error/event boundary. Do not reopen either owner.
 
-1. request-only: change request order or selected exported name while source
-   inputs stay identical;
-2. direct Bzl source: change one root source while an unrelated reached root is
-   identical;
-3. recursive load: change only a child loaded by one root while an unrelated
-   reached root is identical; and
-4. pure export: switch between two valid extension exports from one unchanged
-   module source; do not assume its transaction-local observation epoch is
-   unchanged.
+## Audit questions
 
-For every axis assert the loaded semantic Result/request aggregate/manifest/
-projection changes at B and restores at A as appropriate, and all held old
-Results/epochs/projections remain valid and unchanged. Do not require equality
-of the entire observed parent carrier or cumulative epoch across transactions.
+Resolve with live key/consumer traces and ownership evidence:
 
-Across separate computes compare request and Host-Bzl Results semantically.
-Request-only/order and pure-export axes change the request Result; direct and
-recursive source axes keep the request Result equal. Unaffected Host-Bzl labels
-keep exact semantic Results. Affected direct/recursive children must change the
-relevant semantic Result or epoch map, with the exact Result change asserted
-where the fixture exposes one. Pure export keeps Bzl semantic Results equal
-while the loaded parent projection changes. Never require cross-transaction
-child epoch-map equality: evaluation/cache sequencing may add or omit valid
-nondispositive frontier demands.
+1. Is `HostPreparedModuleExtensionInputsKey` the first complete reusable join
+   of the two accepted parallel carriers, or does one smaller missing observed
+   child/visibility seam precede it?
+2. Which exact semantics belong to prepared inputs versus
+   `HostPureModuleExtensionInvocationsKey`—especially repository rules,
+   extension metadata, evaluation context and invocation grouping?
+3. What are the exact child order, Need/outer/error precedence, Complete epoch
+   merge order, duplicate-Arc policy, event owner and retained lifetime at the
+   selected boundary?
+4. Which upper instantiated/validated/root-mapping/generated/public/bootstrap
+   consumers are independent or strictly later, and therefore must remain
+   inactive?
+5. Which behavior remains exact Bazel 9 compatibility, which private
+   Result/epoch association is Slug-native, and which identity/public/bootstrap
+   work remains deferred?
 
-For every request, Host-Bzl and parent carrier captured in each transaction,
-compare its epoch only to the independently obtained global epoch from that
-same transaction. Every carrier demand must be present with the same semantic
-`PathObservationResult`; global extras are allowed. No carrier may contain a
-demand absent from its own transaction's global epoch.
+Use direct consumer counts and source ownership. Reject an umbrella owner that
+combines independent prepared, pure, instantiated or validated semantics. If a
+cross-crate type is unavailable, prove whether a visibility-only prerequisite
+is uniquely smaller before scheduling it.
 
-Require inner Result-Arc identity only for an exact child key/label whose rich
-activation row proves `ActivationKind::Reused` and whose returned cached key
-value actually retains the Arc. If the row is Evaluated, semantic equality is
-the contract. The accepted finisher test remains the sole unconditional proof
-that an exact incoming child epoch Arc and equal left-first duplicate are
-forwarded. Reuse lower recursive-Bzl proofs for lower behavior, but assert the
-parent semantic lifecycle and any conditional Reused sharing locally.
+## Evidence and validation
 
-## Cancellation and exact recovery
-
-In a fresh same-DICE transaction poll the loaded observed parent once to
-Pending, then drop the future. Prove separately that no parent value, parent
-activation or parent/child event batch was published and that tracker stores
-contain no completed dependency/rich activation row from the cancelled attempt.
-
-Recompute the same key and identical inputs in that DICE. Require a Complete
-valid carrier and compare against a clean identical fixture for exact semantic
-Result, request aggregate and manifests/projections. Do not require clean and
-recovery cumulative epoch maps to be identical. Instead validate every clean
-carrier against its own clean global epoch and every recovered carrier against
-its own recovery global epoch using the subset/semantic-result rule above. A
-subsequent warm compute must be semantically equal and silent; pointer reuse is
-required only under the same exact cached/Reused condition above.
-
-## Production-slice and all-key nonactivation
-
-Add no production state or event tracker. Scan the production source slice
-from the loaded legacy/observed owner through its driver/finisher and prove it
-does not name, construct or compute any of these exact upper key types:
-`HostPreparedModuleExtensionInputsKey`,
-`HostPureModuleExtensionInvocationsKey`,
-`HostInstantiatedModuleExtensionRepositoriesKey`,
-`HostValidatedModuleExtensionRepositoriesKey`,
-`HostRootRepositoryMappingKey`,
-`HostCanonicalSelectedModuleDefinitionKey` and
-`HostGeneratedRepositoryDefinitionKey`. Prove command/public nonactivation by
-the exact all-key `slug-command:` and named upper prefixes below; do not invent
-an unnamed source token or use substring vocabulary.
-
-Across all-key activation and dependency rows require the parent has exactly
-the observed request child followed by its reached observed Host-Bzl roots.
-Allow the lawful lower RootModule command/environment/lockfile and visible-
-lockfile families already accepted by the event slice. Exclude exact reverse
-legacy prefixes `host-selected-extension-definition-load-requests:`,
-`host-bzl-module:` and `host-loaded-module-extension-definitions:`. Exclude
-exact upper/public prefixes `host-prepared-module-extension-inputs:`,
-`host-pure-module-extension-invocations:`,
-`host-instantiated-module-extension-repositories:`,
-`host-validated-module-extension-repositories:`,
-`host-root-repository-mapping:`,
-`host-canonical-selected-module-definition:`,
-`host-generated-repository-definition:` and `slug-command:`. Use exact
-prefix/type predicates, never substring vocabulary.
-
-## Compatibility and validation
-
-Exact remains loaded-definition Result/errors/order/manifests/projections and
-child events. The private Result/epoch association remains Slug-native. Upper
-evaluation/public/bootstrap, M8/M7B and exact identity bytes remain deferred.
-No oracle is needed; reuse pinned Bazel 9.2 loading evidence.
-
-Run serially:
-
-1. focused `observed_loaded_lifecycle_cancellation_and_nonactivation`;
-2. the three accepted `observed_loaded_` parent tests;
-3. protected `module_extension_definition_loading_tests::observed_bzl_` tests;
-4. `CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 --quiet`;
-5. `CARGO_BUILD_JOBS=1 cargo check -p slug_core_v2 --quiet`;
-6. `cargo fmt --all -- --check`; and
-7. `git diff --check`.
+Reuse accepted Bazel 9.2 loading/Bzlmod evidence and existing lower tests. Add
+no oracle or proof code. Read `docs/developers/dice.md` before classifying any
+DICE owner, retention or event boundary. Check `git diff --check` on the four
+records before terminal review.
 
 ## Terminal and stops
 
-ACCEPT performs final semantic acceptance of the loaded-definition observed
-production candidate, commits the single Rust file, and rolls the docs-only
-frontier to the prepared/evaluation observation successor selected by Stage 6.
+Terminate with exactly one of:
 
-STOP and `REPLAN` any production or accepted-test semantic edit; a second Rust
-file/key/owner; fake key/hook/external fixture; lock held across DICE; parent
-event batch; retention/event drift; generic lifecycle/cancellation assertion;
-cap waiver; upper activation; milestone closure; M8/M7B or exact identity work.
-M7 remains partial and M7A -> M8 -> M7B remains.
+- one bounded owner design packet;
+- one uniquely smaller carrier-visibility/evidence packet before that design;
+  or
+- formal `REPLAN` if no bounded Rust-native owner exists.
+
+STOP implementation, Rust/API/export/caller change, second simultaneous
+successor, event movement, retained Starlark heap, proof waiver, milestone
+closure, M8/M7B or exact identity-byte work. M7 remains partial and
+M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-The lifecycle retry scheduled by `401a0cb2` corrected cross-compute Arc
-identity, then its real request-order A -> B transition showed ext Bzl semantic
-Result equality with a different valid epoch: B adds Host
-`/extension-definition-loading/BUILD` Lstat(Missing). Prewarming and stable
-request position do not remove the difference. Parent loaded semantic Result
-restoration already passes. Reserved review confirmed observation frontiers are
-valid transaction-local subsets, not canonical cross-transaction maps. The
-8,235-line candidate and exact nonactivation scan are retained; production is
-unchanged and retry 2 corrects only the epoch association/restoration laws.
+Implementation `3a68afa5`, from loaded-definition design base `0a8e1220` and
+the accepted serial proof corrections through `3388a8fd`, completes the private
+loaded-definition observed owner in `slug_loading_v2`. Final accounting is
+`+1,518/-112`, 8,288 physical. Exact focused parent/lower tests, full loading,
+direct core, formatting and diff gates pass; independent terminal review
+returned `ACCEPT`. This audit resumes the prepared/evaluation frontier promised
+by the accepted design without activating an upper consumer.

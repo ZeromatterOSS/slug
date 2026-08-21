@@ -10894,6 +10894,48 @@ remain unchanged. STOP production or accepted-test edits, canonical-frontier
 overclaim, cap waiver, M8/M7B or exact identity work. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Loaded-definition observation accepted; prepared/evaluation frontier resumed (2026-08-20)
+
+Implementation `3a68afa5`, from design base `0a8e1220` and the accepted serial
+proof corrections through `3388a8fd`, completes the private callerless loaded
+module-extension-definition observation owner in `slug_loading_v2`.
+
+One matching-family driver preserves observed definition requests first, then
+each root Host-Bzl module in request order. Every Complete child epoch merges
+left-first before label/export semantics; equal duplicates retain the incoming
+left Arc, and conflict/operation mismatch uses the accepted typed stage. Need
+and typed child outer stop carrierlessly; semantic terminals retain the exact
+decisive prefix. Legacy moves the same semantic Result projection.
+
+The parent owns no event batch. Root/recursive Host-Bzl children retain their
+exact local print/error batches; direct warm parent is silent and explicit
+cached child reads are Reused/None. Retention is one loaded Result Arc plus the
+compact cumulative epoch. Lifecycle proof separates semantic Result restoration
+from transaction-local observation frontiers, preserves held historical
+handles, validates each carrier epoch against its own global epoch, proves
+poll-drop recovery and exact upper nonactivation.
+
+Accepted accounting is `+1,518/-112` at 8,288 physical lines. Focused lifecycle,
+all three parent tests, protected lower Host-Bzl tests, the full 141-unit plus
+66-integration loading gate, direct `slug_core_v2` check, formatting and diff
+hygiene pass. Independent terminal review returned `ACCEPT`.
+
+Activate only
+`WP-6-7A-extension-definition-evaluation-observation-frontier-audit-resume`.
+Read-only trace the first common consumer of accepted evaluation-input requests
+and loaded definitions, beginning with `HostPreparedModuleExtensionInputsKey`.
+Inspect pure/instantiated/validated/root-mapping/generated/public/bootstrap
+owners only far enough to reject false prerequisites and umbrella ownership.
+Terminate with exactly one bounded owner design, one uniquely smaller
+visibility/evidence prerequisite, or formal REPLAN; authorize at most one
+successor.
+
+Audit write authority is exactly canonical/current/this Stage/routing at net
+caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures, oracles,
+Cargo/BUILD, APIs, exports, callers and other plans are read-only. STOP
+implementation, event/retention movement, milestone closure, M8/M7B or exact
+identity work. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
