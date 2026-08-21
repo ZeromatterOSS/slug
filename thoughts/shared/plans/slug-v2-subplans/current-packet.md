@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-loaded-module-extension-definitions-real-order-event-proof-repair-retry-2`
+Packet: `WP-6-7A-loaded-module-extension-definitions-real-order-event-proof-repair-retry-3`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
 Scheduling base: `ab4db01f`
@@ -8,12 +8,13 @@ Accepted predecessor: `99c23033`
 
 ## Goal and authority
 
-Repair only the real-order/parity/event proof for the retained loaded-definition
-observation candidate. The first retry replaced its blanket command-key ban,
-but reached `REPLAN` because it required `DynKey` downcasts to two Bzlmod policy
-value structs which are not DICE keys. Classify the actual injected root-module
-policy keys instead; do not reopen the independent lifecycle slice or any
-accepted production/finisher decision.
+Repair only the remaining exact event proof and size-cap miss for the retained
+loaded-definition observation candidate. Retry 2 completed lawful key-family
+classification, separate legacy/observed parity and the nine terminal rows,
+but its 213-line test exceeded the hard limit and its batch assertions remained
+nondiscriminating. Its sole correction stopped because the existing two-helper
+authority could not fit an extracted exact-event proof. Add one dedicated
+test-only helper; do not reopen any accepted semantic or independent slice.
 
 Write exactly the `#[cfg(test)] module_extension_definition_loading_tests`
 module in `app/slug_loading_v2/src/bzl_module.rs`. Production, the accepted
@@ -21,11 +22,12 @@ finisher algebra test and the lifecycle/cancellation test are frozen. Every
 other file, fixture, oracle, Cargo/BUILD target, caller and plan is read-only
 until terminal rollover.
 
-The retained candidate is 7,753 physical lines and `+981/-110` versus
+The retained candidate is 7,824 physical lines and `+1,056/-114` versus
 `0a8e1220`. Final caps for this slice are <=`+1,250/-250` and <=8,000 physical.
 Replace only `observed_loaded_real_order_terminals_events_and_parity` plus at
-most two directly used test helpers and the already test-only tracker records;
-do not append a fourth parent test. Every changed helper/test remains below 200.
+most the two already directly used test helpers, one new dedicated test-only
+event assertion/helper and the already test-only tracker records; do not append
+a fourth parent test. Every changed helper/test remains below 200.
 
 ## Frozen decisions
 
@@ -87,13 +89,15 @@ kind or treat both callbacks as two activations.
 Prove in isolated transactions:
 
 - fresh success: exactly the three reached Host-Bzl child keys own nonempty
-  evaluated batches in request order; loaded parent and request child have no
-  batch;
+  evaluated batches in request order, with exact print event variants/texts
+  `A`, `B`, `C`; loaded parent and request child have no batch;
 - direct warm parent: no Host-Bzl child activation/batch is emitted;
 - changed parent with one unchanged reached Bzl child: that child is Reused
   with `batch: None` and is not reevaluated; and
 - print-then-fail: the decisive semantic-failure Host-Bzl child alone retains
-  its nonempty batch while the loaded parent remains batchless.
+  its exact nonempty print batch; use silent successful predecessors so other
+  reached children are batchless/empty as semantically appropriate, while the
+  loaded parent and request child remain batchless.
 
 The dependency rows must show the loaded observed parent depends on the
 observed request child and exactly the reached observed Host-Bzl roots in
@@ -151,12 +155,12 @@ and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-The retry scheduled by `1d511576` retained a passing three-root focused draft,
-but its accepted family contract required `DynKey` downcasts to
-`BzlmodCommandPolicyKey` and `BzlmodEnvironmentPolicyKey`. Both are policy value
-structs with no `Key`/`InjectedKey` implementation, so they cannot inhabit a
-`DynKey`; the worker stopped rather than fabricate activation rows. The actual
-injected rows are `RootModuleCommandPolicyKey` and
-`RootModuleEnvironmentPolicyKey`. Exact legacy/observed parity and exact event
-batch assertions also remain unfinished. Production, identity/finisher and
-lifecycle decisions did not change.
+Retry 2 scheduled by `23e4a3a8` completed lawful RootModule policy
+classification, separate legacy/observed Result/request/manifest/projection
+parity, family separation, warm silence, Reused/None and nine positional
+Request/prefix/suppression rows. Full validation passed at `+1,056/-114` and
+7,824 physical. Terminal review rejected its 213-line test and `batch.is_some()`
+checks: predecessor prints made every reached child nonempty in semantic-failure
+rows, rather than proving isolated decisive ownership. The sole correction made
+no edit because exact helper extraction exceeded the two-helper authority, so
+the orchestration second-correction rule requires this bounded REPLAN.

@@ -10734,6 +10734,35 @@ batch ownership. The nine positional terminal rows and later suppression remain
 required. Caps, validation, stops and the single lifecycle/cancellation
 successor are unchanged. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Loaded-definition exact-event helper REPLAN (2026-08-20)
+
+Retry 2 completed the lawful RootModule policy-key boundary, separate
+legacy/observed Result/request/manifest/projection parity, family separation,
+warm silence, Reused/None and all nine Request/context/prefix/suppression rows.
+Its full validation passed at `+1,056/-114` versus `0a8e1220` and 7,824
+physical. Terminal review rejected the 213-line test and nondiscriminating
+`batch.is_some()` checks: the print-bearing predecessor fixtures made every
+reached child nonempty in semantic-failure cases. The sole correction stopped
+without edits because extracting the exact event proof exceeded the packet's
+two-helper authority, so the orchestration second-correction rule applies.
+
+Activate only
+`WP-6-7A-loaded-module-extension-definitions-real-order-event-proof-repair-retry-3`.
+Retain the exact candidate and allow only the named test, its two existing
+direct helpers, tracker records and one new dedicated test-only event helper.
+Every changed test/helper remains below 200. Fresh success must assert the exact
+ordered evaluated print batches `A`, `B`, `C`; semantic print-fail cases use
+silent successful predecessors so only the decisive child owns the exact print
+batch, with parent/request and other reached children batchless/empty as
+semantically appropriate. Preserve every accepted parity, terminal, prefix,
+suppression, policy-family, denylist, warm and Reused/None assertion.
+
+Production, identity/finisher, lifecycle/cancellation and every other test stay
+byte-frozen. Final caps remain <=`+1,250/-250` and <=8,000 physical; validation
+and the single serial lifecycle successor remain unchanged. STOP any frozen
+scope edit, cap waiver, M8/M7B or exact identity work. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
