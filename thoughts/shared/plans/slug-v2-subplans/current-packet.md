@@ -1,150 +1,130 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-validated-module-extension-repositories-observation-carrier-promotion-implementation`
+Packet: `WP-6-7A-host-generated-repository-definition-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling/design and Rust base: `556de141` / `b8459b4e`
+Scheduling/design and Rust base: docs-only owner design / `8990cf43`
 
 ## Goal and authority
 
-Implement only the accepted doc-hidden loading -> core visibility surface for
-the existing validation observation key, carrier and opaque outer. Do not add a
-semantic consumer or change the private driver, validation Result/epoch
-association, Need/outer algebra, equality, validity, events, retention or
-lifecycle.
+Implement only the accepted private observation owner for
+`HostGeneratedRepositoryDefinitionKey`. Reuse the accepted observed validation
+child and preserve the legacy certificate scan, value/error algebra and lower
+event ownership. Do not activate the later canonical-selected, canonical
+definition, root-mapping, publication, command or bootstrap graph.
 
-Write authority is exactly:
+Write authority is exactly
+`app/slug_core_v2/src/runtime/generated_repository_definition.rs`, baseline
+2,426 physical lines with tests at 777. Every other Rust file, test, fixture,
+oracle, Cargo/BUILD target, API, caller and plan is read-only. Production is
+<=210 lines, proof is <=680, aggregate semantic authority is <=890 and the
+file remains <=3,320 physical lines. Add at most six production and six test
+helpers, one shared driver below 120 lines, exactly three tests, and keep every
+helper/test below 200 lines. The file remains cohesive: before its test module
+it already owns the generated reducer, sole canonical consumer, result/view,
+errors, tracker plumbing and certificate fixtures; splitting would expose a
+private result/view/error or duplicate that proof plumbing.
 
-- `app/slug_loading_v2/src/module_extension_repository_validation.rs`,
-  baseline 1,810 physical lines with tests at 437;
-- `app/slug_loading_v2/src/lib.rs`, baseline 86 physical lines; and
-- new
-  `app/slug_loading_v2/tests/validated_repository_observation_api.rs`.
+## Frozen owner and driver
 
-Every other Rust file, test, fixture, oracle, Cargo/BUILD target, API, caller and
-plan is read-only. Production is <=70 lines, colocated proof <=40, external
-proof <=60 and aggregate semantic authority <=170. Physical caps are
-1,880/95/60, and every changed helper/test remains below 100 lines. The large
-validation file remains cohesive because it owns the private driver, carrier
-and terminal representation; no split or hot-path measurement is warranted for
-this visibility-only step.
+Add exactly three private nominal types:
 
-## Frozen nominal surface
+1. `HostGeneratedRepositoryDefinitionObservationKey`, a newtype over the
+   legacy key with the same workspace/canonical-repository identity,
+   `new(...)`, and Display `observed-{legacy Display}`. For `/workspace` and
+   `CanonicalRepoName::new("generated")`, assert
+   `observed-host-generated-repository-definition:"/workspace":@@generated`.
+2. `ObservedHostGeneratedRepositoryDefinition`, retaining exactly an
+   `Arc<Result<HostGeneratedRepositoryDefinition,
+   HostGeneratedRepositoryDefinitionError>>` and one `PathObservationEpoch`.
+3. `HostGeneratedRepositoryDefinitionObservationError::Validation(
+   HostValidatedModuleExtensionRepositoriesObservationError)`.
 
-Promote exactly these three `#[doc(hidden)]` nominal types from
-`module_extension_repository_validation.rs`:
+Keep every type, field, constructor and accessor private. Add no alias,
+reexport or caller. Factor the legacy compute into one private Legacy/Observed
+driver. Legacy requests only `HostValidatedModuleExtensionRepositoriesKey` and
+uses an empty epoch. Observed requests only
+`HostValidatedModuleExtensionRepositoriesObservationKey` and carries its
+epoch unchanged; this one-child owner performs no merge, rebuild, union or
+epoch validation.
 
-1. existing `HostValidatedModuleExtensionRepositoriesObservationKey`;
-2. existing `ObservedHostValidatedGeneratedRepositorySpecs`; and
-3. new `HostValidatedModuleExtensionRepositoriesObservationError`, an opaque
-   public tuple wrapper with a private field.
+For either mode, child `Need` returns `Need` immediately. DICE compute failure
+is the existing semantic `LoadingCompute(message)` with an empty epoch. A
+complete semantic validation failure becomes the existing `Loading(error)` and
+retains the observed child epoch. An observed opaque validation outer becomes
+the carrierless parent `Validation(...)` outer. Child success clones the
+certificate Arc once and runs the exact existing complete flattened scan: keep
+the first matching ordinal, record the first conflicting ordinal, continue
+through all remaining entries, then return `Duplicate`, success, or `Missing`
+in that order. Success retains certificate plus ordinal; Missing/Duplicate
+retain the certificate; Loading retains the validation error; LoadingCompute
+retains only its message.
 
-Make the key and carrier `pub`, the key's existing
-`new(NormalizedAbsolutePath) -> Self` public, and only these carrier accessors
-public:
+`HostCanonicalSelectedModuleDefinitionKey` is not a child. The later canonical
+owner computes selected first and reaches generated only for selected
+`Missing`; it and every upper key remain inactive here.
 
-- `result()` returning a borrowed `Arc` whose concrete payload is
-  `Result<HostValidatedGeneratedRepositorySpecs,
-  HostValidatedGeneratedRepositorySpecsError>`; and
-- `observations() -> &PathObservationEpoch`.
+## Exact proof
 
-Keep the key/carrier fields and `ValidatedRepositoriesResult` alias private.
-Preserve exact key Debug/Clone/PartialEq/Eq/Hash/Allocative derives and carrier
-Debug/Clone/PartialEq/Eq/Allocative/Dupe derives. Preserve workspace identity,
-Complete-only equality/validity and exact Display. For `/workspace`, the smoke
-must assert
-`observed-host-validated-module-extension-repositories:"/workspace"`.
+Add exactly these tests:
 
-Add exactly these three `#[doc(hidden)]` crate-root reexports, and no fourth:
+1. `observed_generated_definition_identity_scan_and_terminal_algebra`: exact
+   key identity/hash/Display/validity, single-child/no-merge, Need/outer and
+   stage mappings; retain the protected full-scan Missing/Duplicate proof.
+2. `observed_generated_definition_real_order_events_and_parity`: real
+   legacy/observed success, Loading and Missing parity, defensive Duplicate and
+   LoadingCompute source-stage proof, exact tracker edges to only the matching
+   validation child, zero selected activation, lower HostBzl-load then pure-
+   invocation print order, batchless instantiation/validation/generated rows,
+   warm silence and first-terminal suppression.
+3. `observed_generated_definition_lifecycle_cancellation_and_nonactivation`:
+   held A-B-A over definition/order/mapping changes, same-semantic/different-
+   epoch metadata, each recovery carrier epoch a subset of its own transaction
+   global, Arc identity only on exact `Reused`, poll-drop recovery, and an upper
+   denylist covering legacy generated, selected/canonical definition, apparent
+   and root mappings, root apparent definition, route/source, public command
+   and bootstrap keys.
 
-- `HostValidatedModuleExtensionRepositoriesObservationError`;
-- `HostValidatedModuleExtensionRepositoriesObservationKey`; and
-- `ObservedHostValidatedGeneratedRepositorySpecs`.
-
-Add no public Result/outcome alias, field, error inspector, constructor for the
-outer, conversion trait, adapter key, copied carrier or reverse dependency.
-
-## Exact wrapper and projection
-
-Rename the current private
-`HostValidatedModuleExtensionRepositoriesObservationError` enum to
-`ValidatedModuleExtensionRepositoriesObservationError`. Preserve exactly its
-`Instantiation(HostInstantiatedModuleExtensionRepositoriesObservationError)`
-variant and Debug/Clone/PartialEq/Eq/Allocative/Dupe derives. The private driver
-outcome and all private terminal construction continue to use this inner enum.
-
-Define the public nominal wrapper as tuple struct
-`HostValidatedModuleExtensionRepositoriesObservationError` with one private
-`ValidatedModuleExtensionRepositoriesObservationError` field, `#[doc(hidden)]`
-and matching
-Debug/Clone/PartialEq/Eq/Allocative/Dupe derives. The omitted tuple-field
-visibility makes construction and inspection private.
-
-Change only the observed key's associated `Key::Value` error to the public
-wrapper. At the key projection, map only
-`Complete(Err(inner))` to
-`Complete(Err(HostValidatedModuleExtensionRepositoriesObservationError(inner)))`.
-Need and successful Complete remain byte-for-byte in behavior. Add no unwrap
-path: no current production consumer exists, and the later core owner must carry
-the opaque outer without inspecting it. Update the existing private producer
-scan only for the renamed inner terminal spelling; change no semantic proof.
-
-## Exact external smoke and evidence
-
-Add one test named
-`validated_repository_observation_surface_is_cross_crate_usable`. It imports
-the three hidden reexports plus existing public validation value/error,
-`LoadingPreparationOutcome`, `dice::Key`, `NormalizedAbsolutePath`,
-`PathObservationEpoch` and `Arc`. It:
-
-1. constructs only the key for `/workspace` and asserts the exact Display
-   above;
-2. type-checks
-   `<HostValidatedModuleExtensionRepositoriesObservationKey as Key>::Value`
-   as `LoadingPreparationOutcome` over
-   `Result<ObservedHostValidatedGeneratedRepositorySpecs,
-   HostValidatedModuleExtensionRepositoriesObservationError>` through a
-   nonexecuted function-pointer cast; and
-3. type-checks the two borrowed carrier accessors against the exact concrete
-   Result Arc and epoch types through a second nonexecuted function pointer.
-
-The smoke must not construct a carrier/outer, inspect the wrapper, compute a
-key, add a semantic caller or name the private alias/inner/instantiation outer.
-Reuse all accepted validation proof and the earlier Bzlmod promotion pattern;
-add no oracle because no Bazel-visible behavior changes.
+Reuse the accepted validation wrapper proof; do not inspect or construct that
+opaque outer. Prove its branch by source scan plus a real dependency row. Need,
+outer and cancellation produce no carrier or print batch. Warm/Reused children
+never replay lower prints. Retain only the generated Result Arc and child
+epoch: no validation carrier, iterator/scan scratch, mode, evaluator, event,
+duplicate certificate, cache, task or lock may escape compute.
 
 Run serially:
 
-- `cargo test -p slug_loading_v2 observed_validation_ --lib`;
-- `cargo test -p slug_loading_v2 --test validated_repository_observation_api`;
-- full `cargo test -p slug_loading_v2`;
-- `cargo test -p slug_core_v2 generated_repository_definition::tests::`;
-- direct dependent `cargo check -p slug_core_v2`;
+- `cargo test -p slug_core_v2 observed_generated_definition_`;
+- protected `cargo test -p slug_core_v2 generated_repository_definition::tests::`;
+- full `cargo test -p slug_core_v2`;
+- protected `cargo test -p slug_loading_v2 --test validated_repository_observation_api`;
+- direct dependent `cargo check -p slug_commands_v2`;
 - `cargo fmt --all -- --check`; and
 - `git diff --check`.
 
 ## Compatibility and terminal
 
-Existing validation/generated values, errors, order, certificate iteration,
-DICE equality and lower event ownership remain exact Bazel 9 compatibility.
-The doc-hidden cross-crate key/carrier/opaque outer and shared-Arc transaction-
-local epoch association are Slug-native. Generated observation and canonical/
-root-mapping/publication/command/bootstrap activation plus exact Bazel
-configuration/output/ActionKey bytes remain unsupported/deferred.
+Existing generated values/errors, flattened certificate scan/order, ordinal,
+equality, invalidation and lower Bzl/invocation events remain exact Bazel 9
+compatibility. The private observation key/carrier/outer and shared-Arc
+transaction-local epoch association are Slug-native. Canonical/root/publication
+observation, command/bootstrap activation and exact Bazel configuration/output/
+ActionKey bytes remain unsupported/deferred. Existing Bazel 9.2
+`SingleExtensionFunction`, `SingleExtensionEvalFunction` and
+`ModuleExtensionResolutionTest` source evidence plus Buck2 DICE incrementality/
+cancellation concepts suffice; add no oracle.
 
-Implementation ACCEPT returns only to a docs-only
-`HostGeneratedRepositoryDefinitionKey` observation-owner design. STOP semantic
-or compute activation, public field/alias/terminal inspection, a fourth type or
-reexport, second key/carrier/adapter, validation/generated semantic or event/
-equality/retention change, any core source change, reverse dependency, Cargo/
-BUILD or fixture/oracle work, third production file, cap/proof waiver,
-canonical/root-mapping/publication/command/bootstrap activation, milestone
-closure, M8/M7B or exact identity work. REPLAN before widening. M7 remains
-partial and M7A -> M8 -> M7B remains.
+ACCEPT returns only to a docs-only
+`HostCanonicalRepositoryDefinitionKey` selected/generated frontier audit.
+STOP a second file/key/owner/adapter, export/reexport/caller, selected child,
+canonical/root/route/source/public/command/bootstrap activation, semantic/
+scan/order/event/equality/retention drift, epoch merge, task/lock, fixture/oracle,
+cap/helper/test waiver, milestone closure, M8/M7B or identity-byte work. REPLAN
+before widening. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Design `556de141` confirms this three-type projection is the only missing
-cross-crate prerequisite. `b8459b4e` remains the semantic Rust base and already
-proves exact validation behavior, Result/epoch retention and upper
-nonactivation.
+Commit `8990cf43` exposes exactly the observed validation child and opaque outer.
+The live generated owner has one production consumer, the later canonical owner;
+its selected-definition request is an upper missing-only branch, not a generated
+dependency.

@@ -12228,6 +12228,100 @@ equality/retention drift, Cargo/BUILD, fixture/oracle, cap waiver, upper
 activation, milestone closure, M8/M7B or exact identity work. REPLAN before
 widening. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated repository definition observation-owner design accepted (2026-08-21)
+
+Accepted validation handoff `8990cf43` makes the generated-definition frontier
+bounded. Live `generated_repository_definition.rs` proves
+`HostGeneratedRepositoryDefinitionKey` has exactly one lower child, legacy
+`HostValidatedModuleExtensionRepositoriesKey`, and exactly one production
+consumer, `HostCanonicalRepositoryDefinitionKey`. The generated owner does not
+request `HostCanonicalSelectedModuleDefinitionKey`: the canonical consumer
+requests selected first and requests generated only after selected `Missing`.
+Root/apparent mapping, root definition, route/source, public command and
+bootstrap are still later consumers. They are neither prerequisites nor
+authorized activation.
+
+Activate only
+`WP-6-7A-host-generated-repository-definition-observation-implementation`.
+In the existing generated-definition file, add private
+`HostGeneratedRepositoryDefinitionObservationKey` as a newtype over the legacy
+workspace/canonical-repository key, private
+`ObservedHostGeneratedRepositoryDefinition` containing exactly the generated
+`Result` Arc plus `PathObservationEpoch`, and private
+`HostGeneratedRepositoryDefinitionObservationError::Validation` carrying the
+accepted opaque validation outer. Preserve key identity and render Display as
+`observed-{legacy Display}`; `/workspace` plus canonical `generated` is
+`observed-host-generated-repository-definition:"/workspace":@@generated`.
+Add no export, alias or caller.
+
+One private Legacy/Observed driver owns the scan. Legacy requests only the
+legacy validation key and uses an empty epoch. Observed requests only the
+observed validation key and carries that one child epoch unchanged; no merge,
+rebuild, union or validation is needed. Need is immediate. Compute failure maps
+to existing `LoadingCompute(message)` with empty epoch. Complete semantic
+failure maps to existing `Loading(error)` and retains the child epoch. The
+opaque validation outer maps to the carrierless parent Validation outer.
+Success clones the certificate Arc once, then preserves the complete flattened
+scan: retain first matching ordinal, record first conflict, keep scanning, and
+return Duplicate before success before Missing. Preserve the exact certificate,
+ordinal and error retention already represented by the legacy Result.
+
+Lower pure evaluation remains the only owner of HostBzl load/invocation print
+batches. Instantiation, validation and generated rows remain batchless; Need,
+outer error and cancellation publish neither carrier nor batch, and warm/Reused
+children do not replay prints. Retain only the generated Result Arc and child
+epoch. Do not retain the validation carrier, iterator/scan state, mode,
+evaluator, event, cache, task or lock across compute.
+
+Authority is exactly
+`app/slug_core_v2/src/runtime/generated_repository_definition.rs`, baseline
+2,426 physical lines with tests at 777. Caps are <=210 production, <=680 proof,
+<=890 aggregate semantic and <=3,320 physical. Add at most six production and
+six test helpers, exactly three tests, keep the shared driver below 120 lines
+and every helper/test below 200. The file remains cohesive because its
+production prefix already owns the reducer, result/view/errors, sole canonical
+consumer, tracker plumbing and certificate fixtures; splitting would expose a
+private representation or duplicate proof plumbing.
+
+Require exactly
+`observed_generated_definition_identity_scan_and_terminal_algebra`,
+`observed_generated_definition_real_order_events_and_parity`, and
+`observed_generated_definition_lifecycle_cancellation_and_nonactivation`.
+Together prove exact identity/hash/Display/validity, one-child/no-merge,
+Need/outer/stage algebra and the protected full-scan Missing/Duplicate law;
+real legacy/observed success/Loading/Missing parity, defensive Duplicate and
+LoadingCompute source-stage evidence, exact matching validation dependency rows,
+zero selected dependency, exact lower print order, batchless upper rows and
+warm silence; held A-B-A across definition/order/mapping changes,
+same-semantic/different-epoch metadata, each recovery epoch as a subset of its
+own transaction global, Arc identity only for proven Reused values, poll-drop
+recovery and an upper-key denylist. Reuse the accepted opaque validation
+producer proof and prove the branch by source scan plus a real dependency row;
+do not inspect or construct its private field.
+
+Validate focused observed-generated tests, the full protected
+generated-definition module, full `slug_core_v2`, the protected loading
+visibility smoke, direct `slug_commands_v2` check, formatting and diff hygiene
+serially. Reuse Bazel 9.2 `SingleExtensionFunction`,
+`SingleExtensionEvalFunction` and `ModuleExtensionResolutionTest` evidence;
+Buck2 DICE incrementality/cancellation remains concept/test evidence. Add no
+oracle.
+
+Generated values/errors, flattened scan/order, certificate/ordinal retention,
+equality/invalidation and lower events remain exact Bazel 9 compatibility. The
+private key/carrier/outer and shared-Arc transaction-local epoch association
+are Slug-native. Canonical/root/publication observation, command/bootstrap
+activation and exact Bazel configuration/output/ActionKey bytes remain
+unsupported/deferred.
+
+ACCEPT returns only to a docs-only
+`HostCanonicalRepositoryDefinitionKey` selected/generated frontier audit.
+STOP a second file/key/owner/adapter, export/reexport/caller, selected child,
+canonical/root/route/source/public/command/bootstrap activation, semantic/scan/
+order/event/equality/retention drift, epoch merge, task/lock, fixture/oracle,
+cap/helper/test waiver, milestone closure, M8/M7B or identity-byte work. REPLAN
+before widening. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
