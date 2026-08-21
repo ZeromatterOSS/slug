@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
 use slug_bzlmod_v2::BuiltinBazelToolsSnapshot;
 use slug_bzlmod_v2::HostRepositoryLocalPathPolicy;
 use slug_bzlmod_v2::HostRepositorySourceCapability;
@@ -21,12 +22,15 @@ use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathObservationEpoch;
 
 use super::root_apparent_repository_definition::HostRootApparentRepositoryDeferredKind;
 use super::root_apparent_repository_definition::HostRootApparentRepositoryDefinition;
 use super::root_apparent_repository_definition::HostRootApparentRepositoryDefinitionError;
 use super::root_apparent_repository_definition::HostRootApparentRepositoryDefinitionKey;
 use super::root_apparent_repository_definition::HostRootApparentRepositoryDefinitionKind;
+use super::root_apparent_repository_definition::HostRootApparentRepositoryDefinitionObservationError;
+use super::root_apparent_repository_definition::HostRootApparentRepositoryDefinitionObservationKey;
 
 type DefinitionResult =
     Result<HostRootApparentRepositoryDefinition, HostRootApparentRepositoryDefinitionError>;
@@ -287,22 +291,118 @@ impl fmt::Display for HostRootApparentRepositoryRouteKey {
     }
 }
 
-fn complete(
-    value: Result<HostRootApparentRepositoryRoute, HostRootApparentRepositoryRouteError>,
-) -> HostRootApparentRepositoryRouteOutcome {
-    SourcePreparationOutcome::Complete(Arc::new(value))
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct HostRootApparentRepositoryRouteObservationKey(HostRootApparentRepositoryRouteKey);
+
+impl HostRootApparentRepositoryRouteObservationKey {
+    fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
+        HostRootApparentRepositoryRouteKey::new(workspace, apparent_repo).map(Self)
+    }
 }
 
-#[async_trait]
-impl Key for HostRootApparentRepositoryRouteKey {
-    type Value = HostRootApparentRepositoryRouteOutcome;
+impl fmt::Display for HostRootApparentRepositoryRouteObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
 
-    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let predecessor = match ctx
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedHostRootApparentRepositoryRoute {
+    result: Arc<HostRootApparentRepositoryRouteResult>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostRootApparentRepositoryRoute {
+    fn result(&self) -> &Arc<HostRootApparentRepositoryRouteResult> {
+        &self.result
+    }
+
+    fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum HostRootApparentRepositoryRouteObservationError {
+    Definition(HostRootApparentRepositoryDefinitionObservationError),
+}
+
+impl Dupe for HostRootApparentRepositoryRouteObservationError {}
+
+#[derive(Clone, Copy)]
+enum RootApparentRepositoryRouteMode {
+    Legacy,
+    Observed,
+}
+
+type RootApparentRepositoryRouteDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (
+            Arc<HostRootApparentRepositoryRouteResult>,
+            PathObservationEpoch,
+        ),
+        HostRootApparentRepositoryRouteObservationError,
+    >,
+>;
+
+fn finish_root_apparent_repository_route(
+    key: &HostRootApparentRepositoryRouteKey,
+    predecessor: Arc<DefinitionResult>,
+    observations: PathObservationEpoch,
+) -> (
+    Arc<HostRootApparentRepositoryRouteResult>,
+    PathObservationEpoch,
+) {
+    let terminal = |kind| {
+        Arc::new(Err(HostRootApparentRepositoryRouteError {
+            workspace: key.workspace.clone(),
+            apparent_repo: key.apparent_repo.clone(),
+            kind,
+        }))
+    };
+    let view = predecessor_view(predecessor.as_ref());
+    let is_success = predecessor.is_ok();
+    let is_deferred = matches!(predecessor.as_ref(), Err(error) if error.is_deferred());
+    let result = match completed_disposition(is_success, is_deferred, view.is_some()) {
+        None => terminal(HostRootApparentRepositoryRouteErrorKind::Predecessor(
+            predecessor,
+        )),
+        Some(false) => Arc::new(Err(invalid_predecessor(
+            key.workspace.clone(),
+            key.apparent_repo.clone(),
+            predecessor,
+        ))),
+        Some(true) => {
+            let view = view.expect("success disposition has a view");
+            if !view_is_consistent(&key.apparent_repo, view) {
+                Arc::new(Err(invalid_predecessor(
+                    key.workspace.clone(),
+                    key.apparent_repo.clone(),
+                    predecessor,
+                )))
+            } else {
+                Arc::new(Ok(HostRootApparentRepositoryRoute {
+                    workspace: key.workspace.clone(),
+                    apparent_repo: key.apparent_repo.clone(),
+                    predecessor,
+                }))
+            }
+        }
+    };
+    (result, observations)
+}
+
+async fn compute_root_apparent_repository_route(
+    key: &HostRootApparentRepositoryRouteKey,
+    mode: RootApparentRepositoryRouteMode,
+    ctx: &mut DiceComputations<'_>,
+) -> RootApparentRepositoryRouteDriverOutcome {
+    let (predecessor, observations) = match mode {
+        RootApparentRepositoryRouteMode::Legacy => match ctx
             .compute(
                 &HostRootApparentRepositoryDefinitionKey::new(
-                    self.workspace.clone(),
-                    self.apparent_repo.clone(),
+                    key.workspace.clone(),
+                    key.apparent_repo.clone(),
                 )
                 .expect("route key rejects root apparent names"),
             )
@@ -311,55 +411,122 @@ impl Key for HostRootApparentRepositoryRouteKey {
             Ok(SourcePreparationOutcome::Need(need)) => {
                 return SourcePreparationOutcome::Need(need);
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => value,
+            Ok(SourcePreparationOutcome::Complete(value)) => (value, PathObservationEpoch::empty()),
             Err(error) => {
-                return complete(Err(HostRootApparentRepositoryRouteError {
-                    workspace: self.workspace.clone(),
-                    apparent_repo: self.apparent_repo.clone(),
-                    kind: HostRootApparentRepositoryRouteErrorKind::Compute(
-                        error.to_string().into(),
-                    ),
-                }));
-            }
-        };
-        let terminal = |kind| {
-            complete(Err(HostRootApparentRepositoryRouteError {
-                workspace: self.workspace.clone(),
-                apparent_repo: self.apparent_repo.clone(),
-                kind,
-            }))
-        };
-        let view = predecessor_view(predecessor.as_ref());
-        let is_success = predecessor.is_ok();
-        let is_deferred = matches!(predecessor.as_ref(), Err(error) if error.is_deferred());
-        match completed_disposition(is_success, is_deferred, view.is_some()) {
-            Some(true) => {}
-            None => {
-                return terminal(HostRootApparentRepositoryRouteErrorKind::Predecessor(
-                    predecessor,
-                ));
-            }
-            Some(false) => {
-                return complete(Err(invalid_predecessor(
-                    self.workspace.clone(),
-                    self.apparent_repo.clone(),
-                    predecessor,
+                return SourcePreparationOutcome::Complete(Ok((
+                    Arc::new(Err(HostRootApparentRepositoryRouteError {
+                        workspace: key.workspace.clone(),
+                        apparent_repo: key.apparent_repo.clone(),
+                        kind: HostRootApparentRepositoryRouteErrorKind::Compute(
+                            error.to_string().into(),
+                        ),
+                    })),
+                    PathObservationEpoch::empty(),
                 )));
             }
+        },
+        RootApparentRepositoryRouteMode::Observed => match ctx
+            .compute(
+                &HostRootApparentRepositoryDefinitionObservationKey::new(
+                    key.workspace.clone(),
+                    key.apparent_repo.clone(),
+                )
+                .expect("route key rejects root apparent names"),
+            )
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return SourcePreparationOutcome::Complete(Err(
+                    HostRootApparentRepositoryRouteObservationError::Definition(error),
+                ));
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                (observed.result().clone(), observed.observations().clone())
+            }
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Ok((
+                    Arc::new(Err(HostRootApparentRepositoryRouteError {
+                        workspace: key.workspace.clone(),
+                        apparent_repo: key.apparent_repo.clone(),
+                        kind: HostRootApparentRepositoryRouteErrorKind::Compute(
+                            error.to_string().into(),
+                        ),
+                    })),
+                    PathObservationEpoch::empty(),
+                )));
+            }
+        },
+    };
+    SourcePreparationOutcome::Complete(Ok(finish_root_apparent_repository_route(
+        key,
+        predecessor,
+        observations,
+    )))
+}
+
+#[async_trait]
+impl Key for HostRootApparentRepositoryRouteKey {
+    type Value = HostRootApparentRepositoryRouteOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match compute_root_apparent_repository_route(
+            self,
+            RootApparentRepositoryRouteMode::Legacy,
+            ctx,
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(_)) => {
+                unreachable!("legacy route has no observation outer")
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                assert_eq!(observations, PathObservationEpoch::empty());
+                SourcePreparationOutcome::Complete(result)
+            }
         }
-        let view = view.expect("success disposition has a view");
-        if !view_is_consistent(&self.apparent_repo, view) {
-            return complete(Err(invalid_predecessor(
-                self.workspace.clone(),
-                self.apparent_repo.clone(),
-                predecessor,
-            )));
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostRootApparentRepositoryRouteObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostRootApparentRepositoryRoute,
+            HostRootApparentRepositoryRouteObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match compute_root_apparent_repository_route(
+            &self.0,
+            RootApparentRepositoryRouteMode::Observed,
+            ctx,
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostRootApparentRepositoryRoute {
+                    result,
+                    observations,
+                }))
+            }
         }
-        complete(Ok(HostRootApparentRepositoryRoute {
-            workspace: self.workspace.clone(),
-            apparent_repo: self.apparent_repo.clone(),
-            predecessor,
-        }))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -373,6 +540,9 @@ impl Key for HostRootApparentRepositoryRouteKey {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hash;
+    use std::hash::Hasher;
     use std::sync::Mutex;
 
     use dice::ActivationData;
@@ -396,6 +566,7 @@ mod tests {
     use slug_bzlmod_v2::RepositoryPackageSourceKey;
     use slug_bzlmod_v2::RepositorySourceFileKey;
     use slug_bzlmod_v2::RootRepositoryRouteKey;
+    use slug_events_v2::EventBatch;
     use slug_loading_v2::RepositoryPackageLoadKey;
     use slug_workspace_v2::PathObservationEpoch;
     use slug_workspace_v2::PathObservationEpochKey;
@@ -455,32 +626,59 @@ mod tests {
     struct Tracker {
         route: Mutex<Vec<ActivationKind>>,
         predecessor: Mutex<Vec<ActivationKind>>,
+        observed_route: Mutex<Vec<ActivationKind>>,
+        observed_predecessor: Mutex<Vec<ActivationKind>>,
+        activations: Mutex<Vec<(String, ActivationKind, Option<EventBatch>)>>,
+        dependencies: Mutex<Vec<(String, Vec<String>)>>,
         events: Mutex<usize>,
         forbidden: Mutex<Vec<&'static str>>,
     }
     impl ActivationTracker for Tracker {
         fn key_activated(
             &self,
-            _: &DynKey,
-            _: &mut dyn Iterator<Item = &DynKey>,
+            key: &DynKey,
+            dependencies: &mut dyn Iterator<Item = &DynKey>,
             _: ActivationData,
         ) {
+            self.dependencies.lock().unwrap().push((
+                key.to_string(),
+                dependencies.map(ToString::to_string).collect(),
+            ));
         }
         fn tracks_rich_activations(&self) -> bool {
             true
         }
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            let kind = activation.kind();
+            let batch = activation
+                .evaluation_data()
+                .and_then(|data| data.downcast_ref::<EventBatch>())
+                .map(Dupe::dupe);
+            self.activations
+                .lock()
+                .unwrap()
+                .push((key.to_string(), kind, batch));
             if key
+                .downcast_ref::<HostRootApparentRepositoryRouteObservationKey>()
+                .is_some()
+            {
+                self.observed_route.lock().unwrap().push(kind);
+            } else if key
+                .downcast_ref::<HostRootApparentRepositoryDefinitionObservationKey>()
+                .is_some()
+            {
+                self.observed_predecessor.lock().unwrap().push(kind);
+            } else if key
                 .downcast_ref::<HostRootApparentRepositoryRouteKey>()
                 .is_some()
             {
-                self.route.lock().unwrap().push(activation.kind());
+                self.route.lock().unwrap().push(kind);
                 *self.events.lock().unwrap() += usize::from(activation.evaluation_data().is_some());
             } else if key
                 .downcast_ref::<HostRootApparentRepositoryDefinitionKey>()
                 .is_some()
             {
-                self.predecessor.lock().unwrap().push(activation.kind());
+                self.predecessor.lock().unwrap().push(kind);
             } else if key.downcast_ref::<RootRepositoryRouteKey>().is_some() {
                 self.forbidden.lock().unwrap().push("root-route");
             } else if key.downcast_ref::<RegistryFileKey>().is_some() {
@@ -504,8 +702,570 @@ mod tests {
         fn clear(&self) {
             self.route.lock().unwrap().clear();
             self.predecessor.lock().unwrap().clear();
+            self.observed_route.lock().unwrap().clear();
+            self.observed_predecessor.lock().unwrap().clear();
+            self.activations.lock().unwrap().clear();
+            self.dependencies.lock().unwrap().clear();
             *self.events.lock().unwrap() = 0;
             self.forbidden.lock().unwrap().clear();
+        }
+    }
+
+    fn observed_route_value(
+        outcome: &<HostRootApparentRepositoryRouteObservationKey as Key>::Value,
+    ) -> &ObservedHostRootApparentRepositoryRoute {
+        match outcome {
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+            value => panic!("observed route must have a carrier: {value:?}"),
+        }
+    }
+
+    fn dependency_row(tracker: &Tracker, key: &str) -> Vec<String> {
+        tracker
+            .dependencies
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(name, _)| name == key)
+            .unwrap_or_else(|| panic!("missing dependency row for {key}"))
+            .1
+            .clone()
+    }
+
+    fn event_rows(tracker: &Tracker) -> Vec<(String, EventBatch)> {
+        tracker
+            .activations
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(|(owner, _, batch)| batch.dupe().map(|batch| (owner.clone(), batch)))
+            .collect()
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum RealRouteFamily {
+        Generated,
+        SelectedNonregistry,
+        MappingFailure,
+        Main,
+        Builtin,
+    }
+
+    async fn real_route_transaction(
+        dice: &Arc<Dice>,
+        family: RealRouteFamily,
+        tracker: Arc<Tracker>,
+    ) -> dice::DiceTransaction {
+        if family == RealRouteFamily::Builtin {
+            prepare_builtin(dice, &NormalizedAbsolutePath::new(WORKSPACE).unwrap()).await;
+            return dice
+                .updater_with_data(UserComputationData {
+                    cycle_detector: Some(slug_loading_v2::bzl_load_cycle_detector()),
+                    activation_tracker: Some(tracker),
+                    ..Default::default()
+                })
+                .commit()
+                .await;
+        }
+        let (module, extension) = match family {
+            RealRouteFamily::Generated => (MODULE, EXTENSION_A),
+            RealRouteFamily::SelectedNonregistry => (
+                "module(name='bazel_tools')\nlocal_path_override(module_name='local', path='local')\nbazel_dep(name='local', version='1', repo_name='local_alias')\n",
+                EXTENSION_A,
+            ),
+            RealRouteFamily::MappingFailure => ("this is not valid Starlark\n", EXTENSION_A),
+            RealRouteFamily::Main => (
+                "module(name='bazel_tools', repo_name='root_self')\n",
+                EXTENSION_A,
+            ),
+            RealRouteFamily::Builtin => unreachable!(),
+        };
+        transaction(dice, module, extension, true, Some(tracker)).await
+    }
+
+    async fn materialized_transaction(
+        dice: &Arc<Dice>,
+        workspace: &NormalizedAbsolutePath,
+        request: Arc<RepositoryMaterializationRequest>,
+        tracker: Arc<Tracker>,
+    ) -> dice::DiceTransaction {
+        let mut updater = dice.updater_with_data(UserComputationData {
+            cycle_detector: Some(slug_loading_v2::bzl_load_cycle_detector()),
+            activation_tracker: Some(tracker),
+            ..Default::default()
+        });
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.clone(),
+                },
+                RepositoryMaterializationResultEpoch::new(
+                    workspace.clone(),
+                    [RepositoryMaterializationEpochEntry {
+                        request,
+                        result: RepositoryMaterializationResult::Success(
+                            RepositoryMaterializationSuccess::Local,
+                        ),
+                    }],
+                )
+                .unwrap(),
+            )])
+            .unwrap();
+        updater.commit().await
+    }
+
+    async fn observed_route_state(
+        transaction: &mut dice::DiceTransaction,
+        key: &HostRootApparentRepositoryRouteObservationKey,
+        child_key: &HostRootApparentRepositoryDefinitionObservationKey,
+    ) -> (
+        ObservedHostRootApparentRepositoryRoute,
+        ObservedHostRootApparentRepositoryDefinition,
+    ) {
+        let outcome = transaction.compute(key).await.unwrap();
+        let parent = observed_route_value(&outcome).dupe();
+        let child = transaction.compute(child_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(child)) = child else {
+            panic!("observed definition child must have a carrier")
+        };
+        let global = transaction.compute(&PathObservationEpochKey).await.unwrap();
+        assert_eq!(parent.observations(), child.observations());
+        for (demand, result) in parent.observations().observations() {
+            assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref());
+        }
+        (parent, child)
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_root_apparent_repository_route_identity_finisher_and_terminal_algebra() {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let apparent = ApparentRepoName::new("first").unwrap();
+        let key = HostRootApparentRepositoryRouteObservationKey::new(workspace.clone(), apparent.clone()).unwrap();
+        let same = HostRootApparentRepositoryRouteObservationKey::new(workspace.clone(), apparent.clone()).unwrap();
+        let other = HostRootApparentRepositoryRouteObservationKey::new(workspace.clone(), ApparentRepoName::new("second").unwrap()).unwrap();
+        let display = HostRootApparentRepositoryRouteObservationKey::new(NormalizedAbsolutePath::new("/workspace").unwrap(), apparent.clone()).unwrap();
+        let hash = |value: &HostRootApparentRepositoryRouteObservationKey| {
+            let mut state = DefaultHasher::new();
+            value.hash(&mut state);
+            state.finish()
+        };
+        assert_eq!(
+            display.to_string(),
+            "observed-HostRootApparentRepositoryRouteKey { workspace: NormalizedAbsolutePath { path: \"/workspace\" }, apparent_repo: ApparentRepoName(\"first\") }"
+        );
+        assert!(HostRootApparentRepositoryRouteObservationKey::new(workspace.clone(), ApparentRepoName::root()).is_none());
+        assert_eq!(key, same);
+        assert_ne!(key, other);
+        assert_eq!(hash(&key), hash(&same));
+        assert_ne!(hash(&key), hash(&other));
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(Tracker::default());
+        let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+        tracker.clear();
+        let outcome = tx.compute(&key).await.unwrap();
+        let carrier = observed_route_value(&outcome);
+        assert!(carrier.result().as_ref().is_ok());
+        assert!(!carrier.observations().observations().is_empty());
+        assert!(HostRootApparentRepositoryRouteObservationKey::validity(&outcome));
+        assert!(HostRootApparentRepositoryRouteObservationKey::equality(&outcome, &outcome));
+        let child_key = HostRootApparentRepositoryDefinitionObservationKey::new(workspace.clone(), apparent.clone()).unwrap();
+        assert_eq!(dependency_row(&tracker, &key.to_string()), [child_key.to_string()]);
+        let child = tx.compute(&child_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(child)) = child else {
+            panic!("definition carrier expected")
+        };
+        let (finished, observations) = finish_root_apparent_repository_route(&key.0, child.result().clone(), child.observations().clone());
+        assert_eq!(&observations, child.observations());
+        let finished = finished.as_ref().as_ref().unwrap();
+        assert!(Arc::ptr_eq(&finished.predecessor, child.result()));
+        assert_eq!(finished, carrier.result().as_ref().as_ref().unwrap());
+
+        let missing_apparent = ApparentRepoName::new("absent").unwrap();
+        let missing_route = HostRootApparentRepositoryRouteKey::new(workspace.clone(), missing_apparent.clone()).unwrap();
+        let missing_child_key = HostRootApparentRepositoryDefinitionObservationKey::new(workspace.clone(), missing_apparent).unwrap();
+        let missing_child = tx.compute(&missing_child_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(missing_child)) = missing_child else {
+            panic!("missing definition carrier expected")
+        };
+        let (missing, missing_epoch) = finish_root_apparent_repository_route(&missing_route, missing_child.result().clone(), missing_child.observations().clone());
+        assert_eq!(&missing_epoch, missing_child.observations());
+        let HostRootApparentRepositoryRouteErrorKind::Predecessor(retained) = &missing.as_ref().as_ref().unwrap_err().kind else {
+            panic!("missing definition must remain a predecessor terminal")
+        };
+        assert!(Arc::ptr_eq(retained, missing_child.result()));
+        for row in [
+            (true, false, true, Some(true)),
+            (false, true, true, Some(true)),
+            (false, false, false, None),
+            (true, false, false, Some(false)),
+            (false, true, false, Some(false)),
+        ] {
+            assert_eq!(completed_disposition(row.0, row.1, row.2), row.3);
+        }
+
+        let need_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let _ = transaction(&need_dice, MODULE, EXTENSION_A, true, None).await;
+        let mut updater = need_dice.updater();
+        updater.changed_to(vec![(PathObservationEpochKey, PathObservationEpoch::empty())]).unwrap();
+        let need = updater.commit().await.compute(&key).await.unwrap();
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostRootApparentRepositoryRouteObservationKey::validity(&need));
+        assert!(!HostRootApparentRepositoryRouteObservationKey::equality(&need, &need));
+
+        let source = include_str!("root_apparent_repository_route.rs");
+        let producer = &source[source
+            .find("struct HostRootApparentRepositoryRouteObservationKey")
+            .unwrap()..source.find("#[cfg(test)]").unwrap()];
+        assert_eq!(producer.matches("HostRootApparentRepositoryDefinitionObservationKey::new").count(), 1);
+        assert_eq!(producer.matches("HostRootApparentRepositoryRouteObservationError::Definition(error)").count(), 1);
+        for absent in [
+            "PathObservationEpoch::from",
+            "merge_observ",
+            "OperationMismatch",
+            "EventBatch",
+            "store_evaluation_data",
+        ] {
+            assert!(!producer.contains(absent), "unexpected route owner shape: {absent}");
+        }
+        let definition_source = include_str!("root_apparent_repository_definition.rs");
+        for evidence in [
+            "HostRootApparentRepositoryDefinitionKind::SelectedRegistry",
+            "canonical_repo: definition.canonical_repo()",
+            "repo_spec: definition.repo_spec()",
+            "local_path_policy",
+            "observed_root_apparent_repository_definition_real_order_events_and_parity",
+        ] {
+            assert!(definition_source.contains(evidence));
+        }
+        let parent_route = &source[source.find("fn predecessor_view(").unwrap()..source.find("struct HostRootApparentRepositoryRouteObservationKey").unwrap()];
+        for evidence in [
+            "HostRootApparentRepositoryDefinitionKind::SelectedRegistry",
+            "HostRootApparentRepositoryRouteKind::SelectedRegistry",
+            "view.repo_spec.is_some()",
+            "Some(HostRepositoryLocalPathPolicy::LocalUnsupported)",
+            "HostRepositorySourceCapability::from_repo_spec",
+            "view.repo_spec?",
+            "view.local_path_policy()?",
+        ] {
+            assert!(parent_route.contains(evidence), "missing static SelectedRegistry route evidence: {evidence}");
+        }
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_root_apparent_repository_route_real_families_events_and_parity() {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        for family in [
+            RealRouteFamily::Generated,
+            RealRouteFamily::SelectedNonregistry,
+            RealRouteFamily::MappingFailure,
+            RealRouteFamily::Main,
+            RealRouteFamily::Builtin,
+        ] {
+            let apparent = ApparentRepoName::new(match family {
+                RealRouteFamily::Generated | RealRouteFamily::MappingFailure => "first",
+                RealRouteFamily::SelectedNonregistry => "local_alias",
+                RealRouteFamily::Main => "root_self",
+                RealRouteFamily::Builtin => "bazel_tools",
+            })
+            .unwrap();
+            let key = HostRootApparentRepositoryRouteObservationKey::new(workspace.clone(), apparent.clone()).unwrap();
+            let child_key = HostRootApparentRepositoryDefinitionObservationKey::new(workspace.clone(), apparent.clone()).unwrap();
+
+            let observed_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let observed_tracker = Arc::new(Tracker::default());
+            let mut observed_tx = real_route_transaction(&observed_dice, family, observed_tracker.clone()).await;
+            let mut observed = observed_tx.compute(&key).await.unwrap();
+            if let SourcePreparationOutcome::Need(need) = &observed {
+                assert_eq!(family, RealRouteFamily::SelectedNonregistry);
+                let request = need.repository_materializations().values().next().unwrap().clone();
+                observed_tx = materialized_transaction(&observed_dice, &workspace, request, observed_tracker.clone()).await;
+                observed_tracker.clear();
+                observed = observed_tx.compute(&key).await.unwrap();
+            }
+            let carrier = observed_route_value(&observed).dupe();
+            assert_eq!(dependency_row(&observed_tracker, &key.to_string()), [child_key.to_string()], "{family:?}");
+            let activations = observed_tracker.activations.lock().unwrap();
+            let parent = activations.iter().find(|(name, _, _)| name == &key.to_string()).unwrap();
+            assert_eq!(parent.1, ActivationKind::Evaluated);
+            assert!(parent.2.is_none());
+            drop(activations);
+            let parent_events = event_rows(&observed_tracker);
+            let child = observed_tx.compute(&child_key).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(child)) = child else {
+                panic!("{family:?}: observed child must have a carrier")
+            };
+            assert_eq!(carrier.observations(), child.observations());
+            let global = observed_tx.compute(&PathObservationEpochKey).await.unwrap();
+            for (demand, result) in carrier.observations().observations() {
+                assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref());
+            }
+            match (family, carrier.result().as_ref()) {
+                (RealRouteFamily::Generated, Ok(route)) => assert_eq!(
+                    route.view().unwrap().kind(),
+                    HostRootApparentRepositoryRouteKind::Generated
+                ),
+                (RealRouteFamily::SelectedNonregistry, Ok(route)) => assert_eq!(
+                    route.view().unwrap().kind(),
+                    HostRootApparentRepositoryRouteKind::SelectedNonregistry
+                ),
+                (RealRouteFamily::Main, Ok(route)) => assert_eq!(
+                    route.view().unwrap().kind(),
+                    HostRootApparentRepositoryRouteKind::Main
+                ),
+                (RealRouteFamily::Builtin, Ok(route)) => assert_eq!(
+                    route.view().unwrap().kind(),
+                    HostRootApparentRepositoryRouteKind::Builtin
+                ),
+                (RealRouteFamily::MappingFailure, Err(error)) => assert!(matches!(
+                    error.kind,
+                    HostRootApparentRepositoryRouteErrorKind::Predecessor(_)
+                )),
+                value => panic!("unexpected {family:?} route terminal: {value:?}"),
+            }
+            match carrier.result().as_ref() {
+                Ok(route) => assert!(Arc::ptr_eq(&route.predecessor, child.result())),
+                Err(HostRootApparentRepositoryRouteError {
+                    kind: HostRootApparentRepositoryRouteErrorKind::Predecessor(retained),
+                    ..
+                }) => assert!(Arc::ptr_eq(retained, child.result())),
+                value => panic!("unexpected retained terminal: {value:?}"),
+            }
+
+            let direct_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let direct_tracker = Arc::new(Tracker::default());
+            let mut direct_tx = real_route_transaction(&direct_dice, family, direct_tracker.clone()).await;
+            let mut direct = direct_tx.compute(&child_key).await.unwrap();
+            if let SourcePreparationOutcome::Need(need) = &direct {
+                let request = need.repository_materializations().values().next().unwrap().clone();
+                direct_tx = materialized_transaction(&direct_dice, &workspace, request, direct_tracker.clone()).await;
+                direct_tracker.clear();
+                direct = direct_tx.compute(&child_key).await.unwrap();
+            }
+            assert!(matches!(direct, SourcePreparationOutcome::Complete(Ok(_))));
+            assert_eq!(parent_events, event_rows(&direct_tracker), "{family:?}");
+
+            let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let legacy_tracker = Arc::new(Tracker::default());
+            let mut legacy_tx = real_route_transaction(&legacy_dice, family, legacy_tracker.clone()).await;
+            let legacy_key = HostRootApparentRepositoryRouteKey::new(workspace.clone(), apparent).unwrap();
+            let mut legacy = legacy_tx.compute(&legacy_key).await.unwrap();
+            if let SourcePreparationOutcome::Need(need) = &legacy {
+                let request = need.repository_materializations().values().next().unwrap().clone();
+                legacy_tx = materialized_transaction(&legacy_dice, &workspace, request, legacy_tracker).await;
+                legacy = legacy_tx.compute(&legacy_key).await.unwrap();
+            }
+            let SourcePreparationOutcome::Complete(legacy) = legacy else {
+                panic!("{family:?}: legacy route must complete")
+            };
+            assert_eq!(legacy.as_ref(), carrier.result().as_ref(), "{family:?}");
+
+            observed_tracker.clear();
+            let warm = observed_tx.compute(&key).await.unwrap();
+            assert!(Arc::ptr_eq(observed_route_value(&warm).result(), carrier.result()));
+            let warm = observed_tracker.activations.lock().unwrap();
+            assert!(!warm.is_empty());
+            assert!(warm.iter().all(|(_, kind, batch)| *kind == ActivationKind::Reused && batch.is_none()));
+            drop(warm);
+            assert!(event_rows(&observed_tracker).is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn observed_root_apparent_repository_route_lifecycle_cancellation_and_nonactivation() {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let apparent = ApparentRepoName::new("first").unwrap();
+        let key =
+            HostRootApparentRepositoryRouteObservationKey::new(workspace.clone(), apparent.clone())
+                .unwrap();
+        let child_key =
+            HostRootApparentRepositoryDefinitionObservationKey::new(workspace.clone(), apparent)
+                .unwrap();
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(Tracker::default());
+        let mut a_tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+        tracker.clear();
+        let (a, a_child) = observed_route_state(&mut a_tx, &key, &child_key).await;
+        let a_result = a.result().clone();
+        let a_observations = a.observations().clone();
+        let a_child_result = a_child.result().clone();
+        let a_child_observations = a_child.observations().clone();
+
+        tracker.clear();
+        let (warm, warm_child) = observed_route_state(&mut a_tx, &key, &child_key).await;
+        assert!(Arc::ptr_eq(warm.result(), a.result()));
+        assert!(Arc::ptr_eq(warm_child.result(), a_child.result()));
+        assert_eq!(
+            tracker.observed_route.lock().unwrap().as_slice(),
+            [ActivationKind::Reused]
+        );
+        assert_eq!(
+            tracker.observed_predecessor.lock().unwrap().as_slice(),
+            [ActivationKind::Reused]
+        );
+        assert!(
+            tracker
+                .activations
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|(_, _, batch)| batch.is_none())
+        );
+        assert!(event_rows(&tracker).is_empty());
+
+        let mapping_b_module = MODULE.replacen(
+            "first='first', second='second'",
+            "first='second', second='first'",
+            1,
+        );
+        let mut mapping_b_tx = transaction(&dice, &mapping_b_module, EXTENSION_A, true, None).await;
+        let (mapping_b, mapping_b_child) =
+            observed_route_state(&mut mapping_b_tx, &key, &child_key).await;
+        assert_ne!(mapping_b.result(), a.result());
+        assert_ne!(mapping_b_child.result(), a_child.result());
+        let mut mapping_restore_tx = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+        let (mapping_restored, mapping_restored_child) =
+            observed_route_state(&mut mapping_restore_tx, &key, &child_key).await;
+        assert_eq!(mapping_restored.result(), a.result());
+        assert_eq!(mapping_restored_child.result(), a_child.result());
+        assert!(!Arc::ptr_eq(mapping_restored.result(), a.result()));
+        assert!(!Arc::ptr_eq(
+            mapping_restored_child.result(),
+            a_child.result()
+        ));
+
+        let extension_b = EXTENSION_A.replacen("value='one'", "value='changed'", 1);
+        let mut definition_b_tx = transaction(&dice, MODULE, &extension_b, true, None).await;
+        let (definition_b, definition_b_child) =
+            observed_route_state(&mut definition_b_tx, &key, &child_key).await;
+        assert_ne!(definition_b.result(), a.result());
+        assert_ne!(definition_b_child.result(), a_child.result());
+        let mut definition_restore_tx = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+        let (definition_restored, definition_restored_child) =
+            observed_route_state(&mut definition_restore_tx, &key, &child_key).await;
+        assert_eq!(definition_restored.result(), a.result());
+        assert_eq!(definition_restored_child.result(), a_child.result());
+        assert!(!Arc::ptr_eq(definition_restored.result(), a.result()));
+        assert!(!Arc::ptr_eq(
+            definition_restored_child.result(),
+            a_child.result()
+        ));
+
+        let neutral_module = format!("{MODULE}\n");
+        let mut neutral_tx = transaction(&dice, &neutral_module, EXTENSION_A, true, None).await;
+        let (neutral, neutral_child) =
+            observed_route_state(&mut neutral_tx, &key, &child_key).await;
+        assert_eq!(neutral.result(), a.result());
+        assert_eq!(neutral_child.result(), a_child.result());
+        assert_ne!(neutral.observations(), a.observations());
+        assert_ne!(neutral_child.observations(), a_child.observations());
+        assert!(!Arc::ptr_eq(neutral.result(), a.result()));
+        assert!(!Arc::ptr_eq(neutral_child.result(), a_child.result()));
+        assert_ne!(neutral, a);
+        assert_ne!(neutral_child, a_child);
+        assert_eq!(a.result(), &a_result);
+        assert_eq!(a.observations(), &a_observations);
+        assert_eq!(a_child.result(), &a_child_result);
+        assert_eq!(a_child.observations(), &a_child_observations);
+
+        let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let cancel_tracker = Arc::new(Tracker::default());
+        let mut cancelled = transaction(
+            &cancel_dice,
+            MODULE,
+            EXTENSION_A,
+            true,
+            Some(cancel_tracker.clone()),
+        )
+        .await;
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        assert!(
+            cancel_tracker
+                .activations
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|(name, _, _)| name != &key.to_string())
+        );
+        assert!(
+            cancel_tracker
+                .dependencies
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|(name, _)| name != &key.to_string())
+        );
+        let mut recovery = transaction(
+            &cancel_dice,
+            MODULE,
+            EXTENSION_A,
+            true,
+            Some(cancel_tracker.clone()),
+        )
+        .await;
+        let (recovered, recovered_child) =
+            observed_route_state(&mut recovery, &key, &child_key).await;
+        assert_eq!(recovered.result(), a.result());
+        assert_eq!(recovered_child.result(), a_child.result());
+
+        let activations = cancel_tracker.activations.lock().unwrap();
+        let dependencies = cancel_tracker.dependencies.lock().unwrap();
+        for forbidden in [
+            "HostRootApparentRepositorySourceInputKey",
+            "HostRootApparentRepositorySourcePathInputKey",
+            "HostRootApparentRepositorySourceObservationKey",
+            "root-repository-route:",
+            "repository-package-source:",
+            "repository-source-file:",
+            "host-repository-source-file:",
+            "build-command-root:",
+        ] {
+            assert!(
+                activations
+                    .iter()
+                    .all(|(name, _, _)| !name.contains(forbidden))
+            );
+            assert!(
+                dependencies
+                    .iter()
+                    .all(|(name, children)| !name.contains(forbidden)
+                        && children.iter().all(|child| !child.contains(forbidden)))
+            );
+        }
+        assert!(activations.iter().all(|(name, _, _)| {
+            !name.starts_with("HostRootApparentRepositoryRouteKey")
+                && !name.starts_with("host-root-apparent-repository-definition:")
+        }));
+        assert!(dependencies.iter().all(|(name, children)| {
+            !name.starts_with("HostRootApparentRepositoryRouteKey")
+                && !name.starts_with("host-root-apparent-repository-definition:")
+                && children.iter().all(|child| {
+                    !child.starts_with("HostRootApparentRepositoryRouteKey")
+                        && !child.starts_with("host-root-apparent-repository-definition:")
+                })
+        }));
+        let producer = include_str!("root_apparent_repository_route.rs");
+        let producer = &producer[producer
+            .find("struct HostRootApparentRepositoryRouteObservationKey")
+            .unwrap()..producer.find("#[cfg(test)]").unwrap()];
+        for absent in [
+            "SourceInputKey",
+            "SourcePathInputKey",
+            "SourceObservationKey",
+            "RootRepositoryRouteKey",
+            "BuildCommand",
+            "RootModuleBootstrap",
+            "bootstrap",
+        ] {
+            assert!(!producer.contains(absent));
         }
     }
 
