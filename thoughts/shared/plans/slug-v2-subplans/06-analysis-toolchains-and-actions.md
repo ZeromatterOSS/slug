@@ -11431,6 +11431,85 @@ Starlark heap, lock/task across DICE, upper activation, fixture/oracle work,
 proof/cap waiver, milestone closure, M8/M7B or exact identity work. REPLAN
 before widening. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Pure-invocation observation proof correction REPLAN (2026-08-21)
+
+The one-file owner candidate is green but remains uncommitted. Exact accounting
+against `f76bab3a` is +301/-171 production and +565/-127 proof at 2,197
+physical lines. Production semantics, ownership, order, terminal algebra,
+events, retention and lifecycle design are accepted and now byte-frozen. The
+implementation packet is replaced only because its Label proof demanded a
+runtime/prepared injection for a branch that valid prepared values cannot
+reach, and several accepted lifecycle/event assertions remain implicit.
+
+The source dependency makes Label defensive. Loaded-definition preparation in
+`bzl_module.rs:2709-2731` parses each
+`HostSelectedExtensionDefinitionLoadRequest` target with
+`RootPackageBzlTarget::parse` before it can produce a definition. Prepared
+inputs join that exact request to the loaded definition in
+`bzl_module.rs:2934-2964`. Pure preflight parses the same request target again
+at `module_extension.rs:342`. The only producer of
+`HostSelectedExtensionEvaluationInput` is
+`selected_repo_spec.rs:3887-3893`; its request field is private at
+`selected_repo_spec.rs:3752-3758` and consumers receive only borrowed parts.
+Therefore no valid prepared input can first fail this parse in pure. Keep the
+legacy `Label` arm unchanged as defensive exact behavior, but prove the source
+and dependency chain statically; do not synthesize it through runtime or a
+prepared-injection key.
+
+Activate only
+`WP-6-7A-host-pure-module-extension-invocations-observation-proof-correction-implementation`.
+Authority remains solely
+`app/slug_loading_v2/src/module_extension.rs`, and only content at or below its
+first `#[cfg(test)]` may change. Lines 1-894 of the retained candidate are the
+production freeze, SHA-256
+`bdee0efe2873997c4a90429cb0a6912cd809f77fb6e0f2657688817d8ae6b738`.
+The successor must retain +301/-171 production exactly. Proof may grow only
+from the measured +565/-127 to at most +650/-150; aggregate caps are
++951/-321 and physical size is <=2,285. Keep exactly three observed-parent
+tests, at most six test helpers and every changed helper/test below 200 lines.
+No production, second file, fixture, oracle, API, export or caller change is
+authorized.
+
+Correct the existing three tests without replacing their accepted proof. The
+identity/finisher test removes the synthetic Label terminal and instead pins
+the private-producer -> loaded-definition parse -> prepared exact-request join
+-> pure defensive reparse chain with a compile-time/source scan and real
+dependency evidence. The real-order test must additionally prove that every
+later-preflight Bzl or drift failure emits no legacy invocation print, and that
+prepared failure has exact Legacy/Observed semantic parity and no pure batch.
+Every row from a warm transaction, including children and parent, must be
+batchless rather than proving only one reused row.
+
+The lifecycle test must preserve and discriminate held pure, prepared and
+Host-Bzl carriers. Root-tag mutation changes prepared and pure semantics while
+leaving Host-Bzl semantics stable; implementation-source mutation changes
+Host-Bzl, prepared and pure semantics; each A -> B -> A restoration returns to
+the A semantic projection. The metadata-only row keeps all three semantic
+Results equal while changing their transaction-local epochs. Cancellation
+recovery recomputes all three carriers, validates each against its own global
+epoch and proves the prepared and Host-Bzl epoch maps are subsets of the
+recovered pure epoch. Preserve all accepted terminal/prefix, first-failure,
+event-order, retention, historical-handle, family and upper-nonactivation
+assertions.
+
+Reuse pinned Bazel 9.2 `RegularRunnableExtension.load` and
+`SingleExtensionEvalFunction` evidence; add no oracle. Run focused
+`observed_pure_`, protected `real_repository_rule_`, `observed_prepared_` and
+`observed_bzl_`, full `cargo test -p slug_loading_v2`, direct dependent
+`cargo check -p slug_core_v2`, `cargo fmt --all -- --check`, the production
+prefix checksum/accounting checks and `git diff --check` serially.
+
+Exact compatibility remains the accepted pure values/errors/order/evaluator
+ABI/repository receipts and event behavior. The private observation
+key/carrier/typed outer and Result-Arc/epoch association remain Slug-native.
+Instantiation, validation, generated/public/root-mapping/bootstrap activation
+and exact Bazel identity bytes remain unsupported/deferred. ACCEPT returns only
+to the docs-only instantiation frontier audit. REPLAN on any production byte
+change, runtime/prepared Label injection, cap widening, deleted accepted proof,
+semantic/event/retention drift, second file/key/owner, visibility/caller/upper
+activation, fixture/oracle work, milestone closure, M8/M7B or exact identity
+work. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
