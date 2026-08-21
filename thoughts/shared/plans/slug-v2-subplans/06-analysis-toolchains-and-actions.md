@@ -13101,6 +13101,90 @@ fixture/oracle, cap/test/format waiver, milestone closure, M8/M7B or exact
 identity work. REPLAN before widening or hash drift. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Apparent-mapping carrier visibility audit selects sibling surface (2026-08-21)
+
+Accepted `2022a7a2` adds the private callerless apparent-mapping observation at
++599/-99 and 3,828 physical lines. Live source exposes one same-crate visibility
+stop before root apparent-definition ownership.
+
+At generated-definition lines 836-1136, the observed key/constructor, carrier/
+private-alias accessors and typed outer are private. The outer's Definition
+variant directly names the private canonical-definition observation error. The
+observed key has zero production consumers.
+
+The legacy mapping key has exactly one production consumer,
+`HostRootApparentRepositoryDefinitionKey` in a sibling runtime module at line
+266. That owner always computes root-context mapping first, defers main/builtin
+targets, and then computes canonical definition at line 310. It has one route
+consumer at route line 303; route has one source-input consumer at source-input
+line 186. Source observation/path, repository route/source/file, public command
+and bootstrap remain upper and contain no direct observed-mapping consumer.
+
+The canonical-definition observed carrier is also private and will require a
+separate later sibling-visibility decision before root-definition ownership.
+It cannot replace this mapping handoff, and bundling both carrier families is
+wider. No crate-root export, module move or adapter is needed. Select only
+`WP-6-7A-host-canonical-repository-apparent-mapping-observation-carrier-visibility-design`.
+
+Design exactly `pub(super)` visibility for the existing observed key and
+three-argument constructor, existing carrier and concrete borrowed apparent-
+mapping Result-Arc/epoch accessors, and one field-private opaque outer. Keep the
+Result alias and fields private.
+
+Effective Key visibility requires projection. Rename the current private outer
+to `CanonicalRepositoryApparentMappingObservationError`, retaining exactly
+RootMapping and Definition variants and derives. Keep child outcome/driver/
+finisher on that inner enum. Add `pub(super)`
+`HostCanonicalRepositoryApparentMappingObservationError(inner)` with private
+field and matching derives, and wrap only observed Complete Err at Key
+projection. Add no public field/alias/variant/inspector/conversion, reexport,
+adapter or caller.
+
+Freeze one test-only sibling smoke
+`canonical_repository_apparent_mapping_observation_surface_is_sibling_usable`
+in root apparent-definition. It constructs only `/workspace`, root context and
+`@first`, asserts exact Display
+`observed-host-canonical-repository-apparent-mapping:"/workspace":@@:@first`,
+and uses nonexecuted function pointers for the exact associated Value and
+concrete borrowed accessors. It cannot construct/inspect carrier/outer, compute
+or activate root definition.
+
+Allow only private-inner/public-wrapper spelling changes in existing
+`observed_canonical_repository_apparent_mapping_identity_branch_and_terminal_algebra`;
+retain every terminal/dependency/epoch assertion and exact one-per-branch inner
+source mapping plus one Key projection. No other owner proof changes.
+
+Prospective authority is exactly generated definition baseline 3,828 physical/
+tests 1,138, SHA-256
+`7b542ed4e0a661aa81a11651aba9bcd7ef62fc2a89bc947775a651c8a3d2f9db`,
+and test-only root apparent definition baseline 999/tests 372, SHA-256
+`d13997171de5467fca54599d6c3aaf4e62eabfc95d224f91b72507401e63ae3e`.
+Caps are <=80 generated production, <=50 generated proof, <=80 sibling proof,
+<=210 aggregate and physical <=3,959/1,079. Add no production helper/new owner
+test and exactly one sibling smoke; adjusted identity stays below 200 and smoke
+below 100. Both files remain cohesive in their existing owner/test roles. No
+hot-path or retained-representation change applies.
+
+Validate focused observed owner and sibling smoke, protected canonical/root-
+definition tests, full core, direct commands check, formatting and exact two-
+file allowlist/SHA/caps/visibility/test-size/diff checks serially. Reuse accepted
+owner and prior opaque-wrapper proof; add no oracle.
+
+Mapping semantics/branches/targets/errors/predecessor/equality/invalidation/
+epochs/events remain exact. The crate-internal opaque carrier surface is Slug-
+native. Canonical-definition visibility, root-definition owner and route/source/
+public/bootstrap observation plus exact identity bytes remain unsupported/
+deferred.
+
+Docs authority is canonical/current/this Stage/routing under <=40/<=180/<=220/
+<=30 and <=470 aggregate. Design ACCEPT schedules exactly the matching
+visibility implementation, then returns to a root-definition prerequisite
+audit. STOP implementation/activation, crate-public/export, canonical carrier
+visibility, third file/type/key/carrier/adapter, semantic/event/epoch/retention
+drift, Cargo/BUILD, fixture/oracle, cap/proof waiver, upper work, milestone
+closure, M8/M7B or exact identity work. REPLAN before widening. M7 remains
+partial and M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier formatter REPLAN (2026-08-21)
 
 The proof-corrected semantic draft is retained, but
