@@ -10860,6 +10860,40 @@ limits, validation and final prepared/evaluation rollover remain unchanged.
 STOP production or accepted-test edits, pointer overclaim, cap waiver, M8/M7B
 or exact identity work. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Loaded-definition lifecycle epoch-frontier REPLAN (2026-08-20)
+
+The first lifecycle retry corrected cross-compute Arc identity, then its real
+request-order transition disproved cross-transaction epoch-map equality. The
+ext Bzl Result remains equal while B lawfully adds Host workspace `BUILD`
+Lstat(Missing); prewarming and stable position do not canonicalize that valid
+frontier. Parent loaded semantic Result A -> B -> A restoration already passes.
+The retained production-neutral candidate is 8,235 physical and
+`+1,464/-111` versus `0a8e1220`. Its 219-line lifecycle test must be extracted
+below 200 within at most four direct lifecycle helpers.
+
+Activate only
+`WP-6-7A-loaded-module-extension-definitions-lifecycle-cancellation-proof-repair-retry-2`.
+Define A -> B -> A change/restoration on loaded semantic Result, request
+aggregate, manifests and frozen projections, not the entire observed carrier.
+Across transactions require request/Host-Bzl semantic Result equality for
+unaffected layers; affected direct/recursive layers change Result or epoch as
+the fixture exposes; pure export keeps Bzl Results equal. Preserve every held
+historical Result/epoch/projection unchanged.
+
+Treat every request/Bzl/parent epoch as a transaction-local frontier: each
+carrier demand must exist with the same semantic result in that transaction's
+independently obtained global epoch, while global extras and cross-transaction
+epoch differences are lawful. Cancellation compares exact clean/recovery
+semantic Result/request/manifest/projection values and validates each side
+against its own global epoch; it does not compare their full epoch maps. Keep
+conditional exact-Reused Arc checks and the accepted finisher-local Arc proof.
+
+Exact no-publication, warm silence, production-slice/all-key nonactivation,
+authority, <=`+1,800/-350`, <=8,450, <200 limits, validation and final rollover
+remain unchanged. STOP production or accepted-test edits, canonical-frontier
+overclaim, cap waiver, M8/M7B or exact identity work. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`

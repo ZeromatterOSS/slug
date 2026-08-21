@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-loaded-module-extension-definitions-lifecycle-cancellation-proof-repair-retry`
+Packet: `WP-6-7A-loaded-module-extension-definitions-lifecycle-cancellation-proof-repair-retry-2`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
 Scheduling base: `f36e5586`
@@ -10,23 +10,26 @@ Accepted predecessor: `99c23033`
 
 Finish only the held-handle lifecycle, cancellation/recovery and upper-
 nonactivation proof for the retained loaded-definition observation candidate.
-The first lifecycle packet reached `REPLAN` because it inferred inner-Arc
-identity from semantic DICE equality across snapshot replacement and separate
-epoch computes. Correct that proof law. The exact real-order/parity/terminal/
-event slice, production and identity/finisher algebra remain frozen.
+The first lifecycle retry corrected inner-Arc identity, then reached `REPLAN`
+because it treated observation frontiers as canonical across transactions.
+Request reordering lawfully added a nondispositive Host workspace `BUILD`
+Lstat(Missing) demand while the ext Bzl Result stayed equal. Correct that proof
+law. The exact real-order/parity/terminal/event slice, production and identity/
+finisher algebra remain frozen.
 
 Write only the `#[cfg(test)] module_extension_definition_loading_tests` module
 in `app/slug_loading_v2/src/bzl_module.rs`. Replace
-`observed_loaded_lifecycle_cancellation_and_nonactivation` plus at most three
+`observed_loaded_lifecycle_cancellation_and_nonactivation` plus at most four
 directly used lifecycle helpers and existing tracker records. Do not add a
 fourth parent test. Every changed helper/test remains below 200 lines. Rustfmt-
 only layout in the test module is allowed; assertions, values and control flow
 outside this lifecycle slice remain unchanged. Every other file, fixture,
 oracle, Cargo/BUILD target, caller and plan is read-only until rollover.
 
-The retained unaccepted lifecycle candidate is 8,181 physical lines and
-`+1,410/-111` versus `0a8e1220`; it compiles and preserves production but its
-restored identity assertions intentionally reproduce the stop. Final caps stay
+The retained unaccepted lifecycle candidate is 8,235 physical lines and
+`+1,464/-111` versus `0a8e1220`; it preserves production and contains the real
+four-axis harness. Its 219-line lifecycle test must be extracted below 200
+using at most the four lifecycle helpers. Final caps stay
 <=`+1,800/-350` and <=8,450 physical. The shared driver stays 130 lines and
 production remains byte-for-byte unchanged.
 
@@ -61,15 +64,29 @@ axis at a time and restore it before the next:
 3. recursive load: change only a child loaded by one root while an unrelated
    reached root is identical; and
 4. pure export: switch between two valid extension exports from one unchanged
-   evaluated module, without changing its source or observation epoch.
+   module source; do not assume its transaction-local observation epoch is
+   unchanged.
 
-For every axis assert parent equality changes at B and restores at A and all
-held old Results/epochs/projections remain valid and unchanged. Compare request
-and Host-Bzl carrier Results and epochs semantically across separate computes:
-snapshot replacement may recompute an equal key with fresh inner Arcs. Require
-exact Result and demand/result-map equality for unaffected children, while the
-affected direct/recursive Bzl carrier changes semantically. Pure export keeps
-the Bzl Result/epoch semantically equal while the parent projection changes.
+For every axis assert the loaded semantic Result/request aggregate/manifest/
+projection changes at B and restores at A as appropriate, and all held old
+Results/epochs/projections remain valid and unchanged. Do not require equality
+of the entire observed parent carrier or cumulative epoch across transactions.
+
+Across separate computes compare request and Host-Bzl Results semantically.
+Request-only/order and pure-export axes change the request Result; direct and
+recursive source axes keep the request Result equal. Unaffected Host-Bzl labels
+keep exact semantic Results. Affected direct/recursive children must change the
+relevant semantic Result or epoch map, with the exact Result change asserted
+where the fixture exposes one. Pure export keeps Bzl semantic Results equal
+while the loaded parent projection changes. Never require cross-transaction
+child epoch-map equality: evaluation/cache sequencing may add or omit valid
+nondispositive frontier demands.
+
+For every request, Host-Bzl and parent carrier captured in each transaction,
+compare its epoch only to the independently obtained global epoch from that
+same transaction. Every carrier demand must be present with the same semantic
+`PathObservationResult`; global extras are allowed. No carrier may contain a
+demand absent from its own transaction's global epoch.
 
 Require inner Result-Arc identity only for an exact child key/label whose rich
 activation row proves `ActivationKind::Reused` and whose returned cached key
@@ -88,14 +105,12 @@ contain no completed dependency/rich activation row from the cancelled attempt.
 
 Recompute the same key and identical inputs in that DICE. Require a Complete
 valid carrier and compare against a clean identical fixture for exact semantic
-Result, request aggregate, manifests/projections and cumulative epoch
-demand/result map. Against an independently computed recovery-transaction
-`PathObservationEpochKey`, require the exact same demand set and semantic
-`PathObservationResult` for every entry, with no extra or missing demands. Do
-not require cross-compute Arc identity: DICE may publish equal epochs with fresh
-inner Arcs even without another input replacement. A subsequent warm compute
-must be semantically equal and silent; pointer reuse is required only under the
-same exact cached/Reused condition above.
+Result, request aggregate and manifests/projections. Do not require clean and
+recovery cumulative epoch maps to be identical. Instead validate every clean
+carrier against its own clean global epoch and every recovered carrier against
+its own recovery global epoch using the subset/semantic-result rule above. A
+subsequent warm compute must be semantically equal and silent; pointer reuse is
+required only under the same exact cached/Reused condition above.
 
 ## Production-slice and all-key nonactivation
 
@@ -158,13 +173,12 @@ M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-The lifecycle packet scheduled by `2d9dbf95` produced a compiling 8,181-line
-four-axis candidate and exact nonactivation scan, then reproduced two contract
-errors. Source-only snapshot replacement recomputes the semantically unchanged
-request carrier with a new inner Result Arc; pure export can likewise recompute
-unchanged Host-Bzl carriers. Cancellation recovery also returns a semantically
-equal Host `/` Lstat observation with a fresh Arc relative to a separately
-computed global epoch. Reserved review confirmed semantic DICE equality does
-not promise cross-compute inner-Arc identity. Production is unchanged; the
-retry corrects only these proof assertions and retains all exact semantic,
-cancellation, nonactivation and held-old immutability obligations.
+The lifecycle retry scheduled by `401a0cb2` corrected cross-compute Arc
+identity, then its real request-order A -> B transition showed ext Bzl semantic
+Result equality with a different valid epoch: B adds Host
+`/extension-definition-loading/BUILD` Lstat(Missing). Prewarming and stable
+request position do not remove the difference. Parent loaded semantic Result
+restoration already passes. Reserved review confirmed observation frontiers are
+valid transaction-local subsets, not canonical cross-transaction maps. The
+8,235-line candidate and exact nonactivation scan are retained; production is
+unchanged and retry 2 corrects only the epoch association/restoration laws.
