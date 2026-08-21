@@ -1,21 +1,22 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-root-apparent-repository-source-input-observation-owner-design`
+Packet: `WP-6-7A-host-root-apparent-repository-source-input-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Audit and Rust base: pending docs commit / `b61f8f1a`
+Design and Rust base: `400b819e` / `b61f8f1a`
 
-## Goal and decision
+## Goal and authority
 
-Design only the uniquely smallest private observation owner for
+Implement only the accepted private observation owner for
 `HostRootApparentRepositorySourceInputKey`. Freeze one Legacy/Observed driver
 over the now-nameable observed route child, exact source-input projection and
 terminal semantics, child-epoch forwarding and proof without activating the
 sole source-path consumer or any later/public branch.
 
-Write only the canonical plan, this manifest, Stage 6 and routing log at caps
-<=40/<=180/<=220/<=30 additions and <=470 aggregate. Rust, tests, fixtures,
-oracles, Cargo/BUILD, exports and callers are read-only in this packet.
+Rust authority is exactly
+`app/slug_core_v2/src/runtime/root_apparent_repository_source_input.rs`.
+Every second Rust/test/API/export/caller/fixture/oracle/Cargo/BUILD file and all
+orchestration docs are read-only during implementation.
 
 ## Audited frontier
 
@@ -41,10 +42,10 @@ parallel Bzlmod route/observed-route branch at `runtime/dice.rs:4476-4494`.
 Root bootstrap remains imperative and dormant. These upper/parallel layers are
 not prerequisites and stay inactive.
 
-Choose exactly one one-file private owner, not a visibility prerequisite:
-`WP-6-7A-host-root-apparent-repository-source-input-observation-implementation`.
+Committed design `400b819e` selects exactly this one-file private owner, not a
+visibility prerequisite.
 
-## Frozen owner design
+## Frozen implementation contract
 
 Add private nominal
 `HostRootApparentRepositorySourceInputObservationKey(HostRootApparentRepositorySourceInputKey)`
@@ -142,7 +143,7 @@ other predecessor. Preserve all existing legacy assertions.
 
 ## Authority, caps and validation
 
-Future authority is exactly
+Implementation authority is exactly
 `app/slug_core_v2/src/runtime/root_apparent_repository_source_input.rs`,
 baseline 856 physical/cfg(test) line 271, SHA-256
 `940bcf9fe00782fba10dff5c1084525675a3b47c0471a1b15a18408f5c5249f2`.
@@ -181,12 +182,11 @@ REPLAN before widening or hash drift.
 
 ## Terminal
 
-Design ACCEPT may schedule only
-`WP-6-7A-host-root-apparent-repository-source-input-observation-implementation`,
-then returns to source-input carrier visibility/source-path consumer audit. M7
-remains partial and M7A -> M8 -> M7B remains.
+ACCEPT returns only to docs-only source-input carrier visibility/source-path
+consumer audit. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Accepted visibility `b61f8f1a` is +67/-12 across route and test-only source
-input. Source input is 856 physical and its observed route child is nameable.
+Committed design `400b819e` is docs-only +284/-165 and accepts the complete
+one-file contract above. Accepted visibility `b61f8f1a` remains the Rust base;
+source input is 856 physical and its observed route child is nameable.

@@ -13904,7 +13904,7 @@ identity work. REPLAN before widening or hash drift. ACCEPT returns only to
 docs-only source-input observation-owner design. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
-### Root source-input observation-owner design selected (2026-08-21)
+### Root source-input observation-owner design accepted (2026-08-21)
 
 Accepted `b61f8f1a` promotes the observed root-route key/carrier/borrowed
 Result-Arc+epoch accessors and opaque outer without a caller. Source input can
@@ -13925,9 +13925,9 @@ line 234, and source observation has zero production callers. Public command
 analysis uses the parallel Bzlmod route branch at `dice.rs:4476-4494`; root
 bootstrap remains dormant. Keep every upper/parallel branch inactive.
 
-Choose exactly
-`WP-6-7A-host-root-apparent-repository-source-input-observation-owner-design`,
-with one future implementation in source input only. Add private
+Committed design `400b819e` selects exactly the owner below. Schedule only
+`WP-6-7A-host-root-apparent-repository-source-input-observation-implementation`
+in source input; no other prerequisite remains. Add private
 `HostRootApparentRepositorySourceInputObservationKey`,
 `ObservedHostRootApparentRepositorySourceInput` retaining only the source-input
 Result Arc plus `PathObservationEpoch`, and typed
@@ -13977,7 +13977,7 @@ tracker/helpers and update existing production-edge proof to require one legacy
 route request, one observed route request, one pure projection and no other
 predecessor; retain all legacy assertions.
 
-Future authority is exactly source input baseline 856 physical/cfg(test) line
+Implementation authority is exactly source input baseline 856 physical/cfg(test) line
 271, SHA-256
 `940bcf9fe00782fba10dff5c1084525675a3b47c0471a1b15a18408f5c5249f2`.
 Caps are <=240 production, <=620 proof, <=860 aggregate additions and <=1,750
@@ -14003,12 +14003,11 @@ or upper activation, semantic/projection/policy/order/error/event/equality/
 retention drift, epoch merge/rebuild, parent OperationMismatch, retained child/
 scratch/task/lock, private/malformed injection, fixture/oracle, cap/helper/test/
 format waiver, Cargo/BUILD, milestone closure, M8/M7B or exact identity work.
-REPLAN before widening or hash drift. On design ACCEPT schedule only
-`WP-6-7A-host-root-apparent-repository-source-input-observation-implementation`,
-then audit carrier visibility/source-path handoff. M7 remains partial and
-M7A -> M8 -> M7B remains. Documentation
-authority is <=40 canonical, <=180 current, <=220 Stage, <=30 routing and <=470
-aggregate additions.
+REPLAN before widening or hash drift. ACCEPT returns only to carrier
+visibility/source-path handoff audit. M7 remains partial and M7A -> M8 -> M7B
+remains. This terminal scheduling correction changes only the four orchestration
+records at <=20 canonical, <=40 current, <=40 Stage, <=5 routing and <=105
+aggregate additions; it makes no Rust change.
 
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
