@@ -11187,6 +11187,71 @@ drift, retained Starlark heap, lock across DICE, pure/upper activation, proof/
 cap waiver, milestone closure, M8/M7B or exact identity work. REPLAN before
 widening. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Pure-invocation frontier selects prepared-carrier visibility (2026-08-20)
+
+Implementation `682c4a1e` accepts the private callerless prepared-input Result
+Arc plus transaction-local observation epoch. The live successor audit finds
+that pure invocation is the next semantic owner but cannot yet name that
+carrier across the sibling-module boundary.
+
+The observed prepared key, carrier and typed outer remain private in
+`bzl_module.rs:3048-3409`, while the legacy pure driver in
+`module_extension.rs:153-211` is the sole production consumer of prepared
+inputs at line 158. Its other mutable child is already visible: the
+crate-visible Host-Bzl observation key/carrier/accessors are at
+`bzl_module.rs:1303-1344,2318-2363`. No separate evidence owner, adapter or
+semantic predecessor is missing.
+
+The upper chain is strictly serial. Instantiation alone consumes pure at
+`module_extension_repository_instantiation.rs:191`; validation alone consumes
+instantiation at `module_extension_repository_validation.rs:208`; generated
+repository definition alone consumes validation in production at
+`generated_repository_definition.rs:168`. The public validation reexport is a
+later cross-crate publication boundary, not a pure prerequisite. Root
+repository mapping instead consumes selected extension mappings directly at
+`selected_repo_spec.rs:4467`, and canonical selected-module definition is the
+parallel branch joined later by generated repository publication. None is an
+earlier owner.
+
+Pure invocation itself remains a distinct future semantic owner. It owns
+unsupported environment/OS/architecture/facts factors, Host-Bzl
+reacquisition and manifest/definition drift, `module_ctx` construction,
+Starlark evaluation and print capture, repository-rule call receipts, required
+`None` results and the ordered `AfterPrepared` terminal prefix. Do not move
+these facts or its event batch into prepared inputs or a visibility packet.
+
+Activate only
+`WP-6-7A-host-prepared-module-extension-inputs-observation-carrier-visibility-design`.
+Design the smallest crate-internal, one-way `bzl_module` -> `module_extension`
+surface for the existing observation key, constructor, carrier borrowed Result/
+epoch access and opaque typed outer. Decide whether an opaque nominal wrapper
+is required by Rust effective-visibility rules; do not expose private
+Raw/Definitions/Merge internals. Add no crate-root reexport, public external
+API, adapter key, semantic caller or reverse dependency.
+
+The design starts from `682c4a1e`: `bzl_module.rs` is 9,108 physical lines
+with its owning test module at 5,750, and `module_extension.rs` is 1,592 with
+test-only support at 767 and its owning test module at 869. Any future implementation must remain within
+those two files, with the second file test-only, and fit <=80 production,
+<=80 proof, <=160 aggregate semantic, <=9,190/1,675 physical, at most two
+direct helpers and every changed helper/test below 100. The design itself may
+edit only canonical/current/this Stage/routing at net caps
+<=40/<=180/<=220/<=30 and <=470 aggregate.
+
+Existing prepared and pure values/errors/order/events remain exact Bazel 9
+compatibility. Crate-internal observation visibility, an opaque typed outer and
+Result-Arc/epoch association are Slug-native. Pure, instantiated, validated,
+generated/public/root-mapping/bootstrap activation and exact Bazel identity
+bytes remain unsupported/deferred here.
+
+The design may authorize at most one visibility-only implementation, then
+return to a docs-only pure-owner design. STOP Rust edits in the design,
+semantic/equality/event/retention change, public/lib export, outer-stage
+inspection, second key/adapter/owner, pure or upper activation, new fixture/
+oracle, cap/proof waiver, milestone closure, M8/M7B or exact identity work.
+REPLAN if a bounded opaque crate-internal surface cannot type-check. M7 remains
+partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`

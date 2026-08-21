@@ -1,157 +1,119 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-prepared-module-extension-inputs-observation-implementation`
+Packet: `WP-6-7A-host-prepared-module-extension-inputs-observation-carrier-visibility-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling/design base: `3738b2b4`
-Rust base: `50881fc0`
+Audit and Rust base: `682c4a1e`
 
 ## Goal and authority
 
-Implement only one private matching-family observed sibling for
-`HostPreparedModuleExtensionInputsKey`. Share the existing prepared semantics
-between Legacy and Observed modes, retain one local Result Arc plus compact
-transaction-local epoch, and keep pure invocation and every upper owner
-inactive.
+Design only the minimum crate-internal visibility surface by which the sibling
+`module_extension.rs` owner can later consume the accepted callerless prepared-
+input observation. Freeze exact nominal types, effective visibility, borrowed
+accessors, opaque outer handling, compile proof, future implementation
+authority/caps and nonactivation. Do not edit Rust or activate pure invocation.
 
-Write authority is exactly `app/slug_loading_v2/src/bzl_module.rs`, baseline
-8,288 physical lines with the owning test module at line 5,452. Caps are <=380
-production, <=1,050 proof and <=1,430 aggregate semantic at <=9,725 physical.
-Add at most six direct helpers and three observed-parent tests; keep the shared
-driver below 150 lines and every changed helper/test below 200. Every other
-Rust file, test, fixture, oracle, Cargo/BUILD target, API, export, caller and
-plan is read-only.
+Design write authority is exactly the canonical plan, this manifest, Stage 6
+and the routing log. Net caps are <=40/<=180/<=220/<=30 respectively and <=470
+aggregate. Rust, tests, fixtures, oracles, Cargo/BUILD, APIs, exports, callers
+and other plans are read-only. The design may authorize at most one bounded
+visibility-only implementation successor.
 
-The large file remains cohesive for this packet because it already owns the
-legacy prepared key and pure preparation function, the private loaded child
-observation, the imported Bzlmod child surface, activation/dependency tracker,
-real extension fixtures and existing prepared tests. Splitting the one private
-sibling would create a new visibility seam and duplicate proof plumbing.
+## Learned live frontier
 
-## Frozen owner and driver
+`bzl_module.rs` is 9,108 physical lines with the owning test module at 5,750.
+The accepted `HostPreparedModuleExtensionInputsObservationKey`,
+`ObservedHostPreparedModuleExtensionInputs`, their private constructor and
+borrowed Result/epoch accessors, and
+`PreparedModuleExtensionInputsObservationError` occupy lines 3048-3409. They
+are private to `bzl_module`, so sibling `module_extension` cannot name the key,
+carrier or associated `Key::Value` outer.
 
-Add only private `HostPreparedModuleExtensionInputsObservationKey`,
-`ObservedHostPreparedModuleExtensionInputs`, one private typed outer, and one
-Legacy/Observed driver. Preserve this order:
+`module_extension.rs` is 1,592 physical lines with test-only support at 767
+and the owning test module at 869. `HostPureModuleExtensionInvocationsKey` and its legacy driver are at
+98-211. Its compute at line 158 is the sole production consumer of
+`HostPreparedModuleExtensionInputsKey`; there is no production compute of the
+observed sibling. Pure's other mutable child needs no promotion:
+`ObservedHostBzlModule`, `HostBzlModuleObservationKey`, constructor and borrowed
+accessors are already `pub(crate)` at `bzl_module.rs:1303-1344`, with the key
+implementation at 2318-2363.
 
-1. compute selected evaluation-input requests;
-2. finish their child boundary and semantics;
-3. compute loaded module-extension definitions;
-4. finish their child boundary, merge observations and semantics; and
-5. run unchanged `prepare_module_extension_inputs` join/schema/class/coercion.
+The exact production chain above pure is serial: instantiation alone computes
+pure at `module_extension_repository_instantiation.rs:191`; validation alone
+computes instantiation at `module_extension_repository_validation.rs:208`;
+generated repository definition alone computes validation in production at
+`slug_core_v2/src/runtime/generated_repository_definition.rs:168`. The
+validation crate-root export is a later publication boundary. Root repository
+mapping independently computes selected extension mappings at
+`selected_repo_spec.rs:4467`; canonical selected-module definition is the
+parallel publication branch. These are not visibility or evidence
+prerequisites for pure.
 
-Legacy computes only the two legacy child keys with empty epochs. Observed
-computes only `HostSelectedExtensionEvaluationInputRequestsObservationKey`
-then `HostLoadedModuleExtensionDefinitionsObservationKey`. Project Legacy by
-moving the exact local prepared Result Arc from the shared driver. Add no
-adapter key, public/exported type, caller or second semantic owner.
+## Required design decision
 
-## Prefix and terminal algebra
+Specify exactly one one-way `bzl_module` -> `module_extension` surface around
+the existing observation key and carrier. Decide the narrow effective
+visibility of the key, its constructor, the carrier and its borrowed
+`result()`/`observations()` accessors. Inspect Rust `Key::Value` privacy and
+choose exactly one opaque nominal outer technique: promote a safe existing
+name only if that does not reveal Raw/Definitions/Merge internals, otherwise
+wrap the existing private outer only at the observed key projection. The
+future pure owner may carry that outer but must not inspect its private stages.
 
-The private outer has exactly three variants/stages:
+Preserve the exact key identity and Display, Complete-only equality/validity,
+Need and outer carrierlessness, semantic Result Arc, transaction-local epoch,
+child-owned events, warm silence, cancellation behavior and compact retention.
+No new semantic fact or DICE dependency is introduced. Add no adapter key,
+second carrier, result alias exposure, public field, outer inspector, crate-root
+reexport, external API, reverse module edge, semantic caller, event batch,
+cache, interner, task or lock.
 
-- `Raw`, carrying the opaque Bzlmod evaluation-input observation outer and no
-  completed semantic context;
-- `Definitions`, carrying the completed raw semantic aggregate plus the loaded-
-  definition child outer; and
-- `Merge`, carrying the completed raw semantic aggregate plus the exact
-  `ObservedPathFrontierError` from combining the definition epoch.
+Freeze a compile-discriminating sibling-module proof. It may type-check key
+construction, Display, the associated outcome, borrowed carrier accessors and
+opaque error handling from `module_extension` tests, but must not compute the
+key, construct carrier/error internals, inspect stages or activate pure. State
+why same-module proof alone does not discriminate the visibility seam.
 
-Raw DICE compute failure remains semantic `RawCompute` with an empty epoch.
-Raw Need or typed outer is immediate and carrierless. A Complete raw carrier is
-accepted before raw semantics; raw semantic failure returns `Raw` with the raw
-epoch and suppresses definitions.
+## Future implementation bounds
 
-Definitions DICE compute failure remains semantic
-`Definitions { error: Err }` with the raw prefix. Definitions Need or typed
-outer is immediate and carrierless; the typed outer retains raw semantic context but publishes no
-parent carrier. On Complete, merge the definition epoch into the raw prefix
-left-first before inspecting definition semantics. Equal duplicate demands
-retain the raw-side Arc. A valid-epoch same-demand value conflict returns the
-carrierless `Merge` outer. An operation mismatch rejected by a lower child
-remains in that child's carrierless `Raw` or `Definitions` outer. Definition
-semantic failure returns existing
-`Definitions { error: Ok }` with the merged prefix.
+Future Rust authority may include only
+`app/slug_loading_v2/src/bzl_module.rs` and test-only additions in
+`app/slug_loading_v2/src/module_extension.rs`. Starting physical baselines are
+9,108 and 1,592. Hard ceilings are <=80 production, <=80 proof, <=160 aggregate
+semantic and <=9,190/1,675 physical. Add at most two direct helpers and keep
+every changed helper/test below 100 lines. A one-file production change plus
+one sibling compile smoke is preferred; the design must justify anything
+within these ceilings and REPLAN before adding a third file.
 
-Only after both child semantics succeed may existing request-aggregate/count/
-order joins, tag-schema validation, tag-class lookup and repository-aware
-attribute coercion run. Every `AfterInputs` error and success retains the full
-merged prefix. First terminal suppresses every later child and local step; do
-not union Needs or scan/speculate past a terminal.
+Reuse accepted prepared identity/finisher/order/event/lifecycle/cancellation/
+nonactivation proof and Bazel 9.2 loading evidence; add no oracle. A future
+implementation must run its sibling visibility smoke, protected
+`observed_prepared_` tests, full `cargo test -p slug_loading_v2`, direct
+`cargo check -p slug_core_v2`, `cargo fmt --all -- --check` and
+`git diff --check` serially. The design itself runs only source/coherence and
+diff checks.
 
-## Events and retention
+## Compatibility, lifecycle and terminal
 
-The prepared parent owns no event batch. Accepted request/root/Host-Bzl children
-remain sole owners of their exact batches. Fresh evaluation follows raw then
-definitions dependency order; shared lower children may be Reused without
-batch replay. Warm parent reuse is silent, and changed-parent/unchanged-child
-recomputation reports only the child family's accepted Reused/None behavior.
-Need, typed outer and cancellation publish no parent carrier or batch.
+Existing prepared and pure values, errors, dependency order and child event
+behavior remain exact Bazel 9 compatibility. The crate-internal key/carrier/
+opaque-outer visibility and Result-Arc/epoch association are Slug-native. Pure,
+instantiated, validated, generated/public/root-mapping/bootstrap activation and
+exact Bazel configuration/output/ActionKey bytes are unsupported/deferred in
+this packet.
 
-Retain only the local prepared semantic Result Arc, compact cumulative epoch and
-semantic projections already reachable from that Result. Child carriers,
-child Result Arcs, full frozen Bzl modules/heaps, join/coercion Vec/SmallMap
-scratch, event data, locks and tasks remain compute-local. Add no side store,
-cache, interner or lock across a DICE compute.
-
-## Required proof
-
-Use at most three observed-parent tests covering:
-
-1. key hash/Display, carrier accessors, Complete/Need/outer equality/validity,
-   left-first duplicate Arc, valid-epoch conflict at `Merge`, lower child
-   conflict/operation mismatch at `Raw` or `Definitions`, and every finisher
-   prefix/terminal stage; reuse the accepted opaque raw-child outer proof rather
-   than constructing or inspecting it in loading, and add no malformed epoch or
-   synthetic hook;
-2. exact legacy/observed prepared Result parity, dependency order, raw-first
-   suppression, reachable raw/definition/local errors and success, child-only
-   fresh batches, warm silence and isolated Reused/None; and
-3. held parent/raw/definition Result+epoch A -> B -> A across independent raw
-   and definition changes, poll-drop/no-publication/recovery, per-transaction
-   carrier-to-global-epoch association and exact nonactivation.
-
-Across transactions compare semantic Results and frozen projections; treat
-epochs as transaction-local frontiers and require pointer identity only for an
-exact cached value proven Reused. Preserve all held historical handles.
-
-Production-slice and all-key rows must exclude legacy/observed family mixing and
-the exact upper families `HostPureModuleExtensionInvocationsKey`,
-`HostInstantiatedModuleExtensionRepositoriesKey`,
-`HostValidatedModuleExtensionRepositoriesKey`,
-`HostRootRepositoryMappingKey`,
-`HostCanonicalSelectedModuleDefinitionKey`,
-`HostGeneratedRepositoryDefinitionKey` and `slug-command:`. Do not infer the
-new parent contract only from accepted child tests.
-
-## Validation, compatibility and terminal
-
-Reuse accepted Bazel 9.2 loading/Bzlmod evidence; add no oracle. Run serially:
-
-- focused `observed_prepared_` and protected `real_prepared_inputs_` tests;
-- protected `observed_loaded_` loading tests;
-- full `cargo test -p slug_loading_v2`;
-- direct dependent `cargo check -p slug_core_v2`;
-- `cargo fmt --all -- --check`; and
-- `git diff --check`.
-
-Existing prepared values/errors/order, schema/class validation, attribute
-coercion and child events remain exact Bazel 9 compatibility. The private key,
-carrier, typed outer and shared-Arc epoch association are Slug-native.
-
-Implementation ACCEPT returns only to a docs-only pure-invocation frontier
-audit. STOP semantic/event/equality/retention drift, second file/key/adapter/
-owner, API/export/caller change, retained Starlark heap, lock across DICE,
-pure/upper activation, fixture/oracle work, proof/cap waiver, milestone closure,
-M8/M7B or exact identity work. REPLAN before widening. M7 remains partial and
-M7A -> M8 -> M7B remains.
+Implementation ACCEPT after this design returns only to a docs-only pure-
+invocation owner design. STOP Rust edits now; semantic/equality/event/retention
+drift; public or crate-root export; private stage exposure; second key/carrier/
+adapter/owner; pure or upper activation; fixture/oracle work; proof/cap waiver;
+milestone closure; M8/M7B; or exact identity work. REPLAN if Rust effective
+visibility requires an unbounded API, semantic owner or third file. M7 remains
+partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Design `3738b2b4` confirms the prepared key at `bzl_module.rs:3051-3115` owns
-the raw-first join and has one production consumer at `module_extension.rs:158`.
-Accepted children are the public opaque evaluation-input observation API at
-`selected_repo_spec.rs:3937-4000,4275-4303` and the same-module loaded-definition
-observation at `bzl_module.rs:2475-2509,2833-2870`. Existing preparation
-semantics are at `bzl_module.rs:2920-3015`; existing real prepared tests begin
-at `bzl_module.rs:6244`.
+Implementation `682c4a1e`, from design base `3738b2b4`, accepts the private
+prepared Result-Arc plus compact observation epoch with raw-first children,
+left-first merge, unchanged preparation semantics, child-only events and exact
+upper nonactivation. This audit selects only the smaller sibling visibility
+seam before pure ownership.
