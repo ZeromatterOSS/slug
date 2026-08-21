@@ -3944,6 +3944,12 @@ enum EvaluationInputRequestsObservationError {
     },
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct HostSelectedExtensionEvaluationInputRequestsObservationError(
+    EvaluationInputRequestsObservationError,
+);
+
 type EvaluationInputRequestsDriverOutcome = SourcePreparationOutcome<
     Result<
         (EvaluationInputRequestsResult, PathObservationEpoch),
@@ -3951,15 +3957,14 @@ type EvaluationInputRequestsDriverOutcome = SourcePreparationOutcome<
     >,
 >;
 
+#[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-#[allow(dead_code)]
-struct HostSelectedExtensionEvaluationInputRequestsObservationKey(
+pub struct HostSelectedExtensionEvaluationInputRequestsObservationKey(
     HostSelectedExtensionEvaluationInputRequestsKey,
 );
 
-#[allow(dead_code)]
 impl HostSelectedExtensionEvaluationInputRequestsObservationKey {
-    fn new(workspace: NormalizedAbsolutePath) -> Self {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
         Self(HostSelectedExtensionEvaluationInputRequestsKey::new(
             workspace,
         ))
@@ -3972,20 +3977,26 @@ impl fmt::Display for HostSelectedExtensionEvaluationInputRequestsObservationKey
     }
 }
 
+#[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-#[allow(dead_code)]
-struct ObservedHostSelectedExtensionEvaluationInputRequests {
+pub struct ObservedHostSelectedExtensionEvaluationInputRequests {
     result: EvaluationInputRequestsResult,
     observations: PathObservationEpoch,
 }
 
-#[allow(dead_code)]
 impl ObservedHostSelectedExtensionEvaluationInputRequests {
-    fn result(&self) -> &EvaluationInputRequestsResult {
+    pub fn result(
+        &self,
+    ) -> &Arc<
+        Result<
+            HostSelectedExtensionEvaluationInputRequests,
+            HostSelectedExtensionEvaluationInputRequestsError,
+        >,
+    > {
         &self.result
     }
 
-    fn observations(&self) -> &PathObservationEpoch {
+    pub fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
 }
@@ -4265,16 +4276,16 @@ impl Key for HostSelectedExtensionEvaluationInputRequestsObservationKey {
     type Value = SourcePreparationOutcome<
         Result<
             ObservedHostSelectedExtensionEvaluationInputRequests,
-            EvaluationInputRequestsObservationError,
+            HostSelectedExtensionEvaluationInputRequestsObservationError,
         >,
     >;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
         match drive_evaluation_input_requests(ctx, &self.0, RoutesMode::Observed).await {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
-            }
+            SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(
+                Err(HostSelectedExtensionEvaluationInputRequestsObservationError(error)),
+            ),
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
                 SourcePreparationOutcome::Complete(Ok(
                     ObservedHostSelectedExtensionEvaluationInputRequests {
