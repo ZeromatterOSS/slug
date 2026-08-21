@@ -1,162 +1,141 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-root-repository-mapping-observation-implementation`
+Packet: `WP-6-7A-host-root-repository-mapping-observation-carrier-promotion-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Design and Rust base: pending docs commit / `c96ae09d`
+Audit and Rust base: pending docs commit / `7ee0522b`
 
-## Goal and exact authority
+## Goal and decision authority
 
-Add the private callerless observation sibling of
-`HostRootRepositoryMappingKey` in its existing Bzlmod owner. Share its exact
-one-child extension-mappings projection and exhaustive root-ordinal reducer
-between Legacy and Observed modes. Publish one root-mapping Result Arc plus the
-unchanged child observation epoch; activate no core consumer.
+Design only the uniquely smaller cross-crate visibility prerequisite between
+the accepted private Bzlmod root-repository-mapping observation and core's
+future canonical apparent-mapping observation owner. Freeze one doc-hidden
+key/carrier/opaque-outer handoff without changing computation or activating a
+caller.
 
-Write only `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 12,564
-physical lines with `#[cfg(test)]` at line 4,678. Every other Rust file, test,
-fixture, oracle, Cargo/BUILD target, API, export, caller and plan is read-only.
+Write only the canonical plan, this manifest, Stage 6 and routing log at net
+caps <=40/<=180/<=220/<=30 and <=470 aggregate. Rust, tests, fixtures,
+oracles, Cargo/BUILD, APIs, exports and callers are read-only in this packet.
 
-## Exact nominal surface and driver
+## Audited frontier
 
-Add private `HostRootRepositoryMappingObservationKey` as a newtype over the
-legacy key, with private one-argument `new` and Display `observed-{legacy}`.
-For `/workspace`, exact Display is
-`observed-host-root-repository-mapping:"/workspace"`.
+At accepted base `7ee0522b`, `selected_repo_spec.rs:4636-4860` owns private
+`HostRootRepositoryMappingObservationKey`, private
+`ObservedHostRootRepositoryMapping` and private
+`HostRootRepositoryMappingObservationError::Mappings`. The carrier's private
+`result()` names private `RootRepositoryMappingResult`; the outer exposes
+private `ExtensionMappingsObservationError`. There is no crate-root reexport
+and no production consumer of the observed key.
 
-Add private `ObservedHostRootRepositoryMapping` containing exactly
-`RootRepositoryMappingResult` and `PathObservationEpoch`, with private borrowed
-`result()` and `observations()` accessors. Define the private result alias as
-`Arc<Result<HostRootRepositoryMapping, HostRootRepositoryMappingError>>` and
-leave the public legacy outcome's concrete spelling unchanged. Add private typed outer
-`HostRootRepositoryMappingObservationError::Mappings(
-ExtensionMappingsObservationError)`. Key Value is
-`SourcePreparationOutcome<Result<carrier, outer>>`. Use matching Debug/Clone/
-PartialEq/Eq/Hash/Allocative derives on the key and Debug/Clone/PartialEq/Eq/
-Allocative/`Dupe` on carrier and outer; add no export, public field, alias,
-adapter or caller.
+The legacy `HostRootRepositoryMappingKey` has exactly one production consumer:
+the root-context branch of core
+`HostCanonicalRepositoryApparentMappingKey` at
+`generated_repository_definition.rs:879`. That core key's nonroot branch at
+905 already shares a module with the private canonical-definition observation,
+so canonical-carrier promotion is not a prerequisite. The apparent-mapping key
+has exactly one production consumer, `HostRootApparentRepositoryDefinitionKey`
+at `root_apparent_repository_definition.rs:266`; that consumer later computes
+canonical definition at 310. Route/source/public/command/bootstrap branches
+are still upper and contain no direct observed-root-mapping consumer.
 
-Reuse the existing private `RoutesMode::{Legacy, Observed}` and generic
-`RepoSpecChild`; do not add another mode or child enum. Factor the current key
-body only into `root_mapping_complete`,
-`root_repository_mapping_mappings_child`, `finish_root_repository_mapping`,
-`drive_root_repository_mapping` and
-`project_legacy_root_repository_mapping`. Both Key implementations call the
-one driver; the legacy projection moves the exact Result Arc, and the observed
-projection constructs the carrier or forwards the typed outer.
+Core already depends one way on Bzlmod and imports the legacy root-mapping
+surface. Moving the owner, adding a Bzlmod-to-core edge, splitting the root and
+nonroot apparent-mapping family or using an empty root epoch is forbidden.
+Therefore the minimal next step is the Bzlmod carrier promotion, not apparent-
+mapping ownership or canonical/root-definition visibility.
 
-Legacy computes only `HostSelectedExtensionMappingsKey` with empty epoch.
-Observed computes only `HostSelectedExtensionMappingsObservationKey` and
-borrows its exact Result Arc and epoch. DICE child compute failure remains the
-existing semantic `PrivateRootRepositoryMappingError::Compute(message)` with
-empty epoch. Need returns immediately and publishes no carrier. Observed child
-outer becomes carrierless `Mappings(error)`. Complete child semantic error
-remains `Predecessor(predecessor)` with the exact child epoch.
+## Design deliverable
 
-On semantic success, move the same mappings Result Arc through the reducer.
-Refactor the route loop through one production-used private iterator helper
-that records the first root ordinal, records only the first conflicting root,
-and consumes the entire iterator. `root_mapping_ordinal` then preserves the
-context check. Exact terminals are `Missing`, `Duplicate { first,
-conflicting }`, and `Context { ordinal }`; each `Invalid` retains the same
-predecessor Arc and child epoch. Success retains that predecessor plus the root
-ordinal and child epoch. Mapping entry/order storage and borrowed views are
-unchanged. There is one child and no epoch merge, rebuild, union or validation.
+Freeze exactly three doc-hidden public nominal types and exactly three adjacent
+crate-root reexports:
 
-The observed key uses `complete_eq` and Complete-only validity: Need is invalid
-and self-unequal; Complete carrier/outer compares structurally. Result equality
-alone cannot cut off an epoch-only change.
+- existing `HostRootRepositoryMappingObservationKey`, with public one-argument
+  `new(NormalizedAbsolutePath)` and unchanged Display;
+- existing `ObservedHostRootRepositoryMapping`, with public borrowed concrete
+  `&Arc<Result<HostRootRepositoryMapping, HostRootRepositoryMappingError>>`
+  `result()` and `&PathObservationEpoch` `observations()` accessors; and
+- one field-private opaque public
+  `HostRootRepositoryMappingObservationError`.
 
-## Events, retention and lifecycle
+Keep every field and `RootRepositoryMappingResult` private. Effective Key
+visibility requires projection: rename the current private enum to
+`RootRepositoryMappingObservationError`, preserving exactly
+`Mappings(ExtensionMappingsObservationError)` and its derives, keep the shared
+driver on that inner enum, and define the public outer as
+`HostRootRepositoryMappingObservationError(inner)` with a private field and
+matching derives. Wrap only observed `Complete(Err(inner))` at Key projection.
+Need, success, legacy projection, equality/validity, events, retention and all
+terminal semantics remain byte-for-byte equivalent.
 
-Root mapping owns no event batch. Its fresh observed dependency row is exactly
-`[observed-host-selected-extension-mappings]`; legacy is exactly
-`[host-selected-extension-mappings]`. Accepted lower event payloads remain
-equal, with observed owner
-`bzlmod-observed-host-root-module-file:"/selected-repo-spec-test"` and legacy
-owner `root-module-evaluation:/selected-repo-spec-test`. Parent and every warm/
-Reused row are batchless. Need, child outer and cancellation publish neither
-carrier nor parent batch; semantic terminals retain lower child events without
-replay.
+Add no public Result/outcome alias, field, variant, inspector, outer
+constructor, conversion, adapter, second key/carrier, semantic caller or core
+compute. The later core owner may carry but cannot inspect the outer.
 
-Each observed carrier retains only the root-mapping Result Arc and compact
-child epoch. Existing success/error values retain the predecessor Arc and
-ordinal/reason exactly. Child carrier, duplicate maps/order, iterator/scan
-scratch, mode, evaluator/event state, cache, task and lock die before
-publication. DICE owns serialization; no manual lock or task crosses compute.
+Freeze one external API smoke
+`root_repository_mapping_observation_surface_is_cross_crate_usable` in new
+`app/slug_bzlmod_v2/tests/root_repository_mapping_observation_api.rs`. It may
+construct only the observed key for `/workspace`, assert exact Display
+`observed-host-root-repository-mapping:"/workspace"`, and use nonexecuted
+function pointers to prove the associated
+`SourcePreparationOutcome<Result<ObservedHostRootRepositoryMapping,
+HostRootRepositoryMappingObservationError>>` plus the two concrete borrowed
+accessor signatures. It must not construct or inspect carrier/outer, compute a
+key, import core or activate semantics.
 
-Add exactly:
+## Authority, caps and validation
 
-- `observed_root_repository_mapping_identity_scan_and_terminal_algebra`;
-- `observed_root_repository_mapping_real_order_events_and_parity`; and
-- `observed_root_repository_mapping_lifecycle_cancellation_and_nonactivation`.
+Prospective implementation authority is exactly:
 
-The first proves key equality/hash/Display/accessors, Complete/Need/outer
-equality/validity, compute/Predecessor/Missing/Duplicate/Context/success
-terminals, exact epoch/Arc forwarding and the production-used iterator's full
-consumption plus first/conflicting ordinals. It also proves the driver names
-only the observed mappings child, has no merge, and the legacy projection moves
-the Result Arc.
+- `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 13,362 physical
+  lines with tests at 4,862;
+- `app/slug_bzlmod_v2/src/lib.rs`, baseline 421; and
+- new `app/slug_bzlmod_v2/tests/root_repository_mapping_observation_api.rs`.
 
-The real proof requires exact observed/legacy one-child rows, successful and
-predecessor-error parity, retained predecessor Arc, borrowed mapping order,
-exact lower event owner/payload parity, batchless parent/warm behavior,
-matching-family exclusion and no parent replay. Reuse the existing root-mapping
-publication/corruption fixtures and accepted observed-mappings proof.
+Freeze <=80 production, <=40 colocated proof, <=10 lib and <=70 external
+proof; <=200 aggregate semantic lines and physical <=13,483/431/70. Allow only
+a semantic-neutral opaque-wrapper spelling adjustment to existing
+`observed_root_repository_mapping_identity_scan_and_terminal_algebra`, which
+must remain below 200 lines; every new smoke/helper remains below 100. The
+large source remains cohesive because it owns the inner driver, carrier and
+projection. No hot-path measurement applies.
 
-The lifecycle proof holds Result and epoch handles across A-B-A changes to root
-repo name, import order and override/inject order; proves identical semantic
-source with changed metadata has equal Result but unequal epoch/observed Value;
-checks each epoch against its own transaction global, Arc identity only on a
-proven Reused value, real poll-drop with no parent publication, and same-DICE
-recovery. Deny legacy root mapping, definition requests, canonical-selected,
-generated/canonical definition, core apparent mapping/root definition/route/
-source, materialization and public command/bootstrap activation. Use tracker/
-source-direction evidence only; add no malformed runtime injection or hook.
-
-## Caps, validation and compatibility
-
-Caps are <=230 production, <=680 proof, <=910 aggregate semantic and <=13,480
-physical. Add at most six production/six test helpers, exactly three tests,
-keep the shared driver below 120 and every helper/test below 200. The large file
-remains cohesive because it already owns the selected-mappings carrier, root
-mapping reducer/value/error/view, trackers and real fixtures; splitting would
-expose private state. This is not a demonstrated hot path.
-
-Run serially:
+Prospective validation is serial:
 
 - `cargo test -p slug_bzlmod_v2 observed_root_repository_mapping_ --lib`;
-- `cargo test -p slug_bzlmod_v2 root_mapping_ --lib`;
-- `cargo test -p slug_bzlmod_v2 observed_extension_mappings_ --lib`;
+- `cargo test -p slug_bzlmod_v2 root_repository_mapping_observation_surface_is_cross_crate_usable --test root_repository_mapping_observation_api`;
+- protected root-mapping/observed-extension-mappings and existing Bzlmod
+  observation API smokes;
 - full `cargo test -p slug_bzlmod_v2`;
 - direct dependent `cargo check -p slug_core_v2`;
 - `cargo fmt --all -- --check`; and
-- exact allowlist/accounting/physical/helper/test checks plus `git diff --check`.
+- exact allowlist/accounting/physical/reexport/test-size checks plus
+  `git diff --check`.
 
-Reuse Bazel 9.2 `BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
-`BazelDepGraphValue.getRepositoryMapping` and `BazelDepGraphFunctionTest`.
-Buck2 DICE incrementality, cancellation and activation tests remain concept/
-test evidence. Add no fixture or oracle.
+Reuse the accepted owner proof and prior three-type promotion precedents. Add
+no oracle: this visibility-only change has no Bazel-visible behavior.
 
-Root-mapping values/errors/full-scan/order/views, DICE equality/invalidation
-and lower events remain exact Bazel 9 compatibility. The private observation
-key/carrier/typed outer and Result-Arc transaction-local epoch association are
-Slug-native. Promotion/caller, canonical apparent mapping, root definition/
-route/source, public command/bootstrap activation and exact Bazel configuration/
-output/ActionKey bytes remain unsupported/deferred.
+Root-mapping values/errors/full-scan/order/views, equality/invalidation and
+lower events remain **exact** Bazel 9 compatibility. The hidden cross-crate
+carrier/opaque outer and Result-Arc transaction-local epoch handoff are
+**Slug-native**. Apparent-mapping ownership/caller, canonical/root definition,
+route/source/public/command/bootstrap observation and exact Bazel configuration/
+output/ActionKey bytes remain **unsupported/deferred**.
 
 ## Terminal
 
-ACCEPT returns only to a docs-only root-mapping carrier-visibility audit. STOP
-a second file/key/owner/adapter, export/reexport/caller, public API, core edit,
-partial family, root ordinal/order/semantic/event/equality/retention drift,
-epoch merge, copied mapping/order, retained scratch/task/lock, fixture/oracle,
-cap/helper/test waiver, upper activation, milestone closure, M8/M7B or exact
-identity work. REPLAN before widening. M7 remains partial and M7A -> M8 -> M7B
-remains.
+ACCEPT schedules exactly
+`WP-6-7A-host-root-repository-mapping-observation-carrier-promotion-implementation`,
+then returns to a docs-only canonical apparent-mapping observation-owner
+design. STOP Rust/test/API edits in this packet; implementation or caller/core
+activation; public field/alias/terminal/inspector; fourth type/reexport;
+nonadjacent or non-hidden reexport; second key/carrier/adapter; reverse
+dependency; root-mapping semantic/order/event/equality/retention drift;
+Cargo/BUILD, fixture/oracle; third production file; cap/proof/test-size waiver;
+milestone closure, M8/M7B or exact identity work. REPLAN before widening. M7
+remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Design base `cdcdfe24` selects this one-child owner after accepted canonical
-implementation `c96ae09d`; the observed selected-mappings child is already
-private in the same source file.
+Accepted implementation `7ee0522b` adds the private callerless root-mapping
+Result-Arc+epoch owner at +968/-170 and 13,362 physical lines. Its packet
+terminal requires this visibility audit before canonical apparent-mapping work.
