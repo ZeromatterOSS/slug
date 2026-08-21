@@ -11956,6 +11956,124 @@ retention drift, third file, fixture/oracle work, cap waiver, upper/parallel
 activation, milestone closure, M8/M7B or exact identity work. REPLAN before
 widening. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Validated module-extension repositories observation design (2026-08-21)
+
+Visibility implementation `4b5e9d05` closes the last carrierless prerequisite.
+The live one-file design activates only
+`WP-6-7A-host-validated-module-extension-repositories-observation-implementation`
+over Rust base `4b5e9d05`.
+
+Add private `HostValidatedModuleExtensionRepositoriesObservationKey` as a
+newtype over the existing public legacy key, private
+`ObservedHostValidatedGeneratedRepositorySpecs` retaining the exact local
+semantic Result Arc plus transaction-local epoch, and private
+`HostValidatedModuleExtensionRepositoriesObservationError` with exactly
+`Instantiation(HostInstantiatedModuleExtensionRepositoriesObservationError)`.
+Preserve legacy workspace identity, derives and `observed-{legacy Display}`.
+Both keys retain Complete-only equality and validity. Keep every new field,
+alias and accessor private; change no public type, outcome alias, export or
+caller.
+
+Use one Legacy/Observed driver. Legacy computes only
+`HostInstantiatedModuleExtensionRepositoriesKey`; Observed computes only
+`HostInstantiatedModuleExtensionRepositoriesObservationKey`. On successful
+instantiation semantics both call the existing `validate_repositories` exactly
+once and project the same public validation Result. Do not duplicate, reorder
+or parallelize the count/request join, generated-name set construction,
+imports-before-overrides traversal, override-backed import allowance,
+must-exist override check, injection-collision check or flattened exact-size
+generated-spec certificate.
+
+Instantiation DICE compute failure remains existing semantic
+`InstantiationCompute` with an empty epoch. Instantiation Need is immediate
+Need. An observed opaque instantiation outer becomes the one carrierless
+Instantiation outer; do not inspect or rewrap its private terminal. Accept a
+Complete child carrier before semantics: instantiation semantic failure remains
+existing `PrivateValidationError::Instantiation` and retains the child epoch;
+success passes the cloned instantiated value and same epoch into local
+validation. There is one observed child, so validation has no merge stage and
+must not rebuild, union or validate the epoch.
+
+Preserve exact local order and terminals. Count mismatch precedes traversal.
+For each paired receipt/request in extension order, full request mismatch
+precedes membership construction; imports are checked in declaration order
+before overrides; a missing import is accepted only when generated or named by
+an override; overrides are checked in declaration order for MissingOverride
+then InjectCollision polarity. First terminal wins. Join errors retain the full
+predecessor. Validation errors retain predecessor, validated prefix count,
+current request, exact Import/Override offender and exact terminal. Success
+retains the same predecessor through the public certificate.
+
+Validation stores no evaluation event data. Fresh load/invocation batches stay
+owned by the pure subtree; instantiation and validation parent rows are
+batchless on success and every semantic terminal. Need, opaque outer and
+cancellation publish no validation carrier or batch. Warm validation reuse is
+silent, and a Reused instantiation child never replays a batch.
+
+The only new DICE-retained state is the validation Result Arc plus the accepted
+instantiation epoch. The Result already owns the validated predecessor and all
+public certificate projections. Generated-name `SmallSet`, paired iterators,
+driver mode and child projection are compute scratch and drop at terminal. Add
+no duplicate certificate, evaluator heap, event batch, side cache, task, lock
+or command state. Equality cutoff, invalidation and eviction remain ordinary
+DICE ownership; dropped work propagates cancellation through the single child
+compute, and recovery publishes no partial carrier.
+
+Implementation authority is exactly
+`app/slug_loading_v2/src/module_extension_repository_validation.rs`, baseline
+1,173 physical lines with tests at 332. Caps are <=220 production, <=700 proof,
+<=920 aggregate semantic and <=2,100 physical. Add at most six production and
+five test helpers plus three observed-owner tests; keep the shared driver below
+120 and every changed helper/test below 200. The file remains cohesive despite
+the prospective >2,000-line trigger because it already owns the public legacy
+key/value/error, validation reducer, public iterator, real fixture and sole
+generated-publication boundary; splitting a private sibling would expose
+retained internals or duplicate proof plumbing.
+
+Require exactly three tests named
+`observed_validation_identity_finisher_and_terminal_algebra`,
+`observed_validation_real_order_events_and_parity`, and
+`observed_validation_lifecycle_cancellation_and_nonactivation`. Together prove
+key/hash/Display/equality/validity; one-child/no-merge Result+epoch projection;
+count/request Join and Import/Override offender prefixes; exact legacy/observed
+semantic parity for success, instantiation failure and every local validation
+terminal; exact legacy/observed family and single-child dependency rows; Need
+and first-terminal suppression; exact child print batches, batchless parents and
+warm silence; held Result/carrier/epoch A -> B -> A across import/override,
+generated-repository and observation-metadata axes; each carrier epoch as a
+subset of its own transaction global epoch; poll-drop recovery; and zero
+legacy-validation/generated/canonical/public/root-mapping activation. Compare
+separate transactions semantically and require Arc identity only for an exact
+cached value proven Reused.
+
+The instantiation outer remains opaque. Reuse its accepted same-module Pure
+outer proof and require a static private-producer scan plus the real observed
+validation dependency row; do not add an accessor or malformed test hook.
+Reuse Bazel 9.2 `SingleExtensionFunction`, `SingleExtensionEvalFunction` and
+`ModuleExtensionResolutionTest` evidence. Buck2 DICE incrementality,
+cancellation and activation tests remain concept/test evidence only. Add no
+oracle or fixture.
+
+Validate focused `observed_validation_`, protected `real_validation_`,
+`observed_instantiation_` and `real_key_`, full
+`cargo test -p slug_loading_v2`, direct `cargo check -p slug_core_v2`,
+formatting and `git diff --check` serially.
+
+Existing validation values/errors/order, import/override polarity, public
+certificate iteration, DICE equality and pure-owned event behavior remain exact
+Bazel 9 compatibility. The private observation key/carrier/outer and
+Result-Arc/epoch association are Slug-native. Generated/public/root-mapping/
+bootstrap observation activation and exact Bazel configuration/output/ActionKey
+bytes remain unsupported/deferred. ACCEPT returns only to a docs-only generated
+repository publication frontier audit.
+
+STOP a second file/key/owner/adapter, any public API/lib export or caller
+change, changed legacy/instantiation/validation semantics, a validation event
+batch, epoch merge/rebuild, retained scratch/evaluator state, lock/task across
+DICE, generated/canonical/public/root-mapping/bootstrap activation, fixture/
+oracle work, proof or cap waiver, milestone closure, M8/M7B or exact identity
+work. REPLAN before widening. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
