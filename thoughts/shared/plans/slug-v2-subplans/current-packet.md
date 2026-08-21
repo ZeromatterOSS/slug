@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-root-apparent-repository-definition-observation-proof-correction-implementation`
+Packet: `WP-6-7A-host-root-apparent-repository-definition-observation-proof-correction-implementation-retry-2`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
 Rust base / retained candidate: `08524062` / uncommitted one-file draft
@@ -9,21 +9,26 @@ Rust base / retained candidate: `08524062` / uncommitted one-file draft
 
 Correct only the proof contract for the retained private root apparent-
 definition observation owner. Production semantics, API, types, driver,
-terminal order, epochs, events and retention are frozen. Replace the
-unreachable real selected-registry parent claim, complete lawful real-family
-parity/event/warm proof and strengthen transaction-local child lifecycle proof.
+terminal order, epochs, events and retention are frozen. Preserve the completed
+selected-registry correction and lawful real-family proof. The retained
+lifecycle is only an incomplete scaffold: it proves initial child subsets,
+parent A-B-A, neutral parent epoch inequality and neutral child completion.
+Replace the unreachable real Missing parent row with accepted lower evidence
+plus local projection/prefix algebra and complete the authoritative lifecycle
+obligations below.
 
 Authority is proof-only in
 `app/slug_core_v2/src/runtime/root_apparent_repository_definition.rs`.
-The retained candidate is +258/-101 production and +351/-2 proof versus
-`08524062`, 1,585 physical lines, full-file SHA-256
-`835109bc56694e520834cb12941b680267343be8863480d738bfa861615df3ff`.
+The retained partial candidate is +258/-101 production and +442/-2 proof versus
+`08524062`, +700/-103 aggregate and 1,676 physical lines. Its entry full-file
+SHA-256 is
+`090ec34044cf5bb55d4d1b1a57b58ebe1be0b8632fd3abe7e419d1b42c909296`.
 Its `#[cfg(test)]` begins at line 529. Lines 1-528 are byte-frozen at SHA-256
 `c48df171362703eb160508c5179cdbdb7152bfa8e4684f2c6cfe280915651635`.
 No edit before the marker, production import/helper change, second file,
 export, caller, fixture/oracle or Cargo/BUILD change is authorized.
 
-## Frozen accepted candidate
+## Frozen production and retained proof scaffold
 
 Retain exactly the private observed key, Result-Arc+epoch carrier, Mapping/
 Definition/Merge outer, shared Legacy/Observed driver and legacy projection.
@@ -38,10 +43,13 @@ absent and lower events remain child-owned.
 Retain all current identity/terminal/merge/source-order proof, including
 ContextMismatch only through synthetic finisher algebra using lawful real child
 values paired under a mismatched synthetic context. Retain all current lawful
-generated and Builtin evidence, cancellation/no-publication recovery, upper/
-legacy nonactivation and source-shape denylist. No assertion may be weakened or
-deleted except an assertion implementing the rejected selected-registry real-
-parent claim.
+generated, selected-nonregistry, mapping-failure, MainDeferred and
+BuiltinDeferred parity/event/warm evidence; lifecycle scaffold for initial
+child subsets, parent A-B-A, neutral parent epoch inequality and neutral child
+completion; cancellation/no-publication recovery; upper/legacy nonactivation;
+and source-shape denylist. This scaffold is not held-child lifecycle completion.
+No assertion may be weakened or deleted except proof scaffolding implementing
+the rejected real Missing parent claim.
 
 ## Corrected selected-registry contract
 
@@ -65,6 +73,29 @@ Prove the branch without a synthetic parent compute by combining exactly:
 This proves forwarding/policy only. It must not claim a real parent activation,
 event row, epoch, warm row or legacy-parent parity for selected registry.
 
+## Corrected Missing contract
+
+A lawful keyed real parent cannot produce the requested Missing row. Remove it
+from the real-parent family matrix. Reuse accepted lower
+`observed_canonical_repository_definition_real_order_events_and_parity`
+generated-missing evidence, then prove only local parent projection/prefix
+algebra from:
+
+- one lawful real successful apparent-mapping value and its observed epoch;
+- one lawful real canonical-definition Missing Result and its observed epoch;
+- the production
+  `merge_root_apparent_repository_definition_observations` helper, called with
+  mapping-left then definition-right; and
+- `finish_root_apparent_repository_definition`, which must project the exact
+  parent Missing semantic Result with the merged epoch.
+
+Use the real child values and epochs directly; do not fabricate or inject a
+carrier or malformed epoch. This proof makes no real parent activation,
+dependency, event, warm, keyed-association or cross-transaction association
+claim. The lower generated-missing evidence owns its real order/events/warm
+claims; the synthetic local composition owns only parent projection and prefix
+algebra.
+
 ## Required lawful real-family correction
 
 The real-order test must cover every remaining lawful parent family, not only
@@ -72,27 +103,27 @@ generated and BuiltinDeferred:
 
 - generated success;
 - selected-nonregistry success after its lawful materialization Need;
-- canonical-definition Missing after a lawful mapping to an absent generated
-  repository;
 - mapping semantic failure;
 - MainDeferred; and
 - BuiltinDeferred.
 
 For every row, prove exact observed Result parity against an independently
 computed legacy parent. Prove exact mapping-first dependency order and the
-conditional definition edge: definition is present only for generated,
-selected-nonregistry and Missing. Compare the observed-parent lower event owner/
+conditional definition edge: definition is present only for generated and
+selected-nonregistry. Compare the observed-parent lower event owner/
 payload vector with the same observed children computed directly; the parent
 activation has no batch. Clear the tracker and recompute every row, requiring
 the parent and every activated lower row to be Reused/batchless with no print
 replay. Need resolution must remain lawful and row-local.
 
-Do not add ContextMismatch or selected-registry to this real-parent matrix.
+Do not add ContextMismatch, selected-registry or Missing to this real-parent
+matrix.
 Do not replace real rows with direct finisher calls, injected carriers, source
 text alone or fresh-graph-only parity.
 
 ## Required lifecycle correction
 
+This section is authoritative; the retained scaffold does not satisfy it.
 Extend the existing lifecycle test without changing production. Hold cloned
 parent, observed mapping-child and observed definition-child carriers from
 their actual transactions through:
@@ -111,8 +142,8 @@ observed inequality for that epoch change and Arc identity only on a proven
 same-transaction Reused row.
 
 Retain poll-drop with no parent activation/dependency publication, same-DICE
-recovery, recovered transaction-local child associations, warm batchlessness
-and all upper/legacy denylist checks.
+recovery, warm batchlessness and all upper/legacy denylist checks. Complete the
+recovered transaction-local child/parent/global associations required above.
 
 ## Proof spans, caps and validation
 
@@ -120,25 +151,31 @@ Production authority is zero lines: lines 1-528 and their exact prefix hash are
 frozen at +258/-101. Proof authority begins at line 529 and is limited to
 existing test imports/helpers plus the three exact observed-owner tests. Keep
 exactly three tests and at most seven test helpers; every helper/test remains
-below 200 lines.
+below 200 lines. Retained candidate spans are identity/terminal algebra lines
+967-1,078, real-order/parity lines 1,079-1,158 and lifecycle/nonactivation lines
+1,159-1,226; edits may shift those proof-only spans but not cross line 529.
 
 Final proof cap is <=620 additions versus `08524062`; aggregate cap is <=878
-additions and physical <=1,860. From the retained +351 proof/+609 aggregate/
-1,585 physical candidate, headroom is therefore 269 proof additions, 269
-aggregate additions and 275 physical lines. Deletions within proof may remove
-only superseded proof scaffolding. These tightened caps do not widen the
-accepted <=300/<=720/<=1,020/2,100 owner limits.
+additions and physical <=1,860. From the retained +442 proof/+700 aggregate/
+1,676 physical candidate, headroom is therefore 178 proof additions, 178
+aggregate additions and 184 physical lines. Deletions within proof may remove
+only superseded real-Missing proof scaffolding. These tightened caps do not
+widen the accepted <=300/<=720/<=1,020/2,100 owner limits.
 
 Run serially:
 
 1. the three exact `observed_root_apparent_repository_definition_` tests;
-2. accepted lower `observed_canonical_selected_definition_real_order_events_and_parity`;
-3. protected legacy root-definition and both lower observation suites/smokes;
-4. full `cargo test -p slug_core_v2`;
-5. direct `cargo check -p slug_commands_v2`;
-6. `cargo fmt --all -- --check`; and
-7. exact one-file allowlist, frozen lines-1-528 prefix SHA, production/proof
-   accounting, physical/helper/test-size/source-chain/forbidden-name checks and
+2. accepted lower
+   `observed_canonical_selected_definition_real_order_events_and_parity`;
+3. accepted lower
+   `observed_canonical_repository_definition_real_order_events_and_parity`;
+4. protected legacy root-definition and both lower observation suites/smokes;
+5. full `cargo test -p slug_core_v2`;
+6. direct `cargo check -p slug_commands_v2`;
+7. `cargo fmt --all -- --check`; and
+8. exact one-file allowlist, retained-entry full-file SHA before editing,
+   frozen lines-1-528 prefix SHA after editing, production/proof accounting,
+   physical/helper/test-size/lower-proof/local-algebra/forbidden-name checks and
    `git diff --check`.
 
 No formatting or test waiver is allowed. Root-definition semantics remain
@@ -149,10 +186,12 @@ route/source/public/bootstrap observation plus exact identity bytes remain
 ## Terminal and stops
 
 ACCEPT returns only to the docs-only root-definition carrier-visibility/
-consumer-frontier audit. STOP any production-prefix/hash drift; second file;
+consumer-frontier audit. STOP any production-prefix hash drift; second file;
 private HostModuleMirrorsInputKey access/export/injection; selected-registry or
-ContextMismatch real-parent fabrication; parity/event/warm omission for a
-lawful family; cross-transaction epoch pairing; production/API/semantic/order/
+ContextMismatch real-parent fabrication; real Missing activation/dependency/
+event/warm/keyed-association claims; fabricated carrier, malformed epoch or
+injection; parity/event/warm omission for a lawful family; cross-transaction
+epoch pairing; production/API/semantic/order/
 event/retention change; new test/family/helper beyond caps; fixture/oracle;
 format/cap waiver; upper activation, milestone closure, M8/M7B or exact
 identity work. REPLAN before widening. M7 remains partial and
@@ -160,6 +199,10 @@ M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-The first implementation attempt retained a sound production owner but its
-proof asked for an unreachable real selected-registry parent and did not fully
-prove lawful-family parity/events/warm behavior or held child restoration.
+The first proof correction retained the frozen production owner and completed
+the selected-registry and remaining-real-family obligations. It left only an
+initial-child-subset/parent-A-B-A/neutral-parent-epoch/neutral-child-completion
+lifecycle scaffold, not held mapping/definition semantics or per-transaction
+recovery associations, and its attempted real Missing parent row is not
+lawfully constructible. Retry-2 corrects Missing and completes the authoritative
+lifecycle contract without changing production.

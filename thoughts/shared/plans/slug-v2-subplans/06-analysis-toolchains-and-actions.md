@@ -13535,6 +13535,82 @@ closure, M8/M7B or exact identity work. REPLAN before widening or hash drift.
 ACCEPT returns only to root-definition carrier visibility/consumer audit. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
+
+Retain the partial one-file candidate at 1,676 physical lines: production is
++258/-101, proof +442/-2 and aggregate +700/-103 against `08524062`. Its entry
+full-file hash is
+`090ec34044cf5bb55d4d1b1a57b58ebe1be0b8632fd3abe7e419d1b42c909296`.
+Production lines 1..=528 remain byte-frozen at
+`c48df171362703eb160508c5179cdbdb7152bfa8e4684f2c6cfe280915651635`;
+only proof at line 529+ may change.
+
+Preserve the selected-registry correction, exact generated,
+selected-nonregistry, mapping-failure, MainDeferred and BuiltinDeferred real
+legacy semantic parity/lower events/warm batchlessness, cancellation/recovery,
+and upper/legacy nonactivation. Retain only the existing lifecycle scaffold:
+initial child subsets, parent A-B-A, neutral parent epoch inequality and neutral
+child completion. That scaffold is incomplete. The remaining stops are the
+attempted real Missing parent, which lawful keyed construction cannot produce,
+and the unfinished authoritative lifecycle proof.
+
+Remove Missing from the real-parent matrix. Reuse accepted lower
+`observed_canonical_repository_definition_real_order_events_and_parity`
+generated-missing evidence. Then use one lawful real successful apparent-
+mapping value/epoch and one lawful real canonical-definition Missing Result/
+epoch in synthetic local parent algebra: call production
+`merge_root_apparent_repository_definition_observations` mapping-left then
+definition-right, then `finish_root_apparent_repository_definition`; require
+the exact parent Missing semantic Result and merged epoch.
+
+This local proof claims no real parent activation, dependencies, events, warm
+row, keyed association or cross-transaction association. Use real child values
+and epochs directly; fabricate no carrier or malformed epoch and inject no
+private state. Preserve the separate accepted selected-registry lower proof and
+selected-definition -> canonical-definition -> root forwarding/view/policy
+chain. `ContextMismatch` remains lawful-real-child synthetic finisher algebra
+only.
+
+The authoritative lifecycle correction must hold mapping and definition child
+carriers across their separate semantic A-B-A changes/restorations and prove
+each held child's semantic change/restoration and immutability. Every recovered
+mapping/definition child epoch must associate only with its same-transaction
+parent and global epoch; prove child subset parent subset global, no cross-
+transaction pairing, neutral same-Result/different-epoch invalidation and Arc
+identity only for a proven same-transaction Reused row. Retain cancellation,
+same-DICE recovery, warm batchlessness and upper/legacy nonactivation.
+
+Proof authority remains the existing test module/imports/helpers and exactly
+three tests after line 528. Baseline spans are identity/terminal 967-1,078,
+real-order 1,079-1,158 and lifecycle 1,159-1,226. Keep at most seven helpers
+and every helper/test below 200. Caps remain <=620 proof additions, <=878
+aggregate additions and <=1,860 physical lines; from the retained candidate
+headroom is 178 proof additions, 178 aggregate additions and 184 physical
+lines. Delete only superseded real-Missing scaffolding.
+
+Validate the three exact parent tests; both accepted lower real-order proofs;
+protected legacy parent and lower suites/smokes; full core; direct commands
+check; exact serial formatting; and one-file allowlist, the entry full-file
+hash before editing, the frozen production-prefix hash after editing,
+production/proof/aggregate/physical accounting, helper/test sizes, lower-proof
+and local-algebra source shapes, forbidden-name/injection checks, nonactivation
+and diff hygiene.
+
+Root-definition semantics remain exact; its private carrier/epoch is
+Slug-native; carrier visibility/caller, route/source/public/command/bootstrap
+observation and exact identity bytes remain deferred.
+
+STOP production-prefix hash/accounting drift, second file, real Missing
+activation/dependency/event/warm/keyed-association claim, fabricated carrier/
+malformed epoch/injection, selected-registry or ContextMismatch real-parent
+fabrication, lawful-family parity/event/warm regression, lifecycle/cancellation/
+upper drift,
+cap/helper/test/format waiver, milestone closure, M8/M7B or exact-identity
+work. REPLAN before widening. Schedule only
+`WP-6-7A-host-root-apparent-repository-definition-observation-proof-correction-implementation-retry-2`;
+on acceptance audit carrier visibility. M7 stays partial and M7A -> M8 -> M7B
+remains.
+
 ### Root apparent-definition proof-contract REPLAN (2026-08-21)
 
 Retain the unaccepted one-file root apparent-definition candidate at 1,585
