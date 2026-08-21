@@ -12156,6 +12156,78 @@ fixture/oracle work, cap/proof waiver, upper activation, milestone closure,
 M8/M7B or exact identity work. REPLAN before widening. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Validation observation carrier-promotion design accepted (2026-08-21)
+
+Audit `556de141` over semantic Rust base `b8459b4e` accepts one exact
+three-file loading -> core visibility design. Promote only existing
+`HostValidatedModuleExtensionRepositoriesObservationKey` and its `new`, existing
+`ObservedHostValidatedGeneratedRepositorySpecs` and its two borrowed accessors,
+plus one new opaque
+`HostValidatedModuleExtensionRepositoriesObservationError`. Mark all three
+nominal types `#[doc(hidden)] pub`; keep fields private. Spell `result()` as the
+concrete public
+`&Arc<Result<HostValidatedGeneratedRepositorySpecs,
+HostValidatedGeneratedRepositorySpecsError>>` and keep
+`observations() -> &PathObservationEpoch`. The private
+`ValidatedRepositoriesResult` alias is not exported.
+
+Rust effective visibility requires a projection wrapper. Rename the current
+private outer enum to
+`ValidatedModuleExtensionRepositoriesObservationError`, preserving only its
+existing `Instantiation(HostInstantiatedModuleExtensionRepositoriesObservationError)`
+variant and derives. The private driver and terminal construction stay on that
+inner enum. Add the public nominal outer as a tuple struct with one private inner
+field and matching Debug/Clone/PartialEq/Eq/Allocative/Dupe derives. Wrap only
+the observed key's `Complete(Err(inner))`; the associated `Key::Value` names the
+public wrapper. Need and success are unchanged. No production unwrap exists or
+is authorized.
+
+Preserve key/carrier derives, workspace identity, Complete-only equality/
+validity, exact Result Arc and transaction-local epoch, and exact Display. A
+`/workspace` key renders
+`observed-host-validated-module-extension-repositories:"/workspace"`.
+Add exactly three doc-hidden crate-root reexports: the observation error, key
+and observed carrier. Add no Result/outcome alias, public field, wrapper
+constructor, inspector, conversion, adapter or fourth type.
+
+The new external test
+`tests/validated_repository_observation_api.rs` contains exactly one smoke,
+`validated_repository_observation_surface_is_cross_crate_usable`. It constructs
+only the key and asserts Display; a nonexecuted function-pointer cast proves the
+associated Value is
+`LoadingPreparationOutcome<Result<ObservedHostValidatedGeneratedRepositorySpecs,
+HostValidatedModuleExtensionRepositoriesObservationError>>`; another proves
+the exact concrete borrowed Result/epoch accessors. It cannot construct or
+inspect the carrier/outer, compute a key, name private types or activate core.
+
+Implementation authority is exactly validation production/colocated proof at
+1,810 physical with tests at 437, `lib.rs` at 86, and that new external smoke.
+Caps remain <=70 production, <=40 colocated proof, <=60 external proof, <=170
+aggregate semantic and physical <=1,880/95/60, with each changed helper/test
+below 100. The existing private producer scan may change only for the renamed
+inner terminal spelling. The owner remains cohesive and no hot-path measure or
+split is warranted.
+
+Reuse accepted validation proof and prior Bzlmod cross-crate smoke evidence;
+add no oracle. Validate focused observed validation, the named external smoke,
+full loading, protected core generated-definition tests, direct core check,
+formatting and diff hygiene serially.
+
+Existing validation/generated values, errors, order, certificate iteration,
+DICE equality and lower event ownership remain exact. The doc-hidden carrier
+handoff and opaque Result-Arc/epoch association are Slug-native. Generated
+observation, canonical/root/publication/command/bootstrap activation and exact
+Bazel identity bytes remain unsupported/deferred.
+
+Activate only
+`WP-6-7A-host-validated-module-extension-repositories-observation-carrier-promotion-implementation`.
+Implementation ACCEPT returns to generated-definition observation-owner design.
+STOP a caller/compute/semantic change, public alias/field/terminal, fourth type/
+reexport, second key/carrier/adapter, core edit, reverse dependency, event/
+equality/retention drift, Cargo/BUILD, fixture/oracle, cap waiver, upper
+activation, milestone closure, M8/M7B or exact identity work. REPLAN before
+widening. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
