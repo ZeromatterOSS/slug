@@ -14,6 +14,7 @@ use async_trait::async_trait;
 use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinition;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionError;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionErrorDisposition;
@@ -30,7 +31,10 @@ use slug_loading_v2::HostGeneratedRepositoryMapping;
 use slug_loading_v2::HostValidatedGeneratedRepositorySpecs;
 use slug_loading_v2::HostValidatedGeneratedRepositorySpecsError;
 use slug_loading_v2::HostValidatedModuleExtensionRepositoriesKey;
+use slug_loading_v2::HostValidatedModuleExtensionRepositoriesObservationError;
+use slug_loading_v2::HostValidatedModuleExtensionRepositoriesObservationKey;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathObservationEpoch;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 struct HostGeneratedRepositoryDefinition {
@@ -103,6 +107,48 @@ struct HostGeneratedRepositoryDefinitionKey {
     canonical_repo: CanonicalRepoName,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct HostGeneratedRepositoryDefinitionObservationKey(HostGeneratedRepositoryDefinitionKey);
+
+impl HostGeneratedRepositoryDefinitionObservationKey {
+    fn new(workspace: NormalizedAbsolutePath, canonical_repo: CanonicalRepoName) -> Self {
+        Self(HostGeneratedRepositoryDefinitionKey::new(
+            workspace,
+            canonical_repo,
+        ))
+    }
+}
+
+impl fmt::Display for HostGeneratedRepositoryDefinitionObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedHostGeneratedRepositoryDefinition {
+    result: Arc<Result<HostGeneratedRepositoryDefinition, HostGeneratedRepositoryDefinitionError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostGeneratedRepositoryDefinition {
+    fn result(
+        &self,
+    ) -> &Arc<Result<HostGeneratedRepositoryDefinition, HostGeneratedRepositoryDefinitionError>>
+    {
+        &self.result
+    }
+
+    fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+enum HostGeneratedRepositoryDefinitionObservationError {
+    Validation(HostValidatedModuleExtensionRepositoriesObservationError),
+}
+
 impl HostGeneratedRepositoryDefinitionKey {
     fn new(workspace: NormalizedAbsolutePath, canonical_repo: CanonicalRepoName) -> Self {
         Self {
@@ -122,10 +168,26 @@ impl fmt::Display for HostGeneratedRepositoryDefinitionKey {
     }
 }
 
-fn complete(
+#[derive(Clone, Copy)]
+enum GeneratedRepositoryDefinitionMode {
+    Legacy,
+    Observed,
+}
+
+type GeneratedRepositoryDefinitionResult =
+    Arc<Result<HostGeneratedRepositoryDefinition, HostGeneratedRepositoryDefinitionError>>;
+type GeneratedRepositoryDefinitionDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (GeneratedRepositoryDefinitionResult, PathObservationEpoch),
+        HostGeneratedRepositoryDefinitionObservationError,
+    >,
+>;
+
+fn complete_generated_driver(
     value: Result<HostGeneratedRepositoryDefinition, HostGeneratedRepositoryDefinitionError>,
-) -> HostGeneratedRepositoryDefinitionOutcome {
-    SourcePreparationOutcome::Complete(Arc::new(value))
+    observations: PathObservationEpoch,
+) -> GeneratedRepositoryDefinitionDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(value), observations)))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -159,61 +221,94 @@ fn find_unique_ordinal<'a>(
     }
 }
 
+#[rustfmt::skip]
+async fn compute_generated_repository_definition(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostGeneratedRepositoryDefinitionKey,
+    mode: GeneratedRepositoryDefinitionMode,
+) -> GeneratedRepositoryDefinitionDriverOutcome {
+    let (result, observations) = match mode {
+        GeneratedRepositoryDefinitionMode::Legacy => match ctx.compute(&HostValidatedModuleExtensionRepositoriesKey::new(key.workspace.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(result)) => (result, PathObservationEpoch::empty()),
+            Err(error) => return complete_generated_driver(Err(HostGeneratedRepositoryDefinitionError { requested: key.canonical_repo.clone(), kind: HostGeneratedRepositoryDefinitionErrorKind::LoadingCompute(error.to_string().into()) }), PathObservationEpoch::empty()),
+        },
+        GeneratedRepositoryDefinitionMode::Observed => match ctx.compute(&HostValidatedModuleExtensionRepositoriesObservationKey::new(key.workspace.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostGeneratedRepositoryDefinitionObservationError::Validation(error))),
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().clone(), observed.observations().clone()),
+            Err(error) => return complete_generated_driver(Err(HostGeneratedRepositoryDefinitionError { requested: key.canonical_repo.clone(), kind: HostGeneratedRepositoryDefinitionErrorKind::LoadingCompute(error.to_string().into()) }), PathObservationEpoch::empty()),
+        },
+    };
+    let certificate = match result.as_ref() {
+        Ok(value) => Arc::new(value.clone()),
+        Err(error) => return complete_generated_driver(Err(HostGeneratedRepositoryDefinitionError { requested: key.canonical_repo.clone(), kind: HostGeneratedRepositoryDefinitionErrorKind::Loading(error.clone()) }), observations),
+    };
+    let value = match find_unique_ordinal(&key.canonical_repo, certificate.iter().map(|(canonical, _, _, _)| canonical)) {
+        Ok(ordinal) => Ok(HostGeneratedRepositoryDefinition { certificate, ordinal }),
+        Err(UniqueOrdinalError::Missing) => Err(HostGeneratedRepositoryDefinitionError { requested: key.canonical_repo.clone(), kind: HostGeneratedRepositoryDefinitionErrorKind::Missing { certificate } }),
+        Err(UniqueOrdinalError::Duplicate { first, conflicting }) => Err(HostGeneratedRepositoryDefinitionError { requested: key.canonical_repo.clone(), kind: HostGeneratedRepositoryDefinitionErrorKind::Duplicate { certificate, first, conflicting } }),
+    };
+    complete_generated_driver(value, observations)
+}
+
 #[async_trait]
 impl Key for HostGeneratedRepositoryDefinitionKey {
     type Value = HostGeneratedRepositoryDefinitionOutcome;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let certificate = match ctx
-            .compute(&HostValidatedModuleExtensionRepositoriesKey::new(
-                self.workspace.clone(),
-            ))
-            .await
+        match compute_generated_repository_definition(
+            ctx,
+            self,
+            GeneratedRepositoryDefinitionMode::Legacy,
+        )
+        .await
         {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                debug_assert!(observations.observations().is_empty());
+                SourcePreparationOutcome::Complete(result)
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(value) => Arc::new(value.clone()),
-                Err(error) => {
-                    return complete(Err(HostGeneratedRepositoryDefinitionError {
-                        requested: self.canonical_repo.clone(),
-                        kind: HostGeneratedRepositoryDefinitionErrorKind::Loading(error.clone()),
-                    }));
-                }
-            },
-            Err(error) => {
-                return complete(Err(HostGeneratedRepositoryDefinitionError {
-                    requested: self.canonical_repo.clone(),
-                    kind: HostGeneratedRepositoryDefinitionErrorKind::LoadingCompute(
-                        error.to_string().into(),
-                    ),
-                }));
+            SourcePreparationOutcome::Complete(Err(_)) => {
+                unreachable!("legacy generated definition has no observed outer")
             }
-        };
+        }
+    }
 
-        match find_unique_ordinal(
-            &self.canonical_repo,
-            certificate.iter().map(|(canonical, _, _, _)| canonical),
-        ) {
-            Ok(ordinal) => complete(Ok(HostGeneratedRepositoryDefinition {
-                certificate,
-                ordinal,
-            })),
-            Err(UniqueOrdinalError::Missing) => {
-                complete(Err(HostGeneratedRepositoryDefinitionError {
-                    requested: self.canonical_repo.clone(),
-                    kind: HostGeneratedRepositoryDefinitionErrorKind::Missing { certificate },
-                }))
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostGeneratedRepositoryDefinitionObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostGeneratedRepositoryDefinition,
+            HostGeneratedRepositoryDefinitionObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match compute_generated_repository_definition(
+            ctx,
+            &self.0,
+            GeneratedRepositoryDefinitionMode::Observed,
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
             }
-            Err(UniqueOrdinalError::Duplicate { first, conflicting }) => {
-                complete(Err(HostGeneratedRepositoryDefinitionError {
-                    requested: self.canonical_repo.clone(),
-                    kind: HostGeneratedRepositoryDefinitionErrorKind::Duplicate {
-                        certificate,
-                        first,
-                        conflicting,
-                    },
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostGeneratedRepositoryDefinition {
+                    result,
+                    observations,
                 }))
             }
         }
@@ -777,6 +872,9 @@ impl Key for HostCanonicalRepositoryApparentMappingKey {
 #[cfg(test)]
 pub(super) mod tests {
     use std::cell::Cell;
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hash;
+    use std::hash::Hasher;
     use std::sync::Mutex;
 
     use dice::ActivationData;
@@ -805,6 +903,9 @@ pub(super) mod tests {
     use slug_bzlmod_v2::RepositorySourceFileKey;
     use slug_bzlmod_v2::RootPackagePolicyInputs;
     use slug_bzlmod_v2::RootRepositoryRouteKey;
+    use slug_events_v2::CaptureEvaluationEvents;
+    use slug_events_v2::EvaluationEvent;
+    use slug_events_v2::EventBatch;
     use slug_loading_v2::HostValidatedGeneratedRepositorySpecsOutcome;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
@@ -846,15 +947,21 @@ ext=module_extension(implementation=impl)
         apparent: Mutex<Vec<(ActivationKind, bool)>>,
         root_mapping: Mutex<Vec<(ActivationKind, bool)>>,
         forbidden: Mutex<Vec<&'static str>>,
+        activations: Mutex<Vec<(String, ActivationKind, Option<EventBatch>)>>,
+        dependencies: Mutex<Vec<(String, Vec<String>)>>,
     }
 
     impl ActivationTracker for LookupTracker {
         fn key_activated(
             &self,
-            _: &DynKey,
-            _: &mut dyn Iterator<Item = &DynKey>,
+            key: &DynKey,
+            dependencies: &mut dyn Iterator<Item = &DynKey>,
             _: ActivationData,
         ) {
+            self.dependencies.lock().unwrap().push((
+                key.to_string(),
+                dependencies.map(ToString::to_string).collect(),
+            ));
         }
 
         fn tracks_rich_activations(&self) -> bool {
@@ -862,6 +969,14 @@ ext=module_extension(implementation=impl)
         }
 
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            let batch = activation
+                .evaluation_data()
+                .and_then(|data| data.downcast_ref::<EventBatch>())
+                .map(Dupe::dupe);
+            self.activations
+                .lock()
+                .unwrap()
+                .push((key.to_string(), activation.kind(), batch));
             if key
                 .downcast_ref::<HostCanonicalRepositoryDefinitionKey>()
                 .is_some()
@@ -958,6 +1073,91 @@ ext=module_extension(implementation=impl)
         .await
     }
 
+    fn generated_definition_observation_epoch(
+        module: &str,
+        extension: &str,
+        extension_present: bool,
+    ) -> PathObservationEpoch {
+        let demand = |path: &str, operation| {
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(path).unwrap(),
+                operation,
+            )
+        };
+        let lstat = |kind, stamp, mode| {
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                kind, stamp, 1, 1, 1, mode,
+            )))
+        };
+        let path = |name: &str| format!("{WORKSPACE}/{name}");
+        let mut observations = Vec::new();
+        for (stamp, directory) in [(1, "/"), (2, WORKSPACE)] {
+            observations.push((
+                demand(directory, PathObservationOperation::Lstat),
+                lstat(PathNodeKind::Directory, stamp, 0o755),
+            ));
+        }
+        for name in ["REPO.bazel", ".bazelignore", "BUILD", "MODULE.bazel.lock"] {
+            observations.push((
+                demand(&path(name), PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Missing),
+            ));
+        }
+        for (name, kind, stamp, mode) in [
+            ("MODULE.bazel", PathNodeKind::RegularFile, 9, 0o644),
+            ("BUILD.bazel", PathNodeKind::RegularFile, 10, 0o644),
+            ("local", PathNodeKind::Directory, 12, 0o755),
+            ("local/MODULE.bazel", PathNodeKind::RegularFile, 13, 0o644),
+        ] {
+            observations.push((
+                demand(&path(name), PathObservationOperation::Lstat),
+                lstat(kind, stamp, mode),
+            ));
+        }
+        observations.push((
+            demand(&path("MODULE.bazel"), PathObservationOperation::FileBytes),
+            PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                module.as_bytes(),
+            ))),
+        ));
+        observations.push((
+            demand(
+                &path("local/MODULE.bazel"),
+                PathObservationOperation::FileBytes,
+            ),
+            PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                &b"module(name='local')\n"[..],
+            ))),
+        ));
+        let extension_lstat = if extension_present {
+            PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::RegularFile,
+                11,
+                1,
+                1,
+                1,
+                0o644,
+            ))
+        } else {
+            PathOperationResult::Missing
+        };
+        observations.push((
+            demand(&path("ext.bzl"), PathObservationOperation::Lstat),
+            PathObservationResult::Lstat(extension_lstat),
+        ));
+        let extension_bytes = if extension_present {
+            PathOperationResult::Present(Arc::from(extension.as_bytes()))
+        } else {
+            PathOperationResult::Missing
+        };
+        observations.push((
+            demand(&path("ext.bzl"), PathObservationOperation::FileBytes),
+            PathObservationResult::FileBytes(extension_bytes),
+        ));
+        PathObservationEpoch::new(observations).unwrap()
+    }
+
     async fn transaction_with_policy(
         dice: &Arc<Dice>,
         module: &str,
@@ -967,11 +1167,13 @@ ext=module_extension(implementation=impl)
         command_policy: BzlmodCommandPolicyKey,
     ) -> dice::DiceTransaction {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let mut updater = dice.updater_with_data(UserComputationData {
+        let mut user_data = UserComputationData {
             cycle_detector: Some(slug_loading_v2::bzl_load_cycle_detector()),
             activation_tracker: tracker,
             ..Default::default()
-        });
+        };
+        user_data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(user_data);
         updater
             .changed_to(vec![(
                 slug_workspace_v2::WorkspaceSnapshotKey {
@@ -1047,134 +1249,10 @@ ext=module_extension(implementation=impl)
                 RepositoryMaterializationResultEpoch::new(workspace.dupe(), []).unwrap(),
             )])
             .unwrap();
-        let observations = ["/", WORKSPACE]
-            .into_iter()
-            .enumerate()
-            .map(|(index, path)| {
-                (
-                    PathObservationDemand::new(
-                        PathObservationNamespace::Host,
-                        NormalizedAbsolutePath::new(path).unwrap(),
-                        PathObservationOperation::Lstat,
-                    ),
-                    PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
-                        PathNodeKind::Directory,
-                        index as i64 + 1,
-                        1,
-                        1,
-                        1,
-                        0o755,
-                    ))),
-                )
-            })
-            .chain(
-                ["REPO.bazel", ".bazelignore", "BUILD", "MODULE.bazel.lock"]
-                    .into_iter()
-                    .map(|name| {
-                        (
-                            PathObservationDemand::new(
-                                PathObservationNamespace::Host,
-                                NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}")).unwrap(),
-                                PathObservationOperation::Lstat,
-                            ),
-                            PathObservationResult::Lstat(PathOperationResult::Missing),
-                        )
-                    }),
-            )
-            .chain(std::iter::once((
-                PathObservationDemand::new(
-                    PathObservationNamespace::Host,
-                    NormalizedAbsolutePath::new(format!("{WORKSPACE}/BUILD.bazel")).unwrap(),
-                    PathObservationOperation::Lstat,
-                ),
-                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
-                    PathNodeKind::RegularFile,
-                    10,
-                    1,
-                    1,
-                    1,
-                    0o644,
-                ))),
-            )))
-            .chain(std::iter::once((
-                PathObservationDemand::new(
-                    PathObservationNamespace::Host,
-                    NormalizedAbsolutePath::new(format!("{WORKSPACE}/ext.bzl")).unwrap(),
-                    PathObservationOperation::Lstat,
-                ),
-                PathObservationResult::Lstat(if extension_present {
-                    PathOperationResult::Present(PathLstat::new(
-                        PathNodeKind::RegularFile,
-                        11,
-                        1,
-                        1,
-                        1,
-                        0o644,
-                    ))
-                } else {
-                    PathOperationResult::Missing
-                }),
-            )))
-            .chain([
-                (
-                    PathObservationDemand::new(
-                        PathObservationNamespace::Host,
-                        NormalizedAbsolutePath::new(format!("{WORKSPACE}/local")).unwrap(),
-                        PathObservationOperation::Lstat,
-                    ),
-                    PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
-                        PathNodeKind::Directory,
-                        12,
-                        1,
-                        1,
-                        1,
-                        0o755,
-                    ))),
-                ),
-                (
-                    PathObservationDemand::new(
-                        PathObservationNamespace::Host,
-                        NormalizedAbsolutePath::new(format!("{WORKSPACE}/local/MODULE.bazel"))
-                            .unwrap(),
-                        PathObservationOperation::Lstat,
-                    ),
-                    PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
-                        PathNodeKind::RegularFile,
-                        13,
-                        1,
-                        1,
-                        1,
-                        0o644,
-                    ))),
-                ),
-                (
-                    PathObservationDemand::new(
-                        PathObservationNamespace::Host,
-                        NormalizedAbsolutePath::new(format!("{WORKSPACE}/local/MODULE.bazel"))
-                            .unwrap(),
-                        PathObservationOperation::FileBytes,
-                    ),
-                    PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
-                        &b"module(name='local')\n"[..],
-                    ))),
-                ),
-            ])
-            .chain(std::iter::once((
-                PathObservationDemand::new(
-                    PathObservationNamespace::Host,
-                    NormalizedAbsolutePath::new(format!("{WORKSPACE}/ext.bzl")).unwrap(),
-                    PathObservationOperation::FileBytes,
-                ),
-                PathObservationResult::FileBytes(if extension_present {
-                    PathOperationResult::Present(Arc::from(extension.as_bytes()))
-                } else {
-                    PathOperationResult::Missing
-                }),
-            )));
         updater
             .changed_to(vec![(
                 PathObservationEpochKey,
-                PathObservationEpoch::new(observations).unwrap(),
+                generated_definition_observation_epoch(module, extension, extension_present),
             )])
             .unwrap();
         updater.commit().await
@@ -1221,6 +1299,39 @@ ext=module_extension(implementation=impl)
         ))
         .await
         .unwrap()
+    }
+
+    async fn observed_lookup(
+        dice: &Arc<Dice>,
+        module: &str,
+        extension: &str,
+        extension_present: bool,
+        requested: CanonicalRepoName,
+        tracker: Option<Arc<LookupTracker>>,
+    ) -> <HostGeneratedRepositoryDefinitionObservationKey as Key>::Value {
+        transaction(
+            dice,
+            module,
+            extension,
+            extension_present,
+            tracker.map(|tracker| tracker as Arc<dyn ActivationTracker>),
+        )
+        .await
+        .compute(&HostGeneratedRepositoryDefinitionObservationKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            requested,
+        ))
+        .await
+        .unwrap()
+    }
+
+    fn observed_carrier(
+        value: &<HostGeneratedRepositoryDefinitionObservationKey as Key>::Value,
+    ) -> &ObservedHostGeneratedRepositoryDefinition {
+        match value {
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+            value => panic!("expected observed generated definition carrier: {value:?}"),
+        }
     }
 
     fn snapshot(value: &HostGeneratedRepositoryDefinitionOutcome) -> Vec<String> {
@@ -1343,7 +1454,7 @@ ext=module_extension(implementation=impl)
             ),
             Err(UniqueOrdinalError::Duplicate {
                 first: 0,
-                conflicting: 2,
+                conflicting: 2
             })
         );
         assert_eq!(consumed.get(), names.len());
@@ -1778,12 +1889,27 @@ ext=module_extension(implementation=impl)
         let baseline = snapshot(&first);
         for (case, (module, extension, changed_fields)) in [
             (MODULE.to_owned(), EXTENSION_B.to_owned(), &[2][..]),
-            (MODULE.replace("first='first'", "first='renamed'"), EXTENSION_A.replacen("name='first'", "name='renamed'", 1), &[0, 1, 4, 5]),
+            (
+                MODULE.replace("first='first'", "first='renamed'"),
+                EXTENSION_A.replacen("name='first'", "name='renamed'", 1),
+                &[0, 1, 4, 5],
+            ),
             (MODULE.to_owned(), EXTENSION_A.replace("value", "renamed_value"), &[3][..]),
             (MODULE.to_owned(), EXTENSION_A.replace("value='one'", "value='changed'"), &[3][..]),
-            (MODULE.to_owned(), EXTENSION_A.replace("value='one', target=':local'", "target=':local', value='one'"), &[3][..]),
+            (
+                MODULE.to_owned(),
+                EXTENSION_A.replace("value='one', target=':local'", "target=':local', value='one'"),
+                &[3][..],
+            ),
             (MODULE.to_owned(), EXTENSION_A.replace("target=':local'", "target=':changed'"), &[3][..]),
-            (MODULE.to_owned(), EXTENSION_A.replace("repo(name='first', value='one', target=':local')\n    repo(name='second', value='two', target='@first//:item')", "repo(name='second', value='two', target='@first//:item')\n    repo(name='first', value='one', target=':local')"), &[0, 1, 3, 4]),
+            (
+                MODULE.to_owned(),
+                EXTENSION_A.replace(
+                    "repo(name='first', value='one', target=':local')\n    repo(name='second', value='two', target='@first//:item')",
+                    "repo(name='second', value='two', target='@first//:item')\n    repo(name='first', value='one', target=':local')",
+                ),
+                &[0, 1, 3, 4],
+            ),
         ]
         .into_iter()
         .enumerate()
@@ -1791,7 +1917,10 @@ ext=module_extension(implementation=impl)
             let b = lookup(&dice, &module, &extension, None).await;
             assert!(!HostGeneratedRepositoryDefinitionKey::equality(&first, &b));
             let changed = snapshot(&b);
-            assert!(changed_fields.iter().all(|index| baseline[*index] != changed[*index]), "case {case}: {baseline:?} == {changed:?}");
+            assert!(
+                changed_fields.iter().all(|index| baseline[*index] != changed[*index]),
+                "case {case}: {baseline:?} == {changed:?}"
+            );
             let a2 = lookup(&dice, MODULE, EXTENSION_A, None).await;
             assert!(HostGeneratedRepositoryDefinitionKey::equality(&first, &a2));
         }
@@ -2315,6 +2444,353 @@ ext=module_extension(implementation=impl)
             &isolated_a,
             &multi_tx.compute(&first_context).await.unwrap(),
         ));
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_generated_definition_identity_scan_and_terminal_algebra() {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let requested = CanonicalRepoName::new("generated").unwrap();
+        let key = HostGeneratedRepositoryDefinitionObservationKey::new(NormalizedAbsolutePath::new("/workspace").unwrap(), requested.clone());
+        let same = HostGeneratedRepositoryDefinitionObservationKey::new(NormalizedAbsolutePath::new("/workspace").unwrap(), requested.clone());
+        let other = HostGeneratedRepositoryDefinitionObservationKey::new(NormalizedAbsolutePath::new("/workspace").unwrap(), CanonicalRepoName::new("other").unwrap());
+        let hash = |key: &HostGeneratedRepositoryDefinitionObservationKey| {
+            let mut hasher = DefaultHasher::new();
+            key.hash(&mut hasher);
+            hasher.finish()
+        };
+        assert_eq!(key.to_string(), "observed-host-generated-repository-definition:\"/workspace\":@@generated");
+        assert_eq!(key, same);
+        assert_ne!(key, other);
+        assert_eq!(hash(&key), hash(&same));
+        assert_ne!(hash(&key), hash(&other));
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut initial = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+        let generated = names(&validated(&mut initial).await);
+        let success = observed_lookup(&dice, MODULE, EXTENSION_A, true, generated[0].clone(), None).await;
+        let carrier = observed_carrier(&success);
+        assert!(carrier.result().is_ok());
+        assert!(!carrier.observations().observations().is_empty());
+        assert!(HostGeneratedRepositoryDefinitionObservationKey::validity(&success));
+        assert!(HostGeneratedRepositoryDefinitionObservationKey::equality(&success, &success));
+
+        let missing_name = CanonicalRepoName::new("missing").unwrap();
+        let missing = observed_lookup(&dice, MODULE, EXTENSION_A, true, missing_name.clone(), None).await;
+        assert!(matches!(
+            observed_carrier(&missing).result().as_ref(),
+            Err(HostGeneratedRepositoryDefinitionError {
+                requested,
+                kind: HostGeneratedRepositoryDefinitionErrorKind::Missing { certificate },
+            }) if requested == &missing_name && certificate.iter().len() == 2
+        ));
+        let loading = observed_lookup(&dice, MODULE, EXTENSION_A, false, generated[0].clone(), None).await;
+        assert!(matches!(
+            observed_carrier(&loading).result().as_ref(),
+            Err(HostGeneratedRepositoryDefinitionError {
+                kind: HostGeneratedRepositoryDefinitionErrorKind::Loading(_),
+                ..
+            })
+        ));
+
+        let certificate = carrier.result().as_ref().as_ref().unwrap().certificate.clone();
+        let duplicate = complete_generated_driver(
+            Err(HostGeneratedRepositoryDefinitionError {
+                requested: generated[0].clone(),
+                kind: HostGeneratedRepositoryDefinitionErrorKind::Duplicate {
+                    certificate: certificate.clone(),
+                    first: 0,
+                    conflicting: 2,
+                },
+            }),
+            carrier.observations().clone(),
+        );
+        assert!(matches!(
+            duplicate,
+            SourcePreparationOutcome::Complete(Ok((value, observations)))
+                if matches!(value.as_ref(), Err(HostGeneratedRepositoryDefinitionError {
+                    kind: HostGeneratedRepositoryDefinitionErrorKind::Duplicate { first: 0, conflicting: 2, .. },
+                    ..
+                })) && observations == *carrier.observations()
+        ));
+        let compute = complete_generated_driver(
+            Err(HostGeneratedRepositoryDefinitionError {
+                requested: generated[0].clone(),
+                kind: HostGeneratedRepositoryDefinitionErrorKind::LoadingCompute("failed".into()),
+            }),
+            PathObservationEpoch::empty(),
+        );
+        assert!(matches!(compute, SourcePreparationOutcome::Complete(Ok((value, observations)))
+            if matches!(value.as_ref(), Err(HostGeneratedRepositoryDefinitionError {
+                kind: HostGeneratedRepositoryDefinitionErrorKind::LoadingCompute(message), ..
+            }) if message.as_ref() == "failed") && observations.observations().is_empty()));
+
+        let consumed = Cell::new(0);
+        let unrelated = CanonicalRepoName::new("unrelated").unwrap();
+        let scan = [&generated[0], &unrelated, &generated[0], &unrelated];
+        assert_eq!(
+            find_unique_ordinal(&generated[0], scan.into_iter().inspect(|_| consumed.set(consumed.get() + 1)),),
+            Err(UniqueOrdinalError::Duplicate { first: 0, conflicting: 2 })
+        );
+        assert_eq!(consumed.get(), scan.len());
+
+        let tracker = Arc::new(LookupTracker::default());
+        let mut updater = dice.updater_with_data(UserComputationData {
+            cycle_detector: Some(slug_loading_v2::bzl_load_cycle_detector()),
+            activation_tracker: Some(tracker.clone()),
+            ..Default::default()
+        });
+        updater.changed_to(vec![(PathObservationEpochKey, PathObservationEpoch::empty())]).unwrap();
+        let observed_key = HostGeneratedRepositoryDefinitionObservationKey::new(workspace.clone(), generated[0].clone());
+        let need = updater.commit().await.compute(&observed_key).await.unwrap();
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostGeneratedRepositoryDefinitionObservationKey::validity(&need));
+        assert!(!HostGeneratedRepositoryDefinitionObservationKey::equality(&need, &need));
+        assert_eq!(
+            tracker.dependencies.lock().unwrap().iter().find(|(name, _)| name == &observed_key.to_string()).unwrap().1,
+            [HostValidatedModuleExtensionRepositoriesObservationKey::new(workspace).to_string()]
+        );
+
+        let source = include_str!("generated_repository_definition.rs");
+        let producer = &source[source.find("type GeneratedRepositoryDefinitionResult").unwrap()..source.find("enum HostCanonicalRepositoryDefinitionSource").unwrap()];
+        assert_eq!(producer.matches("HostValidatedModuleExtensionRepositoriesObservationKey::new").count(), 1);
+        assert!(producer.contains("HostGeneratedRepositoryDefinitionObservationError::Validation(error)"));
+        assert!(!producer.contains("HostCanonicalSelectedModuleDefinitionKey"));
+        assert!(!producer.contains("union_"));
+        assert!(!producer.contains("store_evaluation_data"));
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_generated_definition_real_order_events_and_parity() {
+        let extension = r#"print('load')
+repo=repository_rule(implementation=lambda ctx: None)
+def first_impl(ctx):
+    print('invoke-first')
+    repo(name='first')
+def second_impl(ctx):
+    print('invoke-second')
+    repo(name='second')
+first=module_extension(implementation=first_impl)
+second=module_extension(implementation=second_impl)
+"#;
+        let module =
+            "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, second='second')\n";
+        let prep = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut prep_tx = transaction(&prep, module, extension, true, None).await;
+        let requested = names(&validated(&mut prep_tx).await).remove(0);
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(LookupTracker::default());
+        let mut tx = transaction(&dice, module, extension, true, Some(tracker.clone())).await;
+        let observed_key = HostGeneratedRepositoryDefinitionObservationKey::new(workspace.clone(), requested.clone());
+        let observed = tx.compute(&observed_key).await.unwrap();
+        let carrier = observed_carrier(&observed);
+        let legacy_key = HostGeneratedRepositoryDefinitionKey::new(workspace.clone(), requested.clone());
+        assert_eq!(
+            tracker.dependencies.lock().unwrap().iter().find(|(name, _)| name == &observed_key.to_string()).unwrap().1,
+            [HostValidatedModuleExtensionRepositoriesObservationKey::new(workspace.clone()).to_string()]
+        );
+        assert!(tracker.selected.lock().unwrap().is_empty());
+        let activations = tracker.activations.lock().unwrap();
+        let parent = activations.iter().find(|(name, _, _)| name == &observed_key.to_string()).unwrap();
+        assert_eq!(parent.1, ActivationKind::Evaluated);
+        assert!(parent.2.is_none());
+        let prints = activations
+            .iter()
+            .filter_map(|(_, _, batch)| batch.as_ref())
+            .flat_map(EventBatch::events)
+            .filter_map(|event| match event {
+                EvaluationEvent::StarlarkPrint { text, .. } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(prints, ["load", "invoke-first", "invoke-second"], "activations: {activations:#?}");
+        assert!(
+            activations
+                .iter()
+                .filter(|(name, _, _)| {
+                    name.contains("instantiated-module-extension-repositories:") || name.contains("validated-module-extension-repositories:") || name == &observed_key.to_string()
+                })
+                .all(|(_, _, batch)| batch.is_none())
+        );
+        drop(activations);
+
+        let legacy = tx.compute(&legacy_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(legacy) = legacy else {
+            panic!("legacy generated definition must complete")
+        };
+        assert_eq!(legacy.as_ref(), carrier.result().as_ref());
+        let snapshot = snapshot(&SourcePreparationOutcome::Complete(legacy.clone()));
+        assert_eq!(snapshot[0], requested.as_str());
+        assert_eq!(&snapshot[1..3], ["first", "repo"]);
+        assert_eq!(snapshot[4], requested.as_str());
+
+        tracker.activations.lock().unwrap().clear();
+        let warm = tx.compute(&observed_key).await.unwrap();
+        assert!(HostGeneratedRepositoryDefinitionObservationKey::equality(&observed, &warm));
+        assert!(Arc::ptr_eq(carrier.result(), observed_carrier(&warm).result()));
+        assert!(
+            tracker
+                .activations
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|(name, kind, batch)| { name == &observed_key.to_string() && *kind == ActivationKind::Reused && batch.is_none() })
+        );
+        assert!(tracker.activations.lock().unwrap().iter().all(|(_, _, batch)| batch.is_none()));
+
+        for (present, requested_case, expected) in [(false, requested.clone(), "Loading"), (true, CanonicalRepoName::new("missing").unwrap(), "Missing")] {
+            let case_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let observed = observed_lookup(&case_dice, module, extension, present, requested_case.clone(), None).await;
+            let mut legacy_tx = transaction(&case_dice, module, extension, present, None).await;
+            let legacy = legacy_tx
+                .compute(&HostGeneratedRepositoryDefinitionKey::new(workspace.clone(), requested_case))
+                .await
+                .unwrap();
+            let SourcePreparationOutcome::Complete(legacy) = legacy else {
+                panic!("legacy terminal must complete")
+            };
+            assert_eq!(legacy.as_ref(), observed_carrier(&observed).result().as_ref());
+            assert!(format!("{:?}", observed_carrier(&observed).result()).contains(expected));
+        }
+
+        let terminal_tracker = Arc::new(LookupTracker::default());
+        let _ = observed_lookup(
+            &Dice::builder().build(DetectCycles::Enabled),
+            module,
+            extension,
+            false,
+            requested,
+            Some(terminal_tracker.clone()),
+        )
+        .await;
+        assert!(
+            terminal_tracker
+                .activations
+                .lock()
+                .unwrap()
+                .iter()
+                .filter_map(|(_, _, batch)| batch.as_ref())
+                .flat_map(EventBatch::events)
+                .all(|event| !matches!(event, EvaluationEvent::StarlarkPrint { .. }))
+        );
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_generated_definition_lifecycle_cancellation_and_nonactivation() {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let prep = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut prep_tx = transaction(&prep, MODULE, EXTENSION_A, true, None).await;
+        let requested = names(&validated(&mut prep_tx).await).remove(0);
+        let order = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, second='second', first='first')\n";
+        let mapping = format!("{MODULE}override_repo(e, first='bazel_tools')\n");
+        let same_semantic = format!("{MODULE}\n");
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let key = HostGeneratedRepositoryDefinitionObservationKey::new(workspace.clone(), requested.clone());
+        let mut held = Vec::new();
+        for (module, extension) in [
+            (MODULE, EXTENSION_A),
+            (MODULE, EXTENSION_B),
+            (MODULE, EXTENSION_A),
+            (order, EXTENSION_A),
+            (MODULE, EXTENSION_A),
+            (mapping.as_str(), EXTENSION_A),
+            (MODULE, EXTENSION_A),
+            (same_semantic.as_str(), EXTENSION_A),
+        ] {
+            let mut tx = transaction(&dice, module, extension, true, None).await;
+            let global = tx.compute(&PathObservationEpochKey).await.unwrap();
+            let carrier = observed_carrier(&tx.compute(&key).await.unwrap()).clone();
+            let child = tx.compute(&HostValidatedModuleExtensionRepositoriesObservationKey::new(workspace.clone())).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(child)) = child else {
+                panic!("observed validation child must complete")
+            };
+            assert_eq!(carrier.observations(), child.observations());
+            for (demand, result) in carrier.observations().observations() {
+                assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref());
+            }
+            held.push(carrier);
+        }
+        for (a, b, restored) in [(0, 1, 2), (2, 3, 4), (4, 5, 6)] {
+            assert_ne!(held[a].result(), held[b].result());
+            assert_eq!(held[a].result(), held[restored].result());
+        }
+        assert_eq!(held[0].result(), held[7].result());
+        assert_ne!(held[0].observations(), held[7].observations());
+
+        let warm_tracker = Arc::new(LookupTracker::default());
+        let mut warm_tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(warm_tracker.clone())).await;
+        let first = observed_carrier(&warm_tx.compute(&key).await.unwrap()).clone();
+        warm_tracker.activations.lock().unwrap().clear();
+        let reused = observed_carrier(&warm_tx.compute(&key).await.unwrap()).clone();
+        assert!(Arc::ptr_eq(first.result(), reused.result()));
+        assert!(
+            warm_tracker
+                .activations
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|(name, kind, batch)| { name == &key.to_string() && *kind == ActivationKind::Reused && batch.is_none() })
+        );
+
+        let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let cancel_tracker = Arc::new(LookupTracker::default());
+        let mut cancelled = transaction(&cancel_dice, MODULE, EXTENSION_A, true, Some(cancel_tracker.clone())).await;
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        assert!(cancel_tracker.activations.lock().unwrap().iter().all(|(name, _, _)| name != &key.to_string()));
+        assert!(cancel_tracker.dependencies.lock().unwrap().iter().all(|(name, _)| name != &key.to_string()));
+
+        let mut recovery = transaction(&cancel_dice, MODULE, EXTENSION_A, true, Some(cancel_tracker.clone())).await;
+        let global = recovery.compute(&PathObservationEpochKey).await.unwrap();
+        let recovered = observed_carrier(&recovery.compute(&key).await.unwrap()).clone();
+        assert_eq!(recovered.result(), held[0].result());
+        for (demand, result) in recovered.observations().observations() {
+            assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref());
+        }
+        let activations = cancel_tracker.activations.lock().unwrap();
+        let dependencies = cancel_tracker.dependencies.lock().unwrap();
+        let forbidden_captures = cancel_tracker.forbidden.lock().unwrap();
+        assert!(!forbidden_captures.is_empty());
+        assert!(forbidden_captures.iter().all(|capture| *capture == "filesystem"));
+        let legacy = HostGeneratedRepositoryDefinitionKey::new(workspace, requested).to_string();
+        assert!(activations.iter().all(|(name, _, _)| name != &legacy));
+        assert!(dependencies.iter().all(|(name, children)| name != &legacy && children.iter().all(|child| child != &legacy)));
+        for forbidden in [
+            "host-canonical-selected-module-definition:",
+            "host-canonical-repository-definition:",
+            "host-canonical-repository-apparent-mapping:",
+            "host-root-repository-mapping:",
+            "host-root-apparent-repository-definition:",
+            "HostRootApparentRepositoryRouteKey",
+            "HostRootApparentRepositorySourceInputKey",
+            "HostRootApparentRepositorySourceObservationKey",
+            "HostRootApparentRepositorySourcePathInputKey",
+            "root-repository-route:",
+            "repository-package-source:",
+            "repository-source-file:",
+            "host-repository-source-file:",
+            "build-command-root:",
+        ] {
+            assert!(activations.iter().all(|(name, _, _)| !name.contains(forbidden)));
+            assert!(
+                dependencies
+                    .iter()
+                    .all(|(name, children)| !name.contains(forbidden) && children.iter().all(|child| !child.contains(forbidden)))
+            );
+        }
+        let source = include_str!("generated_repository_definition.rs");
+        let producer = &source[source.find("type GeneratedRepositoryDefinitionResult").unwrap()..source.find("enum HostCanonicalRepositoryDefinitionSource").unwrap()];
+        assert!(!producer.contains("RootModuleBootstrap"));
+        assert!(!producer.contains("HostCanonicalRepositoryDefinitionKey::new"));
+        assert!(!producer.contains("HostCanonicalRepositoryApparentMappingKey::new"));
     }
 
     #[tokio::test]
