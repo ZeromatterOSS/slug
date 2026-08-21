@@ -107,12 +107,15 @@ pub(crate) struct HostPureModuleExtensionInvocationsKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 #[allow(dead_code)] // Private observed sibling; a later packet owns consumer activation.
-struct HostPureModuleExtensionInvocationsObservationKey(HostPureModuleExtensionInvocationsKey);
+pub(crate) struct HostPureModuleExtensionInvocationsObservationKey(
+    HostPureModuleExtensionInvocationsKey,
+);
 
 #[allow(dead_code)]
-#[rustfmt::skip]
 impl HostPureModuleExtensionInvocationsObservationKey {
-    fn new(workspace: NormalizedAbsolutePath) -> Self { Self(HostPureModuleExtensionInvocationsKey::new(workspace)) }
+    pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self(HostPureModuleExtensionInvocationsKey::new(workspace))
+    }
 }
 
 #[rustfmt::skip]
@@ -125,25 +128,37 @@ type PureInvocationsResult =
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 #[allow(dead_code)] // Retained only by the callerless observed sibling.
-struct ObservedHostPureModuleExtensionInvocations {
+pub(crate) struct ObservedHostPureModuleExtensionInvocations {
     result: PureInvocationsResult,
     observations: PathObservationEpoch,
 }
 
 #[allow(dead_code)]
-#[rustfmt::skip]
 impl ObservedHostPureModuleExtensionInvocations {
-    fn result(&self) -> &PureInvocationsResult { &self.result }
-    fn observations(&self) -> &PathObservationEpoch { &self.observations }
+    pub(crate) fn result(
+        &self,
+    ) -> &Arc<Result<HostPureModuleExtensionInvocations, HostPureModuleExtensionInvocationsError>>
+    {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 #[rustfmt::skip]
-enum HostPureModuleExtensionInvocationsObservationError {
+enum PureModuleExtensionInvocationsObservationError {
     Prepared(HostPreparedModuleExtensionInputsObservationError),
     HostBzl { prepared: Arc<HostPreparedModuleExtensionInputs>, index: usize, error: ObservedPathFrontierError },
     Merge { prepared: Arc<HostPreparedModuleExtensionInputs>, index: usize, error: ObservedPathFrontierError },
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct HostPureModuleExtensionInvocationsObservationError(
+    PureModuleExtensionInvocationsObservationError,
+);
 
 impl HostPureModuleExtensionInvocationsKey {
     pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
@@ -167,7 +182,7 @@ pub(crate) type HostPureModuleExtensionInvocationsOutcome =
 type PureInvocationsDriverOutcome = SourcePreparationOutcome<
     Result<
         (PureInvocationsResult, PathObservationEpoch),
-        HostPureModuleExtensionInvocationsObservationError,
+        PureModuleExtensionInvocationsObservationError,
     >,
 >;
 
@@ -251,7 +266,7 @@ async fn pure_prepared(ctx: &mut DiceComputations<'_>, workspace: &NormalizedAbs
     };
     let (result, observations) = match child {
         SourcePreparationOutcome::Need(need) => return Err(SourcePreparationOutcome::Need(need)),
-        SourcePreparationOutcome::Complete(Err(error)) => return Err(SourcePreparationOutcome::Complete(Err(HostPureModuleExtensionInvocationsObservationError::Prepared(error)))),
+        SourcePreparationOutcome::Complete(Err(error)) => return Err(SourcePreparationOutcome::Complete(Err(PureModuleExtensionInvocationsObservationError::Prepared(error)))),
         SourcePreparationOutcome::Complete(Ok(value)) => value,
     };
     match result.as_ref() {
@@ -293,7 +308,7 @@ async fn pure_host_bzl(ctx: &mut DiceComputations<'_>, workspace: &NormalizedAbs
         },
         PureInvocationsMode::Observed => match ctx.compute(&HostBzlModuleObservationKey::new(workspace.dupe(), label)).await {
             Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => return Err(SourcePreparationOutcome::Complete(Err(HostPureModuleExtensionInvocationsObservationError::HostBzl { prepared: prepared.dupe(), index, error }))),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return Err(SourcePreparationOutcome::Complete(Err(PureModuleExtensionInvocationsObservationError::HostBzl { prepared: prepared.dupe(), index, error }))),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => SourcePreparationOutcome::Complete(Ok((Arc::new(observed.result().clone()), observed.observations().dupe()))),
             Err(error) => return Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()))), observations)),
         },
@@ -304,7 +319,7 @@ async fn pure_host_bzl(ctx: &mut DiceComputations<'_>, workspace: &NormalizedAbs
         SourcePreparationOutcome::Complete(Err(_)) => unreachable!("Host-Bzl outer is handled before the shared finisher"),
     };
     let observations = union_pure_observations(&observations, &incoming).map_err(|error| {
-        SourcePreparationOutcome::Complete(Err(HostPureModuleExtensionInvocationsObservationError::Merge { prepared: prepared.dupe(), index, error }))
+        SourcePreparationOutcome::Complete(Err(PureModuleExtensionInvocationsObservationError::Merge { prepared: prepared.dupe(), index, error }))
     })?;
     match result.as_ref() {
         Ok(module) => Ok((module.clone(), observations)),
@@ -519,9 +534,9 @@ impl Key for HostPureModuleExtensionInvocationsObservationKey {
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
         match compute_pure_invocations(ctx, &self.0, PureInvocationsMode::Observed).await {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
-            }
+            SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(
+                Err(HostPureModuleExtensionInvocationsObservationError(error)),
+            ),
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
                 SourcePreparationOutcome::Complete(Ok(ObservedHostPureModuleExtensionInvocations {
                     result,
@@ -1751,12 +1766,36 @@ mod tests {
             };
             match outcome {
                 SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-                SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(Err(error)),
+                SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(
+                    Err(HostPureModuleExtensionInvocationsObservationError(error)),
+                ),
                 SourcePreparationOutcome::Complete(Ok((result, observations))) => SourcePreparationOutcome::Complete(Ok(ObservedHostPureModuleExtensionInvocations { result, observations })),
             }
         }
         fn equality(x: &Self::Value, y: &Self::Value) -> bool { x.complete_eq(y) }
         fn validity(value: &Self::Value) -> bool { value.is_complete() }
+    }
+
+    #[rustfmt::skip]
+    fn assert_observed_pure_outer_stages(
+        prepared: &Arc<HostPreparedModuleExtensionInputs>,
+        lower_error: ObservedPathFrontierError,
+        merge_error: ObservedPathFrontierError,
+    ) {
+        let host_outer: <HostPureModuleExtensionInvocationsObservationKey as Key>::Value = SourcePreparationOutcome::Complete(Err(HostPureModuleExtensionInvocationsObservationError(PureModuleExtensionInvocationsObservationError::HostBzl {
+            prepared: prepared.dupe(), index: 0, error: lower_error,
+        })));
+        let merge_outer: <HostPureModuleExtensionInvocationsObservationKey as Key>::Value = SourcePreparationOutcome::Complete(Err(HostPureModuleExtensionInvocationsObservationError(PureModuleExtensionInvocationsObservationError::Merge {
+            prepared: prepared.dupe(), index: 0, error: merge_error,
+        })));
+        assert!(HostPureModuleExtensionInvocationsObservationKey::validity(&host_outer));
+        assert!(HostPureModuleExtensionInvocationsObservationKey::equality(&host_outer, &host_outer));
+        assert!(matches!(host_outer, SourcePreparationOutcome::Complete(Err(
+            HostPureModuleExtensionInvocationsObservationError(PureModuleExtensionInvocationsObservationError::HostBzl { .. })
+        ))));
+        assert!(matches!(merge_outer, SourcePreparationOutcome::Complete(Err(
+            HostPureModuleExtensionInvocationsObservationError(PureModuleExtensionInvocationsObservationError::Merge { .. })
+        ))));
     }
 
     #[tokio::test]
@@ -1822,41 +1861,7 @@ mod tests {
                 demand,
                 result_operation: PathObservationOperation::Lstat,
             });
-        let host_outer: <HostPureModuleExtensionInvocationsObservationKey as Key>::Value =
-            SourcePreparationOutcome::Complete(Err(
-                HostPureModuleExtensionInvocationsObservationError::HostBzl {
-                    prepared: prepared.dupe(),
-                    index: 0,
-                    error: lower_error,
-                },
-            ));
-        let merge_outer: <HostPureModuleExtensionInvocationsObservationKey as Key>::Value =
-            SourcePreparationOutcome::Complete(Err(
-                HostPureModuleExtensionInvocationsObservationError::Merge {
-                    prepared: prepared.dupe(),
-                    index: 0,
-                    error: merge_error,
-                },
-            ));
-        assert!(HostPureModuleExtensionInvocationsObservationKey::validity(
-            &host_outer
-        ));
-        assert!(HostPureModuleExtensionInvocationsObservationKey::equality(
-            &host_outer,
-            &host_outer
-        ));
-        assert!(matches!(
-            host_outer,
-            SourcePreparationOutcome::Complete(Err(
-                HostPureModuleExtensionInvocationsObservationError::HostBzl { .. }
-            ))
-        ));
-        assert!(matches!(
-            merge_outer,
-            SourcePreparationOutcome::Complete(Err(
-                HostPureModuleExtensionInvocationsObservationError::Merge { .. }
-            ))
-        ));
+        assert_observed_pure_outer_stages(&prepared, lower_error, merge_error);
         let bzl_source = include_str!("bzl_module.rs");
         let selected_source = include_str!("../../slug_bzlmod_v2/src/selected_repo_spec.rs");
         let pure_source = include_str!("module_extension.rs");

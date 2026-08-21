@@ -564,6 +564,23 @@ pub(crate) mod tests {
     use starlark_map::sorted_map::SortedMap;
 
     use super::*;
+    use crate::module_extension::HostPureModuleExtensionInvocationsObservationError;
+    use crate::module_extension::HostPureModuleExtensionInvocationsObservationKey;
+    use crate::module_extension::ObservedHostPureModuleExtensionInvocations;
+
+    #[test]
+    #[rustfmt::skip]
+    fn pure_observation_surface_is_instantiation_sibling_usable() {
+        let key = HostPureModuleExtensionInvocationsObservationKey::new(NormalizedAbsolutePath::new("/workspace").unwrap());
+        assert_eq!(key.to_string(), "observed-host-pure-module-extension-invocations:\"/workspace\"");
+
+        fn inspect(_value: &<HostPureModuleExtensionInvocationsObservationKey as Key>::Value, observed: &ObservedHostPureModuleExtensionInvocations, _error: &HostPureModuleExtensionInvocationsObservationError) {
+            let _: &Arc<Result<HostPureModuleExtensionInvocations, HostPureModuleExtensionInvocationsError>> = observed.result();
+            let _: &PathObservationEpoch = observed.observations();
+        }
+
+        let _ = inspect as fn(&SourcePreparationOutcome<Result<ObservedHostPureModuleExtensionInvocations, HostPureModuleExtensionInvocationsObservationError>>, &ObservedHostPureModuleExtensionInvocations, &HostPureModuleExtensionInvocationsObservationError);
+    }
 
     fn schema(
         name: &str,
