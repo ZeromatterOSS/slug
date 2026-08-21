@@ -12507,6 +12507,58 @@ scratch, task/lock, fixture/oracle, cap/helper/test waiver, upper activation,
 milestone closure, M8/M7B or identity-byte work. REPLAN before widening. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Selected-definition carrier formatter REPLAN (2026-08-21)
+
+The proof-corrected semantic draft is retained, but
+`cargo fmt --all -- --check` identifies four semantic-neutral layout
+differences in exactly the
+three carrier-promotion files. Schedule one final
+`WP-6-7A-host-canonical-selected-module-definition-observation-carrier-promotion-formatting-correction-implementation`.
+There is no formatting waiver and no semantic reopening.
+
+Pre-format full-file hashes are selected
+`ae0162835c21f20a0e8be2b33bb1476e7b853e42c18fad36aa55a1267106caf5`,
+lib `0f9e763c1685ab3e666f7b06950c0ec4b8580441f3ad913740a27867c812f23b`
+and smoke
+`68fa57dc7e367ee00fca8e98e925a5bea62a63c853bcfe70551d623fc0cdc97e`.
+Current accounting/physical is selected +56/-13 at 12,567, lib +6 at 421
+and new smoke 44.
+
+Rustfmt on temporary copies proves exact post-format targets: selected
+`78a202a4a72b5a49cc6b052234ff95f2813dfbd3b1a1634b9a78102dd71185f5`
+at +61/-20 and 12,565; lib
+`3fdd3d81d94ce7d3618f356114505d7c30515596a3adbe0f14fb7add30c5cea0`
+at +6 and 421; smoke
+`c8ee92e0c7ca1aee1dfcb1fa75e07decda0d2bf084e8baffe434a22608bc5e33`
+at 47. Selected splits +24/-14 production and +37/-6 proof; aggregate is
++114/-20. All original semantic/physical/proof/test-size caps remain green and
+unchanged.
+
+Authorize only rustfmt's exact layout: move the three existing lib reexport
+pairs to lexical positions while preserving each adjacent hidden pair and
+selected-family order Error, Key, Observed; indent the production `.map`
+closure; collapse the identity wrapper projection arm; and wrap the smoke's
+function-pointer binding and concrete Result payload. Reexport membership,
+tokens, types, API, behavior and assertions are frozen.
+
+The corrected lifecycle scan is frozen and remains valid after relocation: it
+requires exactly one adjacent hidden pair for each retained reexport, exactly
+the Error/Key/Observed lines in order, no fourth, and absence from loading/core.
+All tracker/event/nonactivation, held-handle/epoch, cancellation/recovery,
+identity and external-smoke assertions remain unchanged.
+
+Validation requires exact target hashes/accounting/physical and allowlist,
+then formatting check, focused observed-selected tests, new/protected external
+smokes, full Bzlmod, direct core check and diff hygiene, serially. Exact,
+Slug-native and unsupported/deferred classifications are unchanged.
+
+STOP any target mismatch, non-rustfmt or fourth-file change, membership/order/
+adjacency drift, semantic/API/type/assertion/lifecycle change, loading/core
+edit, Cargo/BUILD, fixture/oracle, cap/proof/test-size/fmt waiver, upper
+activation, milestone closure, M8/M7B or identity work. REPLAN before widening.
+ACCEPT returns only to canonical selected/generated owner design. M7 remains
+partial and M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier proof correction REPLAN (2026-08-21)
 
 Formal review retains the narrow carrier-promotion candidate based on

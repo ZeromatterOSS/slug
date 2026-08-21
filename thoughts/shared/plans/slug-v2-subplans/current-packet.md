@@ -1,103 +1,101 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-canonical-selected-module-definition-observation-carrier-promotion-proof-correction-implementation`
+Packet: `WP-6-7A-host-canonical-selected-module-definition-observation-carrier-promotion-formatting-correction-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling/design and retained-candidate base: `6204c9f2` / `a7d9ffcc`
+Scheduling and retained-candidate base: `890b7862` / `a7d9ffcc`
 
-## Goal and retained authority
+## Goal and exact authority
 
-Retain the current narrow three-file carrier-promotion draft and correct only
-the stale source scan at the end of
-`observed_canonical_selected_definition_lifecycle_cancellation_and_nonactivation`.
-The scan must recognize the intentional Bzlmod crate-root exports while still
-proving loading and core remain inactive. Do not change production, API shape,
-reexports, external smoke, identity wrapper proof or any lifecycle assertion.
+Retain the complete semantic carrier-promotion draft and corrected lifecycle
+source scan. Apply only the exact semantic-neutral `cargo fmt` layout
+preflighted on temporary copies of the three carrier files. Do not change any
+behavior, API, type, reexport membership/order, source-scan expectation or
+assertion.
 
-The retained draft is:
+Write authority is exactly:
 
-- `app/slug_bzlmod_v2/src/selected_repo_spec.rs` at +25/-11, comprising
-  +19/-9 production and the frozen +6/-2 identity wrapper update;
-- `app/slug_bzlmod_v2/src/lib.rs` at +6/-0; and
-- new 44-line
-  `app/slug_bzlmod_v2/tests/canonical_selected_definition_observation_api.rs`.
+- `app/slug_bzlmod_v2/src/selected_repo_spec.rs`;
+- `app/slug_bzlmod_v2/src/lib.rs`; and
+- `app/slug_bzlmod_v2/tests/canonical_selected_definition_observation_api.rs`.
 
-Current physical sizes are 12,538/421/44 against unchanged caps
-12,645/425/70. Original authority remains <=80 production, <=40 colocated
-proof, <=10 lib, <=70 external proof and <=200 aggregate semantic. The existing
-identity wrapper update retains its under-200 proof authority, and every new
-smoke/helper remains below 100. No cap or test-size waiver is authorized.
+Every other Rust file, test, fixture, oracle, Cargo/BUILD target, API, caller and
+plan is read-only. Formatting must touch only the exact ranges below. If
+`cargo fmt` would change any other byte or file, STOP and REPLAN; there is no
+format waiver.
 
-Only the lifecycle test's final source-scan block in `selected_repo_spec.rs` is
-writable. Every other line in the three retained files and every other Rust
-file, test, fixture, oracle, Cargo/BUILD target, API, caller and plan is
-read-only. Freeze:
+## Retained and post-format baselines
 
-- production through line 4,677 at SHA-256
-  `eec5dd83dc786a2317c011a19de68dff952c2e6821d664cf6e75da0f18240f0a`;
-- all of `lib.rs` at
+The pre-format semantic draft is frozen at full-file SHA-256:
+
+- `selected_repo_spec.rs`:
+  `ae0162835c21f20a0e8be2b33bb1476e7b853e42c18fad36aa55a1267106caf5`;
+- `lib.rs`:
   `0f9e763c1685ab3e666f7b06950c0ec4b8580441f3ad913740a27867c812f23b`;
-- the external smoke at
-  `68fa57dc7e367ee00fca8e98e925a5bea62a63c853bcfe70551d623fc0cdc97e`;
-  and
-- the existing identity test including its wrapper projection/match update at
-  `d22d3a4d65d0021cbfcd0bbf37cc4fe5d5a039eb8141d66d9756ec7d1e641052`.
+- external smoke:
+  `68fa57dc7e367ee00fca8e98e925a5bea62a63c853bcfe70551d623fc0cdc97e`.
 
-## Frozen carrier draft
+It accounts as selected +56/-13, lib +6/-0 and a new 44-line smoke, at
+12,567/421/44 physical. The exact temporary-copy rustfmt preflight produces:
 
-Keep exactly the three doc-hidden public nominal types: key with public
-two-argument `new`, carrier with concrete borrowed selected Result-Arc and
-epoch accessors, and field-private opaque public outer over private
-`CanonicalSelectedModuleDefinitionObservationError::Routes`. Keep only
-observed Complete Err wrapping at Key projection; Need and success are
-unchanged and no unwrap exists.
+- `selected_repo_spec.rs` +61/-20, 12,565 physical, SHA-256
+  `78a202a4a72b5a49cc6b052234ff95f2813dfbd3b1a1634b9a78102dd71185f5`;
+- `lib.rs` +6/-0, 421 physical, SHA-256
+  `3fdd3d81d94ce7d3618f356114505d7c30515596a3adbe0f14fb7add30c5cea0`;
+- external smoke 47 lines, SHA-256
+  `c8ee92e0c7ca1aee1dfcb1fa75e07decda0d2bf084e8baffe434a22608bc5e33`.
 
-Keep exactly one adjacent `#[doc(hidden)]` plus `pub use
-selected_repo_spec::...;` pair in `lib.rs` for each of:
+Post-format selected accounting is +24/-14 production and +37/-6 colocated
+proof; aggregate draft accounting is +114/-20. Preserve the original caps
+<=80 production, <=40 colocated proof, <=10 lib, <=70 external, <=200 aggregate
+semantic and physical <=12,645/425/70. The identity proof retains its
+under-200 proof authority and every new smoke/helper remains below 100.
 
-- `HostCanonicalSelectedModuleDefinitionObservationError`;
-- `HostCanonicalSelectedModuleDefinitionObservationKey`; and
-- `ObservedHostCanonicalSelectedModuleDefinition`.
+## Exact allowed formatting
 
-There is no fourth selected-observation reexport. Keep the 44-line external
-key/Display/associated-Value/concrete-accessor smoke byte-for-byte. Keep the
-identity proof's input, wrapper projection, private Routes match, control flow
-and every assertion byte-for-byte.
+Allow only these rustfmt transformations:
 
-## Exact proof correction
+1. In `lib.rs`, relocate the existing hidden error and key reexport pairs to
+   rustfmt's lexical position after the legacy selected key, and relocate the
+   existing hidden observed-carrier pair to the `Observed...` group. Preserve
+   each adjacent `#[doc(hidden)]`/`pub use` pair and the selected-observation
+   order Error, Key, Observed. Membership remains exactly those three.
+2. In the observed selected Key projection, indent the closure and closing
+   parenthesis under `.map(`. Tokens, closure body, Result mapping and
+   `.map_err(HostCanonicalSelectedModuleDefinitionObservationError)` are
+   unchanged.
+3. In the identity/scan/terminal proof, collapse only the wrapper projection
+   arm to rustfmt's expression layout. The carrierless panic, public-wrapper/
+   private-Routes match and every other input/control/assertion remain
+   unchanged.
+4. In the external smoke, use rustfmt's two-line function-pointer binding and
+   multiline concrete selected `Result` payload. Imports, key construction,
+   exact Display, associated Value, accessor types and assertions are
+   unchanged.
 
-Replace only the lifecycle tail's obsolete three-source absence loop. The new
-semantic-neutral scan must:
-
-1. read `lib.rs` and require exactly one occurrence of each exact two-line
-   adjacent hidden reexport pair above;
-2. collect selected-observation reexport lines containing either
-   `HostCanonicalSelectedModuleDefinitionObservation` or
-   `ObservedHostCanonicalSelectedModuleDefinition` and require exactly the
-   retained three lines, in retained source order, with no extra selected-
-   observation reexport; and
-3. require both `slug_loading_v2/src/bzl_module.rs` and core
-   `runtime/generated_repository_definition.rs` to contain none of those three
-   nominal names.
-
-Do not edit either scanned file. Preserve every tracker row, parent/warm
-batchlessness assertion, upper-nonactivation assertion, held Result/carrier/
-epoch A-B-A and metadata behavior, transaction epoch-subset check, Arc identity
-condition, cancellation absence and recovery assertion in the lifecycle test.
-Add no helper, semantic input, compute, activation or runtime injection.
+The corrected lifecycle scan is byte-frozen: it still requires exactly one
+adjacent hidden lib reexport pair for Error/Key/Observed, exactly those three
+selected-observation reexport lines in that order, and none of those names in
+loading `bzl_module.rs` or core `generated_repository_definition.rs`. Freeze
+all production/API/types, private-inner/public-outer projection, tracker/event/
+nonactivation, held-handle/epoch, cancellation/recovery and smoke assertions.
 
 ## Validation, compatibility and terminal
 
-Run serially:
+Run serially, after applying the exact formatting:
 
+- `cargo fmt --all -- --check`;
 - `cargo test -p slug_bzlmod_v2 observed_canonical_selected_definition_ --lib`;
 - `cargo test -p slug_bzlmod_v2 --test canonical_selected_definition_observation_api`;
 - protected `cargo test -p slug_bzlmod_v2 --test definition_request_observation_api`;
 - protected `cargo test -p slug_bzlmod_v2 --test evaluation_input_request_observation_api`;
 - full `cargo test -p slug_bzlmod_v2`;
-- direct dependent `cargo check -p slug_core_v2`;
-- `cargo fmt --all -- --check`; and
+- direct dependent `cargo check -p slug_core_v2`; and
 - `git diff --check`.
+
+Before testing, require the three exact post-format hashes, accounting, physical
+sizes, file allowlist and Error/Key/Observed export order above. No oracle is
+needed because formatting cannot change Bazel-visible behavior.
 
 Existing selected values/errors/dispositions/full scan/order/views, DICE
 equality/invalidation and lower event ownership remain exact Bazel 9
@@ -107,17 +105,16 @@ composition, root/publication/command/bootstrap activation and exact Bazel
 configuration/output/ActionKey bytes remain unsupported/deferred.
 
 ACCEPT returns only to a docs-only canonical selected/generated observation-
-owner design. STOP any frozen-hash mismatch, production/API/lib/smoke/identity
-edit, lifecycle change outside the final source scan, tracker/nonactivation/
-retention/cancellation assertion drift, public field/alias/terminal, fourth
-type/reexport, second key/carrier/adapter, core/loading edit, reverse dependency,
-Cargo/BUILD, fixture/oracle, cap/proof/test-size waiver, upper activation,
-milestone closure, M8/M7B or exact identity work. REPLAN before widening. M7
-remains partial and M7A -> M8 -> M7B remains.
+owner design. STOP a pre/post hash or accounting mismatch, any non-rustfmt or
+out-of-range change, reexport membership/order/adjacency drift, behavior/API/
+type/token/assertion change, lifecycle scan change, fourth reexport, downstream
+loading/core edit, Cargo/BUILD, fixture/oracle, cap/proof/test-size/fmt waiver,
+upper activation, milestone closure, M8/M7B or exact identity work. REPLAN
+before widening. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-The implementation draft from `6204c9f2` satisfies the accepted visibility
-surface and smokes. Review found only that the old lifecycle denylist includes
-`lib.rs`, which now intentionally owns the three hidden exports; loading and
-core remain correctly absent.
+Proof-correction packet `890b7862` retains the sound semantic draft and fixes
+the visibility source scan. Its serial gate now fails only because the four
+listed rustfmt layouts were not applied; temporary-copy rustfmt proves the
+bounded final bytes above.
