@@ -287,6 +287,10 @@ pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionErrorDispositio
 #[doc(hidden)]
 pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionKey;
 #[doc(hidden)]
+pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionObservationError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionObservationKey;
+#[doc(hidden)]
 pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionOutcome;
 #[doc(hidden)]
 pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionView;
@@ -338,6 +342,8 @@ pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequestsKey;
 pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequestsObservationError;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequestsObservationKey;
+#[doc(hidden)]
+pub use selected_repo_spec::ObservedHostCanonicalSelectedModuleDefinition;
 #[doc(hidden)]
 pub use selected_repo_spec::ObservedHostSelectedExtensionDefinitionLoadRequests;
 #[doc(hidden)]

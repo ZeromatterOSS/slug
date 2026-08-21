@@ -2383,14 +2383,15 @@ impl Key for HostCanonicalSelectedModuleDefinitionKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 #[allow(dead_code)]
-struct HostCanonicalSelectedModuleDefinitionObservationKey(
+#[doc(hidden)]
+pub struct HostCanonicalSelectedModuleDefinitionObservationKey(
     HostCanonicalSelectedModuleDefinitionKey,
 );
 
 #[rustfmt::skip]
 #[allow(dead_code)]
 impl HostCanonicalSelectedModuleDefinitionObservationKey {
-    fn new(workspace: NormalizedAbsolutePath, canonical_repo: CanonicalRepoName) -> Self { Self(HostCanonicalSelectedModuleDefinitionKey::new(workspace, canonical_repo)) }
+    pub fn new(workspace: NormalizedAbsolutePath, canonical_repo: CanonicalRepoName) -> Self { Self(HostCanonicalSelectedModuleDefinitionKey::new(workspace, canonical_repo)) }
 }
 
 impl fmt::Display for HostCanonicalSelectedModuleDefinitionObservationKey {
@@ -2404,7 +2405,8 @@ type SelectedDefinitionResult =
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 #[allow(dead_code)]
-struct ObservedHostCanonicalSelectedModuleDefinition {
+#[doc(hidden)]
+pub struct ObservedHostCanonicalSelectedModuleDefinition {
     result: SelectedDefinitionResult,
     observations: PathObservationEpoch,
 }
@@ -2412,14 +2414,20 @@ struct ObservedHostCanonicalSelectedModuleDefinition {
 #[rustfmt::skip]
 #[allow(dead_code)]
 impl ObservedHostCanonicalSelectedModuleDefinition {
-    fn result(&self) -> &SelectedDefinitionResult { &self.result }
-    fn observations(&self) -> &PathObservationEpoch { &self.observations }
+    pub fn result(&self) -> &Arc<Result<HostCanonicalSelectedModuleDefinition, HostCanonicalSelectedModuleDefinitionError>> { &self.result }
+    pub fn observations(&self) -> &PathObservationEpoch { &self.observations }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-enum HostCanonicalSelectedModuleDefinitionObservationError {
+enum CanonicalSelectedModuleDefinitionObservationError {
     Routes(HostSelectedModuleRoutesObservationError),
 }
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct HostCanonicalSelectedModuleDefinitionObservationError(
+    CanonicalSelectedModuleDefinitionObservationError,
+);
 
 #[rustfmt::skip]
 #[derive(Clone, Copy)]
@@ -2428,7 +2436,7 @@ enum CanonicalSelectedModuleDefinitionMode { Legacy, Observed }
 type SelectedDefinitionDriverOutcome = SourcePreparationOutcome<
     Result<
         (SelectedDefinitionResult, PathObservationEpoch),
-        HostCanonicalSelectedModuleDefinitionObservationError,
+        CanonicalSelectedModuleDefinitionObservationError,
     >,
 >;
 
@@ -2462,7 +2470,7 @@ fn complete_canonical_selected_definition_driver(
         RepoSpecChild::Need(need) => return SourcePreparationOutcome::Need(need),
         RepoSpecChild::Outer(error) => {
             return SourcePreparationOutcome::Complete(Err(
-                HostCanonicalSelectedModuleDefinitionObservationError::Routes(error),
+                CanonicalSelectedModuleDefinitionObservationError::Routes(error),
             ));
         }
         RepoSpecChild::Complete {
@@ -2587,12 +2595,14 @@ impl Key for HostCanonicalSelectedModuleDefinitionObservationKey {
         )
         .await
         .map(|result| {
-            result.map(
-                |(result, observations)| ObservedHostCanonicalSelectedModuleDefinition {
-                    result,
-                    observations,
-                },
-            )
+            result
+                .map(
+                    |(result, observations)| ObservedHostCanonicalSelectedModuleDefinition {
+                        result,
+                        observations,
+                    },
+                )
+                .map_err(HostCanonicalSelectedModuleDefinitionObservationError)
         })
     }
 
@@ -11992,15 +12002,17 @@ inject_repo(three, injected = "target")
         );
         let outer: <HostCanonicalSelectedModuleDefinitionObservationKey as Key>::Value = match outer
         {
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
-            }
+            SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(
+                Err(HostCanonicalSelectedModuleDefinitionObservationError(error)),
+            ),
             _ => panic!("observed route outer must remain carrierless"),
         };
         assert!(matches!(
             outer,
             SourcePreparationOutcome::Complete(Err(
-                HostCanonicalSelectedModuleDefinitionObservationError::Routes(_)
+                HostCanonicalSelectedModuleDefinitionObservationError(
+                    CanonicalSelectedModuleDefinitionObservationError::Routes(_)
+                )
             ))
         ));
         let compute = complete_canonical_selected_definition_driver(
@@ -12060,7 +12072,6 @@ inject_repo(three, injected = "target")
                 inner: PrivateCanonicalSelectedModuleDefinitionError::Missing { .. }
             })) && observations == epoch)
         );
-
         let mut duplicate_routes = routes.clone();
         let mut entries = duplicate_routes.entries.to_vec();
         entries.push(entries[1].clone());
@@ -12513,12 +12524,41 @@ inject_repo(three, injected = "target")
         assert_eq!(recovered.result(), &legacy);
         assert_eq!(recovered.result(), clean.result());
         assert_selected_epoch_subset(&recovered, &recovered_global);
+        let lib = include_str!("lib.rs");
+        let reexports = [
+            "#[doc(hidden)]\npub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionObservationError;",
+            "#[doc(hidden)]\npub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionObservationKey;",
+            "#[doc(hidden)]\npub use selected_repo_spec::ObservedHostCanonicalSelectedModuleDefinition;",
+        ];
+        for reexport in reexports {
+            assert_eq!(lib.matches(reexport).count(), 1);
+        }
+        let selected_observation_reexports: Vec<_> = lib
+            .lines()
+            .filter(|line| {
+                line.contains("HostCanonicalSelectedModuleDefinitionObservation")
+                    || line.contains("ObservedHostCanonicalSelectedModuleDefinition")
+            })
+            .collect();
+        assert_eq!(
+            selected_observation_reexports,
+            [
+                "pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionObservationError;",
+                "pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionObservationKey;",
+                "pub use selected_repo_spec::ObservedHostCanonicalSelectedModuleDefinition;",
+            ]
+        );
         for source in [
-            include_str!("lib.rs"),
             include_str!("../../slug_loading_v2/src/bzl_module.rs"),
             include_str!("../../slug_core_v2/src/runtime/generated_repository_definition.rs"),
         ] {
-            assert!(!source.contains("HostCanonicalSelectedModuleDefinitionObservationKey"));
+            for name in [
+                "HostCanonicalSelectedModuleDefinitionObservationError",
+                "HostCanonicalSelectedModuleDefinitionObservationKey",
+                "ObservedHostCanonicalSelectedModuleDefinition",
+            ] {
+                assert!(!source.contains(name));
+            }
         }
     }
 }
