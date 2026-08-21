@@ -11510,6 +11510,56 @@ semantic/event/retention drift, second file/key/owner, visibility/caller/upper
 activation, fixture/oracle work, milestone closure, M8/M7B or exact identity
 work. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Pure-invocation final proof correction REPLAN (2026-08-21)
+
+The first correction candidate remains green and production remains frozen.
+Current accounting against `f76bab3a` is +301/-171 production and +597/-127
+proof at 2,229 physical lines; lines 1-894 still hash to
+`bdee0efe2873997c4a90429cb0a6912cd809f77fb6e0f2657688817d8ae6b738`.
+All accepted order, terminal, event, retention, lifecycle, cancellation and
+nonactivation proof remains mandatory. The second stop is solely that the pure
+test tried to own evidence for a private loaded-definition request join that
+already belongs to the committed prepared owner.
+
+Reuse `bzl_module.rs`'s committed prepared proof. Its
+`observed_prepared_real_order_terminals_events_and_parity` asserts the exact
+prepared parent dependency vector: observed evaluation-input requests followed
+by observed loaded definitions. Its same-module prepared identity/finisher
+proof and production join own access to the private loaded request and the
+exact request-order equality check. At the pure layer retain only the static
+private-producer, loaded parse, prepared join and pure reparse source scan plus
+lawful real equality between the prepared input and public raw request and a
+successful target parse. Do not type-access or clone a loaded definition's
+private request, add an accessor, edit `bzl_module.rs` or alter production.
+
+The final retry must add positive real DICE-edge proof in
+`observed_pure_real_order_terminals_events_and_parity`. From the existing
+tracker dependency row for the real observed pure key, assert the exact ordered
+children: `HostPreparedModuleExtensionInputsObservationKey`, then the first and
+second `HostBzlModuleObservationKey` labels in input order. This proves only
+the pure owner's boundary; it neither duplicates the prepared child's internal
+dependency proof nor inspects its private loaded definitions.
+
+Activate only
+`WP-6-7A-host-pure-module-extension-invocations-observation-proof-correction-2-implementation`.
+Authority remains only test/source-scan content at or below the first
+`#[cfg(test)]` in `module_extension.rs`. Preserve exact +301/-171 production,
+the production hash, exactly three observed-parent tests, at most six test
+helpers, <=650/-150 proof, <=951/-321 aggregate and <=2,285 physical lines.
+The retained candidate leaves 53 proof-addition, 23 proof-deletion and 56
+physical-line headroom. Existing focused/protected/full loading, direct-core,
+formatting, hash/accounting and diff validation remains exact.
+
+Compatibility and successor are unchanged: pure semantics/events remain exact;
+the private Result-Arc/epoch owner remains Slug-native; upper activation and
+exact identity remain deferred. ACCEPT returns only to the docs-only
+instantiation frontier audit. REPLAN on any private loaded-request typed access
+or accessor, `bzl_module.rs` or production edit, production hash/accounting change,
+deleted accepted proof, cap widening, second file/key/owner, visibility/caller/
+upper activation, semantic/event/retention drift, fixture/oracle work,
+milestone closure, M8/M7B or exact identity work. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`

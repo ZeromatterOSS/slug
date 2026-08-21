@@ -1,22 +1,22 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-pure-module-extension-invocations-observation-proof-correction-implementation`
+Packet: `WP-6-7A-host-pure-module-extension-invocations-observation-proof-correction-2-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `fab73cfc`; Rust candidate base: `f76bab3a`; candidate is uncommitted
+Scheduling base: `c344d2ed`; Rust candidate base: `f76bab3a`; candidate is uncommitted
 
 ## Goal and retained authority
 
-Correct only the proof for the green one-file pure-invocation observation
-candidate. Keep every production byte, accepted semantic/result/error/order,
-event, retention and lifecycle behavior unchanged; remove false runtime proof
-of an unreachable defensive Label arm and make the missing event/lifecycle
-obligations explicit. Instantiation and every upper owner remain inactive.
+Make one final proof-only correction to the green one-file pure-invocation
+observation candidate. Reuse the prepared owner's committed private-join proof
+and prove only the pure owner's positive real dependency edges. Keep every
+production byte and all accepted semantic/result/error/order, event, retention,
+lifecycle, cancellation and nonactivation proof unchanged.
 
 Write authority is solely
 `app/slug_loading_v2/src/module_extension.rs`, and only content at or below the
 first `#[cfg(test)]` may change. The retained candidate is +301/-171 production
-and +565/-127 proof against `f76bab3a`, with 2,197 physical lines. Its lines
+and +597/-127 proof against `f76bab3a`, with 2,229 physical lines. Its lines
 1-894 are byte-frozen production with SHA-256
 `bdee0efe2873997c4a90429cb0a6912cd809f77fb6e0f2657688817d8ae6b738`.
 Production accounting must remain exactly +301/-171. Proof caps are
@@ -51,12 +51,16 @@ legacy branch for valid prepared inputs. The source chain is exact:
 
 Remove the synthetic Label terminal from
 `observed_pure_identity_finisher_and_prefix_algebra`. Replace it with a
-bounded compile-time/source scan plus real dependency proof that pins the
-private producer, identical parse expression, exact-request join and pure
-reparse. Do not use a runtime malformed request, visibility hook,
-prepared-injection key or lower malformed epoch. Keep all accepted key
-Display/hash, carrier accessor, equality/validity, finisher, left-first Arc,
-valid Merge conflict and HostBzl-vs-Merge proof.
+bounded static scan that pins the private producer, loaded-definition parse,
+prepared join and pure defensive reparse. Retain the lawful real assertions
+that the prepared input equals its public raw request and its target parses.
+Reuse rather than duplicate the committed `bzl_module.rs` prepared proof: its
+real-order test owns the exact observed raw then observed loaded-definitions
+dependency vector, and its same-module production/test proof owns the private
+loaded-request equality join. Do not type-access or clone that private request
+from pure, add an accessor, edit `bzl_module.rs`, use a runtime malformed request,
+visibility hook, Label prepared-injection or lower malformed epoch. Keep all
+accepted key/finisher/prefix algebra proof.
 
 ## Missing proof obligations
 
@@ -65,6 +69,8 @@ Keep the test names and the accepted proof in all three tests. Amend
 
 - both later-preflight Bzl and drift failures occur after an earlier successful
   preflight but before invocation, and legacy publishes no invocation print;
+- the real observed pure parent dependency row is exactly observed prepared,
+  then the first and second observed Host-Bzl children in input order;
 - prepared failure has exact Legacy/Observed semantic Result parity and neither
   path publishes a pure parent batch;
 - every activation row collected from a warm transaction—prepared, Host-Bzl
@@ -118,6 +124,7 @@ unsupported/deferred.
 
 Implementation ACCEPT returns only to a docs-only instantiation frontier
 audit. REPLAN on any production-byte or production-accounting change,
+private loaded-request typed access or accessor, `bzl_module.rs` edit,
 runtime/prepared Label injection, deletion of accepted terminal/event/
 lifecycle/family proof, proof or physical cap widening, second file/key/
 adapter/owner, visibility/export/caller change, semantic/event/retention drift,
@@ -127,7 +134,7 @@ work. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-The original implementation contract selected the correct one-file owner but
-incorrectly required a runtime/prepared-injected Label terminal. The retained
-candidate is green and its production is accepted for this correction; only
-test/source-scan evidence may move before the instantiation frontier audit.
+The first correction removed the false runtime Label terminal and completed
+the missing event/lifecycle proof. Its remaining miss was assigning the pure
+test ownership of a private prepared-layer join. The final retry reuses that
+committed proof and adds only the pure parent's real ordered dependency row.
