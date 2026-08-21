@@ -70,6 +70,12 @@ pub use module_extension_repository_validation::HostValidatedGeneratedRepository
 pub use module_extension_repository_validation::HostValidatedGeneratedRepositorySpecsOutcome;
 #[doc(hidden)]
 pub use module_extension_repository_validation::HostValidatedModuleExtensionRepositoriesKey;
+#[doc(hidden)]
+pub use module_extension_repository_validation::HostValidatedModuleExtensionRepositoriesObservationError;
+#[doc(hidden)]
+pub use module_extension_repository_validation::HostValidatedModuleExtensionRepositoriesObservationKey;
+#[doc(hidden)]
+pub use module_extension_repository_validation::ObservedHostValidatedGeneratedRepositorySpecs;
 pub use package::LoadedPackage;
 pub use package::NativeTargetAttributes;
 pub use package::PackageTarget;

@@ -173,15 +173,15 @@ pub struct HostValidatedModuleExtensionRepositoriesKey {
     workspace: NormalizedAbsolutePath,
 }
 
+#[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-#[allow(dead_code)] // Private observed sibling; a later packet owns consumer activation.
-struct HostValidatedModuleExtensionRepositoriesObservationKey(
+pub struct HostValidatedModuleExtensionRepositoriesObservationKey(
     HostValidatedModuleExtensionRepositoriesKey,
 );
 
 #[allow(dead_code)]
 impl HostValidatedModuleExtensionRepositoriesObservationKey {
-    fn new(workspace: NormalizedAbsolutePath) -> Self {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
         Self(HostValidatedModuleExtensionRepositoriesKey::new(workspace))
     }
 }
@@ -215,28 +215,38 @@ pub type HostValidatedGeneratedRepositorySpecsOutcome = SourcePreparationOutcome
 type ValidatedRepositoriesResult =
     Arc<Result<HostValidatedGeneratedRepositorySpecs, HostValidatedGeneratedRepositorySpecsError>>;
 
+#[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-#[allow(dead_code)] // Retained only by the callerless observed sibling.
-struct ObservedHostValidatedGeneratedRepositorySpecs {
+pub struct ObservedHostValidatedGeneratedRepositorySpecs {
     result: ValidatedRepositoriesResult,
     observations: PathObservationEpoch,
 }
 
 #[allow(dead_code)]
 impl ObservedHostValidatedGeneratedRepositorySpecs {
-    fn result(&self) -> &ValidatedRepositoriesResult {
+    pub fn result(
+        &self,
+    ) -> &Arc<
+        Result<HostValidatedGeneratedRepositorySpecs, HostValidatedGeneratedRepositorySpecsError>,
+    > {
         &self.result
     }
 
-    fn observations(&self) -> &PathObservationEpoch {
+    pub fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-enum HostValidatedModuleExtensionRepositoriesObservationError {
+enum ValidatedModuleExtensionRepositoriesObservationError {
     Instantiation(HostInstantiatedModuleExtensionRepositoriesObservationError),
 }
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct HostValidatedModuleExtensionRepositoriesObservationError(
+    ValidatedModuleExtensionRepositoriesObservationError,
+);
 
 #[derive(Clone, Copy)]
 enum ValidatedRepositoriesMode {
@@ -247,7 +257,7 @@ enum ValidatedRepositoriesMode {
 type ValidatedRepositoriesDriverOutcome = SourcePreparationOutcome<
     Result<
         (ValidatedRepositoriesResult, PathObservationEpoch),
-        HostValidatedModuleExtensionRepositoriesObservationError,
+        ValidatedModuleExtensionRepositoriesObservationError,
     >,
 >;
 
@@ -271,7 +281,7 @@ async fn compute_validated_repositories(ctx: &mut DiceComputations<'_>, key: &Ho
         },
         ValidatedRepositoriesMode::Observed => match ctx.compute(&HostInstantiatedModuleExtensionRepositoriesObservationKey::new(key.workspace.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostValidatedModuleExtensionRepositoriesObservationError::Instantiation(error))),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(ValidatedModuleExtensionRepositoriesObservationError::Instantiation(error))),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().dupe(), observed.observations().dupe()),
             Err(error) => return complete_driver(Err(HostValidatedGeneratedRepositorySpecsError { inner: PrivateValidationError::InstantiationCompute(error.to_string().into()) }), PathObservationEpoch::empty()),
         },
@@ -325,7 +335,9 @@ impl Key for HostValidatedModuleExtensionRepositoriesObservationKey {
         {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
             SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
+                SourcePreparationOutcome::Complete(Err(
+                    HostValidatedModuleExtensionRepositoriesObservationError(error),
+                ))
             }
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
                 SourcePreparationOutcome::Complete(Ok(
@@ -1490,7 +1502,7 @@ second=module_extension(implementation=impl)
             1
         );
         assert!(producer.contains(
-            "HostValidatedModuleExtensionRepositoriesObservationError::Instantiation(error)"
+            "ValidatedModuleExtensionRepositoriesObservationError::Instantiation(error)"
         ));
         assert!(!producer.contains("union_"));
         assert!(!producer.contains("store_evaluation_data"));
