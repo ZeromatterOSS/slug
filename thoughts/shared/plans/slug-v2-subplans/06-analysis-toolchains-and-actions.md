@@ -11893,6 +11893,69 @@ cap waiver, upper or parallel activation, milestone closure, M8/M7B or exact
 identity work. REPLAN before widening. M7 remains partial and M7A -> M8 -> M7B
 remains.
 
+### Instantiation-carrier visibility design accepted (2026-08-21)
+
+The live effective-visibility design accepts one two-file crate-internal
+surface over Rust base `c1c8e1d8`. Promote only the existing observed
+instantiation key and `new` plus the existing carrier and two borrowed
+accessors. Spell `result()` concretely as
+`&Arc<Result<HostInstantiatedModuleExtensionRepositories,
+HostInstantiatedModuleExtensionRepositoriesError>>`; keep
+`InstantiatedRepositoriesResult` private. Preserve key/carrier fields, derives,
+workspace identity, `observed-{legacy Display}`, Complete-only equality and
+validity, Result Arc identity and epoch contents.
+
+A nominal wrapper is required. Rename the current private terminal enum to
+`InstantiatedModuleExtensionRepositoriesObservationError`, preserving exactly
+its `Pure(HostPureModuleExtensionInvocationsObservationError)` variant. Add
+crate-visible `HostInstantiatedModuleExtensionRepositoriesObservationError` as
+a tuple struct with a private inner field and matching
+Debug/Clone/PartialEq/Eq/Allocative/Dupe derives. Keep the private driver outcome
+on the private inner enum. Wrap only the driver's `Complete(Err(inner))` at the
+observed key's associated Value projection; Need and successful Complete remain
+unchanged. Add no other production wrap/unwrap, inspector or conversion.
+
+The validation sibling proof is exactly one test,
+`instantiation_observation_surface_is_validation_sibling_usable`, in
+`module_extension_repository_validation.rs`. It constructs only the observed
+key with `/workspace` and asserts exact unchanged Display. One nonexecuted local
+`inspect` function takes the exact associated Key Value, carrier and opaque
+outer, type-checks the concrete Result and epoch accessor returns, and is cast
+to the explicit `SourcePreparationOutcome<Result<carrier, opaque outer>>`
+function-pointer shape. It must not construct a carrier/outer, inspect the
+wrapper, compute a key, add a driver or activate validation.
+
+Implementation authority is exactly production
+`app/slug_loading_v2/src/module_extension_repository_instantiation.rs`, baseline
+2,049 physical with tests at 641, and test-only
+`app/slug_loading_v2/src/module_extension_repository_validation.rs`, baseline
+1,156 physical with tests at 332. Caps are <=60 production, <=50 proof, <=110
+aggregate semantic and physical <=2,110/1,210. Every changed helper/test remains
+below 100. The large owner stays cohesive around its private driver and
+representation; validation is its sole future consumer and natural witness.
+
+Adjust only same-module static/private-inner assertions required by the wrapper
+and preserve all accepted observed-instantiation discriminators. Reuse accepted
+Bazel 9.2 and DICE evidence; add no oracle. Validate the named sibling smoke,
+focused `observed_instantiation_`, protected `real_key_` and `real_validation_`,
+full `cargo test -p slug_loading_v2`, direct `cargo check -p slug_core_v2`,
+formatting and `git diff --check` serially.
+
+Accepted instantiation/validation values, errors, ordering, import/override
+polarity, `RepoSpec` iteration, DICE equality and pure-owned events remain exact.
+The crate-internal key/carrier/opaque wrapper and Result-Arc/epoch handoff are
+Slug-native. Validation observation, generated/public/root-mapping/bootstrap
+activation and exact Bazel identity bytes remain unsupported/deferred.
+
+Activate only
+`WP-6-7A-host-instantiated-module-extension-repositories-observation-carrier-visibility-implementation`.
+Implementation ACCEPT returns only to a docs-only validation owner design. STOP
+a public/lib reexport, exposed alias/field/variant/inspector, second key/carrier/
+adapter, caller or compute activation, validation semantics, event/equality/
+retention drift, third file, fixture/oracle work, cap waiver, upper/parallel
+activation, milestone closure, M8/M7B or exact identity work. REPLAN before
+widening. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
