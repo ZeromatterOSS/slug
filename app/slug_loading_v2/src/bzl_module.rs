@@ -38,6 +38,8 @@ use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequest;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequests;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequestsError;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequestsKey;
+use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequestsObservationError;
+use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequestsObservationKey;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInput;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequests;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsError;
@@ -2445,130 +2447,418 @@ type HostLoadedModuleExtensionDefinitionsOutcome = SourcePreparationOutcome<
     Arc<Result<HostLoadedModuleExtensionDefinitions, HostLoadedModuleExtensionDefinitionsError>>,
 >;
 
-#[allow(dead_code)]
-fn loaded_extension_definitions_complete(
-    value: Result<HostLoadedModuleExtensionDefinitions, HostLoadedModuleExtensionDefinitionsError>,
-) -> HostLoadedModuleExtensionDefinitionsOutcome {
-    SourcePreparationOutcome::Complete(Arc::new(value))
-}
-
 #[async_trait]
 impl Key for HostLoadedModuleExtensionDefinitionsKey {
     type Value = HostLoadedModuleExtensionDefinitionsOutcome;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let requests = match ctx
+        project_legacy_loaded_extension_definitions(
+            drive_loaded_extension_definitions(
+                ctx,
+                self,
+                LoadedModuleExtensionDefinitionsMode::Legacy,
+            )
+            .await,
+        )
+    }
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)] // Private observed sibling; a later packet owns consumer activation.
+struct HostLoadedModuleExtensionDefinitionsObservationKey(HostLoadedModuleExtensionDefinitionsKey);
+
+impl HostLoadedModuleExtensionDefinitionsObservationKey {
+    fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self(HostLoadedModuleExtensionDefinitionsKey::new(workspace))
+    }
+}
+
+impl fmt::Display for HostLoadedModuleExtensionDefinitionsObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+#[allow(dead_code)] // Retained only by the callerless observed sibling.
+struct ObservedHostLoadedModuleExtensionDefinitions {
+    result: Arc<
+        Result<HostLoadedModuleExtensionDefinitions, HostLoadedModuleExtensionDefinitionsError>,
+    >,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostLoadedModuleExtensionDefinitions {
+    fn result(
+        &self,
+    ) -> &Arc<Result<HostLoadedModuleExtensionDefinitions, HostLoadedModuleExtensionDefinitionsError>>
+    {
+        &self.result
+    }
+
+    fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
+enum LoadedModuleExtensionDefinitionsObservationStage {
+    Bzl,
+    Merge,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum LoadedModuleExtensionDefinitionsObservationError {
+    Requests(HostSelectedExtensionDefinitionLoadRequestsObservationError),
+    Request {
+        requests: Arc<HostSelectedExtensionDefinitionLoadRequests>,
+        request: HostSelectedExtensionDefinitionLoadRequest,
+        stage: LoadedModuleExtensionDefinitionsObservationStage,
+        error: ObservedPathFrontierError,
+    },
+}
+
+impl Dupe for LoadedModuleExtensionDefinitionsObservationError {}
+
+type LoadedModuleExtensionDefinitionsResult =
+    Arc<Result<HostLoadedModuleExtensionDefinitions, HostLoadedModuleExtensionDefinitionsError>>;
+type LoadedModuleExtensionDefinitionsDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (LoadedModuleExtensionDefinitionsResult, PathObservationEpoch),
+        LoadedModuleExtensionDefinitionsObservationError,
+    >,
+>;
+
+#[derive(Clone, Copy)]
+enum LoadedModuleExtensionDefinitionsMode {
+    Legacy,
+    Observed,
+}
+
+fn loaded_extension_definitions_driver_complete(
+    value: Result<HostLoadedModuleExtensionDefinitions, HostLoadedModuleExtensionDefinitionsError>,
+    observations: PathObservationEpoch,
+) -> LoadedModuleExtensionDefinitionsDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(value), observations)))
+}
+
+async fn loaded_extension_definition_requests(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    mode: LoadedModuleExtensionDefinitionsMode,
+) -> Result<
+    (
+        Arc<
+            Result<
+                HostSelectedExtensionDefinitionLoadRequests,
+                HostSelectedExtensionDefinitionLoadRequestsError,
+            >,
+        >,
+        PathObservationEpoch,
+    ),
+    LoadedModuleExtensionDefinitionsDriverOutcome,
+> {
+    match mode {
+        LoadedModuleExtensionDefinitionsMode::Legacy => match ctx
             .compute(&HostSelectedExtensionDefinitionLoadRequestsKey::new(
-                self.workspace.dupe(),
+                workspace.dupe(),
             ))
             .await
         {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
+            Err(error) => Err(loaded_extension_definitions_driver_complete(
+                Err(HostLoadedModuleExtensionDefinitionsError::RequestsCompute(
+                    error.to_string().into(),
+                )),
+                PathObservationEpoch::empty(),
+            )),
+            Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
+            Ok(SourcePreparationOutcome::Complete(result)) => {
+                Ok((result, PathObservationEpoch::empty()))
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(value) => Arc::new(value.clone()),
-                Err(error) => {
-                    return loaded_extension_definitions_complete(Err(
-                        HostLoadedModuleExtensionDefinitionsError::Requests(error.clone()),
-                    ));
+        },
+        LoadedModuleExtensionDefinitionsMode::Observed => match ctx
+            .compute(
+                &HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(workspace.dupe()),
+            )
+            .await
+        {
+            Err(error) => Err(loaded_extension_definitions_driver_complete(
+                Err(HostLoadedModuleExtensionDefinitionsError::RequestsCompute(
+                    error.to_string().into(),
+                )),
+                PathObservationEpoch::empty(),
+            )),
+            Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                Err(SourcePreparationOutcome::Complete(Err(
+                    LoadedModuleExtensionDefinitionsObservationError::Requests(error),
+                )))
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                Ok((observed.result().dupe(), observed.observations().dupe()))
+            }
+        },
+    }
+}
+
+async fn loaded_extension_definition_bzl(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    label: HostRootBzlLabel,
+    mode: LoadedModuleExtensionDefinitionsMode,
+) -> Result<
+    (HostBzlModuleCarrier, PathObservationEpoch),
+    SourcePreparationOutcome<ObservedPathFrontierError>,
+> {
+    match mode {
+        LoadedModuleExtensionDefinitionsMode::Legacy => {
+            match host_dice_invariant(
+                ctx.compute(&HostBzlModuleEvalKey::new(workspace.dupe(), label))
+                    .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => Err(SourcePreparationOutcome::Need(need)),
+                SourcePreparationOutcome::Complete(result) => {
+                    Ok((result, PathObservationEpoch::empty()))
                 }
+            }
+        }
+        LoadedModuleExtensionDefinitionsMode::Observed => {
+            match host_dice_invariant(
+                ctx.compute(&HostBzlModuleObservationKey::new(workspace.dupe(), label))
+                    .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => Err(SourcePreparationOutcome::Need(need)),
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    Err(SourcePreparationOutcome::Complete(error))
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => {
+                    Ok((observed.result.dupe(), observed.observations().dupe()))
+                }
+            }
+        }
+    }
+}
+
+fn finish_loaded_extension_definition_observed_child(
+    requests: &Arc<HostSelectedExtensionDefinitionLoadRequests>,
+    request: &HostSelectedExtensionDefinitionLoadRequest,
+    current: PathObservationEpoch,
+    child: SourcePreparationOutcome<
+        Result<(HostBzlModuleCarrier, PathObservationEpoch), ObservedPathFrontierError>,
+    >,
+) -> Result<
+    (HostBzlModuleCarrier, PathObservationEpoch),
+    LoadedModuleExtensionDefinitionsDriverOutcome,
+> {
+    let (carrier, incoming) = match child {
+        SourcePreparationOutcome::Need(need) => return Err(SourcePreparationOutcome::Need(need)),
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            return Err(SourcePreparationOutcome::Complete(Err(
+                LoadedModuleExtensionDefinitionsObservationError::Request {
+                    requests: requests.dupe(),
+                    request: request.clone(),
+                    stage: LoadedModuleExtensionDefinitionsObservationStage::Bzl,
+                    error,
+                },
+            )));
+        }
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+    };
+    let observations = union_host_observations(&current, &incoming).map_err(|error| {
+        SourcePreparationOutcome::Complete(Err(
+            LoadedModuleExtensionDefinitionsObservationError::Request {
+                requests: requests.dupe(),
+                request: request.clone(),
+                stage: LoadedModuleExtensionDefinitionsObservationStage::Merge,
+                error,
             },
+        ))
+    })?;
+    Ok((carrier, observations))
+}
+
+async fn drive_loaded_extension_definitions(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostLoadedModuleExtensionDefinitionsKey,
+    mode: LoadedModuleExtensionDefinitionsMode,
+) -> LoadedModuleExtensionDefinitionsDriverOutcome {
+    let (requests_result, mut observations) =
+        match loaded_extension_definition_requests(ctx, &key.workspace, mode).await {
+            Ok(value) => value,
+            Err(terminal) => return terminal,
+        };
+    let requests = match requests_result.as_ref() {
+        Ok(requests) => Arc::new(requests.clone()),
+        Err(error) => {
+            return loaded_extension_definitions_driver_complete(
+                Err(HostLoadedModuleExtensionDefinitionsError::Requests(
+                    error.clone(),
+                )),
+                observations,
+            );
+        }
+    };
+    drop(requests_result);
+
+    let mut definitions = Vec::new();
+    for request in requests.parts().1 {
+        let (label, export, _, _) = request.parts();
+        let target = match RootPackageBzlTarget::parse(label.target().as_str()) {
+            Ok(target) => target,
             Err(error) => {
-                return loaded_extension_definitions_complete(Err(
-                    HostLoadedModuleExtensionDefinitionsError::RequestsCompute(
-                        error.to_string().into(),
-                    ),
-                ));
+                return loaded_extension_definitions_driver_complete(
+                    Err(HostLoadedModuleExtensionDefinitionsError::Request {
+                        requests: requests.clone(),
+                        request: request.clone(),
+                        error: HostLoadedModuleExtensionDefinitionError::Label {
+                            label: label.clone(),
+                            message: error.to_string().into(),
+                        },
+                    }),
+                    observations,
+                );
             }
         };
-
-        let mut definitions = Vec::new();
-        for request in requests.parts().1 {
-            let (label, export, _, _) = request.parts();
-            let target = match RootPackageBzlTarget::parse(label.target().as_str()) {
-                Ok(target) => target,
-                Err(error) => {
-                    return loaded_extension_definitions_complete(Err(
-                        HostLoadedModuleExtensionDefinitionsError::Request {
-                            requests: requests.clone(),
-                            request: request.clone(),
-                            error: HostLoadedModuleExtensionDefinitionError::Label {
-                                label: label.clone(),
-                                message: error.to_string().into(),
-                            },
+        let child = match loaded_extension_definition_bzl(
+            ctx,
+            &key.workspace,
+            HostRootBzlLabel::new(label.package().package().clone(), target),
+            mode,
+        )
+        .await
+        {
+            Ok(value) => SourcePreparationOutcome::Complete(Ok(value)),
+            Err(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Err(SourcePreparationOutcome::Complete(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+        };
+        let (module_result, merged) = match finish_loaded_extension_definition_observed_child(
+            &requests,
+            request,
+            observations,
+            child,
+        ) {
+            Ok(observations) => observations,
+            Err(terminal) => return terminal,
+        };
+        observations = merged;
+        let module = match module_result.as_ref() {
+            Ok(module) => module.clone(),
+            Err(error) => {
+                return loaded_extension_definitions_driver_complete(
+                    Err(HostLoadedModuleExtensionDefinitionsError::Request {
+                        requests: requests.clone(),
+                        request: request.clone(),
+                        error: HostLoadedModuleExtensionDefinitionError::Bzl {
+                            label: label.clone(),
+                            error: error.clone(),
                         },
-                    ));
-                }
-            };
-            let host_label = HostRootBzlLabel::new(label.package().package().clone(), target);
-            let module = match host_dice_invariant(
-                ctx.compute(&HostBzlModuleEvalKey::new(
-                    self.workspace.dupe(),
-                    host_label,
-                ))
-                .await,
-            ) {
-                SourcePreparationOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                SourcePreparationOutcome::Complete(value) => match value.as_ref() {
-                    Ok(module) => module.clone(),
-                    Err(error) => {
-                        return loaded_extension_definitions_complete(Err(
-                            HostLoadedModuleExtensionDefinitionsError::Request {
-                                requests: requests.clone(),
-                                request: request.clone(),
-                                error: HostLoadedModuleExtensionDefinitionError::Bzl {
-                                    label: label.clone(),
-                                    error: error.clone(),
-                                },
-                            },
-                        ));
-                    }
-                },
-            };
-            let exported = match module.module.get(export) {
-                Ok(value) => value,
-                Err(error) => {
-                    return loaded_extension_definitions_complete(Err(
-                        HostLoadedModuleExtensionDefinitionsError::Request {
-                            requests: requests.clone(),
-                            request: request.clone(),
-                            error: HostLoadedModuleExtensionDefinitionError::Export {
-                                label: label.clone(),
-                                name: export.into(),
-                                message: error.to_string().into(),
-                            },
+                    }),
+                    observations,
+                );
+            }
+        };
+        let exported = match module.module.get(export) {
+            Ok(value) => value,
+            Err(error) => {
+                return loaded_extension_definitions_driver_complete(
+                    Err(HostLoadedModuleExtensionDefinitionsError::Request {
+                        requests: requests.clone(),
+                        request: request.clone(),
+                        error: HostLoadedModuleExtensionDefinitionError::Export {
+                            label: label.clone(),
+                            name: export.into(),
+                            message: error.to_string().into(),
                         },
-                    ));
-                }
-            };
-            let exported = match exported.downcast::<FrozenModuleExtensionDefinition>() {
-                Ok(value) => value,
-                Err(_) => {
-                    return loaded_extension_definitions_complete(Err(
-                        HostLoadedModuleExtensionDefinitionsError::Request {
-                            requests: requests.clone(),
-                            request: request.clone(),
-                            error: HostLoadedModuleExtensionDefinitionError::WrongKind {
-                                label: label.clone(),
-                                name: export.into(),
-                            },
+                    }),
+                    observations,
+                );
+            }
+        };
+        let exported = match exported.downcast::<FrozenModuleExtensionDefinition>() {
+            Ok(value) => value,
+            Err(_) => {
+                return loaded_extension_definitions_driver_complete(
+                    Err(HostLoadedModuleExtensionDefinitionsError::Request {
+                        requests: requests.clone(),
+                        request: request.clone(),
+                        error: HostLoadedModuleExtensionDefinitionError::WrongKind {
+                            label: label.clone(),
+                            name: export.into(),
                         },
-                    ));
-                }
-            };
-            definitions.push(HostLoadedModuleExtensionDefinition {
-                request: request.clone(),
-                manifest: module.manifest.clone(),
-                definition: exported.projection(),
-            });
-        }
-        loaded_extension_definitions_complete(Ok(HostLoadedModuleExtensionDefinitions {
+                    }),
+                    observations,
+                );
+            }
+        };
+        definitions.push(HostLoadedModuleExtensionDefinition {
+            request: request.clone(),
+            manifest: module.manifest.clone(),
+            definition: exported.projection(),
+        });
+    }
+    loaded_extension_definitions_driver_complete(
+        Ok(HostLoadedModuleExtensionDefinitions {
             requests,
             definitions: definitions.into(),
-        }))
+        }),
+        observations,
+    )
+}
+
+fn project_legacy_loaded_extension_definitions(
+    outcome: LoadedModuleExtensionDefinitionsDriverOutcome,
+) -> HostLoadedModuleExtensionDefinitionsOutcome {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+            debug_assert!(observations.observations().is_empty());
+            SourcePreparationOutcome::Complete(result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy loaded module extension definitions have no observed frontier")
+        }
+    }
+}
+
+#[async_trait]
+impl Key for HostLoadedModuleExtensionDefinitionsObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostLoadedModuleExtensionDefinitions,
+            LoadedModuleExtensionDefinitionsObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match drive_loaded_extension_definitions(
+            ctx,
+            &self.0,
+            LoadedModuleExtensionDefinitionsMode::Observed,
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(
+                    ObservedHostLoadedModuleExtensionDefinitions {
+                        result,
+                        observations,
+                    },
+                ))
+            }
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -2579,7 +2869,6 @@ impl Key for HostLoadedModuleExtensionDefinitionsKey {
         value.is_complete()
     }
 }
-
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct PreparedModuleExtensionTag {
     pub(crate) tag_class: CompactString,
@@ -5162,6 +5451,9 @@ mod host_package_load_tests;
 
 #[cfg(test)]
 mod module_extension_definition_loading_tests {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hash;
+    use std::hash::Hasher;
     use std::sync::Mutex;
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
@@ -5181,12 +5473,15 @@ mod module_extension_definition_loading_tests {
     use slug_bzlmod_v2::RegistryUrls;
     use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
     use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
+    use slug_bzlmod_v2::RootModuleCommandPolicyKey;
+    use slug_bzlmod_v2::RootModuleEnvironmentPolicyKey;
     use slug_bzlmod_v2::RootPackagePolicyInputs;
     use slug_events_v2::EventBatch;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
     use slug_workspace_v2::PathObservationDemand;
     use slug_workspace_v2::PathObservationEpoch;
+    use slug_workspace_v2::PathObservationEpochError;
     use slug_workspace_v2::PathObservationEpochKey;
     use slug_workspace_v2::PathObservationNamespace;
     use slug_workspace_v2::PathObservationOperation;
@@ -5213,9 +5508,46 @@ mod module_extension_definition_loading_tests {
         observed: bool,
     }
 
+    #[derive(Debug, Clone)]
+    struct BzlActivationRow {
+        key: String,
+        family: BzlTrackerFamily,
+        kind: ActivationKind,
+        batch: Option<EventBatch>,
+    }
+
+    #[derive(Debug, Clone)]
+    struct BzlDependencyRow {
+        key: String,
+        family: BzlTrackerFamily,
+        dependencies: Vec<String>,
+        dependency_families: Vec<BzlTrackerFamily>,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum BzlTrackerFamily {
+        Other,
+        BzlmodCommandPolicy,
+        BzlmodEnvironmentPolicy,
+    }
+
+    fn tracker_family(key: &DynKey) -> BzlTrackerFamily {
+        if key.downcast_ref::<RootModuleCommandPolicyKey>().is_some() {
+            BzlTrackerFamily::BzlmodCommandPolicy
+        } else if key
+            .downcast_ref::<RootModuleEnvironmentPolicyKey>()
+            .is_some()
+        {
+            BzlTrackerFamily::BzlmodEnvironmentPolicy
+        } else {
+            BzlTrackerFamily::Other
+        }
+    }
     #[derive(Default)]
     struct BzlEventTracker {
         events: Mutex<Vec<BzlActivation>>,
+        activation_rows: Mutex<Vec<BzlActivationRow>>,
+        dependency_rows: Mutex<Vec<BzlDependencyRow>>,
         legacy_modules: AtomicUsize,
         observed_modules: AtomicUsize,
         legacy_sources: AtomicUsize,
@@ -5225,6 +5557,37 @@ mod module_extension_definition_loading_tests {
     impl BzlEventTracker {
         fn take(&self) -> Vec<BzlActivation> {
             std::mem::take(&mut *self.events.lock().unwrap())
+        }
+
+        fn take_rows(&self) -> (Vec<BzlActivationRow>, Vec<BzlDependencyRow>) {
+            (
+                std::mem::take(&mut *self.activation_rows.lock().unwrap()),
+                std::mem::take(&mut *self.dependency_rows.lock().unwrap()),
+            )
+        }
+
+        fn assert_reused_loaded_bzl_result_arcs(
+            rows: &[BzlActivationRow],
+            before: &ObservedLoadedHandles,
+            after: &ObservedLoadedHandles,
+        ) {
+            for (name, previous, current) in [
+                ("ext.bzl", &before.ext, &after.ext),
+                ("child.bzl", &before.child, &after.child),
+                ("other.bzl", &before.other, &after.other),
+            ] {
+                let key = HostBzlModuleObservationKey::new(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    observed_test_label(name),
+                )
+                .to_string();
+                if rows
+                    .iter()
+                    .any(|row| row.key == key && row.kind == ActivationKind::Reused)
+                {
+                    assert!(Arc::ptr_eq(previous, current));
+                }
+            }
         }
 
         fn take_empty_observed_batches(&self, only: Option<&CanonicalLabel>) -> bool {
@@ -5244,10 +5607,19 @@ mod module_extension_definition_loading_tests {
     impl ActivationTracker for BzlEventTracker {
         fn key_activated(
             &self,
-            _: &DynKey,
-            _: &mut dyn Iterator<Item = &DynKey>,
+            key: &DynKey,
+            dependencies: &mut dyn Iterator<Item = &DynKey>,
             _: ActivationData,
         ) {
+            let dependencies = dependencies
+                .map(|dependency| (dependency.to_string(), tracker_family(dependency)))
+                .collect::<Vec<_>>();
+            self.dependency_rows.lock().unwrap().push(BzlDependencyRow {
+                key: key.to_string(),
+                family: tracker_family(key),
+                dependencies: dependencies.iter().map(|(key, _)| key.clone()).collect(),
+                dependency_families: dependencies.iter().map(|(_, family)| *family).collect(),
+            });
         }
 
         fn tracks_rich_activations(&self) -> bool {
@@ -5261,6 +5633,12 @@ mod module_extension_definition_loading_tests {
                     .and_then(|data| data.downcast_ref::<EventBatch>())
                     .map(Dupe::dupe)
             };
+            self.activation_rows.lock().unwrap().push(BzlActivationRow {
+                key: key.to_string(),
+                family: tracker_family(key),
+                kind: activation.kind(),
+                batch: batch(),
+            });
             if let Some(key) = key.downcast_ref::<HostBzlModuleEvalKey>() {
                 self.legacy_modules.fetch_add(1, Ordering::SeqCst);
                 self.events.lock().unwrap().push(BzlActivation {
@@ -5529,7 +5907,7 @@ mod module_extension_definition_loading_tests {
                     )
                 })
                 .chain(
-                    ["REPO.bazel", ".bazelignore", "BUILD"]
+                    ["REPO.bazel", ".bazelignore", "BUILD", "MODULE.bazel.lock"]
                         .into_iter()
                         .map(|name| {
                             (
@@ -5559,7 +5937,7 @@ mod module_extension_definition_loading_tests {
                     ))),
                 )))
                 .chain(
-                    ["ext.bzl", "child.bzl", "other.bzl"]
+                    ["MODULE.bazel", "ext.bzl", "child.bzl", "other.bzl"]
                         .into_iter()
                         .enumerate()
                         .map(|(index, name)| {
@@ -5589,6 +5967,7 @@ mod module_extension_definition_loading_tests {
                 )
                 .chain(
                     [
+                        ("MODULE.bazel", module_source.as_bytes()),
                         ("ext.bzl", extension_source.as_bytes()),
                         ("child.bzl", child_source.as_bytes()),
                         ("other.bzl", other_source.as_bytes()),
@@ -5682,7 +6061,10 @@ mod module_extension_definition_loading_tests {
             panic!("absence is complete")
         };
         assert!(absent.as_ref().as_ref().unwrap().definitions.is_empty());
-        assert!(tracker.take().is_empty());
+        assert!(tracker.take().iter().all(|activation| {
+            !activation.observed
+                || activation.kind == ActivationKind::Reused && activation.batch.is_none()
+        }));
 
         let module = "module(name='bazel_tools')\n\
             b=use_extension('//:other.bzl','other')\n\
@@ -6518,7 +6900,7 @@ mod module_extension_definition_loading_tests {
     ) -> DiceTransaction {
         let mut data = host_bzl_user_data(
             crate::cycle_detector::bzl_load_cycle_detector(),
-            Some(tracker),
+            Some(tracker.clone()),
         );
         if force_freeze {
             data.data.set(ForceHostBzlFreezeFailure);
@@ -6860,6 +7242,1030 @@ mod module_extension_definition_loading_tests {
             observed_module(&recovered).result(),
             Err(error) if error.cycle().is_some()
         ));
+    }
+    async fn compute_observed_loaded(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        child_source: &str,
+        child_present: bool,
+        tracker: Option<Arc<BzlEventTracker>>,
+    ) -> <HostLoadedModuleExtensionDefinitionsObservationKey as Key>::Value {
+        case_transaction(
+            dice,
+            module_source,
+            extension_source,
+            child_source,
+            child_present,
+            tracker,
+        )
+        .await
+        .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        ))
+        .await
+        .unwrap()
+    }
+
+    fn observed_loaded(
+        value: &<HostLoadedModuleExtensionDefinitionsObservationKey as Key>::Value,
+    ) -> &ObservedHostLoadedModuleExtensionDefinitions {
+        let SourcePreparationOutcome::Complete(Ok(value)) = value else {
+            panic!("observed loaded definitions must complete with a carrier: {value:?}");
+        };
+        value
+    }
+
+    #[derive(Clone)]
+    struct ObservedLoadedHandles {
+        parent: LoadedModuleExtensionDefinitionsResult,
+        parent_epoch: PathObservationEpoch,
+        request: Arc<
+            Result<
+                HostSelectedExtensionDefinitionLoadRequests,
+                HostSelectedExtensionDefinitionLoadRequestsError,
+            >,
+        >,
+        request_epoch: PathObservationEpoch,
+        ext: Arc<Result<FrozenBzlModule, HostBzlModuleError>>,
+        ext_epoch: PathObservationEpoch,
+        child: Arc<Result<FrozenBzlModule, HostBzlModuleError>>,
+        child_epoch: PathObservationEpoch,
+        other: Arc<Result<FrozenBzlModule, HostBzlModuleError>>,
+        other_epoch: PathObservationEpoch,
+        projection: Arc<[(BzlLoadManifest, ModuleExtensionDefinitionProjection)]>,
+        global_epoch: PathObservationEpoch,
+    }
+
+    async fn observed_loaded_handles(
+        dice: &Arc<Dice>,
+        module: &str,
+        ext: &str,
+        child: &str,
+        other: &str,
+        tracker: Option<Arc<BzlEventTracker>>,
+    ) -> ObservedLoadedHandles {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let mut transaction =
+            case_transaction_with_other(dice, module, ext, child, other, true, tracker).await;
+        let global_epoch = transaction.compute(&PathObservationEpochKey).await.unwrap();
+        let parent = observed_loaded(
+            &transaction
+                .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
+                    workspace.dupe(),
+                ))
+                .await
+                .unwrap(),
+        )
+        .dupe();
+        let request = transaction
+            .compute(
+                &HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(workspace.dupe()),
+            )
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(request)) = request else {
+            panic!("observed definition requests must complete: {request:?}");
+        };
+        let ext = compute_observed_module(&mut transaction, "ext.bzl").await;
+        let ext_value = observed_module(&ext).dupe();
+        let child = compute_observed_module(&mut transaction, "child.bzl").await;
+        let child_value = observed_module(&child).dupe();
+        let other = compute_observed_module(&mut transaction, "other.bzl").await;
+        let other_value = observed_module(&other).dupe();
+        let projection = Arc::from(
+            parent
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .definitions
+                .iter()
+                .map(|definition| (definition.manifest.clone(), definition.definition.clone()))
+                .collect::<Vec<_>>(),
+        );
+        ObservedLoadedHandles {
+            parent: parent.result().dupe(),
+            parent_epoch: parent.observations().dupe(),
+            request: request.result().dupe(),
+            request_epoch: request.observations().dupe(),
+            ext: ext_value.result.dupe(),
+            ext_epoch: ext_value.observations().dupe(),
+            child: child_value.result.dupe(),
+            child_epoch: child_value.observations().dupe(),
+            other: other_value.result.dupe(),
+            other_epoch: other_value.observations().dupe(),
+            projection,
+            global_epoch,
+        }
+    }
+
+    fn assert_held_observed_loaded_handles(
+        handles: &ObservedLoadedHandles,
+        retained: &ObservedLoadedHandles,
+    ) {
+        assert!(handles.parent.as_ref().is_ok() && retained.parent.as_ref().is_ok());
+        assert!(handles.request.as_ref().is_ok() && retained.request.as_ref().is_ok());
+        assert!(handles.ext.as_ref().is_ok() && retained.ext.as_ref().is_ok());
+        assert!(handles.child.as_ref().is_ok() && retained.child.as_ref().is_ok());
+        assert!(handles.other.as_ref().is_ok() && retained.other.as_ref().is_ok());
+        assert!(Arc::ptr_eq(&handles.parent, &retained.parent));
+        assert!(Arc::ptr_eq(&handles.request, &retained.request));
+        assert!(Arc::ptr_eq(&handles.ext, &retained.ext));
+        assert!(Arc::ptr_eq(&handles.child, &retained.child));
+        assert!(Arc::ptr_eq(&handles.other, &retained.other));
+        assert_eq!(
+            handles.projection.as_ref(),
+            handles
+                .parent
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .definitions
+                .iter()
+                .map(|definition| (definition.manifest.clone(), definition.definition.clone()))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(handles.parent_epoch, retained.parent_epoch);
+        assert_eq!(handles.request_epoch, retained.request_epoch);
+        assert_eq!(handles.ext_epoch, retained.ext_epoch);
+        assert_eq!(handles.child_epoch, retained.child_epoch);
+        assert_eq!(handles.other_epoch, retained.other_epoch);
+    }
+
+    fn assert_transaction_epoch_subsets(handles: &ObservedLoadedHandles) {
+        for epoch in [
+            &handles.parent_epoch,
+            &handles.request_epoch,
+            &handles.ext_epoch,
+            &handles.child_epoch,
+            &handles.other_epoch,
+        ] {
+            for (demand, result) in epoch.observations() {
+                assert_eq!(
+                    result.as_ref(),
+                    handles.global_epoch.get(demand).unwrap().as_ref()
+                );
+            }
+        }
+    }
+
+    async fn assert_loaded_warm(
+        dice: &Arc<Dice>,
+        root: &str,
+        ext: &str,
+        child: &str,
+        other: &str,
+        tracker: &Arc<BzlEventTracker>,
+        recovered: &ObservedLoadedHandles,
+    ) {
+        tracker.take();
+        tracker.take_rows();
+        let warm_parent =
+            compute_observed_loaded(dice, root, ext, child, true, Some(tracker.clone())).await;
+        assert_eq!(
+            recovered.parent.as_ref(),
+            observed_loaded(&warm_parent).result().as_ref()
+        );
+        assert!(tracker.take().is_empty());
+        let (parent_rows, _) = tracker.take_rows();
+        assert!(
+            !parent_rows
+                .iter()
+                .any(|row| row.key.starts_with("observed-host-bzl-module:"))
+        );
+        let warm =
+            observed_loaded_handles(dice, root, ext, child, other, Some(tracker.clone())).await;
+        assert_eq!(recovered.parent, warm.parent);
+        assert_eq!(recovered.request, warm.request);
+        assert_eq!(recovered.ext, warm.ext);
+        assert_eq!(recovered.child, warm.child);
+        assert_eq!(recovered.other, warm.other);
+        assert_eq!(recovered.projection, warm.projection);
+        assert_transaction_epoch_subsets(&warm);
+        assert!(tracker.take().iter().all(|activation| {
+            activation.observed
+                && activation.kind == ActivationKind::Reused
+                && activation.batch.is_none()
+        }));
+        let (activations, dependencies) = tracker.take_rows();
+        assert!(
+            activations
+                .iter()
+                .all(|row| row.kind == ActivationKind::Reused && row.batch.is_none())
+        );
+        assert!(dependencies.is_empty());
+        BzlEventTracker::assert_reused_loaded_bzl_result_arcs(&activations, recovered, &warm);
+    }
+
+    fn loaded_test_source(name: &str) -> String {
+        format!(
+            "{}def implementation(ctx):\n    pass\next=module_extension(implementation=implementation,environ=['{name}'])\n",
+            if name.is_empty() {
+                String::new()
+            } else {
+                format!("print('{name}')\n")
+            }
+        )
+    }
+
+    async fn assert_observed_bzl_batches(
+        key: &HostLoadedModuleExtensionDefinitionsObservationKey,
+        labels: &[&str; 3],
+        module: impl Fn(&[&str], Option<&str>) -> String,
+        rows: &[BzlActivationRow],
+        dependencies: &[BzlDependencyRow],
+    ) {
+        let admitted = |key: &str, family: BzlTrackerFamily| {
+            matches!(family, BzlTrackerFamily::BzlmodCommandPolicy | BzlTrackerFamily::BzlmodEnvironmentPolicy)
+            || "root-module-command-policy: root-module-environment-policy: root-module-lockfile-mode: visible-lockfile: host-visible-lockfile:".split_whitespace().any(|prefix| key.starts_with(prefix))
+            || !"host-selected-extension-definition-load-requests: host-bzl-module: host-loaded-module-extension-definitions: host-prepared-module-extension-inputs: host-pure-module-extension-invocations: host-instantiated-module-extension-repositories: host-validated-module-extension-repositories: host-root-repository-mapping: host-canonical-selected-module-definition: host-generated-repository-definition: slug-command:".split_whitespace().any(|prefix| key.starts_with(prefix))
+        };
+        let bzl = rows
+            .iter()
+            .filter(|row| row.key.starts_with("observed-host-bzl-module:"))
+            .collect::<Vec<_>>();
+        assert_eq!(bzl.len(), labels.len(), "{bzl:?}");
+        for ((row, label), print) in bzl
+            .iter()
+            .zip(labels)
+            .zip([Some("A"), Some("B"), Some("C")])
+        {
+            assert!(
+                row.key.ends_with(&format!("//:{label}")) && row.kind == ActivationKind::Evaluated,
+                "{row:?}"
+            );
+            assert!(matches!(
+                row.batch.as_ref().map(EventBatch::events),
+                Some([slug_events_v2::EvaluationEvent::StarlarkPrint { text: actual, .. }])
+                    if actual == print.unwrap()
+            ));
+        }
+        let parent = dependencies
+            .iter()
+            .find(|row| row.key == key.to_string())
+            .unwrap();
+        assert!(
+            rows.iter()
+                .filter(|row| row.key == key.to_string()
+                    || row
+                        .key
+                        .starts_with("observed-host-selected-extension-definition-load-requests:"))
+                .all(|row| row.batch.is_none())
+        );
+        assert!(!rows.iter().any(|row| {
+            row.key
+                .starts_with("host-selected-extension-definition-load-requests:")
+                || row.key.starts_with("host-bzl-module:")
+        }));
+        assert!(
+            parent.dependencies[0]
+                .starts_with("observed-host-selected-extension-definition-load-requests")
+        );
+        assert_eq!(
+            parent
+                .dependencies
+                .iter()
+                .filter(|row| row.starts_with("observed-host-bzl-module"))
+                .map(|row| row.rsplit(':').next().unwrap())
+                .collect::<Vec<_>>(),
+            labels
+        );
+        assert!(rows.iter().all(|row| admitted(&row.key, row.family)));
+        assert!(dependencies.iter().all(|row| {
+            admitted(&row.key, row.family)
+                && row
+                    .dependencies
+                    .iter()
+                    .zip(&row.dependency_families)
+                    .all(|(key, family)| admitted(key, *family))
+        }));
+        for position in 0..3 {
+            for (kind, source) in [
+                ("Bzl", "print('before')\nfail('boom')\n".to_owned()),
+                ("Export", loaded_test_source("")),
+                ("WrongKind", "ext=1\n".to_owned()),
+            ] {
+                let order = [
+                    [labels[0], labels[1], labels[2]],
+                    [labels[2], labels[1], labels[0]],
+                    [labels[1], labels[0], labels[2]],
+                ][position];
+                let mut inputs = [
+                    loaded_test_source(""),
+                    loaded_test_source(""),
+                    loaded_test_source(""),
+                ];
+                inputs[position] = source;
+                let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+                let tracker = Arc::new(BzlEventTracker::default());
+                let mut transaction = case_transaction_with_other(
+                    &dice,
+                    &module(&order, (kind == "Export").then_some(labels[position])),
+                    &inputs[0],
+                    &inputs[2],
+                    &inputs[1],
+                    true,
+                    Some(tracker.clone()),
+                )
+                .await;
+                let epoch = transaction.compute(&PathObservationEpochKey).await.unwrap();
+                let outcome = transaction.compute(key).await.unwrap();
+                let result = observed_loaded(&outcome);
+                let error = result.result().as_ref().as_ref().unwrap_err();
+                let HostLoadedModuleExtensionDefinitionsError::Request { request, .. } = error
+                else {
+                    panic!("wrong terminal: {error:?}")
+                };
+                assert_eq!(request.parts().0.target().as_str(), labels[position]);
+                match (kind, error) {
+                    (
+                        "Bzl",
+                        HostLoadedModuleExtensionDefinitionsError::Request {
+                            error: HostLoadedModuleExtensionDefinitionError::Bzl { label, .. },
+                            ..
+                        },
+                    ) => assert_eq!(label.target().as_str(), labels[position]),
+                    (
+                        "Export",
+                        HostLoadedModuleExtensionDefinitionsError::Request {
+                            error:
+                                HostLoadedModuleExtensionDefinitionError::Export { label, name, .. },
+                            ..
+                        },
+                    ) => assert_eq!(
+                        (label.target().as_str(), name.as_str()),
+                        (labels[position], "missing")
+                    ),
+                    (
+                        "WrongKind",
+                        HostLoadedModuleExtensionDefinitionsError::Request {
+                            error:
+                                HostLoadedModuleExtensionDefinitionError::WrongKind { label, name },
+                            ..
+                        },
+                    ) => assert_eq!(
+                        (label.target().as_str(), name.as_str()),
+                        (labels[position], "ext")
+                    ),
+                    _ => panic!("wrong terminal: {error:?}"),
+                }
+                for (expected, targets) in
+                    [(true, &order[..=position]), (false, &order[position + 1..])]
+                {
+                    assert!(targets.iter().all(|label| {
+                        result.observations().observations().keys().any(|demand| {
+                            demand.operation() == PathObservationOperation::FileBytes
+                                && demand.path().as_path().ends_with(label)
+                        }) == expected
+                    }));
+                }
+                assert!(result.observations().observations().iter().all(
+                    |(demand, observation)| Arc::ptr_eq(observation, epoch.get(demand).unwrap())
+                ));
+                let (rows, dependencies) = tracker.take_rows();
+                let bzl = rows
+                    .iter()
+                    .filter(|row| row.key.starts_with("observed-host-bzl-module:"))
+                    .collect::<Vec<_>>();
+                assert_eq!(bzl.len(), position + 1);
+                for (index, row) in bzl.iter().enumerate() {
+                    assert!(
+                        row.key.ends_with(&format!("//:{}", order[index]))
+                            && row.kind == ActivationKind::Evaluated
+                    );
+                    if kind == "Bzl" && index == position {
+                        assert!(
+                            matches!(row.batch.as_ref().map(EventBatch::events), Some([slug_events_v2::EvaluationEvent::StarlarkPrint { text, .. }]) if text == "before")
+                        );
+                    } else {
+                        assert!(
+                            row.batch
+                                .as_ref()
+                                .is_none_or(|batch| batch.events().is_empty())
+                        );
+                    }
+                }
+                assert!(
+                    rows.iter()
+                        .filter(|row| row.key == key.to_string()
+                            || row.key.starts_with(
+                                "observed-host-selected-extension-definition-load-requests:"
+                            ))
+                        .all(|row| row.batch.is_none())
+                );
+                assert!(rows.iter().all(|row| admitted(&row.key, row.family)));
+                assert!(dependencies.iter().all(|row| {
+                    admitted(&row.key, row.family)
+                        && row
+                            .dependencies
+                            .iter()
+                            .zip(&row.dependency_families)
+                            .all(|(key, family)| admitted(key, *family))
+                }));
+            }
+        }
+    }
+
+    async fn compute_observed_loaded_with_other(
+        dice: &Arc<Dice>,
+        module: &str,
+        ext: &str,
+        child: &str,
+        other: &str,
+        tracker: Arc<BzlEventTracker>,
+    ) -> <HostLoadedModuleExtensionDefinitionsObservationKey as Key>::Value {
+        case_transaction_with_other(dice, module, ext, child, other, true, Some(tracker))
+            .await
+            .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap()
+    }
+
+    fn assert_loaded_definition_production_slice_has_no_upper_keys() {
+        let source = include_str!("bzl_module.rs");
+        let start = source
+            .find("type HostLoadedModuleExtensionDefinitionsOutcome")
+            .unwrap();
+        let end = source
+            .find("pub(crate) struct HostPreparedModuleExtensionInputsKey")
+            .unwrap();
+        let slice = &source[start..end];
+        for key in [
+            "HostPreparedModuleExtensionInputsKey",
+            "HostPureModuleExtensionInvocationsKey",
+            "HostInstantiatedModuleExtensionRepositoriesKey",
+            "HostValidatedModuleExtensionRepositoriesKey",
+            "HostRootRepositoryMappingKey",
+            "HostCanonicalSelectedModuleDefinitionKey",
+            "HostGeneratedRepositoryDefinitionKey",
+        ] {
+            assert!(!slice.contains(key), "unexpected upper key: {key}");
+        }
+    }
+
+    #[tokio::test]
+    async fn observed_loaded_real_order_terminals_events_and_parity() {
+        let labels = ["ext.bzl", "other.bzl", "child.bzl"];
+        let module = |order: &[&str], missing: Option<&str>| {
+            format!(
+                "module(name='bazel_tools')\n{}",
+                order
+                    .iter()
+                    .enumerate()
+                    .map(|(i, label)| format!(
+                        "e{i}=use_extension('//:{label}','{}')\n",
+                        if missing == Some(*label) {
+                            "missing"
+                        } else {
+                            "ext"
+                        }
+                    ))
+                    .collect::<String>()
+            )
+        };
+        let sources = [
+            loaded_test_source("A"),
+            loaded_test_source("B"),
+            loaded_test_source("C"),
+        ];
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostLoadedModuleExtensionDefinitionsObservationKey::new(workspace.dupe());
+        assert_eq!(
+            key.to_string(),
+            "observed-host-loaded-module-extension-definitions:\"/extension-definition-loading\""
+        );
+        assert_ne!(
+            key,
+            HostLoadedModuleExtensionDefinitionsObservationKey::new(
+                NormalizedAbsolutePath::new("/other").unwrap()
+            )
+        );
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(BzlEventTracker::default());
+        let request_module = module(&labels, None);
+        let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let legacy_tracker = Arc::new(BzlEventTracker::default());
+        let mut legacy_transaction = case_transaction_with_other(
+            &legacy_dice,
+            &request_module,
+            &sources[0],
+            &sources[2],
+            &sources[1],
+            true,
+            Some(legacy_tracker.clone()),
+        )
+        .await;
+        let legacy = legacy_transaction
+            .compute(&HostLoadedModuleExtensionDefinitionsKey::new(
+                workspace.dupe(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(legacy) = legacy else {
+            panic!("legacy definition loading did not complete")
+        };
+        let (legacy_rows, _) = legacy_tracker.take_rows();
+        assert!(legacy_rows.iter().any(|row| {
+            row.key
+                .starts_with("host-selected-extension-definition-load-requests:")
+        }));
+        assert_eq!(
+            legacy_rows
+                .iter()
+                .filter(|row| row.key.starts_with("host-bzl-module:"))
+                .count(),
+            3
+        );
+        assert!(!legacy_rows.iter().any(|row| {
+            row.key
+                .starts_with("observed-host-selected-extension-definition-load-requests:")
+                || row.key.starts_with("observed-host-bzl-module:")
+        }));
+        let mut first_transaction = case_transaction_with_other(
+            &dice,
+            &request_module,
+            &sources[0],
+            &sources[2],
+            &sources[1],
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        let epoch = first_transaction
+            .compute(&PathObservationEpochKey)
+            .await
+            .unwrap();
+        let first = first_transaction.compute(&key).await.unwrap();
+        assert!(
+            HostLoadedModuleExtensionDefinitionsObservationKey::validity(&first),
+            "{first:?}"
+        );
+        let first_value = observed_loaded(&first);
+        assert_eq!(legacy.as_ref(), first_value.result().as_ref());
+        let definitions = first_value.result().as_ref().as_ref().unwrap();
+        assert_eq!(definitions.definitions.len(), 3);
+        assert_eq!(
+            definitions
+                .definitions
+                .iter()
+                .map(|definition| definition.request.parts().0.target().as_str())
+                .collect::<Vec<_>>(),
+            labels
+        );
+        assert!(
+            definitions
+                .definitions
+                .iter()
+                .enumerate()
+                .all(|(index, definition)| definition.manifest
+                    == legacy.as_ref().as_ref().unwrap().definitions[index].manifest
+                    && definition.definition
+                        == legacy.as_ref().as_ref().unwrap().definitions[index].definition)
+        );
+        for (demand, result) in first_value.observations().observations() {
+            assert!(Arc::ptr_eq(result, epoch.get(demand).unwrap()));
+        }
+        assert_eq!(tracker.legacy_modules.load(Ordering::SeqCst), 0);
+        assert_eq!(tracker.legacy_sources.load(Ordering::SeqCst), 0);
+        let (fresh_rows, fresh_dependencies) = tracker.take_rows();
+        assert!(
+            fresh_rows
+                .iter()
+                .any(|row| row.family == BzlTrackerFamily::BzlmodCommandPolicy)
+                || fresh_dependencies.iter().any(|row| {
+                    row.family == BzlTrackerFamily::BzlmodCommandPolicy
+                        || row
+                            .dependency_families
+                            .contains(&BzlTrackerFamily::BzlmodCommandPolicy)
+                })
+        );
+        assert_observed_bzl_batches(&key, &labels, module, &fresh_rows, &fresh_dependencies).await;
+
+        let warm = compute_observed_loaded_with_other(
+            &dice,
+            &request_module,
+            &sources[0],
+            &sources[2],
+            &sources[1],
+            tracker.clone(),
+        )
+        .await;
+        assert!(HostLoadedModuleExtensionDefinitionsObservationKey::equality(&first, &warm));
+        let (warm_rows, _) = tracker.take_rows();
+        assert!(
+            !warm_rows
+                .iter()
+                .any(|row| row.key.starts_with("observed-host-bzl-module"))
+        );
+
+        let changed = compute_observed_loaded_with_other(
+            &dice,
+            &request_module,
+            &loaded_test_source("changed"),
+            &sources[2],
+            &sources[1],
+            tracker.clone(),
+        )
+        .await;
+        let (changed_rows, _) = tracker.take_rows();
+        assert!(
+            changed_rows
+                .iter()
+                .any(|row| row.key.ends_with("//:other.bzl")
+                    && row.kind == ActivationKind::Reused
+                    && row.batch.is_none())
+        );
+        assert!(
+            !changed_rows
+                .iter()
+                .any(|row| row.key.ends_with("//:other.bzl")
+                    && row.kind == ActivationKind::Evaluated)
+        );
+        let restored = compute_observed_loaded_with_other(
+            &dice,
+            &request_module,
+            &sources[0],
+            &sources[2],
+            &sources[1],
+            tracker.clone(),
+        )
+        .await;
+        assert!(!HostLoadedModuleExtensionDefinitionsObservationKey::equality(&first, &changed));
+        assert!(HostLoadedModuleExtensionDefinitionsObservationKey::equality(&first, &restored));
+    }
+    #[tokio::test]
+    async fn observed_loaded_identity_and_finisher_algebra() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(BzlEventTracker::default());
+        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        let extension = source("finisher", 1);
+        let key = HostLoadedModuleExtensionDefinitionsObservationKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        );
+        let other = HostLoadedModuleExtensionDefinitionsObservationKey::new(
+            NormalizedAbsolutePath::new("/other").unwrap(),
+        );
+        let mut left_hash = DefaultHasher::new();
+        let mut right_hash = DefaultHasher::new();
+        key.hash(&mut left_hash);
+        other.hash(&mut right_hash);
+        assert_eq!(
+            key.to_string(),
+            "observed-host-loaded-module-extension-definitions:\"/extension-definition-loading\""
+        );
+        assert_ne!(key, other);
+        assert_ne!(left_hash.finish(), right_hash.finish());
+        let parent = compute_observed_loaded(
+            &dice,
+            module,
+            &extension,
+            "def implementation(ctx):\n    pass\n",
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        assert!(HostLoadedModuleExtensionDefinitionsObservationKey::validity(&parent));
+        assert!(HostLoadedModuleExtensionDefinitionsObservationKey::equality(&parent, &parent));
+        let (activations, dependencies) = tracker.take_rows();
+        let parent_dependencies = dependencies
+            .iter()
+            .find(|row| row.key == key.to_string())
+            .unwrap();
+        assert!(parent_dependencies.dependencies.iter().any(|dependency| {
+            dependency.starts_with("observed-host-selected-extension-definition-load-requests")
+        }));
+        assert!(
+            parent_dependencies
+                .dependencies
+                .iter()
+                .any(|dependency| dependency.starts_with("observed-host-bzl-module"))
+        );
+        assert!(activations.iter().any(|row| {
+            row.key == key.to_string()
+                && row.batch.is_none()
+                && row.kind == ActivationKind::Evaluated
+        }));
+        let source = include_str!("bzl_module.rs");
+        assert!(source.contains("Ok((observed.result().dupe(), observed.observations().dupe()))"));
+        assert!(
+            source.contains("LoadedModuleExtensionDefinitionsObservationError::Requests(error)")
+        );
+        let loaded = observed_loaded(&parent);
+        let requests = loaded.result().as_ref().as_ref().unwrap().requests.dupe();
+        let request_context = requests.parts().1[0].clone();
+        let mut transaction = case_transaction(
+            &dice,
+            module,
+            &extension,
+            "def implementation(ctx):\n    pass\n",
+            true,
+            None,
+        )
+        .await;
+        let child = compute_observed_module(&mut transaction, "ext.bzl").await;
+        let child = observed_module(&child);
+        let carrier = child.result.dupe();
+        let incoming = child.observations().dupe();
+        let (_, prior) = finish_loaded_extension_definition_observed_child(
+            &requests,
+            &request_context,
+            PathObservationEpoch::empty(),
+            SourcePreparationOutcome::Complete(Ok((carrier.dupe(), incoming))),
+        )
+        .unwrap();
+        let (_, current) = finish_loaded_extension_definition_observed_child(
+            &requests,
+            &request_context,
+            prior.dupe(),
+            SourcePreparationOutcome::Complete(Ok((carrier.dupe(), prior.dupe()))),
+        )
+        .unwrap();
+        assert_eq!(current, prior);
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/observed-loaded").unwrap(),
+            PathObservationOperation::Lstat,
+        );
+        let first = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let request = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+        let duplicate = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+        let (_, duplicate) = finish_loaded_extension_definition_observed_child(
+            &requests,
+            &request_context,
+            request.dupe(),
+            SourcePreparationOutcome::Complete(Ok((carrier.dupe(), duplicate))),
+        )
+        .unwrap();
+        assert!(Arc::ptr_eq(duplicate.get(&demand).unwrap(), &first));
+
+        let conflicting = PathObservationEpoch::from_shared([(
+            demand.dupe(),
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                PathLstat::new(PathNodeKind::RegularFile, 1, 1, 1, 1, 0o644),
+            ))),
+        )])
+        .unwrap();
+        let merge = finish_loaded_extension_definition_observed_child(
+            &requests,
+            &request_context,
+            request.dupe(),
+            SourcePreparationOutcome::Complete(Ok((carrier.dupe(), conflicting.dupe()))),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            merge,
+            SourcePreparationOutcome::Complete(Err(
+                LoadedModuleExtensionDefinitionsObservationError::Request {
+                    requests: actual,
+                    request: actual_request,
+                    stage: LoadedModuleExtensionDefinitionsObservationStage::Merge,
+                    ..
+                }
+            )) if Arc::ptr_eq(&actual, &requests) && actual_request == request_context
+        ));
+
+        let conflict = union_host_observations(&request, &conflicting).unwrap_err();
+        let operation =
+            ObservedPathFrontierError::from(PathObservationEpochError::OperationMismatch {
+                demand,
+                result_operation: PathObservationOperation::FileBytes,
+            });
+        for error in [conflict, operation] {
+            let outer = finish_loaded_extension_definition_observed_child(
+                &requests,
+                &request_context,
+                PathObservationEpoch::empty(),
+                SourcePreparationOutcome::Complete(Err(error)),
+            )
+            .unwrap_err();
+            assert!(outer.is_complete());
+            assert!(outer.complete_eq(&outer));
+            assert!(matches!(
+                outer,
+                SourcePreparationOutcome::Complete(Err(
+                    LoadedModuleExtensionDefinitionsObservationError::Request {
+                        requests: actual,
+                        request: actual_request,
+                        stage: LoadedModuleExtensionDefinitionsObservationStage::Bzl,
+                        ..
+                    }
+                )) if Arc::ptr_eq(&actual, &requests) && actual_request == request_context
+            ));
+        }
+        let request_error =
+            compute_observed_loaded(&dice, "module(", &extension, "", true, None).await;
+        assert!(HostLoadedModuleExtensionDefinitionsObservationKey::validity(&request_error));
+        assert!(
+            HostLoadedModuleExtensionDefinitionsObservationKey::equality(
+                &request_error,
+                &request_error
+            )
+        );
+        assert!(matches!(
+            request_error,
+            SourcePreparationOutcome::Complete(Ok(value))
+                if matches!(value.result().as_ref(), Err(HostLoadedModuleExtensionDefinitionsError::Requests(_)))
+        ));
+        let need = compute_observed_loaded(
+            &dice,
+            "module(name='bazel_tools')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n",
+            &extension,
+            "",
+            true,
+            None,
+        )
+        .await;
+        assert!(!HostLoadedModuleExtensionDefinitionsObservationKey::validity(&need));
+        assert!(!HostLoadedModuleExtensionDefinitionsObservationKey::equality(&need, &need));
+    }
+    #[tokio::test]
+    async fn observed_loaded_lifecycle_cancellation_and_nonactivation() {
+        assert_loaded_definition_production_slice_has_no_upper_keys();
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(BzlEventTracker::default());
+        let root = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\no=use_extension('//:other.bzl','other')\n";
+        let reordered = "module(name='bazel_tools')\no=use_extension('//:other.bzl','other')\ne=use_extension('//:ext.bzl','ext')\n";
+        let alternate = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','alternate')\no=use_extension('//:other.bzl','other')\n";
+        let ext_a = "load('//:child.bzl','child')\ndef implementation(ctx):\n    pass\next=module_extension(implementation=implementation,environ=[child])\nalternate=module_extension(implementation=implementation,environ=['alternate'])\n";
+        let ext_b = "load('//:child.bzl','child')\ndef implementation(ctx):\n    pass\next=module_extension(implementation=implementation,environ=['direct'])\nalternate=module_extension(implementation=implementation,environ=['alternate'])\n";
+        let child_a = "child='child-a'\n";
+        let child_b = "child='child-b'\n";
+        let other = "def implementation(ctx):\n    pass\nother=module_extension(implementation=implementation)\n";
+        let first =
+            observed_loaded_handles(&dice, root, ext_a, child_a, other, Some(tracker.clone()))
+                .await;
+        assert_transaction_epoch_subsets(&first);
+        let retained = first.clone();
+        let request_b = observed_loaded_handles(
+            &dice,
+            reordered,
+            ext_a,
+            child_a,
+            other,
+            Some(tracker.clone()),
+        )
+        .await;
+        let request_a =
+            observed_loaded_handles(&dice, root, ext_a, child_a, other, Some(tracker.clone()))
+                .await;
+        assert_transaction_epoch_subsets(&request_b);
+        assert_transaction_epoch_subsets(&request_a);
+        assert_ne!(first.parent, request_b.parent);
+        assert_eq!(first.parent, request_a.parent);
+        assert_ne!(first.request, request_b.request);
+        assert_eq!(first.ext, request_b.ext);
+        assert_eq!(first.child, request_b.child);
+        assert_eq!(first.other, request_b.other);
+        assert_held_observed_loaded_handles(&first, &retained);
+
+        let direct_b =
+            observed_loaded_handles(&dice, root, ext_b, child_a, other, Some(tracker.clone()))
+                .await;
+        let direct_a =
+            observed_loaded_handles(&dice, root, ext_a, child_a, other, Some(tracker.clone()))
+                .await;
+        assert_transaction_epoch_subsets(&direct_b);
+        assert_transaction_epoch_subsets(&direct_a);
+        assert_ne!(first.parent, direct_b.parent);
+        assert_eq!(first.parent, direct_a.parent);
+        assert_ne!(first.ext, direct_b.ext);
+        assert_ne!(first.ext_epoch, direct_b.ext_epoch);
+        assert_eq!(first.request, direct_b.request);
+        assert_eq!(first.child, direct_b.child);
+        assert_eq!(first.other, direct_b.other);
+        assert_held_observed_loaded_handles(&first, &retained);
+
+        let recursive_b =
+            observed_loaded_handles(&dice, root, ext_a, child_b, other, Some(tracker.clone()))
+                .await;
+        let recursive_a =
+            observed_loaded_handles(&dice, root, ext_a, child_a, other, Some(tracker.clone()))
+                .await;
+        assert_transaction_epoch_subsets(&recursive_b);
+        assert_transaction_epoch_subsets(&recursive_a);
+        assert_ne!(first.parent, recursive_b.parent);
+        assert_eq!(first.parent, recursive_a.parent);
+        assert_ne!(first.ext, recursive_b.ext);
+        assert_ne!(first.ext_epoch, recursive_b.ext_epoch);
+        assert_ne!(first.child, recursive_b.child);
+        assert_ne!(first.child_epoch, recursive_b.child_epoch);
+        assert_eq!(first.request, recursive_b.request);
+        assert_eq!(first.other, recursive_b.other);
+        assert_held_observed_loaded_handles(&first, &retained);
+
+        let export_b = observed_loaded_handles(
+            &dice,
+            alternate,
+            ext_a,
+            child_a,
+            other,
+            Some(tracker.clone()),
+        )
+        .await;
+        let export_a =
+            observed_loaded_handles(&dice, root, ext_a, child_a, other, Some(tracker.clone()))
+                .await;
+        assert_transaction_epoch_subsets(&export_b);
+        assert_transaction_epoch_subsets(&export_a);
+        assert_ne!(first.parent, export_b.parent);
+        assert_ne!(first.projection, export_b.projection);
+        assert_eq!(first.parent, export_a.parent);
+        assert_ne!(first.request, export_b.request);
+        assert_eq!(first.ext, export_b.ext);
+        assert_eq!(first.child, export_b.child);
+        assert_eq!(first.other, export_b.other);
+        assert_held_observed_loaded_handles(&first, &retained);
+
+        let (activations, dependencies) = tracker.take_rows();
+        let parent = HostLoadedModuleExtensionDefinitionsObservationKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        )
+        .to_string();
+        let parent_row = dependencies.iter().find(|row| row.key == parent).unwrap();
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        assert_eq!(
+            parent_row.dependencies,
+            [
+                HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(workspace.dupe())
+                    .to_string(),
+                HostBzlModuleObservationKey::new(workspace.dupe(), observed_test_label("ext.bzl"))
+                    .to_string(),
+                HostBzlModuleObservationKey::new(workspace, observed_test_label("other.bzl"))
+                    .to_string(),
+            ]
+        );
+        for key in
+            activations
+                .iter()
+                .map(|row| row.key.as_str())
+                .chain(dependencies.iter().flat_map(|row| {
+                    std::iter::once(row.key.as_str())
+                        .chain(row.dependencies.iter().map(String::as_str))
+                }))
+        {
+            assert!(
+                ![
+                    "host-selected-extension-definition-load-requests:",
+                    "host-bzl-module:",
+                    "host-loaded-module-extension-definitions:",
+                    "host-prepared-module-extension-inputs:",
+                    "host-pure-module-extension-invocations:",
+                    "host-instantiated-module-extension-repositories:",
+                    "host-validated-module-extension-repositories:",
+                    "host-root-repository-mapping:",
+                    "host-canonical-selected-module-definition:",
+                    "host-generated-repository-definition:",
+                    "slug-command:",
+                ]
+                .iter()
+                .any(|prefix| key.starts_with(prefix)),
+                "unexpected activation: {key}"
+            );
+        }
+        tracker.take();
+        let key = HostLoadedModuleExtensionDefinitionsObservationKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        );
+        let mut cancelled = case_transaction_with_other(
+            &dice,
+            root,
+            ext_a,
+            child_a,
+            other,
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        assert!(tracker.take().is_empty());
+        let (activations, dependencies) = tracker.take_rows();
+        assert!(activations.is_empty() && dependencies.is_empty());
+        let recovered =
+            observed_loaded_handles(&dice, root, ext_a, child_a, other, Some(tracker.clone()))
+                .await;
+        let clean_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let clean = observed_loaded_handles(&clean_dice, root, ext_a, child_a, other, None).await;
+        assert_eq!(recovered.parent, clean.parent);
+        assert_eq!(recovered.request, clean.request);
+        assert_eq!(recovered.ext, clean.ext);
+        assert_eq!(recovered.child, clean.child);
+        assert_eq!(recovered.other, clean.other);
+        assert_eq!(recovered.projection, clean.projection);
+        assert_transaction_epoch_subsets(&recovered);
+        assert_transaction_epoch_subsets(&clean);
+        let recovered_retained = recovered.clone();
+        assert_held_observed_loaded_handles(&recovered, &recovered_retained);
+        assert_loaded_warm(&dice, root, ext_a, child_a, other, &tracker, &recovered).await;
     }
 }
 
