@@ -13812,6 +13812,98 @@ partial and M7A -> M8 -> M7B remains. Documentation authority is capped at
 <=40 canonical, <=180 current packet, <=220 Stage and <=30 routing additions,
 <=470 aggregate.
 
+### Root apparent-route carrier-visibility design accepted (2026-08-21)
+
+Committed audit `7444a51e` proves that the accepted private observed route has
+zero production consumers, cannot be named by its sole future sibling source-
+input owner, and needs no upper or parallel prerequisite. Schedule exactly
+`WP-6-7A-host-root-apparent-repository-route-observation-carrier-visibility-implementation`.
+Do not activate source input or any later source/public consumer.
+
+Authority is exactly core `root_apparent_repository_route.rs`, baseline 1,890
+physical/cfg(test) line 541 and SHA-256
+`aa25fa3d36c6b9ba7ff5a9bb4ca6565f2cb2e8d579e6d4ab6721efaf8139d8d8`,
+plus test-only `root_apparent_repository_source_input.rs`, baseline 814
+physical/cfg(test) line 271 and SHA-256
+`76893b9cfd6c7358260cafe60caa8c5a6922f6b7c6e85e791c3f5603360f1dd3`.
+Every third Rust/API/export/caller/fixture/oracle file is read-only.
+
+Promote exactly `HostRootApparentRepositoryRouteObservationKey`, its existing
+two-argument `Option<Self>` constructor and
+`ObservedHostRootApparentRepositoryRoute` to `pub(super)`. The key tuple field
+and carrier fields stay private. Preserve root rejection and
+`observed-{legacy Display}`; `/workspace`, `@first` renders exactly
+`observed-HostRootApparentRepositoryRouteKey { workspace: NormalizedAbsolutePath { path: "/workspace" }, apparent_repo: ApparentRepoName("first") }`.
+
+Expose only concrete borrowed carrier accessors named `result` and
+`observations`, returning respectively
+`&Arc<Result<HostRootApparentRepositoryRoute,
+HostRootApparentRepositoryRouteError>>` and `&PathObservationEpoch`. Add no
+observation Result alias, field, constructor, conversion or inspector.
+
+Rename the current private outer to
+`RootApparentRepositoryRouteObservationError`. It retains only
+`Definition(HostRootApparentRepositoryDefinitionObservationError)`, existing
+Debug/Clone/PartialEq/Eq/Allocative derives and manual Dupe; driver outcome and
+driver terminals use only this inner. Add a same-derived/manual-Dupe,
+field-private opaque wrapper exactly:
+
+```rust
+pub(super) struct HostRootApparentRepositoryRouteObservationError(
+    RootApparentRepositoryRouteObservationError,
+);
+```
+
+Only observed Key `Complete(Err(inner))` projection constructs the wrapper.
+The associated Value remains the concrete
+`SourcePreparationOutcome<Result<ObservedHostRootApparentRepositoryRoute,
+HostRootApparentRepositoryRouteObservationError>>`. Need/success/legacy/
+equality/validity/order/Arc/epoch/event/retention/cancellation stay unchanged.
+
+Allow only wrapper/source spelling in existing
+`observed_root_apparent_repository_route_identity_finisher_and_terminal_algebra`.
+Its producer scan must prove exactly one private Definition mapping and exactly
+one Key wrapper; preserve every semantic assertion. Real-family/event and
+lifecycle/cancellation/nonactivation proofs remain byte-unchanged. Add no
+route-module test.
+
+Add exactly one source-input sibling test,
+`root_apparent_repository_route_observation_surface_is_sibling_usable`, with
+explicit test-only imports of the three promoted names. Construct only the
+`/workspace`, `@first` key, assert the exact Display and use a nonexecuted
+function/function-pointer cast to prove associated Value, opaque outer and
+concrete borrowed Result-Arc/epoch accessor types. Do not construct or inspect
+carrier/outer, name inner/variant, compute, invoke source input or activate a
+graph edge. Production source-input imports/compute remain byte-unchanged.
+
+Caps are <=80 route production, <=50 route proof, <=80 source-input proof,
+<=210 aggregate additions and <=1,990/894 physical. Add no production helper
+or route test and exactly one sibling smoke; identity stays below 200 and smoke
+below 100. Add no `rustfmt::skip`, preserve existing skips and require
+rustfmt-stable bytes with no waiver. No hot-path/retained-representation change
+applies.
+
+Validate the exact identity and sibling tests, protected observed route real-
+family/event/lifecycle tests, legacy route/source-input and observed root-
+definition tests, full core, direct commands check, formatting, exact two-file
+allowlist/SHA/accounting/physical/test-size/effective-visibility/wrapper/source-
+shape and diff hygiene serially. No visibility-only oracle is needed.
+
+Route values/five-family projection/predecessor/views/source capability/
+errors/order/equality/invalidation/lower events remain exact. The opaque same-
+crate Result-Arc+transaction-local epoch handoff is Slug-native. Source-input
+ownership, source path/source observation, public command/bootstrap activation
+and exact identity bytes remain deferred.
+
+STOP third file/type/key/carrier/adapter, crate-public/root reexport, public
+field/alias/private-inner/variant/inspector, source-input production or caller
+activation, semantic/order/event/equality/epoch/retention/cancellation drift,
+proof beyond wrapper spelling plus one smoke, formatter/cap/test waiver,
+Cargo/BUILD, fixture/oracle, upper work, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening or hash drift. ACCEPT returns only to
+docs-only source-input observation-owner design. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
