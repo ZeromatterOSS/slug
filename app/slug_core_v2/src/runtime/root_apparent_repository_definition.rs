@@ -371,6 +371,7 @@ impl Key for HostRootApparentRepositoryDefinitionKey {
 }
 #[cfg(test)]
 pub(super) mod tests {
+    use std::sync::Arc;
     use std::sync::Mutex;
 
     use dice::ActivationData;
@@ -403,6 +404,9 @@ pub(super) mod tests {
     use slug_workspace_v2::PathObservationResult;
     use slug_workspace_v2::PathOperationResult;
 
+    use super::super::generated_repository_definition::HostCanonicalRepositoryApparentMappingObservationError;
+    use super::super::generated_repository_definition::HostCanonicalRepositoryApparentMappingObservationKey;
+    use super::super::generated_repository_definition::ObservedHostCanonicalRepositoryApparentMapping;
     use super::super::generated_repository_definition::tests::EXTENSION_A;
     use super::super::generated_repository_definition::tests::MODULE;
     use super::super::generated_repository_definition::tests::WORKSPACE;
@@ -410,6 +414,45 @@ pub(super) mod tests {
     use super::super::generated_repository_definition::tests::transaction;
     use super::super::generated_repository_definition::tests::validated;
     use super::*;
+
+    #[test]
+    fn canonical_repository_apparent_mapping_observation_surface_is_sibling_usable() {
+        let key = HostCanonicalRepositoryApparentMappingObservationKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            CanonicalRepoName::root(),
+            ApparentRepoName::new("first").unwrap(),
+        );
+        assert_eq!(
+            key.to_string(),
+            "observed-host-canonical-repository-apparent-mapping:\"/workspace\":@@:@first"
+        );
+
+        fn inspect(
+            _: &<HostCanonicalRepositoryApparentMappingObservationKey as Key>::Value,
+            observed: &ObservedHostCanonicalRepositoryApparentMapping,
+            _: &HostCanonicalRepositoryApparentMappingObservationError,
+        ) {
+            let _: &Arc<
+                Result<
+                    HostCanonicalRepositoryApparentMapping,
+                    HostCanonicalRepositoryApparentMappingError,
+                >,
+            > = observed.result();
+            let _: &PathObservationEpoch = observed.observations();
+        }
+        let _ = inspect
+            as fn(
+                &SourcePreparationOutcome<
+                    Result<
+                        ObservedHostCanonicalRepositoryApparentMapping,
+                        HostCanonicalRepositoryApparentMappingObservationError,
+                    >,
+                >,
+                &ObservedHostCanonicalRepositoryApparentMapping,
+                &HostCanonicalRepositoryApparentMappingObservationError,
+            );
+    }
+
     #[derive(Default)]
     struct CompositionTracker {
         composition: Mutex<Vec<ActivationKind>>,
