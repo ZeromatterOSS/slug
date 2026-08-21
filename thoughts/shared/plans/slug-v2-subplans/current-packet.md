@@ -1,169 +1,165 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-root-apparent-repository-definition-observation-implementation`
+Packet: `WP-6-7A-host-root-apparent-repository-definition-observation-proof-correction-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Design and Rust base: pending docs commit / `08524062`
+Rust base / retained candidate: `08524062` / uncommitted one-file draft
 
-## Goal and authority
+## Goal and retained boundary
 
-Implement one private callerless observation owner for
-`HostRootApparentRepositoryDefinitionKey`. Share its existing semantics through
-one Legacy/Observed driver over exactly two sibling-nameable children: observed
-canonical apparent mapping first, then observed canonical definition only for a
-nondeferred target. Preserve exact behavior and lower event ownership while
-retaining one local Result Arc plus transaction-local observation epoch.
+Correct only the proof contract for the retained private root apparent-
+definition observation owner. Production semantics, API, types, driver,
+terminal order, epochs, events and retention are frozen. Replace the
+unreachable real selected-registry parent claim, complete lawful real-family
+parity/event/warm proof and strengthen transaction-local child lifecycle proof.
 
-Authority is only
-`app/slug_core_v2/src/runtime/root_apparent_repository_definition.rs`, baseline
-1,079 physical/tests 372 and SHA-256
-`58759d7662285abf8b3debce6f0a2f64649e5c7218faf097ade1eee7e2658715`.
-Every other file, export, caller, fixture/oracle and Cargo/BUILD surface is
-read-only.
+Authority is proof-only in
+`app/slug_core_v2/src/runtime/root_apparent_repository_definition.rs`.
+The retained candidate is +258/-101 production and +351/-2 proof versus
+`08524062`, 1,585 physical lines, full-file SHA-256
+`835109bc56694e520834cb12941b680267343be8863480d738bfa861615df3ff`.
+Its `#[cfg(test)]` begins at line 529. Lines 1-528 are byte-frozen at SHA-256
+`c48df171362703eb160508c5179cdbdb7152bfa8e4684f2c6cfe280915651635`.
+No edit before the marker, production import/helper change, second file,
+export, caller, fixture/oracle or Cargo/BUILD change is authorized.
 
-## Frozen owner and driver
+## Frozen accepted candidate
 
-Add private `HostRootApparentRepositoryDefinitionObservationKey` as a nominal
-wrapper over the legacy key. Its `new(NormalizedAbsolutePath,
-ApparentRepoName) -> Option<Self>` preserves root-name rejection. Display is
-`observed-{legacy}`; `/workspace` and `@first` render exactly
-`observed-host-root-apparent-repository-definition:"/workspace":@first`.
+Retain exactly the private observed key, Result-Arc+epoch carrier, Mapping/
+Definition/Merge outer, shared Legacy/Observed driver and legacy projection.
+Apparent mapping remains first; its Need/outer is carrierless and mapping
+semantic/Main/Builtin terminals retain the mapping epoch. Only another target
+requests canonical definition second. Its Need/outer is carrierless,
+DefinitionCompute retains the mapping prefix, and complete epochs merge
+mapping-left before definition semantics. Equal duplicates retain the left Arc;
+parent Merge covers only valid differing-result conflict. Parent events remain
+absent and lower events remain child-owned.
 
-Add private `ObservedHostRootApparentRepositoryDefinition` with private local
-Result-Arc and `PathObservationEpoch` fields plus borrowed accessors. Add one
-private `HostRootApparentRepositoryDefinitionObservationError` with exactly:
+Retain all current identity/terminal/merge/source-order proof, including
+ContextMismatch only through synthetic finisher algebra using lawful real child
+values paired under a mismatched synthetic context. Retain all current lawful
+generated and Builtin evidence, cancellation/no-publication recovery, upper/
+legacy nonactivation and source-shape denylist. No assertion may be weakened or
+deleted except an assertion implementing the rejected selected-registry real-
+parent claim.
 
-- `Mapping(HostCanonicalRepositoryApparentMappingObservationError)`;
-- `Definition { mapping: HostCanonicalRepositoryApparentMapping,
-  error: HostCanonicalRepositoryDefinitionObservationError }`; and
-- `Merge { mapping: HostCanonicalRepositoryApparentMapping,
-  error: ObservedPathFrontierError }`.
+## Corrected selected-registry contract
 
-Use one private `RootApparentRepositoryDefinitionMode::{Legacy, Observed}` and
-shared driver returning Need, typed outer, or local Result Arc plus epoch.
-Legacy Key delegates to it, requires an empty epoch and projects the existing
-outcome. Observed Key wraps only successful local results in the carrier;
-`complete_eq` and `is_complete` remain its equality/validity laws.
+A lawful keyed root parent cannot construct the selected-registry row from the
+available fixture: the required module-mirror input owner is private to
+Bzlmod. Do not import, expose, name in production, or inject
+`HostModuleMirrorsInputKey`; do not edit `slug_bzlmod_v2` or add a second file.
 
-## Exact order, terminals and epochs
+Prove the branch without a synthetic parent compute by combining exactly:
 
-The driver order is fixed:
+- accepted lower
+  `observed_canonical_selected_definition_real_order_events_and_parity`
+  evidence for the real selected-registry result/event family;
+- a bounded static source-chain check from selected definition through
+  canonical definition to this parent;
+- the existing `HostCanonicalRepositoryDefinitionKind::SelectedRegistry` to
+  `HostRootApparentRepositoryDefinitionKind::SelectedRegistry` forwarding; and
+- `definition_policy_matches(SelectedRegistry, LocalUnsupported)` plus the
+  parent view projection.
 
-1. Compute canonical apparent mapping for root context first: legacy child in
-   Legacy mode, promoted observed child in Observed mode.
-2. Mapping Need returns carrierless Need. Observed mapping outer returns typed
-   `Mapping` with no parent carrier. DICE compute failure remains the existing
-   local `MappingCompute` semantic terminal with an empty epoch.
-3. A completed mapping semantic error becomes the existing local `Mapping`
-   terminal with the mapping epoch. A successful mapping supplies the target.
-4. Main target immediately returns existing `MainDeferred`; `bazel_tools`
-   immediately returns `BuiltinDeferred`. Both retain only the mapping epoch
-   and never request definition.
-5. Only another target computes canonical definition second. Definition Need
-   is carrierless. Its observed outer becomes typed `Definition`, retaining
-   the successful mapping value but no parent carrier. DICE compute failure is
-   existing local `DefinitionCompute` with the mapping prefix epoch.
-6. On completed definition, merge mapping observations left-first with
-   definition observations right. Equal duplicate demand/results retain the
-   mapping/left Arc. A valid same-demand differing-result conflict is typed
-   `Merge { mapping, error }`. Parent Merge does not manufacture
-   OperationMismatch; lower OperationMismatch remains inside typed Mapping or
-   Definition outers. Add no malformed epoch/hook proof.
-7. Only after successful merge, project the existing definition semantic
-   Missing/Definition, ContextMismatch or success terminal with the full
-   merged epoch. Preserve exact target/canonical/mapping-context checks and all
-   existing error payloads/views.
+This proves forwarding/policy only. It must not claim a real parent activation,
+event row, epoch, warm row or legacy-parent parity for selected registry.
 
-The Result Arc is newly allocated only for the local terminal exactly as the
-shared driver requires. Need and typed outers carry no carrier or epoch.
+## Required lawful real-family correction
 
-## Events, lifetime and nonactivation
+The real-order test must cover every remaining lawful parent family, not only
+generated and BuiltinDeferred:
 
-The parent emits no `EvaluationEvent` or `EventBatch`. Mapping and conditional
-definition children retain exact event ownership and order; mapping-only
-terminals expose no definition event. Warm parent and all warm lower rows are
-batchless and replay nothing.
+- generated success;
+- selected-nonregistry success after its lawful materialization Need;
+- canonical-definition Missing after a lawful mapping to an absent generated
+  repository;
+- mapping semantic failure;
+- MainDeferred; and
+- BuiltinDeferred.
 
-The DICE-retained carrier owns only the local root-definition Result Arc plus
-merged epoch. Child carriers/Result Arcs, target/view values, merge iterator and
-event/test scratch are compute-local. Add no map, cache, interner, evaluator,
-task, lock, side store or command-lifetime borrow. Overlapping transactions
-remain isolated by child observation dependencies; equality cutoff includes
-both local Result and epoch. Cancellation publishes neither parent activation
-nor dependency row; same-DICE recovery recomputes normally.
+For every row, prove exact observed Result parity against an independently
+computed legacy parent. Prove exact mapping-first dependency order and the
+conditional definition edge: definition is present only for generated,
+selected-nonregistry and Missing. Compare the observed-parent lower event owner/
+payload vector with the same observed children computed directly; the parent
+activation has no batch. Clear the tracker and recompute every row, requiring
+the parent and every activated lower row to be Reused/batchless with no print
+replay. Need resolution must remain lawful and row-local.
 
-Legacy parent, root route/source input/source observation/path input,
-repository publication/materialization, public commands and bootstrap remain
-inactive. No route visibility, import or caller is authorized.
+Do not add ContextMismatch or selected-registry to this real-parent matrix.
+Do not replace real rows with direct finisher calls, injected carriers, source
+text alone or fresh-graph-only parity.
 
-## Frozen proof
+## Required lifecycle correction
 
-Add exactly three tests:
+Extend the existing lifecycle test without changing production. Hold cloned
+parent, observed mapping-child and observed definition-child carriers from
+their actual transactions through:
 
-1. `observed_root_apparent_repository_definition_identity_staging_and_terminal_algebra`
-   proves key/hash/Display/root rejection/accessors/equality/validity; mapping-
-   first and conditional-definition dependency rows; all mapping/definition
-   semantic terminals; carrierless Need/typed outers; lawful left-Arc/equal
-   merge and conflicting-result Merge; exact source order and no legacy child.
-   ContextMismatch is proved only through synthetic finisher algebra using
-   lawful real child values paired under a mismatched synthetic context;
-   no real keyed-parent row may claim it.
-2. `observed_root_apparent_repository_definition_real_order_events_and_parity`
-   proves real selected-registry, selected-nonregistry, generated, Missing,
-   mapping failure, MainDeferred and BuiltinDeferred families;
-   exact legacy Result parity; observed mapping then conditional definition;
-   mapping-only short circuit; lower event vectors and parent eventlessness;
-   every warm row batchless.
-3. `observed_root_apparent_repository_definition_lifecycle_cancellation_and_nonactivation`
-   holds parent and both real child carriers through semantic A-B-A restoration
-   and semantic-neutral source metadata changes; proves each child epoch is a
-   subset of the parent and parent is a subset of its transaction global,
-   equal Result/different epoch invalidation, Arc identity only on Reused,
-   poll-drop/no publication, same-DICE recovery and all upper/legacy families
-   inactive.
+- a mapping-semantic A-B-A change/restoration;
+- a definition-semantic A-B-A change/restoration; and
+- a semantic-neutral source metadata change.
 
-Reuse accepted lower outer/mismatch and Bazel 9.2
-`BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
-`BazelDepGraphValue.getRepositoryMapping` and `BazelDepGraphFunctionTest`
-evidence. Source/dependency proof may establish inaccessible opaque lower
-outers; add no private injection, malformed hook, fixture or oracle.
+For each transaction, associate only that transaction's mapping/definition
+children with its parent and global epoch. Require each selected child epoch to
+be a subset of that parent epoch and the parent epoch to be a subset of the
+same transaction global. Never pair a child from A with a parent/global from B.
+Prove the expected child Result semantic change/restoration for its own change,
+held-carrier immutability, equal Result/different epoch on the neutral change,
+observed inequality for that epoch change and Arc identity only on a proven
+same-transaction Reused row.
 
-## Caps and validation
+Retain poll-drop with no parent activation/dependency publication, same-DICE
+recovery, recovered transaction-local child associations, warm batchlessness
+and all upper/legacy denylist checks.
 
-Caps are <=300 production, <=720 proof, <=1,020 aggregate semantic and <=2,100
-physical lines; at most six production/seven test helpers, exactly three new
-tests, shared driver below 180 and every helper/test below 200. The file remains
-cohesive because it already owns the legacy key/value/error/views, both child
-composition, trackers and fixtures. No hot-path or retained-representation
-change applies.
+## Proof spans, caps and validation
 
-Run serially: the three exact observed-root-definition tests; protected
-`request_shape_and_target_precedence_are_total`,
-`real_generated_selected_and_deferred_domains_are_structural`,
-`lifecycle_identity_and_mapping_precedence_are_structural` and both child
-observation suites/smokes; full `cargo test -p slug_core_v2`; direct
-`cargo check -p slug_commands_v2`; `cargo fmt --all -- --check`; then exact
-one-file allowlist/SHA/accounting/physical/helper/test-size/source-shape and
-`git diff --check`.
+Production authority is zero lines: lines 1-528 and their exact prefix hash are
+frozen at +258/-101. Proof authority begins at line 529 and is limited to
+existing test imports/helpers plus the three exact observed-owner tests. Keep
+exactly three tests and at most seven test helpers; every helper/test remains
+below 200 lines.
 
-Root-definition values, target order, errors/views, equality/invalidation and
-lower events remain **exact** Bazel 9 compatibility. The private Result-Arc+
-epoch carrier and typed outer are **Slug-native**. Carrier visibility, route/
-source/public/command/bootstrap observation and exact Bazel configuration/
-output/ActionKey bytes remain **unsupported/deferred**.
+Final proof cap is <=620 additions versus `08524062`; aggregate cap is <=878
+additions and physical <=1,860. From the retained +351 proof/+609 aggregate/
+1,585 physical candidate, headroom is therefore 269 proof additions, 269
+aggregate additions and 275 physical lines. Deletions within proof may remove
+only superseded proof scaffolding. These tightened caps do not widen the
+accepted <=300/<=720/<=1,020/2,100 owner limits.
+
+Run serially:
+
+1. the three exact `observed_root_apparent_repository_definition_` tests;
+2. accepted lower `observed_canonical_selected_definition_real_order_events_and_parity`;
+3. protected legacy root-definition and both lower observation suites/smokes;
+4. full `cargo test -p slug_core_v2`;
+5. direct `cargo check -p slug_commands_v2`;
+6. `cargo fmt --all -- --check`; and
+7. exact one-file allowlist, frozen lines-1-528 prefix SHA, production/proof
+   accounting, physical/helper/test-size/source-chain/forbidden-name checks and
+   `git diff --check`.
+
+No formatting or test waiver is allowed. Root-definition semantics remain
+**exact**, its private typed carrier remains **Slug-native**, and visibility/
+route/source/public/bootstrap observation plus exact identity bytes remain
+**unsupported/deferred**.
 
 ## Terminal and stops
 
-ACCEPT returns only to a docs-only root-definition observation carrier-
-visibility/consumer-frontier audit. STOP a second file/key/owner/adapter,
-visibility/export/caller, route/source compute, semantic/order/error/event/
-equality/retention drift, third child/parallel join, invalid parent
-OperationMismatch, malformed injection, retained child/scratch/task/lock,
-fixture/oracle, cap/helper/test/format waiver, milestone closure, M8/M7B or
-exact identity work. REPLAN before widening or hash drift. M7 remains partial
-and M7A -> M8 -> M7B remains.
+ACCEPT returns only to the docs-only root-definition carrier-visibility/
+consumer-frontier audit. STOP any production-prefix/hash drift; second file;
+private HostModuleMirrorsInputKey access/export/injection; selected-registry or
+ContextMismatch real-parent fabrication; parity/event/warm omission for a
+lawful family; cross-transaction epoch pairing; production/API/semantic/order/
+event/retention change; new test/family/helper beyond caps; fixture/oracle;
+format/cap waiver; upper activation, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening. M7 remains partial and
+M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Accepted `08524062` makes both child observation surfaces sibling-nameable and
-keeps the legacy root owner and sole upper route consumer unchanged.
+The first implementation attempt retained a sound production owner but its
+proof asked for an unreachable real selected-registry parent and did not fully
+prove lawful-family parity/events/warm behavior or held child restoration.

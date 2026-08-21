@@ -13535,6 +13535,80 @@ closure, M8/M7B or exact identity work. REPLAN before widening or hash drift.
 ACCEPT returns only to root-definition carrier visibility/consumer audit. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Root apparent-definition proof-contract REPLAN (2026-08-21)
+
+Retain the unaccepted one-file root apparent-definition candidate at 1,585
+physical lines: production is +258/-101 and proof is +351/-2 against
+`08524062`. Lines 1..=528 are the production prefix and are byte-frozen at
+`c48df171362703eb160508c5179cdbdb7152bfa8e4684f2c6cfe280915651635`.
+The private Legacy/Observed driver, two-child mapping-first order, terminal and
+prefix rules, complete-epoch merge law, typed outers, parent eventlessness,
+retention, cancellation and upper nonactivation remain accepted candidate
+content; this REPLAN changes proof only.
+
+A real selected-registry parent row is unreachable: lawful keyed construction
+would require private `HostModuleMirrorsInputKey` injection. Prove that family
+by reusing accepted
+`observed_canonical_selected_definition_real_order_events_and_parity` plus
+static selected-definition -> canonical-definition -> root-parent forwarding,
+view and policy evidence. Any expanded lower scan follows mirrors/Host registry
+-> selected registry repo specs/routes -> canonical selected definition; it
+must never substitute the generated module-extension pipeline. Do not expose,
+inject or access the private input, edit `slug_bzlmod_v2`, add an accessor or
+add a second file.
+`ContextMismatch` remains synthetic identity/finisher algebra only, built from
+lawful real child values under a mismatched synthetic parent context.
+
+The real-order proof must establish exact legacy Result semantic parity, exact
+lower event order/count/payload ownership and fully batchless warm replay for
+every remaining lawful family: generated success; selected-nonregistry
+success after materialization Need; canonical-definition Missing after lawful
+mapping to an absent generated repository; mapping semantic failure;
+MainDeferred; and
+BuiltinDeferred. Need resolution remains row-local. No row may rely only on a
+generated/Builtin representative.
+
+The lifecycle proof must hold observed mapping and definition child carriers
+across semantic changes, demonstrate separate child A -> B -> A restoration,
+and preserve parent Result/Arc equality plus exact child-subset -> parent-subset
+-> global transaction-local epoch associations in each transaction. It must
+show no cross-transaction child pairing, no stale child retention and Arc
+identity only on Reused restoration, while retaining neutral-input reuse,
+recovery carrier epoch subsets, cancellation cleanup and route/source/public/
+command/bootstrap nonactivation.
+
+Only the existing test module/imports/helpers and exactly the three named tests
+at lines 529+ may change. Production imports/helpers/API/semantics and lines
+1..=528 stay frozen; no second file. Keep at most seven test helpers and every
+helper/test below 200 lines. Tight proof caps are <=620 additions, aggregate
+<=878 additions and <=1,860 physical lines. Against the retained candidate,
+headroom is 269 proof additions, 269 aggregate additions and 275 physical
+lines; these tighten rather than widen the original <=720 proof, <=1,020
+aggregate and <=2,100 physical caps.
+
+Validate the three exact tests; the accepted lower selected-definition proof;
+apparent-mapping and canonical-definition observation suites/smokes; protected
+legacy root-definition tests; full core; direct commands check; exact serial
+`cargo fmt --all -- --check`; and exact one-file allowlist, production-prefix
+hash, +258/-101 production accounting, proof/aggregate/physical caps,
+helper/test sizes, source-chain/policy/forwarding scans, private-input absence,
+upper nonactivation and diff hygiene.
+
+Root-definition values/order/errors/views/equality/invalidation and lower-event
+parity remain exact. The private carrier/typed outer and transaction-local
+epoch remain Slug-native. Carrier visibility/caller, route/source/public/
+command/bootstrap observation and exact identity bytes remain deferred.
+
+STOP on any production-prefix/hash/accounting change; a second file; private
+input/accessor/export/injection; real selected-registry or ContextMismatch
+fabrication; missing lawful-family parity/events/warm proof; cross-transaction
+epoch pairing; lifecycle or upper-activation regression; cap/helper/test-size/
+format waiver; milestone closure; M8/M7B or exact-identity work. REPLAN before
+any widening. Schedule only
+`WP-6-7A-host-root-apparent-repository-definition-observation-proof-correction-implementation`;
+on acceptance audit root-definition carrier visibility. M7 stays partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier formatter REPLAN (2026-08-21)
 
 The proof-corrected semantic draft is retained, but
