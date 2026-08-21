@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-loaded-module-extension-definitions-real-order-event-proof-repair-retry-3`
+Packet: `WP-6-7A-loaded-module-extension-definitions-real-order-event-proof-repair-retry-4`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
 Scheduling base: `ab4db01f`
@@ -8,13 +8,14 @@ Accepted predecessor: `99c23033`
 
 ## Goal and authority
 
-Repair only the remaining exact event proof and size-cap miss for the retained
-loaded-definition observation candidate. Retry 2 completed lawful key-family
-classification, separate legacy/observed parity and the nine terminal rows,
-but its 213-line test exceeded the hard limit and its batch assertions remained
-nondiscriminating. Its sole correction stopped because the existing two-helper
-authority could not fit an extracted exact-event proof. Add one dedicated
-test-only helper; do not reopen any accepted semantic or independent slice.
+Repair only the remaining exact event proof, size cap and mechanical formatting
+gate for the retained loaded-definition observation candidate. Retry 3's worker
+reported a correction which was not persisted; root inspection found the same
+213-line test and nondiscriminating batches. More importantly, mandatory
+rustfmt also changes already-retained identity/finisher test lines that retry 3
+declared byte-frozen, so the packet could not reach its own validation gate.
+Authorize that exact semantic-neutral formatting; do not reopen any semantic or
+independent slice.
 
 Write exactly the `#[cfg(test)] module_extension_definition_loading_tests`
 module in `app/slug_loading_v2/src/bzl_module.rs`. Production, the accepted
@@ -22,12 +23,17 @@ finisher algebra test and the lifecycle/cancellation test are frozen. Every
 other file, fixture, oracle, Cargo/BUILD target, caller and plan is read-only
 until terminal rollover.
 
-The retained candidate is 7,824 physical lines and `+1,056/-114` versus
-`0a8e1220`. Final caps for this slice are <=`+1,250/-250` and <=8,000 physical.
+The retained live candidate is 7,824 physical lines and `+1,056/-114` versus
+`0a8e1220`. A rustfmt-only temporary-copy preflight is 7,993 physical and
+`+1,222/-111`. Final caps for this slice are <=`+1,450/-250` and <=8,150
+physical.
 Replace only `observed_loaded_real_order_terminals_events_and_parity` plus at
 most the two already directly used test helpers, one new dedicated test-only
 event assertion/helper and the already test-only tracker records; do not append
-a fourth parent test. Every changed helper/test remains below 200.
+a fourth parent test. Every changed helper/test remains below 200. In the same
+`#[cfg(test)] module_extension_definition_loading_tests` module, rustfmt-only
+changes identified by the preflight are allowed in otherwise frozen tests and
+imports; they must not change assertions, values, control flow or semantics.
 
 ## Frozen decisions
 
@@ -40,7 +46,7 @@ The identity/finisher test now lawfully proves equal duplicate left-Arc,
 valid-epoch conflict -> carrierless Merge and typed child conflict/operation
 mismatch -> carrierless Bzl without malformed epoch construction. The opaque
 request outer reuses accepted Bzlmod proof and parent forwarding source/
-dependency evidence. Do not reopen it.
+dependency evidence. Do not reopen it; rustfmt-only layout changes are allowed.
 
 Lifecycle, parent cancellation/recovery and held-handle A -> B -> A remain the
 next serial proof slice. Do not edit or weaken their current test here.
@@ -147,7 +153,7 @@ ACCEPT freezes this real-order/event proof and activates only the docs packet
 for the final lifecycle/cancellation/nonactivation repair. It does not accept or
 commit the production candidate yet.
 
-STOP and `REPLAN` a production, identity/finisher or lifecycle-test edit; a
+STOP and `REPLAN` a production or semantic identity/finisher/lifecycle-test edit; a
 second Rust file/key/owner; fake key/hook/external fixture; parent event batch;
 tracker row conflation; generic terminal assertion; cap waiver; upper
 activation; milestone closure; M8/M7B or exact identity work. M7 remains partial
@@ -155,12 +161,12 @@ and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Retry 2 scheduled by `23e4a3a8` completed lawful RootModule policy
-classification, separate legacy/observed Result/request/manifest/projection
-parity, family separation, warm silence, Reused/None and nine positional
-Request/prefix/suppression rows. Full validation passed at `+1,056/-114` and
-7,824 physical. Terminal review rejected its 213-line test and `batch.is_some()`
-checks: predecessor prints made every reached child nonempty in semantic-failure
-rows, rather than proving isolated decisive ownership. The sole correction made
-no edit because exact helper extraction exceeded the two-helper authority, so
-the orchestration second-correction rule requires this bounded REPLAN.
+Retry 3 scheduled by `ce36f109` added one helper of authority, but the worker's
+reported correction was absent from the shared checkout: the test remained 213
+lines with `batch.is_some()` and print-bearing predecessors. Root validation
+also found `cargo fmt --check` requires mechanical changes in the explicitly
+frozen identity/finisher test. That STOP makes retry 3 infeasible even though
+focused/protected/full/core tests on the retained candidate remain green. A
+temporary-copy rustfmt preflight measured `+1,222/-111`, 7,993 physical and no
+production change; retry 4 grants only that formatting layout authority plus
+the already reserved exact-event helper.

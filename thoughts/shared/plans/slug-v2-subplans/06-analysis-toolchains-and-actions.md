@@ -10763,6 +10763,33 @@ and the single serial lifecycle successor remain unchanged. STOP any frozen
 scope edit, cap waiver, M8/M7B or exact identity work. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Loaded-definition retained-test rustfmt REPLAN (2026-08-20)
+
+Retry 3 did not persist its reported event-helper correction: root inspection
+found the retained 213-line test, `batch.is_some()` checks and print-bearing
+predecessors unchanged. It also exposed a packet contradiction: mandatory
+`cargo fmt --check` requires layout-only changes in the byte-frozen
+identity/finisher test, triggering the retry's own STOP. A temporary-copy
+rustfmt preflight makes no production change and yields `+1,222/-111` versus
+`0a8e1220`, 7,993 physical, before exact-event extraction.
+
+Activate only
+`WP-6-7A-loaded-module-extension-definitions-real-order-event-proof-repair-retry-4`.
+Retain the retry-2 semantic candidate. Authorize the named real-order/event test,
+its two existing helpers/tracker records and one dedicated event helper, plus
+rustfmt-only semantic-neutral layout changes within the same `#[cfg(test)]`
+module where preflight requires them. The identity/finisher and all other test
+assertions/values/control flow remain frozen; production remains byte-frozen.
+
+Require every changed test/helper below 200, exact ordered fresh `A`/`B`/`C`
+print events and silent-predecessor decisive-only `before` ownership with
+parent/request batchlessness. Preserve all accepted parity, nine-row terminal,
+prefix/suppression, policy-family/denylist, warm and Reused/None proof. Rebased
+final caps are <=`+1,450/-250` and <=8,150 physical. Run the unchanged full
+serial validation and then schedule only the lifecycle/cancellation successor.
+STOP any semantic frozen-test change, production edit, cap waiver, M8/M7B or
+exact identity work. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
