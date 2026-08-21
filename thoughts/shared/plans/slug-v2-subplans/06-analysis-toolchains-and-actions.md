@@ -10790,6 +10790,47 @@ serial validation and then schedule only the lifecycle/cancellation successor.
 STOP any semantic frozen-test change, production edit, cap waiver, M8/M7B or
 exact identity work. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Loaded-definition lifecycle/cancellation proof repair (2026-08-20)
+
+Retry 4 accepts the exact real-order/event slice at `+1,235/-111` versus
+`0a8e1220` and 8,006 physical. The production driver, finisher algebra,
+three-request legacy parity, nine positional terminals, decisive prefixes and
+suppression, lawful RootModule policy boundary, exact upper/legacy denylist and
+fresh/warm/reused/failure event ownership are frozen. The retained lifecycle
+test still changes one aggregate source, holds only a parent carrier, accepts
+validity-only recovery and uses incomplete substring nonactivation checks.
+
+Activate only
+`WP-6-7A-loaded-module-extension-definitions-lifecycle-cancellation-proof-repair`.
+Replace that lifecycle test plus at most three direct helpers/tracker records.
+On one same-DICE fixture independently drive request-only, direct root-Bzl,
+recursive child-load and pure-export A -> B -> A changes. Hold parent and
+observed-request Result/epoch handles, each relevant Host-Bzl Result/epoch and
+manifest/frozen-definition projections. Assert old handles remain valid,
+unaffected child Result Arcs remain pointer-identical, and parent equality
+changes/restores for every axis; pure export retains the exact Bzl carrier.
+
+Poll/drop a fresh parent, prove no value/activation/batch publication, recover
+in the same DICE with exact semantic and per-demand epoch-Arc association, then
+prove warm silence. The production-slice scan excludes the exact key types
+`HostPreparedModuleExtensionInputsKey`,
+`HostPureModuleExtensionInvocationsKey`,
+`HostInstantiatedModuleExtensionRepositoriesKey`,
+`HostValidatedModuleExtensionRepositoriesKey`,
+`HostRootRepositoryMappingKey`,
+`HostCanonicalSelectedModuleDefinitionKey` and
+`HostGeneratedRepositoryDefinitionKey`. All-key rows prove exact observed
+parent lineage, lawful lower families and exact reverse-legacy/upper/public/
+`slug-command:` exclusion. Use no substring vocabulary, hook or fake key.
+
+Production and all accepted proof remain byte-frozen. Final caps are
+<=`+1,800/-350` and <=8,450 physical; every changed helper/test stays below 200.
+After full serial validation and ACCEPT, commit the single Rust file and roll
+only to the prepared/evaluation observation frontier. STOP any production or
+accepted-test semantic edit, second file/key/owner, lock across DICE, parent
+batch, cap waiver, M8/M7B or exact identity work. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
