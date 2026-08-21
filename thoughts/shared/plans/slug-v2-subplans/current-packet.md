@@ -1,108 +1,183 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-canonical-selected-module-definition-observation-carrier-promotion-identity-test-layout-correction-implementation`
+Packet: `WP-6-7A-host-canonical-repository-definition-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling and retained-candidate base: `f70ede65` / `a7d9ffcc`
+Design and Rust base: pending docs commit / `66a669cc`
 
-## Goal and exact authority
+## Goal and authority
 
-Retain the fully formatted, green three-file carrier-promotion draft. Remove
-only one rustfmt-stable blank line inside
-`observed_canonical_selected_definition_identity_scan_and_terminal_algebra` so
-the function is below 200 physical lines. Do not change any token, semantic
-input, branch, assertion, API, type, reexport, smoke or lifecycle proof.
+Add the private callerless observation sibling of
+`HostCanonicalRepositoryDefinitionKey` in its existing core owner. Share the
+exact selected-first/generated-only-on-semantic-Missing composition between
+Legacy and Observed modes. Publish one local canonical Result Arc plus its
+transaction-local observation epoch; do not activate an upper consumer.
 
-Only `app/slug_bzlmod_v2/src/selected_repo_spec.rs` is writable, and only the
-single blank line between the completed Missing assertion and
-`let mut duplicate_routes = routes.clone();`. `app/slug_bzlmod_v2/src/lib.rs`
-and
-`app/slug_bzlmod_v2/tests/canonical_selected_definition_observation_api.rs`
-are byte-frozen. Every other Rust file, test, fixture, oracle, Cargo/BUILD
-target, API, caller and plan is read-only.
+Write only
+`app/slug_core_v2/src/runtime/generated_repository_definition.rs`, baseline
+2,902 physical lines with `#[cfg(test)]` at line 872. Every other Rust file,
+test, fixture, oracle, Cargo/BUILD target, API, reexport, caller and plan is
+read-only.
 
-## Frozen and target bytes
+## Frozen owner and types
 
-The green formatted draft is frozen at:
+Add private `HostCanonicalRepositoryDefinitionObservationKey` as a newtype over
+the legacy key with the same two-argument constructor and Display
+`observed-{legacy}`. Add private `ObservedHostCanonicalRepositoryDefinition`
+holding exactly
+`Arc<Result<HostCanonicalRepositoryDefinition,
+HostCanonicalRepositoryDefinitionError>>` and `PathObservationEpoch`, with
+borrowed accessors. Its Key Value is
+`SourcePreparationOutcome<Result<carrier, outer>>`; Complete equality and
+validity match accepted observation siblings.
 
-- `selected_repo_spec.rs` SHA-256
-  `78a202a4a72b5a49cc6b052234ff95f2813dfbd3b1a1634b9a78102dd71185f5`,
-  +61/-20 and 12,565 physical;
-- `lib.rs` SHA-256
-  `3fdd3d81d94ce7d3618f356114505d7c30515596a3adbe0f14fb7add30c5cea0`,
-  +6/-0 and 421 physical; and
-- external smoke SHA-256
-  `c8ee92e0c7ca1aee1dfcb1fa75e07decda0d2bf084e8baffe434a22608bc5e33`,
-  47 physical.
+Add only the private typed outer
+`HostCanonicalRepositoryDefinitionObservationError` with:
 
-The current identity function from signature through closing brace is exactly
-200 physical lines with SHA-256
-`3e4fc30b33b2d125bca9cd448915defe3e1fb17b64da4cc716269ac329b3a18d`.
+- `Selected(HostCanonicalSelectedModuleDefinitionObservationError)`;
+- `Generated { selected_missing:
+  HostCanonicalSelectedModuleDefinitionError, error:
+  HostGeneratedRepositoryDefinitionObservationError }`; and
+- `Merge { selected_missing:
+  HostCanonicalSelectedModuleDefinitionError, error:
+  ObservedPathFrontierError }`.
 
-Temporary-copy preflight removes only the named blank line and remains clean
-under rustfmt. The exact target is:
+No stage enum is needed because there is exactly one merge site, after the
+generated child. Add no export, alias, adapter, caller, public field or outer
+inspector.
 
-- `selected_repo_spec.rs` SHA-256
-  `70bfee696f637543ca1e830ebb780d961c0bacffc85a1940eb41bd229b5ce31e`,
-  +61/-21 and 12,564 physical; and
-- the identity function from signature through closing brace is 199 physical
-  lines with SHA-256
-  `ab3ad14719d015c5744a4c1a29aa39fb9d6f4a8793859435691247aeb4ff6901`.
+## Exact shared driver and terminal algebra
 
-Production remains +24/-14 and colocated proof becomes +37/-7. With frozen lib
-and smoke, aggregate accounting is +114/-21. Preserve unchanged caps <=80
-production, <=40 colocated proof, <=10 lib, <=70 external, <=200 aggregate
-semantic and physical <=12,645/425/70. Every new smoke/helper remains below
-100. There is no proof, test-size or formatter waiver.
+Factor only the existing canonical compute into private
+`CanonicalRepositoryDefinitionMode::{Legacy, Observed}`, one canonical Result
+alias, one driver-outcome alias and bounded child/finisher helpers. Legacy
+computes only the legacy selected/generated keys and uses empty epochs.
+Observed computes only the accepted selected/generated observation keys.
 
-## Frozen behavior and proof
+The first child is always selected. Selected Need returns Need. A selected DICE
+compute failure remains `SelectedCompute(message)` with an empty epoch. The
+observed selected outer becomes carrierless `Selected`. Selected success,
+non-Missing semantic failure and their complete epochs are final: success maps
+to canonical Selected, a non-Missing error maps to canonical `Selected`, and
+generated is not requested. Only an exact semantic error whose disposition is
+`Missing` retains that error plus the selected epoch as the generated-stage
+prefix.
 
-The only allowed diff is deletion of the blank separator. Freeze byte-for-byte
-all production and public/private carrier types, constructor/accessors,
-private-inner/public-outer projection, Error/Key/Observed hidden reexport
-membership/order/adjacency, external key/Display/associated-Value/accessor
-smoke, and the corrected lifecycle source scan.
+Only then request generated. Generated Need returns Need without publishing the
+stored prefix. Generated DICE compute failure remains semantic
+`GeneratedCompute { selected_missing, message }` and carries the selected
+prefix epoch. The observed generated outer becomes carrierless `Generated {
+selected_missing, error }`. On a complete generated carrier, merge selected
+prefix then generated epoch left-first with `PathObservationEpoch::from_shared`.
+Equal duplicate demands retain the selected prefix entry/Arc; a differing
+result for the same demand becomes carrierless `Merge { selected_missing,
+error: ObservedPathFrontierError::Epoch(ConflictingDemand) }`. Valid epochs
+cannot create an operation mismatch at this parent merge. OperationMismatch is
+proved only through accepted lower typed `Selected` or `Generated` outers; the
+latter retains selected Missing. Merge happens before generated semantic
+projection. Generated success maps to canonical Generated; generated Missing
+maps to canonical Missing retaining both errors; every other generated
+semantic error maps to canonical Generated retaining selected Missing. Each
+carries the merged epoch.
 
-Within the identity test, preserve every token and the exact identity/hash/
-Display, Need, outer, compute, Missing, Duplicate, BuiltinDeferred, success,
-epoch, Arc, equality and validity assertions. Preserve all tracker/event/
-nonactivation, held-handle/epoch, cancellation and recovery proof elsewhere.
+Need/outer/merge never publishes a carrier. No full scan, Need union, direct
+Host read, legacy fallback, epoch reconstruction or runtime injection is
+allowed. The shared driver must preserve the exact current Result values,
+error fields, selected-first order and generated-on-Missing polarity.
 
-## Validation, compatibility and terminal
+## Events, retention and lifecycle proof
+
+The canonical parent owns no event batch. Selected/generated observed children
+retain all lower batches; the parent neither moves nor replays them. Selected
+terminal rows have exactly one child edge. Missing-fallback rows have ordered
+children `[observed selected, observed generated]`. Parent, instantiation,
+validation, generated and every warm/Reused row remain batchless. Later-child
+Need/outer/compute/semantic/merge terminals do not replay legacy invocation
+prints; cancellation publishes no parent carrier or batch.
+
+Each successful observed carrier retains only the canonical Result Arc and
+compact epoch. A carrierless outer retains only its named child outer plus
+selected Missing where specified, and no epoch. The child carriers, generated
+Result, prefix tuple, merge iterators, mode, event/evaluator state and all
+task/lock scratch die before publication. Existing canonical values/errors
+retain only their established selected or generated certificates/errors. DICE
+owns serialization; add no manual lock, task, cache, store or retained Starlark
+heap.
+
+Add exactly:
+
+- `observed_canonical_repository_definition_identity_staging_and_terminal_algebra`;
+- `observed_canonical_repository_definition_real_order_events_and_parity`; and
+- `observed_canonical_repository_definition_lifecycle_cancellation_and_nonactivation`.
+
+Together prove key identity/hash/Display/accessors/equality/validity; exact
+selected success/Need/outer/compute/non-Missing/Missing staging; generated
+Need/outer/compute/success/Missing/other error; equal-left merge and conflicting
+merge; accepted lower outer/mismatch evidence plus bounded parent mapping,
+source and dependency evidence, exact legacy parity and ordered dependency
+rows; real selected and
+generated success/failure families, lower print order, parent batchlessness,
+warm silence and no later invocation prints; held Result/epoch handles through
+selected and generated semantic A-B-A, metadata-only equal Result with changed
+epoch, each carrier epoch as a subset of its own transaction global, Arc
+identity only on proven Reused, poll-drop of real selected-terminal and
+Missing-fallback requests plus same-DICE recovery. Prove zero legacy canonical,
+apparent/root mapping, root apparent definition, route/source, public command
+or bootstrap activation. Use pure finishers only for valid equal/conflicting
+epochs and real graph inputs; forbid a malformed epoch, production/test hook or
+local synthetic operation mismatch.
+
+## Caps, validation and compatibility
+
+Permit <=320 production, <=740 proof and <=1,060 aggregate semantic net lines,
+with <=3,975 physical lines. Add at most eight production and eight test
+helpers, exactly three tests, keep the shared driver below 140 lines and every
+helper/test below 200. The >2,000-line owner remains cohesive because it
+already contains the generated child observation, canonical reducer/value/
+error/view, both production consumers, tracker and real fixtures beside the
+imported selected handoff; splitting would expose private representations.
+This is not a demonstrated hot path and changes no retained representation
+beyond the standard Result-Arc+epoch carrier.
 
 Run serially:
 
-- verify the three frozen input hashes;
-- delete only the named blank line;
-- `cargo fmt --all -- --check`;
-- verify the exact target selected/identity hashes, accounting, physical sizes
-  and three-file allowlist;
-- `cargo test -p slug_bzlmod_v2 observed_canonical_selected_definition_ --lib`;
-- `cargo test -p slug_bzlmod_v2 --test canonical_selected_definition_observation_api`;
-- protected `cargo test -p slug_bzlmod_v2 --test definition_request_observation_api`;
-- protected `cargo test -p slug_bzlmod_v2 --test evaluation_input_request_observation_api`;
-- full `cargo test -p slug_bzlmod_v2`;
-- direct dependent `cargo check -p slug_core_v2`; and
-- `git diff --check`.
+- `cargo test -p slug_core_v2 observed_canonical_repository_definition_ --lib`;
+- `cargo test -p slug_core_v2 canonical_definition_ --lib`;
+- `cargo test -p slug_core_v2 observed_generated_definition_ --lib`;
+- `cargo test -p slug_core_v2 real_generated_selected_and_deferred_domains_are_structural --lib`;
+- `cargo test -p slug_core_v2 lifecycle_identity_and_mapping_precedence_are_structural --lib`;
+- full `cargo test -p slug_core_v2`;
+- protected `cargo test -p slug_bzlmod_v2 --test canonical_selected_definition_observation_api`;
+- direct dependent `cargo check -p slug_commands_v2`;
+- `cargo fmt --all -- --check`; and
+- exact accounting/physical/helper/test allowlist plus `git diff --check`.
 
-No oracle is needed because blank-line removal cannot change Bazel-visible
-behavior. Existing selected values/errors/dispositions/full scan/order/views,
-DICE equality/invalidation and lower event ownership remain exact Bazel 9
-compatibility. The doc-hidden carrier/opaque outer/shared-Arc transaction-local
-epoch is Slug-native. Canonical/generated composition, upper activation and
+Reuse Bazel 9.2 `BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
+`BazelDepGraphValue.getRepositoryMapping`, `SingleExtensionFunction`,
+`SingleExtensionEvalFunction` and `ModuleExtensionResolutionTest`; add no
+fixture or oracle. Buck2 DICE incrementality/cancellation and activation tests
+remain concept/test evidence only.
+
+Canonical selected/generated values, errors, order, Missing-only fallback,
+equality/invalidation and lower events remain exact Bazel 9 compatibility. The
+private observed key/carrier/typed outer and shared-Arc transaction-local epoch
+are Slug-native. Carrier promotion, an observed upper caller, apparent/root
+mapping, root definition/route/source/public/command/bootstrap activation and
 exact Bazel configuration/output/ActionKey bytes remain unsupported/deferred.
 
-ACCEPT returns only to a docs-only canonical selected/generated observation-
-owner design. STOP an input/target hash, accounting, physical, fmt or allowlist
-mismatch; deletion or edit of any other line/token/file; semantic/API/type/
-reexport/smoke/assertion/lifecycle drift; loading/core edit; Cargo/BUILD;
-fixture/oracle; cap/proof/test-size/fmt waiver; upper activation; milestone
-closure; M8/M7B or exact identity work. REPLAN before widening. M7 remains
-partial and M7A -> M8 -> M7B remains.
+## Terminal
+
+ACCEPT returns only to a docs-only canonical-observation consumer frontier
+audit. STOP a second file/key/owner/adapter, export/reexport/caller, public API,
+upper compute change, child order or Missing polarity drift, semantic/error/
+event/equality/retention drift, legacy invocation-print replay, epoch union
+waiver, retained scratch/task/lock, fixture/oracle, cap/helper/test waiver,
+milestone closure, M8/M7B or exact identity work. REPLAN before widening. M7
+remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Formatter packet `f70ede65` produces the exact fully green three-file bytes.
-Final review finds only that the identity function is 200 rather than below 200
-physical lines; temporary-copy deletion of one blank separator proves the
-minimal rustfmt-stable correction.
+Accepted `66a669cc` exposes only the selected observation key/carrier/opaque
+outer to core. The generated observed child is already private in this module.
+Live source proves these are the complete lower prerequisites and canonical is
+the first selected/generated composition owner.

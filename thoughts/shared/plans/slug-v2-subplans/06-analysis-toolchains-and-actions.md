@@ -12553,6 +12553,116 @@ milestone closure, M8/M7B or identity work. REPLAN before widening. ACCEPT
 returns only to canonical selected/generated owner design. M7 remains partial
 and M7A -> M8 -> M7B remains.
 
+### Canonical selected/generated observation-owner design accepted (2026-08-21)
+
+Accepted carrier promotion `66a669cc` closes the only cross-crate prerequisite.
+Live `generated_repository_definition.rs` has the accepted selected observed
+surface from Bzlmod and its own private generated observed sibling. The legacy
+canonical key at lines 484-605 is the first common owner and has exactly two
+production consumers: same-file nonroot apparent mapping at line 799 and root
+apparent definition at its line 310. Neither consumer nor later mapping,
+route/source, public command or bootstrap work is activated.
+
+Activate only
+`WP-6-7A-host-canonical-repository-definition-observation-implementation`.
+Authority is exactly the existing core owner, baseline 2,902 physical with
+tests at 872. Add private observed key/new, Result-Arc+epoch carrier/borrowed
+accessors and typed outer only. Display is `observed-{legacy}` and Key Value is
+`SourcePreparationOutcome<Result<carrier, outer>>`; add no export, alias,
+adapter, caller or public field.
+
+The exact outer is:
+
+- `Selected(HostCanonicalSelectedModuleDefinitionObservationError)`;
+- `Generated { selected_missing, error:
+  HostGeneratedRepositoryDefinitionObservationError }`; and
+- `Merge { selected_missing, error: ObservedPathFrontierError }`.
+
+Both latter variants retain the exact
+`HostCanonicalSelectedModuleDefinitionError` Missing prefix. There is one
+merge site, so no stage enum is admitted.
+
+Factor only current canonical compute into one private Legacy/Observed driver.
+Selected is always first. Need is immediate; selected compute remains semantic
+`SelectedCompute` with empty epoch; selected observed outer is carrierless.
+Selected success and non-Missing semantic error terminate with the selected
+epoch and never request generated. Only semantic Missing retains its error and
+epoch as a prefix and reaches generated.
+
+Generated Need is immediate without carrier publication. Generated compute
+remains semantic `GeneratedCompute` with the selected prefix epoch. Generated
+outer is carrierless and retains selected Missing. A complete generated carrier
+merges selected then generated epochs left-first with
+`PathObservationEpoch::from_shared` before semantic projection. Equal duplicate
+demands retain the selected entry/Arc; conflict becomes carrierless Merge.
+Only a same-demand differing-result `ConflictingDemand` can arise from two
+valid epochs here. OperationMismatch remains evidence of a lower typed Selected
+or Generated outer, with Generated retaining selected Missing; it cannot be
+synthesized at the parent merge. Generated success, Missing and other semantic
+error preserve the existing Generated/Missing/Generated exact values and
+retained error fields with the merged epoch. No full scan, Need union, direct
+Host read, fallback, epoch reconstruction or runtime injection is allowed.
+
+Canonical remains batchless. Selected terminals have only the observed selected
+dependency; Missing fallback has ordered observed selected then observed
+generated dependencies. Lower children own all load/invocation prints. Parent
+and every warm row are batchless; later Need/outer/compute/semantic/merge
+failures replay no legacy invocation prints, and poll-drop publishes no carrier
+or batch.
+
+Each successful observed carrier retains only one canonical Result Arc plus
+compact epoch. A carrierless outer retains only its named child outer plus
+selected Missing where specified, and no epoch. Child carriers, generated
+Result, prefix tuple, merge iterator, mode, evaluator/event state and task/
+lock/cache scratch die before publication. Existing canonical Result variants
+remain the only semantic certificate/error retention. DICE owns serialization;
+no manual lock or task crosses a compute.
+
+Add exactly
+`observed_canonical_repository_definition_identity_staging_and_terminal_algebra`,
+`observed_canonical_repository_definition_real_order_events_and_parity` and
+`observed_canonical_repository_definition_lifecycle_cancellation_and_nonactivation`.
+Prove identity/Display/accessors/equality/validity, every selected/generated
+terminal, accepted lower outer/mismatch proof plus bounded parent mapping,
+source and dependency evidence, left-first equal/conflicting merge and exact
+legacy parity; exact
+one-/two-child dependency rows, real selected/generated families and lower
+event order, parent/warm batchlessness and later-terminal print suppression;
+held selected and generated semantic A-B-A, metadata-only equal Result with
+changed epoch, per-transaction global-epoch subsets, Arc identity only on
+Reused, poll-drop of real selected-terminal and Missing-fallback requests,
+same-DICE recovery and upper denylist/source scan. Use pure finishers only for
+valid equal/conflicting epochs and real inputs; add no malformed epoch, hook or
+local synthetic operation mismatch.
+
+Caps are <=320 production, <=740 proof, <=1,060 aggregate semantic and <=3,975
+physical, at most eight production/eight test helpers, exactly three tests,
+driver below 140 and every helper/test below 200. The large file stays cohesive
+because it already contains the generated child carrier, canonical reducer/
+value/errors, both consumers, tracker and fixtures beside the imported selected
+handoff; splitting exposes private state. This is not a demonstrated hot path.
+
+Validate focused observed canonical, protected canonical/generated and root-
+apparent tests, full core, protected selected external smoke, direct commands
+check, formatting, exact caps/allowlist and diff hygiene serially. Reuse Bazel
+9.2 `BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
+`BazelDepGraphValue.getRepositoryMapping`, `SingleExtensionFunction`,
+`SingleExtensionEvalFunction` and `ModuleExtensionResolutionTest`; Buck2 DICE
+incrementality/cancellation remains concept/test evidence. Add no oracle.
+
+Canonical semantics, selected-first/Missing-only order, errors, equality/
+invalidation and lower events remain exact. The private carrier/outer and
+shared-Arc transaction-local epoch are Slug-native. Promotion/caller and
+apparent/root mapping, root definition/route/source/public/command/bootstrap
+observation plus exact Bazel identity bytes remain unsupported/deferred.
+
+ACCEPT returns only to a docs-only canonical-observation consumer frontier
+audit. STOP a second file/key/owner/adapter, export/caller/API, upper compute,
+order/polarity/semantic/event/equality/retention drift, legacy print replay,
+epoch waiver, retained scratch/task/lock, fixture/oracle, cap/helper/test waiver,
+milestone closure, M8/M7B or exact identity work. REPLAN before widening. M7
+remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier formatter REPLAN (2026-08-21)
 
 The proof-corrected semantic draft is retained, but
