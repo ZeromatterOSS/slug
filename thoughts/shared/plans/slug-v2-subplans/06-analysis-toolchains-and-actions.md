@@ -11098,6 +11098,95 @@ owner, reverse dependency, retained Starlark heap, event movement, pure/upper
 activation, proof waiver, milestone closure, M8/M7B or exact identity work.
 M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Prepared module-extension inputs observation design (2026-08-20)
+
+The bounded design from scheduling base `3738b2b4` activates only
+`WP-6-7A-host-prepared-module-extension-inputs-observation-implementation`
+over Rust base `50881fc0`.
+
+Add one private `HostPreparedModuleExtensionInputsObservationKey`, one
+`ObservedHostPreparedModuleExtensionInputs` carrying the exact local prepared
+Result Arc plus cumulative epoch, and one private outer with exactly Raw,
+Definitions and Merge variants. One Legacy/Observed driver preserves selected
+evaluation inputs -> loaded definitions -> unchanged prepared join/schema/
+class/coercion order. Legacy uses only legacy children with empty epochs and
+moves the exact local Result Arc from the shared driver; Observed uses only the
+two accepted observation children.
+
+Raw compute failure remains semantic `RawCompute` with empty epoch. Raw Need or
+opaque child outer is carrierless. Accept a Complete raw epoch before raw
+semantics; raw semantic failure retains that epoch and suppresses definitions.
+The Raw outer retains no completed semantic context.
+
+Definitions compute failure remains semantic `Definitions { error: Err }`
+with the raw prefix. Definitions Need or typed child outer is carrierless; the
+outer retains the completed raw semantic aggregate but publishes no carrier.
+For Complete definitions, merge its epoch into raw left-first before child
+semantics. Equal duplicate demands retain the raw-side Arc. A valid-epoch
+same-demand value conflict is the carrierless Merge outer with raw context and
+the exact `ObservedPathFrontierError`. An operation mismatch rejected by a
+lower child remains in that child's carrierless Raw or Definitions outer;
+construct no malformed epoch or synthetic hook. Definition semantic failure
+retains the merged prefix through existing `Definitions { error: Ok }`.
+
+Only two successful child semantics reach unchanged
+`prepare_module_extension_inputs`; every request/count/order Join,
+UnknownTagClass, schema/attribute error and success retains the full merged
+prefix. First terminal suppresses every later child/local step; add no Need
+union, full scan or speculative task.
+
+The parent owns no event batch. Accepted request/root/Host-Bzl children remain
+sole event owners; fresh evaluation preserves child order, shared lower work
+may be Reused without replay, warm parent reuse is silent, and Need/outer/
+cancellation publishes no parent carrier or batch. Retain only the local
+prepared Result Arc, compact epoch and semantic projections reachable from the
+Result. Child carriers/Result Arcs, full Bzl modules/heaps, join/coercion/event
+scratch, maps, locks and tasks remain compute-local.
+
+Implementation authority is exactly
+`app/slug_loading_v2/src/bzl_module.rs`, baseline 8,288 physical with the
+owning test module at 5,452. Caps are <=380 production, <=1,050 proof, <=1,430
+aggregate semantic and <=9,725 physical. Add at most six direct helpers and
+three observed-parent tests; keep the shared driver below 150 and every
+changed helper/test below 200.
+
+The large file remains cohesive because it already owns the legacy key and
+pure preparation function, both child observation surfaces, tracker, fixtures
+and prepared tests. Splitting the private sibling would create a visibility
+seam and duplicate proof plumbing.
+
+Require exact identity/finisher/left-Arc proof, valid-epoch conflict at Merge,
+and lower child conflict/operation mismatch at Raw or Definitions; require real
+legacy/observed Result parity and raw/definition/local terminal order; exact child
+family/dependency/event rows, warm/Reused behavior; independent raw and
+definition held-handle A -> B -> A; poll-drop/recovery; transaction-local
+carrier/global-epoch association; and production-slice/all-key nonactivation.
+Reuse accepted opaque raw-child outer proof rather than constructing or
+inspecting it from loading. Across transactions compare semantic Results and
+projections, not whole epoch maps; require Arc identity only for an exact
+cached value proven Reused.
+
+Exclude reverse-family mixing and exact upper
+`HostPureModuleExtensionInvocationsKey`,
+`HostInstantiatedModuleExtensionRepositoriesKey`,
+`HostValidatedModuleExtensionRepositoriesKey`,
+`HostRootRepositoryMappingKey`,
+`HostCanonicalSelectedModuleDefinitionKey`,
+`HostGeneratedRepositoryDefinitionKey` and `slug-command:` activation.
+
+Reuse accepted Bazel 9.2 evidence; add no oracle. Run focused
+`observed_prepared_`, protected `real_prepared_inputs_` and `observed_loaded_`,
+full `slug_loading_v2`, direct `slug_core_v2` check, formatting and diff gates
+serially.
+
+Existing prepared values/errors/order/schema/class/coercion and child events
+remain exact. The private key/carrier/outer/epoch is Slug-native. Implementation
+ACCEPT returns only to a docs-only pure-invocation frontier audit. STOP second
+file/key/adapter/owner, API/export/caller change, semantic/event/retention
+drift, retained Starlark heap, lock across DICE, pure/upper activation, proof/
+cap waiver, milestone closure, M8/M7B or exact identity work. REPLAN before
+widening. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
