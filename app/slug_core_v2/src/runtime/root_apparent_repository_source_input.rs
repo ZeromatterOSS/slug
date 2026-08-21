@@ -295,6 +295,7 @@ pub(super) mod tests {
     use slug_bzlmod_v2::RepositorySourceFileKey;
     use slug_bzlmod_v2::RootRepositoryRouteKey;
     use slug_loading_v2::RepositoryPackageLoadKey;
+    use slug_workspace_v2::PathObservationEpoch;
     use slug_workspace_v2::PathObservationEpochKey;
 
     use super::super::generated_repository_definition::tests::EXTENSION_A;
@@ -304,7 +305,48 @@ pub(super) mod tests {
     use super::super::generated_repository_definition::tests::transaction_with_command_override;
     use super::super::generated_repository_definition::tests::validated;
     use super::super::root_apparent_repository_definition::tests::prepare_builtin;
+    use super::super::root_apparent_repository_route::HostRootApparentRepositoryRoute;
+    use super::super::root_apparent_repository_route::HostRootApparentRepositoryRouteError;
+    use super::super::root_apparent_repository_route::HostRootApparentRepositoryRouteObservationError;
+    use super::super::root_apparent_repository_route::HostRootApparentRepositoryRouteObservationKey;
+    use super::super::root_apparent_repository_route::ObservedHostRootApparentRepositoryRoute;
     use super::*;
+
+    #[test]
+    fn root_apparent_repository_route_observation_surface_is_sibling_usable() {
+        let key = HostRootApparentRepositoryRouteObservationKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            ApparentRepoName::new("first").unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            key.to_string(),
+            "observed-HostRootApparentRepositoryRouteKey { workspace: NormalizedAbsolutePath { path: \"/workspace\" }, apparent_repo: ApparentRepoName(\"first\") }"
+        );
+
+        fn inspect(
+            _: &<HostRootApparentRepositoryRouteObservationKey as Key>::Value,
+            observed: &ObservedHostRootApparentRepositoryRoute,
+            _: &HostRootApparentRepositoryRouteObservationError,
+        ) {
+            let _: &Arc<
+                Result<HostRootApparentRepositoryRoute, HostRootApparentRepositoryRouteError>,
+            > = observed.result();
+            let _: &PathObservationEpoch = observed.observations();
+        }
+        let _ = inspect
+            as fn(
+                &SourcePreparationOutcome<
+                    Result<
+                        ObservedHostRootApparentRepositoryRoute,
+                        HostRootApparentRepositoryRouteObservationError,
+                    >,
+                >,
+                &ObservedHostRootApparentRepositoryRoute,
+                &HostRootApparentRepositoryRouteObservationError,
+            );
+    }
+
     #[derive(Default)]
     struct Tracker {
         order: Mutex<Vec<(&'static str, ActivationKind)>>,

@@ -292,10 +292,13 @@ impl fmt::Display for HostRootApparentRepositoryRouteKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostRootApparentRepositoryRouteObservationKey(HostRootApparentRepositoryRouteKey);
+pub(super) struct HostRootApparentRepositoryRouteObservationKey(HostRootApparentRepositoryRouteKey);
 
 impl HostRootApparentRepositoryRouteObservationKey {
-    fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
+    pub(super) fn new(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+    ) -> Option<Self> {
         HostRootApparentRepositoryRouteKey::new(workspace, apparent_repo).map(Self)
     }
 }
@@ -307,25 +310,34 @@ impl fmt::Display for HostRootApparentRepositoryRouteObservationKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-struct ObservedHostRootApparentRepositoryRoute {
+pub(super) struct ObservedHostRootApparentRepositoryRoute {
     result: Arc<HostRootApparentRepositoryRouteResult>,
     observations: PathObservationEpoch,
 }
 
 impl ObservedHostRootApparentRepositoryRoute {
-    fn result(&self) -> &Arc<HostRootApparentRepositoryRouteResult> {
+    pub(super) fn result(
+        &self,
+    ) -> &Arc<Result<HostRootApparentRepositoryRoute, HostRootApparentRepositoryRouteError>> {
         &self.result
     }
 
-    fn observations(&self) -> &PathObservationEpoch {
+    pub(super) fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum HostRootApparentRepositoryRouteObservationError {
+enum RootApparentRepositoryRouteObservationError {
     Definition(HostRootApparentRepositoryDefinitionObservationError),
 }
+
+impl Dupe for RootApparentRepositoryRouteObservationError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(super) struct HostRootApparentRepositoryRouteObservationError(
+    RootApparentRepositoryRouteObservationError,
+);
 
 impl Dupe for HostRootApparentRepositoryRouteObservationError {}
 
@@ -341,7 +353,7 @@ type RootApparentRepositoryRouteDriverOutcome = SourcePreparationOutcome<
             Arc<HostRootApparentRepositoryRouteResult>,
             PathObservationEpoch,
         ),
-        HostRootApparentRepositoryRouteObservationError,
+        RootApparentRepositoryRouteObservationError,
     >,
 >;
 
@@ -440,7 +452,7 @@ async fn compute_root_apparent_repository_route(
             }
             Ok(SourcePreparationOutcome::Complete(Err(error))) => {
                 return SourcePreparationOutcome::Complete(Err(
-                    HostRootApparentRepositoryRouteObservationError::Definition(error),
+                    RootApparentRepositoryRouteObservationError::Definition(error),
                 ));
             }
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
@@ -517,9 +529,9 @@ impl Key for HostRootApparentRepositoryRouteObservationKey {
         .await
         {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
-            }
+            SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(
+                Err(HostRootApparentRepositoryRouteObservationError(error)),
+            ),
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
                 SourcePreparationOutcome::Complete(Ok(ObservedHostRootApparentRepositoryRoute {
                     result,
@@ -919,7 +931,8 @@ mod tests {
             .find("struct HostRootApparentRepositoryRouteObservationKey")
             .unwrap()..source.find("#[cfg(test)]").unwrap()];
         assert_eq!(producer.matches("HostRootApparentRepositoryDefinitionObservationKey::new").count(), 1);
-        assert_eq!(producer.matches("HostRootApparentRepositoryRouteObservationError::Definition(error)").count(), 1);
+        assert_eq!(producer.matches("RootApparentRepositoryRouteObservationError::Definition(error)").count(), 1);
+        assert_eq!(producer.matches("HostRootApparentRepositoryRouteObservationError(error)").count(), 1);
         for absent in [
             "PathObservationEpoch::from",
             "merge_observ",
