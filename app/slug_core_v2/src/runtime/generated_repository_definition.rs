@@ -493,10 +493,15 @@ pub(super) struct HostCanonicalRepositoryDefinitionKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostCanonicalRepositoryDefinitionObservationKey(HostCanonicalRepositoryDefinitionKey);
+pub(super) struct HostCanonicalRepositoryDefinitionObservationKey(
+    HostCanonicalRepositoryDefinitionKey,
+);
 
 impl HostCanonicalRepositoryDefinitionObservationKey {
-    fn new(workspace: NormalizedAbsolutePath, canonical_repo: CanonicalRepoName) -> Self {
+    pub(super) fn new(
+        workspace: NormalizedAbsolutePath,
+        canonical_repo: CanonicalRepoName,
+    ) -> Self {
         Self(HostCanonicalRepositoryDefinitionKey::new(
             workspace,
             canonical_repo,
@@ -514,23 +519,26 @@ type CanonicalRepositoryDefinitionResult =
     Arc<Result<HostCanonicalRepositoryDefinition, HostCanonicalRepositoryDefinitionError>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-struct ObservedHostCanonicalRepositoryDefinition {
+pub(super) struct ObservedHostCanonicalRepositoryDefinition {
     result: CanonicalRepositoryDefinitionResult,
     observations: PathObservationEpoch,
 }
 
 impl ObservedHostCanonicalRepositoryDefinition {
-    fn result(&self) -> &CanonicalRepositoryDefinitionResult {
+    pub(super) fn result(
+        &self,
+    ) -> &Arc<Result<HostCanonicalRepositoryDefinition, HostCanonicalRepositoryDefinitionError>>
+    {
         &self.result
     }
 
-    fn observations(&self) -> &PathObservationEpoch {
+    pub(super) fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum HostCanonicalRepositoryDefinitionObservationError {
+enum CanonicalRepositoryDefinitionObservationError {
     Selected(HostCanonicalSelectedModuleDefinitionObservationError),
     Generated {
         selected_missing: HostCanonicalSelectedModuleDefinitionError,
@@ -541,6 +549,13 @@ enum HostCanonicalRepositoryDefinitionObservationError {
         error: ObservedPathFrontierError,
     },
 }
+
+impl Dupe for CanonicalRepositoryDefinitionObservationError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(super) struct HostCanonicalRepositoryDefinitionObservationError(
+    CanonicalRepositoryDefinitionObservationError,
+);
 
 impl Dupe for HostCanonicalRepositoryDefinitionObservationError {}
 
@@ -596,7 +611,7 @@ enum CanonicalRepositoryDefinitionMode {
 type CanonicalRepositoryDefinitionDriverOutcome = SourcePreparationOutcome<
     Result<
         (CanonicalRepositoryDefinitionResult, PathObservationEpoch),
-        HostCanonicalRepositoryDefinitionObservationError,
+        CanonicalRepositoryDefinitionObservationError,
     >,
 >;
 
@@ -614,7 +629,7 @@ async fn compute_canonical_repository_definition(
         },
         CanonicalRepositoryDefinitionMode::Observed => match ctx.compute(&HostCanonicalSelectedModuleDefinitionObservationKey::new(key.workspace.clone(), key.canonical_repo.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostCanonicalRepositoryDefinitionObservationError::Selected(error))),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(CanonicalRepositoryDefinitionObservationError::Selected(error))),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().clone(), observed.observations().clone()),
             Err(error) => return complete_canonical_driver(Err(HostCanonicalRepositoryDefinitionError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::SelectedCompute(error.to_string().into()) }), PathObservationEpoch::empty()),
         },
@@ -632,14 +647,14 @@ async fn compute_canonical_repository_definition(
         },
         CanonicalRepositoryDefinitionMode::Observed => match ctx.compute(&HostGeneratedRepositoryDefinitionObservationKey::new(key.workspace.clone(), key.canonical_repo.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostCanonicalRepositoryDefinitionObservationError::Generated { selected_missing, error })),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(CanonicalRepositoryDefinitionObservationError::Generated { selected_missing, error })),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().clone(), observed.observations().clone()),
             Err(error) => return complete_canonical_driver(Err(HostCanonicalRepositoryDefinitionError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::GeneratedCompute { selected_missing, message: error.to_string().into() } }), selected_observations),
         },
     };
     let observations = match merge_canonical_observations(&selected_observations, &generated_observations) {
         Ok(observations) => observations,
-        Err(error) => return SourcePreparationOutcome::Complete(Err(HostCanonicalRepositoryDefinitionObservationError::Merge { selected_missing, error })),
+        Err(error) => return SourcePreparationOutcome::Complete(Err(CanonicalRepositoryDefinitionObservationError::Merge { selected_missing, error })),
     };
     let value = match generated.as_ref() {
         Ok(value) => Ok(HostCanonicalRepositoryDefinition { source: HostCanonicalRepositoryDefinitionSource::Generated(value.clone()) }),
@@ -699,9 +714,9 @@ impl Key for HostCanonicalRepositoryDefinitionObservationKey {
         .await
         {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
-            }
+            SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(
+                Err(HostCanonicalRepositoryDefinitionObservationError(error)),
+            ),
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
                 SourcePreparationOutcome::Complete(Ok(ObservedHostCanonicalRepositoryDefinition {
                     result,
@@ -872,7 +887,7 @@ impl ObservedHostCanonicalRepositoryApparentMapping {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 enum CanonicalRepositoryApparentMappingObservationError {
     RootMapping(HostRootRepositoryMappingObservationError),
-    Definition(HostCanonicalRepositoryDefinitionObservationError),
+    Definition(CanonicalRepositoryDefinitionObservationError),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
@@ -958,7 +973,7 @@ async fn canonical_definition_apparent_mapping_child(
         CanonicalRepositoryApparentMappingMode::Observed => match ctx.compute(&HostCanonicalRepositoryDefinitionObservationKey::new(key.workspace.clone(), key.context_repo.clone())).await {
             Err(error) => return CanonicalRepositoryApparentMappingChildOutcome::Complete { result: Err(HostCanonicalRepositoryApparentMappingErrorKind::DefinitionCompute(error.to_string().into())), observations: PathObservationEpoch::empty() },
             Ok(SourcePreparationOutcome::Need(need)) => return CanonicalRepositoryApparentMappingChildOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => return CanonicalRepositoryApparentMappingChildOutcome::Outer(CanonicalRepositoryApparentMappingObservationError::Definition(error)),
+            Ok(SourcePreparationOutcome::Complete(Err(HostCanonicalRepositoryDefinitionObservationError(error)))) => return CanonicalRepositoryApparentMappingChildOutcome::Outer(CanonicalRepositoryApparentMappingObservationError::Definition(error)),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().clone(), observed.observations().clone()),
         },
     };
@@ -3244,13 +3259,14 @@ second=module_extension(implementation=second_impl)
         assert_eq!(producer.matches("HostCanonicalSelectedModuleDefinitionObservationKey::new").count(), 1);
         assert_eq!(producer.matches("HostGeneratedRepositoryDefinitionObservationKey::new").count(), 1);
         assert!(producer.find("HostCanonicalSelectedModuleDefinitionObservationKey::new").unwrap() < producer.find("HostGeneratedRepositoryDefinitionObservationKey::new").unwrap());
-        assert!(producer.contains("HostCanonicalRepositoryDefinitionObservationError::Selected(error)"));
-        assert!(producer.contains("HostCanonicalRepositoryDefinitionObservationError::Generated { selected_missing, error }"));
-        assert!(producer.contains("HostCanonicalRepositoryDefinitionObservationError::Merge { selected_missing, error }"));
+        assert!(producer.contains("CanonicalRepositoryDefinitionObservationError::Selected(error)"));
+        assert!(producer.contains("CanonicalRepositoryDefinitionObservationError::Generated { selected_missing, error }"));
+        assert!(producer.contains("CanonicalRepositoryDefinitionObservationError::Merge { selected_missing, error }"));
         assert!(producer.contains("Err(error) => return complete_canonical_driver(Err(HostCanonicalRepositoryDefinitionError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::SelectedCompute"));
         assert!(producer.contains("Err(error) => return complete_canonical_driver(Err(HostCanonicalRepositoryDefinitionError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::GeneratedCompute { selected_missing"));
-        assert!(producer.contains("return SourcePreparationOutcome::Complete(Err(HostCanonicalRepositoryDefinitionObservationError::Selected(error)))"));
-        assert!(producer.contains("return SourcePreparationOutcome::Complete(Err(HostCanonicalRepositoryDefinitionObservationError::Generated { selected_missing, error }))"));
+        assert!(producer.contains("return SourcePreparationOutcome::Complete(Err(CanonicalRepositoryDefinitionObservationError::Selected(error)))"));
+        assert!(producer.contains("return SourcePreparationOutcome::Complete(Err(CanonicalRepositoryDefinitionObservationError::Generated { selected_missing, error }))"));
+        assert_eq!(producer.matches("HostCanonicalRepositoryDefinitionObservationError(error)").count(), 1);
         assert!(!producer.contains("store_evaluation_data")); assert!(!producer.contains("union_")); assert!(!producer.contains("HostCanonicalRepositoryApparentMappingKey::new"));
         let selected_source = include_str!("../../../slug_bzlmod_v2/src/selected_repo_spec.rs");
         let selected_proof = &selected_source[selected_source.find("observed_canonical_selected_definition_identity_scan_and_terminal_algebra").unwrap()..selected_source.find("observed_canonical_selected_definition_real_order_events_and_parity").unwrap()];
@@ -3539,7 +3555,7 @@ second=module_extension(implementation=second_impl)
         let SourcePreparationOutcome::Complete(missing_definition) = missing_definition else { panic!("missing definition must complete") };
         let HostCanonicalRepositoryDefinitionErrorKind::Missing { selected_missing, .. } = &missing_definition.as_ref().as_ref().unwrap_err().kind else { panic!("missing definition terminal expected") };
         let conflict = merge_canonical_observations(&generated_definition_observation_epoch(MODULE, EXTENSION_A, true), &generated_definition_observation_epoch(&format!("{MODULE}\n"), EXTENSION_A, true)).unwrap_err();
-        let outer = finish_canonical_repository_apparent_mapping(&nonroot_key.0, CanonicalRepositoryApparentMappingChildOutcome::Outer(CanonicalRepositoryApparentMappingObservationError::Definition(HostCanonicalRepositoryDefinitionObservationError::Merge { selected_missing: selected_missing.clone(), error: conflict })));
+        let outer = finish_canonical_repository_apparent_mapping(&nonroot_key.0, CanonicalRepositoryApparentMappingChildOutcome::Outer(CanonicalRepositoryApparentMappingObservationError::Definition(CanonicalRepositoryDefinitionObservationError::Merge { selected_missing: selected_missing.clone(), error: conflict })));
         let outer_value: <HostCanonicalRepositoryApparentMappingObservationKey as Key>::Value = match outer { SourcePreparationOutcome::Complete(Err(error @ CanonicalRepositoryApparentMappingObservationError::Definition(_))) => SourcePreparationOutcome::Complete(Err(HostCanonicalRepositoryApparentMappingObservationError(error))), _ => panic!("definition outer expected") };
         assert!(HostCanonicalRepositoryApparentMappingObservationKey::validity(&outer_value));
         assert!(HostCanonicalRepositoryApparentMappingObservationKey::equality(&outer_value, &outer_value));
@@ -3551,6 +3567,7 @@ second=module_extension(implementation=second_impl)
         assert_eq!(producer.matches("CanonicalRepositoryApparentMappingObservationError::RootMapping(error)").count(), 1);
         assert_eq!(producer.matches("CanonicalRepositoryApparentMappingObservationError::Definition(error)").count(), 1);
         assert_eq!(producer.matches("HostCanonicalRepositoryApparentMappingObservationError(error)").count(), 1);
+        assert_eq!(producer.matches("HostCanonicalRepositoryDefinitionObservationError(error)").count(), 1);
         for forbidden in ["merge_canonical_observations", "union_", "store_evaluation_data", "HostRootApparentRepositoryDefinitionKey"] { assert!(!producer.contains(forbidden)); }
     }
 

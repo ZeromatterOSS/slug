@@ -406,7 +406,10 @@ pub(super) mod tests {
 
     use super::super::generated_repository_definition::HostCanonicalRepositoryApparentMappingObservationError;
     use super::super::generated_repository_definition::HostCanonicalRepositoryApparentMappingObservationKey;
+    use super::super::generated_repository_definition::HostCanonicalRepositoryDefinitionObservationError;
+    use super::super::generated_repository_definition::HostCanonicalRepositoryDefinitionObservationKey;
     use super::super::generated_repository_definition::ObservedHostCanonicalRepositoryApparentMapping;
+    use super::super::generated_repository_definition::ObservedHostCanonicalRepositoryDefinition;
     use super::super::generated_repository_definition::tests::EXTENSION_A;
     use super::super::generated_repository_definition::tests::MODULE;
     use super::super::generated_repository_definition::tests::WORKSPACE;
@@ -414,6 +417,40 @@ pub(super) mod tests {
     use super::super::generated_repository_definition::tests::transaction;
     use super::super::generated_repository_definition::tests::validated;
     use super::*;
+
+    #[test]
+    fn canonical_repository_definition_observation_surface_is_sibling_usable() {
+        let key = HostCanonicalRepositoryDefinitionObservationKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            CanonicalRepoName::new("requested").unwrap(),
+        );
+        assert_eq!(
+            key.to_string(),
+            "observed-host-canonical-repository-definition:\"/workspace\":@@requested"
+        );
+
+        fn inspect(
+            _: &<HostCanonicalRepositoryDefinitionObservationKey as Key>::Value,
+            observed: &ObservedHostCanonicalRepositoryDefinition,
+            _: &HostCanonicalRepositoryDefinitionObservationError,
+        ) {
+            let _: &Arc<
+                Result<HostCanonicalRepositoryDefinition, HostCanonicalRepositoryDefinitionError>,
+            > = observed.result();
+            let _: &PathObservationEpoch = observed.observations();
+        }
+        let _ = inspect
+            as fn(
+                &SourcePreparationOutcome<
+                    Result<
+                        ObservedHostCanonicalRepositoryDefinition,
+                        HostCanonicalRepositoryDefinitionObservationError,
+                    >,
+                >,
+                &ObservedHostCanonicalRepositoryDefinition,
+                &HostCanonicalRepositoryDefinitionObservationError,
+            );
+    }
 
     #[test]
     fn canonical_repository_apparent_mapping_observation_surface_is_sibling_usable() {
