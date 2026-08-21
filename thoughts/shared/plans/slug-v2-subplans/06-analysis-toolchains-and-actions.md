@@ -12507,6 +12507,63 @@ scratch, task/lock, fixture/oracle, cap/helper/test waiver, upper activation,
 milestone closure, M8/M7B or identity-byte work. REPLAN before widening. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Selected-definition carrier proof correction REPLAN (2026-08-21)
+
+Formal review retains the narrow carrier-promotion candidate based on
+`6204c9f2` but rejects its stale lifecycle source scan. The production/API,
+three `lib.rs` reexports, 44-line external smoke and identity wrapper update are
+accepted and frozen. Schedule only
+`WP-6-7A-host-canonical-selected-module-definition-observation-carrier-promotion-proof-correction-implementation`.
+
+Retained accounting is `selected_repo_spec.rs` +25/-11 (+19/-9 production and
++6/-2 identity proof), `lib.rs` +6/-0, and one new 44-line smoke. Current
+physical sizes are 12,538/421/44. Preserve caps <=80 production, <=40 colocated
+proof, <=10 lib, <=70 external, <=200 aggregate and physical
+<=12,645/425/70; the existing identity update keeps its under-200 proof
+authority and every new smoke/helper stays below 100.
+
+Freeze selected production through line 4,677 at
+`eec5dd83dc786a2317c011a19de68dff952c2e6821d664cf6e75da0f18240f0a`,
+all of `lib.rs` at
+`0f9e763c1685ab3e666f7b06950c0ec4b8580441f3ad913740a27867c812f23b`,
+the external smoke at
+`68fa57dc7e367ee00fca8e98e925a5bea62a63c853bcfe70551d623fc0cdc97e`,
+and the identity test/wrapper update at
+`d22d3a4d65d0021cbfcd0bbf37cc4fe5d5a039eb8141d66d9756ec7d1e641052`.
+Only the lifecycle test's final source-scan block is writable.
+
+The retained Bzlmod crate root contains exactly one adjacent
+`#[doc(hidden)]`/`pub use selected_repo_spec::...;` pair for each observed key,
+carrier and opaque error, and no fourth selected-observation reexport. The old
+proof incorrectly includes `lib.rs` in a three-file absence loop, even though
+that crate root is now the intentional visibility boundary.
+
+Replace only that loop. Require each exact adjacent hidden reexport pair once;
+collect the selected-observation reexport lines and require exactly the three
+retained lines in retained order with no extra; separately require loading's
+`bzl_module.rs` and core's `generated_repository_definition.rs` to contain none
+of the three names. Neither scanned downstream file is writable.
+
+Preserve byte-for-byte the private-inner/public-outer projection, concrete
+accessors, three reexports, external key/Display/associated-Value/accessor
+smoke and identity wrapper proof. Preserve every tracker, lower-event, parent/
+warm batchlessness, upper-nonactivation, held-handle A-B-A, metadata, epoch-
+subset, Arc identity, cancellation and recovery assertion. Add no helper,
+compute, semantic input, runtime injection or activation.
+
+Validation remains focused observed-selected owner, new and protected external
+smokes, full Bzlmod, direct core check, formatting and diff hygiene, serially.
+Compatibility classes remain unchanged: selected semantics/events are exact;
+the hidden carrier/opaque outer/transaction-local epoch is Slug-native; upper
+composition/activation and exact identity bytes are unsupported/deferred.
+
+STOP any frozen-hash mismatch, edit outside the final source scan, production/
+API/lib/smoke/identity or lifecycle assertion drift, fourth reexport, downstream
+loading/core edit, new helper, Cargo/BUILD, fixture/oracle, cap/proof/test-size
+waiver, upper activation, milestone closure, M8/M7B or exact identity work.
+REPLAN before widening. ACCEPT returns only to canonical selected/generated
+owner design. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier promotion design accepted (2026-08-21)
 
 Design commit `bdeab11d` and live source accept exactly

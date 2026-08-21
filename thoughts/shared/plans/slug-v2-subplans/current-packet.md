@@ -1,126 +1,92 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-canonical-selected-module-definition-observation-carrier-promotion-implementation`
+Packet: `WP-6-7A-host-canonical-selected-module-definition-observation-carrier-promotion-proof-correction-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling/design and Rust base: `bdeab11d` / `a7d9ffcc`
+Scheduling/design and retained-candidate base: `6204c9f2` / `a7d9ffcc`
 
-## Goal and authority
+## Goal and retained authority
 
-Implement only the accepted doc-hidden Bzlmod -> core visibility surface for
-the existing canonical selected-definition observation key, carrier and opaque
-outer. Do not add a semantic consumer or change the private driver, selected
-Result/epoch association, Need/terminal algebra, equality, validity, events,
-retention or lifecycle.
+Retain the current narrow three-file carrier-promotion draft and correct only
+the stale source scan at the end of
+`observed_canonical_selected_definition_lifecycle_cancellation_and_nonactivation`.
+The scan must recognize the intentional Bzlmod crate-root exports while still
+proving loading and core remain inactive. Do not change production, API shape,
+reexports, external smoke, identity wrapper proof or any lifecycle assertion.
 
-Write authority is exactly:
+The retained draft is:
 
-- `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 12,524 physical
-  lines with tests at 4,668;
-- `app/slug_bzlmod_v2/src/lib.rs`, baseline 415 physical lines; and
-- new
+- `app/slug_bzlmod_v2/src/selected_repo_spec.rs` at +25/-11, comprising
+  +19/-9 production and the frozen +6/-2 identity wrapper update;
+- `app/slug_bzlmod_v2/src/lib.rs` at +6/-0; and
+- new 44-line
   `app/slug_bzlmod_v2/tests/canonical_selected_definition_observation_api.rs`.
 
-Every other Rust file, test, fixture, oracle, Cargo/BUILD target, API, caller and
-plan is read-only. Production is <=80 lines, colocated proof <=40, lib semantic
-change <=10, external proof <=70 and aggregate semantic authority <=200.
-Physical caps are 12,645/425/70. Only a semantic-neutral wrapper adjustment to
-the existing
-`observed_canonical_selected_definition_identity_scan_and_terminal_algebra` is
-allowed, and that test must remain under 200 lines; every new smoke/helper must
-remain below 100. The large selected file remains cohesive because it owns the
-private driver, carrier and projection. No split or hot-path measurement is
-warranted for this visibility-only step.
+Current physical sizes are 12,538/421/44 against unchanged caps
+12,645/425/70. Original authority remains <=80 production, <=40 colocated
+proof, <=10 lib, <=70 external proof and <=200 aggregate semantic. The existing
+identity wrapper update retains its under-200 proof authority, and every new
+smoke/helper remains below 100. No cap or test-size waiver is authorized.
 
-## Frozen nominal surface
+Only the lifecycle test's final source-scan block in `selected_repo_spec.rs` is
+writable. Every other line in the three retained files and every other Rust
+file, test, fixture, oracle, Cargo/BUILD target, API, caller and plan is
+read-only. Freeze:
 
-Promote exactly these three `#[doc(hidden)]` nominal types from
-`selected_repo_spec.rs`:
+- production through line 4,677 at SHA-256
+  `eec5dd83dc786a2317c011a19de68dff952c2e6821d664cf6e75da0f18240f0a`;
+- all of `lib.rs` at
+  `0f9e763c1685ab3e666f7b06950c0ec4b8580441f3ad913740a27867c812f23b`;
+- the external smoke at
+  `68fa57dc7e367ee00fca8e98e925a5bea62a63c853bcfe70551d623fc0cdc97e`;
+  and
+- the existing identity test including its wrapper projection/match update at
+  `d22d3a4d65d0021cbfcd0bbf37cc4fe5d5a039eb8141d66d9756ec7d1e641052`.
 
-1. existing `HostCanonicalSelectedModuleDefinitionObservationKey`;
-2. existing `ObservedHostCanonicalSelectedModuleDefinition`; and
-3. new `HostCanonicalSelectedModuleDefinitionObservationError`, an opaque
-   public tuple wrapper with a private field.
+## Frozen carrier draft
 
-Make the key and carrier `pub`, and make the key's existing
-`new(NormalizedAbsolutePath, CanonicalRepoName) -> Self` public. Make only these
-carrier accessors public:
+Keep exactly the three doc-hidden public nominal types: key with public
+two-argument `new`, carrier with concrete borrowed selected Result-Arc and
+epoch accessors, and field-private opaque public outer over private
+`CanonicalSelectedModuleDefinitionObservationError::Routes`. Keep only
+observed Complete Err wrapping at Key projection; Need and success are
+unchanged and no unwrap exists.
 
-- `result()` returning
-  `&Arc<Result<HostCanonicalSelectedModuleDefinition,
-  HostCanonicalSelectedModuleDefinitionError>>`; and
-- `observations() -> &PathObservationEpoch`.
-
-Keep all key/carrier/wrapper fields and `SelectedDefinitionResult` private.
-Preserve the key's Debug/Clone/PartialEq/Eq/Hash/Allocative derives and the
-carrier's Debug/Clone/PartialEq/Eq/Allocative/Dupe derives. Preserve exact
-workspace/canonical identity, Complete-only equality/validity and Display. For
-`/workspace` and canonical `dep+`, the smoke must assert
-`observed-host-canonical-selected-module-definition:"/workspace":@@dep+`.
-
-Add exactly these three `#[doc(hidden)]` crate-root reexports, and no fourth:
+Keep exactly one adjacent `#[doc(hidden)]` plus `pub use
+selected_repo_spec::...;` pair in `lib.rs` for each of:
 
 - `HostCanonicalSelectedModuleDefinitionObservationError`;
 - `HostCanonicalSelectedModuleDefinitionObservationKey`; and
 - `ObservedHostCanonicalSelectedModuleDefinition`.
 
-Add no public Result/outcome alias, field, terminal inspector, outer
-constructor, conversion trait, adapter key, copied carrier, caller or reverse
-dependency.
+There is no fourth selected-observation reexport. Keep the 44-line external
+key/Display/associated-Value/concrete-accessor smoke byte-for-byte. Keep the
+identity proof's input, wrapper projection, private Routes match, control flow
+and every assertion byte-for-byte.
 
-## Exact private inner and projection
+## Exact proof correction
 
-Rename the current private
-`HostCanonicalSelectedModuleDefinitionObservationError` enum to
-`CanonicalSelectedModuleDefinitionObservationError`. Preserve exactly its
-`Routes(HostSelectedModuleRoutesObservationError)` variant and
-Debug/Clone/PartialEq/Eq/Allocative/Dupe derives. The private driver outcome and
-all private terminal construction continue to use this inner enum.
+Replace only the lifecycle tail's obsolete three-source absence loop. The new
+semantic-neutral scan must:
 
-Define the public nominal wrapper as tuple struct
-`HostCanonicalSelectedModuleDefinitionObservationError` with one private
-`CanonicalSelectedModuleDefinitionObservationError` field, `#[doc(hidden)]`
-and matching Debug/Clone/PartialEq/Eq/Allocative/Dupe derives. The omitted tuple-
-field visibility makes construction and inspection private.
+1. read `lib.rs` and require exactly one occurrence of each exact two-line
+   adjacent hidden reexport pair above;
+2. collect selected-observation reexport lines containing either
+   `HostCanonicalSelectedModuleDefinitionObservation` or
+   `ObservedHostCanonicalSelectedModuleDefinition` and require exactly the
+   retained three lines, in retained source order, with no extra selected-
+   observation reexport; and
+3. require both `slug_loading_v2/src/bzl_module.rs` and core
+   `runtime/generated_repository_definition.rs` to contain none of those three
+   nominal names.
 
-Change only the observed key's associated `Key::Value` error to the public
-wrapper. At the key projection, map only `Complete(Err(inner))` to
-`Complete(Err(HostCanonicalSelectedModuleDefinitionObservationError(inner)))`.
-Need and successful Complete remain byte-for-byte in behavior. Add no unwrap
-path: no current production consumer exists, and the later core owner must
-carry the opaque outer without inspection.
+Do not edit either scanned file. Preserve every tracker row, parent/warm
+batchlessness assertion, upper-nonactivation assertion, held Result/carrier/
+epoch A-B-A and metadata behavior, transaction epoch-subset check, Arc identity
+condition, cancellation absence and recovery assertion in the lifecycle test.
+Add no helper, semantic input, compute, activation or runtime injection.
 
-In the existing identity/scan/terminal test, update only the outer projection
-and match spelling to include the public wrapper around private `Routes`.
-Change no input, control flow, semantic assertion or terminal expectation, and
-keep the entire existing test below 200 lines. No other colocated test needs a
-semantic change.
-
-## Exact external smoke and evidence
-
-Add one test named
-`canonical_selected_definition_observation_surface_is_cross_crate_usable`. It
-imports the three hidden reexports plus existing public selected value/error,
-`SourcePreparationOutcome`, `dice::Key`, `CanonicalRepoName`,
-`NormalizedAbsolutePath`, `PathObservationEpoch` and `Arc`. It:
-
-1. constructs only the key for `/workspace` and canonical `dep+`, then asserts
-   the exact Display above;
-2. type-checks
-   `<HostCanonicalSelectedModuleDefinitionObservationKey as Key>::Value` as
-   `SourcePreparationOutcome<Result<
-   ObservedHostCanonicalSelectedModuleDefinition,
-   HostCanonicalSelectedModuleDefinitionObservationError>>` through a
-   nonexecuted function-pointer cast; and
-3. type-checks the two borrowed carrier accessors against the exact concrete
-   selected Result Arc and epoch types through a second nonexecuted function
-   pointer.
-
-The smoke must not construct a carrier/outer, inspect the wrapper, compute a
-key, add a semantic caller, import core or name the private alias/inner/routes
-outer. Reuse the accepted selected-owner proof, the prior validation promotion
-pattern and the existing definition/evaluation Bzlmod API smokes; add no oracle
-because no Bazel-visible behavior changes.
+## Validation, compatibility and terminal
 
 Run serially:
 
@@ -133,26 +99,25 @@ Run serially:
 - `cargo fmt --all -- --check`; and
 - `git diff --check`.
 
-## Compatibility and terminal
-
 Existing selected values/errors/dispositions/full scan/order/views, DICE
 equality/invalidation and lower event ownership remain exact Bazel 9
 compatibility. The doc-hidden cross-crate key/carrier/opaque outer and shared-
 Arc transaction-local epoch association are Slug-native. Canonical/generated
-observation composition, root/publication/command/bootstrap activation and
-exact Bazel configuration/output/ActionKey bytes remain unsupported/deferred.
+composition, root/publication/command/bootstrap activation and exact Bazel
+configuration/output/ActionKey bytes remain unsupported/deferred.
 
-Implementation ACCEPT returns only to a docs-only canonical selected/generated
-observation-owner design. STOP semantic or compute activation, public field/
-alias/terminal inspection, a fourth type or reexport, second key/carrier/
-adapter, selected semantic/event/equality/retention change, any core source
-change, reverse dependency, Cargo/BUILD or fixture/oracle work, third production
-file, cap/proof/test-size waiver, canonical/root/publication/command/bootstrap
-activation, milestone closure, M8/M7B or exact identity work. REPLAN before
-widening. M7 remains partial and M7A -> M8 -> M7B remains.
+ACCEPT returns only to a docs-only canonical selected/generated observation-
+owner design. STOP any frozen-hash mismatch, production/API/lib/smoke/identity
+edit, lifecycle change outside the final source scan, tracker/nonactivation/
+retention/cancellation assertion drift, public field/alias/terminal, fourth
+type/reexport, second key/carrier/adapter, core/loading edit, reverse dependency,
+Cargo/BUILD, fixture/oracle, cap/proof/test-size waiver, upper activation,
+milestone closure, M8/M7B or exact identity work. REPLAN before widening. M7
+remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Design `bdeab11d` confirms this three-type projection is the only missing
-cross-crate prerequisite. `a7d9ffcc` remains the semantic Rust base and already
-proves exact selected behavior, Result/epoch retention and upper nonactivation.
+The implementation draft from `6204c9f2` satisfies the accepted visibility
+surface and smokes. Review found only that the old lifecycle denylist includes
+`lib.rs`, which now intentionally owns the three hidden exports; loading and
+core remain correctly absent.
