@@ -11814,6 +11814,85 @@ root-mapping/bootstrap activation, fixture/oracle work, proof or cap waiver,
 milestone closure, M8/M7B or exact identity work. REPLAN before widening. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Validation frontier selects instantiation-carrier visibility (2026-08-21)
+
+Implementation `c1c8e1d8` accepts the private observed instantiation owner at
+2,049 physical lines with its test module at 641. Its exact observed dependency
+row is the single observed pure child. It retains one instantiation semantic
+Result Arc plus that child's unchanged transaction-local epoch, has no merge
+stage or parent event batch, and remains callerless in production.
+
+Validation is the next semantic owner but has one effective-visibility stop.
+`HostValidatedModuleExtensionRepositoriesKey` computes the legacy
+`HostInstantiatedModuleExtensionRepositoriesKey` at
+`module_extension_repository_validation.rs:208`. The accepted observed key,
+constructor, carrier and accessors are private to the instantiation sibling at
+lines 157-218, and `result()` returns private
+`InstantiatedRepositoriesResult`. The private outer directly exposes its Pure
+variant. Validation therefore cannot name the associated Key Value or consume
+a Complete carrier without exposing private terminal detail.
+
+No semantic prerequisite is missing. Validation alone owns the count and full
+request join between invocation receipts and instantiated requests, generated
+name membership, imports-before-overrides order, override-backed imports,
+must-exist override failure, inject collision failure and the flattened exact-
+size public certificate iterator. Success retains the instantiated predecessor;
+Join errors retain it, and validation errors retain predecessor, validated
+prefix, current request, exact offender and terminal. It stores no event data;
+the existing tracker proves Evaluated/Reused validation rows are batchless and
+pure/instantiation child batches are not replayed.
+
+Consumer tracing rejects upper and parallel prerequisites. The public
+validation key has exactly one production consumer,
+`HostGeneratedRepositoryDefinitionKey` at
+`generated_repository_definition.rs:168`. Canonical publication first checks
+`HostCanonicalSelectedModuleDefinitionKey` at line 428 and only then the
+generated definition at 467; apparent root mapping separately computes
+`HostRootRepositoryMappingKey` at 678. The selected definition consumes
+`HostSelectedModuleRoutesKey`, while root mapping consumes
+`HostSelectedExtensionMappingsKey`. Generated/public publication is serially
+later; selected definitions and root mapping are parallel and cannot supply the
+missing instantiation carrier surface.
+
+Activate only
+`WP-6-7A-host-instantiated-module-extension-repositories-observation-carrier-visibility-design`.
+The design must freeze the smallest crate-internal observed key/constructor,
+carrier/concrete borrowed Result+epoch accessors and field-private nominal
+outer. It must decide the wrapper projection required because the current
+private alias and Pure variant cannot cross effective visibility unchanged.
+Expose no alias, field, variant, child outer inspector, public/lib reexport,
+compute caller or validation semantic.
+
+Prospective implementation authority is exactly production
+`app/slug_loading_v2/src/module_extension_repository_instantiation.rs` plus a
+test-only sibling compile proof in
+`app/slug_loading_v2/src/module_extension_repository_validation.rs`. Baselines
+are 2,049 physical with tests at 641 and 1,156 physical with tests at 332.
+The design must remain within <=60 production, <=50 proof and <=110 aggregate
+semantic; physical caps are 2,110/1,210, and every changed helper/test remains
+below 100. The validation proof may name the associated Key Value and borrowed
+accessors and may construct only the observed key to prove `new()` and exact
+Display; it must not construct a carrier/outer, compute a key, inspect the
+outer or activate validation.
+
+Design write authority is only canonical/current/this Stage/routing at net
+caps <=40/<=180/<=220/<=30 and <=470 aggregate. Rust, tests, fixtures,
+oracles, Cargo/BUILD, existing public APIs/exports and callers are read-only.
+Design ACCEPT may schedule exactly one carrier-visibility implementation, after
+which work returns to a docs-only validation owner design.
+
+Exact compatibility remains accepted instantiation and validation values,
+errors, ordering, import/override polarity, `RepoSpec` iteration, DICE equality
+and pure-owned event behavior. The crate-internal key/carrier/opaque outer and
+Result-Arc/epoch handoff are Slug-native. Validation observation,
+generated/public/root-mapping/bootstrap activation and exact Bazel identity
+bytes remain unsupported/deferred. STOP a public/lib export, exposed alias/
+field/variant/inspector, second key/carrier/adapter, validation semantic or
+caller change, event/equality/retention drift, third file, oracle/fixture work,
+cap waiver, upper or parallel activation, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening. M7 remains partial and M7A -> M8 -> M7B
+remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`

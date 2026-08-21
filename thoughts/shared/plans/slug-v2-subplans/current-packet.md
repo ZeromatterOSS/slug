@@ -1,148 +1,120 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-instantiated-module-extension-repositories-observation-implementation`
+Packet: `WP-6-7A-host-instantiated-module-extension-repositories-observation-carrier-visibility-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling and Rust base: `0dcf2eea`
+Scheduling and Rust base: `c1c8e1d8`
 
-## Goal and authority
+## Goal and design authority
 
-Add one private observed sibling for
-`HostInstantiatedModuleExtensionRepositoriesKey`. Preserve all legacy
-instantiation semantics, order, errors and pure-child event ownership. Retain
-only the exact local semantic Result Arc plus the pure child transaction-local
-epoch. Do not activate its sole upper consumer, validation.
+Freeze the smallest crate-internal surface that lets the validation sibling
+name the accepted observed instantiation Key Value and borrowed carrier. Decide
+the opaque wrapper projection required by Rust effective visibility. Do not
+edit Rust, activate validation or expose private instantiation terminals.
 
-Write authority is exactly
-`app/slug_loading_v2/src/module_extension_repository_instantiation.rs`,
-baseline 1,380 physical lines with the owning test module at 532. Caps are
-<=220 production, <=700 proof, <=920 aggregate semantic and <=2,300 physical.
-Add at most six production and five test helpers plus three observed tests; the
-shared driver stays below 120 lines and every changed helper/test below 200.
-Every other Rust file, test, fixture, oracle, Cargo/BUILD target, API, export and
-caller is read-only. The owner remains cohesive because this file already owns
-the legacy key, instantiation/schema/label functions, real fixture and sole
-validation boundary; splitting would expose private retained values or
-duplicate proof plumbing.
+Design write authority is exactly:
 
-## Exact owner and driver
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`, net <=40;
+- this manifest, net <=180;
+- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`,
+  net <=220; and
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md`, net <=30.
 
-Add exactly these private types:
+Aggregate net growth is <=470. Every Rust file, test, fixture, oracle,
+Cargo/BUILD target, public API/export and caller is read-only. Schedule exactly
+one implementation successor on ACCEPT or one narrower prerequisite/REPLAN.
 
-1. `HostInstantiatedModuleExtensionRepositoriesObservationKey`, a newtype over
-   `HostInstantiatedModuleExtensionRepositoriesKey` with the same workspace
-   identity and `observed-{legacy Display}`;
-2. `ObservedHostInstantiatedModuleExtensionRepositories`, holding the exact
-   local `Arc<Result<HostInstantiatedModuleExtensionRepositories,
-   HostInstantiatedModuleExtensionRepositoriesError>>` and one
-   `PathObservationEpoch`; and
-3. `HostInstantiatedModuleExtensionRepositoriesObservationError`, with exactly
-   `Pure(HostPureModuleExtensionInvocationsObservationError)`.
+## Live visibility and ownership facts
 
-Keep all fields, result aliases and accessors private. Preserve the legacy key.
-Use matching Debug/Clone/PartialEq/Eq/Hash/Allocative derives for the key and
-Debug/Clone/PartialEq/Eq/Allocative/Dupe for carrier and outer as their fields
-permit. Both keys use Complete-only equality and validity.
+`c1c8e1d8` accepts a callerless private observed instantiation owner. In
+`module_extension_repository_instantiation.rs`, the observed key and constructor
+are private at lines 157-169, the carrier and its accessors are private at
+202-216, `result()` exposes the private `InstantiatedRepositoriesResult` alias,
+and the private outer at 219 directly exposes its Pure child variant.
 
-Refactor one Legacy/Observed driver. Legacy computes only
-`HostPureModuleExtensionInvocationsKey`; Observed computes only
-`HostPureModuleExtensionInvocationsObservationKey`. After successful pure
-semantics, both invoke the existing `instantiate_repositories` exactly once
-and project the same semantic Result.
-Do not duplicate or reorder the prepared/request receipt join, generated
-canonical namespace, base/call/override mapping precedence, repository-rule
-schema lookup, supplied attribute order, legacy/None omission,
-mandatory/default validation, label resolution/visibility or ordered
-`RepoSpec` construction.
+Validation at `module_extension_repository_validation.rs:208` is the sole
+production consumer of the legacy instantiation key and the next semantic
+owner. It alone validates receipt/request joins, imports before overrides,
+override-backed imports, must-exist and injection polarity, and retains the
+public flattened generated-spec certificate. It stores no event batch.
 
-## Terminal, epoch and event law
+The public validation key has exactly one production consumer,
+`HostGeneratedRepositoryDefinitionKey` at
+`generated_repository_definition.rs:168`. Canonical publication checks the
+parallel selected definition first at 428 and the generated definition at 467;
+root apparent mapping separately consumes root mapping at 678. Selected
+definition and root mapping derive from accepted routes and extension mappings,
+not validation. These later/parallel owners cannot replace carrier visibility.
 
-- Pure DICE compute failure remains semantic `InvocationsCompute` with an empty
-  epoch. Need remains immediate Need.
-- Observed pure opaque error maps only to the carrierless `Pure` outer. Do not
-  inspect or rewrap its private terminal.
-- Accept a Complete pure carrier before semantics. Pure semantic failure remains
-  existing `Invocations` and retains the complete child epoch. Success passes
-  the cloned pure value and the same epoch into local instantiation.
-- This parent has one observed child: add no merge stage and do not rebuild,
-  union or validate the epoch.
-- Local count/request Join, Namespace and Attribute terminals retain the full
-  pure epoch and exact `AfterInvocations` predecessor/completed/request/current/
-  call prefixes. Success retains the same epoch. First terminal wins in exact
-  request and call order.
+## Decision to freeze
 
-Instantiation stores no evaluation event data. Fresh pure load and
-invocation-print batches stay on the pure subtree; every instantiation parent
-row is batchless. Need, opaque outer and cancellation publish no parent carrier
-or batch. Warm parent reuse is silent, and a Reused pure child never replays a
-batch.
+Decide exactly one minimal crate-internal surface:
 
-The carrier's Result already owns the predecessor, completed/current repository
-projections and `RepoSpec`s. Driver mode, child projection and construction
-vectors are compute scratch. Retain no evaluator heap, duplicate request state,
-event batch, side cache, task, lock or command state. Ordinary DICE owns
-equality cutoff, invalidation, eviction and cancellation; dropped work cannot
-publish a partial carrier, and recovery recomputes normally.
+1. the existing observed instantiation key and `new` constructor;
+2. the existing carrier with borrowed concrete
+   `Arc<Result<HostInstantiatedModuleExtensionRepositories,
+   HostInstantiatedModuleExtensionRepositoriesError>>` and
+   `PathObservationEpoch` accessors; and
+3. one opaque nominal outer whose fields and terminal variants remain private.
 
-## Proof and validation
+The design must determine whether to rename the current private outer to an
+inner enum and project one field-private `pub(crate)` wrapper only at the
+observed Key boundary, following the accepted prepared and pure precedents.
+Keep `InstantiatedRepositoriesResult` private. Preserve all key/carrier derives,
+workspace identity, `observed-{legacy Display}`, Complete-only equality and
+validity, Result Arc identity and epoch contents. Add no alias, variant/field
+accessor, conversion trait, second key/carrier/adapter, public/lib reexport or
+caller.
 
-Add exactly:
+Freeze one sibling compile-only proof in the existing validation test module.
+It may construct the key only to prove constructor and unchanged Display, then
+type-check the exact associated Value, carrier, opaque outer and concrete
+borrowed accessors through one nonexecuted local function and explicit function
+pointer. It must not construct a carrier/outer, inspect the outer, compute any
+key, add a driver, observe dependencies/events or activate validation.
 
-- `observed_instantiation_identity_finisher_and_terminal_algebra`;
-- `observed_instantiation_real_order_events_and_parity`; and
-- `observed_instantiation_lifecycle_cancellation_and_nonactivation`.
+## Prospective implementation boundary
 
-Together prove key/hash/Display/equality/validity; one-child/no-merge projection;
-Join/Namespace/Attribute prefixes; legacy/observed semantic parity for success,
-pure failure and local failures; exact legacy/observed family and single-child
-dependency rows; Need and first-terminal suppression; child-only exact print
-batches, batchless parents and warm silence; held Result/carrier/epoch A -> B ->
-A for call/schema/mapping changes; same-semantic/different-epoch observation
-metadata; each carrier epoch as a subset of its own transaction global epoch;
-poll-drop recovery; and zero
-`HostValidatedModuleExtensionRepositoriesKey` activation. Compare separate
-transactions semantically and require Arc identity only for an exact cached
-value proven Reused.
+Prospective Rust authority is exactly:
 
-The pure outer stays opaque. Reuse its accepted same-module HostBzl/Merge proof
-and add only a static private-producer scan plus the real observed dependency
-row; do not expose an accessor, construct invalid epochs or edit
-`module_extension.rs`.
+- production
+  `app/slug_loading_v2/src/module_extension_repository_instantiation.rs`,
+  baseline 2,049 physical lines with tests at 641; and
+- test-only
+  `app/slug_loading_v2/src/module_extension_repository_validation.rs`, baseline
+  1,156 physical lines with tests at 332.
 
-Reuse Bazel 9.2 `RegularRunnableExtension.run`,
-`SingleExtensionEvalFunction.compute` and `ModuleExtensionResolutionTest`
-evidence; add no oracle. Buck2 DICE incrementality/cancellation/activation tests
-are concept/test evidence only. Run serially:
+Caps are <=60 production, <=50 proof, <=110 aggregate semantic and physical
+<=2,110/1,210. Every changed helper/test stays below 100. The large
+instantiation file remains cohesive because it owns the private driver and
+representation; the validation sibling is the sole future consumer and natural
+visibility witness. No split or hot-path measurement is warranted for this
+visibility-only step.
 
-- focused `observed_instantiation_` tests;
-- protected `pure_instantiation_`, `real_key_`, `observed_pure_` and validation
-  `real_validation_` tests;
-- full `cargo test -p slug_loading_v2`;
-- direct dependent `cargo check -p slug_core_v2`;
-- `cargo fmt --all -- --check`; and
-- `git diff --check`.
+Reuse the accepted instantiation identity, family, terminal, event, lifecycle,
+cancellation and nonactivation proof; add no oracle. The design must freeze
+serial validation of the named sibling smoke, focused `observed_instantiation_`,
+protected validation `real_validation_`, full `cargo test -p slug_loading_v2`,
+direct `cargo check -p slug_core_v2`, formatting and `git diff --check`.
 
 ## Compatibility and terminal
 
-Existing values/errors/order, namespaces, attribute/label semantics, `RepoSpec`
-projections, DICE equality and pure-owned events remain exact Bazel 9
-compatibility. The private key/carrier/outer and Result-Arc/epoch association
-are Slug-native. Validation observation, generated/public/root-mapping/bootstrap
-activation and exact Bazel configuration/output/ActionKey bytes remain
-unsupported/deferred.
+Accepted instantiation/validation values, errors, order, import/override
+polarity, `RepoSpec` iteration, DICE equality and pure-owned events remain exact
+Bazel 9 compatibility. The crate-internal carrier handoff is Slug-native.
+Validation observation, generated/public/root-mapping/bootstrap activation and
+exact Bazel configuration/output/ActionKey bytes remain unsupported/deferred.
 
-ACCEPT returns only to a docs-only
-`HostValidatedModuleExtensionRepositoriesKey` observation-frontier audit. STOP
-a second file/key/owner/adapter, visibility/lib export/caller, legacy or pure
-semantic drift, parent event batch, epoch merge/rebuild, retained evaluator
-state, lock/task across DICE, validation/generated/public/root-mapping/bootstrap
-activation, fixture/oracle work, proof/cap waiver, milestone closure, M8/M7B or
-exact identity work. REPLAN before widening. M7 remains partial and M7A -> M8
--> M7B remains.
+ACCEPT schedules exactly one carrier-visibility implementation, then returns
+to a docs-only `HostValidatedModuleExtensionRepositoriesKey` observation-owner
+design. STOP a public/lib reexport, exposed alias/field/variant/inspector,
+second key/carrier/adapter, caller or compute activation, validation semantic
+change, event/equality/retention drift, third file, fixture/oracle work, cap
+waiver, upper/parallel activation, milestone closure, M8/M7B or exact identity
+work. REPLAN before widening. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-`0dcf2eea` exposes exactly the accepted opaque pure observation key, carrier,
-concrete Result accessor and epoch accessor to this sibling without a caller.
-Live trace proves instantiation has no other semantic child and validation is
-its sole production consumer.
+`c1c8e1d8` proves the accepted observed instantiation carrier is the only
+missing input to validation. Generated publication is later, while selected
+definition and root mapping are parallel.
