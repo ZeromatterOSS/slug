@@ -352,6 +352,9 @@ mod tests {
     use slug_workspace_v2::PathObservationEpochKey;
 
     use super::*;
+    use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesObservationError;
+    use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesObservationKey;
+    use crate::module_extension_repository_instantiation::ObservedHostInstantiatedModuleExtensionRepositories;
     use crate::module_extension_repository_instantiation::tests::WORKSPACE;
     use crate::module_extension_repository_instantiation::tests::transaction_untracked;
     use crate::module_extension_repository_instantiation::tests::transaction_with_tracker;
@@ -362,6 +365,20 @@ def impl(ctx):
     repo(name='second')
 ext=module_extension(implementation=impl)
 "#;
+
+    #[test]
+    #[rustfmt::skip]
+    fn instantiation_observation_surface_is_validation_sibling_usable() {
+        let key = HostInstantiatedModuleExtensionRepositoriesObservationKey::new(NormalizedAbsolutePath::new("/workspace").unwrap());
+        assert_eq!(key.to_string(), "observed-host-instantiated-module-extension-repositories:\"/workspace\"");
+
+        fn inspect(_value: &<HostInstantiatedModuleExtensionRepositoriesObservationKey as Key>::Value, observed: &ObservedHostInstantiatedModuleExtensionRepositories, _error: &HostInstantiatedModuleExtensionRepositoriesObservationError) {
+            let _: &Arc<Result<HostInstantiatedModuleExtensionRepositories, HostInstantiatedModuleExtensionRepositoriesError>> = observed.result();
+            let _: &PathObservationEpoch = observed.observations();
+        }
+
+        let _ = inspect as fn(&SourcePreparationOutcome<Result<ObservedHostInstantiatedModuleExtensionRepositories, HostInstantiatedModuleExtensionRepositoriesObservationError>>, &ObservedHostInstantiatedModuleExtensionRepositories, &HostInstantiatedModuleExtensionRepositoriesObservationError);
+    }
     #[derive(Default)]
     struct ValidationTracker {
         validation: Mutex<Vec<(ActivationKind, bool)>>,

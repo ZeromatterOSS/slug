@@ -154,13 +154,13 @@ pub(crate) struct HostInstantiatedModuleExtensionRepositoriesKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 #[allow(dead_code)] // Private observed sibling; a later packet owns consumer activation.
-struct HostInstantiatedModuleExtensionRepositoriesObservationKey(
+pub(crate) struct HostInstantiatedModuleExtensionRepositoriesObservationKey(
     HostInstantiatedModuleExtensionRepositoriesKey,
 );
 
 #[allow(dead_code)]
 impl HostInstantiatedModuleExtensionRepositoriesObservationKey {
-    fn new(workspace: NormalizedAbsolutePath) -> Self {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
         Self(HostInstantiatedModuleExtensionRepositoriesKey::new(
             workspace,
         ))
@@ -199,31 +199,43 @@ type InstantiatedRepositoriesResult = Arc<
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 #[allow(dead_code)] // Retained only by the callerless observed sibling.
-struct ObservedHostInstantiatedModuleExtensionRepositories {
+pub(crate) struct ObservedHostInstantiatedModuleExtensionRepositories {
     result: InstantiatedRepositoriesResult,
     observations: PathObservationEpoch,
 }
 
 #[allow(dead_code)]
 impl ObservedHostInstantiatedModuleExtensionRepositories {
-    fn result(&self) -> &InstantiatedRepositoriesResult {
+    pub(crate) fn result(
+        &self,
+    ) -> &Arc<
+        Result<
+            HostInstantiatedModuleExtensionRepositories,
+            HostInstantiatedModuleExtensionRepositoriesError,
+        >,
+    > {
         &self.result
     }
 
-    fn observations(&self) -> &PathObservationEpoch {
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-enum HostInstantiatedModuleExtensionRepositoriesObservationError {
+enum InstantiatedModuleExtensionRepositoriesObservationError {
     Pure(HostPureModuleExtensionInvocationsObservationError),
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct HostInstantiatedModuleExtensionRepositoriesObservationError(
+    InstantiatedModuleExtensionRepositoriesObservationError,
+);
 
 type InstantiatedRepositoriesDriverOutcome = SourcePreparationOutcome<
     Result<
         (InstantiatedRepositoriesResult, PathObservationEpoch),
-        HostInstantiatedModuleExtensionRepositoriesObservationError,
+        InstantiatedModuleExtensionRepositoriesObservationError,
     >,
 >;
 
@@ -253,7 +265,7 @@ async fn compute_instantiated_repositories(ctx: &mut DiceComputations<'_>, key: 
         },
         InstantiatedRepositoriesMode::Observed => match ctx.compute(&HostPureModuleExtensionInvocationsObservationKey::new(key.workspace.dupe())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostInstantiatedModuleExtensionRepositoriesObservationError::Pure(error))),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(InstantiatedModuleExtensionRepositoriesObservationError::Pure(error))),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().dupe(), observed.observations().dupe()),
             Err(error) => return complete(Err(HostInstantiatedModuleExtensionRepositoriesError::InvocationsCompute(error.to_string().into())), PathObservationEpoch::empty()),
         },
@@ -313,7 +325,9 @@ impl Key for HostInstantiatedModuleExtensionRepositoriesObservationKey {
         {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
             SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
+                SourcePreparationOutcome::Complete(Err(
+                    HostInstantiatedModuleExtensionRepositoriesObservationError(error),
+                ))
             }
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
                 SourcePreparationOutcome::Complete(Ok(
@@ -1784,9 +1798,8 @@ second_ext=module_extension(implementation=second_impl)
         assert!(!producer.contains("store_evaluation_data"));
         assert!(!producer.contains("union_"));
         assert!(
-            producer.contains(
-                "HostInstantiatedModuleExtensionRepositoriesObservationError::Pure(error)"
-            )
+            producer
+                .contains("InstantiatedModuleExtensionRepositoriesObservationError::Pure(error)")
         );
     }
 
