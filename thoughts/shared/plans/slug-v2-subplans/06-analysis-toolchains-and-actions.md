@@ -11633,6 +11633,66 @@ equality/retention drift, third file, oracle/fixture work, cap waiver, upper or
 parallel activation, milestone closure, M8/M7B or exact identity work. REPLAN
 before widening. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Pure-invocation carrier visibility design accepted (2026-08-21)
+
+The live effective-visibility design accepts one two-file crate-internal
+surface over Rust base `9bab80b3`. Promote only the existing observed pure key
+and constructor plus the existing carrier and two borrowed accessors. Spell
+the Result accessor with the concrete
+`Arc<Result<HostPureModuleExtensionInvocations,
+HostPureModuleExtensionInvocationsError>>`; keep `PureInvocationsResult`
+private. Preserve the key/carrier fields, derives, Display, hash, equality and
+validity unchanged.
+
+A nominal wrapper is required. Rename the existing private terminal enum to
+`PureModuleExtensionInvocationsObservationError`, preserving its exact
+Prepared/HostBzl/Merge variants and fields. Add crate-visible
+`HostPureModuleExtensionInvocationsObservationError` as a tuple struct with a
+private inner field and the same Debug/Clone/PartialEq/Eq/Allocative/Dupe
+derives. Keep `PureInvocationsDriverOutcome` on the private inner enum. Wrap
+only `Complete(Err(inner))` in the observed key's `Key::Value` projection; no
+other production path wraps or unwraps it. Same-module tests may match the
+private inner to preserve terminal proof, but no sibling receives an inspector.
+
+The sibling proof is exactly one test,
+`pure_observation_surface_is_instantiation_sibling_usable`, in
+`module_extension_repository_instantiation.rs`. It constructs only the key to
+prove constructor and unchanged Display, then type-checks one local `inspect`
+function against the exact associated Value, carrier, opaque wrapper and
+concrete Result/epoch accessor return types. It does not construct a carrier or
+outer, inspect wrapper contents, compute any key, add a driver or activate
+instantiation. Add no lib reexport.
+
+Implementation authority is exactly
+`app/slug_loading_v2/src/module_extension.rs`, baseline 2,232 physical with
+first `#[cfg(test)]` at 895, and test-only
+`app/slug_loading_v2/src/module_extension_repository_instantiation.rs`,
+baseline 1,363 physical with tests at 532. Caps are <=60 production, <=50 proof,
+<=110 aggregate semantic and physical <=2,290/1,415. Every changed helper/test
+is below 100 lines. The owner file remains cohesive around the private driver;
+the sibling is the sole future consumer and natural visibility witness.
+
+Reuse all accepted pure and instantiation evidence; add no oracle. Validate
+the named sibling smoke, focused `observed_pure_`, protected
+`pure_instantiation_` and `real_key_`, full `cargo test -p slug_loading_v2`,
+direct `cargo check -p slug_core_v2`, formatting and `git diff --check`.
+
+Existing pure and instantiation values, errors, ordering, namespace/attribute/
+label semantics, DICE equality and events remain exact. The crate-internal
+key/carrier/opaque wrapper and Result-Arc/epoch handoff are Slug-native.
+Instantiation observation, validation, generated/public/root-mapping/bootstrap
+activation and exact Bazel identity bytes remain unsupported/deferred.
+
+Activate only
+`WP-6-7A-host-pure-module-extension-invocations-observation-carrier-visibility-implementation`.
+Implementation ACCEPT returns only to a docs-only instantiation owner design.
+STOP a public/lib reexport, exposed alias/field/variant/inspector, second key/
+carrier/adapter, caller or compute activation, instantiation semantics, event/
+equality/retention drift, third file, oracle/fixture work, cap waiver,
+validation/generated/root-mapping/public/bootstrap activation, milestone
+closure, M8/M7B or exact identity work. REPLAN before widening. M7 remains
+partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
