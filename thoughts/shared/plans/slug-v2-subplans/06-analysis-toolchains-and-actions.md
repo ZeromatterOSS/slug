@@ -13277,6 +13277,84 @@ REPLAN before widening or hash drift. ACCEPT returns only to a docs-only root
 apparent-definition observation prerequisite audit. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Root apparent-definition prerequisite audit selects canonical visibility (2026-08-21)
+
+Accepted `4fe0bf1c` exposes the apparent-mapping observation to its runtime
+sibling at +73/-15 across exactly two files. The key/carrier/opaque outer are
+now `pub(super)`, the exact sibling smoke is green and production remains
+callerless. That lower visibility stop is closed.
+
+Root apparent definition computes legacy apparent mapping first at line 266.
+Mapping failure terminates; successful root and `bazel_tools` targets defer
+before definition lookup. Only another resolved target reaches canonical
+definition at line 310. This fixes the future observed order as mapping first,
+mapping-owned target disposition, then conditional definition.
+
+The canonical-definition observed key at generated-definition lines 496-727
+has exactly one production consumer, apparent mapping's nonroot observed branch
+at line 958. Key/new, carrier/private-alias accessors and outer remain private.
+The root-definition sibling cannot name its associated Value or preserve its
+epoch. Legacy canonical definition is not an admissible substitute.
+
+The outer's Selected/Generated/Merge variants name lower terminal structure,
+including a private generated outer and local merge error. Direct enum
+promotion would leak those details. A `pub(super)` field-private nominal outer
+at Key projection, plus same-scope key/new and carrier/concrete accessors, is
+the uniquely smaller prerequisite. No core crate-root reexport, module move,
+adapter, alias or caller is needed.
+
+Root apparent definition has exactly one production consumer, root route at
+route line 303. Route, source input/source observation/path input, repository
+publication/materialization, command and bootstrap do not directly consume a
+lower observed carrier and cannot replace its epoch. They remain upper and
+inactive.
+
+Select only
+`WP-6-7A-host-canonical-repository-definition-observation-carrier-visibility-design`.
+It must freeze exact nominal types, Display/new, concrete borrowed Result-Arc
+and epoch accessors, private-inner/public-wrapper Key projection and one
+root-definition sibling key/Display/associated-Value/accessor smoke. The smoke
+cannot construct/inspect carrier or outer, compute, name private variants or
+activate root definition.
+
+Only wrapper-spelling changes may be considered in existing
+`observed_canonical_repository_definition_identity_staging_and_terminal_algebra`.
+All selected-first/generated-on-Missing/merge/Need/outer/dependency/equality/
+validity/epoch assertions remain frozen. Real-order/event and lifecycle/
+cancellation/nonactivation proof must remain unchanged.
+
+Prospective authority is exactly generated definition baseline 3,843
+physical/tests 1,152, SHA-256
+`ea48d5e52dbad37bfc79e745ae0d6e24cc3e2b133b45fb4e861b5373810722ba`,
+and test-only root apparent definition baseline 1,042/tests 372, SHA-256
+`c06fa8c8a2ebed243e32168a411c4f36bc1ff0d48803e077c431ae4c37aef19e`.
+Caps are <=80 generated production, <=50 generated proof, <=80 sibling proof,
+<=210 aggregate and physical <=3,974/1,122. Add no production helper or new
+generated test and exactly one sibling smoke; identity remains below 200 and
+smoke below 100. The generated file remains the cohesive owner; no hot-path or
+retained-representation change applies.
+
+Prospective validation is focused canonical observation, exact sibling smoke,
+protected apparent-mapping/root-definition tests, full core, direct commands
+check, formatting and exact two-file allowlist/SHA/caps/test-size/visibility/
+source-shape plus diff hygiene serially. Reuse accepted owner/wrapper evidence;
+add no oracle.
+
+Canonical selection/generation semantics/order/errors/equality/invalidation/
+epochs/events remain exact. The same-crate opaque Result-Arc+epoch handoff is
+Slug-native. Root-definition ownership and its later carrier, route/source/
+public/command/bootstrap observation and exact identity bytes remain deferred.
+
+Docs authority is canonical/current/this Stage/routing under <=40/<=180/
+<=220/<=30 and <=470 aggregate. Design ACCEPT schedules exactly the matching
+visibility implementation and then returns to root-definition owner design.
+STOP Rust/tests in this audit, activation, crate-public/export, public field/
+alias/inner/variant/inspector, apparent-mapping redesign, third file/type/key/
+carrier/adapter, semantic/event/epoch/retention drift, Cargo/BUILD, oracle,
+cap/proof waiver, upper work, milestone closure, M8/M7B or exact identity work.
+REPLAN before widening or hash drift. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier formatter REPLAN (2026-08-21)
 
 The proof-corrected semantic draft is retained, but

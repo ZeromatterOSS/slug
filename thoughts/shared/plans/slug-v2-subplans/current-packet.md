@@ -1,170 +1,144 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-canonical-repository-apparent-mapping-observation-carrier-visibility-implementation`
+Packet: `WP-6-7A-host-canonical-repository-definition-observation-carrier-visibility-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Design and Rust base: pending docs commit / `bf093a17`
+Audit and Rust base: pending docs commit / `4fe0bf1c`
 
-## Goal and authority
+## Goal and decision authority
 
-Implement only the designed same-crate handoff between the accepted callerless
-canonical apparent-mapping observation and its sole future sibling consumer.
-Expose exactly one `pub(super)` key/carrier/field-private opaque-outer surface
-and prove it with one test-only sibling compile smoke. Do not activate a caller
-or change computation.
+Design only the uniquely smaller same-crate visibility prerequisite between
+the accepted private canonical-definition observation and the future root
+apparent-definition observation owner. Freeze one minimal `pub(super)` opaque
+carrier surface plus sibling compile proof without changing computation or
+activating any caller.
 
-Authority is exactly:
+Write only the canonical plan, this manifest, Stage 6 and routing log at net
+caps <=40/<=180/<=220/<=30 and <=470 aggregate. Rust, tests, fixtures,
+oracles, Cargo/BUILD, exports and callers are read-only in this packet.
+
+## Audited frontier and decision
+
+Accepted `4fe0bf1c` promotes the apparent-mapping observation key, carrier,
+concrete borrowed Result/epoch accessors and opaque outer to `pub(super)`.
+The root-definition sibling smoke compiles, while the observation remains
+callerless. Apparent-mapping visibility is no longer a blocker.
+
+`HostRootApparentRepositoryDefinitionKey` currently computes legacy apparent
+mapping first at `root_apparent_repository_definition.rs:266`. A mapping
+failure terminates immediately. Successful main and `bazel_tools` targets
+defer before any definition lookup; only another resolved target reaches the
+legacy canonical-definition child at line 310. Mapping therefore owns the
+prefix and target disposition, and definition is a conditional second child.
+
+The accepted canonical-definition observation at
+`generated_repository_definition.rs:496-727` has one current production
+consumer: the nonroot branch of the observed apparent-mapping owner at line
+958. Its key/new, carrier, private-alias accessors and typed outer remain
+private to that sibling module. Root apparent definition cannot name the
+associated Value or preserve the definition epoch. Reusing the legacy child
+would silently discard observation ownership and is not an admissible bridge.
+
+The private canonical outer has Selected, Generated and Merge variants. Its
+Generated variant names the private generated-definition outer and Merge names
+the local frontier error, so direct enum promotion would reveal lower terminal
+structure. A field-private nominal wrapper at Key projection is the bounded
+effective-visibility shape; exact names and projection are reserved for this
+design packet.
+
+Root apparent definition has exactly one production consumer,
+`HostRootApparentRepositoryRouteKey` at
+`root_apparent_repository_route.rs:303`. Route, source input/source
+observation/path input, repository publication/materialization, command and
+bootstrap layers do not consume either lower observed carrier directly and
+cannot replace its epoch. They are not prerequisites.
+
+Thus canonical-definition carrier visibility is uniquely smaller than root
+apparent-definition ownership. It needs no crate-public API, `lib.rs` reexport,
+module move, adapter, alias or semantic caller because both modules share the
+core runtime parent.
+
+## Design deliverable
+
+Freeze exactly one minimal same-crate surface:
+
+- the existing canonical-definition observation key and only its existing
+  two-argument constructor at `pub(super)`;
+- the existing carrier with private fields and concrete borrowed canonical
+  Result-Arc and `PathObservationEpoch` accessors at `pub(super)`; and
+- one `pub(super)` field-private opaque outer, retaining all Selected/
+  Generated/Merge details in a renamed private inner used by the driver and
+  wrapping only the observed Key error projection.
+
+The design must determine the exact nominal names, Display and accessor
+signatures from live types. It must add no public field, lower variant,
+private-alias exposure, constructor/conversion/inspector for the outer,
+crate-root export, adapter or caller.
+
+Freeze exactly one test-only sibling proof in
+`root_apparent_repository_definition.rs`. It may construct only the canonical-
+definition observation key and assert exact Display, then use nonexecuted
+function pointers to prove the associated Value and concrete borrowed carrier
+accessors. It must not construct or inspect carrier/outer, compute, activate
+root definition, or name private inner/variants/alias.
+
+Audit the existing
+`observed_canonical_repository_definition_identity_staging_and_terminal_algebra`
+for wrapper-only spelling changes. Preserve all accepted selected-first,
+generated-on-semantic-Missing, merge, Need, outer, equality, validity,
+dependency and epoch assertions. Do not change real-order/event or lifecycle/
+cancellation/nonactivation proof.
+
+## Prospective authority, caps and validation
+
+Prospective implementation authority is exactly:
 
 - `app/slug_core_v2/src/runtime/generated_repository_definition.rs`, baseline
-  3,828 physical/tests 1,138, SHA-256
-  `7b542ed4e0a661aa81a11651aba9bcd7ef62fc2a89bc947775a651c8a3d2f9db`;
+  3,843 physical/tests 1,152, SHA-256
+  `ea48d5e52dbad37bfc79e745ae0d6e24cc3e2b133b45fb4e861b5373810722ba`;
 - test-only
   `app/slug_core_v2/src/runtime/root_apparent_repository_definition.rs`,
-  baseline 999 physical/tests 372, SHA-256
-  `d13997171de5467fca54599d6c3aaf4e62eabfc95d224f91b72507401e63ae3e`.
+  baseline 1,042 physical/tests 372, SHA-256
+  `c06fa8c8a2ebed243e32168a411c4f36bc1ff0d48803e077c431ae4c37aef19e`.
 
-No third file, module declaration, crate-root export, Cargo/BUILD, fixture,
-oracle, adapter or semantic caller is authorized.
+Prospective caps are <=80 generated production, <=50 generated proof and <=80
+sibling proof; <=210 aggregate semantic lines and physical <=3,974/1,122.
+Add no production helper or new generated-module test and exactly one sibling
+smoke. The adjusted identity test stays below 200 and the smoke below 100.
+The large generated module remains cohesive because it owns the canonical
+driver/carrier/projection; the sibling changes only its colocated compile
+proof. No hot-path or retained-representation change applies.
 
-## Frozen production surface
+Prospective validation is serial: focused observed canonical-definition tests,
+the exact sibling smoke, protected apparent-mapping and root-definition tests,
+full `slug_core_v2`, direct `slug_commands_v2` check, formatting, then exact
+two-file allowlist/SHA/accounting/physical/test-size/visibility/source-shape
+checks and `git diff --check`. Reuse accepted owner and same-crate opaque-
+wrapper proof; add no Bazel oracle for a visibility-only change.
 
-Give exactly these existing names `pub(super)` visibility:
-
-- `HostCanonicalRepositoryApparentMappingObservationKey`;
-- `ObservedHostCanonicalRepositoryApparentMapping`; and
-- `HostCanonicalRepositoryApparentMappingObservationError`.
-
-The key tuple field remains private. Promote only the exact constructor
-`pub(super) fn new(workspace: NormalizedAbsolutePath, context_repo:
-CanonicalRepoName, apparent_repo: ApparentRepoName) -> Self`. Preserve exact
-Display, including
-`observed-host-canonical-repository-apparent-mapping:"/workspace":@@:@first`
-for `/workspace`, root context and `@first`.
-
-The carrier fields and `CanonicalRepositoryApparentMappingResult` alias remain
-private. Promote only these exact concrete borrowed accessors:
-
-```rust
-pub(super) fn result(
-    &self,
-) -> &Arc<
-    Result<
-        HostCanonicalRepositoryApparentMapping,
-        HostCanonicalRepositoryApparentMappingError,
-    >,
->
-pub(super) fn observations(&self) -> &PathObservationEpoch
-```
-
-Effective Key visibility requires one wrapper projection. Rename the current
-private enum to `CanonicalRepositoryApparentMappingObservationError`, retaining
-exactly `RootMapping(HostRootRepositoryMappingObservationError)` and
-`Definition(HostCanonicalRepositoryDefinitionObservationError)` plus its
-existing derives. The child outcome, driver, finisher and terminal construction
-continue to use this private inner.
-
-Add exactly:
-
-```rust
-pub(super) struct HostCanonicalRepositoryApparentMappingObservationError(
-    CanonicalRepositoryApparentMappingObservationError,
-);
-```
-
-Its field remains private. Both inner and wrapper derive exactly `Debug`,
-`Clone`, `PartialEq`, `Eq`, `Allocative` and `Dupe`.
-Only the observed Key projection wraps `Complete(Err(inner))`; Need, success,
-legacy, equality/validity, branch order, Result Arc identity, epochs, events,
-retention and cancellation remain byte-for-behavior unchanged. Do not add an
-outer constructor, conversion, inspector, public field, alias or variant.
-
-## Frozen proof
-
-Allow only wrapper-spelling adjustments in existing
-`observed_canonical_repository_apparent_mapping_identity_branch_and_terminal_algebra`:
-finisher/child source assertions name the private inner; Key-Value construction
-and matching use the field-private wrapper around the private `Definition`
-inner. Preserve every existing terminal, dependency and epoch assertion and
-source evidence for exactly one RootMapping inner, one Definition inner and one
-Key projection. No lifecycle proof change or new generated-module test is
-authorized.
-
-Add exactly one test to the existing test-only sibling module in
-`root_apparent_repository_definition.rs`:
-`canonical_repository_apparent_mapping_observation_surface_is_sibling_usable`.
-Use explicit test-only sibling imports for the three promoted names; do not
-change production imports. The smoke:
-
-- constructs only the key for `/workspace`, root context and `@first` and
-  asserts the exact Display above;
-- defines one nonexecuted `inspect` taking
-  `&<HostCanonicalRepositoryApparentMappingObservationKey as Key>::Value`,
-  `&ObservedHostCanonicalRepositoryApparentMapping` and
-  `&HostCanonicalRepositoryApparentMappingObservationError`; inside it assigns
-  `observed.result()` to
-  `&Arc<Result<HostCanonicalRepositoryApparentMapping,
-  HostCanonicalRepositoryApparentMappingError>>` and
-  `observed.observations()` to `&PathObservationEpoch`;
-- casts `inspect` to the exact function pointer whose first parameter is
-  `&SourcePreparationOutcome<Result<ObservedHostCanonicalRepositoryApparentMapping,
-  HostCanonicalRepositoryApparentMappingObservationError>>`, followed by the
-  same carrier and opaque-error references; and
-- does not construct or inspect the carrier/outer, compute the key, name the
-  private alias/inner/variants, invoke root definition or activate semantics.
-
-## Caps and validation
-
-Caps are <=80 generated production, <=50 generated colocated proof and <=80
-sibling proof; <=210 aggregate semantic lines and physical <=3,959/1,079. Add
-no production helper or generated-module test and exactly one sibling smoke.
-The adjusted identity test remains below 200 lines and the smoke below 100.
-Add no new `rustfmt::skip`; preserve existing skips and require rustfmt-stable
-bytes. The generated owner remains cohesive around its driver/carrier/Key
-projection; the sibling changes only its colocated compile proof. No hot-path
-or retained-representation change applies.
-
-Run serially:
-
-1. `cargo test -p slug_core_v2 observed_canonical_repository_apparent_mapping_ --lib`;
-2. `cargo test -p slug_core_v2 canonical_repository_apparent_mapping_observation_surface_is_sibling_usable --lib`;
-3. protected root apparent-definition and observed canonical-definition tests;
-4. full `cargo test -p slug_core_v2`;
-5. `cargo check -p slug_commands_v2`;
-6. `cargo fmt --all -- --check`; and
-7. exact two-file allowlist, baseline-SHA/accounting/physical/test-size/
-   visibility/source-shape checks plus `git diff --check`.
-
-Reuse the accepted owner proof and same-crate opaque-wrapper precedents. Add no
-Bazel oracle because this handoff has no Bazel-visible behavior.
-
-## Compatibility and stops
-
-Apparent-mapping branches/order/targets/errors/predecessor, equality/
+Canonical-definition selection/generation order, targets, failures, equality/
 invalidation, epochs and lower events remain **exact** Bazel 9 compatibility.
-The crate-internal opaque carrier and Result-Arc transaction-local epoch
-handoff are **Slug-native**. Canonical-definition carrier visibility, root
-apparent-definition ownership, route/source/public/command/bootstrap
-observation and exact Bazel configuration/output/ActionKey bytes remain
-**unsupported/deferred**.
-
-STOP on a third file/type/key/carrier/adapter; crate-public visibility or
-crate-root reexport; public field/alias/private-inner exposure/variant
-inspector; canonical-definition visibility or root-definition activation;
-semantic/branch/event/equality/epoch/retention drift; proof change beyond the
-wrapper spelling and exact sibling smoke; new broad formatter skip; Cargo/
-BUILD, fixture/oracle; cap/test/format waiver; upper activation, milestone
-closure, M8/M7B or exact identity work. REPLAN before widening or on baseline
-hash drift.
+The crate-internal opaque Result-Arc+epoch handoff is **Slug-native**. Root
+apparent-definition ownership, its later carrier visibility, route/source/
+public/command/bootstrap observation and exact Bazel configuration/output/
+ActionKey bytes remain **unsupported/deferred**.
 
 ## Terminal
 
-ACCEPT returns only to a docs-only root apparent-definition observation
-prerequisite audit. That audit may separately select canonical-definition
-carrier visibility; this packet must not preempt it. M7 remains partial and
+ACCEPT schedules exactly
+`WP-6-7A-host-canonical-repository-definition-observation-carrier-visibility-implementation`,
+then returns only to a docs-only root apparent-definition observation-owner
+design. STOP Rust/test/API edits in this packet; root-definition activation;
+crate-public/export or public field/alias/inner/variant/inspector; apparent-
+mapping redesign; third file/type/key/carrier/adapter; canonical semantics/
+order/event/equality/epoch/retention drift; proof beyond wrapper spelling and
+one sibling smoke; Cargo/BUILD, fixture/oracle; cap/proof/test/format waiver;
+upper route/source/public/bootstrap work, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening or hash drift. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Committed audit `bf093a17` selected this two-file `pub(super)` handoff as the
-unique prerequisite smaller than root-definition ownership. Accepted owner
-`2022a7a2` is +599/-99 at 3,828 physical lines and remains callerless.
+Accepted visibility implementation `4fe0bf1c` is +73/-15 across exactly the
+generated-definition owner and root-definition test module. Its terminal
+requires this prerequisite audit before root-definition ownership.
