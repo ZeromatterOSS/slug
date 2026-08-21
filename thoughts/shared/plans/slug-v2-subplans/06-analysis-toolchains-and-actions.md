@@ -10831,6 +10831,35 @@ accepted-test semantic edit, second file/key/owner, lock across DICE, parent
 batch, cap waiver, M8/M7B or exact identity work. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Loaded-definition lifecycle Arc-identity REPLAN (2026-08-20)
+
+The lifecycle packet produced a compiling 8,181-line, `+1,410/-111` candidate
+and exact upper scan, but its focused test lawfully fails restored pointer
+assertions. Replacing only a root source recomputes an equal observed request
+carrier with a fresh inner Result Arc; pure export can recompute equal Host-Bzl
+carriers. After poll/drop recovery, a separately computed global epoch contains
+a semantically equal Host `/` Lstat result with a fresh Arc. Semantic DICE key
+equality does not guarantee cross-compute inner-Arc identity. Production has no
+defect and remains frozen.
+
+Activate only
+`WP-6-7A-loaded-module-extension-definitions-lifecycle-cancellation-proof-repair-retry`.
+Keep parent A -> B -> A inequality/restoration and held-old Result/epoch/
+projection immutability across request, direct-source, recursive-load and pure-
+export axes. For separately computed request/Bzl/global epoch values require
+exact semantic Result and demand/result-map equality. Require inner Arc identity
+only for an exact key/label proven `Reused` whose returned cached value retains
+it; otherwise Evaluated equal values are semantic-equality proof. Preserve the
+accepted finisher-local left-first Arc proof unchanged.
+
+Cancellation still proves no completed publication, exact clean-fixture Result,
+request/manifest/projection/epoch equality, exact global-epoch demand membership
+and semantic results, followed by warm equality/silence. Exact production-slice
+and all-key nonactivation, authority, <=`+1,800/-350`, <=8,450, <200 function
+limits, validation and final prepared/evaluation rollover remain unchanged.
+STOP production or accepted-test edits, pointer overclaim, cap waiver, M8/M7B
+or exact identity work. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
