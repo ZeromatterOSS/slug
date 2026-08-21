@@ -13355,6 +13355,93 @@ cap/proof waiver, upper work, milestone closure, M8/M7B or exact identity work.
 REPLAN before widening or hash drift. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Canonical-definition carrier visibility design accepted (2026-08-21)
+
+Schedule exactly
+`WP-6-7A-host-canonical-repository-definition-observation-carrier-visibility-implementation`
+from committed audit `05ddd7fc`. The packet remains callerless and does not
+activate root apparent-definition ownership.
+
+Authority is exactly generated definition baseline 3,843 physical/tests 1,152,
+SHA-256
+`ea48d5e52dbad37bfc79e745ae0d6e24cc3e2b133b45fb4e861b5373810722ba`,
+and test-only root apparent definition baseline 1,042/tests 372, SHA-256
+`c06fa8c8a2ebed243e32168a411c4f36bc1ff0d48803e077c431ae4c37aef19e`.
+No third file, crate-root export or semantic caller is authorized.
+
+Promote exactly
+`HostCanonicalRepositoryDefinitionObservationKey`,
+`ObservedHostCanonicalRepositoryDefinition` and
+`HostCanonicalRepositoryDefinitionObservationError` to `pub(super)`. The key
+field remains private; only exact `new(NormalizedAbsolutePath,
+CanonicalRepoName) -> Self` becomes `pub(super)`. `/workspace` plus
+`@@requested` displays exactly
+`observed-host-canonical-repository-definition:"/workspace":@@requested`.
+
+Keep carrier fields and `CanonicalRepositoryDefinitionResult` private. Expose
+only concrete borrowed
+`&Arc<Result<HostCanonicalRepositoryDefinition,
+HostCanonicalRepositoryDefinitionError>>` and `&PathObservationEpoch`
+accessors.
+
+Rename the private terminal enum to
+`CanonicalRepositoryDefinitionObservationError`, retaining exact Selected,
+Generated and Merge variants. It keeps Debug/Clone/PartialEq/Eq/Allocative plus
+manual Dupe. Driver outcome and all three terminal constructions use this
+inner. Add a same-derived/manual-Dupe `pub(super)` field-private
+`HostCanonicalRepositoryDefinitionObservationError(inner)` and wrap only at
+the observed canonical Key error projection. Add no outer constructor,
+conversion, inspector, public field, alias or variant.
+
+The existing same-file apparent-mapping child destructures the wrapper in its
+Observed terminal arm and passes only the private inner to
+`CanonicalRepositoryApparentMappingObservationError::Definition`. Change that
+variant payload to the renamed private inner. This is the sole consumer
+adjustment: no adapter, clone, translation, merge, branch or compute changes.
+
+Allow wrapper-only source/proof spelling changes in existing canonical-
+definition and apparent-mapping identity tests. The former proves the three
+private inner terminals plus exactly one Key wrapper; the latter constructs the
+private Definition inner and proves exactly one consumer unwrap. Preserve all
+semantic/Need/dependency/equality/validity/Arc/epoch assertions and all real-
+event/lifecycle proof.
+
+Add exactly one test-only root-definition sibling smoke named
+`canonical_repository_definition_observation_surface_is_sibling_usable`.
+With explicit imports of the three promoted names, it constructs only the key,
+asserts exact Display and uses one nonexecuted associated-Value/carrier/error
+function pointer. Its body proves the concrete Result-Arc and epoch accessors.
+It cannot construct/inspect carrier or outer, compute, name private details or
+activate root definition; production imports remain unchanged.
+
+Caps are <=80 generated production, <=50 generated proof, <=80 sibling proof,
+<=210 aggregate and physical <=3,974/1,122. Add no production helper or
+generated test and exactly one sibling smoke; both adjusted identities remain
+below 200 and smoke below 100. Add no new `rustfmt::skip`; formatting has no
+waiver and all changed bytes must be rustfmt-stable. The generated file remains
+the cohesive semantic owner; no hot-path/retained-representation change
+applies.
+
+Validate focused canonical observation, apparent identity and exact sibling
+smoke; protected root-definition and prior sibling-surface tests; full core;
+direct commands check; `cargo fmt --all -- --check`; exact two-file allowlist/
+baseline-SHA/accounting/physical/test-size/visibility/wrapper/source-shape; and
+`git diff --check` serially. Reuse accepted owner/wrapper proof; add no oracle.
+
+Canonical selection/generation semantics/order/errors/equality/invalidation/
+epochs/events remain exact. The opaque same-crate Result-Arc+epoch handoff is
+Slug-native. Root-definition ownership/later carrier, route/source/public/
+command/bootstrap observation and exact identity bytes remain deferred.
+
+STOP third file/type/key/carrier/adapter, crate-public/root export, public
+field/alias/private-inner/variant/inspector, root-definition activation,
+apparent redesign beyond exact unwrap, semantic/event/epoch/retention drift,
+proof beyond two wrapper-only identities plus one smoke, formatter/cap/test
+waiver, Cargo/BUILD, oracle, upper work, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening or hash drift. ACCEPT returns only to
+root apparent-definition observation-owner design. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier formatter REPLAN (2026-08-21)
 
 The proof-corrected semantic draft is retained, but
