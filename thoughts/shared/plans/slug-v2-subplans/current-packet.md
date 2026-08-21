@@ -1,29 +1,29 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-loaded-module-extension-definitions-observation-proof-correction-implementation-retry-2`
+Packet: `WP-6-7A-loaded-module-extension-definitions-observation-proof-correction-implementation-retry-3`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `2d59ade1`
+Scheduling base: `f3a39399`
 Accepted predecessor: `99c23033`
 
 ## Goal and authority
 
 Close the parent-specific proof for the uncommitted loaded-definition
-observation candidate after the first proof-correction packet reached terminal
-`REPLAN` on one contradictory operation-mismatch requirement. Preserve the
-independently accepted production driver/finisher and replace only the
-nondiscriminating proof. Activate no caller or upper extension owner.
+observation candidate after retry 2 reached terminal `REPLAN` on an unreachable
+opaque request-outer construction requirement. Preserve the independently
+accepted production driver/finisher and replace only the nondiscriminating
+proof. Activate no caller or upper extension owner.
 
 Write exactly `app/slug_loading_v2/src/bzl_module.rs`. Every other file is
 read-only, including Bzlmod, loading callers/modules, Cargo/BUILD metadata,
 fixtures, oracles and planning documents until terminal rollover.
 
-The retained retry candidate is 7,572 physical lines and `+799/-109` versus
-`0a8e1220`. Final caps remain <=`+1,099/-327` versus `0a8e1220` and <=7,654
-physical lines, leaving <=300 added and <=82 net physical lines while coarse
-added tests may be replaced in place. Production is fully frozen: touch zero
-production lines, including the 130-line shared driver, existing pure finisher,
-keys, carriers and errors. Permit at most four test helpers and three parent
+The retained retry-2 candidate is 7,637 physical lines and `+864/-109` versus
+`0a8e1220`. Corrected final caps are <=`+1,450/-327` versus `0a8e1220` and
+<=8,025 physical lines; replace the three coarse tests and duplicate tracker
+rows rather than stack proof. Production is fully frozen: touch zero production
+lines, including the 130-line shared driver, existing pure finisher, keys,
+carriers and errors. Permit at most four new test helpers and three parent
 tests; every helper/test remains below 200.
 
 ## REPLAN basis and accepted candidate
@@ -55,6 +55,16 @@ maps real child conflict or operation mismatch to `stage: Bzl`; only a conflict
 between two valid epochs can arise at `stage: Merge`. The worker stopped before
 changing the correction diff.
 
+Retry 2 improved key/finisher assertions but left the two-request omnibus,
+duplicate tracker rows and aggregate-only lifecycle. Its terminal review also
+proved the local request-outer equality obligation unreachable: the accepted
+Bzlmod outer is intentionally opaque, and ordinary consistent snapshots do not
+produce its lower frontier failure. Production freeze, no-hook and no-API
+stops prevent constructing it here. Reuse the accepted lower request-key
+Complete/equality/carrierlessness proof and require only the parent forwarding
+arm plus dependency-family evidence. This is the sole retry-3 contract change;
+all realizable parent obligations remain.
+
 ## Lawful proof seam
 
 An ordinary consistent snapshot cannot produce a genuine parent Bzl outer,
@@ -80,9 +90,10 @@ Add exactly three bounded parent specifications.
 `observed_loaded_identity_and_finisher_algebra` proves:
 
 - distinct key equality/hash/Display;
-- Complete-only equality/validity for semantic carrier, request outer and Bzl
-  outer, with Need invalid and self-unequal;
-- request outer is carrierless;
+- Complete-only equality/validity for semantic carrier and Bzl outer, with Need
+  invalid and self-unequal;
+- source-slice and dependency-family evidence that the accepted opaque request
+  outer is forwarded carrierlessly by the parent; do not construct it locally;
 - empty/request/prior/current prefix association at the production finisher;
 - equal duplicate retains the left/request-side Arc;
 - conflicting valid same-demand results return exact parent
@@ -115,10 +126,12 @@ requests and proves:
   and
 - a semantic Bzl failure still leaves its decisive child batch at the child.
 
-Extend the existing tracker only as test proof. Record key Display,
-`ActivationKind`, optional batch and dependency rows for the loaded parent,
-request child and Host-Bzl children. Do not introduce production event state or
-weaken existing lower assertions.
+Extend the existing tracker only as test proof. Keep dependency rows from
+`key_activated` and real kind/batch activations from `key_activated_rich` as two
+separate records; never fabricate a kind or count both callbacks as two
+activations. Record all keys for upper/legacy exclusion, while event assertions
+filter exact parent/request/Host-Bzl identities. Do not introduce production
+event state or weaken existing lower assertions.
 
 ### Lifecycle, cancellation and nonactivation
 
@@ -191,4 +204,9 @@ first proof-correction implementation added the accepted pure finisher and
 three named tests, but review found the tests still nondiscriminating. Its one
 correction stopped without edits on the contradictory Merge-stage operation
 mismatch contract. Reserved review corrected only that classification and
-kept production plus every other proof obligation frozen for this retry.
+kept production plus every other proof obligation frozen for retry 2.
+Scheduling commit `f3a39399` recorded that correction. Retry 2's proof remained
+incomplete, and its opaque request-outer construction requirement proved
+unreachable under frozen no-hook/no-API authority. The current test-only diff
+is retained; full loading validation must be rerun after its final replacement
+because the last recorded full suite predates the final compaction.

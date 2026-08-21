@@ -10601,6 +10601,46 @@ key/owner, fake key/hook/malformed epoch, parent batch, upper activation, proof
 waiver, M8/M7B or exact identity work. After ACCEPT return only to the docs-only
 prepared/evaluation frontier. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Loaded-definition opaque request-outer proof REPLAN (2026-08-20)
+
+Retry-2 scheduling `f3a39399` corrected the Bzl-vs-Merge stage contract, but
+its test-only implementation reached terminal `REPLAN`. The retained candidate
+is 7,637 physical and `+864/-109` versus `0a8e1220`; production remains exactly
+the independently accepted driver/finisher. Key/finisher assertions improved,
+while real order/events/lifecycles and tracker authority remained incomplete.
+
+The retry also required local construction/equality of the request-child outer.
+That Bzlmod type is intentionally opaque, and a normal consistent snapshot does
+not produce its lower frontier failure. Frozen production, no API widening and
+no fake key/hook make the requirement unreachable. Reuse the accepted Bzlmod
+request-key Complete/equality/carrierlessness proof. The loading parent must
+instead prove, by its production source slice and all-key dependency rows, that
+the opaque outer arm is forwarded carrierlessly and no alternate family or
+upper key is activated.
+
+Activate only
+`WP-6-7A-loaded-module-extension-definitions-observation-proof-correction-implementation-retry-3`.
+Freeze every production line. Replace all three coarse tests and split tracker
+dependency rows from real rich kind/batch activations; record every key for
+upper/legacy exclusion. Preserve the corrected algebra: equal valid duplicate
+retains the left Arc, valid-epoch value conflict is Merge, and real child
+conflict/operation mismatch is Bzl.
+
+All realizable parent obligations remain: three-request exact legacy parity;
+first/middle/last terminal suppression and decisive prefixes; exact ordered
+fresh/warm/reused/failure child event ownership; independent held request,
+Bzl-source/recursive-load and export A -> B -> A; poll-drop/recovery; and
+production-slice plus all-key nonactivation. Rerun the full loading suite after
+the final source state.
+
+Corrected final caps are <=`+1,450/-327` versus `0a8e1220` and <=8,025 physical,
+with zero production lines touched, at most four new helpers and three tests,
+each below 200. Write only `app/slug_loading_v2/src/bzl_module.rs`. STOP any
+production edit, second file/key/owner, fake/hook/API widening, parent batch,
+upper activation, proof waiver, M8/M7B or exact identity work. After ACCEPT
+return only to the prepared/evaluation frontier. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
