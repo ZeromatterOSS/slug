@@ -12926,6 +12926,83 @@ equality/retention drift, Cargo/BUILD, fixture/oracle, third production file,
 cap/proof waiver, upper activation, milestone closure, M8/M7B or exact identity
 work. REPLAN before widening. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Root-mapping carrier-promotion design accepted (2026-08-21)
+
+Committed audit `681732db` and live base `7ee0522b` accept exactly
+`WP-6-7A-host-root-repository-mapping-observation-carrier-promotion-implementation`.
+The change is visibility-only and activates no core consumer.
+
+Promote exactly doc-hidden public
+`HostRootRepositoryMappingObservationKey`,
+`ObservedHostRootRepositoryMapping` and
+`HostRootRepositoryMappingObservationError`. The key retains its private
+legacy-key field and exact Display; make only its one-argument `new` public.
+The carrier retains private Result alias and fields; make only concrete
+borrowed `Arc<Result<HostRootRepositoryMapping,
+HostRootRepositoryMappingError>>` `result()` and `PathObservationEpoch`
+`observations()` public.
+
+Rename the present private Mappings enum to
+`RootRepositoryMappingObservationError`, keeping exactly
+`Mappings(ExtensionMappingsObservationError)` and all driver uses. Add the
+public outer as a tuple wrapper over that inner with a private field and
+matching derives. The public Key Value names this outer; wrap only observed
+Complete Err at Key projection. Need/success/legacy, equality/validity,
+semantics, events, retention and cancellation remain unchanged. Expose no
+field, private alias/enum/variant, inspector, constructor/conversion or adapter.
+
+In Bzlmod `lib.rs`, after the complete legacy root-mapping block and before
+selected-extension exports, add exactly three adjacent `#[doc(hidden)]`/`pub
+use` pairs in exact order Error, Key, Observed. Add no fourth observation
+reexport or alias.
+
+Add exactly external
+`root_repository_mapping_observation_surface_is_cross_crate_usable`: construct
+only the key for `/workspace`, assert
+`observed-host-root-repository-mapping:"/workspace"`, and use nonexecuted
+function pointers to prove the exact associated
+`SourcePreparationOutcome<Result<ObservedHostRootRepositoryMapping,
+HostRootRepositoryMappingObservationError>>` and concrete borrowed accessor
+types. The smoke cannot construct/inspect carrier/outer, compute or import core.
+
+Adjust existing identity/terminal proof only for the private-inner/public-
+wrapper spelling. The lifecycle proof must replace only its obsolete `lib.rs`
+absence clause with exact-once hidden-pair and exact Error/Key/Observed order
+assertions; all names remain absent from loading Bzl-module, core generated-
+definition and root-apparent-definition sources. Retain every tracker,
+lifecycle, cancellation, recovery and upper-nonactivation assertion.
+
+Authority is exactly selected source at baseline 13,362 physical/tests 4,862,
+SHA-256 `f98ef97df33eadca597cf8e10714c00654864e316979bfce0eb1813005f99c67`;
+Bzlmod `lib.rs` at 421,
+`3fdd3d81d94ce7d3618f356114505d7c30515596a3adbe0f14fb7add30c5cea0`;
+and new `tests/root_repository_mapping_observation_api.rs`. Caps are <=80
+production, <=40 colocated proof, <=10 lib, <=70 external, <=200 aggregate
+semantic and physical <=13,483/431/70. Existing adjusted tests stay below 200,
+new smoke/helpers below 100, and no new colocated test/helper is allowed. The
+large source stays cohesive around its private driver/carrier/projection; no
+hot-path or retained-representation change applies.
+
+Validate focused observed root-mapping and exact external smoke, protected
+existing Bzlmod observation API smokes, full Bzlmod, direct core check,
+formatting, exact SHA/allowlist/accounting/physical/test-size/reexport checks and
+diff hygiene serially. Reuse accepted owner, Bazel 9.2 canonical mapping source/
+test anchors and prior opaque promotions; add no oracle.
+
+Root-mapping semantics/order/errors/views/equality/invalidation/events remain
+exact. The hidden cross-crate carrier/opaque outer and Result-Arc+transaction-
+epoch association are Slug-native. Apparent-mapping caller/observation, root
+definition/route/source/public/command/bootstrap and exact identity bytes remain
+unsupported/deferred.
+
+ACCEPT returns only to canonical apparent-mapping observation-owner design.
+STOP a fourth file/type/reexport, public inner state/alias/terminal, adapter/
+caller/core edit, semantic/event/equality/retention drift, proof change beyond
+wrapper/reexport projection, Cargo/BUILD, fixture/oracle, cap/test-size/format
+waiver, upper activation, milestone closure, M8/M7B or exact identity work.
+REPLAN before widening or baseline-hash drift. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier formatter REPLAN (2026-08-21)
 
 The proof-corrected semantic draft is retained, but

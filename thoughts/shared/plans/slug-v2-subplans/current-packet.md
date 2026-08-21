@@ -1,141 +1,157 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-root-repository-mapping-observation-carrier-promotion-design`
+Packet: `WP-6-7A-host-root-repository-mapping-observation-carrier-promotion-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Audit and Rust base: pending docs commit / `7ee0522b`
+Design and Rust base: pending docs commit / `7ee0522b`
 
-## Goal and decision authority
+## Goal and exact authority
 
-Design only the uniquely smaller cross-crate visibility prerequisite between
-the accepted private Bzlmod root-repository-mapping observation and core's
-future canonical apparent-mapping observation owner. Freeze one doc-hidden
-key/carrier/opaque-outer handoff without changing computation or activating a
-caller.
+Promote only the accepted private Bzlmod root-repository-mapping observation
+carrier across the existing Bzlmod -> core dependency. Expose one doc-hidden
+key, carrier and field-private opaque outer plus exactly three crate-root
+reexports and one external API smoke. Add no semantic caller or activation.
 
-Write only the canonical plan, this manifest, Stage 6 and routing log at net
-caps <=40/<=180/<=220/<=30 and <=470 aggregate. Rust, tests, fixtures,
-oracles, Cargo/BUILD, APIs, exports and callers are read-only in this packet.
-
-## Audited frontier
-
-At accepted base `7ee0522b`, `selected_repo_spec.rs:4636-4860` owns private
-`HostRootRepositoryMappingObservationKey`, private
-`ObservedHostRootRepositoryMapping` and private
-`HostRootRepositoryMappingObservationError::Mappings`. The carrier's private
-`result()` names private `RootRepositoryMappingResult`; the outer exposes
-private `ExtensionMappingsObservationError`. There is no crate-root reexport
-and no production consumer of the observed key.
-
-The legacy `HostRootRepositoryMappingKey` has exactly one production consumer:
-the root-context branch of core
-`HostCanonicalRepositoryApparentMappingKey` at
-`generated_repository_definition.rs:879`. That core key's nonroot branch at
-905 already shares a module with the private canonical-definition observation,
-so canonical-carrier promotion is not a prerequisite. The apparent-mapping key
-has exactly one production consumer, `HostRootApparentRepositoryDefinitionKey`
-at `root_apparent_repository_definition.rs:266`; that consumer later computes
-canonical definition at 310. Route/source/public/command/bootstrap branches
-are still upper and contain no direct observed-root-mapping consumer.
-
-Core already depends one way on Bzlmod and imports the legacy root-mapping
-surface. Moving the owner, adding a Bzlmod-to-core edge, splitting the root and
-nonroot apparent-mapping family or using an empty root epoch is forbidden.
-Therefore the minimal next step is the Bzlmod carrier promotion, not apparent-
-mapping ownership or canonical/root-definition visibility.
-
-## Design deliverable
-
-Freeze exactly three doc-hidden public nominal types and exactly three adjacent
-crate-root reexports:
-
-- existing `HostRootRepositoryMappingObservationKey`, with public one-argument
-  `new(NormalizedAbsolutePath)` and unchanged Display;
-- existing `ObservedHostRootRepositoryMapping`, with public borrowed concrete
-  `&Arc<Result<HostRootRepositoryMapping, HostRootRepositoryMappingError>>`
-  `result()` and `&PathObservationEpoch` `observations()` accessors; and
-- one field-private opaque public
-  `HostRootRepositoryMappingObservationError`.
-
-Keep every field and `RootRepositoryMappingResult` private. Effective Key
-visibility requires projection: rename the current private enum to
-`RootRepositoryMappingObservationError`, preserving exactly
-`Mappings(ExtensionMappingsObservationError)` and its derives, keep the shared
-driver on that inner enum, and define the public outer as
-`HostRootRepositoryMappingObservationError(inner)` with a private field and
-matching derives. Wrap only observed `Complete(Err(inner))` at Key projection.
-Need, success, legacy projection, equality/validity, events, retention and all
-terminal semantics remain byte-for-byte equivalent.
-
-Add no public Result/outcome alias, field, variant, inspector, outer
-constructor, conversion, adapter, second key/carrier, semantic caller or core
-compute. The later core owner may carry but cannot inspect the outer.
-
-Freeze one external API smoke
-`root_repository_mapping_observation_surface_is_cross_crate_usable` in new
-`app/slug_bzlmod_v2/tests/root_repository_mapping_observation_api.rs`. It may
-construct only the observed key for `/workspace`, assert exact Display
-`observed-host-root-repository-mapping:"/workspace"`, and use nonexecuted
-function pointers to prove the associated
-`SourcePreparationOutcome<Result<ObservedHostRootRepositoryMapping,
-HostRootRepositoryMappingObservationError>>` plus the two concrete borrowed
-accessor signatures. It must not construct or inspect carrier/outer, compute a
-key, import core or activate semantics.
-
-## Authority, caps and validation
-
-Prospective implementation authority is exactly:
+Write exactly:
 
 - `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 13,362 physical
-  lines with tests at 4,862;
-- `app/slug_bzlmod_v2/src/lib.rs`, baseline 421; and
-- new `app/slug_bzlmod_v2/tests/root_repository_mapping_observation_api.rs`.
+  lines, `#[cfg(test)]` at 4,862, SHA-256
+  `f98ef97df33eadca597cf8e10714c00654864e316979bfce0eb1813005f99c67`;
+- `app/slug_bzlmod_v2/src/lib.rs`, baseline 421, SHA-256
+  `3fdd3d81d94ce7d3618f356114505d7c30515596a3adbe0f14fb7add30c5cea0`;
+  and
+- new
+  `app/slug_bzlmod_v2/tests/root_repository_mapping_observation_api.rs`.
 
-Freeze <=80 production, <=40 colocated proof, <=10 lib and <=70 external
-proof; <=200 aggregate semantic lines and physical <=13,483/431/70. Allow only
-a semantic-neutral opaque-wrapper spelling adjustment to existing
-`observed_root_repository_mapping_identity_scan_and_terminal_algebra`, which
-must remain below 200 lines; every new smoke/helper remains below 100. The
-large source remains cohesive because it owns the inner driver, carrier and
-projection. No hot-path measurement applies.
+Every core/loading source, other Rust/test, fixture, oracle, Cargo/BUILD target,
+command, public output and plan is read-only.
 
-Prospective validation is serial:
+## Exact nominal surface and projection
+
+Make exactly these three existing names doc-hidden public nominal types:
+
+- `HostRootRepositoryMappingObservationKey(HostRootRepositoryMappingKey)`;
+- `ObservedHostRootRepositoryMapping`; and
+- `HostRootRepositoryMappingObservationError`.
+
+The key retains Debug/Clone/PartialEq/Eq/Hash/Allocative and its private field.
+Make only its existing `new(workspace: NormalizedAbsolutePath) -> Self` public.
+Display remains `observed-{legacy}` and for `/workspace` is exactly
+`observed-host-root-repository-mapping:"/workspace"`.
+
+The carrier retains Debug/Clone/PartialEq/Eq/Allocative/`Dupe`, private
+`result: RootRepositoryMappingResult` and private
+`observations: PathObservationEpoch`. Keep `RootRepositoryMappingResult`
+private. Make only these concrete borrowed accessors public:
+
+- `result(&self) -> &Arc<Result<HostRootRepositoryMapping,
+  HostRootRepositoryMappingError>>`; and
+- `observations(&self) -> &PathObservationEpoch`.
+
+Effective `Key::Value` visibility requires one projection. Rename the current
+private enum to `RootRepositoryMappingObservationError`, retaining exactly
+`Mappings(ExtensionMappingsObservationError)` and its current derives. Keep
+`RootRepositoryMappingDriverOutcome`, child adapter, finisher and shared driver
+on this private inner enum. Define doc-hidden public
+`HostRootRepositoryMappingObservationError(
+RootRepositoryMappingObservationError)` with a private field and matching
+Debug/Clone/PartialEq/Eq/Allocative/`Dupe` derives.
+
+The observed Key Value stays
+`SourcePreparationOutcome<Result<ObservedHostRootRepositoryMapping,
+HostRootRepositoryMappingObservationError>>`. Preserve its current Need and
+success arms and wrap only `Complete(Err(inner))` at this Key projection.
+Legacy projection, key equality/validity, Result/epoch identity, terminal
+polarity, events, retention, cancellation and computation are unchanged.
+
+Add no public Result/outcome alias, field, inner enum/variant, inspector,
+outer constructor or conversion; no adapter, fourth nominal type, second key/
+carrier, semantic caller or core compute.
+
+## Exact exports and proof
+
+In `lib.rs`, immediately after the existing complete legacy root-mapping
+reexport block and before selected-extension reexports, add exactly these three
+adjacent hidden pairs in this order, with no other root-mapping observation
+reexport:
+
+1. `#[doc(hidden)] pub use selected_repo_spec::HostRootRepositoryMappingObservationError;`
+2. `#[doc(hidden)] pub use selected_repo_spec::HostRootRepositoryMappingObservationKey;`
+3. `#[doc(hidden)] pub use selected_repo_spec::ObservedHostRootRepositoryMapping;`
+
+Add exactly one external test
+`root_repository_mapping_observation_surface_is_cross_crate_usable`. It
+constructs only `HostRootRepositoryMappingObservationKey::new` for
+`/workspace` and asserts the exact Display above. A nonexecuted value function
+pointer proves
+`<HostRootRepositoryMappingObservationKey as dice::Key>::Value` equals
+`SourcePreparationOutcome<Result<ObservedHostRootRepositoryMapping,
+HostRootRepositoryMappingObservationError>>`. A nonexecuted carrier function
+pointer proves the exact concrete borrowed Result-Arc and epoch accessor types.
+The test cannot construct or inspect carrier/outer, compute the key, name the
+private alias/inner/variant, import core or activate semantics.
+
+In existing
+`observed_root_repository_mapping_identity_scan_and_terminal_algebra`, change
+only the typed-inner and public-wrapper spelling required by projection; keep
+all assertions and cases unchanged. In existing
+`observed_root_repository_mapping_lifecycle_cancellation_and_nonactivation`,
+replace only the now-obsolete `lib.rs` absence clause with proof that each exact
+hidden reexport pair occurs once and that the extracted root-mapping
+observation reexport list is exactly Error, Key, Observed in the order above.
+Continue proving all three names absent from loading `bzl_module.rs`, core
+`generated_repository_definition.rs` and core
+`root_apparent_repository_definition.rs`. Do not weaken tracker, lifecycle,
+cancellation, recovery or upper-nonactivation assertions.
+
+## Caps, validation and compatibility
+
+Caps are <=80 production, <=40 colocated proof, <=10 lib, <=70 external proof
+and <=200 aggregate semantic lines; physical maxima are <=13,483/431/70.
+Both adjusted existing tests remain below 200 lines and every new smoke/helper
+below 100. Add no new colocated test or helper. The large selected owner remains
+cohesive because it owns the private inner driver, carrier and Key projection;
+a visibility-only split would expose or duplicate private state. This is not a
+demonstrated hot path and changes no retained representation.
+
+Run serially:
 
 - `cargo test -p slug_bzlmod_v2 observed_root_repository_mapping_ --lib`;
 - `cargo test -p slug_bzlmod_v2 root_repository_mapping_observation_surface_is_cross_crate_usable --test root_repository_mapping_observation_api`;
-- protected root-mapping/observed-extension-mappings and existing Bzlmod
-  observation API smokes;
+- `cargo test -p slug_bzlmod_v2 --test canonical_selected_definition_observation_api --test definition_request_observation_api --test evaluation_input_request_observation_api`;
 - full `cargo test -p slug_bzlmod_v2`;
 - direct dependent `cargo check -p slug_core_v2`;
 - `cargo fmt --all -- --check`; and
-- exact allowlist/accounting/physical/reexport/test-size checks plus
-  `git diff --check`.
+- exact three-file allowlist, SHA baseline/accounting/physical/test-size,
+  exactly-three hidden reexport and `git diff --check` checks.
 
-Reuse the accepted owner proof and prior three-type promotion precedents. Add
-no oracle: this visibility-only change has no Bazel-visible behavior.
+Reuse the accepted root-mapping owner proof and prior opaque promotion
+precedents. Add no Bazel oracle: visibility is behavior-neutral. Existing Bazel
+9.2 `BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
+`BazelDepGraphValue.getRepositoryMapping` and `BazelDepGraphFunctionTest`
+remain the semantic evidence; Buck2 DICE lifecycle proof remains concept/test
+evidence.
 
 Root-mapping values/errors/full-scan/order/views, equality/invalidation and
 lower events remain **exact** Bazel 9 compatibility. The hidden cross-crate
 carrier/opaque outer and Result-Arc transaction-local epoch handoff are
-**Slug-native**. Apparent-mapping ownership/caller, canonical/root definition,
-route/source/public/command/bootstrap observation and exact Bazel configuration/
+**Slug-native**. Canonical apparent-mapping observation/caller, root definition/
+route/source/public/command/bootstrap activation and exact Bazel configuration/
 output/ActionKey bytes remain **unsupported/deferred**.
 
 ## Terminal
 
-ACCEPT schedules exactly
-`WP-6-7A-host-root-repository-mapping-observation-carrier-promotion-implementation`,
-then returns to a docs-only canonical apparent-mapping observation-owner
-design. STOP Rust/test/API edits in this packet; implementation or caller/core
-activation; public field/alias/terminal/inspector; fourth type/reexport;
-nonadjacent or non-hidden reexport; second key/carrier/adapter; reverse
-dependency; root-mapping semantic/order/event/equality/retention drift;
-Cargo/BUILD, fixture/oracle; third production file; cap/proof/test-size waiver;
-milestone closure, M8/M7B or exact identity work. REPLAN before widening. M7
-remains partial and M7A -> M8 -> M7B remains.
+ACCEPT returns only to a docs-only canonical apparent-mapping observation-owner
+design. STOP a fourth file/type/reexport, nonadjacent or non-hidden export,
+public field/alias/inner/variant/inspector, adapter/caller/core edit, semantic/
+event/equality/retention drift, altered test assertion beyond wrapper/reexport
+projection, Cargo/BUILD, fixture/oracle, cap/test-size/format waiver, upper
+activation, milestone closure, M8/M7B or exact identity work. REPLAN before
+widening or if any baseline hash differs. M7 remains partial and
+M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Accepted implementation `7ee0522b` adds the private callerless root-mapping
-Result-Arc+epoch owner at +968/-170 and 13,362 physical lines. Its packet
-terminal requires this visibility audit before canonical apparent-mapping work.
+Committed audit `681732db` proves this three-type promotion is the uniquely
+smaller prerequisite after accepted private owner `7ee0522b`; core's apparent-
+mapping root branch remains the sole future semantic consumer.
