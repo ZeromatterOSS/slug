@@ -1,183 +1,119 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-canonical-repository-definition-observation-implementation`
+Packet: `WP-6-7A-host-root-repository-mapping-observation-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Design and Rust base: pending docs commit / `66a669cc`
+Audit and Rust base: pending docs commit / `c96ae09d`
 
 ## Goal and authority
 
-Add the private callerless observation sibling of
-`HostCanonicalRepositoryDefinitionKey` in its existing core owner. Share the
-exact selected-first/generated-only-on-semantic-Missing composition between
-Legacy and Observed modes. Publish one local canonical Result Arc plus its
-transaction-local observation epoch; do not activate an upper consumer.
+Design only the private observation sibling of
+`HostRootRepositoryMappingKey`. This is the uniquely smallest missing lower
+owner before the accepted canonical observation can feed a complete apparent-
+mapping family. Do not implement or promote a carrier and do not activate
+canonical apparent mapping or any upper consumer.
 
-Write only
-`app/slug_core_v2/src/runtime/generated_repository_definition.rs`, baseline
-2,902 physical lines with `#[cfg(test)]` at line 872. Every other Rust file,
-test, fixture, oracle, Cargo/BUILD target, API, reexport, caller and plan is
+Write only the canonical plan, this manifest, Stage 6 and the orchestration
+routing log, at net caps <=40/<=180/<=220/<=30 and <=470 aggregate. Rust,
+tests, fixtures, oracles, Cargo/BUILD, APIs, exports, callers and commits are
 read-only.
 
-## Frozen owner and types
+## Learned frontier and decision
 
-Add private `HostCanonicalRepositoryDefinitionObservationKey` as a newtype over
-the legacy key with the same two-argument constructor and Display
-`observed-{legacy}`. Add private `ObservedHostCanonicalRepositoryDefinition`
-holding exactly
-`Arc<Result<HostCanonicalRepositoryDefinition,
-HostCanonicalRepositoryDefinitionError>>` and `PathObservationEpoch`, with
-borrowed accessors. Its Key Value is
-`SourcePreparationOutcome<Result<carrier, outer>>`; Complete equality and
-validity match accepted observation siblings.
+Accepted `c96ae09d` adds the callerless private canonical observation key,
+carrier and typed outer at
+`generated_repository_definition.rs:493-710`. Its exact two direct semantic
+consumers remain:
 
-Add only the private typed outer
-`HostCanonicalRepositoryDefinitionObservationError` with:
+- same-file `HostCanonicalRepositoryApparentMappingKey`, whose nonroot branch
+  computes canonical definition at lines 905-934; and
+- sibling `HostRootApparentRepositoryDefinitionKey`, which computes canonical
+  definition at lines 310-343 only after root apparent mapping resolves a
+  non-main, non-builtin target.
 
-- `Selected(HostCanonicalSelectedModuleDefinitionObservationError)`;
-- `Generated { selected_missing:
-  HostCanonicalSelectedModuleDefinitionError, error:
-  HostGeneratedRepositoryDefinitionObservationError }`; and
-- `Merge { selected_missing:
-  HostCanonicalSelectedModuleDefinitionError, error:
-  ObservedPathFrontierError }`.
+The observed canonical key, constructor, carrier/accessors and outer are all
+module-private. The same-file mapping owner can use them, while the sibling
+root-definition module cannot. A visibility change is not the next step:
+apparent mapping's total key domain also includes root context, whose first
+child at generated-definition line 879 is the carrierless public Bzlmod
+`HostRootRepositoryMappingKey`. An observed mapping key that covered only
+nonroot context, silently used an empty epoch on root context, or split the
+legacy key family would be an invalid partial adapter.
 
-No stage enum is needed because there is exactly one merge site, after the
-generated child. Add no export, alias, adapter, caller, public field or outer
-inspector.
+Live Bzlmod source shows root mapping at
+`selected_repo_spec.rs:4607-4669` has exactly one semantic child,
+`HostSelectedExtensionMappingsKey`, and exactly one production consumer, the
+core apparent-mapping root branch. The accepted private
+`HostSelectedExtensionMappingsObservationKey` and Result-Arc/epoch carrier
+already occupy the same Bzlmod file. Therefore no visibility or semantic
+prerequisite precedes a private root-mapping observation owner.
 
-## Exact shared driver and terminal algebra
+Root apparent definition remains later: it first computes apparent mapping at
+line 266, handles main/builtin deferred targets, and only then computes
+canonical definition. Its sole production consumer is root apparent route at
+route line 303; route feeds source input at its line 186, followed by existing
+source-path/observation, repository route/source/file and public command/
+bootstrap boundaries. None directly consumes the canonical observed key, and
+none can substitute for the missing root-mapping epoch.
 
-Factor only the existing canonical compute into private
-`CanonicalRepositoryDefinitionMode::{Legacy, Observed}`, one canonical Result
-alias, one driver-outcome alias and bounded child/finisher helpers. Legacy
-computes only the legacy selected/generated keys and uses empty epochs.
-Observed computes only the accepted selected/generated observation keys.
+## Required design decision
 
-The first child is always selected. Selected Need returns Need. A selected DICE
-compute failure remains `SelectedCompute(message)` with an empty epoch. The
-observed selected outer becomes carrierless `Selected`. Selected success,
-non-Missing semantic failure and their complete epochs are final: success maps
-to canonical Selected, a non-Missing error maps to canonical `Selected`, and
-generated is not requested. Only an exact semantic error whose disposition is
-`Missing` retains that error plus the selected epoch as the generated-stage
-prefix.
+Freeze one private matching-family Legacy/Observed root-mapping owner in
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 12,564 physical with
+tests at line 4,678. The design must decide exact nominal key/carrier/typed
+outer names, shared driver and child projection over only the accepted observed
+extension-mappings sibling. Preserve the existing root full-scan ordinal law:
+first root, first conflict while scanning all routes, exact Missing/Duplicate/
+Context terminals, existing predecessor retention and mapping order.
 
-Only then request generated. Generated Need returns Need without publishing the
-stored prefix. Generated DICE compute failure remains semantic
-`GeneratedCompute { selected_missing, message }` and carries the selected
-prefix epoch. The observed generated outer becomes carrierless `Generated {
-selected_missing, error }`. On a complete generated carrier, merge selected
-prefix then generated epoch left-first with `PathObservationEpoch::from_shared`.
-Equal duplicate demands retain the selected prefix entry/Arc; a differing
-result for the same demand becomes carrierless `Merge { selected_missing,
-error: ObservedPathFrontierError::Epoch(ConflictingDemand) }`. Valid epochs
-cannot create an operation mismatch at this parent merge. OperationMismatch is
-proved only through accepted lower typed `Selected` or `Generated` outers; the
-latter retains selected Missing. Merge happens before generated semantic
-projection. Generated success maps to canonical Generated; generated Missing
-maps to canonical Missing retaining both errors; every other generated
-semantic error maps to canonical Generated retaining selected Missing. Each
-carries the merged epoch.
+Need and lower observed outer must remain carrierless. DICE compute and
+complete semantic terminals must retain the exact empty or child epoch dictated
+by the accepted family; the single complete child epoch passes unchanged, with
+no merge/rebuild/union. Preserve lower event ownership, batchless parent/warm
+rows, cancellation recovery, Complete-only validity/equality and exact legacy
+parity. Retain only one root-mapping Result Arc plus compact epoch; no child
+carrier, extra map/order copy, scan scratch, event/evaluator state, cache,
+manual lock or task may survive publication.
 
-Need/outer/merge never publishes a carrier. No full scan, Need union, direct
-Host read, legacy fallback, epoch reconstruction or runtime injection is
-allowed. The shared driver must preserve the exact current Result values,
-error fields, selected-first order and generated-on-Missing polarity.
+Freeze exactly three proof tests for identity/terminal/full-scan algebra, real
+family/order/events/parity, and held lifecycle/cancellation/nonactivation.
+Require exact observed-parent -> observed-extension-mappings and legacy-parent
+-> legacy-extension-mappings dependency rows, no canonical/core activation,
+epoch subset/metadata-only/Arc-Reused evidence and an upper denylist. Reuse the
+accepted extension-mappings proof and Bazel 9.2
+`BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
+`BazelDepGraphValue.getRepositoryMapping` and `BazelDepGraphFunctionTest`; add
+no fixture or oracle.
 
-## Events, retention and lifecycle proof
+Prospective implementation caps are <=230 production, <=680 proof, <=910
+aggregate semantic and <=13,480 physical, at most six production/six test
+helpers, exactly three tests, driver below 120 and every helper/test below 200.
+The design must retain or tighten these caps, name exact serial focused/full
+Bzlmod validation plus direct core compile check, and record the large-file
+cohesion decision. No hot-path measurement is required unless source review
+finds a demonstrated hot path.
 
-The canonical parent owns no event batch. Selected/generated observed children
-retain all lower batches; the parent neither moves nor replays them. Selected
-terminal rows have exactly one child edge. Missing-fallback rows have ordered
-children `[observed selected, observed generated]`. Parent, instantiation,
-validation, generated and every warm/Reused row remain batchless. Later-child
-Need/outer/compute/semantic/merge terminals do not replay legacy invocation
-prints; cancellation publishes no parent carrier or batch.
+## Compatibility and terminal
 
-Each successful observed carrier retains only the canonical Result Arc and
-compact epoch. A carrierless outer retains only its named child outer plus
-selected Missing where specified, and no epoch. The child carriers, generated
-Result, prefix tuple, merge iterators, mode, event/evaluator state and all
-task/lock scratch die before publication. Existing canonical values/errors
-retain only their established selected or generated certificates/errors. DICE
-owns serialization; add no manual lock, task, cache, store or retained Starlark
-heap.
+Root mapping values/errors/order/full-scan behavior, equality/invalidation and
+lower event ownership remain exact Bazel 9 compatibility. A private observed
+key/carrier/typed outer and transaction-local Result-Arc/epoch association are
+Slug-native. Cross-crate carrier promotion, canonical apparent mapping, root
+definition/route/source, public command/bootstrap activation and exact Bazel
+configuration/output/ActionKey bytes remain unsupported/deferred.
 
-Add exactly:
-
-- `observed_canonical_repository_definition_identity_staging_and_terminal_algebra`;
-- `observed_canonical_repository_definition_real_order_events_and_parity`; and
-- `observed_canonical_repository_definition_lifecycle_cancellation_and_nonactivation`.
-
-Together prove key identity/hash/Display/accessors/equality/validity; exact
-selected success/Need/outer/compute/non-Missing/Missing staging; generated
-Need/outer/compute/success/Missing/other error; equal-left merge and conflicting
-merge; accepted lower outer/mismatch evidence plus bounded parent mapping,
-source and dependency evidence, exact legacy parity and ordered dependency
-rows; real selected and
-generated success/failure families, lower print order, parent batchlessness,
-warm silence and no later invocation prints; held Result/epoch handles through
-selected and generated semantic A-B-A, metadata-only equal Result with changed
-epoch, each carrier epoch as a subset of its own transaction global, Arc
-identity only on proven Reused, poll-drop of real selected-terminal and
-Missing-fallback requests plus same-DICE recovery. Prove zero legacy canonical,
-apparent/root mapping, root apparent definition, route/source, public command
-or bootstrap activation. Use pure finishers only for valid equal/conflicting
-epochs and real graph inputs; forbid a malformed epoch, production/test hook or
-local synthetic operation mismatch.
-
-## Caps, validation and compatibility
-
-Permit <=320 production, <=740 proof and <=1,060 aggregate semantic net lines,
-with <=3,975 physical lines. Add at most eight production and eight test
-helpers, exactly three tests, keep the shared driver below 140 lines and every
-helper/test below 200. The >2,000-line owner remains cohesive because it
-already contains the generated child observation, canonical reducer/value/
-error/view, both production consumers, tracker and real fixtures beside the
-imported selected handoff; splitting would expose private representations.
-This is not a demonstrated hot path and changes no retained representation
-beyond the standard Result-Arc+epoch carrier.
-
-Run serially:
-
-- `cargo test -p slug_core_v2 observed_canonical_repository_definition_ --lib`;
-- `cargo test -p slug_core_v2 canonical_definition_ --lib`;
-- `cargo test -p slug_core_v2 observed_generated_definition_ --lib`;
-- `cargo test -p slug_core_v2 real_generated_selected_and_deferred_domains_are_structural --lib`;
-- `cargo test -p slug_core_v2 lifecycle_identity_and_mapping_precedence_are_structural --lib`;
-- full `cargo test -p slug_core_v2`;
-- protected `cargo test -p slug_bzlmod_v2 --test canonical_selected_definition_observation_api`;
-- direct dependent `cargo check -p slug_commands_v2`;
-- `cargo fmt --all -- --check`; and
-- exact accounting/physical/helper/test allowlist plus `git diff --check`.
-
-Reuse Bazel 9.2 `BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
-`BazelDepGraphValue.getRepositoryMapping`, `SingleExtensionFunction`,
-`SingleExtensionEvalFunction` and `ModuleExtensionResolutionTest`; add no
-fixture or oracle. Buck2 DICE incrementality/cancellation and activation tests
-remain concept/test evidence only.
-
-Canonical selected/generated values, errors, order, Missing-only fallback,
-equality/invalidation and lower events remain exact Bazel 9 compatibility. The
-private observed key/carrier/typed outer and shared-Arc transaction-local epoch
-are Slug-native. Carrier promotion, an observed upper caller, apparent/root
-mapping, root definition/route/source/public/command/bootstrap activation and
-exact Bazel configuration/output/ActionKey bytes remain unsupported/deferred.
-
-## Terminal
-
-ACCEPT returns only to a docs-only canonical-observation consumer frontier
-audit. STOP a second file/key/owner/adapter, export/reexport/caller, public API,
-upper compute change, child order or Missing polarity drift, semantic/error/
-event/equality/retention drift, legacy invocation-print replay, epoch union
-waiver, retained scratch/task/lock, fixture/oracle, cap/helper/test waiver,
+Design ACCEPT may schedule exactly
+`WP-6-7A-host-root-repository-mapping-observation-implementation`. After its
+acceptance return only to a root-mapping carrier-visibility audit, then the
+canonical apparent-mapping frontier. STOP implementation, a second file/key/
+owner/adapter, export/reexport/caller, canonical/core edit, partial root/nonroot
+family, semantic/order/event/equality/retention drift, epoch merge, retained
+scratch/task/lock, fixture/oracle, cap/proof waiver, upper activation,
 milestone closure, M8/M7B or exact identity work. REPLAN before widening. M7
 remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Accepted `66a669cc` exposes only the selected observation key/carrier/opaque
-outer to core. The generated observed child is already private in this module.
-Live source proves these are the complete lower prerequisites and canonical is
-the first selected/generated composition owner.
+Canonical implementation `c96ae09d` is green and callerless. The consumer
+audit rejects early canonical visibility and partial nonroot mapping because
+neither closes the root branch's missing root-mapping observation epoch.

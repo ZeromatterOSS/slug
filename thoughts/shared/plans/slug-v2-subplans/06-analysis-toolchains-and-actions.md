@@ -12663,6 +12663,82 @@ epoch waiver, retained scratch/task/lock, fixture/oracle, cap/helper/test waiver
 milestone closure, M8/M7B or exact identity work. REPLAN before widening. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Canonical consumer frontier selects root-mapping observation (2026-08-21)
+
+Accepted `c96ae09d` adds the private callerless canonical Result-Arc+epoch
+carrier at +504/-78 and 3,328 physical lines. Live source confirms exactly two
+direct semantic consumers and one uniquely smaller lower prerequisite.
+
+Same-file `HostCanonicalRepositoryApparentMappingKey` uses canonical definition
+only for nonroot context at generated-definition lines 905-934. Its root
+context instead computes Bzlmod `HostRootRepositoryMappingKey` first at line
+879. Because one key identity covers both contexts, an observed mapping sibling
+cannot cover only nonroot, use an empty root epoch or split the family.
+
+Sibling `HostRootApparentRepositoryDefinitionKey` first computes canonical
+apparent mapping at line 266, defers main/builtin targets, and only then computes
+canonical definition at line 310. Canonical observed key/carrier/outer and
+accessors remain private to the generated-definition module, so that sibling
+cannot name them. Promoting visibility now still would not close its mapping
+predecessor and is not the next graph edge.
+
+Root mapping at `selected_repo_spec.rs:4607-4669` is the smallest missing owner.
+It has exactly one semantic child, `HostSelectedExtensionMappingsKey`, whose
+accepted private observed sibling/carrier is in the same file. Its sole
+production consumer is core's apparent-mapping root branch. No smaller
+visibility or observation prerequisite remains.
+
+Root apparent definition's sole production consumer is root apparent route at
+route line 303. Route feeds source input at its line 186, then existing source-
+path/observation, repository route/source/file and public command/bootstrap
+boundaries. None directly consumes canonical observation or can replace the
+root-mapping epoch. Keep every branch inactive.
+
+Activate only `WP-6-7A-host-root-repository-mapping-observation-design`.
+Design one private Legacy/Observed owner in
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 12,564 physical with
+tests at 4,678. Freeze exact key/carrier/typed outer, one observed extension-
+mappings child, unchanged epoch on Complete, carrierless Need/outer and no
+merge/rebuild/union. Preserve first-root/full-scan/first-conflict ordinal law,
+Missing/Duplicate/Context terminals, predecessor and mapping order retention,
+legacy parity, lower event ownership, batchless warm/cancel behavior and
+Result-Arc+epoch lifetime.
+
+Require exactly three proof tests covering identity/terminal/full-scan algebra,
+real family/order/events/parity, and lifecycle/cancellation/nonactivation.
+Prove observed-parent -> observed-mappings and legacy-parent -> legacy-mappings
+dependency rows, metadata-only epoch change, per-transaction epoch subsets,
+Arc identity only on Reused and zero root-mapping consumer/core activation.
+Retain no child carrier, duplicate map/order, scan/event/evaluator scratch,
+cache, task or lock.
+
+Prospective caps are <=230 production, <=680 proof, <=910 aggregate semantic
+and <=13,480 physical, at most six production/six test helpers, exactly three
+tests, driver below 120 and every helper/test below 200. The design must retain
+or tighten them, state exact focused/full Bzlmod plus direct core validation and
+record why the existing large owner remains cohesive. Reuse accepted extension-
+mappings evidence and Bazel 9.2
+`BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
+`BazelDepGraphValue.getRepositoryMapping` and `BazelDepGraphFunctionTest`; add
+no oracle.
+
+Root mapping values/errors/order/full-scan behavior, equality/invalidation and
+lower events remain exact. The private carrier/outer and shared-Arc transaction-
+local epoch are Slug-native. Promotion, canonical apparent mapping, root
+definition/route/source, public command/bootstrap activation and exact Bazel
+identity bytes remain unsupported/deferred.
+
+Docs authority is canonical/current/this Stage/routing at net caps
+<=40/<=180/<=220/<=30 and <=470 aggregate. Rust/tests/fixtures/oracles/API are
+read-only. Design ACCEPT may schedule only
+`WP-6-7A-host-root-repository-mapping-observation-implementation`, then return
+to a root-mapping carrier-visibility audit before canonical apparent mapping.
+STOP implementation, second file/key/owner/adapter, export/caller, partial
+family, core edit, semantic/order/event/equality/retention drift, epoch merge,
+retained scratch/task/lock, fixture/oracle, cap waiver, upper activation,
+milestone closure, M8/M7B or exact identity work. REPLAN before widening. M7
+remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier formatter REPLAN (2026-08-21)
 
 The proof-corrected semantic draft is retained, but
