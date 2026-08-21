@@ -13628,6 +13628,124 @@ upper work, milestone closure, M8/M7B or exact identity work. REPLAN before
 widening or hash drift. ACCEPT returns only to docs-only root route observation-
 owner design. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Root apparent-route observation-owner design accepted (2026-08-21)
+
+Accepted `16a3d80a` makes the root-definition observed key/carrier/opaque outer
+nameable in its route sibling without activating it. Live route production at
+lines 296-372 has exactly one child: legacy root definition at lines 301-324.
+No visibility, merge or evidence prerequisite remains. Schedule exactly
+`WP-6-7A-host-root-apparent-repository-route-observation-implementation`.
+
+The route legacy key has exactly one production consumer, source input at its
+lines 24/186. Source input has one source-path consumer; source path has one
+source-observation consumer; source observation has no production caller.
+Public command analysis instead consumes the parallel Bzlmod
+`RootRepositoryRouteKey`/observation at `dice.rs:4476-4494`, and imperative
+root bootstrap remains dormant. Keep every upper/parallel branch inactive.
+
+Authority is exactly core `root_apparent_repository_route.rs`, baseline 1,130
+physical/tests 374 and SHA-256
+`e70226c7dd65eae174022ed37949056df2c0086d610d8a16ea01f30aa8231bb7`.
+Every second Rust/API/export/caller/fixture/oracle file is read-only.
+
+Add private `HostRootApparentRepositoryRouteObservationKey`, nominally
+wrapping the legacy key, with the exact two-argument Option constructor and
+root-name rejection. Display is `observed-{legacy Display}`; `/workspace`,
+`@first` renders exactly:
+
+```text
+observed-HostRootApparentRepositoryRouteKey { workspace: NormalizedAbsolutePath { path: "/workspace" }, apparent_repo: ApparentRepoName("first") }
+```
+
+Add private `ObservedHostRootApparentRepositoryRoute` retaining only an
+`Arc<HostRootApparentRepositoryRouteResult>` plus `PathObservationEpoch`, with
+borrowed result/observations accessors. Add private typed outer
+`HostRootApparentRepositoryRouteObservationError::Definition(
+HostRootApparentRepositoryDefinitionObservationError)`. Use matching derives/
+Dupe. Key Value is `SourcePreparationOutcome<Result<carrier, outer>>`, with
+complete_eq equality and is_complete validity.
+
+Factor only existing compute into one private
+`RootApparentRepositoryRouteMode::{Legacy, Observed}` driver and, if needed,
+one pure finisher. Legacy requests exactly legacy definition and supplies an
+empty epoch. Observed requests exactly observed definition: Need is immediate,
+typed child outer becomes carrierless Definition, child DICE failure stays the
+semantic route Compute error with empty epoch, and Complete carrier supplies
+its original Result Arc and cloned epoch. Add no second child, fallback, join,
+merge, union, reconstructed epoch or direct Host read.
+
+Run the existing completed route algebra unchanged. Ordinary nondeferred child
+failure is Predecessor. Success/deferred without a view and any inconsistent
+request/view are InvalidPredecessor. Consistent generated, selected-registry,
+selected-nonregistry, Main and Builtin views return the same route; Main/
+Builtin still promote exact deferred definition errors to successful routes.
+Every semantic terminal retains the original predecessor Arc and forwards the
+child epoch unchanged. No parent OperationMismatch exists. Legacy projection
+asserts empty epoch; observed success publishes Result Arc+epoch; outer has no
+carrier/epoch.
+
+The route owner is eventless. The observed definition child owns every lower
+load/invocation batch and order; route and every warm row are batchless. Exact
+dependency rows are legacy route -> legacy definition and observed route ->
+observed definition. Need, child outer/compute, finisher errors and success add
+no event or replay.
+
+Retain only the parent route Result Arc plus compact epoch. The Result keeps
+its already-required predecessor Arc. Child carrier, mode, views, disposition
+scratch, closure and evaluator/event state die before publication. Add no
+cache/store/interner/task/lock or command borrow. DICE owns serialization;
+poll-drop publishes no parent activation/dependency/carrier/event and same-DICE
+recovery remains lawful.
+
+Add exactly
+`observed_root_apparent_repository_route_identity_finisher_and_terminal_algebra`,
+`observed_root_apparent_repository_route_real_families_events_and_parity` and
+`observed_root_apparent_repository_route_lifecycle_cancellation_and_nonactivation`.
+They prove identity/root rejection/exact Display/accessors/equality/validity/
+Need and finisher/source algebra; lawful generated, selected-nonregistry,
+mapping-failure, Main and Builtin legacy semantic parity, exact one-child edges,
+unchanged child epoch, lower event vectors and warm batchlessness; held child/
+parent mapping and generated-definition A-B-A, neutral equal Result/different
+epoch, parent epoch equal child and subset transaction-global, Arc identity
+only on Reused, cancellation/recovery and all upper nonactivation.
+
+Reuse accepted
+`observed_root_apparent_repository_definition_real_order_events_and_parity`
+for real-family child proof, plus its identity test's accepted selected-registry
+source/policy/forwarding chain and a bounded route projection scan. Do not
+inject private mirrors or construct the opaque child outer, malformed epoch or
+synthetic keyed mismatch.
+
+Caps are <=240 production, <=620 proof, <=860 aggregate additions and <=1,990
+physical. Add at most six production/six test helpers, exactly three tests,
+driver below 150 and every helper/test below 200. The existing file stays
+cohesive as sole route value/error/view/driver/tracker/fixture owner and remains
+below the 2,000-line trigger. This is not a demonstrated hot path.
+
+Validate exact observed-route prefix, protected sibling/legacy route and lower
+observed-definition tests, full core, direct commands check, formatting, exact
+one-file allowlist/baseline-SHA/accounting/physical/helper/test/driver/source-
+shape and diff hygiene serially. Reuse accepted Bazel 9.2
+`BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
+`BazelDepGraphValue.getRepositoryMapping`, ModuleKey naming and accepted route/
+source-capability tests; Buck2 DICE lifecycle is concept/test evidence. Add no
+fixture or oracle.
+
+Route values/five-family projection/predecessor/views/source capability/
+errors/order/equality/invalidation/lower events remain exact. The private
+Result-Arc+transaction-local epoch carrier/outer is Slug-native. Visibility,
+source-input/path/source/public-command/bootstrap activation and exact identity
+bytes remain deferred.
+
+STOP second file/key/child/owner/adapter, visibility/export/caller/API, source-
+input or upper activation, semantic/view/policy/order/error/event/equality/
+retention drift, epoch merge/rebuild, parent OperationMismatch, retained child/
+scratch/task/lock, private/malformed injection, fixture/oracle, cap/helper/test/
+format waiver, Cargo/BUILD, milestone closure, M8/M7B or exact identity work.
+REPLAN before widening or hash drift. ACCEPT returns only to a docs-only route-
+carrier visibility/source-input audit. M7 remains partial and M7A -> M8 -> M7B
+remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is

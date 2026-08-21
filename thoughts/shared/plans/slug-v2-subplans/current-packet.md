@@ -1,179 +1,193 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-root-apparent-repository-definition-observation-carrier-visibility-implementation`
+Packet: `WP-6-7A-host-root-apparent-repository-route-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Design and Rust base: pending docs commit / `04443253`
+Design and Rust base: pending docs commit / `16a3d80a`
 
 ## Goal and authority
 
-Implement only the designed same-crate handoff between the accepted callerless
-root apparent-definition observation and its sole future sibling route
-consumer. Expose exactly one `pub(super)` key/carrier/field-private opaque
-outer and prove it with one test-only sibling compile smoke. Do not activate a
-caller or change computation.
+Implement one private observation owner for the accepted root apparent-
+repository route. Share the existing route semantics between Legacy and
+Observed modes, consume exactly the now-nameable observed root-definition
+child, and forward that child's epoch unchanged. Do not activate source input
+or any later consumer.
 
-Authority is exactly:
+Authority is exactly
+`app/slug_core_v2/src/runtime/root_apparent_repository_route.rs`, baseline
+1,130 physical/tests 374, SHA-256
+`e70226c7dd65eae174022ed37949056df2c0086d610d8a16ea01f30aa8231bb7`.
+Every second Rust/API/export/caller/fixture/oracle file is read-only.
 
-- `app/slug_core_v2/src/runtime/root_apparent_repository_definition.rs`,
-  baseline 1,714 physical/tests 529, SHA-256
-  `9aba8dba56972fce08d23d9fb97a604a849e5aac4694b34c29b472e4e837dca5`;
-- test-only `app/slug_core_v2/src/runtime/root_apparent_repository_route.rs`,
-  baseline 1,088 physical/tests 374, SHA-256
-  `131fb0fca448acb3786946500d91f66ece2b6ee54441cc65968a9ce4605131ee`.
+## Audited frontier and owner decision
 
-No third file, module declaration, crate-root export, Cargo/BUILD, fixture,
-oracle, adapter or semantic caller is authorized.
+Accepted visibility commit `16a3d80a` makes
+`HostRootApparentRepositoryDefinitionObservationKey`, its carrier and opaque
+outer nameable in the route sibling. The legacy route at production lines
+296-372 computes exactly one child,
+`HostRootApparentRepositoryDefinitionKey`, at lines 301-324 and has no other
+semantic input. Thus no visibility, merge or evidence prerequisite remains.
 
-## Frozen production surface
+The legacy route key has exactly one production consumer:
+`HostRootApparentRepositorySourceInputKey` imports it and computes it at
+source-input lines 24/186. Source input then has one source-path consumer;
+source path has one source-observation consumer; that source observation has
+no production caller. Public command analysis instead consumes Bzlmod
+`RootRepositoryRouteKey`/`RootRepositoryRouteObservationKey` at
+`dice.rs:4476-4494`, and root bootstrap remains a dormant imperative owner.
+Those are later or parallel branches, not route-owner prerequisites.
 
-Give exactly these existing nominal names `pub(super)` visibility:
+## Frozen owner and driver
 
-- `HostRootApparentRepositoryDefinitionObservationKey`;
-- `ObservedHostRootApparentRepositoryDefinition`; and
-- `HostRootApparentRepositoryDefinitionObservationError`.
+Add private `HostRootApparentRepositoryRouteObservationKey` as a nominal
+wrapper over `HostRootApparentRepositoryRouteKey`. Its exact two-argument
+`Option<Self>` constructor delegates to the legacy constructor and preserves
+root-name rejection. Display is exactly `observed-{legacy Display}`; for
+`/workspace` and `@first` it is:
 
-The key tuple field remains private. Promote only the exact constructor:
-
-```rust
-pub(super) fn new(
-    workspace: NormalizedAbsolutePath,
-    apparent_repo: ApparentRepoName,
-) -> Option<Self>
+```text
+observed-HostRootApparentRepositoryRouteKey { workspace: NormalizedAbsolutePath { path: "/workspace" }, apparent_repo: ApparentRepoName("first") }
 ```
 
-Preserve root-name rejection and exact Display. For `/workspace` and `@first`
-it is
-`observed-host-root-apparent-repository-definition:"/workspace":@first`.
-
-The carrier fields and `RootApparentRepositoryDefinitionResult` alias remain
-private. Promote only these exact concrete borrowed accessors:
+Add private `ObservedHostRootApparentRepositoryRoute` with exactly private
+`Arc<HostRootApparentRepositoryRouteResult>` and `PathObservationEpoch` fields
+and borrowed `result`/`observations` accessors. Add private, typed:
 
 ```rust
-pub(super) fn result(
-    &self,
-) -> &Arc<
-    Result<
-        HostRootApparentRepositoryDefinition,
-        HostRootApparentRepositoryDefinitionError,
-    >,
->
-pub(super) fn observations(&self) -> &PathObservationEpoch
+enum HostRootApparentRepositoryRouteObservationError {
+    Definition(HostRootApparentRepositoryDefinitionObservationError),
+}
 ```
 
-Effective Key visibility requires one wrapper. Rename the current private enum
-to `RootApparentRepositoryDefinitionObservationError`, retaining exactly:
+Use existing matching Debug/Clone/PartialEq/Eq/Allocative and Dupe conventions.
+The Key Value is
+`SourcePreparationOutcome<Result<ObservedHostRootApparentRepositoryRoute,
+HostRootApparentRepositoryRouteObservationError>>`. Equality remains
+`complete_eq`; validity remains `is_complete`.
 
-- `Mapping(HostCanonicalRepositoryApparentMappingObservationError)`;
-- `Definition { mapping: HostCanonicalRepositoryApparentMapping,
-  error: HostCanonicalRepositoryDefinitionObservationError }`; and
-- `Merge { mapping: HostCanonicalRepositoryApparentMapping,
-  error: ObservedPathFrontierError }`.
+Factor only the existing compute into one private
+`RootApparentRepositoryRouteMode::{Legacy, Observed}` driver and, if needed,
+one pure finisher over the legacy key, predecessor Result Arc and epoch. The
+driver outcome is
+`SourcePreparationOutcome<Result<(Arc<HostRootApparentRepositoryRouteResult>,
+PathObservationEpoch), HostRootApparentRepositoryRouteObservationError>>`.
 
-Keep the exact `Debug`, `Clone`, `PartialEq`, `Eq`, `Allocative` derives and
-manual `Dupe` implementation. The driver outcome and every Mapping/Definition/
-Merge construction continue to use this private inner.
+Legacy computes exactly the legacy definition child and pairs Complete with
+an empty epoch. Observed computes exactly
+`HostRootApparentRepositoryDefinitionObservationKey`; Need returns immediately,
+the opaque child outer becomes carrierless `Definition(error)`, and a carrier
+supplies its original Result Arc and cloned epoch. A child DICE failure keeps
+the existing semantic route `Compute` error with an empty epoch. No fallback,
+second child, join, merge, union, epoch reconstruction or direct Host read is
+allowed.
 
-Add exactly:
+For every completed child Result, run the existing route algebra unchanged:
+ordinary nondeferred child failure becomes `Predecessor`; a successful or
+deferred child without a valid view becomes `InvalidPredecessor`; request/view
+inconsistency also becomes `InvalidPredecessor`; and a consistent generated,
+selected-registry, selected-nonregistry, Main or Builtin view produces the
+same route certificate. Main/Builtin remain successful route projections of
+the exact deferred definition errors. Every semantic success/error retains the
+original predecessor Arc and forwards the child epoch unchanged. There is no
+epoch merge and no parent OperationMismatch.
 
-```rust
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(super) struct HostRootApparentRepositoryDefinitionObservationError(
-    RootApparentRepositoryDefinitionObservationError,
-);
+Legacy projection asserts the epoch is empty and returns the original route
+outcome. Observed success publishes the local Result Arc plus epoch; its typed
+outer publishes no carrier or epoch.
 
-impl Dupe for HostRootApparentRepositoryDefinitionObservationError {}
-```
+## Events, retention and lifecycle proof
 
-The field remains private. Only the observed Key projection wraps
-`Complete(Err(inner))` as
-`HostRootApparentRepositoryDefinitionObservationError(inner)`. Need, success,
-legacy, equality/validity, child order, Result Arc identity, epochs, events,
-retention and cancellation remain unchanged. Add no outer constructor,
-conversion, inspector, public field, alias or variant.
+The route owner is eventless. The sole observed definition child owns every
+load/invocation batch and exact event order; route and all warm rows are
+batchless. Need, child outer, child compute, Predecessor, InvalidPredecessor and
+success introduce no parent event or replay. Dependency rows are exactly
+legacy route -> legacy definition and observed route -> observed definition.
 
-## Frozen proof
+The carrier retains only one route Result Arc plus the compact epoch. The route
+Result retains its already-required predecessor Arc. Child carrier, mode,
+views, disposition booleans, closure and evaluator/event scratch die before
+publication. Add no cache/store/interner/task/lock or command borrow. DICE owns
+serialization; cancellation publishes no parent activation/dependency/carrier
+or event, and same-DICE recovery recomputes lawfully.
 
-Allow only wrapper-spelling/source-shape adjustments in existing
-`observed_root_apparent_repository_definition_identity_staging_and_terminal_algebra`.
-Driver terminal construction and source assertions name the private inner;
-Key-Value construction uses the field-private wrapper around the private Merge
-inner. Preserve every existing key/root/Display, Need, dependency, terminal,
-merge, equality, validity, Arc and epoch assertion. Do not change real-order/
-event or lifecycle/cancellation/nonactivation proof, and add no definition-
-module test. Source evidence must prove exactly one Mapping, Definition and
-Merge inner mapping plus exactly one wrapper at observed Key projection.
+Add exactly three tests:
 
-Add exactly one test to the existing test-only sibling module in
-`root_apparent_repository_route.rs`:
-`root_apparent_repository_definition_observation_surface_is_sibling_usable`.
-Use explicit test-only sibling imports for the three promoted names; production
-imports remain unchanged. The smoke:
+- `observed_root_apparent_repository_route_identity_finisher_and_terminal_algebra`;
+- `observed_root_apparent_repository_route_real_families_events_and_parity`;
+- `observed_root_apparent_repository_route_lifecycle_cancellation_and_nonactivation`.
 
-- constructs only the key for `/workspace` and `@first` and asserts
-  `observed-host-root-apparent-repository-definition:"/workspace":@first`;
-- defines one nonexecuted `inspect` taking
-  `&<HostRootApparentRepositoryDefinitionObservationKey as Key>::Value`,
-  `&ObservedHostRootApparentRepositoryDefinition` and
-  `&HostRootApparentRepositoryDefinitionObservationError`;
-- assigns the carrier accessors to
-  `&Arc<Result<HostRootApparentRepositoryDefinition,
-  HostRootApparentRepositoryDefinitionError>>` and `&PathObservationEpoch`;
-- casts `inspect` to the exact function pointer whose first parameter is
-  `&SourcePreparationOutcome<Result<ObservedHostRootApparentRepositoryDefinition,
-  HostRootApparentRepositoryDefinitionObservationError>>`, followed by the
-  same carrier and opaque-error references; and
-- does not construct or inspect carrier/outer, compute the key, name the
-  private alias/inner/variants, invoke route or activate semantics.
+They prove key identity/root rejection/exact Display, accessors, equality/
+validity, Need and exact completed-disposition/finisher terminals; source shape
+with exactly one observed child and one typed outer mapping; exact real
+generated, selected-nonregistry, mapping-failure, Main and Builtin legacy
+semantic parity, one-child dependency rows, unchanged child epoch, lower-owned
+event vectors and all warm rows batchless; plus held child/parent semantic
+A-B-A through mapping and generated-definition changes, equal Result with a
+metadata-only changed epoch, parent epoch equal to child and a subset of that
+transaction's global epoch, Arc identity only on Reused, poll-drop recovery,
+and legacy/source-input/source-path/source-observation/Bzlmod-route/public-
+command/bootstrap nonactivation.
+
+Reuse accepted
+`observed_root_apparent_repository_definition_real_order_events_and_parity`
+for the real-family child proof, plus its identity test's accepted selected-
+registry source/policy/forwarding chain. Require static route projection
+evidence rather than private mirror injection. Construct no opaque child outer,
+malformed epoch, private state hook or synthetic keyed mismatch.
 
 ## Caps and validation
 
-Caps are <=80 definition production, <=50 definition colocated proof and <=80
-route sibling proof; <=210 aggregate semantic additions and physical
-<=1,845/1,168. Add no production helper or definition-module test and exactly
-one sibling smoke. The adjusted identity test remains below 200 and the smoke
-below 100. Add no new `rustfmt::skip`; preserve existing skips and require
-rustfmt-stable bytes. The definition owner remains cohesive around its driver/
-carrier/Key projection; the route changes only its colocated compile proof. No
-hot-path or retained-representation change applies.
+Caps are <=240 production, <=620 proof and <=860 aggregate semantic additions,
+with physical <=1,990. Add at most six production and six test helpers, exactly
+three tests, driver below 150 and every helper/test below 200. The file remains
+cohesive because it already owns the legacy route value/error/views, sole-child
+projection, trackers and real fixtures; the cap remains below the 2,000-line
+complexity trigger. This is not a demonstrated hot path and changes no retained
+representation beyond the bounded carrier.
 
 Run serially:
 
-1. `cargo test -p slug_core_v2 observed_root_apparent_repository_definition_ --lib`;
-2. `cargo test -p slug_core_v2 root_apparent_repository_definition_observation_surface_is_sibling_usable --lib`;
-3. protected legacy root-definition and route tests;
+1. `cargo test -p slug_core_v2 observed_root_apparent_repository_route_ --lib`;
+2. protected sibling-surface, `consistency_is_fail_closed`,
+   `generated_route_borrows_original_definition`,
+   `selected_nonregistry_route_retains_original_spec` and
+   `main_deferred_is_promoted_without_fallback` tests;
+3. protected observed root-definition tests;
 4. full `cargo test -p slug_core_v2`;
 5. `cargo check -p slug_commands_v2`;
 6. `cargo fmt --all -- --check`; and
-7. exact two-file allowlist, baseline-SHA/accounting/physical/test-size/
-   visibility/wrapper/source-shape checks plus `git diff --check`.
+7. exact one-file allowlist, baseline SHA/accounting/physical/helper/test-size/
+   driver/dependency/event/retention/nonactivation/source-shape checks plus
+   `git diff --check`.
 
-Reuse accepted owner proof and same-crate opaque-wrapper precedents. Add no
-Bazel oracle because this handoff has no Bazel-visible behavior.
+Reuse accepted Bazel 9.2 `BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
+`BazelDepGraphValue.getRepositoryMapping`, `ModuleKey` canonical naming and
+the accepted route/source-capability tests. Buck2 DICE incrementality,
+cancellation and activation-tracker tests remain concept/test evidence. Add no
+fixture or oracle because the owner introduces no new Bazel-visible behavior.
 
 ## Compatibility and stops
 
-Root-definition values/order/errors/views/equality/invalidation and lower
-events remain **exact** Bazel 9 compatibility. The crate-internal opaque
-carrier and Result-Arc transaction-local epoch handoff are **Slug-native**.
-Route ownership, source/public/command/bootstrap observation and exact Bazel
-configuration/output/ActionKey bytes remain **unsupported/deferred**.
+Route values, five-family projection, predecessor/view/source-capability
+semantics, errors, order, equality/invalidation and lower events remain
+**exact** Bazel 9 compatibility. The private Result-Arc+transaction-local epoch
+carrier and typed outer are **Slug-native**. Carrier visibility, source-input/
+source-path/source observation, public-command/bootstrap activation and exact
+Bazel configuration/output/ActionKey bytes remain **unsupported/deferred**.
 
-STOP on a third file/type/key/carrier/adapter; crate-public visibility or
-crate-root reexport; public field/alias/private-inner exposure/variant
-inspector; route activation; lower-carrier redesign; semantic/order/event/
-equality/epoch/retention drift; proof beyond wrapper spelling and exact sibling
-smoke; new formatter skip; Cargo/BUILD, fixture/oracle; cap/test/format waiver;
-upper source/public/command/bootstrap work, milestone closure, M8/M7B or exact
+STOP on a second file/key/child/owner/adapter; visibility/export/caller/API;
+source-input or upper activation; semantic/view/policy/order/error/event/
+equality/retention drift; epoch merge/rebuild; parent OperationMismatch;
+retained child/scratch/task/lock; private/malformed injection; fixture/oracle;
+cap/helper/test/format waiver; Cargo/BUILD; milestone closure, M8/M7B or exact
 identity work. REPLAN before widening or on baseline hash drift.
 
 ## Terminal
 
-ACCEPT returns only to a docs-only root apparent-route observation-owner
-design. M7 remains partial and M7A -> M8 -> M7B remains.
+ACCEPT returns only to a docs-only root-route carrier-visibility and sole
+source-input consumer audit. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Committed audit `04443253` proved this two-file `pub(super)` opaque-wrapper
-handoff is the unique prerequisite smaller than route ownership. Accepted
-owner `29795aeb` is +738/-103 at 1,714 physical lines and remains callerless.
+Accepted `16a3d80a` promoted only the root-definition observation handoff and
+its route sibling smoke at +75/-17 across two files. It activated no caller.
