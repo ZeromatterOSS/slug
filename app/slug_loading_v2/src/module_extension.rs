@@ -30,6 +30,8 @@ use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
 use slug_identity_v2::CanonicalLabel;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathObservationEpoch;
 use starlark::PrintHandler;
 use starlark::PrintLocation;
 use starlark::any::ProvidesStaticType;
@@ -47,11 +49,15 @@ use starlark::values::starlark_value;
 use starlark_map::StarlarkHasher;
 
 use crate::attrs::CoercedAttributeValue;
+use crate::bzl_module::FrozenBzlModule;
 use crate::bzl_module::HostBzlModuleError;
 use crate::bzl_module::HostBzlModuleEvalKey;
+use crate::bzl_module::HostBzlModuleObservationKey;
 use crate::bzl_module::HostPreparedModuleExtensionInputs;
 use crate::bzl_module::HostPreparedModuleExtensionInputsError;
 use crate::bzl_module::HostPreparedModuleExtensionInputsKey;
+use crate::bzl_module::HostPreparedModuleExtensionInputsObservationError;
+use crate::bzl_module::HostPreparedModuleExtensionInputsObservationKey;
 use crate::bzl_module::HostRootBzlLabel;
 use crate::bzl_module::PreparedModuleExtensionInput;
 use crate::bzl_module::PreparedModuleExtensionTag;
@@ -99,6 +105,46 @@ pub(crate) struct HostPureModuleExtensionInvocationsKey {
     workspace: NormalizedAbsolutePath,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)] // Private observed sibling; a later packet owns consumer activation.
+struct HostPureModuleExtensionInvocationsObservationKey(HostPureModuleExtensionInvocationsKey);
+
+#[allow(dead_code)]
+#[rustfmt::skip]
+impl HostPureModuleExtensionInvocationsObservationKey {
+    fn new(workspace: NormalizedAbsolutePath) -> Self { Self(HostPureModuleExtensionInvocationsKey::new(workspace)) }
+}
+
+#[rustfmt::skip]
+impl fmt::Display for HostPureModuleExtensionInvocationsObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "observed-{}", self.0) }
+}
+
+type PureInvocationsResult =
+    Arc<Result<HostPureModuleExtensionInvocations, HostPureModuleExtensionInvocationsError>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+#[allow(dead_code)] // Retained only by the callerless observed sibling.
+struct ObservedHostPureModuleExtensionInvocations {
+    result: PureInvocationsResult,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)]
+#[rustfmt::skip]
+impl ObservedHostPureModuleExtensionInvocations {
+    fn result(&self) -> &PureInvocationsResult { &self.result }
+    fn observations(&self) -> &PathObservationEpoch { &self.observations }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+#[rustfmt::skip]
+enum HostPureModuleExtensionInvocationsObservationError {
+    Prepared(HostPreparedModuleExtensionInputsObservationError),
+    HostBzl { prepared: Arc<HostPreparedModuleExtensionInputs>, index: usize, error: ObservedPathFrontierError },
+    Merge { prepared: Arc<HostPreparedModuleExtensionInputs>, index: usize, error: ObservedPathFrontierError },
+}
+
 impl HostPureModuleExtensionInvocationsKey {
     pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
         Self { workspace }
@@ -115,14 +161,25 @@ impl fmt::Display for HostPureModuleExtensionInvocationsKey {
     }
 }
 
-pub(crate) type HostPureModuleExtensionInvocationsOutcome = SourcePreparationOutcome<
-    Arc<Result<HostPureModuleExtensionInvocations, HostPureModuleExtensionInvocationsError>>,
+pub(crate) type HostPureModuleExtensionInvocationsOutcome =
+    SourcePreparationOutcome<PureInvocationsResult>;
+
+type PureInvocationsDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (PureInvocationsResult, PathObservationEpoch),
+        HostPureModuleExtensionInvocationsObservationError,
+    >,
 >;
 
-fn complete(
-    value: Result<HostPureModuleExtensionInvocations, HostPureModuleExtensionInvocationsError>,
-) -> HostPureModuleExtensionInvocationsOutcome {
-    SourcePreparationOutcome::Complete(Arc::new(value))
+#[derive(Clone, Copy)]
+enum PureInvocationsMode {
+    Legacy,
+    Observed,
+}
+
+#[rustfmt::skip]
+fn pure_complete(value: Result<HostPureModuleExtensionInvocations, HostPureModuleExtensionInvocationsError>, observations: PathObservationEpoch) -> PureInvocationsDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(value), observations)))
 }
 
 #[derive(Default)]
@@ -149,73 +206,114 @@ impl PrintHandler for InvocationPrintCapture {
     }
 }
 
-#[async_trait]
-impl Key for HostPureModuleExtensionInvocationsKey {
-    type Value = HostPureModuleExtensionInvocationsOutcome;
+fn union_pure_observations(
+    left: &PathObservationEpoch,
+    right: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    PathObservationEpoch::from_shared(
+        left.observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain(
+                right
+                    .observations()
+                    .iter()
+                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
+            ),
+    )
+    .map_err(ObservedPathFrontierError::from)
+}
 
-    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let prepared = match ctx
-            .compute(&HostPreparedModuleExtensionInputsKey::new(
-                self.workspace.clone(),
-            ))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(value) => Arc::new(value.clone()),
-                Err(error) => {
-                    return complete(Err(HostPureModuleExtensionInvocationsError::Prepared(
-                        error.clone(),
-                    )));
-                }
-            },
-            Err(error) => {
-                return complete(Err(
-                    HostPureModuleExtensionInvocationsError::PreparedCompute(
-                        error.to_string().into(),
-                    ),
-                ));
-            }
+#[rustfmt::skip]
+async fn pure_prepared(ctx: &mut DiceComputations<'_>, workspace: &NormalizedAbsolutePath, mode: PureInvocationsMode) -> Result<(Arc<HostPreparedModuleExtensionInputs>, PathObservationEpoch), PureInvocationsDriverOutcome> {
+    macro_rules! compute_error {
+        ($error:expr) => {
+            pure_complete(
+                Err(HostPureModuleExtensionInvocationsError::PreparedCompute(
+                    $error.to_string().into(),
+                )),
+                PathObservationEpoch::empty(),
+            )
         };
-        let capture_events = ctx
-            .per_transaction_data()
-            .data
-            .get::<CaptureEvaluationEvents>()
-            .is_ok();
-        let mut event_batch = EventBatch::empty();
-        let result = invoke_all(
-            ctx,
-            self.workspace.clone(),
-            prepared,
-            capture_events,
-            &mut event_batch,
-        )
-        .await;
-        if capture_events && matches!(result, SourcePreparationOutcome::Complete(_)) {
-            ctx.store_evaluation_data(event_batch)
-                .expect("pure module-extension invocation stores one Complete event batch");
-        }
-        result
     }
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        x.complete_eq(y)
-    }
-
-    fn validity(value: &Self::Value) -> bool {
-        value.is_complete()
+    let child = match mode {
+        PureInvocationsMode::Legacy => match ctx.compute(&HostPreparedModuleExtensionInputsKey::new(workspace.dupe())).await {
+            Err(error) => return Err(compute_error!(error)),
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(result)) => SourcePreparationOutcome::Complete(Ok((result, PathObservationEpoch::empty()))),
+        },
+        PureInvocationsMode::Observed => match ctx.compute(&HostPreparedModuleExtensionInputsObservationKey::new(workspace.dupe())).await {
+            Err(error) => return Err(compute_error!(error)),
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => SourcePreparationOutcome::Complete(Err(error)),
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => SourcePreparationOutcome::Complete(Ok((observed.result().dupe(), observed.observations().dupe()))),
+        },
+    };
+    let (result, observations) = match child {
+        SourcePreparationOutcome::Need(need) => return Err(SourcePreparationOutcome::Need(need)),
+        SourcePreparationOutcome::Complete(Err(error)) => return Err(SourcePreparationOutcome::Complete(Err(HostPureModuleExtensionInvocationsObservationError::Prepared(error)))),
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+    };
+    match result.as_ref() {
+        Ok(prepared) => Ok((Arc::new(prepared.clone()), observations)),
+        Err(error) => Err(pure_complete(Err(HostPureModuleExtensionInvocationsError::Prepared(error.clone())), observations)),
     }
 }
 
-async fn invoke_all(
-    ctx: &mut DiceComputations<'_>,
-    workspace: NormalizedAbsolutePath,
-    prepared: Arc<HostPreparedModuleExtensionInputs>,
-    capture_events: bool,
-    event_batch: &mut EventBatch,
-) -> HostPureModuleExtensionInvocationsOutcome {
+struct PurePreflight {
+    module: starlark::environment::FrozenModule,
+    implementation: starlark::values::FrozenValue,
+    tag_classes: Arc<[CompactString]>,
+}
+
+type PureHostBzlChild = SourcePreparationOutcome<
+    Result<
+        (
+            Arc<Result<FrozenBzlModule, HostBzlModuleError>>,
+            PathObservationEpoch,
+        ),
+        ObservedPathFrontierError,
+    >,
+>;
+
+#[rustfmt::skip]
+async fn pure_host_bzl(ctx: &mut DiceComputations<'_>, workspace: &NormalizedAbsolutePath, prepared: &Arc<HostPreparedModuleExtensionInputs>, index: usize, request: &HostSelectedExtensionDefinitionLoadRequest, label: HostRootBzlLabel, observations: PathObservationEpoch, mode: PureInvocationsMode) -> Result<(FrozenBzlModule, PathObservationEpoch), PureInvocationsDriverOutcome> {
+    let after = |error| HostPureModuleExtensionInvocationsError::AfterPrepared {
+        prepared: prepared.clone(),
+        request: Some(request.clone()),
+        completed: Arc::from([]),
+        current_calls: Arc::from([]),
+        error,
+    };
+    let child: PureHostBzlChild = match mode {
+        PureInvocationsMode::Legacy => match ctx.compute(&HostBzlModuleEvalKey::new(workspace.dupe(), label)).await {
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(result)) => SourcePreparationOutcome::Complete(Ok((result, PathObservationEpoch::empty()))),
+            Err(error) => return Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()))), observations)),
+        },
+        PureInvocationsMode::Observed => match ctx.compute(&HostBzlModuleObservationKey::new(workspace.dupe(), label)).await {
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return Err(SourcePreparationOutcome::Complete(Err(HostPureModuleExtensionInvocationsObservationError::HostBzl { prepared: prepared.dupe(), index, error }))),
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => SourcePreparationOutcome::Complete(Ok((Arc::new(observed.result().clone()), observed.observations().dupe()))),
+            Err(error) => return Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()))), observations)),
+        },
+    };
+    let (result, incoming) = match child {
+        SourcePreparationOutcome::Need(need) => return Err(SourcePreparationOutcome::Need(need)),
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+        SourcePreparationOutcome::Complete(Err(_)) => unreachable!("Host-Bzl outer is handled before the shared finisher"),
+    };
+    let observations = union_pure_observations(&observations, &incoming).map_err(|error| {
+        SourcePreparationOutcome::Complete(Err(HostPureModuleExtensionInvocationsObservationError::Merge { prepared: prepared.dupe(), index, error }))
+    })?;
+    match result.as_ref() {
+        Ok(module) => Ok((module.clone(), observations)),
+        Err(error) => Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::Bzl(error.clone()))), observations)),
+    }
+}
+
+#[rustfmt::skip]
+async fn preflight_pure_invocations(ctx: &mut DiceComputations<'_>, workspace: &NormalizedAbsolutePath, prepared: &Arc<HostPreparedModuleExtensionInputs>, mut observations: PathObservationEpoch, mode: PureInvocationsMode) -> Result<(Vec<PurePreflight>, PathObservationEpoch), PureInvocationsDriverOutcome> {
     let after = |request: Option<&HostSelectedExtensionDefinitionLoadRequest>,
                  completed: &[HostPureModuleExtensionInvocationReceipt],
                  current_calls: Arc<[RepositoryRuleCallRecord]>,
@@ -228,11 +326,6 @@ async fn invoke_all(
             error,
         }
     };
-    struct Preflight {
-        module: starlark::environment::FrozenModule,
-        implementation: starlark::values::FrozenValue,
-        tag_classes: Arc<[CompactString]>,
-    }
     let mut preflight = Vec::with_capacity(prepared.inputs.len());
     for (index, input) in prepared.inputs.iter().enumerate() {
         let (request, _, _, _) = input.input.parts().0.parts();
@@ -244,95 +337,40 @@ async fn invoke_all(
             || loaded_definition.arch_dependent
             || loaded_definition.facts_version != 0
         {
-            return complete(Err(after(
-                Some(input.input.parts().0),
-                &[],
-                Arc::from([]),
-                HostPureModuleExtensionInvocationError::UnsupportedFactors,
-            )));
+            return Err(pure_complete(Err(after(Some(input.input.parts().0), &[], Arc::from([]), HostPureModuleExtensionInvocationError::UnsupportedFactors)), observations));
         }
         let target = match RootPackageBzlTarget::parse(request.target().as_str()) {
             Ok(target) => target,
-            Err(error) => {
-                return complete(Err(after(
-                    Some(input.input.parts().0),
-                    &[],
-                    Arc::from([]),
-                    HostPureModuleExtensionInvocationError::Label(error.to_string().into()),
-                )));
-            }
+            Err(error) => return Err(pure_complete(Err(after(Some(input.input.parts().0), &[], Arc::from([]), HostPureModuleExtensionInvocationError::Label(error.to_string().into()))), observations)),
         };
         let label = HostRootBzlLabel::new(request.package().package().clone(), target);
-        let module = match ctx
-            .compute(&HostBzlModuleEvalKey::new(workspace.clone(), label))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(module) => module.clone(),
-                Err(error) => {
-                    return complete(Err(after(
-                        Some(input.input.parts().0),
-                        &[],
-                        Arc::from([]),
-                        HostPureModuleExtensionInvocationError::Bzl(error.clone()),
-                    )));
-                }
-            },
-            Err(error) => {
-                return complete(Err(after(
-                    Some(input.input.parts().0),
-                    &[],
-                    Arc::from([]),
-                    HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()),
-                )));
-            }
-        };
+        let (module, next_observations) = pure_host_bzl(
+            ctx,
+            workspace,
+            prepared,
+            index,
+            input.input.parts().0,
+            label,
+            observations,
+            mode,
+        )
+        .await?;
+        observations = next_observations;
         if &module.manifest != loaded_manifest {
-            return complete(Err(after(
-                Some(input.input.parts().0),
-                &[],
-                Arc::from([]),
-                HostPureModuleExtensionInvocationError::Drift("reacquired manifest differs".into()),
-            )));
+            return Err(pure_complete(Err(after(Some(input.input.parts().0), &[], Arc::from([]), HostPureModuleExtensionInvocationError::Drift("reacquired manifest differs".into()))), observations));
         }
         let export = match module.module.get(input.input.parts().0.parts().1) {
             Ok(value) => value,
-            Err(error) => {
-                return complete(Err(after(
-                    Some(input.input.parts().0),
-                    &[],
-                    Arc::from([]),
-                    HostPureModuleExtensionInvocationError::Drift(error.to_string().into()),
-                )));
-            }
+            Err(error) => return Err(pure_complete(Err(after(Some(input.input.parts().0), &[], Arc::from([]), HostPureModuleExtensionInvocationError::Drift(error.to_string().into()))), observations)),
         };
         let definition = match export.downcast::<FrozenModuleExtensionDefinition>() {
             Ok(value) => value,
-            Err(_) => {
-                return complete(Err(after(
-                    Some(input.input.parts().0),
-                    &[],
-                    Arc::from([]),
-                    HostPureModuleExtensionInvocationError::Drift(
-                        "reacquired export is not module_extension".into(),
-                    ),
-                )));
-            }
+            Err(_) => return Err(pure_complete(Err(after(Some(input.input.parts().0), &[], Arc::from([]), HostPureModuleExtensionInvocationError::Drift("reacquired export is not module_extension".into()))), observations)),
         };
         if &definition.projection() != loaded_definition {
-            return complete(Err(after(
-                Some(input.input.parts().0),
-                &[],
-                Arc::from([]),
-                HostPureModuleExtensionInvocationError::Drift(
-                    "reacquired definition differs".into(),
-                ),
-            )));
+            return Err(pure_complete(Err(after(Some(input.input.parts().0), &[], Arc::from([]), HostPureModuleExtensionInvocationError::Drift("reacquired definition differs".into()))), observations));
         }
-        preflight.push(Preflight {
+        preflight.push(PurePreflight {
             module: module.module.dupe(),
             implementation: definition.implementation,
             tag_classes: loaded_definition
@@ -343,7 +381,23 @@ async fn invoke_all(
                 .into(),
         });
     }
+    Ok((preflight, observations))
+}
 
+#[rustfmt::skip]
+fn invoke_pure_preflight(prepared: Arc<HostPreparedModuleExtensionInputs>, preflight: Vec<PurePreflight>, observations: PathObservationEpoch, capture_events: bool, event_batch: &mut EventBatch) -> PureInvocationsDriverOutcome {
+    let after = |request: Option<&HostSelectedExtensionDefinitionLoadRequest>,
+                 completed: &[HostPureModuleExtensionInvocationReceipt],
+                 current_calls: Arc<[RepositoryRuleCallRecord]>,
+                 error| {
+        HostPureModuleExtensionInvocationsError::AfterPrepared {
+            prepared: prepared.clone(),
+            request: request.cloned(),
+            completed: completed.to_vec().into(),
+            current_calls,
+            error,
+        }
+    };
     let mut invoked = Vec::with_capacity(prepared.inputs.len());
     for (input, preflight) in prepared.inputs.iter().zip(preflight) {
         let _module_lifetime = preflight.module;
@@ -379,37 +433,111 @@ async fn invoke_all(
         let returned = match returned {
             Ok(value) => value,
             Err(error) => {
-                return complete(Err(after(
-                    Some(input.input.parts().0),
-                    &invoked,
-                    repository_rule_calls,
-                    HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()),
-                )));
+                return pure_complete(Err(after(Some(input.input.parts().0), &invoked, repository_rule_calls, HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()))), observations);
             }
         };
         if !returned.is_none() {
-            return complete(Err(after(
-                Some(input.input.parts().0),
-                &invoked,
-                repository_rule_calls,
-                HostPureModuleExtensionInvocationError::Result(
-                    format!(
-                        "module extension must return None, got {}",
-                        returned.get_type()
-                    )
-                    .into(),
-                ),
-            )));
+            return pure_complete(Err(after(Some(input.input.parts().0), &invoked, repository_rule_calls, HostPureModuleExtensionInvocationError::Result(format!("module extension must return None, got {}", returned.get_type()).into()))), observations);
         }
         invoked.push(HostPureModuleExtensionInvocationReceipt {
             request: input.input.parts().0.clone(),
             repository_rule_calls,
         });
     }
-    complete(Ok(HostPureModuleExtensionInvocations {
-        prepared,
-        invoked: invoked.into(),
-    }))
+    pure_complete(Ok(HostPureModuleExtensionInvocations { prepared, invoked: invoked.into() }), observations)
+}
+
+async fn compute_pure_invocations(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostPureModuleExtensionInvocationsKey,
+    mode: PureInvocationsMode,
+) -> PureInvocationsDriverOutcome {
+    let capture_events = ctx
+        .per_transaction_data()
+        .data
+        .get::<CaptureEvaluationEvents>()
+        .is_ok();
+    let mut event_batch = EventBatch::empty();
+    let (prepared, observations) = match pure_prepared(ctx, &key.workspace, mode).await {
+        Ok(value) => value,
+        Err(terminal) => return terminal,
+    };
+    let value = match preflight_pure_invocations(ctx, &key.workspace, &prepared, observations, mode)
+        .await
+    {
+        Ok((preflight, observations)) => invoke_pure_preflight(
+            prepared,
+            preflight,
+            observations,
+            capture_events,
+            &mut event_batch,
+        ),
+        Err(terminal) => terminal,
+    };
+    if capture_events && matches!(value, SourcePreparationOutcome::Complete(Ok(_))) {
+        ctx.store_evaluation_data(event_batch)
+            .expect("pure module-extension invocation stores one local Complete event batch");
+    }
+    value
+}
+
+#[async_trait]
+impl Key for HostPureModuleExtensionInvocationsKey {
+    type Value = HostPureModuleExtensionInvocationsOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match compute_pure_invocations(ctx, self, PureInvocationsMode::Legacy).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                debug_assert!(observations.observations().is_empty());
+                SourcePreparationOutcome::Complete(result)
+            }
+            SourcePreparationOutcome::Complete(Err(_)) => {
+                unreachable!("legacy pure invocations have no observed frontier")
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostPureModuleExtensionInvocationsObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostPureModuleExtensionInvocations,
+            HostPureModuleExtensionInvocationsObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match compute_pure_invocations(ctx, &self.0, PureInvocationsMode::Observed).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostPureModuleExtensionInvocations {
+                    result,
+                    observations,
+                }))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
@@ -808,14 +936,35 @@ pub(crate) mod test_support {
             _: &CancellationContext,
         ) -> Self::Value {
             let mut events = EventBatch::empty();
-            let outcome = invoke_all(
+            let observations = PathObservationEpoch::empty();
+            let outcome = match preflight_pure_invocations(
                 ctx,
-                self.workspace.clone(),
-                self.prepared.clone(),
-                true,
-                &mut events,
+                &self.workspace,
+                &self.prepared,
+                observations,
+                PureInvocationsMode::Legacy,
             )
-            .await;
+            .await
+            {
+                Ok((preflight, observations)) => invoke_pure_preflight(
+                    self.prepared.clone(),
+                    preflight,
+                    observations,
+                    true,
+                    &mut events,
+                ),
+                Err(terminal) => terminal,
+            };
+            let outcome = match outcome {
+                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                    debug_assert!(observations.observations().is_empty());
+                    SourcePreparationOutcome::Complete(result)
+                }
+                SourcePreparationOutcome::Complete(Err(_)) => {
+                    unreachable!("legacy prepared injection has no observed frontier")
+                }
+            };
             let prints = events
                 .events()
                 .iter()
@@ -868,6 +1017,8 @@ pub(crate) mod test_support {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hasher;
     use std::sync::Mutex;
 
     use dice::ActivationData;
@@ -890,6 +1041,7 @@ mod tests {
     use slug_workspace_v2::PathNodeKind;
     use slug_workspace_v2::PathObservationDemand;
     use slug_workspace_v2::PathObservationEpoch;
+    use slug_workspace_v2::PathObservationEpochError;
     use slug_workspace_v2::PathObservationEpochKey;
     use slug_workspace_v2::PathObservationNamespace;
     use slug_workspace_v2::PathObservationOperation;
@@ -1252,22 +1404,40 @@ mod tests {
 
     const REPO_RULE_WORKSPACE: &str = "/module-extension-repository-rule";
 
+    #[derive(Debug)]
+    struct RepositoryRuleActivation {
+        key: String,
+        kind: ActivationKind,
+        batch: Option<EventBatch>,
+    }
+
     #[derive(Default)]
-    struct RepositoryRuleActivationTracker(Mutex<Vec<(ActivationKind, Option<EventBatch>)>>);
+    struct RepositoryRuleActivationTracker {
+        activations: Mutex<Vec<RepositoryRuleActivation>>,
+        dependencies: Mutex<Vec<(String, Vec<String>)>>,
+    }
 
     impl RepositoryRuleActivationTracker {
-        fn take(&self) -> Vec<(ActivationKind, Option<EventBatch>)> {
-            std::mem::take(&mut *self.0.lock().unwrap())
+        fn take(&self) -> Vec<RepositoryRuleActivation> {
+            std::mem::take(&mut *self.activations.lock().unwrap())
+        }
+
+        fn take_dependencies(&self) -> Vec<(String, Vec<String>)> {
+            std::mem::take(&mut *self.dependencies.lock().unwrap())
         }
     }
 
     impl ActivationTracker for RepositoryRuleActivationTracker {
         fn key_activated(
             &self,
-            _: &DynKey,
-            _: &mut dyn Iterator<Item = &DynKey>,
+            key: &DynKey,
+            dependencies: &mut dyn Iterator<Item = &DynKey>,
             _: ActivationData,
         ) {
+            self.dependencies.lock().unwrap().push((
+                key.to_string(),
+                dependencies.map(ToString::to_string).collect(),
+            ));
         }
 
         fn tracks_rich_activations(&self) -> bool {
@@ -1275,26 +1445,117 @@ mod tests {
         }
 
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
-            if key
-                .downcast_ref::<HostPureModuleExtensionInvocationsKey>()
-                .is_some()
-            {
-                self.0.lock().unwrap().push((
-                    activation.kind(),
-                    activation
+            self.activations
+                .lock()
+                .unwrap()
+                .push(RepositoryRuleActivation {
+                    key: key.to_string(),
+                    kind: activation.kind(),
+                    batch: activation
                         .evaluation_data()
                         .and_then(|data| data.downcast_ref::<EventBatch>())
                         .map(Dupe::dupe),
-                ));
-            }
+                });
         }
     }
 
-    async fn repository_rule_transaction(
+    fn repository_rule_epoch(
+        module_source: &str,
+        sources: &[(&str, Option<&str>)],
+        metadata_bias: i64,
+    ) -> PathObservationEpoch {
+        let path = |name: &str| {
+            NormalizedAbsolutePath::new(if name.starts_with('/') {
+                name.to_owned()
+            } else {
+                format!("{REPO_RULE_WORKSPACE}/{name}")
+            })
+            .unwrap()
+        };
+        let demand = |name, operation| {
+            PathObservationDemand::new(PathObservationNamespace::Host, path(name), operation)
+        };
+        let lstat = |kind, id| {
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                kind,
+                id + metadata_bias,
+                1,
+                1,
+                1,
+                0o755,
+            )))
+        };
+        let mut observations = vec![
+            (
+                demand("/", PathObservationOperation::Lstat),
+                lstat(PathNodeKind::Directory, 1),
+            ),
+            (
+                demand(REPO_RULE_WORKSPACE, PathObservationOperation::Lstat),
+                lstat(PathNodeKind::Directory, 2),
+            ),
+            (
+                demand("REPO.bazel", PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Missing),
+            ),
+            (
+                demand(".bazelignore", PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Missing),
+            ),
+            (
+                demand("BUILD", PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Missing),
+            ),
+            (
+                demand("MODULE.bazel.lock", PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Missing),
+            ),
+            (
+                demand("MODULE.bazel", PathObservationOperation::Lstat),
+                lstat(PathNodeKind::RegularFile, 9),
+            ),
+            (
+                demand("MODULE.bazel", PathObservationOperation::FileBytes),
+                PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                    module_source.as_bytes(),
+                ))),
+            ),
+            (
+                demand("BUILD.bazel", PathObservationOperation::Lstat),
+                lstat(PathNodeKind::RegularFile, 10),
+            ),
+        ];
+        for (index, (name, source)) in sources.iter().enumerate() {
+            observations.push((
+                demand(name, PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(source.map_or(PathOperationResult::Missing, |_| {
+                    PathOperationResult::Present(PathLstat::new(
+                        PathNodeKind::RegularFile,
+                        11 + index as i64 + metadata_bias,
+                        1,
+                        1,
+                        1,
+                        0o644,
+                    ))
+                })),
+            ));
+            observations.push((
+                demand(name, PathObservationOperation::FileBytes),
+                PathObservationResult::FileBytes(
+                    source.map_or(PathOperationResult::Missing, |source| {
+                        PathOperationResult::Present(Arc::from(source.as_bytes()))
+                    }),
+                ),
+            ));
+        }
+        PathObservationEpoch::new(observations).unwrap()
+    }
+
+    async fn repository_rule_sources_transaction(
         dice: &Arc<Dice>,
         module_source: &str,
-        extension_source: &str,
-        extension_present: bool,
+        sources: &[(&str, Option<&str>)],
+        metadata_bias: i64,
         tracker: Option<Arc<RepositoryRuleActivationTracker>>,
     ) -> dice::DiceTransaction {
         let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
@@ -1311,24 +1572,25 @@ mod tests {
                     workspace: workspace.as_path().to_owned(),
                 },
                 Arc::new(slug_workspace_v2::WorkspaceSnapshot {
-                    files: Arc::new(SortedMap::from_iter([
-                        (
+                    files: Arc::new(SortedMap::from_iter(
+                        [(
                             workspace.as_path().join("MODULE.bazel"),
                             WorkspaceFileValue::Present(Arc::new(module_source.to_owned())),
-                        ),
-                        (
-                            workspace.as_path().join("ext.bzl"),
-                            if extension_present {
-                                WorkspaceFileValue::Present(Arc::new(extension_source.to_owned()))
-                            } else {
-                                WorkspaceFileValue::Absent
-                            },
-                        ),
-                        (
+                        )]
+                        .into_iter()
+                        .chain(sources.iter().map(|(name, source)| {
+                            (
+                                workspace.as_path().join(name),
+                                source.map_or(WorkspaceFileValue::Absent, |source| {
+                                    WorkspaceFileValue::Present(Arc::new(source.to_owned()))
+                                }),
+                            )
+                        }))
+                        .chain(std::iter::once((
                             workspace.as_path().join("BUILD.bazel"),
                             WorkspaceFileValue::Present(Arc::new(String::new())),
-                        ),
-                    ])),
+                        ))),
+                    )),
                 }),
             )])
             .unwrap();
@@ -1380,97 +1642,31 @@ mod tests {
                 RepositoryMaterializationResultEpoch::new(workspace.dupe(), []).unwrap(),
             )])
             .unwrap();
-        let observations = ["/", REPO_RULE_WORKSPACE]
-            .into_iter()
-            .enumerate()
-            .map(|(index, path)| {
-                (
-                    PathObservationDemand::new(
-                        PathObservationNamespace::Host,
-                        NormalizedAbsolutePath::new(path).unwrap(),
-                        PathObservationOperation::Lstat,
-                    ),
-                    PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
-                        PathNodeKind::Directory,
-                        index as i64 + 1,
-                        1,
-                        1,
-                        1,
-                        0o755,
-                    ))),
-                )
-            })
-            .chain(
-                ["REPO.bazel", ".bazelignore", "BUILD"]
-                    .into_iter()
-                    .map(|name| {
-                        (
-                            PathObservationDemand::new(
-                                PathObservationNamespace::Host,
-                                NormalizedAbsolutePath::new(format!(
-                                    "{REPO_RULE_WORKSPACE}/{name}"
-                                ))
-                                .unwrap(),
-                                PathObservationOperation::Lstat,
-                            ),
-                            PathObservationResult::Lstat(PathOperationResult::Missing),
-                        )
-                    }),
-            )
-            .chain(std::iter::once((
-                PathObservationDemand::new(
-                    PathObservationNamespace::Host,
-                    NormalizedAbsolutePath::new(format!("{REPO_RULE_WORKSPACE}/BUILD.bazel"))
-                        .unwrap(),
-                    PathObservationOperation::Lstat,
-                ),
-                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
-                    PathNodeKind::RegularFile,
-                    10,
-                    1,
-                    1,
-                    1,
-                    0o644,
-                ))),
-            )))
-            .chain(std::iter::once((
-                PathObservationDemand::new(
-                    PathObservationNamespace::Host,
-                    NormalizedAbsolutePath::new(format!("{REPO_RULE_WORKSPACE}/ext.bzl")).unwrap(),
-                    PathObservationOperation::Lstat,
-                ),
-                PathObservationResult::Lstat(if extension_present {
-                    PathOperationResult::Present(PathLstat::new(
-                        PathNodeKind::RegularFile,
-                        11,
-                        1,
-                        1,
-                        1,
-                        0o644,
-                    ))
-                } else {
-                    PathOperationResult::Missing
-                }),
-            )))
-            .chain(std::iter::once((
-                PathObservationDemand::new(
-                    PathObservationNamespace::Host,
-                    NormalizedAbsolutePath::new(format!("{REPO_RULE_WORKSPACE}/ext.bzl")).unwrap(),
-                    PathObservationOperation::FileBytes,
-                ),
-                PathObservationResult::FileBytes(if extension_present {
-                    PathOperationResult::Present(Arc::from(extension_source.as_bytes()))
-                } else {
-                    PathOperationResult::Missing
-                }),
-            )));
         updater
             .changed_to(vec![(
                 PathObservationEpochKey,
-                PathObservationEpoch::new(observations).unwrap(),
+                repository_rule_epoch(module_source, sources, metadata_bias),
             )])
             .unwrap();
         updater.commit().await
+    }
+
+    async fn repository_rule_transaction(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        extension_present: bool,
+        metadata_bias: i64,
+        tracker: Option<Arc<RepositoryRuleActivationTracker>>,
+    ) -> dice::DiceTransaction {
+        repository_rule_sources_transaction(
+            dice,
+            module_source,
+            &[("ext.bzl", extension_present.then_some(extension_source))],
+            metadata_bias,
+            tracker,
+        )
+        .await
     }
 
     async fn compute_repository_rule_case(
@@ -1485,6 +1681,7 @@ mod tests {
             module_source,
             extension_source,
             extension_present,
+            0,
             tracker,
         )
         .await
@@ -1493,6 +1690,410 @@ mod tests {
         ))
         .await
         .unwrap()
+    }
+
+    async fn compute_observed_repository_rule_case(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        extension_present: bool,
+        tracker: Option<Arc<RepositoryRuleActivationTracker>>,
+    ) -> <HostPureModuleExtensionInvocationsObservationKey as Key>::Value {
+        repository_rule_transaction(
+            dice,
+            module_source,
+            extension_source,
+            extension_present,
+            0,
+            tracker,
+        )
+        .await
+        .compute(&HostPureModuleExtensionInvocationsObservationKey::new(
+            NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap(),
+        ))
+        .await
+        .unwrap()
+    }
+
+    fn observed_pure_carrier(
+        outcome: &<HostPureModuleExtensionInvocationsObservationKey as Key>::Value,
+    ) -> &ObservedHostPureModuleExtensionInvocations {
+        match outcome {
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+            value => panic!("expected observed pure carrier: {value:?}"),
+        }
+    }
+
+    #[derive(Debug, Clone, Allocative)]
+    #[rustfmt::skip]
+    struct ObservePreparedKey {
+        workspace: NormalizedAbsolutePath,
+        prepared: Arc<HostPreparedModuleExtensionInputs>,
+        observations: PathObservationEpoch,
+        id: u64,
+    }
+    #[rustfmt::skip]
+    impl PartialEq for ObservePreparedKey { fn eq(&self, other: &Self) -> bool { self.id == other.id } }
+    impl Eq for ObservePreparedKey {}
+    #[rustfmt::skip]
+    impl Hash for ObservePreparedKey { fn hash<H: Hasher>(&self, state: &mut H) { self.id.hash(state); } }
+    #[rustfmt::skip]
+    impl fmt::Display for ObservePreparedKey { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "test-observe-prepared:{}", self.id) } }
+    #[async_trait]
+    #[rustfmt::skip]
+    impl Key for ObservePreparedKey {
+        type Value = <HostPureModuleExtensionInvocationsObservationKey as Key>::Value;
+        async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+            let mut events = EventBatch::empty();
+            let outcome = match preflight_pure_invocations(ctx, &self.workspace, &self.prepared, self.observations.dupe(), PureInvocationsMode::Observed).await {
+                Ok((preflight, observations)) => invoke_pure_preflight(self.prepared.clone(), preflight, observations, true, &mut events),
+                Err(terminal) => terminal,
+            };
+            match outcome {
+                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(Err(error)),
+                SourcePreparationOutcome::Complete(Ok((result, observations))) => SourcePreparationOutcome::Complete(Ok(ObservedHostPureModuleExtensionInvocations { result, observations })),
+            }
+        }
+        fn equality(x: &Self::Value, y: &Self::Value) -> bool { x.complete_eq(y) }
+        fn validity(value: &Self::Value) -> bool { value.is_complete() }
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_pure_identity_finisher_and_prefix_algebra() {
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let key = HostPureModuleExtensionInvocationsObservationKey::new(workspace.dupe());
+        let same = HostPureModuleExtensionInvocationsObservationKey::new(workspace.dupe());
+        let other = HostPureModuleExtensionInvocationsObservationKey::new(
+            NormalizedAbsolutePath::new("/other").unwrap(),
+        );
+        assert_eq!(
+            key.to_string(),
+            "observed-host-pure-module-extension-invocations:\"/module-extension-repository-rule\""
+        );
+        let hash = |key: &HostPureModuleExtensionInvocationsObservationKey| {
+            let mut hasher = DefaultHasher::new();
+            key.hash(&mut hasher);
+            hasher.finish()
+        };
+        assert_eq!(hash(&key), hash(&same));
+        assert_ne!(hash(&key), hash(&other));
+
+        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        let source = "def impl(ctx):\n    return None\next=module_extension(implementation=impl)\n";
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let observed =
+            compute_observed_repository_rule_case(&dice, module, source, true, None).await;
+        let carrier = observed_pure_carrier(&observed);
+        assert!(carrier.result().is_ok());
+        assert!(!carrier.observations().observations().is_empty());
+        assert!(HostPureModuleExtensionInvocationsObservationKey::validity(
+            &observed
+        ));
+        assert!(HostPureModuleExtensionInvocationsObservationKey::equality(
+            &observed, &observed
+        ));
+
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            workspace,
+            PathObservationOperation::FileBytes,
+        );
+        let first = Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Present(Arc::from(&b"first"[..])),
+        ));
+        let second = Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Present(Arc::from(&b"second"[..])),
+        ));
+        let left = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+        let duplicate = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+        let merged = union_pure_observations(&left, &duplicate).unwrap();
+        assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first));
+        let conflicting = PathObservationEpoch::from_shared([(demand.dupe(), second)]).unwrap();
+        let merge_error = union_pure_observations(&left, &conflicting).unwrap_err();
+
+        let prepared = match carrier.result().as_ref() {
+            Ok(value) => value.prepared.dupe(),
+            Err(error) => panic!("expected success: {error:?}"),
+        };
+        let lower_error =
+            ObservedPathFrontierError::from(PathObservationEpochError::OperationMismatch {
+                demand,
+                result_operation: PathObservationOperation::Lstat,
+            });
+        let host_outer: <HostPureModuleExtensionInvocationsObservationKey as Key>::Value =
+            SourcePreparationOutcome::Complete(Err(
+                HostPureModuleExtensionInvocationsObservationError::HostBzl {
+                    prepared: prepared.dupe(),
+                    index: 0,
+                    error: lower_error,
+                },
+            ));
+        let merge_outer: <HostPureModuleExtensionInvocationsObservationKey as Key>::Value =
+            SourcePreparationOutcome::Complete(Err(
+                HostPureModuleExtensionInvocationsObservationError::Merge {
+                    prepared: prepared.dupe(),
+                    index: 0,
+                    error: merge_error,
+                },
+            ));
+        assert!(HostPureModuleExtensionInvocationsObservationKey::validity(
+            &host_outer
+        ));
+        assert!(HostPureModuleExtensionInvocationsObservationKey::equality(
+            &host_outer,
+            &host_outer
+        ));
+        assert!(matches!(
+            host_outer,
+            SourcePreparationOutcome::Complete(Err(
+                HostPureModuleExtensionInvocationsObservationError::HostBzl { .. }
+            ))
+        ));
+        assert!(matches!(
+            merge_outer,
+            SourcePreparationOutcome::Complete(Err(
+                HostPureModuleExtensionInvocationsObservationError::Merge { .. }
+            ))
+        ));
+        let bzl_source = include_str!("bzl_module.rs");
+        let selected_source = include_str!("../../slug_bzlmod_v2/src/selected_repo_spec.rs");
+        let pure_source = include_str!("module_extension.rs");
+        assert!(bzl_source.contains("RootPackageBzlTarget::parse(label.target().as_str())"));
+        assert!(pure_source.contains("RootPackageBzlTarget::parse(request.target().as_str())"));
+        assert_eq!(selected_source.matches("Ok(HostSelectedExtensionEvaluationInput {").count(), 1);
+        assert!(selected_source.contains("pub struct HostSelectedExtensionEvaluationInput {\n    load_request:"));
+        assert!(bzl_source.contains("if request != &loaded.request"));
+        assert_eq!(&prepared.inputs[0].input, &prepared.raw.parts().1[0]);
+        assert!(RootPackageBzlTarget::parse(prepared.inputs[0].input.parts().0.parts().0.target().as_str()).is_ok());
+
+        let need_module = "module(name='bazel_tools')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n";
+        let need = compute_observed_repository_rule_case(
+            &Dice::builder().build(DetectCycles::Enabled),
+            need_module,
+            source,
+            true,
+            None,
+        )
+        .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostPureModuleExtensionInvocationsObservationKey::validity(
+            &need
+        ));
+        assert!(!HostPureModuleExtensionInvocationsObservationKey::equality(
+            &need, &need
+        ));
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_pure_real_order_terminals_events_and_parity() {
+        let module = "module(name='bazel_tools')\na=use_extension('//:first.bzl','first')\nb=use_extension('//:second.bzl','second')\n";
+        let first = "print('load-first')\ndef impl(ctx):\n    print('invoke-first')\nfirst=module_extension(implementation=impl)\n";
+        let second = "print('load-second')\ndef impl(ctx):\n    print('invoke-second')\nsecond=module_extension(implementation=impl)\n";
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let mut transaction = repository_rule_sources_transaction(&dice, module, &[("first.bzl", Some(first)), ("second.bzl", Some(second))], 0, Some(tracker.clone())).await;
+        let legacy = transaction.compute(&HostPureModuleExtensionInvocationsKey::new(workspace.dupe())).await.unwrap();
+        let observed = transaction.compute(&HostPureModuleExtensionInvocationsObservationKey::new(workspace.dupe())).await.unwrap();
+        let prepared = transaction.compute(&HostPreparedModuleExtensionInputsObservationKey::new(workspace.dupe())).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(prepared)) = prepared else { panic!("prepared observation must complete") };
+        let prepared_value = Arc::new(prepared.result().as_ref().as_ref().unwrap().clone());
+        let SourcePreparationOutcome::Complete(legacy_result) = legacy else { panic!("legacy pure invocation must complete") };
+        assert_eq!(legacy_result.as_ref(), observed_pure_carrier(&observed).result().as_ref());
+        let rows = tracker.take();
+        let dependencies = tracker.take_dependencies();
+        let observed_parent_dependencies = &dependencies.iter().find(|(name, _)| name.starts_with("observed-host-pure-module-extension-invocations:")).unwrap().1;
+        assert_eq!(observed_parent_dependencies, &["observed-host-prepared-module-extension-inputs:\"/module-extension-repository-rule\"", "observed-host-bzl-module:\"/module-extension-repository-rule\"://:first.bzl", "observed-host-bzl-module:\"/module-extension-repository-rule\"://:second.bzl"]);
+        let parent = rows.iter().find(|row| row.key.starts_with("observed-host-pure-module-extension-invocations:")).unwrap();
+        let prints = parent.batch.as_ref().unwrap().events().iter().filter_map(|event| match event { EvaluationEvent::StarlarkPrint { text, .. } => Some(text.as_str()), _ => None }).collect::<Vec<_>>();
+        assert_eq!(prints, ["invoke-first", "invoke-second"]);
+        let children = rows.iter().enumerate().filter(|(_, row)| row.key.starts_with("observed-host-bzl-module:")).collect::<Vec<_>>();
+        assert_eq!(children.iter().filter_map(|(_, row)| row.batch.as_ref()).flat_map(|batch| batch.events()).filter_map(|event| match event { EvaluationEvent::StarlarkPrint { text, .. } => Some(text.as_str()), _ => None }).collect::<Vec<_>>(), ["load-first", "load-second"]);
+        assert_eq!(children.iter().map(|(_, row)| (row.key.contains("first.bzl"), row.kind)).collect::<Vec<_>>(), [(true, ActivationKind::Evaluated), (false, ActivationKind::Evaluated), (true, ActivationKind::Reused), (false, ActivationKind::Reused)]);
+        assert!(children.windows(2).all(|pair| pair[0].1.key != pair[1].1.key || pair[1].1.kind == ActivationKind::Reused));
+        assert!(children.iter().any(|(_, row)| row.kind == ActivationKind::Reused && row.batch.is_none()));
+        let child_index = children[0].0;
+        let parent_index = rows.iter().position(|row| row.key.starts_with("observed-host-pure-module-extension-invocations:")).unwrap();
+        assert!(child_index < parent_index);
+        assert!(children.iter().all(|(index, _)| *index < parent_index));
+
+        for (id, replacement, terminal) in [(1, second.replace("invoke-second", "drifted").replace("print('load-second')", "print('changed-load')"), "drift"), (2, "this is not valid Starlark".to_owned(), "bzl")] {
+            let injected_tracker = Arc::new(RepositoryRuleActivationTracker::default());
+            let mut injected = repository_rule_sources_transaction(&dice, module, &[("first.bzl", Some(first)), ("second.bzl", Some(&replacement))], 0, Some(injected_tracker.clone())).await;
+            let observed_injected = injected.compute(&ObservePreparedKey { workspace: workspace.dupe(), prepared: prepared_value.dupe(), observations: PathObservationEpoch::empty(), id }).await.unwrap();
+            let legacy_injected = injected.compute(&test_support::InvokePreparedKey { workspace: workspace.dupe(), prepared: prepared_value.dupe(), id: id + 10 }).await.unwrap();
+            let observed_result = observed_pure_carrier(&observed_injected).result();
+            let SourcePreparationOutcome::Complete(legacy_result) = &legacy_injected.outcome else { panic!("legacy injection must complete") };
+            assert_eq!(legacy_result, observed_result);
+            assert!(legacy_injected.prints.is_empty());
+            assert!(matches!((terminal, observed_result.as_ref()), ("drift", Err(HostPureModuleExtensionInvocationsError::AfterPrepared { error: HostPureModuleExtensionInvocationError::Drift(_), .. })) | ("bzl", Err(HostPureModuleExtensionInvocationsError::AfterPrepared { error: HostPureModuleExtensionInvocationError::Bzl(_), .. }))));
+            assert!(injected_tracker.take().iter().find(|row| row.key.starts_with("test-observe-prepared:")).is_some_and(|row| row.batch.is_none()));
+        }
+
+        for (source, expected) in [("def impl(ctx):\n    fail('boom')\next=module_extension(implementation=impl)\n", "invocation"), ("def impl(ctx):\n    return 1\next=module_extension(implementation=impl)\n", "result"), ("def impl(ctx):\n    print('must-not-run')\next=module_extension(implementation=impl,os_dependent=True)\n", "factor")] {
+            let one = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+            let terminal_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let terminal_tracker = Arc::new(RepositoryRuleActivationTracker::default());
+            let outcome = compute_observed_repository_rule_case(&terminal_dice, one, source, true, Some(terminal_tracker.clone())).await;
+            let legacy = compute_repository_rule_case(&terminal_dice, one, source, true, None).await;
+            let SourcePreparationOutcome::Complete(legacy) = legacy else { panic!("legacy failure must complete") };
+            assert_eq!(legacy, *observed_pure_carrier(&outcome).result());
+            let error = observed_pure_carrier(&outcome).result().as_ref().as_ref().unwrap_err();
+            assert!(matches!((expected, error), ("invocation", HostPureModuleExtensionInvocationsError::AfterPrepared { error: HostPureModuleExtensionInvocationError::Invocation(_), .. }) | ("result", HostPureModuleExtensionInvocationsError::AfterPrepared { error: HostPureModuleExtensionInvocationError::Result(_), .. }) | ("factor", HostPureModuleExtensionInvocationsError::AfterPrepared { error: HostPureModuleExtensionInvocationError::UnsupportedFactors, .. })));
+            if expected == "factor" { let terminal_rows = terminal_tracker.take(); assert!(terminal_rows.iter().find(|row| row.key.starts_with("observed-host-pure-module-extension-invocations:")).is_some_and(|row| row.batch.as_ref().is_some_and(|batch| batch.events().is_empty()))); }
+        }
+
+        let prepared_tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let prepared_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut prepared_tx = repository_rule_transaction(&prepared_dice, "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n", first, false, 0, Some(prepared_tracker.clone())).await;
+        let prepared_legacy = prepared_tx.compute(&HostPureModuleExtensionInvocationsKey::new(workspace.dupe())).await.unwrap();
+        let prepared_observed = prepared_tx.compute(&HostPureModuleExtensionInvocationsObservationKey::new(workspace.dupe())).await.unwrap();
+        let SourcePreparationOutcome::Complete(prepared_legacy) = prepared_legacy else { panic!("legacy prepared failure must complete") };
+        assert_eq!(&prepared_legacy, observed_pure_carrier(&prepared_observed).result());
+        assert!(matches!(prepared_legacy.as_ref(), Err(HostPureModuleExtensionInvocationsError::Prepared(_))));
+        let prepared_rows = prepared_tracker.take();
+        assert_eq!(prepared_rows.iter().filter(|row| row.key.contains("host-pure-module-extension-invocations:")).count(), 2);
+        assert!(prepared_rows.iter().filter(|row| row.key.contains("host-pure-module-extension-invocations:")).all(|row| row.batch.is_none()));
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_pure_lifecycle_cancellation_and_nonactivation() {
+        let module_a = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\ne.tag(value='tag-a')\n";
+        let module_b = module_a.replace("tag-a", "tag-b");
+        let source_a = "tag=tag_class(attrs={'value':attr.string()})\ndef impl(ctx):\n    print(ctx.modules[0].tags.tag[0].value + '-source-a')\next=module_extension(implementation=impl,tag_classes={'tag':tag})\n";
+        let source_b = source_a.replace("source-a", "source-b");
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let key = HostPureModuleExtensionInvocationsObservationKey::new(workspace.dupe());
+        let mut held = Vec::new();
+        for (module, source, bias) in [
+            (module_a, source_a, 0),
+            (module_b.as_str(), source_a, 0),
+            (module_a, source_a, 0),
+            (module_a, source_b.as_str(), 0),
+            (module_a, source_a, 0),
+            (module_a, source_a, 100),
+        ] {
+            let mut transaction =
+                repository_rule_transaction(&dice, module, source, true, bias, None).await;
+            let global = transaction.compute(&PathObservationEpochKey).await.unwrap();
+            let value = transaction.compute(&key).await.unwrap();
+            let carrier = observed_pure_carrier(&value).dupe();
+            let prepared = transaction.compute(&HostPreparedModuleExtensionInputsObservationKey::new(workspace.dupe())).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(prepared)) = prepared else { panic!("prepared observation must complete") };
+            let prepared_value = prepared.result().as_ref().as_ref().unwrap();
+            let (request, _, _, _) = prepared_value.inputs[0].input.parts().0.parts();
+            let label = HostRootBzlLabel::new(request.package().package().clone(), RootPackageBzlTarget::parse(request.target().as_str()).unwrap());
+            let child = transaction.compute(&HostBzlModuleObservationKey::new(workspace.dupe(), label)).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(child)) = child else { panic!("Host-Bzl observation must complete") };
+            for epoch in [carrier.observations(), prepared.observations(), child.observations()] {
+                for (demand, result) in epoch.observations() { assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref()); }
+            }
+            held.push((carrier, prepared, child, global));
+        }
+        assert_ne!(held[0].0.result(), held[1].0.result());
+        assert_ne!(held[0].1.result(), held[1].1.result());
+        assert_eq!(held[0].2.result(), held[1].2.result());
+        assert_eq!(held[0].0.result(), held[2].0.result());
+        assert_eq!(held[0].1.result(), held[2].1.result());
+        assert_eq!(held[0].2.result(), held[2].2.result());
+        assert_ne!(held[2].0.result(), held[3].0.result());
+        assert_ne!(held[2].1.result(), held[3].1.result());
+        assert_ne!(held[2].2.result(), held[3].2.result());
+        assert_eq!(held[2].0.result(), held[4].0.result());
+        assert_eq!(held[2].1.result(), held[4].1.result());
+        assert_eq!(held[2].2.result(), held[4].2.result());
+        assert_eq!(held[0].0.result(), held[5].0.result());
+        assert_eq!(held[0].1.result(), held[5].1.result());
+        assert_eq!(held[0].2.result(), held[5].2.result());
+        assert_ne!(held[0].0.observations(), held[5].0.observations());
+        assert_ne!(held[0].1.observations(), held[5].1.observations());
+        assert_ne!(held[0].2.observations(), held[5].2.observations());
+
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let mut warm =
+            repository_rule_transaction(&dice, module_a, source_a, true, 0, Some(tracker.clone()))
+                .await;
+        let first = observed_pure_carrier(&warm.compute(&key).await.unwrap()).dupe();
+        tracker.take();
+        tracker.take_dependencies();
+        let repeated = observed_pure_carrier(&warm.compute(&key).await.unwrap()).dupe();
+        assert!(Arc::ptr_eq(first.result(), repeated.result()));
+        let warm_rows = tracker.take();
+        assert!(warm_rows.iter().any(|row| row.key.starts_with("observed-host-pure-module-extension-invocations:") && row.kind == ActivationKind::Reused && row.batch.is_none()));
+        assert!(warm_rows.iter().all(|row| row.batch.is_none()));
+
+        let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let cancel_tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let mut cancelled = repository_rule_transaction(
+            &cancel_dice,
+            module_a,
+            source_a,
+            true,
+            0,
+            Some(cancel_tracker.clone()),
+        )
+        .await;
+        let cancel_key = HostPureModuleExtensionInvocationsObservationKey::new(workspace.dupe());
+        let mut future = Box::pin(cancelled.compute(&cancel_key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        assert!(cancel_tracker.take().iter().all(|row| !row.key.starts_with("observed-host-pure-module-extension-invocations:")));
+        assert!(cancel_tracker.take_dependencies().iter().all(|(name, _)| !name.starts_with("observed-host-pure-module-extension-invocations:")));
+        let mut recovery = repository_rule_transaction(&cancel_dice, module_a, source_a, true, 0, Some(cancel_tracker)).await;
+        let own_global = recovery.compute(&PathObservationEpochKey).await.unwrap();
+        let recovered = recovery.compute(&cancel_key).await.unwrap();
+        let recovered = observed_pure_carrier(&recovered);
+        assert!(recovered.result().is_ok());
+        let recovery_prepared = recovery.compute(&HostPreparedModuleExtensionInputsObservationKey::new(workspace.dupe())).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(recovery_prepared)) = recovery_prepared else { panic!("recovery prepared must complete") };
+        let recovery_input = recovery_prepared.result().as_ref().as_ref().unwrap();
+        let (request, _, _, _) = recovery_input.inputs[0].input.parts().0.parts();
+        let recovery_label = HostRootBzlLabel::new(request.package().package().clone(), RootPackageBzlTarget::parse(request.target().as_str()).unwrap());
+        let recovery_child = recovery.compute(&HostBzlModuleObservationKey::new(workspace.dupe(), recovery_label)).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(recovery_child)) = recovery_child else { panic!("recovery Host-Bzl must complete") };
+        for epoch in [recovered.observations(), recovery_prepared.observations(), recovery_child.observations()] {
+            for (demand, result) in epoch.observations() { assert_eq!(result.as_ref(), own_global.get(demand).unwrap().as_ref()); }
+        }
+        for epoch in [recovery_prepared.observations(), recovery_child.observations()] {
+            for (demand, result) in epoch.observations() { assert_eq!(result.as_ref(), recovered.observations().get(demand).unwrap().as_ref()); }
+        }
+
+        let rows = tracker.take_dependencies();
+        for forbidden in [
+            "host-prepared-module-extension-inputs:",
+            "host-bzl-module:",
+            "host-pure-module-extension-invocations:",
+            "host-instantiated-module-extension-repositories:",
+            "host-validated-module-extension-repositories:",
+            "host-root-repository-mapping:",
+            "host-canonical-selected-module-definition:",
+            "host-generated-repository-definition:",
+            "slug-command:",
+        ] {
+            assert!(warm_rows.iter().map(|row| row.key.as_str()).chain(rows.iter().flat_map(|(name, dependencies)| std::iter::once(name.as_str()).chain(dependencies.iter().map(String::as_str)))).all(|name| !name.starts_with(forbidden)));
+        }
+
+        let legacy_tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let _ = compute_repository_rule_case(
+            &Dice::builder().build(DetectCycles::Enabled),
+            module_a,
+            source_a,
+            true,
+            Some(legacy_tracker.clone()),
+        )
+        .await;
+        let legacy_activations = legacy_tracker.take();
+        let legacy_rows = legacy_tracker.take_dependencies();
+        assert!(legacy_activations.iter().map(|row| row.key.as_str()).chain(legacy_rows.iter().flat_map(|(name, dependencies)| std::iter::once(name.as_str()).chain(dependencies.iter().map(String::as_str)))).all(|name| !name.starts_with("observed-")));
     }
 
     #[tokio::test]
@@ -1526,16 +2127,18 @@ mod tests {
         .await;
         assert!(HostPureModuleExtensionInvocationsKey::equality(&a, &warm));
         let activations = tracker.take();
-        assert!(
-            activations
-                .iter()
-                .any(|(kind, batch)| *kind == ActivationKind::Evaluated && batch.is_some())
-        );
-        assert!(
-            activations
-                .iter()
-                .any(|(kind, batch)| *kind == ActivationKind::Reused && batch.is_none())
-        );
+        assert!(activations.iter().any(|row| {
+            row.key
+                .starts_with("host-pure-module-extension-invocations:")
+                && row.kind == ActivationKind::Evaluated
+                && row.batch.is_some()
+        }));
+        assert!(activations.iter().any(|row| {
+            row.key
+                .starts_with("host-pure-module-extension-invocations:")
+                && row.kind == ActivationKind::Reused
+                && row.batch.is_none()
+        }));
         let SourcePreparationOutcome::Complete(a_value) = &a else {
             panic!("repository-rule invocation must complete")
         };
