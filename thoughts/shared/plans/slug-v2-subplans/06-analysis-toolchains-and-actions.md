@@ -10561,6 +10561,46 @@ retention/event drift, cap excess or proof waiver. After implementation ACCEPT
 return only to the prepared/evaluation observation frontier. M7 remains partial
 and M7A -> M8 -> M7B remains.
 
+### Loaded-definition proof contract correction REPLAN (2026-08-20)
+
+The proof-correction packet from `2d59ade1` reached `REPLAN` before its one
+correction changed code. Its 7,572-line candidate (`+799/-109` versus
+`0a8e1220`) passes all recorded focused/full loading, core, formatting and diff
+gates, but review correctly rejected the still-coarse three tests.
+
+The correction contract also required an operation mismatch at parent
+`stage: Merge`. Reserved review proved that impossible: epoch construction
+validates demand/result operation before an epoch exists. Two valid epochs can
+retain an equal left Arc or produce a same-demand value conflict during parent
+merge, but cannot produce operation mismatch. A real child conflict or
+operation-mismatch frontier error instead reaches the existing pure finisher's
+child-outer arm and is correctly carrierless at `stage: Bzl` with completed
+request context. Relabeling it or injecting malformed state would change
+accepted semantics or add a forbidden hook.
+
+Activate only
+`WP-6-7A-loaded-module-extension-definitions-observation-proof-correction-implementation-retry-2`.
+Freeze every production line, including the accepted driver, finisher, keys,
+carriers, errors, retention and events. Replace only test/tracker code within
+the existing three-test/four-helper boundary. Require equal valid duplicate ->
+left Arc; valid same-demand conflict -> exact Merge outer; real child conflict
+or operation mismatch -> exact Bzl outer. Do not claim Merge-stage operation
+mismatch.
+
+All other proof obligations remain: exact Complete/Need/outer identity laws;
+real three-request legacy parity, first/middle/last terminal suppression and
+ordered child events; nonduplicating dependency/rich activation records;
+independent held request/Bzl/export A -> B -> A; parent poll-drop/recovery; and
+production-slice plus all-key upper/legacy nonactivation. Reuse lower recursive
+Host-Bzl proof only for lower behavior.
+
+Final caps remain <=`+1,099/-327` versus `0a8e1220` and <=7,654 physical, with
+the shared driver at 130 and zero production lines touched. Write only
+`app/slug_loading_v2/src/bzl_module.rs`. STOP any production edit, second file/
+key/owner, fake key/hook/malformed epoch, parent batch, upper activation, proof
+waiver, M8/M7B or exact identity work. After ACCEPT return only to the docs-only
+prepared/evaluation frontier. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
