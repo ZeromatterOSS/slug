@@ -19,6 +19,8 @@ use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinition;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionError;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionErrorDisposition;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionKey;
+use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionObservationError;
+use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionObservationKey;
 use slug_bzlmod_v2::HostRepositoryLocalPathPolicy;
 use slug_bzlmod_v2::HostRootRepositoryMapping;
 use slug_bzlmod_v2::HostRootRepositoryMappingError;
@@ -34,6 +36,7 @@ use slug_loading_v2::HostValidatedModuleExtensionRepositoriesKey;
 use slug_loading_v2::HostValidatedModuleExtensionRepositoriesObservationError;
 use slug_loading_v2::HostValidatedModuleExtensionRepositoriesObservationKey;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathObservationEpoch;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -486,6 +489,58 @@ pub(super) struct HostCanonicalRepositoryDefinitionKey {
     canonical_repo: CanonicalRepoName,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct HostCanonicalRepositoryDefinitionObservationKey(HostCanonicalRepositoryDefinitionKey);
+
+impl HostCanonicalRepositoryDefinitionObservationKey {
+    fn new(workspace: NormalizedAbsolutePath, canonical_repo: CanonicalRepoName) -> Self {
+        Self(HostCanonicalRepositoryDefinitionKey::new(
+            workspace,
+            canonical_repo,
+        ))
+    }
+}
+
+impl fmt::Display for HostCanonicalRepositoryDefinitionObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+type CanonicalRepositoryDefinitionResult =
+    Arc<Result<HostCanonicalRepositoryDefinition, HostCanonicalRepositoryDefinitionError>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedHostCanonicalRepositoryDefinition {
+    result: CanonicalRepositoryDefinitionResult,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostCanonicalRepositoryDefinition {
+    fn result(&self) -> &CanonicalRepositoryDefinitionResult {
+        &self.result
+    }
+
+    fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum HostCanonicalRepositoryDefinitionObservationError {
+    Selected(HostCanonicalSelectedModuleDefinitionObservationError),
+    Generated {
+        selected_missing: HostCanonicalSelectedModuleDefinitionError,
+        error: HostGeneratedRepositoryDefinitionObservationError,
+    },
+    Merge {
+        selected_missing: HostCanonicalSelectedModuleDefinitionError,
+        error: ObservedPathFrontierError,
+    },
+}
+
+impl Dupe for HostCanonicalRepositoryDefinitionObservationError {}
+
 impl HostCanonicalRepositoryDefinitionKey {
     pub(super) fn new(
         workspace: NormalizedAbsolutePath,
@@ -508,10 +563,87 @@ impl fmt::Display for HostCanonicalRepositoryDefinitionKey {
     }
 }
 
-fn complete_canonical(
+fn complete_canonical_driver(
     value: Result<HostCanonicalRepositoryDefinition, HostCanonicalRepositoryDefinitionError>,
-) -> HostCanonicalRepositoryDefinitionOutcome {
-    SourcePreparationOutcome::Complete(Arc::new(value))
+    observations: PathObservationEpoch,
+) -> CanonicalRepositoryDefinitionDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(value), observations)))
+}
+
+fn merge_canonical_observations(
+    selected: &PathObservationEpoch,
+    generated: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    PathObservationEpoch::from_shared(
+        selected
+            .observations()
+            .iter()
+            .chain(generated.observations().iter())
+            .map(|(demand, result)| (demand.dupe(), result.dupe())),
+    )
+    .map_err(ObservedPathFrontierError::from)
+}
+
+#[derive(Clone, Copy)]
+enum CanonicalRepositoryDefinitionMode {
+    Legacy,
+    Observed,
+}
+
+type CanonicalRepositoryDefinitionDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (CanonicalRepositoryDefinitionResult, PathObservationEpoch),
+        HostCanonicalRepositoryDefinitionObservationError,
+    >,
+>;
+
+#[rustfmt::skip]
+async fn compute_canonical_repository_definition(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostCanonicalRepositoryDefinitionKey,
+    mode: CanonicalRepositoryDefinitionMode,
+) -> CanonicalRepositoryDefinitionDriverOutcome {
+    let (selected, selected_observations) = match mode {
+        CanonicalRepositoryDefinitionMode::Legacy => match ctx.compute(&HostCanonicalSelectedModuleDefinitionKey::new(key.workspace.clone(), key.canonical_repo.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(result)) => (result, PathObservationEpoch::empty()),
+            Err(error) => return complete_canonical_driver(Err(HostCanonicalRepositoryDefinitionError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::SelectedCompute(error.to_string().into()) }), PathObservationEpoch::empty()),
+        },
+        CanonicalRepositoryDefinitionMode::Observed => match ctx.compute(&HostCanonicalSelectedModuleDefinitionObservationKey::new(key.workspace.clone(), key.canonical_repo.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostCanonicalRepositoryDefinitionObservationError::Selected(error))),
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().clone(), observed.observations().clone()),
+            Err(error) => return complete_canonical_driver(Err(HostCanonicalRepositoryDefinitionError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::SelectedCompute(error.to_string().into()) }), PathObservationEpoch::empty()),
+        },
+    };
+    let selected_missing = match selected.as_ref() {
+        Ok(value) => return complete_canonical_driver(Ok(HostCanonicalRepositoryDefinition { source: HostCanonicalRepositoryDefinitionSource::Selected(value.clone()) }), selected_observations),
+        Err(error) if error.disposition() == HostCanonicalSelectedModuleDefinitionErrorDisposition::Missing => error.clone(),
+        Err(error) => return complete_canonical_driver(Err(HostCanonicalRepositoryDefinitionError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::Selected(error.clone()) }), selected_observations),
+    };
+    let (generated, generated_observations) = match mode {
+        CanonicalRepositoryDefinitionMode::Legacy => match ctx.compute(&HostGeneratedRepositoryDefinitionKey::new(key.workspace.clone(), key.canonical_repo.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(result)) => (result, PathObservationEpoch::empty()),
+            Err(error) => return complete_canonical_driver(Err(HostCanonicalRepositoryDefinitionError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::GeneratedCompute { selected_missing, message: error.to_string().into() } }), selected_observations),
+        },
+        CanonicalRepositoryDefinitionMode::Observed => match ctx.compute(&HostGeneratedRepositoryDefinitionObservationKey::new(key.workspace.clone(), key.canonical_repo.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostCanonicalRepositoryDefinitionObservationError::Generated { selected_missing, error })),
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().clone(), observed.observations().clone()),
+            Err(error) => return complete_canonical_driver(Err(HostCanonicalRepositoryDefinitionError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::GeneratedCompute { selected_missing, message: error.to_string().into() } }), selected_observations),
+        },
+    };
+    let observations = match merge_canonical_observations(&selected_observations, &generated_observations) {
+        Ok(observations) => observations,
+        Err(error) => return SourcePreparationOutcome::Complete(Err(HostCanonicalRepositoryDefinitionObservationError::Merge { selected_missing, error })),
+    };
+    let value = match generated.as_ref() {
+        Ok(value) => Ok(HostCanonicalRepositoryDefinition { source: HostCanonicalRepositoryDefinitionSource::Generated(value.clone()) }),
+        Err(error) if matches!(error.kind, HostGeneratedRepositoryDefinitionErrorKind::Missing { .. }) => Err(HostCanonicalRepositoryDefinitionError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::Missing { selected_missing, generated_missing: error.clone() } }),
+        Err(error) => Err(HostCanonicalRepositoryDefinitionError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::Generated { selected_missing, error: error.clone() } }),
+    };
+    complete_canonical_driver(value, observations)
 }
 
 #[async_trait]
@@ -519,86 +651,60 @@ impl Key for HostCanonicalRepositoryDefinitionKey {
     type Value = HostCanonicalRepositoryDefinitionOutcome;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let selected_missing = match ctx
-            .compute(&HostCanonicalSelectedModuleDefinitionKey::new(
-                self.workspace.clone(),
-                self.canonical_repo.clone(),
-            ))
-            .await
+        match compute_canonical_repository_definition(
+            ctx,
+            self,
+            CanonicalRepositoryDefinitionMode::Legacy,
+        )
+        .await
         {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                debug_assert!(observations.observations().is_empty());
+                SourcePreparationOutcome::Complete(result)
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(value) => {
-                    return complete_canonical(Ok(HostCanonicalRepositoryDefinition {
-                        source: HostCanonicalRepositoryDefinitionSource::Selected(value.clone()),
-                    }));
-                }
-                Err(error)
-                    if error.disposition()
-                        == HostCanonicalSelectedModuleDefinitionErrorDisposition::Missing =>
-                {
-                    error.clone()
-                }
-                Err(error) => {
-                    return complete_canonical(Err(HostCanonicalRepositoryDefinitionError {
-                        canonical_repo: self.canonical_repo.clone(),
-                        kind: HostCanonicalRepositoryDefinitionErrorKind::Selected(error.clone()),
-                    }));
-                }
-            },
-            Err(error) => {
-                return complete_canonical(Err(HostCanonicalRepositoryDefinitionError {
-                    canonical_repo: self.canonical_repo.clone(),
-                    kind: HostCanonicalRepositoryDefinitionErrorKind::SelectedCompute(
-                        error.to_string().into(),
-                    ),
-                }));
+            SourcePreparationOutcome::Complete(Err(_)) => {
+                unreachable!("legacy canonical definition has no observed outer")
             }
-        };
+        }
+    }
 
-        match ctx
-            .compute(&HostGeneratedRepositoryDefinitionKey::new(
-                self.workspace.clone(),
-                self.canonical_repo.clone(),
-            ))
-            .await
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostCanonicalRepositoryDefinitionObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostCanonicalRepositoryDefinition,
+            HostCanonicalRepositoryDefinitionObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match compute_canonical_repository_definition(
+            ctx,
+            &self.0,
+            CanonicalRepositoryDefinitionMode::Observed,
+        )
+        .await
         {
-            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(value) => complete_canonical(Ok(HostCanonicalRepositoryDefinition {
-                    source: HostCanonicalRepositoryDefinitionSource::Generated(value.clone()),
-                })),
-                Err(error)
-                    if matches!(
-                        error.kind,
-                        HostGeneratedRepositoryDefinitionErrorKind::Missing { .. }
-                    ) =>
-                {
-                    complete_canonical(Err(HostCanonicalRepositoryDefinitionError {
-                        canonical_repo: self.canonical_repo.clone(),
-                        kind: HostCanonicalRepositoryDefinitionErrorKind::Missing {
-                            selected_missing,
-                            generated_missing: error.clone(),
-                        },
-                    }))
-                }
-                Err(error) => complete_canonical(Err(HostCanonicalRepositoryDefinitionError {
-                    canonical_repo: self.canonical_repo.clone(),
-                    kind: HostCanonicalRepositoryDefinitionErrorKind::Generated {
-                        selected_missing,
-                        error: error.clone(),
-                    },
-                })),
-            },
-            Err(error) => complete_canonical(Err(HostCanonicalRepositoryDefinitionError {
-                canonical_repo: self.canonical_repo.clone(),
-                kind: HostCanonicalRepositoryDefinitionErrorKind::GeneratedCompute {
-                    selected_missing,
-                    message: error.to_string().into(),
-                },
-            })),
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostCanonicalRepositoryDefinition {
+                    result,
+                    observations,
+                }))
+            }
         }
     }
 
@@ -1331,6 +1437,39 @@ ext=module_extension(implementation=impl)
         match value {
             SourcePreparationOutcome::Complete(Ok(value)) => value,
             value => panic!("expected observed generated definition carrier: {value:?}"),
+        }
+    }
+
+    async fn observed_canonical_lookup(
+        dice: &Arc<Dice>,
+        module: &str,
+        extension: &str,
+        extension_present: bool,
+        requested: CanonicalRepoName,
+        tracker: Option<Arc<LookupTracker>>,
+    ) -> <HostCanonicalRepositoryDefinitionObservationKey as Key>::Value {
+        transaction(
+            dice,
+            module,
+            extension,
+            extension_present,
+            tracker.map(|tracker| tracker as Arc<dyn ActivationTracker>),
+        )
+        .await
+        .compute(&HostCanonicalRepositoryDefinitionObservationKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            requested,
+        ))
+        .await
+        .unwrap()
+    }
+
+    fn observed_canonical_carrier(
+        value: &<HostCanonicalRepositoryDefinitionObservationKey as Key>::Value,
+    ) -> &ObservedHostCanonicalRepositoryDefinition {
+        match value {
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+            value => panic!("expected observed canonical definition carrier: {value:?}"),
         }
     }
 
@@ -2791,6 +2930,293 @@ second=module_extension(implementation=second_impl)
         assert!(!producer.contains("RootModuleBootstrap"));
         assert!(!producer.contains("HostCanonicalRepositoryDefinitionKey::new"));
         assert!(!producer.contains("HostCanonicalRepositoryApparentMappingKey::new"));
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_canonical_repository_definition_identity_staging_and_terminal_algebra() {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let requested = CanonicalRepoName::new("requested").unwrap();
+        let key = HostCanonicalRepositoryDefinitionObservationKey::new(workspace.clone(), requested.clone());
+        let same = HostCanonicalRepositoryDefinitionObservationKey::new(workspace.clone(), requested.clone());
+        let other = HostCanonicalRepositoryDefinitionObservationKey::new(workspace.clone(), CanonicalRepoName::new("other").unwrap());
+        let hash = |key: &HostCanonicalRepositoryDefinitionObservationKey| { let mut hasher = DefaultHasher::new(); key.hash(&mut hasher); hasher.finish() };
+        assert_eq!(key.to_string(), format!("observed-host-canonical-repository-definition:{workspace}:{requested}"));
+        assert_eq!(key, same); assert_ne!(key, other); assert_eq!(hash(&key), hash(&same)); assert_ne!(hash(&key), hash(&other));
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let root = observed_canonical_lookup(&dice, MODULE, EXTENSION_A, true, CanonicalRepoName::root(), None).await;
+        let root_carrier = observed_canonical_carrier(&root);
+        assert!(matches!(root_carrier.result().as_ref(), Ok(HostCanonicalRepositoryDefinition { source: HostCanonicalRepositoryDefinitionSource::Selected(_) })));
+        assert!(!root_carrier.observations().observations().is_empty());
+        assert!(HostCanonicalRepositoryDefinitionObservationKey::validity(&root));
+        assert!(HostCanonicalRepositoryDefinitionObservationKey::equality(&root, &root));
+
+        let mut prep = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+        let generated_name = names(&validated(&mut prep).await).remove(0);
+        let generated = observed_canonical_lookup(&dice, MODULE, EXTENSION_A, true, generated_name.clone(), None).await;
+        assert!(matches!(observed_canonical_carrier(&generated).result().as_ref(), Ok(HostCanonicalRepositoryDefinition { source: HostCanonicalRepositoryDefinitionSource::Generated(_) })));
+        let missing_name = CanonicalRepoName::new("missing").unwrap();
+        let missing = observed_canonical_lookup(&dice, MODULE, EXTENSION_A, true, missing_name.clone(), None).await;
+        assert!(matches!(observed_canonical_carrier(&missing).result().as_ref(), Err(HostCanonicalRepositoryDefinitionError { canonical_repo, kind: HostCanonicalRepositoryDefinitionErrorKind::Missing { selected_missing, generated_missing } }) if canonical_repo == &missing_name && selected_missing.disposition() == HostCanonicalSelectedModuleDefinitionErrorDisposition::Missing && matches!(generated_missing.kind, HostGeneratedRepositoryDefinitionErrorKind::Missing { .. })));
+        let loading = observed_canonical_lookup(&dice, MODULE, EXTENSION_A, false, generated_name, None).await;
+        assert!(matches!(observed_canonical_carrier(&loading).result().as_ref(), Err(HostCanonicalRepositoryDefinitionError { kind: HostCanonicalRepositoryDefinitionErrorKind::Generated { selected_missing, error: HostGeneratedRepositoryDefinitionError { kind: HostGeneratedRepositoryDefinitionErrorKind::Loading(_), .. } }, .. }) if selected_missing.disposition() == HostCanonicalSelectedModuleDefinitionErrorDisposition::Missing));
+        let selected_terminal = observed_canonical_lookup(&dice, "module(name='root')\nbazel_dep(name='missing', version='1')\n", EXTENSION_A, true, CanonicalRepoName::root(), None).await;
+        assert!(matches!(observed_canonical_carrier(&selected_terminal).result().as_ref(), Err(HostCanonicalRepositoryDefinitionError { kind: HostCanonicalRepositoryDefinitionErrorKind::Selected(error), .. }) if error.disposition() == HostCanonicalSelectedModuleDefinitionErrorDisposition::Terminal));
+
+        let mut selected_tx = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+        let selected_key = HostCanonicalSelectedModuleDefinitionObservationKey::new(workspace.clone(), missing_name.clone());
+        let selected_value = selected_tx.compute(&selected_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(selected_carrier)) = &selected_value else { panic!("selected Missing carrier must complete") };
+        let selected_missing = selected_carrier.result().as_ref().as_ref().unwrap_err().clone();
+        let selected_epoch = selected_carrier.observations().clone();
+        assert_eq!(selected_missing.disposition(), HostCanonicalSelectedModuleDefinitionErrorDisposition::Missing);
+
+        let selected_need_tracker = Arc::new(LookupTracker::default());
+        let mut updater = dice.updater_with_data(UserComputationData { cycle_detector: Some(slug_loading_v2::bzl_load_cycle_detector()), activation_tracker: Some(selected_need_tracker.clone()), ..Default::default() });
+        updater.changed_to(vec![(PathObservationEpochKey, PathObservationEpoch::empty())]).unwrap();
+        let selected_need = updater.commit().await.compute(&key).await.unwrap();
+        assert!(matches!(selected_need, SourcePreparationOutcome::Need(_)));
+        assert_eq!(selected_need_tracker.dependencies.lock().unwrap().iter().find(|(name, _)| name == &key.to_string()).unwrap().1, [HostCanonicalSelectedModuleDefinitionObservationKey::new(workspace.clone(), requested.clone()).to_string()]);
+
+        let generated_need_tracker = Arc::new(LookupTracker::default());
+        let mut updater = dice.updater_with_data(UserComputationData { cycle_detector: Some(slug_loading_v2::bzl_load_cycle_detector()), activation_tracker: Some(generated_need_tracker.clone()), ..Default::default() });
+        updater.changed_to(vec![(PathObservationEpochKey, selected_epoch.clone())]).unwrap();
+        let generated_need_key = HostCanonicalRepositoryDefinitionObservationKey::new(workspace.clone(), missing_name.clone());
+        let generated_need = updater.commit().await.compute(&generated_need_key).await.unwrap();
+        assert!(matches!(generated_need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostCanonicalRepositoryDefinitionObservationKey::validity(&generated_need));
+        assert!(!HostCanonicalRepositoryDefinitionObservationKey::equality(&generated_need, &generated_need));
+        assert_eq!(generated_need_tracker.dependencies.lock().unwrap().iter().find(|(name, _)| name == &generated_need_key.to_string()).unwrap().1, [selected_key.to_string(), HostGeneratedRepositoryDefinitionObservationKey::new(workspace.clone(), missing_name.clone()).to_string()]);
+
+        let selected_compute = complete_canonical_driver(Err(HostCanonicalRepositoryDefinitionError { canonical_repo: requested.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::SelectedCompute("selected-dice".into()) }), PathObservationEpoch::empty());
+        assert!(matches!(selected_compute, SourcePreparationOutcome::Complete(Ok((result, observations))) if matches!(result.as_ref(), Err(HostCanonicalRepositoryDefinitionError { canonical_repo, kind: HostCanonicalRepositoryDefinitionErrorKind::SelectedCompute(message) }) if canonical_repo == &requested && message.as_ref() == "selected-dice") && observations.observations().is_empty()));
+        let generated_compute = complete_canonical_driver(Err(HostCanonicalRepositoryDefinitionError { canonical_repo: missing_name.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::GeneratedCompute { selected_missing: selected_missing.clone(), message: "generated-dice".into() } }), selected_epoch.clone());
+        assert!(matches!(generated_compute, SourcePreparationOutcome::Complete(Ok((result, observations))) if matches!(result.as_ref(), Err(HostCanonicalRepositoryDefinitionError { canonical_repo, kind: HostCanonicalRepositoryDefinitionErrorKind::GeneratedCompute { selected_missing: prefix, message } }) if canonical_repo == &missing_name && prefix == &selected_missing && message.as_ref() == "generated-dice") && observations == selected_epoch));
+
+        let demand = PathObservationDemand::new(PathObservationNamespace::Host, NormalizedAbsolutePath::new("/merge").unwrap(), PathObservationOperation::Lstat);
+        let first = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let left = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+        let equal = PathObservationEpoch::from_shared([(demand.dupe(), Arc::new(first.as_ref().clone()))]).unwrap();
+        let merged = merge_canonical_observations(&left, &equal).unwrap();
+        assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first));
+        let conflict = PathObservationEpoch::from_shared([(demand.dupe(), Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(PathNodeKind::RegularFile, 1, 1, 1, 1, 0o644))))) ]).unwrap();
+        assert!(matches!(merge_canonical_observations(&left, &conflict), Err(ObservedPathFrontierError::Epoch(slug_workspace_v2::PathObservationEpochError::ConflictingDemand(found))) if found == demand));
+
+        let source = include_str!("generated_repository_definition.rs");
+        let producer = &source[source.find("type CanonicalRepositoryDefinitionResult").unwrap()..source.find("pub(super) struct HostCanonicalRepositoryApparentMapping").unwrap()];
+        assert_eq!(producer.matches("HostCanonicalSelectedModuleDefinitionObservationKey::new").count(), 1);
+        assert_eq!(producer.matches("HostGeneratedRepositoryDefinitionObservationKey::new").count(), 1);
+        assert!(producer.find("HostCanonicalSelectedModuleDefinitionObservationKey::new").unwrap() < producer.find("HostGeneratedRepositoryDefinitionObservationKey::new").unwrap());
+        assert!(producer.contains("HostCanonicalRepositoryDefinitionObservationError::Selected(error)"));
+        assert!(producer.contains("HostCanonicalRepositoryDefinitionObservationError::Generated { selected_missing, error }"));
+        assert!(producer.contains("HostCanonicalRepositoryDefinitionObservationError::Merge { selected_missing, error }"));
+        assert!(producer.contains("Err(error) => return complete_canonical_driver(Err(HostCanonicalRepositoryDefinitionError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::SelectedCompute"));
+        assert!(producer.contains("Err(error) => return complete_canonical_driver(Err(HostCanonicalRepositoryDefinitionError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryDefinitionErrorKind::GeneratedCompute { selected_missing"));
+        assert!(producer.contains("return SourcePreparationOutcome::Complete(Err(HostCanonicalRepositoryDefinitionObservationError::Selected(error)))"));
+        assert!(producer.contains("return SourcePreparationOutcome::Complete(Err(HostCanonicalRepositoryDefinitionObservationError::Generated { selected_missing, error }))"));
+        assert!(!producer.contains("store_evaluation_data")); assert!(!producer.contains("union_")); assert!(!producer.contains("HostCanonicalRepositoryApparentMappingKey::new"));
+        let selected_source = include_str!("../../../slug_bzlmod_v2/src/selected_repo_spec.rs");
+        let selected_proof = &selected_source[selected_source.find("observed_canonical_selected_definition_identity_scan_and_terminal_algebra").unwrap()..selected_source.find("observed_canonical_selected_definition_real_order_events_and_parity").unwrap()];
+        assert!(selected_proof.contains("PathObservationEpochError::OperationMismatch"));
+        assert!(selected_proof.contains("RepoSpecChild::Outer(HostSelectedModuleRoutesObservationError::Graph"));
+        assert!(selected_proof.contains("observed route outer must remain carrierless"));
+        let pure_source = include_str!("../../../slug_loading_v2/src/module_extension.rs");
+        let pure_proof = &pure_source[pure_source.find("observed_pure_identity_finisher_and_prefix_algebra").unwrap()..];
+        assert!(pure_proof.contains("PathObservationEpochError::OperationMismatch"));
+        assert!(pure_proof.contains("assert_observed_pure_outer_stages(&prepared, lower_error, merge_error)"));
+        let instantiation_source = include_str!("../../../slug_loading_v2/src/module_extension_repository_instantiation.rs");
+        let validation_source = include_str!("../../../slug_loading_v2/src/module_extension_repository_validation.rs");
+        assert!(instantiation_source.contains("Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(InstantiatedModuleExtensionRepositoriesObservationError::Pure(error)))"));
+        assert!(validation_source.contains("Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(ValidatedModuleExtensionRepositoriesObservationError::Instantiation(error)))"));
+        assert!(source.contains("Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostGeneratedRepositoryDefinitionObservationError::Validation(error)))"));
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_canonical_repository_definition_real_order_events_and_parity() {
+        let extension = r#"print('load')
+repo=repository_rule(implementation=lambda ctx: None)
+def first_impl(ctx):
+    print('invoke-first')
+    repo(name='first')
+def second_impl(ctx):
+    print('invoke-second')
+    repo(name='second')
+first=module_extension(implementation=first_impl)
+second=module_extension(implementation=second_impl)
+"#;
+        let module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, second='second')\n";
+        let prep = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut prep_tx = transaction(&prep, module, extension, true, None).await;
+        let generated = names(&validated(&mut prep_tx).await).remove(0);
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let selected_failure = "module(name='root')\nbazel_dep(name='missing', version='1')\n";
+        let empty: &[&str] = &[];
+        let generated_prints = ["load", "invoke-first", "invoke-second"];
+        for (case, case_module, case_extension, present, requested, generated_stage, expected_prints) in [
+            ("selected-success", MODULE, EXTENSION_A, true, CanonicalRepoName::root(), false, empty),
+            ("selected-failure", selected_failure, EXTENSION_A, true, CanonicalRepoName::root(), false, empty),
+            ("generated-success", module, extension, true, generated.clone(), true, generated_prints.as_slice()),
+            ("generated-failure", module, extension, false, generated.clone(), true, empty),
+            ("generated-missing", module, extension, true, CanonicalRepoName::new("missing").unwrap(), true, generated_prints.as_slice()),
+        ] {
+            let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let tracker = Arc::new(LookupTracker::default());
+            let mut tx = transaction(&dice, case_module, case_extension, present, Some(tracker.clone())).await;
+            let key = HostCanonicalRepositoryDefinitionObservationKey::new(workspace.clone(), requested.clone());
+            let observed = tx.compute(&key).await.unwrap();
+            let carrier = observed_canonical_carrier(&observed);
+            match case {
+                "selected-success" => assert!(matches!(carrier.result().as_ref(), Ok(HostCanonicalRepositoryDefinition { source: HostCanonicalRepositoryDefinitionSource::Selected(_) }))),
+                "selected-failure" => assert!(matches!(carrier.result().as_ref(), Err(HostCanonicalRepositoryDefinitionError { kind: HostCanonicalRepositoryDefinitionErrorKind::Selected(_), .. }))),
+                "generated-success" => assert!(matches!(carrier.result().as_ref(), Ok(HostCanonicalRepositoryDefinition { source: HostCanonicalRepositoryDefinitionSource::Generated(_) }))),
+                "generated-failure" => assert!(matches!(carrier.result().as_ref(), Err(HostCanonicalRepositoryDefinitionError { kind: HostCanonicalRepositoryDefinitionErrorKind::Generated { .. }, .. }))),
+                "generated-missing" => assert!(matches!(carrier.result().as_ref(), Err(HostCanonicalRepositoryDefinitionError { kind: HostCanonicalRepositoryDefinitionErrorKind::Missing { selected_missing, generated_missing }, .. }) if selected_missing.disposition() == HostCanonicalSelectedModuleDefinitionErrorDisposition::Missing && matches!(generated_missing.kind, HostGeneratedRepositoryDefinitionErrorKind::Missing { .. }))),
+                _ => unreachable!(),
+            }
+            let mut expected_children = vec![HostCanonicalSelectedModuleDefinitionObservationKey::new(workspace.clone(), requested.clone()).to_string()];
+            if generated_stage { expected_children.push(HostGeneratedRepositoryDefinitionObservationKey::new(workspace.clone(), requested.clone()).to_string()); }
+            assert_eq!(tracker.dependencies.lock().unwrap().iter().find(|(name, _)| name == &key.to_string()).unwrap().1, expected_children);
+            let activations = tracker.activations.lock().unwrap();
+            let parent = activations.iter().find(|(name, _, _)| name == &key.to_string()).unwrap();
+            assert_eq!(parent.1, ActivationKind::Evaluated); assert!(parent.2.is_none());
+            for child in &expected_children { assert!(activations.iter().any(|(name, _, batch)| name == child && batch.is_none()), "{case}: {child}"); }
+            let prints = activations.iter().filter_map(|(_, _, batch)| batch.as_ref()).flat_map(EventBatch::events).filter_map(|event| match event { EvaluationEvent::StarlarkPrint { text, .. } => Some(text.as_str()), _ => None }).collect::<Vec<_>>();
+            assert_eq!(prints, expected_prints, "{case}: {activations:#?}");
+            drop(activations);
+            let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let mut legacy_tx = transaction(&legacy_dice, case_module, case_extension, present, None).await;
+            let SourcePreparationOutcome::Complete(legacy) = legacy_tx.compute(&HostCanonicalRepositoryDefinitionKey::new(workspace.clone(), requested)).await.unwrap() else { panic!("{case}: legacy must complete") };
+            assert_eq!(legacy.as_ref(), carrier.result().as_ref(), "{case}");
+            tracker.activations.lock().unwrap().clear();
+            let warm = tx.compute(&key).await.unwrap();
+            assert!(HostCanonicalRepositoryDefinitionObservationKey::equality(&observed, &warm));
+            assert!(Arc::ptr_eq(carrier.result(), observed_canonical_carrier(&warm).result()));
+            let warm_activations = tracker.activations.lock().unwrap();
+            assert!(warm_activations.iter().any(|(name, kind, batch)| name == &key.to_string() && *kind == ActivationKind::Reused && batch.is_none()));
+            assert!(warm_activations.iter().all(|(_, _, batch)| batch.is_none()));
+            drop(warm_activations);
+            for forbidden in ["host-canonical-selected-module-definition:", "host-generated-repository-definition:", "host-canonical-repository-definition:", "host-canonical-repository-apparent-mapping:", "host-root-repository-mapping:", "host-root-apparent-repository-definition:", "root-repository-route:", "repository-package-source:", "repository-source-file:", "host-repository-source-file:", "build-command-root:"] {
+                assert!(tracker.activations.lock().unwrap().iter().all(|(name, _, _)| !name.starts_with(forbidden)), "{case}: {forbidden}");
+                assert!(tracker.dependencies.lock().unwrap().iter().all(|(name, children)| !name.starts_with(forbidden) && children.iter().all(|child| !child.starts_with(forbidden))), "{case}: {forbidden}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    #[rustfmt::skip]
+    async fn observed_canonical_repository_definition_lifecycle_cancellation_and_nonactivation() {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let prep = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut prep_tx = transaction(&prep, MODULE, EXTENSION_A, true, None).await;
+        let generated = names(&validated(&mut prep_tx).await).remove(0);
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let selected_tracker = Arc::new(LookupTracker::default());
+        let selected_parent_key = HostCanonicalRepositoryDefinitionObservationKey::new(workspace.clone(), CanonicalRepoName::root());
+        let selected_child_key = HostCanonicalSelectedModuleDefinitionObservationKey::new(workspace.clone(), CanonicalRepoName::root());
+        let selected_b = MODULE.replacen("bazel_tools", "root", 1);
+        let mut selected_held = Vec::new();
+        for module in [MODULE, selected_b.as_str(), MODULE] {
+            let mut tx = transaction(&dice, module, EXTENSION_A, true, Some(selected_tracker.clone())).await;
+            let global = tx.compute(&PathObservationEpochKey).await.unwrap();
+            let parent = observed_canonical_carrier(&tx.compute(&selected_parent_key).await.unwrap()).clone();
+            let child_value = tx.compute(&selected_child_key).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(child)) = child_value else { panic!("selected child must complete") };
+            assert_eq!(parent.observations(), child.observations());
+            for carrier_epoch in [parent.observations(), child.observations()] {
+                for (demand, result) in carrier_epoch.observations() { assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref()); }
+            }
+            selected_held.push((parent, child));
+        }
+        assert_ne!(selected_held[0].0.result(), selected_held[1].0.result());
+        assert_eq!(selected_held[0].0.result(), selected_held[2].0.result());
+        assert_ne!(selected_held[0].1.result(), selected_held[1].1.result());
+        assert_eq!(selected_held[0].1.result(), selected_held[2].1.result());
+
+        let generated_tracker = Arc::new(LookupTracker::default());
+        let generated_parent_key = HostCanonicalRepositoryDefinitionObservationKey::new(workspace.clone(), generated.clone());
+        let generated_child_key = HostGeneratedRepositoryDefinitionObservationKey::new(workspace.clone(), generated.clone());
+        let same_semantic = format!("{MODULE}\n");
+        let mut generated_held = Vec::new();
+        for (module, extension) in [(MODULE, EXTENSION_A), (MODULE, EXTENSION_B), (MODULE, EXTENSION_A), (same_semantic.as_str(), EXTENSION_A)] {
+            let mut tx = transaction(&dice, module, extension, true, Some(generated_tracker.clone())).await;
+            let global = tx.compute(&PathObservationEpochKey).await.unwrap();
+            let parent = observed_canonical_carrier(&tx.compute(&generated_parent_key).await.unwrap()).clone();
+            let child_value = tx.compute(&generated_child_key).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(child)) = child_value else { panic!("generated child must complete") };
+            for carrier_epoch in [parent.observations(), child.observations()] {
+                for (demand, result) in carrier_epoch.observations() { assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref()); }
+            }
+            generated_held.push((parent, child));
+        }
+        assert_ne!(generated_held[0].0.result(), generated_held[1].0.result());
+        assert_eq!(generated_held[0].0.result(), generated_held[2].0.result());
+        assert_ne!(generated_held[0].1.result(), generated_held[1].1.result());
+        assert_eq!(generated_held[0].1.result(), generated_held[2].1.result());
+        assert_eq!(generated_held[0].0.result(), generated_held[3].0.result());
+        assert_ne!(generated_held[0].0.observations(), generated_held[3].0.observations());
+        assert_eq!(generated_held[0].1.result(), generated_held[3].1.result());
+        assert_ne!(generated_held[0].1.observations(), generated_held[3].1.observations());
+
+        let selected_failure = "module(name='root')\nbazel_dep(name='missing', version='1')\n";
+        let mut trackers = vec![selected_tracker, generated_tracker];
+        for (case, module, requested, generated_stage) in [
+            ("selected-terminal", selected_failure, CanonicalRepoName::root(), false),
+            ("missing-fallback", MODULE, CanonicalRepoName::new("missing").unwrap(), true),
+        ] {
+            let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let tracker = Arc::new(LookupTracker::default());
+            let mut cancelled = transaction(&cancel_dice, module, EXTENSION_A, true, Some(tracker.clone())).await;
+            let key = HostCanonicalRepositoryDefinitionObservationKey::new(workspace.clone(), requested.clone());
+            let mut future = Box::pin(cancelled.compute(&key));
+            std::future::poll_fn(|context| { assert!(std::future::Future::poll(future.as_mut(), context).is_pending()); std::task::Poll::Ready(()) }).await;
+            drop(future); drop(cancelled);
+            assert!(tracker.activations.lock().unwrap().iter().all(|(name, _, _)| name != &key.to_string()));
+            assert!(tracker.dependencies.lock().unwrap().iter().all(|(name, _)| name != &key.to_string()));
+
+            let mut recovery = transaction(&cancel_dice, module, EXTENSION_A, true, Some(tracker.clone())).await;
+            let global = recovery.compute(&PathObservationEpochKey).await.unwrap();
+            let recovered_value = recovery.compute(&key).await.unwrap();
+            let recovered = observed_canonical_carrier(&recovered_value);
+            match case {
+                "selected-terminal" => assert!(matches!(recovered.result().as_ref(), Err(HostCanonicalRepositoryDefinitionError { kind: HostCanonicalRepositoryDefinitionErrorKind::Selected(_), .. }))),
+                "missing-fallback" => assert!(matches!(recovered.result().as_ref(), Err(HostCanonicalRepositoryDefinitionError { kind: HostCanonicalRepositoryDefinitionErrorKind::Missing { .. }, .. }))),
+                _ => unreachable!(),
+            }
+            for (demand, result) in recovered.observations().observations() { assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref()); }
+            let clean_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let clean = observed_canonical_lookup(&clean_dice, module, EXTENSION_A, true, requested.clone(), None).await;
+            assert_eq!(recovered.result(), observed_canonical_carrier(&clean).result(), "{case}");
+            let mut expected_children = vec![HostCanonicalSelectedModuleDefinitionObservationKey::new(workspace.clone(), requested.clone()).to_string()];
+            if generated_stage { expected_children.push(HostGeneratedRepositoryDefinitionObservationKey::new(workspace.clone(), requested).to_string()); }
+            assert_eq!(tracker.dependencies.lock().unwrap().iter().find(|(name, _)| name == &key.to_string()).unwrap().1, expected_children);
+            let activations = tracker.activations.lock().unwrap();
+            assert!(activations.iter().any(|(name, kind, batch)| name == &key.to_string() && *kind == ActivationKind::Evaluated && batch.is_none()));
+            for child in &expected_children { assert!(activations.iter().any(|(name, _, batch)| name == child && batch.is_none()), "{case}: {child}"); }
+            drop(activations);
+            trackers.push(tracker);
+        }
+
+        for tracker in trackers {
+            let activations = tracker.activations.lock().unwrap();
+            let dependencies = tracker.dependencies.lock().unwrap();
+            for family in ["host-canonical-selected-module-definition:", "host-generated-repository-definition:", "host-canonical-repository-definition:"] {
+                assert!(activations.iter().all(|(name, _, _)| !name.starts_with(family)));
+                assert!(dependencies.iter().all(|(name, children)| !name.starts_with(family) && children.iter().all(|child| !child.starts_with(family))));
+            }
+            for upper in ["host-canonical-repository-apparent-mapping:", "host-root-repository-mapping:", "host-root-apparent-repository-definition:", "HostRootApparentRepositoryRouteKey", "HostRootApparentRepositorySourceInputKey", "HostRootApparentRepositorySourceObservationKey", "HostRootApparentRepositorySourcePathInputKey", "root-repository-route:", "repository-package-source:", "repository-source-file:", "host-repository-source-file:", "build-command-root:"] {
+                assert!(activations.iter().all(|(name, _, _)| !name.contains(upper)));
+                assert!(dependencies.iter().all(|(name, children)| !name.contains(upper) && children.iter().all(|child| !child.contains(upper))));
+            }
+        }
+        let source = include_str!("generated_repository_definition.rs");
+        let producer = &source[source.find("type CanonicalRepositoryDefinitionResult").unwrap()..source.find("pub(super) struct HostCanonicalRepositoryApparentMapping").unwrap()];
+        assert!(!producer.contains("HostCanonicalRepositoryDefinitionKey::new"));
+        assert!(!producer.contains("HostCanonicalRepositoryApparentMappingKey::new"));
+        assert!(!producer.contains("HostRootRepositoryMappingKey"));
+        assert!(!producer.contains("RootModuleBootstrap"));
+        assert!(!producer.contains("CaptureEvaluationEvents"));
     }
 
     #[tokio::test]
