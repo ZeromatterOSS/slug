@@ -10679,6 +10679,34 @@ activation, M8/M7B or exact identity work. After ACCEPT schedule only the final
 lifecycle/cancellation proof repair. M7 remains partial and M7A -> M8 -> M7B
 remains.
 
+### Loaded-definition lower command-policy proof REPLAN (2026-08-20)
+
+The split real-order/event packet from `ab4db01f` reached a real three-root
+fresh evaluation, then stopped on its blanket ban of any key Display containing
+`command`. That ban is inexact: `BzlmodCommandPolicyKey` and
+`RootModuleCommandPolicyKey` are required lower semantic inputs beneath the
+observed request owner. Production and the independent identity/lifecycle tests
+remain frozen; the 7,753-line test draft is retained.
+
+Activate only
+`WP-6-7A-loaded-module-extension-definitions-real-order-event-proof-repair-retry`.
+Replace substring vocabulary with exact family predicates. Tag
+`BzlmodCommandPolicyKey` and `BzlmodEnvironmentPolicyKey` by tracker-side
+`DynKey` downcast because their Display is only the serialized policy value.
+Allow those tags plus exact `root-module-command-policy:*`,
+`root-module-environment-policy:*`, `root-module-lockfile-mode:*` and
+`visible-lockfile:*` lower prefixes where reached. Exclude exact reverse legacy
+request/Bzl/loaded families and the named prepared/pure/instantiated/validated/
+root-mapping/canonical-selected/generated upper families plus `slug-command:*`.
+
+All three-request parity, nine positional terminal, decisive-prefix/order/
+suppression and exact fresh/warm/reused/failure event obligations remain
+unchanged. Final caps remain <=`+1,250/-250` versus `0a8e1220` and <=8,000
+physical. STOP production/identity/lifecycle edits, broad substring filters,
+upper activation, tracker conflation, cap waiver, M8/M7B or exact identity
+work. After ACCEPT schedule only the lifecycle/cancellation proof repair. M7
+remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
