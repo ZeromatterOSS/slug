@@ -13904,6 +13904,112 @@ identity work. REPLAN before widening or hash drift. ACCEPT returns only to
 docs-only source-input observation-owner design. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Root source-input observation-owner design selected (2026-08-21)
+
+Accepted `b61f8f1a` promotes the observed root-route key/carrier/borrowed
+Result-Arc+epoch accessors and opaque outer without a caller. Source input can
+now name the entire associated Value while the route Definition terminal stays
+hidden. No smaller visibility or evidence prerequisite remains.
+
+Live `root_apparent_repository_source_input.rs` has exactly one child: legacy
+route imported at line 24 and computed at line 186. Its exact order is Need;
+route compute error -> semantic Compute; completed route error -> Route;
+successful route without a source or valid association -> InvalidRoute; one
+`host_repository_source_input` projection -> Projection or Main/Input success.
+Every completed terminal with a route retains its exact Result Arc. There is no
+second child or merge.
+
+The legacy source-input key has exactly one production consumer: source-path
+input at lines 27/234. Source path has one source-observation consumer at its
+line 234, and source observation has zero production callers. Public command
+analysis uses the parallel Bzlmod route branch at `dice.rs:4476-4494`; root
+bootstrap remains dormant. Keep every upper/parallel branch inactive.
+
+Choose exactly
+`WP-6-7A-host-root-apparent-repository-source-input-observation-owner-design`,
+with one future implementation in source input only. Add private
+`HostRootApparentRepositorySourceInputObservationKey`,
+`ObservedHostRootApparentRepositorySourceInput` retaining only the source-input
+Result Arc plus `PathObservationEpoch`, and typed
+`HostRootApparentRepositorySourceInputObservationError::Route(
+HostRootApparentRepositoryRouteObservationError)`. Use matching derives/Dupe,
+private fields and borrowed result/observations accessors. Display is
+`observed-{legacy Display}`; `/workspace`, `@first` renders exactly
+`observed-HostRootApparentRepositorySourceInputKey { workspace: NormalizedAbsolutePath { path: "/workspace" }, apparent_repo: ApparentRepoName("first") }`.
+
+Factor only existing computation into private
+`RootApparentRepositorySourceInputMode::{Legacy, Observed}`, shared
+`compute_root_apparent_repository_source_input` and exactly one pure
+`finish_root_apparent_repository_source_input`.
+Legacy requests legacy route and supplies empty epoch. Observed requests the
+observed route: Need is immediate, opaque child outer maps to carrierless Route
+outer, success supplies the original route Result Arc and cloned epoch, and a
+DICE error stays semantic Compute with empty epoch. Then run the exact existing
+projection once. Every success/semantic terminal forwards the child epoch
+unchanged. Add no prefix union, epoch rebuild, join, fallback, Merge or
+OperationMismatch.
+
+Source input is eventless. The observed route owns all lower event batches and
+order; parent event rows equal direct-child rows and every warm activation is
+batchless. Dependency rows are exactly legacy parent -> legacy route and
+observed parent -> observed route. Retain only the source-input Result Arc and
+compact epoch; child carrier/mode/source scratch dies before publication. Add
+no cache/store/interner/task/lock. Poll-drop publishes no parent activation,
+edge, carrier or event and recovery remains lawful.
+
+Add exactly
+`observed_root_apparent_repository_source_input_identity_finisher_and_terminal_algebra`,
+`observed_root_apparent_repository_source_input_real_families_events_and_parity`
+and
+`observed_root_apparent_repository_source_input_lifecycle_cancellation_and_nonactivation`.
+They prove exact key/Display/Need/child edge/terminal/Arc/epoch algebra; lawful
+Generated, SelectedNonregistry workspace/command, mapping/missing, Main and
+Builtin legacy Result parity/lower events/warm replay; held parent/route-child
+mapping/definition/policy A-B-A, neutral same-Result/different-epoch,
+transaction-local child=parent subset associations, cancellation/recovery and
+upper nonactivation. `InvalidRoute` is defensive pure algebra for lawful route
+inputs. Reuse accepted route selected-registry static/pure evidence and
+`host_repository_source_input` policy tests; forbid private mirror or opaque-
+outer injection.
+
+Preserve the route-surface sibling smoke byte-for-byte. Extend only shared
+tracker/helpers and update existing production-edge proof to require one legacy
+route request, one observed route request, one pure projection and no other
+predecessor; retain all legacy assertions.
+
+Future authority is exactly source input baseline 856 physical/cfg(test) line
+271, SHA-256
+`940bcf9fe00782fba10dff5c1084525675a3b47c0471a1b15a18408f5c5249f2`.
+Caps are <=240 production, <=620 proof, <=860 aggregate additions and <=1,750
+physical; at most six production/eight test helpers, exactly three tests,
+driver below 150 and every helper/test below 200. The one file remains cohesive
+below the 2,000-line trigger and is not a demonstrated hot path.
+
+Validate the exact three tests, protected legacy source-input and accepted
+route-observation suites/smoke, full core, direct commands check, formatting,
+exact one-file allowlist/SHA/accounting/physical/helper/test/driver/source-
+shape and diff hygiene serially. Reuse accepted Bazel 9.2
+`BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
+`BazelDepGraphValue.getRepositoryMapping`, source-capability tests and original
+owner `e4292de7`; Buck2 DICE lifecycle is concept/test evidence. Add no oracle.
+
+Source-input projection/order/errors/identity/policy/invalidation/lower events
+remain exact. The private Result-Arc+transaction-local epoch carrier/outer is
+Slug-native. Source-path/source observation/public command/bootstrap and exact
+identity bytes remain deferred.
+
+STOP second file/key/child/owner/adapter, visibility/export/caller, source-path
+or upper activation, semantic/projection/policy/order/error/event/equality/
+retention drift, epoch merge/rebuild, parent OperationMismatch, retained child/
+scratch/task/lock, private/malformed injection, fixture/oracle, cap/helper/test/
+format waiver, Cargo/BUILD, milestone closure, M8/M7B or exact identity work.
+REPLAN before widening or hash drift. On design ACCEPT schedule only
+`WP-6-7A-host-root-apparent-repository-source-input-observation-implementation`,
+then audit carrier visibility/source-path handoff. M7 remains partial and
+M7A -> M8 -> M7B remains. Documentation
+authority is <=40 canonical, <=180 current, <=220 Stage, <=30 routing and <=470
+aggregate additions.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
