@@ -11252,6 +11252,79 @@ oracle, cap/proof waiver, milestone closure, M8/M7B or exact identity work.
 REPLAN if a bounded opaque crate-internal surface cannot type-check. M7 remains
 partial and M7A -> M8 -> M7B remains.
 
+### Prepared-input carrier visibility design (2026-08-20)
+
+The bounded design from base `1e20b072` activates only
+`WP-6-7A-host-prepared-module-extension-inputs-observation-carrier-visibility-implementation`
+over unchanged Rust base `682c4a1e`.
+
+Promote exactly the existing
+`HostPreparedModuleExtensionInputsObservationKey`, its `new` constructor,
+`ObservedHostPreparedModuleExtensionInputs`, and its `result()` and
+`observations()` accessors to `pub(crate)`. Spell `result()` as the concrete
+`&Arc<Result<HostPreparedModuleExtensionInputs,
+HostPreparedModuleExtensionInputsError>>`; do not expose the private result
+alias. Keep both carrier fields private.
+
+Add exactly one `pub(crate)` field-private nominal
+`HostPreparedModuleExtensionInputsObservationError` newtype around the private
+`PreparedModuleExtensionInputsObservationError`, with matching Debug/Clone/
+PartialEq/Eq/Allocative/Dupe derives. The wrapper is required: retaining the
+private enum in the associated `Key::Value` would violate effective visibility,
+while promoting that enum would make all Raw/Definitions/Merge variants
+crate-visible. Use the wrapper only in the observation key's associated Value
+and construct it only at the key's `Complete(Err(error))` projection. Keep the
+driver, finishers, private enum/variants and all tests that inspect them
+unchanged. Add no unwrapping method or public field.
+
+The sole proof is one test named
+`prepared_observation_surface_is_sibling_module_usable` in the existing
+`module_extension.rs` test module. Import exactly the promoted key, carrier and
+opaque error from `crate::bzl_module`; construct only the key for `/workspace`
+and assert
+`observed-host-prepared-module-extension-inputs:"/workspace"`. One nested
+`inspect` function must accept a borrowed `<Key as Key>::Value`, carrier and
+opaque error; its function-pointer cast spells the associated outcome as
+`SourcePreparationOutcome<Result<ObservedHostPreparedModuleExtensionInputs,
+HostPreparedModuleExtensionInputsObservationError>>`. Inside, type-check
+`result()` as the concrete borrowed prepared Result Arc and `observations()` as
+`&PathObservationEpoch`. Do not construct an outcome/carrier/error, compute the
+key, inspect the wrapper or activate pure. Same-module tests alone cannot prove
+the sibling visibility boundary.
+
+Implementation authority is exactly production
+`app/slug_loading_v2/src/bzl_module.rs`, baseline 9,108 physical with its
+owning test module at 5,750, and test-only
+`app/slug_loading_v2/src/module_extension.rs`, baseline 1,592 with support at
+767 and its owning test module at 869. Caps are <=40 production, <=45 proof,
+<=85 aggregate semantic and <=9,150/1,640 physical. Add only the one wrapper,
+one sibling test and one nested compile helper; keep every changed helper/test
+below 70 lines. The large producer file remains cohesive because only its
+existing owner's visibility and key projection change; the consumer module is
+proof-only.
+
+Preserve key identity/Display, Complete-only equality/validity, Need/outer
+carrierlessness, exact semantic Result Arc, transaction-local epoch,
+child-owned events, warm/cancellation behavior and compact DICE retention.
+There is no new dependency, semantic value, request projection, publication,
+cache, task, lock or lifetime. No fallback is introduced.
+
+Reuse accepted prepared and Bazel 9.2 loading evidence; add no oracle. Validate
+the exact sibling test, protected `observed_prepared_`, full
+`cargo test -p slug_loading_v2`, direct `cargo check -p slug_core_v2`,
+formatting and diff hygiene serially. Existing prepared/pure values, errors,
+order and events remain exact. Crate-internal carrier/opaque-outer visibility
+and Result-Arc/epoch association are Slug-native. Pure and upper activation and
+exact Bazel identity bytes remain unsupported/deferred.
+
+Implementation ACCEPT returns only to a docs-only pure-invocation owner design.
+STOP semantic/equality/event/retention drift, public/lib export, private alias/
+field/variant exposure, outer unwrapping, second type/key/carrier/adapter,
+production `module_extension.rs` change, caller/compute activation, third file,
+fixture/oracle work, proof/cap waiver, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`

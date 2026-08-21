@@ -1,119 +1,153 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-prepared-module-extension-inputs-observation-carrier-visibility-design`
+Packet: `WP-6-7A-host-prepared-module-extension-inputs-observation-carrier-visibility-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Audit and Rust base: `682c4a1e`
+Scheduling/design base: `1e20b072`
+Rust base: `682c4a1e`
 
 ## Goal and authority
 
-Design only the minimum crate-internal visibility surface by which the sibling
-`module_extension.rs` owner can later consume the accepted callerless prepared-
-input observation. Freeze exact nominal types, effective visibility, borrowed
-accessors, opaque outer handling, compile proof, future implementation
-authority/caps and nonactivation. Do not edit Rust or activate pure invocation.
+Expose only the accepted prepared-input observation surface to its future
+sibling pure-invocation owner. Add one opaque crate-internal outer wrapper and
+one compile-discriminating sibling test. Do not compute the observed key from
+pure, change semantics or activate any caller.
 
-Design write authority is exactly the canonical plan, this manifest, Stage 6
-and the routing log. Net caps are <=40/<=180/<=220/<=30 respectively and <=470
-aggregate. Rust, tests, fixtures, oracles, Cargo/BUILD, APIs, exports, callers
-and other plans are read-only. The design may authorize at most one bounded
-visibility-only implementation successor.
+Rust authority is exactly production
+`app/slug_loading_v2/src/bzl_module.rs`, baseline 9,108 physical lines with its
+owning test module at 5,750, and test-only
+`app/slug_loading_v2/src/module_extension.rs`, baseline 1,592 with test support
+at 767 and its owning test module at 869. Caps are <=40 production, <=45 proof,
+<=85 aggregate semantic and <=9,150/1,640 physical. Add only one nominal
+wrapper, one sibling test and one nested compile helper; keep every changed
+helper/test below 70 lines. Every other Rust file, test, fixture, oracle,
+Cargo/BUILD target, API, export, caller and plan is read-only.
 
-## Learned live frontier
+The large producer remains cohesive because this packet changes only the
+visibility and outer projection of an existing DICE owner. The sibling consumer
+module is proof-only. Splitting or reexporting the surface would widen rather
+than simplify the ownership boundary.
 
-`bzl_module.rs` is 9,108 physical lines with the owning test module at 5,750.
-The accepted `HostPreparedModuleExtensionInputsObservationKey`,
-`ObservedHostPreparedModuleExtensionInputs`, their private constructor and
-borrowed Result/epoch accessors, and
-`PreparedModuleExtensionInputsObservationError` occupy lines 3048-3409. They
-are private to `bzl_module`, so sibling `module_extension` cannot name the key,
-carrier or associated `Key::Value` outer.
+## Frozen crate-internal surface
 
-`module_extension.rs` is 1,592 physical lines with test-only support at 767
-and the owning test module at 869. `HostPureModuleExtensionInvocationsKey` and its legacy driver are at
-98-211. Its compute at line 158 is the sole production consumer of
-`HostPreparedModuleExtensionInputsKey`; there is no production compute of the
-observed sibling. Pure's other mutable child needs no promotion:
-`ObservedHostBzlModule`, `HostBzlModuleObservationKey`, constructor and borrowed
-accessors are already `pub(crate)` at `bzl_module.rs:1303-1344`, with the key
-implementation at 2318-2363.
+In `bzl_module.rs`, change exactly these existing items to `pub(crate)`:
 
-The exact production chain above pure is serial: instantiation alone computes
-pure at `module_extension_repository_instantiation.rs:191`; validation alone
-computes instantiation at `module_extension_repository_validation.rs:208`;
-generated repository definition alone computes validation in production at
-`slug_core_v2/src/runtime/generated_repository_definition.rs:168`. The
-validation crate-root export is a later publication boundary. Root repository
-mapping independently computes selected extension mappings at
-`selected_repo_spec.rs:4467`; canonical selected-module definition is the
-parallel publication branch. These are not visibility or evidence
-prerequisites for pure.
+- `HostPreparedModuleExtensionInputsObservationKey` and only its `new`
+  constructor;
+- `ObservedHostPreparedModuleExtensionInputs`; and
+- only its borrowed `result()` and `observations()` accessors.
 
-## Required design decision
+Keep the key tuple field and both carrier fields private. Spell `result()` as:
 
-Specify exactly one one-way `bzl_module` -> `module_extension` surface around
-the existing observation key and carrier. Decide the narrow effective
-visibility of the key, its constructor, the carrier and its borrowed
-`result()`/`observations()` accessors. Inspect Rust `Key::Value` privacy and
-choose exactly one opaque nominal outer technique: promote a safe existing
-name only if that does not reveal Raw/Definitions/Merge internals, otherwise
-wrap the existing private outer only at the observed key projection. The
-future pure owner may carry that outer but must not inspect its private stages.
+```rust
+pub(crate) fn result(
+    &self,
+) -> &Arc<
+    Result<HostPreparedModuleExtensionInputs, HostPreparedModuleExtensionInputsError>,
+>
+```
 
-Preserve the exact key identity and Display, Complete-only equality/validity,
-Need and outer carrierlessness, semantic Result Arc, transaction-local epoch,
-child-owned events, warm silence, cancellation behavior and compact retention.
-No new semantic fact or DICE dependency is introduced. Add no adapter key,
-second carrier, result alias exposure, public field, outer inspector, crate-root
-reexport, external API, reverse module edge, semantic caller, event batch,
-cache, interner, task or lock.
+Keep `observations()` exactly
+`pub(crate) fn observations(&self) -> &PathObservationEpoch`. Do not expose or
+rename `PreparedModuleExtensionInputsResult`.
 
-Freeze a compile-discriminating sibling-module proof. It may type-check key
-construction, Display, the associated outcome, borrowed carrier accessors and
-opaque error handling from `module_extension` tests, but must not compute the
-key, construct carrier/error internals, inspect stages or activate pure. State
-why same-module proof alone does not discriminate the visibility seam.
+Add exactly this nominal shape beside the existing private outer enum:
 
-## Future implementation bounds
+```rust
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct HostPreparedModuleExtensionInputsObservationError(
+    PreparedModuleExtensionInputsObservationError,
+);
+```
 
-Future Rust authority may include only
-`app/slug_loading_v2/src/bzl_module.rs` and test-only additions in
-`app/slug_loading_v2/src/module_extension.rs`. Starting physical baselines are
-9,108 and 1,592. Hard ceilings are <=80 production, <=80 proof, <=160 aggregate
-semantic and <=9,190/1,675 physical. Add at most two direct helpers and keep
-every changed helper/test below 100 lines. A one-file production change plus
-one sibling compile smoke is preferred; the design must justify anything
-within these ceilings and REPLAN before adding a third file.
+The tuple field remains private and there is no constructor, accessor,
+conversion, Display/Error implementation or unwrapper. A wrapper is required:
+the private enum cannot remain in the associated Value of a crate-visible type,
+and promoting the enum would reveal its Raw/Definitions/Merge variants.
+
+Change only the observation key's associated `Key::Value` error to
+`HostPreparedModuleExtensionInputsObservationError`. At its existing
+`SourcePreparationOutcome::Complete(Err(error))` arm, construct the wrapper and
+return `Complete(Err(HostPreparedModuleExtensionInputsObservationError(error)))`.
+The private shared driver and finishers continue to use and inspect only
+`PreparedModuleExtensionInputsObservationError`. Need and success projection,
+legacy projection, key equality/validity and existing same-module proof remain
+unchanged.
+
+Add no crate-root/lib reexport, external visibility, adapter key, result alias,
+public field, stage inspector, reverse dependency, semantic caller or second
+carrier/error type.
+
+## Exact sibling compile proof
+
+In the existing `module_extension.rs` `tests` module, import exactly the key,
+carrier and opaque error from `crate::bzl_module`. Add one test named
+`prepared_observation_surface_is_sibling_module_usable`.
+
+Construct only the key with `NormalizedAbsolutePath::new("/workspace")` and
+assert exact Display:
+
+```text
+observed-host-prepared-module-extension-inputs:"/workspace"
+```
+
+Define one nested `inspect` function taking, in order:
+
+1. `&<HostPreparedModuleExtensionInputsObservationKey as Key>::Value`;
+2. `&ObservedHostPreparedModuleExtensionInputs`; and
+3. `&HostPreparedModuleExtensionInputsObservationError`.
+
+Inside it, type-check `observed.result()` as exactly
+`&Arc<Result<HostPreparedModuleExtensionInputs,
+HostPreparedModuleExtensionInputsError>>` and `observed.observations()` as
+exactly `&PathObservationEpoch`. Cast the function item to a function pointer
+whose first parameter spells the concrete
+`&SourcePreparationOutcome<Result<ObservedHostPreparedModuleExtensionInputs,
+HostPreparedModuleExtensionInputsObservationError>>`; retain the two carrier/
+error parameters. This proves the associated Value and all names are usable
+from the sibling module.
+
+Do not construct an outcome, carrier or error; compute either prepared key;
+inspect or unwrap the error; add a synthetic hook; or activate pure. Existing
+same-module tests cannot replace this proof because they can already reach
+private items.
+
+## Invariants and validation
+
+Preserve exact key hash/identity/Display, Complete-only equality/validity,
+carrierless Need/typed outer behavior, semantic Result Arc, transaction-local
+epoch, raw-first child order, left-first merge, child-owned event batches, warm
+silence, cancellation recovery and compact retention. The wrapper changes only
+the observed key's outer projection; it owns no semantic fact, dependency,
+request input, event, memory, cache, task or lock. Add no fallback.
 
 Reuse accepted prepared identity/finisher/order/event/lifecycle/cancellation/
-nonactivation proof and Bazel 9.2 loading evidence; add no oracle. A future
-implementation must run its sibling visibility smoke, protected
-`observed_prepared_` tests, full `cargo test -p slug_loading_v2`, direct
-`cargo check -p slug_core_v2`, `cargo fmt --all -- --check` and
-`git diff --check` serially. The design itself runs only source/coherence and
-diff checks.
+nonactivation proof and Bazel 9.2 loading evidence; add no oracle. Run serially:
 
-## Compatibility, lifecycle and terminal
+- `cargo test -p slug_loading_v2 prepared_observation_surface_is_sibling_module_usable`;
+- protected `cargo test -p slug_loading_v2 observed_prepared_`;
+- full `cargo test -p slug_loading_v2`;
+- direct dependent `cargo check -p slug_core_v2`;
+- `cargo fmt --all -- --check`; and
+- `git diff --check`.
 
 Existing prepared and pure values, errors, dependency order and child event
 behavior remain exact Bazel 9 compatibility. The crate-internal key/carrier/
 opaque-outer visibility and Result-Arc/epoch association are Slug-native. Pure,
 instantiated, validated, generated/public/root-mapping/bootstrap activation and
-exact Bazel configuration/output/ActionKey bytes are unsupported/deferred in
-this packet.
+exact Bazel configuration/output/ActionKey bytes remain unsupported/deferred.
 
-Implementation ACCEPT after this design returns only to a docs-only pure-
-invocation owner design. STOP Rust edits now; semantic/equality/event/retention
-drift; public or crate-root export; private stage exposure; second key/carrier/
-adapter/owner; pure or upper activation; fixture/oracle work; proof/cap waiver;
-milestone closure; M8/M7B; or exact identity work. REPLAN if Rust effective
-visibility requires an unbounded API, semantic owner or third file. M7 remains
-partial and M7A -> M8 -> M7B remains.
+Implementation ACCEPT returns only to a docs-only pure-invocation owner design.
+STOP semantic/equality/event/retention drift, public/lib export, private alias/
+field/variant exposure, outer unwrapping, second type/key/carrier/adapter,
+production `module_extension.rs` change, caller/compute activation, third file,
+fixture/oracle work, proof/cap waiver, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening. M7 remains partial and
+M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Implementation `682c4a1e`, from design base `3738b2b4`, accepts the private
-prepared Result-Arc plus compact observation epoch with raw-first children,
-left-first merge, unchanged preparation semantics, child-only events and exact
-upper nonactivation. This audit selects only the smaller sibling visibility
-seam before pure ownership.
+Audit/design `1e20b072` proves pure is the sole production consumer of prepared
+inputs, the observed prepared surface is its only visibility blocker, the
+Host-Bzl observed child is already crate-visible, and every instantiated,
+validated, generated/public or root-mapping owner is later or parallel.
