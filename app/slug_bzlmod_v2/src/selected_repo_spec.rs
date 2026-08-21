@@ -4633,11 +4633,12 @@ type RootRepositoryMappingResult =
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 #[allow(dead_code)]
-struct HostRootRepositoryMappingObservationKey(HostRootRepositoryMappingKey);
+#[doc(hidden)]
+pub struct HostRootRepositoryMappingObservationKey(HostRootRepositoryMappingKey);
 
 #[allow(dead_code)]
 impl HostRootRepositoryMappingObservationKey {
-    fn new(workspace: NormalizedAbsolutePath) -> Self {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
         Self(HostRootRepositoryMappingKey::new(workspace))
     }
 }
@@ -4650,31 +4651,38 @@ impl fmt::Display for HostRootRepositoryMappingObservationKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 #[allow(dead_code)]
-struct ObservedHostRootRepositoryMapping {
+#[doc(hidden)]
+pub struct ObservedHostRootRepositoryMapping {
     result: RootRepositoryMappingResult,
     observations: PathObservationEpoch,
 }
 
 #[allow(dead_code)]
 impl ObservedHostRootRepositoryMapping {
-    fn result(&self) -> &RootRepositoryMappingResult {
+    pub fn result(
+        &self,
+    ) -> &Arc<Result<HostRootRepositoryMapping, HostRootRepositoryMappingError>> {
         &self.result
     }
 
-    fn observations(&self) -> &PathObservationEpoch {
+    pub fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-enum HostRootRepositoryMappingObservationError {
+enum RootRepositoryMappingObservationError {
     Mappings(ExtensionMappingsObservationError),
 }
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct HostRootRepositoryMappingObservationError(RootRepositoryMappingObservationError);
 
 type RootRepositoryMappingDriverOutcome = SourcePreparationOutcome<
     Result<
         (RootRepositoryMappingResult, PathObservationEpoch),
-        HostRootRepositoryMappingObservationError,
+        RootRepositoryMappingObservationError,
     >,
 >;
 
@@ -4747,7 +4755,7 @@ fn finish_root_repository_mapping(
         RepoSpecChild::Need(need) => return SourcePreparationOutcome::Need(need),
         RepoSpecChild::Outer(error) => {
             return SourcePreparationOutcome::Complete(Err(
-                HostRootRepositoryMappingObservationError::Mappings(error),
+                RootRepositoryMappingObservationError::Mappings(error),
             ));
         }
         RepoSpecChild::Complete {
@@ -4838,9 +4846,9 @@ impl Key for HostRootRepositoryMappingObservationKey {
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
         match drive_root_repository_mapping(ctx, &self.0, RoutesMode::Observed).await {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
-            }
+            SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(
+                Err(HostRootRepositoryMappingObservationError(error)),
+            ),
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
                 SourcePreparationOutcome::Complete(Ok(ObservedHostRootRepositoryMapping {
                     result,
@@ -8576,12 +8584,13 @@ repo(name="replacement")
         assert!(matches!(
             finish_root_repository_mapping(&key.0, RepoSpecChild::Outer(mismatch())),
             SourcePreparationOutcome::Complete(Err(
-                HostRootRepositoryMappingObservationError::Mappings(_)
+                RootRepositoryMappingObservationError::Mappings(_)
             ))
         ));
-        let outer = SourcePreparationOutcome::Complete(Err(
-            HostRootRepositoryMappingObservationError::Mappings(mismatch()),
-        ));
+        let outer =
+            SourcePreparationOutcome::Complete(Err(HostRootRepositoryMappingObservationError(
+                RootRepositoryMappingObservationError::Mappings(mismatch()),
+            )));
         assert!(HostRootRepositoryMappingObservationKey::validity(&outer));
         assert!(HostRootRepositoryMappingObservationKey::equality(
             &outer, &outer
@@ -9008,8 +9017,31 @@ repo(name="replacement")
         };
         assert_eq!(recovered.result(), &legacy);
 
+        let lib = include_str!("lib.rs");
+        let reexports = [
+            "#[doc(hidden)]\npub use selected_repo_spec::HostRootRepositoryMappingObservationError;",
+            "#[doc(hidden)]\npub use selected_repo_spec::HostRootRepositoryMappingObservationKey;",
+            "#[doc(hidden)]\npub use selected_repo_spec::ObservedHostRootRepositoryMapping;",
+        ];
+        for reexport in reexports {
+            assert_eq!(lib.matches(reexport).count(), 1);
+        }
+        let root_mapping_observation_reexports: Vec<_> = lib
+            .lines()
+            .filter(|line| {
+                line.contains("HostRootRepositoryMappingObservation")
+                    || line.contains("ObservedHostRootRepositoryMapping")
+            })
+            .collect();
+        assert_eq!(
+            root_mapping_observation_reexports,
+            [
+                "pub use selected_repo_spec::HostRootRepositoryMappingObservationError;",
+                "pub use selected_repo_spec::HostRootRepositoryMappingObservationKey;",
+                "pub use selected_repo_spec::ObservedHostRootRepositoryMapping;",
+            ]
+        );
         for source in [
-            include_str!("lib.rs"),
             include_str!("../../slug_loading_v2/src/bzl_module.rs"),
             include_str!("../../slug_core_v2/src/runtime/generated_repository_definition.rs"),
             include_str!("../../slug_core_v2/src/runtime/root_apparent_repository_definition.rs"),

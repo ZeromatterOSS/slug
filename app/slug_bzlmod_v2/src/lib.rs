@@ -312,6 +312,15 @@ pub use selected_repo_spec::HostRootRepositoryMappingKey;
 pub use selected_repo_spec::HostRootRepositoryMappingOutcome;
 #[doc(hidden)]
 pub use selected_repo_spec::HostRootRepositoryMappingView;
+#[rustfmt::skip]
+#[doc(hidden)]
+pub use selected_repo_spec::HostRootRepositoryMappingObservationError;
+#[rustfmt::skip]
+#[doc(hidden)]
+pub use selected_repo_spec::HostRootRepositoryMappingObservationKey;
+#[rustfmt::skip]
+#[doc(hidden)]
+pub use selected_repo_spec::ObservedHostRootRepositoryMapping;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionImport;
 #[doc(hidden)]
