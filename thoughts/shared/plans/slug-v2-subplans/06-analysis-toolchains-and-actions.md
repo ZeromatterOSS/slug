@@ -13442,6 +13442,99 @@ identity work. REPLAN before widening or hash drift. ACCEPT returns only to
 root apparent-definition observation-owner design. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Root apparent-definition observation-owner design accepted (2026-08-21)
+
+Accepted `08524062` exposes both lower observation surfaces to the root-
+definition sibling. Schedule exactly
+`WP-6-7A-host-root-apparent-repository-definition-observation-implementation`
+without route or caller activation.
+
+Authority is only core `root_apparent_repository_definition.rs`, baseline
+1,079 physical/tests 372 and SHA-256
+`58759d7662285abf8b3debce6f0a2f64649e5c7218faf097ade1eee7e2658715`.
+Every other Rust/API/export/caller/fixture/oracle file is read-only.
+
+Add one private observation key nominally wrapping the legacy key, preserving
+two-argument Option construction/root-name rejection and exact `observed-`
+Display. Add one private local Result-Arc+epoch carrier and private typed outer
+with exactly Mapping(lower apparent outer), Definition { mapping, lower
+canonical outer } and Merge { mapping, frontier error }.
+
+One `RootApparentRepositoryDefinitionMode::{Legacy, Observed}` driver owns the
+exact order. Apparent mapping for root context always runs first. Need and
+Mapping outer are carrierless; mapping DICE failure stays local MappingCompute.
+A completed mapping semantic error retains its mapping epoch. Successful main
+and `bazel_tools` targets return MainDeferred/BuiltinDeferred with mapping epoch
+and never request definition.
+
+Only another target computes canonical definition second. Definition Need is
+carrierless. Definition outer retains the successful mapping value but no
+carrier. Definition DICE failure stays local DefinitionCompute with mapping
+prefix. Complete definition merges mapping-left then definition-right before
+semantic interpretation. Equal duplicates preserve mapping/left Arc; a valid
+same-demand differing-result conflict becomes typed Merge. Parent Merge cannot
+manufacture OperationMismatch; only lower typed outers carry lower mismatch.
+
+After merge, existing Missing/Definition/ContextMismatch/success projection
+retains the full epoch and exact values/errors/views. Legacy delegates to the
+same driver, proves empty observations and returns its existing outcome.
+Observed success wraps local Result+epoch; equality/validity remain complete_eq
+and is_complete.
+
+The parent is eventless. Lower mapping then conditional definition retain exact
+batch ownership/order; short-circuit rows contain no definition batch, and all
+warm rows are batchless. The carrier retains only local Result Arc+epoch.
+Child carriers/Arcs, target/view, merge/event scratch remain compute-local; add
+no store/cache/interner/task/lock or command borrow. Cancellation publishes no
+parent activation/dependency and same-DICE recovery remains lawful.
+
+Add exactly
+`observed_root_apparent_repository_definition_identity_staging_and_terminal_algebra`,
+`observed_root_apparent_repository_definition_real_order_events_and_parity`
+and
+`observed_root_apparent_repository_definition_lifecycle_cancellation_and_nonactivation`.
+They prove identity/root rejection/Display/accessors/equality/validity; exact
+dependency order/short circuit/terminal prefixes/left-Arc conflict merge.
+ContextMismatch appears only in synthetic identity/finisher algebra using
+lawful real child values paired under a mismatched synthetic context; lawful
+keyed parent children always match and no real-parent row may claim it. The
+real matrix covers selected registry/nonregistry/generated/Missing, mapping
+failure, MainDeferred and BuiltinDeferred with legacy parity and lower event
+vectors; every warm row is batchless; held parent/two-child A-B-A,
+semantic-neutral equal Result/different
+epoch, child subsets of parent and parent subset of transaction global, Arc
+identity only on Reused, poll-drop recovery and legacy/upper nonactivation.
+
+Reuse accepted lower opaque-outer/mismatch proof and Bazel 9.2
+`BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
+`BazelDepGraphValue.getRepositoryMapping` and `BazelDepGraphFunctionTest`.
+Use bounded source/dependency evidence where lower opaque variants cannot be
+constructed. Add no private/malformed hook or oracle.
+
+Caps are <=300 production, <=720 proof, <=1,020 aggregate and <=2,100 physical;
+at most six production/seven test helpers, exactly three tests, driver below
+180 and every helper/test below 200. The file is cohesive because it already
+owns legacy value/error/views, both-child composition, trackers and fixtures.
+No hot-path or retained-representation change applies.
+
+Validate the three exact tests, protected legacy root-definition and both lower
+observation suites/smokes, full core, direct commands check, formatting, exact
+one-file allowlist/SHA/caps/helper/test-size/source-shape and diff hygiene
+serially.
+
+Root-definition values/order/errors/views/equality/invalidation/lower events
+remain exact. The private carrier/typed outer and transaction-local epoch are
+Slug-native. Visibility/caller, route/source/public/command/bootstrap
+observation and exact identity bytes remain deferred.
+
+STOP second file/key/owner/adapter, visibility/export/caller, route/source
+compute, semantic/order/error/event/equality/retention drift, third child/
+parallel join, parent OperationMismatch, malformed injection, retained child/
+scratch/task/lock, fixture/oracle, cap/helper/test/format waiver, milestone
+closure, M8/M7B or exact identity work. REPLAN before widening or hash drift.
+ACCEPT returns only to root-definition carrier visibility/consumer audit. M7
+remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier formatter REPLAN (2026-08-21)
 
 The proof-corrected semantic draft is retained, but
