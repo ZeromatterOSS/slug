@@ -3045,11 +3045,13 @@ type HostPreparedModuleExtensionInputsOutcome = SourcePreparationOutcome<
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 #[allow(dead_code)] // Private observed sibling; a later packet owns consumer activation.
-struct HostPreparedModuleExtensionInputsObservationKey(HostPreparedModuleExtensionInputsKey);
+pub(crate) struct HostPreparedModuleExtensionInputsObservationKey(
+    HostPreparedModuleExtensionInputsKey,
+);
 
 #[allow(dead_code)]
 impl HostPreparedModuleExtensionInputsObservationKey {
-    fn new(workspace: NormalizedAbsolutePath) -> Self {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
         Self(HostPreparedModuleExtensionInputsKey::new(workspace))
     }
 }
@@ -3062,18 +3064,21 @@ impl fmt::Display for HostPreparedModuleExtensionInputsObservationKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 #[allow(dead_code)] // Retained only by the callerless observed sibling.
-struct ObservedHostPreparedModuleExtensionInputs {
+pub(crate) struct ObservedHostPreparedModuleExtensionInputs {
     result: PreparedModuleExtensionInputsResult,
     observations: PathObservationEpoch,
 }
 
 #[allow(dead_code)]
 impl ObservedHostPreparedModuleExtensionInputs {
-    fn result(&self) -> &PreparedModuleExtensionInputsResult {
+    pub(crate) fn result(
+        &self,
+    ) -> &Arc<Result<HostPreparedModuleExtensionInputs, HostPreparedModuleExtensionInputsError>>
+    {
         &self.result
     }
 
-    fn observations(&self) -> &PathObservationEpoch {
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
 }
@@ -3090,6 +3095,11 @@ enum PreparedModuleExtensionInputsObservationError {
         error: ObservedPathFrontierError,
     },
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct HostPreparedModuleExtensionInputsObservationError(
+    PreparedModuleExtensionInputsObservationError,
+);
 
 type PreparedModuleExtensionInputsResult =
     Arc<Result<HostPreparedModuleExtensionInputs, HostPreparedModuleExtensionInputsError>>;
@@ -3380,7 +3390,7 @@ impl Key for HostPreparedModuleExtensionInputsObservationKey {
     type Value = SourcePreparationOutcome<
         Result<
             ObservedHostPreparedModuleExtensionInputs,
-            PreparedModuleExtensionInputsObservationError,
+            HostPreparedModuleExtensionInputsObservationError,
         >,
     >;
 
@@ -3393,9 +3403,9 @@ impl Key for HostPreparedModuleExtensionInputsObservationKey {
         .await
         {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
-            }
+            SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(
+                Err(HostPreparedModuleExtensionInputsObservationError(error)),
+            ),
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
                 SourcePreparationOutcome::Complete(Ok(ObservedHostPreparedModuleExtensionInputs {
                     result,
@@ -6827,7 +6837,9 @@ mod module_extension_definition_loading_tests {
         .unwrap_err();
         let outer: <HostPreparedModuleExtensionInputsObservationKey as Key>::Value = match &merge {
             SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error.dupe()))
+                SourcePreparationOutcome::Complete(Err(
+                    HostPreparedModuleExtensionInputsObservationError(error.dupe()),
+                ))
             }
             _ => panic!("prepared merge must be a typed outer"),
         };

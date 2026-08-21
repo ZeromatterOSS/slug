@@ -903,6 +903,43 @@ mod tests {
     use starlark_map::sorted_map::SortedMap;
 
     use super::*;
+    use crate::bzl_module::HostPreparedModuleExtensionInputsObservationError;
+    use crate::bzl_module::HostPreparedModuleExtensionInputsObservationKey;
+    use crate::bzl_module::ObservedHostPreparedModuleExtensionInputs;
+
+    #[test]
+    fn prepared_observation_surface_is_sibling_module_usable() {
+        let key = HostPreparedModuleExtensionInputsObservationKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+        );
+        assert_eq!(
+            key.to_string(),
+            "observed-host-prepared-module-extension-inputs:\"/workspace\""
+        );
+
+        fn inspect(
+            _value: &<HostPreparedModuleExtensionInputsObservationKey as Key>::Value,
+            observed: &ObservedHostPreparedModuleExtensionInputs,
+            _error: &HostPreparedModuleExtensionInputsObservationError,
+        ) {
+            let _: &Arc<
+                Result<HostPreparedModuleExtensionInputs, HostPreparedModuleExtensionInputsError>,
+            > = observed.result();
+            let _: &PathObservationEpoch = observed.observations();
+        }
+
+        let _ = inspect
+            as fn(
+                &SourcePreparationOutcome<
+                    Result<
+                        ObservedHostPreparedModuleExtensionInputs,
+                        HostPreparedModuleExtensionInputsObservationError,
+                    >,
+                >,
+                &ObservedHostPreparedModuleExtensionInputs,
+                &HostPreparedModuleExtensionInputsObservationError,
+            );
+    }
 
     fn empty_module(owner: &Arc<()>) -> InvocationModule {
         InvocationModule {
