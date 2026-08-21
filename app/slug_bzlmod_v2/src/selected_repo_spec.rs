@@ -4557,16 +4557,8 @@ enum RootMappingInvalid {
 fn root_mapping_ordinal(
     mappings: &HostSelectedExtensionMappings,
 ) -> Result<usize, RootMappingInvalid> {
-    let (mut root, mut conflicting) = (None, None);
-    for (ordinal, route) in mappings.routes.entries.iter().enumerate() {
-        if matches!(route.entry.key, HostGraphModuleKey::Root) {
-            if root.is_none() {
-                root = Some(ordinal);
-            } else if conflicting.is_none() {
-                conflicting = Some(ordinal);
-            }
-        }
-    }
+    let (root, conflicting) =
+        root_mapping_ordinals(mappings.routes.entries.iter().map(|route| &route.entry.key));
     let root = root.ok_or(RootMappingInvalid::Missing)?;
     if let Some(conflicting) = conflicting {
         return Err(RootMappingInvalid::Duplicate {
@@ -4580,6 +4572,22 @@ fn root_mapping_ordinal(
         .filter(|mapping| mapping.context_repo == CanonicalRepoName::root())
         .map(|_| root)
         .ok_or(RootMappingInvalid::Context { ordinal: root })
+}
+
+fn root_mapping_ordinals<'a>(
+    keys: impl Iterator<Item = &'a HostGraphModuleKey>,
+) -> (Option<usize>, Option<usize>) {
+    let (mut root, mut conflicting) = (None, None);
+    for (ordinal, key) in keys.enumerate() {
+        if matches!(key, HostGraphModuleKey::Root) {
+            if root.is_none() {
+                root = Some(ordinal);
+            } else if conflicting.is_none() {
+                conflicting = Some(ordinal);
+            }
+        }
+    }
+    (root, conflicting)
 }
 
 #[doc(hidden)]
@@ -4620,50 +4628,226 @@ impl fmt::Display for HostRootRepositoryMappingKey {
     }
 }
 
+type RootRepositoryMappingResult =
+    Arc<Result<HostRootRepositoryMapping, HostRootRepositoryMappingError>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)]
+struct HostRootRepositoryMappingObservationKey(HostRootRepositoryMappingKey);
+
+#[allow(dead_code)]
+impl HostRootRepositoryMappingObservationKey {
+    fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self(HostRootRepositoryMappingKey::new(workspace))
+    }
+}
+
+impl fmt::Display for HostRootRepositoryMappingObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+#[allow(dead_code)]
+struct ObservedHostRootRepositoryMapping {
+    result: RootRepositoryMappingResult,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)]
+impl ObservedHostRootRepositoryMapping {
+    fn result(&self) -> &RootRepositoryMappingResult {
+        &self.result
+    }
+
+    fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+enum HostRootRepositoryMappingObservationError {
+    Mappings(ExtensionMappingsObservationError),
+}
+
+type RootRepositoryMappingDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (RootRepositoryMappingResult, PathObservationEpoch),
+        HostRootRepositoryMappingObservationError,
+    >,
+>;
+
+fn root_mapping_complete(
+    key: &HostRootRepositoryMappingKey,
+    result: Result<HostRootRepositoryMapping, PrivateRootRepositoryMappingError>,
+    observations: PathObservationEpoch,
+) -> RootRepositoryMappingDriverOutcome {
+    let result = result.map_err(|inner| HostRootRepositoryMappingError {
+        workspace: key.workspace.dupe(),
+        inner,
+    });
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+async fn root_repository_mapping_mappings_child(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    mode: RoutesMode,
+) -> RepoSpecChild<
+    HostSelectedExtensionMappings,
+    HostSelectedExtensionMappingsError,
+    ExtensionMappingsObservationError,
+> {
+    match mode {
+        RoutesMode::Legacy => match ctx
+            .compute(&HostSelectedExtensionMappingsKey::new(workspace.dupe()))
+            .await
+        {
+            Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+            Ok(SourcePreparationOutcome::Need(need)) => RepoSpecChild::Need(need),
+            Ok(SourcePreparationOutcome::Complete(result)) => RepoSpecChild::Complete {
+                result,
+                observations: PathObservationEpoch::empty(),
+            },
+        },
+        RoutesMode::Observed => match ctx
+            .compute(&HostSelectedExtensionMappingsObservationKey::new(
+                workspace.dupe(),
+            ))
+            .await
+        {
+            Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+            Ok(SourcePreparationOutcome::Need(need)) => RepoSpecChild::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => RepoSpecChild::Outer(error),
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => RepoSpecChild::Complete {
+                result: observed.result().dupe(),
+                observations: observed.observations().dupe(),
+            },
+        },
+    }
+}
+
+fn finish_root_repository_mapping(
+    key: &HostRootRepositoryMappingKey,
+    child: RepoSpecChild<
+        HostSelectedExtensionMappings,
+        HostSelectedExtensionMappingsError,
+        ExtensionMappingsObservationError,
+    >,
+) -> RootRepositoryMappingDriverOutcome {
+    let (predecessor, observations) = match child {
+        RepoSpecChild::Compute(message) => {
+            return root_mapping_complete(
+                key,
+                Err(PrivateRootRepositoryMappingError::Compute(message)),
+                PathObservationEpoch::empty(),
+            );
+        }
+        RepoSpecChild::Need(need) => return SourcePreparationOutcome::Need(need),
+        RepoSpecChild::Outer(error) => {
+            return SourcePreparationOutcome::Complete(Err(
+                HostRootRepositoryMappingObservationError::Mappings(error),
+            ));
+        }
+        RepoSpecChild::Complete {
+            result,
+            observations,
+        } => (result, observations),
+    };
+    let mappings = match predecessor.as_ref() {
+        Ok(mappings) => mappings,
+        Err(_) => {
+            return root_mapping_complete(
+                key,
+                Err(PrivateRootRepositoryMappingError::Predecessor(predecessor)),
+                observations,
+            );
+        }
+    };
+    match root_mapping_ordinal(mappings) {
+        Ok(root_ordinal) => root_mapping_complete(
+            key,
+            Ok(HostRootRepositoryMapping {
+                predecessor,
+                root_ordinal,
+            }),
+            observations,
+        ),
+        Err(reason) => root_mapping_complete(
+            key,
+            Err(PrivateRootRepositoryMappingError::Invalid {
+                predecessor,
+                reason,
+            }),
+            observations,
+        ),
+    }
+}
+
+async fn drive_root_repository_mapping(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostRootRepositoryMappingKey,
+    mode: RoutesMode,
+) -> RootRepositoryMappingDriverOutcome {
+    finish_root_repository_mapping(
+        key,
+        root_repository_mapping_mappings_child(ctx, &key.workspace, mode).await,
+    )
+}
+
+fn project_legacy_root_repository_mapping(
+    outcome: RootRepositoryMappingDriverOutcome,
+) -> HostRootRepositoryMappingOutcome {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((result, _))) => {
+            SourcePreparationOutcome::Complete(result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy root repository mapping has no observed frontier")
+        }
+    }
+}
+
 #[async_trait]
 impl Key for HostRootRepositoryMappingKey {
     type Value = HostRootRepositoryMappingOutcome;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let terminal = |inner| {
-            SourcePreparationOutcome::Complete(Arc::new(Err(HostRootRepositoryMappingError {
-                workspace: self.workspace.clone(),
-                inner,
-            })))
-        };
-        let predecessor = match ctx
-            .compute(&HostSelectedExtensionMappingsKey::new(
-                self.workspace.clone(),
-            ))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
+        project_legacy_root_repository_mapping(
+            drive_root_repository_mapping(ctx, self, RoutesMode::Legacy).await,
+        )
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostRootRepositoryMappingObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedHostRootRepositoryMapping, HostRootRepositoryMappingObservationError>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match drive_root_repository_mapping(ctx, &self.0, RoutesMode::Observed).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => value,
-            Err(error) => {
-                return terminal(PrivateRootRepositoryMappingError::Compute(
-                    error.to_string().into(),
-                ));
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostRootRepositoryMapping {
+                    result,
+                    observations,
+                }))
             }
-        };
-        if predecessor.as_ref().is_err() {
-            return terminal(PrivateRootRepositoryMappingError::Predecessor(predecessor));
         }
-        let mappings = predecessor.as_ref().as_ref().expect("checked above");
-        let root_ordinal = match root_mapping_ordinal(mappings) {
-            Ok(root) => root,
-            Err(reason) => {
-                return terminal(PrivateRootRepositoryMappingError::Invalid {
-                    predecessor,
-                    reason,
-                });
-            }
-        };
-        SourcePreparationOutcome::Complete(Arc::new(Ok(HostRootRepositoryMapping {
-            predecessor,
-            root_ordinal,
-        })))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -5619,6 +5803,124 @@ mod tests {
             ))
             .await
             .unwrap()
+    }
+
+    fn complete_observed_root_mapping(
+        value: &<HostRootRepositoryMappingObservationKey as Key>::Value,
+    ) -> ObservedHostRootRepositoryMapping {
+        let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+            panic!("observed root mapping must complete: {value:?}");
+        };
+        observed.dupe()
+    }
+
+    fn assert_root_mapping_epoch_subset(
+        observed: &ObservedHostRootRepositoryMapping,
+        global: &PathObservationEpoch,
+    ) {
+        for (demand, result) in observed.observations().observations() {
+            assert_eq!(global.get(demand).unwrap().as_ref(), result.as_ref());
+        }
+    }
+
+    fn assert_no_root_mapping_upper(rows: &[(String, Vec<String>)]) {
+        let forbidden = "host-selected-extension-definition-load-requests: observed-host-selected-extension-definition-load-requests: host-selected-extension-evaluation-inputs: observed-host-selected-extension-evaluation-inputs: host-canonical-selected-module-definition: observed-host-canonical-selected-module-definition: host-generated-repository-definition: observed-host-generated-repository-definition: host-canonical-repository-definition: observed-host-canonical-repository-definition: host-canonical-repository-apparent-mapping: host-root-apparent-repository-definition: host-root-apparent-repository-route: host-root-apparent-repository-source: repository-materialization: repository-source-file: slug-command: slug-bootstrap:";
+        assert!(
+            rows.iter().all(|(owner, deps)| {
+                !forbidden.split(' ').any(|prefix| {
+                    owner.starts_with(prefix) || deps.iter().any(|dep| dep.starts_with(prefix))
+                })
+            }),
+            "unexpected root-mapping upper row: {rows:#?}"
+        );
+    }
+
+    fn root_mapping_source(
+        first: &str,
+        reversed: bool,
+        extension_order: bool,
+        operation_order: bool,
+    ) -> String {
+        let imports = if reversed {
+            format!("second_alias='plain_b', first_alias='{first}'")
+        } else {
+            format!("first_alias='{first}', second_alias='plain_b'")
+        };
+        let extensions = if extension_order {
+            format!(
+                "three=use_extension('//:three.bzl','third')\nuse_repo(three, visible_alias='visible')\np=use_extension('//:ext.bzl','extension')\nuse_repo(p, {imports}, overridden_alias='overridden')"
+            )
+        } else {
+            format!(
+                "p=use_extension('//:ext.bzl','extension')\nuse_repo(p, {imports}, overridden_alias='overridden')\nthree=use_extension('//:three.bzl','third')\nuse_repo(three, visible_alias='visible')"
+            )
+        };
+        let operations = if operation_order {
+            "inject_repo(three, injected='replacement')\noverride_repo(p, overridden='replacement')"
+        } else {
+            "override_repo(p, overridden='replacement')\ninject_repo(three, injected='replacement')"
+        };
+        format!(
+            "module(name='bazel_tools', repo_name='root_self')\n{extensions}\n{operations}\nrepo=use_repo_rule('//:repo.bzl','simple_repo')\nrepo(name='replacement')\n"
+        )
+    }
+
+    async fn observed_root_mapping_state(
+        dice: &Arc<Dice>,
+        root: &str,
+        generation: u64,
+    ) -> (
+        ObservedHostRootRepositoryMapping,
+        HostRootRepositoryMappingOutcome,
+        PathObservationEpoch,
+    ) {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let mut transaction = real_transaction(dice, root, generation, &[], true).await;
+        let observed = transaction
+            .compute(&HostRootRepositoryMappingObservationKey::new(
+                workspace.dupe(),
+            ))
+            .await
+            .unwrap();
+        let observed = complete_observed_root_mapping(&observed);
+        let legacy = transaction
+            .compute(&HostRootRepositoryMappingKey::new(workspace))
+            .await
+            .unwrap();
+        let global = transaction.compute(&PathObservationEpochKey).await.unwrap();
+        (observed, legacy, global)
+    }
+
+    fn assert_root_mapping_driver_shape() {
+        let source = include_str!("selected_repo_spec.rs");
+        let driver = source
+            .split("async fn drive_root_repository_mapping")
+            .nth(1)
+            .unwrap()
+            .split("fn project_legacy_root_repository_mapping")
+            .next()
+            .unwrap();
+        assert_eq!(
+            driver
+                .matches("root_repository_mapping_mappings_child")
+                .count(),
+            1
+        );
+        assert!(!driver.contains("merge"));
+        let child = source
+            .split("async fn root_repository_mapping_mappings_child")
+            .nth(1)
+            .unwrap()
+            .split("fn finish_root_repository_mapping")
+            .next()
+            .unwrap();
+        assert_eq!(
+            child
+                .matches("HostSelectedExtensionMappingsObservationKey")
+                .count(),
+            1
+        );
+        assert_eq!(child.matches("HostSelectedExtensionMappingsKey").count(), 1);
     }
 
     async fn compute_real_definition_requests(
@@ -8224,6 +8526,502 @@ repo(name="replacement")
                         if predecessor.as_ref().is_err()
                 )
         ));
+    }
+
+    #[tokio::test]
+    async fn observed_root_repository_mapping_identity_scan_and_terminal_algebra() {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostRootRepositoryMappingObservationKey::new(workspace.dupe());
+        let other = HostRootRepositoryMappingObservationKey::new(
+            NormalizedAbsolutePath::new("/other").unwrap(),
+        );
+        let hash = |value: &HostRootRepositoryMappingObservationKey| {
+            let mut state = std::collections::hash_map::DefaultHasher::new();
+            std::hash::Hash::hash(value, &mut state);
+            std::hash::Hasher::finish(&state)
+        };
+        assert_ne!(key, other);
+        assert_ne!(hash(&key), hash(&other));
+        assert_eq!(
+            key.to_string(),
+            "observed-host-root-repository-mapping:\"/selected-repo-spec-test\""
+        );
+        let demand = observation("/root-mapping", PathObservationOperation::Lstat);
+        let first = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let epoch = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+        let computed =
+            finish_root_repository_mapping(&key.0, RepoSpecChild::Compute("dice".into()));
+        assert!(matches!(
+            computed,
+            SourcePreparationOutcome::Complete(Ok((result, observations)))
+                if matches!(result.as_ref(), Err(HostRootRepositoryMappingError {
+                    inner: PrivateRootRepositoryMappingError::Compute(message), ..
+                }) if message == "dice") && observations.observations().is_empty()
+        ));
+        let need = SourcePreparationNeeds::path(
+            slug_workspace_v2::NeedPathObservations::singleton(demand.dupe()),
+        );
+        assert!(matches!(
+            finish_root_repository_mapping(&key.0, RepoSpecChild::Need(need.dupe())),
+            SourcePreparationOutcome::Need(_)
+        ));
+        let mismatch = || {
+            ExtensionMappingsObservationError::RootFiles(ObservedPathFrontierError::from(
+                PathObservationEpochError::OperationMismatch {
+                    demand: demand.dupe(),
+                    result_operation: PathObservationOperation::FileBytes,
+                },
+            ))
+        };
+        assert!(matches!(
+            finish_root_repository_mapping(&key.0, RepoSpecChild::Outer(mismatch())),
+            SourcePreparationOutcome::Complete(Err(
+                HostRootRepositoryMappingObservationError::Mappings(_)
+            ))
+        ));
+        let outer = SourcePreparationOutcome::Complete(Err(
+            HostRootRepositoryMappingObservationError::Mappings(mismatch()),
+        ));
+        assert!(HostRootRepositoryMappingObservationKey::validity(&outer));
+        assert!(HostRootRepositoryMappingObservationKey::equality(
+            &outer, &outer
+        ));
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let SourcePreparationOutcome::Complete(original) =
+            compute_real_extensions(&dice, "module(name='bazel_tools')\n", 1, true).await
+        else {
+            panic!("extension mappings must complete")
+        };
+        let original = original.as_ref().as_ref().unwrap().clone();
+        let keys = [
+            HostGraphModuleKey::Root,
+            route_key("dep", "1"),
+            HostGraphModuleKey::Root,
+            HostGraphModuleKey::Root,
+        ];
+        let consumed = Cell::new(0);
+        assert_eq!(
+            root_mapping_ordinals(keys.iter().inspect(|_| consumed.set(consumed.get() + 1))),
+            (Some(0), Some(2))
+        );
+        assert_eq!(consumed.get(), keys.len());
+        let finish = |result, observations| {
+            finish_root_repository_mapping(
+                &key.0,
+                RepoSpecChild::Complete {
+                    result,
+                    observations,
+                },
+            )
+        };
+        let predecessor_error = Arc::new(Err(extension_invalid(&module(), "predecessor")));
+        assert!(matches!(
+            finish(predecessor_error.dupe(), epoch.dupe()),
+            SourcePreparationOutcome::Complete(Ok((result, observations)))
+                if matches!(result.as_ref(), Err(HostRootRepositoryMappingError {
+                    inner: PrivateRootRepositoryMappingError::Predecessor(predecessor), ..
+                }) if Arc::ptr_eq(predecessor, &predecessor_error))
+                    && Arc::ptr_eq(observations.get(&demand).unwrap(), &first)
+        ));
+        let mut missing = original.clone();
+        missing.routes = Arc::new(HostSelectedModuleRoutes {
+            entries: Arc::from([]),
+        });
+        let missing = Arc::new(Ok(missing));
+        assert!(matches!(
+            finish(missing.dupe(), epoch.dupe()),
+            SourcePreparationOutcome::Complete(Ok((result, observations)))
+                if matches!(result.as_ref(), Err(HostRootRepositoryMappingError {
+                    inner: PrivateRootRepositoryMappingError::Invalid { predecessor, reason: RootMappingInvalid::Missing }, ..
+                }) if Arc::ptr_eq(predecessor, &missing)) && observations == epoch
+        ));
+        let root = root_mapping_ordinal(&original).unwrap();
+        let mut duplicate = original.clone();
+        let mut routes = duplicate.routes.entries.to_vec();
+        routes.push(routes[root].clone());
+        duplicate.routes = Arc::new(HostSelectedModuleRoutes {
+            entries: routes.into(),
+        });
+        let duplicate = Arc::new(Ok(duplicate));
+        assert!(matches!(
+            finish(duplicate.dupe(), epoch.dupe()),
+            SourcePreparationOutcome::Complete(Ok((result, observations)))
+                if matches!(result.as_ref(), Err(HostRootRepositoryMappingError {
+                    inner: PrivateRootRepositoryMappingError::Invalid { predecessor, reason: RootMappingInvalid::Duplicate { first, conflicting } }, ..
+                }) if Arc::ptr_eq(predecessor, &duplicate) && *first == root && *conflicting == duplicate.as_ref().as_ref().unwrap().routes.entries.len() - 1)
+                    && observations == epoch
+        ));
+        let mut context = original.clone();
+        let mut mappings = context.mappings.to_vec();
+        mappings[root].context_repo = CanonicalRepoName::new("wrong+").unwrap();
+        context.mappings = mappings.into();
+        let context = Arc::new(Ok(context));
+        assert!(matches!(
+            finish(context.dupe(), epoch.dupe()),
+            SourcePreparationOutcome::Complete(Ok((result, observations)))
+                if matches!(result.as_ref(), Err(HostRootRepositoryMappingError {
+                    inner: PrivateRootRepositoryMappingError::Invalid { predecessor, reason: RootMappingInvalid::Context { ordinal } }, ..
+                }) if Arc::ptr_eq(predecessor, &context) && *ordinal == root) && observations == epoch
+        ));
+        let predecessor = Arc::new(Ok(original));
+        let SourcePreparationOutcome::Complete(Ok((result, actual_epoch))) =
+            finish(predecessor.dupe(), epoch.dupe())
+        else {
+            panic!("root mapping success must complete")
+        };
+        let value = result.as_ref().as_ref().unwrap();
+        assert!(Arc::ptr_eq(&value.predecessor, &predecessor));
+        let observed = ObservedHostRootRepositoryMapping {
+            result: result.dupe(),
+            observations: actual_epoch,
+        };
+        assert!(Arc::ptr_eq(observed.result(), &result));
+        assert_exact_repo_epoch(&epoch, observed.observations());
+        let associated = SourcePreparationOutcome::Complete(Ok(observed));
+        assert!(HostRootRepositoryMappingObservationKey::validity(
+            &associated
+        ));
+        assert!(HostRootRepositoryMappingObservationKey::equality(
+            &associated,
+            &associated
+        ));
+        let need_value = SourcePreparationOutcome::Need(need);
+        assert!(!HostRootRepositoryMappingObservationKey::validity(
+            &need_value
+        ));
+        assert!(!HostRootRepositoryMappingObservationKey::equality(
+            &need_value,
+            &need_value
+        ));
+        assert!(matches!(
+            project_legacy_root_repository_mapping(SourcePreparationOutcome::Complete(Ok((
+                result.dupe(), epoch.dupe()
+            )))),
+            SourcePreparationOutcome::Complete(projected) if Arc::ptr_eq(&projected, &result)
+        ));
+        assert_root_mapping_driver_shape();
+    }
+
+    #[tokio::test]
+    async fn observed_root_repository_mapping_real_order_events_and_parity() {
+        let source = root_mapping_source("plain_a", false, false, false);
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let tracker = Arc::new(RepoSpecTracker::default());
+        let io = Arc::new(TrackingRegistryIo::new([]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io);
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let key = HostRootRepositoryMappingObservationKey::new(workspace.dupe());
+        let mut transaction =
+            real_transaction_with_tracker(&dice, &source, 1, &[], true, Some(tracker.dupe())).await;
+        let cold = transaction.compute(&key).await.unwrap();
+        let observed = complete_observed_root_mapping(&cold);
+        let mapping = observed.result().as_ref().as_ref().unwrap();
+        assert_eq!(
+            external_root_mapping_snapshot(mapping).mapping,
+            [
+                ("", ""),
+                ("root_self", ""),
+                ("first_alias", "+extension+plain_a"),
+                ("second_alias", "+extension+plain_b"),
+                ("overridden_alias", "+simple_repo+replacement"),
+                ("visible_alias", "+third+visible"),
+                ("replacement", "+simple_repo+replacement"),
+            ]
+            .map(|(name, target)| (name.to_owned(), target.to_owned()))
+        );
+        let (observed_activations, observed_rows) = tracker.take();
+        assert_eq!(
+            repo_spec_row(&observed_rows, &key.to_string()),
+            [HostSelectedExtensionMappingsObservationKey::new(workspace.dupe()).to_string()]
+        );
+        assert_no_root_mapping_upper(&observed_rows);
+        assert!(observed_rows.iter().all(|(owner, deps)| {
+            !owner.starts_with("host-root-repository-mapping:")
+                && !owner.starts_with("host-selected-extension-mappings:")
+                && deps.iter().all(|dep| {
+                    !dep.starts_with("host-root-repository-mapping:")
+                        && !dep.starts_with("host-selected-extension-mappings:")
+                })
+        }));
+        let observed_events = observed_activations
+            .iter()
+            .filter_map(|entry| entry.batch.dupe().map(|batch| (entry.key.clone(), batch)))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            observed_events
+                .iter()
+                .map(|(owner, _)| owner.as_str())
+                .collect::<Vec<_>>(),
+            ["bzlmod-observed-host-root-module-file:\"/selected-repo-spec-test\""]
+        );
+        assert!(
+            observed_activations
+                .iter()
+                .filter(|entry| entry.key == key.to_string())
+                .all(|entry| entry.batch.is_none())
+        );
+        let child = transaction
+            .compute(&HostSelectedExtensionMappingsObservationKey::new(
+                workspace.dupe(),
+            ))
+            .await
+            .unwrap();
+        let child = complete_observed_extensions(&child);
+        assert!(Arc::ptr_eq(&mapping.predecessor, child.result()));
+        tracker.take();
+        let warm = complete_observed_root_mapping(&transaction.compute(&key).await.unwrap());
+        assert!(Arc::ptr_eq(observed.result(), warm.result()));
+        let warm_activations = tracker.take().0;
+        assert!(warm_activations.iter().all(|entry| entry.batch.is_none()));
+        assert!(
+            warm_activations.iter().any(|entry| {
+                entry.key == key.to_string() && entry.kind == ActivationKind::Reused
+            })
+        );
+
+        let legacy_tracker = Arc::new(RepoSpecTracker::default());
+        let legacy_io = Arc::new(TrackingRegistryIo::new([]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, legacy_io);
+        let legacy_dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let legacy_key = HostRootRepositoryMappingKey::new(workspace.dupe());
+        let mut legacy_transaction = real_transaction_with_tracker(
+            &legacy_dice,
+            &source,
+            1,
+            &[],
+            true,
+            Some(legacy_tracker.dupe()),
+        )
+        .await;
+        let legacy = legacy_transaction.compute(&legacy_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(legacy_result) = &legacy else {
+            panic!("legacy root mapping must complete")
+        };
+        assert_eq!(observed.result(), legacy_result);
+        let (legacy_activations, legacy_rows) = legacy_tracker.take();
+        assert_eq!(
+            repo_spec_row(&legacy_rows, &legacy_key.to_string()),
+            [HostSelectedExtensionMappingsKey::new(workspace.dupe()).to_string()]
+        );
+        assert_no_root_mapping_upper(&legacy_rows);
+        assert!(legacy_rows.iter().all(|(owner, deps)| {
+            !owner.starts_with("observed-host-root-repository-mapping:")
+                && !owner.starts_with("observed-host-selected-extension-mappings:")
+                && deps.iter().all(|dep| {
+                    !dep.starts_with("observed-host-root-repository-mapping:")
+                        && !dep.starts_with("observed-host-selected-extension-mappings:")
+                })
+        }));
+        let legacy_events = legacy_activations
+            .iter()
+            .filter_map(|entry| entry.batch.dupe().map(|batch| (entry.key.clone(), batch)))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            legacy_events
+                .iter()
+                .map(|(owner, _)| owner.as_str())
+                .collect::<Vec<_>>(),
+            ["root-module-evaluation:/selected-repo-spec-test"]
+        );
+        assert_eq!(
+            observed_events
+                .iter()
+                .map(|(_, batch)| batch)
+                .collect::<Vec<_>>(),
+            legacy_events
+                .iter()
+                .map(|(_, batch)| batch)
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            legacy_activations
+                .iter()
+                .filter(|entry| entry.key == legacy_key.to_string())
+                .all(|entry| entry.batch.is_none())
+        );
+
+        let bad = "module(name='bazel_tools')\nbazel_dep(name='missing', version='1')\n";
+        let (observed_bad, legacy_bad, _) = observed_root_mapping_state(&dice, bad, 2).await;
+        let SourcePreparationOutcome::Complete(legacy_bad) = legacy_bad else {
+            panic!("legacy predecessor error must complete")
+        };
+        assert_eq!(observed_bad.result(), &legacy_bad);
+        assert!(matches!(
+            observed_bad.result().as_ref(),
+            Err(HostRootRepositoryMappingError {
+                inner: PrivateRootRepositoryMappingError::Predecessor(predecessor), ..
+            }) if predecessor.as_ref().is_err()
+        ));
+    }
+
+    #[tokio::test]
+    async fn observed_root_repository_mapping_lifecycle_cancellation_and_nonactivation() {
+        let base_source = root_mapping_source("plain_a", false, false, false);
+        let io = Arc::new(TrackingRegistryIo::new([]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io);
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let (base, _, global) = observed_root_mapping_state(&dice, &base_source, 1).await;
+        assert_root_mapping_epoch_subset(&base, &global);
+        let held_result = base.result().dupe();
+        let held_carrier = base.dupe();
+        let held_epoch = base.observations().dupe();
+        let root_name = base_source.replace("repo_name='root_self'", "repo_name='root_other'");
+        let import_order = root_mapping_source("plain_a", true, false, false);
+        let operation_order = root_mapping_source("plain_a", false, false, true);
+        for (index, changed) in [root_name, import_order, operation_order]
+            .into_iter()
+            .enumerate()
+        {
+            let generation = 10 + index as u64 * 3;
+            let (a, _, a_global) =
+                observed_root_mapping_state(&dice, &base_source, generation).await;
+            let (b, _, b_global) =
+                observed_root_mapping_state(&dice, &changed, generation + 1).await;
+            let (restored, _, restored_global) =
+                observed_root_mapping_state(&dice, &base_source, generation + 2).await;
+            assert_ne!(a.result(), b.result(), "axis {index}");
+            assert_eq!(a.result(), restored.result(), "axis {index}");
+            assert_root_mapping_epoch_subset(&a, &a_global);
+            assert_root_mapping_epoch_subset(&b, &b_global);
+            assert_root_mapping_epoch_subset(&restored, &restored_global);
+        }
+        let metadata_source = format!("{base_source}# metadata-only revision\n");
+        let (metadata_a, legacy_a, metadata_global_a) =
+            observed_root_mapping_state(&dice, &base_source, 30).await;
+        let (metadata_b, legacy_b, metadata_global_b) =
+            observed_root_mapping_state(&dice, &metadata_source, 31).await;
+        assert_eq!(metadata_a.result(), metadata_b.result());
+        assert!(HostRootRepositoryMappingKey::equality(&legacy_a, &legacy_b));
+        assert_ne!(metadata_a.observations(), metadata_b.observations());
+        assert_root_mapping_epoch_subset(&metadata_a, &metadata_global_a);
+        assert_root_mapping_epoch_subset(&metadata_b, &metadata_global_b);
+        let associated = |observed| SourcePreparationOutcome::Complete(Ok(observed));
+        assert!(!HostRootRepositoryMappingObservationKey::equality(
+            &associated(metadata_a),
+            &associated(metadata_b),
+        ));
+        assert_eq!(held_result.as_ref(), held_carrier.result().as_ref());
+        assert_exact_repo_epoch(&held_epoch, held_carrier.observations());
+
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let warm_key = HostRootRepositoryMappingObservationKey::new(workspace.dupe());
+        let mut warm_transaction = real_transaction(&dice, &base_source, 40, &[], true).await;
+        let warm_a =
+            complete_observed_root_mapping(&warm_transaction.compute(&warm_key).await.unwrap());
+        let warm_b =
+            complete_observed_root_mapping(&warm_transaction.compute(&warm_key).await.unwrap());
+        assert!(Arc::ptr_eq(warm_a.result(), warm_b.result()));
+
+        let cancel_io = Arc::new(CancelOnceRegistryIo {
+            calls: AtomicUsize::new(0),
+        });
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, cancel_io.dupe());
+        let cancel_dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepoSpecTracker::default());
+        let cancel_key = HostRootRepositoryMappingObservationKey::new(workspace);
+        let cancel_root = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n";
+        let mut cancelled = real_transaction_with_tracker(
+            &cancel_dice,
+            cancel_root,
+            1,
+            &[],
+            true,
+            Some(tracker.dupe()),
+        )
+        .await;
+        tracker.take();
+        let mut future = Box::pin(cancelled.compute(&cancel_key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while cancel_io.calls.load(Ordering::SeqCst) == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        drop(future);
+        drop(cancelled);
+        let (cancelled_activations, cancelled_rows) = tracker.take();
+        assert!(
+            cancelled_rows
+                .iter()
+                .all(|(owner, _)| owner != &cancel_key.to_string())
+        );
+        assert!(
+            cancelled_activations
+                .iter()
+                .all(|entry| entry.key != cancel_key.to_string())
+        );
+        assert_no_root_mapping_upper(&cancelled_rows);
+        let mut recovered_transaction = real_transaction_with_tracker(
+            &cancel_dice,
+            cancel_root,
+            1,
+            &[],
+            true,
+            Some(tracker.dupe()),
+        )
+        .await;
+        let recovered_value = recovered_transaction.compute(&cancel_key).await.unwrap();
+        let recovered = complete_observed_root_mapping(&recovered_value);
+        assert!(recovered.result().as_ref().is_ok());
+        let (recovered_activations, recovered_rows) = tracker.take();
+        assert!(
+            recovered_activations
+                .iter()
+                .filter(|entry| entry.key == cancel_key.to_string())
+                .all(|entry| entry.batch.is_none())
+        );
+        assert_no_root_mapping_upper(&recovered_rows);
+        assert!(recovered_rows.iter().all(|(owner, deps)| {
+            owner
+                != &HostRootRepositoryMappingKey::new(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                )
+                .to_string()
+                && deps
+                    .iter()
+                    .all(|dep| !dep.starts_with("host-root-repository-mapping:"))
+        }));
+        let recovered_global = recovered_transaction
+            .compute(&PathObservationEpochKey)
+            .await
+            .unwrap();
+        assert_root_mapping_epoch_subset(&recovered, &recovered_global);
+        let legacy = recovered_transaction
+            .compute(&HostRootRepositoryMappingKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(legacy) = legacy else {
+            panic!("recovered legacy control must complete")
+        };
+        assert_eq!(recovered.result(), &legacy);
+
+        for source in [
+            include_str!("lib.rs"),
+            include_str!("../../slug_loading_v2/src/bzl_module.rs"),
+            include_str!("../../slug_core_v2/src/runtime/generated_repository_definition.rs"),
+            include_str!("../../slug_core_v2/src/runtime/root_apparent_repository_definition.rs"),
+        ] {
+            for name in [
+                "HostRootRepositoryMappingObservationKey",
+                "ObservedHostRootRepositoryMapping",
+                "HostRootRepositoryMappingObservationError",
+            ] {
+                assert!(!source.contains(name));
+            }
+        }
     }
 
     #[tokio::test]
@@ -12550,7 +13348,7 @@ inject_repo(three, injected = "target")
         );
         for source in [
             include_str!("../../slug_loading_v2/src/bzl_module.rs"),
-            include_str!("../../slug_core_v2/src/runtime/generated_repository_definition.rs"),
+            // Accepted core composition consumes the selected observation surface.
         ] {
             for name in [
                 "HostCanonicalSelectedModuleDefinitionObservationError",
