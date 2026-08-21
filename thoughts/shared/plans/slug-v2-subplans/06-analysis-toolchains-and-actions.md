@@ -11325,6 +11325,112 @@ fixture/oracle work, proof/cap waiver, milestone closure, M8/M7B or exact
 identity work. REPLAN before widening. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Pure module-extension invocation observation design (2026-08-20)
+
+Visibility implementation `f76bab3a` closes the last carrierless prerequisite.
+The live one-file design activates only
+`WP-6-7A-host-pure-module-extension-invocations-observation-implementation`
+over unchanged semantic base `f76bab3a`.
+
+Add one private `HostPureModuleExtensionInvocationsObservationKey`, one private
+`ObservedHostPureModuleExtensionInvocations` holding the exact local semantic
+Result Arc plus cumulative transaction-local epoch, and one private outer with
+exactly Prepared, HostBzl and Merge variants. Prepared carries only the opaque
+prepared-child outer. HostBzl and Merge carry the completed prepared semantic
+Arc, current preflight index and respectively the child
+`ObservedPathFrontierError` or parent merge error. The prepared value plus index
+encodes the successful preflight prefix without retaining child modules or
+duplicating request state.
+
+One Legacy/Observed driver preserves prepared inputs first, then for every
+prepared input in order: unsupported-factor check, root-package label parse,
+Host-Bzl reacquisition, manifest equality, export lookup/kind/projection drift
+checks; only after all preflights succeed does it invoke every implementation
+in order. Legacy computes only `HostPreparedModuleExtensionInputsKey` and
+`HostBzlModuleEvalKey` with empty epochs. Observed computes only the accepted
+prepared and Host-Bzl observation siblings. Legacy projects the exact local
+Result Arc from the shared driver; add no adapter or second execution path.
+
+Prepared DICE compute failure remains semantic `PreparedCompute` with empty
+epoch. Prepared Need or opaque outer is immediate and carrierless. Accept a
+Complete prepared epoch before semantics; prepared semantic failure retains it
+as existing `Prepared` and suppresses every preflight/invocation. No pure event
+batch is published for any prepared terminal.
+
+Local UnsupportedFactors/Label terminals before a request's Host-Bzl child keep
+the cumulative prepared/prior-Bzl prefix. Host-Bzl DICE compute failure remains
+existing `AfterPrepared` with `Invocation` error and that prefix. Host-Bzl Need
+or child outer is carrierless; the HostBzl outer keeps prepared plus current index and
+publishes no parent carrier. On Complete, merge the child epoch left-first
+before semantics. Equal duplicates keep the accumulated left Arc. A lower
+operation mismatch remains HostBzl; a valid-epoch same-demand value conflict is
+Merge. Bzl semantic error through existing `AfterPrepared` with `Bzl` error,
+and all manifest/export/kind/projection drift, retain the merged prefix. First terminal returns; do not union Needs, scan past a
+failure, preflight in parallel or start invocation early.
+
+Preserve the existing all-preflight-before-invocation boundary, `module_ctx`,
+repository-rule call capture, completed/current-call error prefixes and
+required `None` result. Every invocation error, non-None terminal and success
+retains the full preflight epoch. Refactor the current 196-line `invoke_all`
+into bounded preflight and invocation helpers; each execution semantic remains
+owned only here.
+
+The pure parent continues to own exactly its implementation-print batch;
+prepared and Host-Bzl children keep their accepted batches. Publish one parent
+batch only for a semantic Complete after prepared succeeded: success and every
+`AfterPrepared` terminal publish once, including an empty batch for preflight
+terminals. Prepared semantic/compute failure, Need, typed outer and cancellation
+publish no pure batch. Fresh child events precede pure invocation prints; a
+reused Host-Bzl child has no replay; warm pure reuse is silent.
+
+Retain only the pure Result Arc, cumulative epoch and semantic prepared/
+receipt/call projections already reachable from the Result. Private outer
+retention is prepared Arc + index + frontier error. Frozen Bzl modules and
+callables, preflight Vec/tag-class scratch, invocation Module/Heap/context,
+print capture, repository-rule state and event assembly stay compute-local and
+drop at the terminal. Add no side cache, interner, task or lock across DICE.
+
+Implementation authority is exactly
+`app/slug_loading_v2/src/module_extension.rs`, baseline 1,629 physical with
+test support at 767 and the owning test module at 869. Caps are <=480
+production, <=900 proof, <=1,380 aggregate semantic and <=3,010 physical. Add
+at most eight production and six test helpers plus three observed-parent tests;
+keep the shared driver/preflight/invocation helpers below 180 and every changed
+helper/test below 200. The file remains cohesive because it alone owns the
+legacy key, extension evaluator ABI, print capture, repository-call receipts,
+real fixtures and sole instantiation consumer boundary; splitting proof would
+expose private evaluator/test seams.
+
+Require three tests named `observed_pure_identity_finisher_and_prefix_algebra`,
+`observed_pure_real_order_terminals_events_and_parity`, and
+`observed_pure_lifecycle_cancellation_and_nonactivation`. Together prove key/
+carrier/equality/validity; left-first Arc and HostBzl-vs-Merge stages; exact
+legacy/observed Result parity, dependency and terminal suppression; child-only
+load events plus exact pure print batches, warm silence and isolated Reused;
+held carrier/Result/epoch A -> B -> A for root-tag and implementation-source
+axes plus an observation-metadata same-semantic/different-epoch axis;
+per-transaction global-epoch association; poll-drop no-publication/recovery; and reverse-family plus exact
+upper nonactivation. Reuse the accepted opaque prepared-outer and lower
+Host-Bzl operation-mismatch proof instead of constructing malformed state.
+Across transactions compare semantic Results/projections, not whole epoch maps;
+require Arc identity only for an exact cached value proven Reused.
+
+Reuse pinned Bazel 9.2 `RegularRunnableExtension.load`/
+`SingleExtensionEvalFunction` evidence and existing pure/prepared/Host-Bzl
+tests; add no oracle. Validate focused `observed_pure_`, protected
+`real_repository_rule_`, `observed_prepared_` and `observed_bzl_`, full loading,
+direct `slug_core_v2` check, formatting and diff hygiene serially.
+
+Existing pure values/errors/order/ABI/call receipts/events remain exact Bazel 9
+compatibility. The private key/carrier/outer/epoch association is Slug-native.
+Instantiation, validation, generated/public/root-mapping/bootstrap activation
+and exact Bazel identity bytes remain unsupported/deferred. ACCEPT returns only
+to a docs-only instantiation frontier audit. STOP a second file/key/adapter/
+owner, visibility/export/caller change, semantic/event/retention drift, retained
+Starlark heap, lock/task across DICE, upper activation, fixture/oracle work,
+proof/cap waiver, milestone closure, M8/M7B or exact identity work. REPLAN
+before widening. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
