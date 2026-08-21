@@ -10641,6 +10641,44 @@ upper activation, proof waiver, M8/M7B or exact identity work. After ACCEPT
 return only to the prepared/evaluation frontier. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Loaded-definition proof split after retry 3 (2026-08-20)
+
+Retry 3 reached `REPLAN` after its one correction. The 7,682-line retained
+candidate (`+910/-110` versus `0a8e1220`) keeps production frozen, separates
+dependency and rich activation records, lawfully reuses the opaque request
+outer proof and constructs typed operation mismatch directly. Focused proof is
+green, but the real-order test remains two-request and the lifecycle remains
+aggregate-only.
+
+The combined proof packet repeatedly left independent matrices incomplete.
+Split them without changing the production candidate: repair real three-request
+order/parity/terminal/event behavior first, then repair held-handle lifecycle,
+cancellation and nonactivation in one successor. Neither slice accepts or
+commits production alone.
+
+Activate only
+`WP-6-7A-loaded-module-extension-definitions-real-order-event-proof-repair`.
+Write only the colocated loading test module. Freeze production, the finisher
+identity test and lifecycle test. Replace the real-order test plus at most two
+helpers/tracker records; do not append a fourth parent test.
+
+Require exact legacy/observed Result, request, manifest and projection parity
+for three distinct ordered root Bzl requests. For first/middle/last positions,
+separately prove Bzl semantic, missing-export and wrong-kind errors, decisive
+prefixes, exact reached-child order and later suppression. Fresh success must
+have exactly three ordered child-owned nonempty batches; warm parent emits no
+child activation; changed-parent/unchanged-child is Reused/None; print-fail
+retains only the decisive child batch. Dependency/activation rows exclude all
+legacy and upper families.
+
+Final caps for the retained candidate are <=`+1,250/-250` versus `0a8e1220`
+and <=8,000 physical. Every changed helper/test remains below 200. STOP any
+production/identity/lifecycle edit, second file/key/owner, hook/fixture,
+generic terminal assertion, tracker conflation, cap waiver, parent batch, upper
+activation, M8/M7B or exact identity work. After ACCEPT schedule only the final
+lifecycle/cancellation proof repair. M7 remains partial and M7A -> M8 -> M7B
+remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`

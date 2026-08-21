@@ -1,181 +1,116 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-loaded-module-extension-definitions-observation-proof-correction-implementation-retry-3`
+Packet: `WP-6-7A-loaded-module-extension-definitions-real-order-event-proof-repair`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `f3a39399`
+Scheduling base: `fa5a3184`
 Accepted predecessor: `99c23033`
 
 ## Goal and authority
 
-Close the parent-specific proof for the uncommitted loaded-definition
-observation candidate after retry 2 reached terminal `REPLAN` on an unreachable
-opaque request-outer construction requirement. Preserve the independently
-accepted production driver/finisher and replace only the nondiscriminating
-proof. Activate no caller or upper extension owner.
+Repair only the real-order/parity/event proof for the retained loaded-definition
+observation candidate. Retry 3 exhausted its correction after fixing the lawful
+typed operation-mismatch discriminator but did not complete its order or
+lifecycle matrices. Split those independent proof concerns rather than retrying
+another omnibus.
 
-Write exactly `app/slug_loading_v2/src/bzl_module.rs`. Every other file is
-read-only, including Bzlmod, loading callers/modules, Cargo/BUILD metadata,
-fixtures, oracles and planning documents until terminal rollover.
+Write exactly the `#[cfg(test)] module_extension_definition_loading_tests`
+module in `app/slug_loading_v2/src/bzl_module.rs`. Production, the accepted
+finisher algebra test and the lifecycle/cancellation test are frozen. Every
+other file, fixture, oracle, Cargo/BUILD target, caller and plan is read-only
+until terminal rollover.
 
-The retained retry-2 candidate is 7,637 physical lines and `+864/-109` versus
-`0a8e1220`. Corrected final caps are <=`+1,450/-327` versus `0a8e1220` and
-<=8,025 physical lines; replace the three coarse tests and duplicate tracker
-rows rather than stack proof. Production is fully frozen: touch zero production
-lines, including the 130-line shared driver, existing pure finisher, keys,
-carriers and errors. Permit at most four new test helpers and three parent
-tests; every helper/test remains below 200.
+The retained candidate is 7,682 physical lines and `+910/-110` versus
+`0a8e1220`. Final caps for this slice are <=`+1,250/-250` and <=8,000 physical.
+Replace only `observed_loaded_real_order_terminals_events_and_parity` plus at
+most two directly used test helpers and the already test-only tracker records;
+do not append a fourth parent test. Every changed helper/test remains below 200.
 
-## REPLAN basis and accepted candidate
+## Frozen decisions
 
-The prior Terra-high implementation and correction pass compile and pass the
-focused and full loading suites plus the direct core check. Independent Sol
-review accepts its production semantics:
+Production semantics remain independently accepted: matching families,
+request-compute/Host-Bzl-invariant asymmetry, one request-value clone and child
+Arc drop, left-first Complete epoch merge, first terminal, child-only event
+batches, compact retention and Complete-only equality/validity.
 
-- matching Legacy/Observed request and Host-Bzl families;
-- request DICE failure -> existing `RequestsCompute` versus Host-Bzl
-  `host_dice_invariant` asymmetry;
-- one successful request-value clone followed by child Result-Arc drop;
-- left-first Complete Bzl epoch merge before Bzl/export/downcast semantics;
-- first-terminal return, child-owned Bzl batches and no parent batch;
-- bounded typed-outer retention; and
-- Complete-only parent equality/validity.
+The identity/finisher test now lawfully proves equal duplicate left-Arc,
+valid-epoch conflict -> carrierless Merge and typed child conflict/operation
+mismatch -> carrierless Bzl without malformed epoch construction. The opaque
+request outer reuses accepted Bzlmod proof and parent forwarding source/
+dependency evidence. Do not reopen it.
 
-The original proof remained material incomplete after its sole correction. Its union
-test exercised `union_host_observations` rather than the parent boundary, and
-its omnibus test did not discriminate stage/context/carrierlessness, terminal
-positions/order, event ownership/reuse, held-handle lifecycles, parent
-cancellation, exact legacy parity or upper nonactivation. The orchestration
-second-correction rule therefore requires this new packet; it does not admit a
-production semantic correction. The first proof-correction packet then
-required a real child `OperationMismatch` to prove `stage: Merge`. That is
-impossible: epoch construction rejects demand/result operation mismatch before
-an epoch exists. Reserved review confirmed the existing finisher correctly
-maps real child conflict or operation mismatch to `stage: Bzl`; only a conflict
-between two valid epochs can arise at `stage: Merge`. The worker stopped before
-changing the correction diff.
+Lifecycle, parent cancellation/recovery and held-handle A -> B -> A remain the
+next serial proof slice. Do not edit or weaken their current test here.
 
-Retry 2 improved key/finisher assertions but left the two-request omnibus,
-duplicate tracker rows and aggregate-only lifecycle. Its terminal review also
-proved the local request-outer equality obligation unreachable: the accepted
-Bzlmod outer is intentionally opaque, and ordinary consistent snapshots do not
-produce its lower frontier failure. Production freeze, no-hook and no-API
-stops prevent constructing it here. Reuse the accepted lower request-key
-Complete/equality/carrierlessness proof and require only the parent forwarding
-arm plus dependency-family evidence. This is the sole retry-3 contract change;
-all realizable parent obligations remain.
+## Three-request fixture and exact parity
 
-## Lawful proof seam
+Use one real MODULE request list of exactly three distinct ordered root Bzl
+labels. Reuse the existing in-memory `ext.bzl`, `other.bzl` and `child.bzl`
+sources; if needed, change only test-helper inputs so all three export valid
+module-extension definitions. Do not add an external fixture or test hook.
 
-An ordinary consistent snapshot cannot produce a genuine parent Bzl outer,
-merge conflict or operation mismatch: equal demands share the snapshot result
-Arc and epoch construction rejects a mismatched demand/result pair. A loaded
-definition label-parse failure is likewise unreachable from the valid Bzlmod
-request constructor.
+For a successful fresh transaction compute the legacy key and observed key in
+separate matching-family transactions over identical injected state. Assert:
 
-Use the existing production-called pure Bzl finisher without changing it. It
-consumes the real child outcome/carrier/epoch and existing request context,
-then owns the accepted child-outer versus left-first merge projection. Add no
-test-only branch, fake/synthetic DICE key, hook, alternate owner or semantic
-value. Real first/middle/last proof applies to reachable Bzl semantic/export/
-wrong-kind terminals and later-child suppression.
+- exact semantic Result equality, including request aggregate;
+- exact three-definition source order;
+- exact manifest and frozen projection equality for each position;
+- legacy transactions activate only legacy request/Bzl families and observed
+  transactions only observed request/Bzl families; and
+- the observed cumulative epoch contains the exact request prefix plus each
+  reached root/recursive Host-Bzl prefix, with per-demand Result Arcs forwarded.
 
-## Required proof decomposition
+## Terminal-position matrix
 
-Replace the three current added tests rather than accumulating another omnibus.
-Add exactly three bounded parent specifications.
+Drive one decisive request at first, middle and last position by reordering the
+same three valid requests. Cover each reachable terminal family separately:
 
-### Identity and finisher algebra
-
-`observed_loaded_identity_and_finisher_algebra` proves:
-
-- distinct key equality/hash/Display;
-- Complete-only equality/validity for semantic carrier and Bzl outer, with Need
-  invalid and self-unequal;
-- source-slice and dependency-family evidence that the accepted opaque request
-  outer is forwarded carrierlessly by the parent; do not construct it locally;
-- empty/request/prior/current prefix association at the production finisher;
-- equal duplicate retains the left/request-side Arc;
-- conflicting valid same-demand results return exact parent
-  `Request { requests, request, stage: Merge, error }` with no carrier; and
-- a real child conflict or operation-mismatch outer returns exact
-  `stage: Bzl` request context with no carrier.
-
-The operation-mismatch discriminator must enter the production finisher as the
-real typed child frontier failure. Do not claim a Merge-stage operation
-mismatch or construct a malformed epoch. Equal valid duplicates must succeed
-and preserve the left/request-side Arc.
-
-### Real order, terminals, events and parity
-
-`observed_loaded_real_order_terminals_events_and_parity` uses three ordered
-requests and proves:
-
-- exact legacy/observed semantic Result, request aggregate, definition order,
-  manifest and projection equality;
-- matching request/Bzl family exclusion and exact observed Bzl activation
-  order;
-- reachable first/middle/last Bzl semantic, export and wrong-kind terminals
-  retain the decisive prefix and suppress every later Bzl/export operation;
-- the label parser invariant is recorded through the pure production finisher,
-  not an impossible fixture;
-- fresh evaluated Host-Bzl children alone own nonempty batches in request
-  order, while parent/request activations have no batch;
-- direct warm parent reuse is silent;
-- changed-parent/unchanged-child activation is `Reused` with `batch: None`;
+- Bzl semantic failure uses a print-then-fail source;
+- export failure requests a missing name from a successfully evaluated module;
   and
-- a semantic Bzl failure still leaves its decisive child batch at the child.
+- wrong kind requests an exported non-extension value.
 
-Extend the existing tracker only as test proof. Keep dependency rows from
-`key_activated` and real kind/batch activations from `key_activated_rich` as two
-separate records; never fabricate a kind or count both callbacks as two
-activations. Record all keys for upper/legacy exclusion, while event assertions
-filter exact parent/request/Host-Bzl identities. Do not introduce production
-event state or weaken existing lower assertions.
+For all nine rows assert the exact existing `Request` error variant and decisive
+request context, cumulative prefix through the decisive Complete Bzl child,
+exact observed root-Bzl activation label order, and zero activation/export work
+for every later request. Do not accept generic Need/Request polarity. Label
+parse and request outer remain frozen finisher/lower invariants, not fixture
+rows.
 
-### Lifecycle, cancellation and nonactivation
+## Exact event ownership
 
-`observed_loaded_lifecycle_cancellation_and_nonactivation` proves:
+Use separate tracker stores: all-key dependency rows from `key_activated` and
+real kind/batch rows from `key_activated_rich`. Never synthesize an activation
+kind or treat both callbacks as two activations.
 
-- independent request, each decisive Bzl source/recursive load and pure export
-  A -> B -> A transitions while holding prior parent Result/epoch and child
-  handles;
-- old handles remain valid, unaffected child Result/epoch Arcs remain shared,
-  and parent equality changes/restores exactly;
-- poll-drop before parent publication records no parent value, activation or
-  batch, followed by same-DICE recovery;
-- activation dependencies contain only the observed request/Host-Bzl lineage;
-  and
-- a production-slice plus activation assertion excludes legacy siblings and
-  prepared, pure, instantiated, validated, root-mapping, generated,
-  public/command keys.
+Prove in isolated transactions:
 
-Reuse accepted lower request identity/Need/cancellation/no-upper proof and the
-existing `observed_bzl_*` recursive source/child/cycle/frontier/cancellation
-tests. Parent prefix composition, typed outer mapping, family selection,
-terminal stop order, event ownership, parent held handles/cancellation and
-upper nonactivation must be asserted here rather than inferred.
+- fresh success: exactly the three reached Host-Bzl child keys own nonempty
+  evaluated batches in request order; loaded parent and request child have no
+  batch;
+- direct warm parent: no Host-Bzl child activation/batch is emitted;
+- changed parent with one unchanged reached Bzl child: that child is Reused
+  with `batch: None` and is not reevaluated; and
+- print-then-fail: the decisive semantic-failure Host-Bzl child alone retains
+  its nonempty batch while the loaded parent remains batchless.
 
-## Compatibility, retention and validation
+The dependency rows must show the loaded observed parent depends on the
+observed request child and exactly the reached observed Host-Bzl roots in
+source order. Assert no legacy loaded/request/Bzl sibling and no prepared,
+pure, instantiated, validated, root-mapping, generated, public or command key
+appears in any activation or dependency row.
 
-Exact remains existing loaded-definition values, semantic errors, request
-order, manifests, projections and child Bzl events. Slug-native remains the
-private observed key/carrier/typed outer/cumulative epoch and Display token.
-Prepared/pure/instantiated/validated evaluation, root mapping, generated
-repositories, public/bootstrap activation, M8/M7B and exact identity bytes stay
-deferred.
+## Compatibility and validation
 
-The retained value remains exactly one local semantic Result Arc plus one
-cumulative compact epoch. The typed outer retains only the accepted opaque
-request error, or completed request aggregate plus decisive request/stage/
-frontier error. Add no child carrier, evaluator/module heap, event vector,
-cache/interner/store/lock/task/revision/certificate or second owner. No lock
-spans DICE compute.
+Exact remains current loaded-definition Result/errors/order/manifests/
+projections and child events. The private observed association remains
+Slug-native. Upper evaluation/public/bootstrap, M8/M7B and exact identity bytes
+remain deferred. No oracle is needed; reuse pinned Bazel 9.2 loading evidence.
 
 Run serially:
 
-1. the exact three `module_extension_definition_loading_tests::observed_loaded`
-   successor tests;
+1. `CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2
+   module_extension_definition_loading_tests::observed_loaded_real_order_terminals_events_and_parity --quiet`;
 2. protected `module_extension_definition_loading_tests::observed_bzl_` tests;
 3. `CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 --quiet`;
 4. `CARGO_BUILD_JOBS=1 cargo check -p slug_core_v2 --quiet`;
@@ -184,29 +119,19 @@ Run serially:
 
 ## Terminal and stops
 
-ACCEPT commits the retained candidate plus corrected proof, records exact
-accounting/validation and activates only the docs-only prepared/evaluation
-observation frontier.
+ACCEPT freezes this real-order/event proof and activates only the docs packet
+for the final lifecycle/cancellation/nonactivation repair. It does not accept or
+commit the production candidate yet.
 
-STOP and `REPLAN` a second file/key/owner; any production line or semantic
-driver/key/carrier/error/event/retention correction; a test hook or synthetic
-DICE key; prepared/pure/instantiated/validated/
-root-mapping/generated/public activation; a parent batch; non-Complete parent
-equality/validity; parent carrier on typed outer; wider caps; milestone closure;
-M8/M7B or exact identity-byte work. M7 remains partial and M7A -> M8 -> M7B
-remains.
+STOP and `REPLAN` a production, identity/finisher or lifecycle-test edit; a
+second Rust file/key/owner; fake key/hook/external fixture; parent event batch;
+tracker row conflation; generic terminal assertion; cap waiver; upper
+activation; milestone closure; M8/M7B or exact identity work. M7 remains partial
+and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Design commit `0a8e1220` activated the first implementation attempt over
-accepted carrier `99c23033`; `2d59ade1` recorded its proof-gap REPLAN. The
-first proof-correction implementation added the accepted pure finisher and
-three named tests, but review found the tests still nondiscriminating. Its one
-correction stopped without edits on the contradictory Merge-stage operation
-mismatch contract. Reserved review corrected only that classification and
-kept production plus every other proof obligation frozen for retry 2.
-Scheduling commit `f3a39399` recorded that correction. Retry 2's proof remained
-incomplete, and its opaque request-outer construction requirement proved
-unreachable under frozen no-hook/no-API authority. The current test-only diff
-is retained; full loading validation must be rerun after its final replacement
-because the last recorded full suite predates the final compaction.
+Scheduling `fa5a3184` activated retry 3. Its test-only attempt separated tracker
+records and improved lawful finisher evidence, but the one correction completed
+only direct typed operation-mismatch construction. Independent review therefore
+returned `REVISE -> REPLAN` for the still-coarse order/event/lifecycle proof.
