@@ -256,10 +256,15 @@ fn definition_context_matches(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostRootApparentRepositoryDefinitionObservationKey(HostRootApparentRepositoryDefinitionKey);
+pub(super) struct HostRootApparentRepositoryDefinitionObservationKey(
+    HostRootApparentRepositoryDefinitionKey,
+);
 
 impl HostRootApparentRepositoryDefinitionObservationKey {
-    fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
+    pub(super) fn new(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+    ) -> Option<Self> {
         HostRootApparentRepositoryDefinitionKey::new(workspace, apparent_repo).map(Self)
     }
 }
@@ -274,23 +279,26 @@ type RootApparentRepositoryDefinitionResult =
     Arc<Result<HostRootApparentRepositoryDefinition, HostRootApparentRepositoryDefinitionError>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-struct ObservedHostRootApparentRepositoryDefinition {
+pub(super) struct ObservedHostRootApparentRepositoryDefinition {
     result: RootApparentRepositoryDefinitionResult,
     observations: PathObservationEpoch,
 }
 
 impl ObservedHostRootApparentRepositoryDefinition {
-    fn result(&self) -> &RootApparentRepositoryDefinitionResult {
+    pub(super) fn result(
+        &self,
+    ) -> &Arc<Result<HostRootApparentRepositoryDefinition, HostRootApparentRepositoryDefinitionError>>
+    {
         &self.result
     }
 
-    fn observations(&self) -> &PathObservationEpoch {
+    pub(super) fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum HostRootApparentRepositoryDefinitionObservationError {
+enum RootApparentRepositoryDefinitionObservationError {
     Mapping(HostCanonicalRepositoryApparentMappingObservationError),
     Definition {
         mapping: HostCanonicalRepositoryApparentMapping,
@@ -301,6 +309,13 @@ enum HostRootApparentRepositoryDefinitionObservationError {
         error: ObservedPathFrontierError,
     },
 }
+
+impl Dupe for RootApparentRepositoryDefinitionObservationError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(super) struct HostRootApparentRepositoryDefinitionObservationError(
+    RootApparentRepositoryDefinitionObservationError,
+);
 
 impl Dupe for HostRootApparentRepositoryDefinitionObservationError {}
 
@@ -313,7 +328,7 @@ enum RootApparentRepositoryDefinitionMode {
 type RootApparentRepositoryDefinitionDriverOutcome = SourcePreparationOutcome<
     Result<
         (RootApparentRepositoryDefinitionResult, PathObservationEpoch),
-        HostRootApparentRepositoryDefinitionObservationError,
+        RootApparentRepositoryDefinitionObservationError,
     >,
 >;
 
@@ -422,7 +437,7 @@ async fn compute_root_apparent_repository_definition(
         },
         RootApparentRepositoryDefinitionMode::Observed => match ctx.compute(&HostCanonicalRepositoryApparentMappingObservationKey::new(key.workspace.clone(), CanonicalRepoName::root(), key.apparent_repo.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostRootApparentRepositoryDefinitionObservationError::Mapping(error))),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(RootApparentRepositoryDefinitionObservationError::Mapping(error))),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().clone(), observed.observations().clone()),
             Err(error) => return complete_root_apparent_repository_definition_driver(key, Err(HostRootApparentRepositoryDefinitionErrorKind::MappingCompute(error.to_string().into())), PathObservationEpoch::empty()),
         },
@@ -445,14 +460,14 @@ async fn compute_root_apparent_repository_definition(
         },
         RootApparentRepositoryDefinitionMode::Observed => match ctx.compute(&HostCanonicalRepositoryDefinitionObservationKey::new(key.workspace.clone(), target.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostRootApparentRepositoryDefinitionObservationError::Definition { mapping, error })),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(RootApparentRepositoryDefinitionObservationError::Definition { mapping, error })),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().clone(), observed.observations().clone()),
             Err(error) => return complete_root_apparent_repository_definition_driver(key, Err(HostRootApparentRepositoryDefinitionErrorKind::DefinitionCompute { mapping, message: error.to_string().into() }), mapping_observations),
         },
     };
     let observations = match merge_root_apparent_repository_definition_observations(&mapping_observations, &definition_observations) {
         Ok(observations) => observations,
-        Err(error) => return SourcePreparationOutcome::Complete(Err(HostRootApparentRepositoryDefinitionObservationError::Merge { mapping, error })),
+        Err(error) => return SourcePreparationOutcome::Complete(Err(RootApparentRepositoryDefinitionObservationError::Merge { mapping, error })),
     };
     finish_root_apparent_repository_definition(key, mapping, target, definition_result, observations)
 }
@@ -504,9 +519,9 @@ impl Key for HostRootApparentRepositoryDefinitionObservationKey {
         .await
         {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
-            }
+            SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(
+                Err(HostRootApparentRepositoryDefinitionObservationError(error)),
+            ),
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
                 SourcePreparationOutcome::Complete(Ok(
                     ObservedHostRootApparentRepositoryDefinition {
@@ -1083,7 +1098,7 @@ pub(super) mod tests {
         assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &left_result));
         let conflict_epoch = PathObservationEpoch::from_shared([(demand.dupe(), Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(PathNodeKind::RegularFile, 1, 1, 1, 1, 0o644))))) ]).unwrap();
         let conflict = merge_root_apparent_repository_definition_observations(&left, &conflict_epoch).unwrap_err();
-        let outer: <HostRootApparentRepositoryDefinitionObservationKey as Key>::Value = SourcePreparationOutcome::Complete(Err(HostRootApparentRepositoryDefinitionObservationError::Merge { mapping, error: conflict }));
+        let outer: <HostRootApparentRepositoryDefinitionObservationKey as Key>::Value = SourcePreparationOutcome::Complete(Err(HostRootApparentRepositoryDefinitionObservationError(RootApparentRepositoryDefinitionObservationError::Merge { mapping, error: conflict })));
         assert!(HostRootApparentRepositoryDefinitionObservationKey::validity(&outer));
         assert!(HostRootApparentRepositoryDefinitionObservationKey::equality(&outer, &outer));
 
@@ -1092,9 +1107,10 @@ pub(super) mod tests {
         assert_eq!(producer.matches("HostCanonicalRepositoryApparentMappingObservationKey::new").count(), 1);
         assert_eq!(producer.matches("HostCanonicalRepositoryDefinitionObservationKey::new").count(), 1);
         assert!(producer.find("HostCanonicalRepositoryApparentMappingObservationKey::new").unwrap() < producer.find("HostCanonicalRepositoryDefinitionObservationKey::new").unwrap());
-        assert_eq!(producer.matches("HostRootApparentRepositoryDefinitionObservationError::Mapping(error)").count(), 1);
-        assert_eq!(producer.matches("HostRootApparentRepositoryDefinitionObservationError::Definition { mapping, error }").count(), 1);
-        assert_eq!(producer.matches("HostRootApparentRepositoryDefinitionObservationError::Merge { mapping, error }").count(), 1);
+        assert_eq!(producer.matches("RootApparentRepositoryDefinitionObservationError::Mapping(error)").count(), 1);
+        assert_eq!(producer.matches("RootApparentRepositoryDefinitionObservationError::Definition { mapping, error }").count(), 1);
+        assert_eq!(producer.matches("RootApparentRepositoryDefinitionObservationError::Merge { mapping, error }").count(), 1);
+        assert_eq!(producer.matches("HostRootApparentRepositoryDefinitionObservationError(error)").count(), 1);
         assert!(!producer.contains("OperationMismatch")); assert!(!producer.contains("EventBatch")); assert!(!producer.contains("store_evaluation_data"));
 
         let selected_source = include_str!("../../../slug_bzlmod_v2/src/selected_repo_spec.rs");
