@@ -13611,6 +13611,83 @@ work. REPLAN before widening. Schedule only
 on acceptance audit carrier visibility. M7 stays partial and M7A -> M8 -> M7B
 remains.
 
+### Root apparent-definition carrier-visibility frontier audit (2026-08-21)
+
+Accepted `29795aeb` closes the private root apparent-definition owner at
++738/-103 and 1,714 physical lines. Its observation key/carrier/typed outer at
+`root_apparent_repository_definition.rs:259-528` have zero production
+consumers and remain private to that module. The private Result alias and
+outer's Mapping/Definition/Merge variants make the associated Key Value
+unnameable from a sibling.
+
+The legacy definition has exactly one production consumer: sibling
+`HostRootApparentRepositoryRouteKey` imports it at
+`root_apparent_repository_route.rs:28` and computes it at line 303. Route is a
+one-predecessor validation/source-capability projection; its eventual observed
+owner must consume the accepted observed definition without discarding the
+epoch. Direct enum promotion would expose lower opaque terminal structure, so
+a field-private nominal wrapper around a renamed private inner is required by
+effective visibility.
+
+The legacy route has one production consumer at source input line 186; source
+input has one at source-path input line 234; source-path has one at source
+observation line 234; source observation has zero production consumers. Public
+commands still use Bzlmod `RootRepositoryRouteKey`/observation at
+`dice.rs:4476-4494`, and root bootstrap remains dormant. These later source/
+public/command/bootstrap layers neither consume this observation nor provide
+visibility and are not prerequisites.
+
+Choose exactly
+`WP-6-7A-host-root-apparent-repository-definition-observation-carrier-visibility-design`.
+It must freeze only same-crate `pub(super)` key/new, carrier with private fields
+and concrete borrowed definition Result-Arc/epoch accessors, and one field-
+private opaque
+`pub(super) struct HostRootApparentRepositoryDefinitionObservationError(
+RootApparentRepositoryDefinitionObservationError)` with matching existing
+derives/Dupe, wrapping only at observed Key projection. The named private
+`enum RootApparentRepositoryDefinitionObservationError` retains Mapping/
+Definition/Merge and matching existing derives/Dupe. Keep the
+private alias/inner/fields/variants hidden; add no crate-root export, adapter or
+caller.
+
+The design must freeze one route-module sibling smoke that constructs only the
+key for `/workspace` and `@first`, proves exact Display
+`observed-host-root-apparent-repository-definition:"/workspace":@first` and
+associated Value/accessor types through nonexecuted function pointers, and
+cannot construct/inspect carrier or outer, compute or activate route. Only
+wrapper spelling may change in the existing root-definition identity proof;
+all semantic/order/terminal/merge/event/epoch/lifecycle/cancellation/
+nonactivation assertions remain.
+
+Prospective implementation authority is root definition baseline 1,714
+physical/tests 529, SHA
+`9aba8dba56972fce08d23d9fb97a604a849e5aac4694b34c29b472e4e837dca5`,
+and test-only route baseline 1,088 physical/tests 374, SHA
+`131fb0fca448acb3786946500d91f66ece2b6ee54441cc65968a9ce4605131ee`.
+Caps are <=80 definition production, <=50 definition proof, <=80 route proof,
+<=210 aggregate additions and physical <=1,845/1,168; no production helper or
+new definition test, exactly one route smoke, identity below 200 and smoke
+below 100.
+
+Validate focused observed definition and sibling smoke, protected legacy
+definition/route, full core, direct commands check, formatting, exact two-file
+allowlist/SHA/accounting/physical/test-size/effective-visibility/source-shape
+and diff hygiene serially. No new oracle applies to a visibility-only change.
+
+Root-definition values/order/errors/views/equality/invalidation/lower events
+remain exact. The crate-internal opaque Result-Arc+transaction-local epoch
+handoff is Slug-native. Route ownership and later source/public/command/
+bootstrap observation plus exact identity bytes remain deferred.
+
+STOP Rust/test edits during design, route/caller activation, crate-public/root
+export, public field/alias/inner/variant/inspector, lower-carrier redesign,
+third file/type/key/carrier/adapter, semantic/event/equality/epoch/retention
+drift, proof beyond wrapper spelling and one smoke, Cargo/BUILD, fixture/oracle,
+cap/test/format waiver, upper work, milestone closure, M8/M7B or exact identity
+work. REPLAN before widening. On design ACCEPT schedule one visibility
+implementation, then root-route owner design. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN (2026-08-21)
 
 Retain the unaccepted one-file root apparent-definition candidate at 1,585
