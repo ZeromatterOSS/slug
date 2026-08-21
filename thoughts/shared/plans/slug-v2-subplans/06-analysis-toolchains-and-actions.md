@@ -12507,6 +12507,73 @@ scratch, task/lock, fixture/oracle, cap/helper/test waiver, upper activation,
 milestone closure, M8/M7B or identity-byte work. REPLAN before widening. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Selected-definition carrier promotion design accepted (2026-08-21)
+
+Design commit `bdeab11d` and live source accept exactly
+`WP-6-7A-host-canonical-selected-module-definition-observation-carrier-promotion-implementation`.
+The semantic Rust base remains `a7d9ffcc`; this visibility-only packet adds no
+consumer and cannot alter selected computation, Result/epoch association,
+Need/terminal algebra, equality, validity, events, retention or lifecycle.
+
+Promote exactly three `#[doc(hidden)]` types in `selected_repo_spec.rs`: the
+existing `HostCanonicalSelectedModuleDefinitionObservationKey`, the existing
+`ObservedHostCanonicalSelectedModuleDefinition`, and one new field-private
+public `HostCanonicalSelectedModuleDefinitionObservationError`. Make the key
+and carrier public, make only the existing two-argument `new` public, and make
+only concrete borrowed selected Result-Arc and epoch carrier accessors public.
+All fields and `SelectedDefinitionResult` remain private.
+
+Rename the current private error enum to
+`CanonicalSelectedModuleDefinitionObservationError`, preserving exactly its
+private `Routes(HostSelectedModuleRoutesObservationError)` variant and derives.
+The private driver/result alias remains on this inner. The public outer is a
+tuple struct over that inner with an omitted field visibility and matching
+derives. Only observed Key projection wraps Complete Err; Need and Complete Ok
+are unchanged. No unwrap/inspection path exists, and the later core owner must
+carry the opaque outer.
+
+Add exactly three hidden Bzlmod crate-root reexports: the public outer, observed
+key and carrier. Add no fourth reexport, public alias/field/terminal,
+constructor/conversion, adapter, caller or reverse dependency.
+
+The new external
+`canonical_selected_definition_observation_surface_is_cross_crate_usable`
+smoke constructs only the key for `/workspace` and canonical `dep+`, asserts
+`observed-host-canonical-selected-module-definition:"/workspace":@@dep+`, and
+uses nonexecuted function-pointer casts to prove the exact associated
+`SourcePreparationOutcome<Result<carrier, opaque outer>>` plus concrete
+borrowed selected Result-Arc and epoch accessors. It cannot construct/inspect a
+carrier/outer, compute, import core or activate semantics.
+
+Implementation authority is exactly `selected_repo_spec.rs` at baseline 12,524
+physical/tests 4,668, `lib.rs` at 415, and new
+`tests/canonical_selected_definition_observation_api.rs`. Caps remain <=80
+production, <=40 colocated proof, <=10 lib, <=70 external proof, <=200 aggregate
+semantic and physical <=12,645/425/70. Only a semantic-neutral outer projection
+and match-spelling adjustment is allowed in existing
+`observed_canonical_selected_definition_identity_scan_and_terminal_algebra`;
+that test remains under 200 lines and every new smoke/helper below 100. The
+large owner stays cohesive and no hot-path measurement applies.
+
+Validation is focused observed-selected owner tests, the new external smoke,
+protected definition/evaluation Bzlmod API smokes, full Bzlmod, direct core
+check, formatting and diff hygiene, serially. Reuse accepted owner and prior
+promotion proof; no oracle is needed for a non-Bazel-visible visibility change.
+
+Selected values/errors/dispositions/full scan/order/views, equality/
+invalidation and lower events remain exact. The hidden cross-crate carrier/
+opaque outer and shared-Arc transaction-local epoch are Slug-native.
+Canonical/generated composition, upper activation and exact identity bytes
+remain unsupported/deferred.
+
+STOP semantic/core edit, public field/alias/terminal, fourth type/reexport,
+second key/carrier/adapter, reverse dependency, selected semantic/event/
+equality/retention drift, Cargo/BUILD, fixture/oracle, third production file,
+cap/proof/test-size waiver, upper activation, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening. ACCEPT returns only to a docs-only
+canonical selected/generated observation-owner design. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier visibility audit selects promotion design (2026-08-21)
 
 Accepted implementation `a7d9ffcc` completes the callerless private selected-
