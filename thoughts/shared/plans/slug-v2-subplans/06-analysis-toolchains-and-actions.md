@@ -12739,6 +12739,98 @@ retained scratch/task/lock, fixture/oracle, cap waiver, upper activation,
 milestone closure, M8/M7B or exact identity work. REPLAN before widening. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Root repository-mapping observation-owner design accepted (2026-08-21)
+
+Audit base `cdcdfe24` and live source accept only
+`WP-6-7A-host-root-repository-mapping-observation-implementation` over Rust
+base `c96ae09d`.
+
+In `selected_repo_spec.rs`, add private
+`HostRootRepositoryMappingObservationKey(HostRootRepositoryMappingKey)`,
+private `ObservedHostRootRepositoryMapping` with one private
+`RootRepositoryMappingResult` Arc plus `PathObservationEpoch`, and private
+`HostRootRepositoryMappingObservationError::Mappings(
+ExtensionMappingsObservationError)`. Constructor/accessors stay private,
+Display is `observed-{legacy}`, and Key Value is
+`SourcePreparationOutcome<Result<carrier, outer>>`. Leave the public legacy
+outcome concretely spelled and add no export, adapter or caller.
+
+Reuse existing `RoutesMode::{Legacy, Observed}` and `RepoSpecChild`; add no
+mode/child duplicate. Factor only current key compute through
+`root_mapping_complete`, one mappings-child adapter, one shared finisher/driver
+and legacy projector. Legacy requests only legacy selected mappings with empty
+epoch. Observed requests only observed selected mappings and forwards its
+Result Arc and epoch.
+
+Child DICE compute failure remains semantic `Compute(message)` with empty
+epoch. Need is immediate. Child outer becomes carrierless `Mappings`. Complete
+semantic failure remains `Predecessor(predecessor)` with the exact child epoch.
+Complete success runs one production-used iterator helper that records first
+root, first conflicting root and exhausts all routes; `root_mapping_ordinal`
+then preserves the exact context check. Missing, Duplicate and Context retain
+the same predecessor and epoch; success retains predecessor+ordinal and epoch.
+Mapping order/views are unchanged. There is no merge/rebuild/union/epoch
+validation.
+
+Use `complete_eq` and Complete-only validity. Need is invalid/self-unequal;
+carrier and outer compare structurally. Parent and every warm row remain
+batchless. Exact fresh direct rows are observed parent -> observed selected
+mappings and legacy parent -> legacy selected mappings. Lower event payloads
+stay equal and owned respectively by observed Host root-module file and legacy
+root-module evaluation; root mapping never moves or replays them.
+
+Retain only the root-mapping Result Arc and compact child epoch. Existing
+success/errors remain the sole predecessor/ordinal/reason retention. Child
+carrier, extra map/order, iterator/scan, mode, evaluator/event, cache, task and
+lock scratch die before publication. DICE alone serializes compute.
+
+Add exactly
+`observed_root_repository_mapping_identity_scan_and_terminal_algebra`,
+`observed_root_repository_mapping_real_order_events_and_parity` and
+`observed_root_repository_mapping_lifecycle_cancellation_and_nonactivation`.
+Prove identity/hash/Display/accessors/equality/validity; compute, Need, outer,
+Predecessor, Missing, Duplicate, Context and success; exact Arc/epoch forwarding
+and full iterator consumption with first/conflicting ordinals. Prove real
+legacy parity, exact one-child rows, predecessor Arc, borrowed mapping order,
+lower event owner/payload equality, batchless warm behavior and family
+exclusion.
+
+Hold Result/epoch handles through root-name, import-order and override/inject-
+order A-B-A; require metadata-only equal Result/different epoch, each carrier
+epoch as a subset of its own transaction global, Arc identity only on Reused,
+real poll-drop/no parent publication and same-DICE recovery. Deny legacy root
+mapping, definition requests, canonical-selected, generated/canonical, core
+mapping/root/route/source, materialization and public/bootstrap activation.
+Reuse trackers and source-direction evidence; add no hook or malformed input.
+
+Authority is exactly `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline
+12,564 physical/tests at 4,678. Caps are <=230 production, <=680 proof, <=910
+aggregate semantic and <=13,480 physical; at most six production/six test
+helpers, exactly three tests, driver below 120 and every helper/test below 200.
+The large file remains cohesive because it owns child carrier, reducer/value/
+error/view, trackers and fixtures. No hot-path measurement applies.
+
+Validate focused observed-root-mapping, protected root-mapping and observed-
+extension-mappings tests, full Bzlmod, direct core check, formatting, exact
+caps/allowlist and diff hygiene serially. Reuse Bazel 9.2
+`BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
+`BazelDepGraphValue.getRepositoryMapping`, `BazelDepGraphFunctionTest` and
+accepted lower observation proof; Buck2 DICE incrementality/cancellation stays
+concept/test evidence. Add no fixture or oracle.
+
+Root-mapping values/errors/full-scan/order/views, equality/invalidation and
+lower events remain exact. The private carrier/outer and shared-Arc transaction-
+local epoch are Slug-native. Promotion/caller, canonical apparent mapping,
+root definition/route/source, public command/bootstrap activation and exact
+identity bytes remain unsupported/deferred.
+
+ACCEPT returns only to a docs-only root-mapping carrier-visibility audit. STOP
+second file/key/owner/adapter, export/caller/API, core edit, partial family,
+semantic/order/event/equality/retention drift, epoch merge, copied map/order,
+retained scratch/task/lock, fixture/oracle, cap/helper/test waiver, upper
+activation, milestone closure, M8/M7B or exact identity work. REPLAN before
+widening. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Selected-definition carrier formatter REPLAN (2026-08-21)
 
 The proof-corrected semantic draft is retained, but
