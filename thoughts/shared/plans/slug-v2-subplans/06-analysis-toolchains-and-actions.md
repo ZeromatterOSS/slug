@@ -14443,6 +14443,93 @@ Design ACCEPT schedules exactly
 then returns to callerless root source-observation owner design. M7 remains
 partial and M7A -> M8 -> M7B remains.
 
+### Root source-path carrier-visibility design accepted (2026-08-21)
+
+Committed audit `1b046a22` proves the private source-path observation is
+unnameable by its sole future source-observation sibling and that the
+callerless/public-parallel branches supply no prerequisite. Schedule exactly
+`WP-6-7A-host-root-apparent-repository-source-path-input-observation-carrier-visibility-implementation`.
+
+In `root_apparent_repository_source_path_input.rs`, promote exactly
+`HostRootApparentRepositorySourcePathInputObservationKey` and its existing
+three-argument `Option<Self>` constructor to `pub(super)`. Keep the tuple field
+private and preserve root rejection, requested `PathBuf` identity and exact
+Display:
+`observed-HostRootApparentRepositorySourcePathInputKey { workspace: NormalizedAbsolutePath { path: "/workspace" }, apparent_repo: ApparentRepoName("first"), requested_path: "pkg/file.bzl" }`.
+
+Promote exactly `ObservedHostRootApparentRepositorySourcePathInput` with its
+existing derives/Dupe and private fields. Expose only concrete borrowed
+`&Arc<HostRootApparentRepositorySourcePathInputResult>` and
+`&PathObservationEpoch` accessors. Add no observation Result/Outcome alias;
+existing legacy aliases and visibility stay unchanged.
+
+Rename the typed outer to private
+`RootApparentRepositorySourcePathInputObservationError`, retaining the sole
+`Source(HostRootApparentRepositorySourceInputObservationError)` variant,
+matching derives and manual Dupe. Driver outcome and terminal mapping use only
+the inner. Add same-derived/manual-Dupe field-private
+`pub(super) HostRootApparentRepositorySourcePathInputObservationError(inner)`
+and wrap only observed Key `Complete(Err(inner))`. Add no constructor,
+conversion, inspector, public field, alias, export or accessible variant.
+
+In existing `production_edge_is_path_then_source_input_only`, replace only the
+old outer spelling and require exactly one private-inner Source mapping plus
+one opaque Key projection. Every other assertion, the exact three observation
+tests, their helpers and all legacy proof remain frozen.
+
+Add exactly one test-only source-observation sibling smoke named
+`root_apparent_repository_source_path_input_observation_surface_is_sibling_usable`.
+It explicitly imports the three promoted names plus `PathObservationEpoch`,
+constructs only the key, asserts the exact Display above and uses one
+nonexecuted function-pointer cast accepting associated Value, carrier and
+opaque-outer references. Its body assigns accessors to exact
+`&Arc<HostRootApparentRepositorySourcePathInputResult>` and
+`&PathObservationEpoch`. It cannot construct/inspect carrier or outer, name
+private inner/variant, compute or activate source observation. Production
+sibling imports remain unchanged.
+
+Authority is exactly source path baseline 1,687 physical/tests at 481,
+SHA-256
+`bba8073d34fc9cf13d6c8c9b2572a30bbf8d96764d948509980735a110ad4371`,
+and test-only source observation baseline 899 physical/tests at 340, SHA-256
+`47f16b844ae86a4707e77af27679f8faae484f09bdfdd36d60a8b34399f0b937`.
+Caps are <=80 owner production, <=50 owner proof, <=80 sibling proof, <=210
+aggregate additions and physical <=1,787/979. Add no production helper or
+owner test and exactly one sibling smoke below 100; enlarge no accepted proof
+except the bounded source-shape assertions. Add no `rustfmt::skip`; there is no
+format, cap or test waiver. Both files remain cohesive and below 2,000 lines;
+no hot-path or retained-representation change applies.
+
+Validate exact smoke/source shape, the three accepted source-path observation
+tests, protected legacy source-path/source-observation and observed-source-input
+suites, full core, separate runtime integration, direct commands check,
+`cargo fmt --all -- --check`, exact two-file allowlist/baseline-SHA/accounting/
+physical/test-size/effective-visibility/wrapper/source-shape/no-skip and diff
+hygiene serially. Full core may reproduce only the byte-identical accepted
+library query diagnostic failure. Run
+`cargo test -p slug_core_v2 --test runtime` separately; only the accepted
+`c8d2d0b5`-identical `PathObservationEpochKey`/configured-analysis-Needs
+failure is admissible while the other 12 tests pass. These are baseline
+accounting, not waivers: compare exact diagnostics and STOP any changed or
+additional failure. Reuse accepted owner/opaque-wrapper evidence; add no
+fixture or oracle.
+
+Path normalization, requested/relative-path identity, source-input projection,
+admitted values/terminals/order/equality/invalidation/lower events remain
+exact. The opaque same-crate Result-Arc+transaction-local epoch handoff is
+Slug-native. Source-observation ownership/activation and later carrier,
+public command/bootstrap activation and exact identity bytes remain deferred.
+
+STOP third file/type/key/carrier/adapter, crate-public/root export, public field/
+alias/private-inner/variant/inspector, legacy alias/visibility change, source-
+observation production/import/compute/caller, semantic/path/order/event/
+equality/epoch/retention/lifecycle drift, proof beyond exact source shape plus
+one smoke, formatter/cap/test waiver, Cargo/BUILD, fixture/oracle, upper/public/
+bootstrap work, milestone closure, M8/M7B or exact identity work. REPLAN before
+widening, baseline drift, changed/additional validation failure or format
+exception. ACCEPT returns only to a docs-only root source-observation owner
+design/frontier audit. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
