@@ -14060,6 +14060,78 @@ partial and M7A -> M8 -> M7B remains. This docs-only REPLAN may change only
 canonical/current/Stage/routing under <=20/<=100/<=100/<=10 and <=230 aggregate
 documentation additions.
 
+### Root source-input carrier-visibility audit selects same-crate design (2026-08-21)
+
+Accepted source-input owner `ff0728ce` changed only
+`root_apparent_repository_source_input.rs` by +941/-81 and left it at 1,716
+physical lines. Its observation surface at lines 176-439 remains wholly
+private: `HostRootApparentRepositorySourceInputObservationKey`,
+`ObservedHostRootApparentRepositorySourceInput` and the typed Route outer have
+zero production consumers. The legacy source-input key has exactly one
+production consumer, sibling source-path input at its lines 27/234.
+
+Source path first normalizes the requested path and then consumes exactly that
+one legacy source-input predecessor. It is the natural next owner but cannot
+name the observed Key associated Value, and using the legacy child would lose
+the accepted epoch. Directly promoting the existing outer would reveal its
+opaque lower route terminal. Effective visibility requires a private inner
+`RootApparentRepositorySourceInputObservationError` plus field-private opaque
+`pub(super) HostRootApparentRepositorySourceInputObservationError(...)`.
+
+The source-path key has exactly one production consumer, host source
+observation at its line 234, and that observation key has zero production
+callers. Public commands instead use the parallel Bzlmod route keys at
+`runtime/dice.rs:4476-4494`; imperative root bootstrap remains dormant. These
+later or parallel branches neither consume this observation nor provide
+visibility and are not prerequisites.
+
+Choose exactly
+`WP-6-7A-host-root-apparent-repository-source-input-observation-carrier-visibility-design`.
+It must freeze only same-crate `pub(super)` key/new, carrier with private fields
+and concrete borrowed source-input Result-Arc/epoch accessors, and the opaque
+outer above. Add no observation alias; existing legacy aliases and their
+visibility remain unchanged. Keep only the new inner, carrier fields, variant
+and every lower opaque route terminal private. Add no crate-root export,
+adapter, caller or semantic owner.
+
+The exact Display remains `observed-{legacy Display}`; `/workspace`, `@first`
+must render
+`observed-HostRootApparentRepositorySourceInputKey { workspace: NormalizedAbsolutePath { path: "/workspace" }, apparent_repo: ApparentRepoName("first") }`.
+Exactly one source-path test-only sibling smoke may construct only the key and
+prove Display, associated Value/carrier/outer types and concrete accessor
+function pointers. It may not construct or inspect carrier/outer, compute a
+key or activate source path. Adjust only private-inner/wrapper spelling in the
+existing source-input source-shape proof; all accepted semantic, identity,
+family/event and lifecycle/cancellation evidence remains unchanged.
+
+Prospective authority is exactly source input SHA-256
+`619374fed097c1423037ab80268ef714800364b2f967eb6b7b446f8b99cf4b10`
+at 1,716 physical/cfg(test) line 440 and source path SHA-256
+`254303b96882a68329c334662d4e07bb728b0c6b0c3eb7f78adbaf44896ff200`
+at 845 physical/cfg(test) line 300. Caps are <=80 source-input production,
+<=50 colocated proof, <=80 source-path proof, <=210 aggregate additions and
+<=1,816/925 physical. Add no production helper or source-input test, exactly
+one source-path smoke below 100, no accepted-test enlargement, no formatter
+waiver and no new `rustfmt::skip`.
+
+Validation must cover the three accepted observed source-input tests, exact
+sibling smoke, protected legacy source-input/source-path and observed route
+tests, full core, direct commands check, formatting, exact two-file allowlist/
+SHA/accounting/physical/effective-visibility/wrapper/source-shape and diff
+hygiene. Source-input values/projection/order/errors/identity/policy/
+invalidation/lower events remain exact. The opaque same-crate Result-Arc+epoch
+handoff is Slug-native. Source-path ownership, source observation, public
+command/bootstrap activation and exact identity bytes remain deferred.
+
+STOP implementation in this audit/design packet, any third file/type/key/
+carrier/adapter, crate-public/root export, public inner field/alias/variant,
+caller/source-path compute, semantic/order/event/equality/epoch/retention drift,
+proof beyond wrapper spelling plus one smoke, formatter/cap/test waiver,
+Cargo/BUILD, fixture/oracle, upper work, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening or hash drift. M7 remains partial and
+M7A -> M8 -> M7B remains. Documentation authority is capped at <=40 canonical,
+<=180 current packet, <=220 Stage and <=30 routing additions, <=470 aggregate.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
