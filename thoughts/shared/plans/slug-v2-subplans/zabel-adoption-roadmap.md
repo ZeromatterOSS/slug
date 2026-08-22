@@ -9,8 +9,9 @@ Zabel donor commit reviewed:
 
 Adopt the reviewed contracts, fixture themes, and operational ideas through
 Slug-owned Rust and the existing Bazel 9.2 oracle harness. Do not port Zabel's
-custom DICE scheduler, Starlark runtime, identity bytes, or monolithic module
-layout.
+custom DICE scheduler, Starlark runtime, or monolithic module layout. Zabel's
+identity outputs are not an oracle, but isolated ActionKey byte-feeding leaves
+may be audited and reimplemented in Rust against Bazel 9.2.
 
 This roadmap is a cross-stage adoption checklist, not Stage 11 and not a new
 scheduling authority. The canonical Live Status and compact current-packet
@@ -36,8 +37,9 @@ After the now-accepted source-consumer cutover:
 7. resume M7B command/ruleset breadth before the later cache, progress,
    explain, and watch workstreams whose prerequisites are then satisfied.
 
-M7A and M7B are scheduling gates within M7, not new milestones. M9 remains
-after the functional bootstrap path.
+M7A and M7B are scheduling gates within M7, not new milestones. M9 retains
+exact configuration/output identity after the functional bootstrap path;
+ActionKey projections move just in time with admitted action families.
 
 ## Adoption matrix
 
@@ -49,6 +51,7 @@ after the functional bootstrap path.
 | Six-class memory-lifetime review | all stages | Slug-native architecture | packet touches retained/cache/async state | adopted in planning |
 | Natural evaluated `.bzl` producer and repository owner/materializer split | Stages 4/5 | exact semantics; Slug-native Rust boundaries | accepted graph owners and first private source-observation consumer | first private consumer/cutover accepted; public migration deferred |
 | Immutable action-owner context | Stage 6 | exact platform/exec-group semantics; Slug-native storage | M1 request-revision vertical and relevant oracle subset | planned before broader action registration |
+| Bazel ActionKey fingerprint leaves | Stages 6/8 | exact per admitted action family | immutable action row/owner context plus Bazel 9.2 source and oracle | just in time; FileWrite first |
 | REAPI concurrency/interoperability oracle wave | Stage 7 | exact REAPI behavior | M7A action kinds/input trees | planned before bootstrap execution |
 | Sparse AC/CAS repository-output cache | Stages 5/7 | exact only after Bazel-compatible initial identity; otherwise Slug-native | generated-repository owner and recorded inputs | deferred |
 | Producer-owned truthful progress | Stages 7/8 | Slug-native presentation | stable execution observations | deferred |
@@ -71,6 +74,9 @@ after the functional bootstrap path.
       and measured rejected-experiment discipline.
 - [x] Record all agreed architecture, fixture, product, and non-adoption items
       in their owning stage plans.
+- [x] Keep structural action identity, exact Bazel ActionKey projection, and
+      REAPI ActionDigest as three independently derived domains; feed the exact
+      Bazel byte stream per family and never use ActionKey as an AC key.
 - [x] Accept the first private consumer as the fixed cutover and pivot only to
       the focused M1 oracle/DICE gate before request-revision Rust.
 
@@ -195,6 +201,9 @@ workstream complete from the presence of a type named `Certificate`.
       prompts that keep agents busy speculatively.
 - [x] Do not claim Bazel remote-repository-cache interoperability until exact
       initial identity and wire behavior are demonstrated.
+- [x] Do not use Zabel output vectors alone for an exact claim or copy its
+      monolithic dispatcher; reverify every ActionKey field/order against Bazel
+      9.2 and fail closed for incomplete families.
 - [x] Do not let a cache, watcher, progress renderer, or explain surface become
       semantic authority.
 
@@ -203,6 +212,12 @@ workstream complete from the presence of a type named `Certificate`.
 The reviewed Zabel files are non-hermetic design inputs at the pinned donor
 commit above:
 
+- ActionKey leaf references: `src/core/bazel_fingerprint.zig`,
+  `src/core/bazel_internal_string_java_utf8.zig`,
+  `src/analysis/action_key_fingerprint.zig`,
+  `src/analysis/file_write_content.zig`,
+  `src/analysis/file_write_action_key.zig`, and
+  `src/analysis/complete_action_key.zig`;
 - `plans/AGENTS.md` and `plans/01-prior-art-review.md`;
 - `plans/04-memory-lifetime-architecture.md`;
 - `plans/07-concurrent-sessions-and-input-revisions.md`;

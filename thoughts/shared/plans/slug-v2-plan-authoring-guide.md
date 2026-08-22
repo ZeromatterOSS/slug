@@ -76,6 +76,14 @@ Bazel source and tests remain the compatibility oracle. Zabel, Buck2, V1, and
 other implementations may supply design ideas and fixture themes, but cannot
 replace Bazel 9.2 evidence for an exact claim.
 
+For an exact byte-algorithm donor, the packet may classify a bounded encoder or
+fingerprint helper as leaf reuse/concept input only after it lists every ordered
+byte input, conditional field, framing rule, and domain separator. Donor output
+vectors are regression candidates, not acceptance authority: replace the exact
+claim with pinned Bazel 9.2 source anchors and fresh discriminating oracle
+evidence. The packet must also state which semantic owner supplies each input
+and which consumers may use the derived projection.
+
 For a migrated test theme:
 
 - identify the upstream Bazel class, method, or shell test that establishes
@@ -92,7 +100,7 @@ A prior-art review should explicitly record:
 |----------------|---------------|
 | Leaf reuse | Small isolated utility or protocol code after ownership, license, and compatibility review |
 | Concept/test only | Architecture contract, failure lesson, benchmark method, or fixture theme reimplemented behind Slug owners |
-| Avoid | Donor scheduler/runtime, semantic side store, fallback repair, incompatible identity, or monolithic orchestration |
+| Avoid | Donor scheduler/runtime, semantic side store, fallback repair, unverified identity output, or monolithic orchestration |
 
 ## Complexity and document hygiene
 

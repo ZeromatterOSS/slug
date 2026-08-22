@@ -219,9 +219,10 @@ Do not later reconstruct an action's platform or properties from only its
 label, the owner's current topology, a process-global current platform, or a
 new toolchain-resolution run. `aquery`, Stage 7 execution, Slug-native action
 provenance, progress observations, and future explain output must consume the
-same retained owner context and action row. Bazel checksum and ActionKey bytes
-remain separate M9 domains; admitting Slug-native internal bytes does not
-permit semantic inputs to be omitted.
+same retained owner context and action row. Bazel checksum and
+configured-output bytes remain separate M9 domains.
+Bazel ActionKey is a derived exact projection admitted per action family under
+6.4B; neither projection permits semantic inputs to be omitted.
 
 The design packet must audit the current `ConfiguredActionExecGroup::Default`
 and `ConfiguredActionView` topology-derived platform path, then prove:
@@ -244,13 +245,97 @@ Compatibility classification:
   action-visible provenance are **exact** for admitted Bazel 9.2 slices;
 - private Rust rows, compact identities, and added explain fields are
   **Slug-native**; and
-- exact configuration checksum, configured output token, and Bazel ActionKey
-  bytes remain **deferred to M9**.
+- exact configuration checksum and configured output token remain
+  **deferred to M9**; exact Bazel ActionKey projections are **exact per admitted
+  action family** under 6.4B.
 
 Use the Stage 1 provider, action-conflict, aquery-topology, and toolchain
 fixture backlog before implementation. This section freezes a future owner
 contract; it does not modify the accepted bounded FileWrite action surface or
 widen the active M7 packet.
+
+### 6.4B Exact Bazel ActionKey projection
+
+An exact Bazel ActionKey is a derived compatibility projection of the retained
+configured-action row plus immutable owner context. It is not the action's
+structural semantic identity, a new action graph, a configured-output token, or
+the REAPI Action digest. Historical M9 ActionKey deferrals below are superseded
+by this current contract; configuration checksum and output identity stay M9.
+
+Mirror Zabel's byte-feeding approach, but reverify every field and order against
+Bazel 9.2 source and fresh discriminating oracle evidence:
+
+- provide one small V2-owned `BazelFingerprint` leaf over SHA-256 with the
+  exact protobuf `CodedOutputStream` no-tag bool/int64/string length framing,
+  Java UUID word order, and Bazel internal-string-to-Java-UTF-8 conversion;
+- implement each admitted action family's exact `computeKey` body, including
+  its GUID, field order, collection order, conditional fields, and byte
+  representation, then append the common `ActionKeyComputer` tail;
+- the common tail must reproduce platform presence and `PlatformInfo`
+  fingerprinting in Bazel order, including parent/constraint structures,
+  maps/lists, settings, toolchain types, message booleans, action execution
+  properties, and the current zero uniquifier;
+- never hash debug output, formatter text, Slug canonical identity bytes,
+  `StrongHash`, a weak/precomputed map hash, or the REAPI Action encoding as a
+  substitute for Bazel's ordered fingerprint stream; and
+- fail closed when any source-derived input is not modeled. No zero,
+  hard-coded, truncated, or opaque fallback key is admitted.
+
+FileWrite is the first projection. Its packet must distinguish the regular and
+compressed GUIDs, executable bit, and exact logical content; reproduce Bazel's
+Java compression threshold and deterministic `GZIPOutputStream` bytes; and
+retain the accepted discriminator that content and platform affect ActionKey
+while declared output path, owner configuration token, and output-root spelling
+do not. Each M7A/M7B action family receives the same just-in-time source audit
+and exact projection alongside semantic activation.
+
+Reviewed Zabel donor commit
+`c7298478e2e56262a2f438e9c065325744c9f0fc` supplies bounded leaf and test
+ideas from:
+
+- `src/core/bazel_fingerprint.zig`;
+- `src/core/bazel_internal_string_java_utf8.zig`;
+- `src/analysis/action_key_fingerprint.zig`;
+- `src/analysis/file_write_content.zig`;
+- `src/analysis/file_write_action_key.zig`; and
+- `src/analysis/complete_action_key.zig`.
+
+These are donor inputs, not the oracle. The packet must record exact Bazel 9.2
+source anchors, accepted output vectors, mutation discriminators for every
+conditional field, and a cross-check that Zabel's result still matches the
+pinned Bazel revision.
+
+Keep the domains visibly separate:
+
+```text
+ConfiguredAction + immutable owner context
+  -> Slug structural identity       (equality and DICE invalidation)
+  -> Bazel ActionKey projection     (aquery and parity)
+  -> REAPI Action projection
+       -> REAPI ActionDigest        (remote Action Cache)
+```
+
+There is no direct ActionKey-to-ActionDigest mapping. Exact Bazel ActionKey
+reproduction alone is insufficient for Bazel local-cache or remote-cache
+interoperability. It is nevertheless a necessary input to any future Bazel
+local ActionCache reader/writer. That work requires a separate packet covering
+cache-record versioning and namespace, discovered inputs, environment and
+execution metadata, output validation, and stale-entry behavior before the
+exact key may be used for lookup or publication.
+
+Compute the projection on demand in request/phase scratch unless measured reuse
+and invalidation justify a DICE projection. Do not retain a second semantic
+identity or duplicate the action row. Reuse compact immutable owner fields and
+deterministic compact maps already retained by Stage 6, preserve
+`Allocative` coverage for any new long-lived wrapper, and benchmark only after
+semantic vectors pass. Buck2 fast hashers and `strong_hash` remain useful in
+their existing domains but do not implement Bazel's SHA-256 fingerprint
+protocol.
+
+This contract does not displace the active M7 source-observation packet. It
+schedules FileWrite and later family projections just in time with their owning
+Stage 6/8 packets; only residual, not-yet-admitted action families may remain
+under M9.
 
 ### 6.5 Toolchains and Platforms
 

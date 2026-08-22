@@ -152,6 +152,30 @@ import mode, oracle, and validation.
 - Stale local AC and orphaned remote AC entries must re-execute through REAPI
   with zero direct-local fallback.
 
+### 7.5A Action-key mapping firewall
+
+Persisted and remote action-cache identity is strictly the SHA-256 digest of
+the deterministic encoded REAPI `Action`: `ActionDigest -> ActionResult`.
+The same configured action may also have a Slug structural identity and an
+exact Bazel ActionKey projection, but these are separate derivations with
+different byte inputs and consumers.
+
+There is no direct or reversible mapping from Bazel ActionKey to REAPI
+ActionDigest. Stage 7 derives Command, Directory, Platform, and Action protobuf
+blobs from the retained action/owner semantics and keys local or remote memo
+records by ActionDigest, instance, and applicable policy -- never by Bazel
+ActionKey. Stage 6/8 may use an exact ActionKey for aquery and differential
+validation; that does not alter cache lookup or prove Bazel cache
+interoperability.
+
+Add a cross-domain FileWrite discriminator: changing the declared output name
+changes the REAPI Command/Action digest but leaves Bazel's FileWrite ActionKey
+unchanged; changing logical content or admitted platform properties changes
+both. A configuration-only edit may leave the REAPI digest unchanged when the
+execution inputs are identical even though Slug's structural owner identity
+changes. These relations are required evidence that no implementation aliases
+the domains.
+
 ### 7.6 Ruleset-Shaped REAPI Smoke
 
 - Defer broad ruleset conformance to Stage 8.
@@ -207,8 +231,10 @@ that selected owner and run each subset immediately before its implementation;
 the whole Wave B catalog is not one gate. M8 begins when the bootstrap REAPI
 slice is accepted. Remaining backend breadth, progress presentation, and watch
 output generations stay in M7B or later product packets unless the bootstrap
-closure directly demonstrates a prerequisite. M9 identity bytes remain
-separate.
+closure directly demonstrates a prerequisite. M9
+configuration/output-identity bytes remain separate. Per-family Bazel
+ActionKey projections belong to Stages 6/8 and remain firewalled from this
+Stage 7 cache identity.
 
 After broader Stage 6 actions and input trees are accepted, add a recording
 REAPI boundary that proves behavior under concurrency rather than only scalar

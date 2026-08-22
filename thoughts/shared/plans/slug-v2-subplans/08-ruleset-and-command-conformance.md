@@ -40,19 +40,19 @@ execution/cache breadth becomes the project priority.
 
 ### Current M3 status
 
-Live Status in the canonical plan owns scheduling. The root-repository query
-command is user-visible with default/explicit `label`, graph, `label_kind`, and
-`package` output and 13 of Bazel 9.2's 16 default functions. Output-specific
-kind completion loads only otherwise unresolved selected kinds; standard label
-and graph dependencies and ordering stay unchanged. Focused cross-package
-failure/edit/recovery proves that boundary.
+Live Status in the canonical plan owns scheduling. M3 is accepted with all 16
+Bazel 9.2 default query functions and the admitted output formats. `attr`,
+`filter`, and `kind` use the reviewed Slug-native `regex` 1.13.1 contract:
+compile once, search the exact function-specific candidate strings without
+implicit anchoring, enforce bounded parser/NFA/DFA and input limits, and fail
+closed with Slug-owned diagnostics.
 
-`attr`, `filter`, and `kind` remain blocked on an exact Java-compatible
-`Pattern` substrate. External repositories, pattern breadth, and other output
-formats also remain. The old tests-metadata Gate A and subsequent `tests()`,
-`labels()`, `executables()`, and `visible()` packets are accepted history, not
-live instructions. When M3 resumes, select one bounded user-visible gap and
-reuse accepted Bazel 9.2 evidence.
+This is intentionally valid-Unicode compatibility, not Java `Pattern`
+emulation. Java-only constructs, lone UTF-16 surrogates, exact Java diagnostic
+wording, and UTF-16 error-offset parity are unsupported. Sky Query-only
+functions, external-repository breadth, and non-text formats remain later
+breadth rather than M3 gates. Historical Java-compatibility feasibility notes
+below are evidence only and do not reopen the accepted contract.
 
 ### Query engine reuse policy
 
@@ -145,6 +145,23 @@ events, query output, cquery provider output, and aquery action graph. Missing
 Stage 6 or Stage 7 semantics must stay expected-failing with explicit owner
 backreferences; Stage 8 should not add local workarounds for analysis or
 execution gaps.
+
+### 8.2A Bazel ActionKey command projection
+
+For every action family whose Stage 6 exact ActionKey projection is accepted,
+`aquery` emits that exact Bazel 9.2 ActionKey. The command consumes the
+immutable configured-action row and owner context; it must not derive a key
+from formatter text, Slug's structural action identity, or the REAPI Action
+digest.
+
+An already accepted action family may temporarily retain an explicitly
+Slug-native token until its projection packet lands, but every newly admitted
+family must pair its semantic activation with the exact per-family
+projection. If any source-derived fingerprint input is unavailable, the
+projection is unsupported and fails closed; no zero, hard-coded, or opaque
+fallback is admitted. Exact ActionKey output is a parity and inspection
+surface, not evidence that Bazel local-cache or remote-cache entries are
+interchangeable.
 
 ### 8.3 Diagnostics and Compatibility Gates
 

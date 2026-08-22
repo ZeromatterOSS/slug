@@ -25,14 +25,14 @@ and must name the same packet.
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | **accepted** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, the first private core repository source-observation consumer in `53152727`, the pinned in-flight loading/source-lock oracle in `2ffad088`, the private request-revision/source-certificate vertical in `207fe438`, the sole-root native publication bridge in `f0849151`, the exact callerless observed-path/Host-file frontier in `308b409a`, the accepted observed root REPO, repository-ignore, package-marker, root-module, anchor, root-package source, and recursive Host `.bzl` frontiers in `f2c7305f`, `43adf74b`, `0875728b`, `2640d1c0`, `c6e61d60`, `2225cf99`, and `b9fda97d`; Host-glob listing/boundary, segment, traversal, complete root-package loading, singleton root-package-all publication, observed configured analysis, neutral singleton-root `Single`, public cquery publication, observed external repository routing, routed Host path/source, routed REPO/ignore policy, external package-marker lookup, and direct-local MODULE file, inspection, include-package horizon, recursive preparation, evaluation, repository-package source, external-Bzl evaluation, repository-package-load, loading-query publication, epoch-shaped source-certificate acceptance, external singleton build and root-only multi-build publication are accepted through `bd4fb8db`, `dc6f6e02`, `2bccb48e`, `daf5eef9`, `31a8b1d3`, `69d37ddb`, `941db0d0`, `03f2db3e`, `e4555dca`, `e4ee0a8e`, `2a8dd968`, `33717f27`, `99d78875`, `a61de5d4`, `79248832`, `cc34e31d`, `1815c019`, `ac7b8bdf`, `93f43264`, `a9270586`, `2e1c1334`, `3f1d4dd4`, and `51127df8`; the exit audit proves shared typed roots, overlapping isolation/cancellation, bounded revision retry, exact final certificate reobservation, atomic materializer/path/repository/event publication, lifecycle restoration, warm nonreplay, compact retained state, and deferred snapshot adapters | none | preserve the accepted semantic spine |
-| M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
+| M2: analysis graph | **accepted (Slug-native semantic identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output bytes remain deferred to M9; exact ActionKey projections are admitted just in time per action family | preserve structural identity and the distinct digest/projection domains |
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
-| M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, and multi-platform choice are later breadth | preserve the admitted FileWrite boundary |
+| M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
 | M7: command/ruleset breadth | **partial; source-observation implementation active** | `53152727` accepts the first private core source consumer; M1 supplies the shared publication spine; bounded FileWrite aquery/REAPI, `cb5073e0`'s immutable action-owner row, `b7390392`'s rules_rust 0.73 evidence, the accepted repository-observation chain through `e155d74f`, `ccf7421e`'s selected registry repo-spec epoch, `9d2f7a7d`'s selected-module-routes epoch, `2e0a19ae`'s selected-extension-mappings epoch, `094ba075`'s selected-extension definition-request epoch, `e82057f2`'s evaluation-input epoch, `99c23033`'s hidden request-carrier handoff, `3a68afa5`'s loaded-definition epoch, `50881fc0`'s hidden evaluation-input handoff, `682c4a1e`'s private prepared-input epoch, `f76bab3a`'s crate-internal prepared handoff, `9bab80b3`'s pure-invocation epoch, `0dcf2eea`'s crate-internal opaque pure handoff, `c1c8e1d8`'s private instantiation epoch, `4b5e9d05`'s crate-internal opaque instantiation handoff, `b8459b4e`'s private validation epoch, `8990cf43`'s hidden validation handoff, `7f9325e1`'s private generated-definition epoch, `a7d9ffcc`'s private canonical-selected epoch, `66a669cc`'s hidden selected-carrier handoff, `c96ae09d`'s private canonical epoch, `7ee0522b`'s private root-mapping epoch, `e27974c8`'s hidden root-mapping handoff, `2022a7a2`'s private apparent-mapping epoch, `4fe0bf1c`'s crate-internal opaque apparent-mapping handoff, `08524062`'s crate-internal opaque canonical-definition handoff, `29795aeb`'s private root apparent-definition epoch, `16a3d80a`'s crate-internal opaque root-definition handoff, `cf30f8f2`'s private root-route epoch, `b61f8f1a`'s crate-internal opaque route handoff, `ff0728ce`'s private source-input epoch, `c8d2d0b5`'s crate-internal opaque source-input handoff, `54c444d2`'s source-path owner design, `bc95291a`'s private source-path epoch, `1b573d5c`'s crate-internal opaque source-path handoff and `597df31b`'s terminal source-observation owner frontier are accepted | the exact callerless private Legacy/Observed source-observation owner and its one-prefix/no-merge proof remain to be implemented | implement only `WP-6-7A-host-root-apparent-repository-source-observation-observation-implementation`, then audit terminal carrier/publication consumers; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
-| M9: exact Bazel identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum, output-directory identity, and ActionKey algorithms | begin only after the functional semantic graph/bootstrap path |
+| M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
@@ -42,11 +42,34 @@ and must name the same packet.
 
 Explicit user direction permanently excludes JVM/Java integration or semantic
 delegation. Rust Host observations and valid-Unicode regex/string behavior are
-Slug-native; exact Bazel configuration/output-directory/ActionKey bytes move to
-M9. Complete structural equality/invalidation remains mandatory for admitted
+Slug-native; exact Bazel configuration/output-directory bytes remain M9 work.
+Complete structural equality/invalidation remains mandatory for admitted
 inputs, unmodeled inputs fail closed, and a namespaced display/path projection
 never becomes the semantic key. REAPI/CAS, content, repository, and lockfile
 digests remain exact and separate.
+
+The query-regex contract is the locked Rust `regex` 1.13.1 engine over valid
+Unicode strings: compile once, apply unanchored search to the exact candidate
+strings selected by each query function, enforce explicit parser/NFA/DFA and
+input limits, and report Slug-owned diagnostics. Lone UTF-16 surrogates,
+Java-only `Pattern` constructs, Java diagnostic text, and UTF-16 offset parity
+are unsupported rather than emulated.
+
+Exact Bazel ActionKey work is no longer a wholesale M9 item. After Stage 6 owns
+an immutable configured-action row and owner platform/properties, each admitted
+action family may add a Rust-only exact projection that feeds SHA-256 the same
+ordered byte stream as Bazel 9.2. Zabel commit
+`c7298478e2e56262a2f438e9c065325744c9f0fc` is a reviewed donor for protobuf
+no-tag fingerprint primitives, Bazel internal-string encoding, per-family
+GUID/body order, deterministic FileWrite compression, and the common
+ActionKeyComputer platform/property tail. Fresh Bazel 9.2 source and oracle
+evidence remain the authority for every accepted family.
+
+The identity domains stay firewalled: structural action identity owns equality
+and invalidation; an exact Bazel ActionKey is an optional aquery/parity
+projection; and the SHA-256 digest of the encoded REAPI Action is the remote
+Action Cache key. Exact ActionKey reproduction does not by itself establish
+local or remote cache interoperability.
 
 Source-language parsing remains the vendored Buck2 `starlark-rust` parser and
 evaluator with Bazel-owned dialect, globals, labels, effects, and diagnostics.
@@ -666,7 +689,9 @@ packets in this order:
    after their named semantic owners and lifecycle prerequisites exist.
 
 M7A and M7B are scheduling gates within M7, not new compatibility milestones.
-M9 exact Bazel identity-byte work remains after the functional bootstrap path.
+M9 exact Bazel configuration/output-identity work remains after the functional
+bootstrap path; exact ActionKey projections move with each admitted action
+family.
 
 Zabel remains a pinned donor of design lessons and fixture themes, never the
 compatibility oracle. Exact claims still require Bazel 9.2 source or generated
@@ -897,12 +922,12 @@ order. Use this overlay for scheduling new packets:
 | M2: analysis graph | Recursive configured targets return real providers and deterministic declared actions without execution | 3, 4, 5, 6 | Admitted inputs have complete structural identity/invalidation; named Slug-native ID bytes are explicit. |
 | M3: `query` | Bazel 9 unconfigured query semantics evaluate the loading graph | 8, 9 | Admitted non-regex semantics are exact; named regex functions follow the reviewed Slug-native valid-Unicode contract. |
 | M4: `cquery` | Configured query reads the same configured-target graph as analysis | 6, 8 | Transitions/providers/graph semantics match; provisional configuration ID bytes are explicitly Slug-native. |
-| M5: `aquery` | Action query reads the same Stage 6 action graph and implements Bazel 9.2.0's formatter shapes | 6, 8 | Graph/content/platform relationships match after only configuration/path/ActionKey opaque-token normalization. |
+| M5: `aquery` | Action query reads the same Stage 6 action graph and implements Bazel 9.2.0's formatter shapes | 6, 8 | Graph/content/platform relationships match; new family activations include an exact ActionKey projection, with the accepted FileWrite follow-on explicitly queued, while configuration/path tokens remain Slug-native. |
 | M6: execution and caching | Stage 6 actions execute and replay only through REAPI | 7 | BuildBuddy and local actiond evidence prove upload, execute, AC, and materialization with zero direct-local actions. |
 | M7A: bootstrap-critical command/ruleset breadth | The exact repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, aquery shapes, and REAPI behavior needed by the Slug bootstrap closure use the accepted graph and executor | 4, 5, 6, 7, 8 | Focused bootstrap-closure fixtures match and Stage 10.3 can compare the ordinary Slug graph without a bootstrap-only path. |
 | M8: bootstrap | Bazel-built Slug builds Slug and reaches a self-hosted fixed point | 10 | Stage1 and stage2 action graphs and declared outputs match after only admitted normalization. |
 | M7B: remaining command/ruleset breadth | `run`, `test`, BEP, unrelated public rulesets, and command formats not required by the bootstrap closure use the accepted graph and executor | 8 | Focused public fixtures match; stress projects remain supplemental. |
-| M9: exact Bazel identity bytes | Reproduce Bazel configuration, configured-output, and ActionKey byte algorithms in Rust | 6, 8 | Existing four-domain evidence and new source audits prove exact bytes without JVM production code. |
+| M9: exact Bazel configuration/output identity bytes | Reproduce Bazel configuration and configured-output byte algorithms in Rust; finish only residual ActionKey families not admitted earlier | 6, 8 | Existing four-domain evidence and new source audits prove exact bytes without JVM production code. |
 
 M3 progress: implementation commit `61ca25db` lands the first accepted
 DICE-backed loading-query thin vertical over the root repository, with

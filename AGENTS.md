@@ -20,15 +20,21 @@ silently widen a Slug-native or unsupported surface into a parity claim.
 - Approved Slug-native divergences are Rust Host observations rather than
   bitwise HotSpot state, Rust valid-Unicode strings/regex rather than exact Java
   UTF-16/`Pattern` edge behavior, and collision-safe, explicitly Slug-native
-  configuration/path/action identity bytes rather than Bazel checksum,
-  `bazel-out`, or ActionKey bytes.
-  Exact Bazel identity-byte reproduction is a later milestone.
+  configuration/path/action semantic identity rather than Bazel checksum or
+  `bazel-out` bytes. An admitted action family may additionally expose an exact
+  Rust-computed Bazel ActionKey projection once every source-derived byte input
+  is owned and oracle-verified; that projection never replaces structural
+  action identity or the REAPI Action digest used by the remote Action Cache.
+  Exact Bazel configuration and output-identity reproduction remains a later
+  milestone.
 - Relaxing identity bytes never relaxes semantic identity or integrity. Every
   admitted configuration-affecting input must participate structurally in DICE
   equality and invalidation; unmodeled inputs fail closed. Keep semantic
   configuration identity, display/path tokens, Bazel checksum, Bazel ActionKey,
-  and REAPI/CAS digests as distinct domains. Content, repository, lockfile, and
-  REAPI/CAS hashes remain exact for Slug's actual graph.
+  and REAPI/CAS digests as distinct domains. A Bazel ActionKey projection
+  reproduces that action family's ordered Bazel fingerprint byte stream; it is
+  never a hash of Slug's canonical semantic identity. Content, repository,
+  lockfile, and REAPI/CAS hashes remain exact for Slug's actual graph.
 - Record an unsupported boundary or `REPLAN` when no bounded Rust-native
   implementation exists within the packet's declared compatibility class.
 - Port `@bazel_tools` content verbatim from upstream; do not invent it.
