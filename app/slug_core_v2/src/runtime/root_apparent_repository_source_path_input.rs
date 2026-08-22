@@ -166,11 +166,11 @@ impl fmt::Display for HostRootApparentRepositorySourcePathInputKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostRootApparentRepositorySourcePathInputObservationKey(
+pub(super) struct HostRootApparentRepositorySourcePathInputObservationKey(
     HostRootApparentRepositorySourcePathInputKey,
 );
 impl HostRootApparentRepositorySourcePathInputObservationKey {
-    fn new(
+    pub(super) fn new(
         workspace: NormalizedAbsolutePath,
         apparent_repo: ApparentRepoName,
         requested_path: PathBuf,
@@ -185,22 +185,27 @@ impl fmt::Display for HostRootApparentRepositorySourcePathInputObservationKey {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-struct ObservedHostRootApparentRepositorySourcePathInput {
+pub(super) struct ObservedHostRootApparentRepositorySourcePathInput {
     result: Arc<HostRootApparentRepositorySourcePathInputResult>,
     observations: PathObservationEpoch,
 }
 impl ObservedHostRootApparentRepositorySourcePathInput {
-    fn result(&self) -> &Arc<HostRootApparentRepositorySourcePathInputResult> {
+    pub(super) fn result(&self) -> &Arc<HostRootApparentRepositorySourcePathInputResult> {
         &self.result
     }
-    fn observations(&self) -> &PathObservationEpoch {
+    pub(super) fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum HostRootApparentRepositorySourcePathInputObservationError {
+enum RootApparentRepositorySourcePathInputObservationError {
     Source(HostRootApparentRepositorySourceInputObservationError),
 }
+impl Dupe for RootApparentRepositorySourcePathInputObservationError {}
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(super) struct HostRootApparentRepositorySourcePathInputObservationError(
+    RootApparentRepositorySourcePathInputObservationError,
+);
 impl Dupe for HostRootApparentRepositorySourcePathInputObservationError {}
 enum RootApparentRepositorySourcePathInputMode {
     Legacy,
@@ -212,7 +217,7 @@ type RootApparentRepositorySourcePathInputDriverOutcome = SourcePreparationOutco
             Arc<HostRootApparentRepositorySourcePathInputResult>,
             PathObservationEpoch,
         ),
-        HostRootApparentRepositorySourcePathInputObservationError,
+        RootApparentRepositorySourcePathInputObservationError,
     >,
 >;
 
@@ -380,7 +385,7 @@ async fn compute_root_apparent_repository_source_path_input(
             }
             Ok(SourcePreparationOutcome::Complete(Err(error))) => {
                 return SourcePreparationOutcome::Complete(Err(
-                    HostRootApparentRepositorySourcePathInputObservationError::Source(error),
+                    RootApparentRepositorySourcePathInputObservationError::Source(error),
                 ));
             }
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
@@ -456,7 +461,9 @@ impl Key for HostRootApparentRepositorySourcePathInputObservationKey {
         {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
             SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
+                SourcePreparationOutcome::Complete(Err(
+                    HostRootApparentRepositorySourcePathInputObservationError(error),
+                ))
             }
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
                 SourcePreparationOutcome::Complete(Ok(
@@ -1663,7 +1670,13 @@ mod tests {
         );
         assert_eq!(
             production
-                .matches("HostRootApparentRepositorySourcePathInputObservationError::Source(error)")
+                .matches("RootApparentRepositorySourcePathInputObservationError::Source(error)")
+                .count(),
+            1
+        );
+        assert_eq!(
+            production
+                .matches("HostRootApparentRepositorySourcePathInputObservationError(error)")
                 .count(),
             1
         );

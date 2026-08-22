@@ -354,6 +354,7 @@ mod tests {
     use slug_bzlmod_v2::HostRepositorySourceFileValue;
     use slug_bzlmod_v2::HostRepositorySourceInputDispositionView;
     use slug_bzlmod_v2::HostRepositorySourceObservationView;
+    use slug_workspace_v2::PathObservationEpoch;
 
     use super::super::generated_repository_definition::tests::EXTENSION_A;
     use super::super::generated_repository_definition::tests::MODULE;
@@ -363,7 +364,39 @@ mod tests {
     use super::super::root_apparent_repository_definition::tests::prepare_builtin;
     use super::super::root_apparent_repository_source_input::HostRootApparentRepositorySourceInputKey;
     use super::super::root_apparent_repository_source_input::tests::complete_local;
+    use super::super::root_apparent_repository_source_path_input::HostRootApparentRepositorySourcePathInputObservationError;
+    use super::super::root_apparent_repository_source_path_input::HostRootApparentRepositorySourcePathInputObservationKey;
+    use super::super::root_apparent_repository_source_path_input::ObservedHostRootApparentRepositorySourcePathInput;
     use super::*;
+
+    #[test]
+    fn root_apparent_repository_source_path_input_observation_surface_is_sibling_usable() {
+        let key = HostRootApparentRepositorySourcePathInputObservationKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            ApparentRepoName::new("first").unwrap(),
+            "pkg/file.bzl".into(),
+        )
+        .unwrap();
+        assert_eq!(
+            key.to_string(),
+            "observed-HostRootApparentRepositorySourcePathInputKey { workspace: NormalizedAbsolutePath { path: \"/workspace\" }, apparent_repo: ApparentRepoName(\"first\"), requested_path: \"pkg/file.bzl\" }"
+        );
+
+        fn inspect(
+            _: &<HostRootApparentRepositorySourcePathInputObservationKey as Key>::Value,
+            observed: &ObservedHostRootApparentRepositorySourcePathInput,
+            _: &HostRootApparentRepositorySourcePathInputObservationError,
+        ) {
+            let _: &Arc<HostRootApparentRepositorySourcePathInputResult> = observed.result();
+            let _: &PathObservationEpoch = observed.observations();
+        }
+        let _ = inspect
+            as fn(
+                &<HostRootApparentRepositorySourcePathInputObservationKey as Key>::Value,
+                &ObservedHostRootApparentRepositorySourcePathInput,
+                &HostRootApparentRepositorySourcePathInputObservationError,
+            );
+    }
 
     #[derive(Default)]
     struct Tracker {
