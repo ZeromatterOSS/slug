@@ -1,22 +1,28 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-root-apparent-repository-source-input-observation-implementation`
+Packet: `WP-6-7A-host-root-apparent-repository-source-input-observation-proof-correction-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Design and Rust base: `400b819e` / `b61f8f1a`
+REPLAN and candidate base: pending docs commit / `5d0f11ca`
 
 ## Goal and authority
 
-Implement only the accepted private observation owner for
-`HostRootApparentRepositorySourceInputKey`. Freeze one Legacy/Observed driver
-over the now-nameable observed route child, exact source-input projection and
-terminal semantics, child-epoch forwarding and proof without activating the
-sole source-path consumer or any later/public branch.
+Retain the current one-file source-input observation candidate and correct or
+validate only its proof after the latest unvalidated refactor. Preserve the
+accepted Legacy/Observed owner, exact projection/terminal/epoch/event/lifecycle
+contract and sibling smoke while freezing production and API byte-for-byte.
 
-Rust authority is exactly
+Rust authority is only lines 440+ of
 `app/slug_core_v2/src/runtime/root_apparent_repository_source_input.rs`.
-Every second Rust/test/API/export/caller/fixture/oracle/Cargo/BUILD file and all
-orchestration docs are read-only during implementation.
+Production lines 1..=439, every second file, API/helper/test count and names,
+fixtures/oracles/Cargo/BUILD/exports/callers and orchestration docs are
+read-only during proof correction.
+
+The retained candidate exceeds only the former proof/aggregate addition caps:
+proof is +697/-11 against <=620 and aggregate is +936/-81 against <=860.
+Production is +239/-70 within its <=240 cap, all spans are below 200, and the
+file remains below its physical ceiling. This formal REPLAN raises proof and
+aggregate caps narrowly; it changes no semantic, proof or activation contract.
 
 ## Audited frontier
 
@@ -45,7 +51,7 @@ not prerequisites and stay inactive.
 Committed design `400b819e` selects exactly this one-file private owner, not a
 visibility prerequisite.
 
-## Frozen implementation contract
+## Frozen accepted production contract
 
 Add private nominal
 `HostRootApparentRepositorySourceInputObservationKey(HostRootApparentRepositorySourceInputKey)`
@@ -109,7 +115,7 @@ dependency, carrier or event; recovery recomputes lawfully.
 
 ## Exact proof
 
-Add exactly three tests:
+Retain exactly three tests:
 
 - `observed_root_apparent_repository_source_input_identity_finisher_and_terminal_algebra`;
 - `observed_root_apparent_repository_source_input_real_families_events_and_parity`;
@@ -141,24 +147,33 @@ shared tracker/helpers and update existing
 legacy route request, one observed route request, one pure projection and no
 other predecessor. Preserve all existing legacy assertions.
 
-## Authority, caps and validation
+## Retained candidate, caps and validation
 
-Implementation authority is exactly
-`app/slug_core_v2/src/runtime/root_apparent_repository_source_input.rs`,
-baseline 856 physical/cfg(test) line 271, SHA-256
-`940bcf9fe00782fba10dff5c1084525675a3b47c0471a1b15a18408f5c5249f2`.
-Every second file is read-only.
+Entry candidate is 1,711 physical with full SHA-256
+`f2188f3cb08b7f64cf87e09c2bcbb67c84a3dcceacc5bda03abbb41f0554c632`.
+Production lines 1..=439 are byte-frozen at SHA-256
+`6bf7709327d6b0070ca17449f655d747f816c050e8ea3c023921ebb49c5bb9fc`.
+Accounting against `5d0f11ca` is +239/-70 production, +697/-11 proof and
++936/-81 aggregate. Proof begins exactly at `#[cfg(test)]` line 440.
 
-Caps are <=240 production, <=620 proof, <=860 aggregate additions and <=1,750
-physical. Add at most six production/eight test helpers and exactly three
-tests; driver below 150 and every helper/test below 200. The file remains the
-cohesive source-input value/view/error/key/driver/fixture owner below the
-2,000-line trigger. No hot-path/retained-representation review applies.
+Retain exactly eight test helpers and the three named tests, add no
+`rustfmt::skip`, and keep every helper/test span below 200. Production/API,
+production-helper count, proof-helper count and test count/names may not
+change. Correct only assertions/source scans/imports inside the existing proof
+when a fresh gate demonstrates a concrete miss.
 
-Validate the three exact tests; protected legacy source-input and accepted
-route-observation tests/smoke; full core; direct commands check; formatting;
-exact one-file allowlist/SHA/accounting/physical/helper/test/driver/source-
-shape and diff hygiene serially. Reuse accepted Bazel 9.2
+Corrected caps are <=240 production additions, <=720 proof additions, <=960
+aggregate additions and <=1,750 physical. Relative to the entry candidate,
+headroom is exactly 23 proof additions, 24 aggregate additions and 39 physical
+lines. Deletions do not authorize replacement breadth or cap transfer.
+
+Run a completely fresh serial validation; no result predating the latest
+refactor is admissible. Validate the three exact tests; protected legacy
+source-input and accepted route-observation tests/smoke; full
+`cargo test -p slug_core_v2`; direct `cargo check -p slug_commands_v2`;
+`cargo fmt --all -- --check`; exact one-file allowlist, entry/prefix SHA,
+production/proof/aggregate accounting, physical/helper/test/span/source-shape
+and `git diff --check`. Reuse accepted Bazel 9.2
 `BazelDepGraphFunction.computeCanonicalRepoNameLookup`,
 `BazelDepGraphValue.getRepositoryMapping`, repository source-capability tests
 and original owner `e4292de7`; Buck2 DICE lifecycle is concept/test evidence.
@@ -173,20 +188,25 @@ carrier/outer is **Slug-native**. Source-path/source observation, public
 command/bootstrap activation and exact identity bytes remain
 **unsupported/deferred**.
 
-STOP second file/key/child/owner/adapter, visibility/export/caller, source-path
+STOP any production-prefix/hash/API/helper/test name or count change; second
+file/key/child/owner/adapter, visibility/export/caller, source-path
 or upper activation, semantic/projection/policy/order/error/event/equality/
 retention drift, epoch merge/rebuild, parent OperationMismatch, retained child/
 scratch/task/lock, private/malformed injection, fixture/oracle, cap/helper/test/
-format waiver, Cargo/BUILD, milestone closure, M8/M7B or exact identity work.
-REPLAN before widening or hash drift.
+format waiver or new `rustfmt::skip`, stale validation, Cargo/BUILD, milestone
+closure, M8/M7B or exact identity work. REPLAN before cap widening, production
+change or any proof correction that cannot fit the frozen existing helpers and
+tests.
 
 ## Terminal
 
-ACCEPT returns only to docs-only source-input carrier visibility/source-path
-consumer audit. M7 remains partial and M7A -> M8 -> M7B remains.
+ACCEPT requires the complete fresh serial gates above and returns only to docs-
+only source-input carrier visibility/source-path consumer audit. M7 remains
+partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Committed design `400b819e` is docs-only +284/-165 and accepts the complete
-one-file contract above. Accepted visibility `b61f8f1a` remains the Rust base;
-source input is 856 physical and its observed route child is nameable.
+Accepted design `400b819e` and scheduling correction `5d0f11ca` authorize the
+one-file owner. The current retained candidate implements production within
+cap but exceeds the former proof/aggregate caps and has not received fresh
+post-refactor serial validation; this REPLAN corrects only those constraints.

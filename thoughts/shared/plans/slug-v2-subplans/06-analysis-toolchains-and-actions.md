@@ -14009,6 +14009,57 @@ remains. This terminal scheduling correction changes only the four orchestration
 records at <=20 canonical, <=40 current, <=40 Stage, <=5 routing and <=105
 aggregate additions; it makes no Rust change.
 
+### Root source-input proof-cap/authority REPLAN (2026-08-21)
+
+Retain the current one-file candidate at 1,711 physical and full SHA-256
+`f2188f3cb08b7f64cf87e09c2bcbb67c84a3dcceacc5bda03abbb41f0554c632`.
+Against scheduling base `5d0f11ca`, production is +239/-70, proof +697/-11
+and aggregate +936/-81. Production lines 1..=439 are byte-frozen at
+`6bf7709327d6b0070ca17449f655d747f816c050e8ea3c023921ebb49c5bb9fc`;
+proof begins exactly at `#[cfg(test)]` line 440.
+
+Production remains within its <=240 cap. Only the old <=620 proof and <=860
+aggregate addition caps are exceeded, and the latest proof refactor has not
+received fresh serial validation. Schedule exactly
+`WP-6-7A-host-root-apparent-repository-source-input-observation-proof-correction-implementation`.
+Authority is only proof lines 440+ in the same file; production/API and every
+second file are read-only.
+
+Preserve the complete accepted Legacy/Observed owner: exact legacy/observed
+route child order, Need/outer/compute/finisher terminals, one projection,
+unchanged child epoch, no merge/mismatch, eventless parent, child-owned lower
+events, compact Result-Arc+epoch retention, DICE lifecycle/cancellation and all
+source-path/source-observation/public/bootstrap nonactivation. Preserve exact/
+Slug-native/deferred classifications.
+
+Retain exactly eight test helpers, the three named observation tests and the
+accepted route-surface sibling smoke. Add no helper/test, rename, production
+helper, API or `rustfmt::skip`; every helper/test remains below 200. Only a
+freshly demonstrated assertion/source-scan/import proof miss may be corrected
+inside the existing proof surface.
+
+Corrected caps are <=240 production additions, <=720 proof additions, <=960
+aggregate additions and <=1,750 physical. Entry-candidate headroom is exactly
+23 proof additions, 24 aggregate additions and 39 physical lines. Deletions do
+not transfer authority or permit replacement breadth.
+
+Run every validation gate fresh and serially because the latest refactor is
+unvalidated: the three exact tests; protected legacy source-input and accepted
+route-observation tests/smoke; full core; direct commands check; formatting;
+exact one-file allowlist, entry/prefix SHA, partitioned accounting, physical/
+helper/test/span/source shape and diff hygiene. No earlier passing result is
+admissible and no new fixture/oracle applies.
+
+STOP production-prefix/hash/API/helper/test name or count change, second file,
+semantic/proof obligation removal, source-path or upper activation, event/
+epoch/retention/lifecycle drift, private injection, new rustfmt skip, stale
+validation, cap/format/test waiver, Cargo/BUILD, milestone closure, M8/M7B or
+exact identity work. REPLAN before production change or cap widening. ACCEPT
+returns only to source-input carrier visibility/source-path audit. M7 remains
+partial and M7A -> M8 -> M7B remains. This docs-only REPLAN may change only
+canonical/current/Stage/routing under <=20/<=100/<=100/<=10 and <=230 aggregate
+documentation additions.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
