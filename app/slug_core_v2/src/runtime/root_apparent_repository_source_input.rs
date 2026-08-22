@@ -173,11 +173,14 @@ impl fmt::Display for HostRootApparentRepositorySourceInputKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostRootApparentRepositorySourceInputObservationKey(
+pub(super) struct HostRootApparentRepositorySourceInputObservationKey(
     HostRootApparentRepositorySourceInputKey,
 );
 impl HostRootApparentRepositorySourceInputObservationKey {
-    fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
+    pub(super) fn new(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+    ) -> Option<Self> {
         HostRootApparentRepositorySourceInputKey::new(workspace, apparent_repo).map(Self)
     }
 }
@@ -187,24 +190,33 @@ impl fmt::Display for HostRootApparentRepositorySourceInputObservationKey {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-struct ObservedHostRootApparentRepositorySourceInput {
+pub(super) struct ObservedHostRootApparentRepositorySourceInput {
     result: Arc<HostRootApparentRepositorySourceInputResult>,
     observations: PathObservationEpoch,
 }
 impl ObservedHostRootApparentRepositorySourceInput {
-    fn result(&self) -> &Arc<HostRootApparentRepositorySourceInputResult> {
+    pub(super) fn result(
+        &self,
+    ) -> &Arc<
+        Result<HostRootApparentRepositorySourceInput, HostRootApparentRepositorySourceInputError>,
+    > {
         &self.result
     }
 
-    fn observations(&self) -> &PathObservationEpoch {
+    pub(super) fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum HostRootApparentRepositorySourceInputObservationError {
+enum RootApparentRepositorySourceInputObservationError {
     Route(HostRootApparentRepositoryRouteObservationError),
 }
+impl Dupe for RootApparentRepositorySourceInputObservationError {}
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(super) struct HostRootApparentRepositorySourceInputObservationError(
+    RootApparentRepositorySourceInputObservationError,
+);
 impl Dupe for HostRootApparentRepositorySourceInputObservationError {}
 #[derive(Clone, Copy)]
 enum RootApparentRepositorySourceInputMode {
@@ -218,7 +230,7 @@ type RootApparentRepositorySourceInputDriverOutcome = SourcePreparationOutcome<
             Arc<HostRootApparentRepositorySourceInputResult>,
             PathObservationEpoch,
         ),
-        HostRootApparentRepositorySourceInputObservationError,
+        RootApparentRepositorySourceInputObservationError,
     >,
 >;
 
@@ -341,7 +353,7 @@ async fn compute_root_apparent_repository_source_input(
             }
             Ok(SourcePreparationOutcome::Complete(Err(error))) => {
                 return SourcePreparationOutcome::Complete(Err(
-                    HostRootApparentRepositorySourceInputObservationError::Route(error),
+                    RootApparentRepositorySourceInputObservationError::Route(error),
                 ));
             }
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
@@ -415,9 +427,9 @@ impl Key for HostRootApparentRepositorySourceInputObservationKey {
         .await
         {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
-            }
+            SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(
+                Err(HostRootApparentRepositorySourceInputObservationError(error)),
+            ),
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
                 SourcePreparationOutcome::Complete(Ok(
                     ObservedHostRootApparentRepositorySourceInput {
@@ -1675,7 +1687,11 @@ pub(super) mod tests {
             ("HostRootApparentRepositoryRouteObservationKey::new", 1),
             ("host_repository_source_input(capability)", 1),
             (
-                "HostRootApparentRepositorySourceInputObservationError::Route(error)",
+                "RootApparentRepositorySourceInputObservationError::Route(error)",
+                1,
+            ),
+            (
+                "HostRootApparentRepositorySourceInputObservationError(error)",
                 1,
             ),
         ] {
