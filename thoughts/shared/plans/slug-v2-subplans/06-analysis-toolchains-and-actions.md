@@ -14355,6 +14355,94 @@ exact identity work. REPLAN before production/assertion change or cap widening.
 ACCEPT returns only to source-path carrier-visibility/source-observation audit.
 M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Root source-path carrier-visibility audit selects same-crate design (2026-08-21)
+
+Accepted source-path owner `bc95291a` changed only
+`root_apparent_repository_source_path_input.rs` by +861/-63 and left it at
+1,687 physical lines. Its observation key/new, local Result-Arc+epoch carrier/
+accessors and typed Source outer at lines 169-215/441-480 remain wholly
+private and have zero production consumers outside their owner.
+
+The legacy source-path key has exactly one production consumer. Sibling
+`root_apparent_repository_source_observation.rs` imports it at line 28 and
+computes it first at line 234 before its conditional
+`HostRepositorySourceObservationKey` child. That sibling is the natural next
+owner, but it cannot name the observed Key associated Value or retain the
+accepted source-path epoch through a legacy child.
+
+The source-observation key itself has zero production callers. Public command
+analysis instead computes parallel Bzlmod `RootRepositoryRouteKey` and
+`RootRepositoryRouteObservationKey` at `runtime/dice.rs:4476-4494`; imperative
+root bootstrap remains dormant. Activating the callerless upper owner or
+following the public route would neither repair effective visibility nor be a
+smaller prerequisite.
+
+Choose exactly
+`WP-6-7A-host-root-apparent-repository-source-path-input-observation-carrier-visibility-design`.
+It must freeze only same-crate `pub(super)` key/new, carrier with private fields
+and concrete borrowed source-path Result-Arc/epoch accessors, plus one opaque
+outer. Direct promotion of the existing enum would expose its Source variant;
+rename that enum to a private inner and wrap it in one field-private nominal
+outer only at the observed Key projection.
+
+Add no observation Result alias and preserve existing legacy aliases and their
+visibility. Keep key/carrier fields, private inner/variant and the lower opaque
+source-input terminal inaccessible. Add no crate-root export, adapter, copied
+carrier, semantic caller or compute change.
+
+The exact three-argument Option constructor/root-name rejection and key
+identity stay unchanged. `/workspace`, `@first`, `pkg/file.bzl` displays
+exactly
+`observed-HostRootApparentRepositorySourcePathInputKey { workspace: NormalizedAbsolutePath { path: "/workspace" }, apparent_repo: ApparentRepoName("first"), requested_path: "pkg/file.bzl" }`.
+
+Freeze exactly one source-observation test-only sibling smoke. It constructs
+only the observed key, asserts exact Display and type-checks associated Value,
+carrier/opaque outer and concrete accessor function pointers without
+constructing or inspecting carrier/outer, computing a key or activating source
+observation. Production sibling imports remain unchanged. Only wrapper spelling
+in the owner's existing source-shape proof may change; accepted semantic,
+identity, family/event, lifecycle/cancellation tests/helpers stay frozen.
+
+Prospective authority is exactly source path baseline 1,687 physical/tests at
+481, SHA-256
+`bba8073d34fc9cf13d6c8c9b2572a30bbf8d96764d948509980735a110ad4371`,
+and test-only source observation baseline 899 physical/tests at 340, SHA-256
+`47f16b844ae86a4707e77af27679f8faae484f09bdfdd36d60a8b34399f0b937`.
+Caps are <=80 owner production, <=50 owner proof, <=80 sibling proof, <=210
+aggregate additions and physical <=1,787/979. Add no production helper or
+owner test and exactly one sibling smoke below 100; enlarge no accepted
+test/helper, add no `rustfmt::skip` and allow no formatting waiver. Both files
+remain cohesive and below the 2,000-line trigger; no hot-path or retained-
+representation change applies.
+
+Validation is exact owner identity/source-shape and sibling smoke; protected
+three observed source-path tests, legacy source-path/source-observation and
+observed-source-input suites; full core; direct commands check; formatting;
+exact two-file allowlist/SHA/accounting/physical/test-size/effective-visibility/
+wrapper/source-shape and diff hygiene, serially. Reuse accepted owner and
+opaque-wrapper proof; add no oracle.
+
+Path normalization, requested/relative-path identity, source-input projection,
+admitted values/terminals/order/equality/invalidation/lower events remain
+exact. The opaque same-crate Result-Arc+transaction-local epoch handoff is
+Slug-native. Source-observation ownership/activation and later carrier,
+public command/bootstrap activation and exact identity bytes remain deferred.
+
+STOP Rust/tests in this audit/design packet, third file/type/key/carrier/
+adapter, crate-public/root export, public field/alias/private-inner/variant,
+legacy alias/visibility change, source-observation production/compute/caller,
+semantic/path/order/event/equality/epoch/retention/lifecycle drift, proof beyond
+wrapper spelling plus one smoke, formatter/cap/test waiver, Cargo/BUILD,
+fixture/oracle, upper/public/bootstrap work, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening or baseline-hash drift. Documentation
+authority is canonical/current/this Stage/routing under <=40/<=180/<=220/<=30
+and <=470 aggregate additions.
+
+Design ACCEPT schedules exactly
+`WP-6-7A-host-root-apparent-repository-source-path-input-observation-carrier-visibility-implementation`,
+then returns to callerless root source-observation owner design. M7 remains
+partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is

@@ -1,142 +1,138 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-root-apparent-repository-source-path-input-observation-proof-correction-implementation`
+Packet: `WP-6-7A-host-root-apparent-repository-source-path-input-observation-carrier-visibility-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-REPLAN and candidate base: pending docs commit / `c8d2d0b5`
+Audit base: pending docs commit / `bc95291a`
 
 ## Goal and authority
 
-Retain the current one-file source-path observation candidate and complete only
-its proof-cap correction plus fresh serial validation. Preserve the accepted
-path-first Legacy/Observed owner, API, driver, semantic/error/event/epoch/
-retention/lifecycle contract, assertion set and all test/helper identities.
+Design only the smallest same-crate visibility handoff from the accepted
+private source-path observation to its sole future sibling source-observation
+consumer. Freeze exact nominal visibility, opaque error projection, borrowed
+accessors and a nonactivating sibling compile proof. Do not edit Rust, tests,
+APIs, exports, fixtures, Cargo/BUILD or callers in this packet.
 
-Rust authority is only proof lines 481+ of
-`app/slug_core_v2/src/runtime/root_apparent_repository_source_path_input.rs`.
-Production lines 1..=480, every second file, API/driver/helper/test names and
-counts, fixtures/oracles/Cargo/BUILD/exports/callers and orchestration docs are
-read-only during proof correction.
+Documentation authority is only the canonical plan, this manifest, Stage 6
+and the routing log, capped at <=40/<=180/<=220/<=30 additions respectively
+and <=470 aggregate additions. Every other file is read-only.
 
-The retained candidate exceeds only the former proof and aggregate addition
-caps: proof is +623/-6 against <=620 and aggregate is +861/-63 against <=860.
-Production is +238/-57 within <=240. This formal REPLAN raises only proof and
-aggregate ceilings; it changes no implementation, assertion, test, helper,
-formatting or activation contract.
+## Learned frontier and decision
 
-## Frozen retained candidate
+Accepted `bc95291a` changes only
+`root_apparent_repository_source_path_input.rs` by +861/-63 and leaves it at
+1,687 physical lines with tests beginning at line 481. Its private observation
+surface is:
 
-Entry candidate is 1,687 physical lines with full SHA-256
-`bba8073d34fc9cf13d6c8c9b2572a30bbf8d96764d948509980735a110ad4371`.
-Production lines 1..=480 are byte-frozen at SHA-256
-`2fd574628625d9f09ff248f784801e93e97e7f629d73d56404feb5ee7966f9ba`;
-proof begins exactly at `#[cfg(test)]` line 481. Accounting against
-`c8d2d0b5` is +238/-57 production, +623/-6 proof and +861/-63 aggregate.
+- `HostRootApparentRepositorySourcePathInputObservationKey`, with private
+  three-argument `new` and exact `observed-{legacy Display}`;
+- `ObservedHostRootApparentRepositorySourcePathInput`, retaining the concrete
+  source-path Result Arc and transaction-local `PathObservationEpoch`; and
+- `HostRootApparentRepositorySourcePathInputObservationError::Source`, naming
+  the lower opaque source-input outer.
 
-Freeze the complete production/API/driver byte sequence and accepted contract:
+These observed names have zero production consumers outside their owner. The
+legacy source-path key has exactly one production consumer: sibling
+`root_apparent_repository_source_observation.rs` imports it at line 28 and
+computes it first at line 234. That source-observation key has zero production
+callers. It later computes `HostRepositorySourceObservationKey`, but cannot
+preserve or merge the accepted source-path epoch through the private observed
+associated Value.
 
-- pure requested-path normalization precedes every child; invalid Path is a
-  semantic empty-epoch Result with no child edge;
-- Legacy requests exactly legacy source input with empty epoch; Observed
-  requests exactly observed source input;
-- Need is immediate and the opaque child outer maps to carrierless Source;
-  child DICE failure remains semantic Compute with empty epoch;
-- every child-complete Source/InvalidSource/success retains the exact legacy
-  child Result Arc and forwards the child epoch unchanged;
-- there is one shared driver, one pure finisher, no second child/merge/union/
-  rebuild/fallback/mismatch and no direct Host read;
-- the parent is eventless, dependency vectors are exact, warm rows are
-  batchless and every lower batch stays child-owned; and
-- the carrier retains only the local Result Arc plus compact epoch; child
-  carrier/path/view/event scratch dies before publication, with DICE-owned
-  serialization and lawful poll-drop/recovery.
+Public command analysis is a parallel branch: `runtime/dice.rs:4476-4494`
+uses public Bzlmod `RootRepositoryRouteKey` and
+`RootRepositoryRouteObservationKey`, not either Host source-path key. Root
+bootstrap remains dormant. Neither the callerless upper owner nor the public
+route supplies effective visibility, so neither is a prerequisite.
 
-The private observation key/carrier/Source outer, equality/validity and exact
-Display remain unchanged. Visibility, caller activation and upper source-
-observation/public/bootstrap work remain absent.
+Choose exactly this same-crate visibility design before source-observation
+ownership. It is uniquely smaller than activating or redesigning the
+callerless source-observation owner.
 
-## Frozen proof contract
+## Required design freeze
 
-Retain exactly the three named tests:
+Freeze only `pub(super)` visibility for the existing observed key, its exact
+constructor, the carrier and concrete borrowed Result-Arc/epoch accessors, and
+one field-private opaque outer. Keep the key field, carrier fields and terminal
+variant private. Directly exposing the current enum would reveal the `Source`
+variant; the design must rename it to a private inner and project it through a
+nominal opaque wrapper only at the observed Key boundary.
 
-- `observed_root_apparent_repository_source_path_input_identity_finisher_and_terminal_algebra`;
-- `observed_root_apparent_repository_source_path_input_real_families_events_and_parity`;
-- `observed_root_apparent_repository_source_path_input_lifecycle_cancellation_and_nonactivation`.
+Add no observation Result alias. Existing legacy aliases and visibility remain
+unchanged. Add no crate-root reexport, public field, constructor/conversion/
+inspector for the outer, adapter, copied carrier, caller or compute change.
 
-Their entry spans are respectively 107, 132 and 148 lines. Preserve every
-existing assertion and the entry candidate's proof-helper count/names/spans;
-add/remove/rename no test or helper, grow no helper/test beyond its entry span,
-and keep every span below 200. Preserve the accepted source-input visibility
-smoke and all legacy tests/source-shape assertions. Add no `rustfmt::skip`.
+Preserve exact key identity, three-argument Option construction/root-name
+rejection and Display. For `/workspace`, `@first`, `pkg/file.bzl`, Display is:
 
-The proof remains authoritative for exact key/path identity, invalid-path no-
-child precedence, Need/outer/compute/Source/InvalidSource/success Arc+epoch
-algebra; Main/Builtin/selected success, generated/mapping/missing Source
-terminal legacy semantic parity, complete lower event vectors and warm
-batchlessness; held parent/child mapping/definition/policy A-B-A, lawful
-same-Result/different-epoch invalidation, same-transaction child=parent subset-
-global epoch associations, no cross-transaction pairing, cancellation/
-recovery and source-observation/public/bootstrap nonactivation.
+`observed-HostRootApparentRepositorySourcePathInputKey { workspace: NormalizedAbsolutePath { path: "/workspace" }, apparent_repo: ApparentRepoName("first"), requested_path: "pkg/file.bzl" }`.
 
-No Rust edit is required merely to raise the cap. Within proof lines 481+, only
-a semantic-neutral import/layout/source-scan repair demonstrated by the fresh
-gates is permitted, and it must preserve the exact assertion set, helper/test
-names and counts, and the frozen span ceilings. REPLAN rather than changing an
-assertion, adding a helper/test family or touching production.
+Freeze exactly one test-only sibling smoke in
+`root_apparent_repository_source_observation.rs`. It may construct only the
+observed key, assert exact Display and type-check the associated Value,
+carrier, opaque outer and concrete borrowed accessor signatures through a
+nonexecuted function pointer. It may not construct or inspect carrier/outer,
+compute a key or activate source observation. Production sibling imports stay
+unchanged. Only wrapper spelling in the owner's existing source-shape proof may
+change; every accepted semantic/identity/family/event/lifecycle assertion and
+test/helper identity stays frozen.
 
-## Corrected caps and validation
+## Baselines, caps and validation
 
-Corrected caps are <=240 production additions, <=640 proof additions, <=880
-aggregate additions and <=1,750 physical lines. Relative to the entry candidate
-there is exactly 17 proof-addition, 19 aggregate-addition and 63 physical-line
-headroom; the two unused production additions are frozen and cannot transfer.
-Deletions do not authorize replacement breadth.
+Prospective Rust authority is exactly:
 
-Run every gate fresh and serially; no result predating this REPLAN is
-admissible:
+- `app/slug_core_v2/src/runtime/root_apparent_repository_source_path_input.rs`,
+  1,687 physical lines, `#[cfg(test)]` at 481, SHA-256
+  `bba8073d34fc9cf13d6c8c9b2572a30bbf8d96764d948509980735a110ad4371`;
+- test-only
+  `app/slug_core_v2/src/runtime/root_apparent_repository_source_observation.rs`,
+  899 physical lines, `#[cfg(test)]` at 340, SHA-256
+  `47f16b844ae86a4707e77af27679f8faae484f09bdfdd36d60a8b34399f0b937`.
 
-1. the exact three observation tests;
-2. protected source-input visibility smoke, legacy source-path tests and the
-   observed-source-input suite;
-3. full `cargo test -p slug_core_v2`;
-4. direct `cargo check -p slug_commands_v2`;
-5. `cargo fmt --all -- --check`; and
-6. exact one-file allowlist, entry full-file hash before any permitted proof
-   repair, frozen production-prefix hash after it, production/proof/aggregate
-   accounting, physical/helper/test/name/span/no-skip/source-shape checks and
-   `git diff --check`.
+Prospective caps are <=80 owner production, <=50 owner proof, <=80 sibling
+proof and <=210 aggregate additions, with physical ceilings <=1,787/979. Add
+no production helper or owner test and exactly one sibling smoke below 100;
+enlarge no accepted test/helper. Add no `rustfmt::skip` and allow no formatter,
+cap or test waiver. Both files remain cohesive existing semantic/test owners,
+stay below 2,000 lines and change no hot-path or retained representation.
 
-Reuse the accepted Bazel 9.2 source/path-capability evidence and Buck2 DICE
-lifecycle concepts. Add no fixture or oracle.
+The implementation packet must validate the exact owner identity/source-shape
+and sibling smoke; protected three observed source-path tests, legacy source-
+path/source-observation and observed-source-input suites; full
+`cargo test -p slug_core_v2`; direct `cargo check -p slug_commands_v2`;
+`cargo fmt --all -- --check`; exact two-file allowlist/baseline-SHA/accounting/
+physical/test-size/effective-visibility/wrapper/source-shape checks; and
+`git diff --check`, serially. Reuse accepted owner and opaque-wrapper proof; no
+new Bazel fixture or oracle is needed for a visibility-only handoff.
 
 ## Compatibility and stops
 
 Path normalization, requested/relative-path identity, source-input projection,
-Main/Builtin/selected values, generated/source errors and terminal order,
-equality/invalidation and lower events remain **exact** Bazel 9 compatibility.
-The private Result-Arc+transaction-local epoch carrier/outer remains
-**Slug-native**. Carrier visibility, source observation, public command/
-bootstrap activation and exact Bazel configuration/output/ActionKey bytes
-remain **unsupported/deferred**.
+admitted family values, terminals/order, equality/invalidation and lower event
+ownership remain **exact** Bazel 9 compatibility. The opaque same-crate Result-
+Arc+transaction-local epoch handoff is **Slug-native**. Source-observation
+ownership/activation, its later carrier, public command/bootstrap activation
+and exact Bazel configuration/output/ActionKey bytes remain
+**unsupported/deferred**.
 
-STOP production-prefix/full-entry hash precondition drift, production/API/
-driver/semantic or assertion change, test/helper name/count/span change, second
-file/key/child/owner/adapter, visibility/export/caller/source-observation work,
-event/epoch/equality/retention/lifecycle/cancellation drift, private/malformed
-injection, new test/helper family, new `rustfmt::skip`, cap/format/test waiver,
-stale validation, Cargo/BUILD, fixture/oracle, milestone closure, M8/M7B or
-exact identity work. REPLAN before production change, assertion change or cap
-widening.
+STOP implementation in this design packet, a third file/type/key/carrier/
+adapter, crate-public/root export, public field/alias/private-inner/variant,
+legacy alias/visibility change, source-observation production/compute/caller,
+semantic/path/order/event/equality/epoch/retention/lifecycle drift, proof beyond
+wrapper spelling plus one smoke, formatter/cap/test waiver, Cargo/BUILD,
+fixture/oracle, upper/public/bootstrap work, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening or baseline-hash drift.
 
 ## Terminal
 
-ACCEPT requires the complete fresh serial gates above and returns only to a
-docs-only source-path carrier-visibility/source-observation consumer audit. M7
-remains partial and M7A -> M8 -> M7B remains.
+If the exact opaque surface and two-file proof remain feasible, ACCEPT
+schedules exactly
+`WP-6-7A-host-root-apparent-repository-source-path-input-observation-carrier-visibility-implementation`,
+then returns to callerless root source-observation owner design. M7 remains
+partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Accepted design `54c444d2` authorizes the one-file owner from Rust base
-`c8d2d0b5`. The retained implementation fits production and physical caps but
-exceeds the former proof/aggregate additions by 3/1 respectively; this REPLAN
-corrects only those measured limits.
+Accepted `bc95291a` completes and validates the private source-path observation
+owner at the retained full hash and exact +861/-63 accounting above. Its packet
+terminal requires this docs-only carrier-visibility/source-observation audit.
