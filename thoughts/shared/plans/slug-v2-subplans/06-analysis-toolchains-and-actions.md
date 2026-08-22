@@ -14302,6 +14302,59 @@ milestone closure, M8/M7B or exact identity work. REPLAN before widening or
 hash drift. ACCEPT returns only to carrier-visibility/source-observation audit.
 M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Root source-path observation proof-cap REPLAN (2026-08-21)
+
+Retain the current one-file candidate at 1,687 physical lines with full entry
+SHA-256
+`bba8073d34fc9cf13d6c8c9b2572a30bbf8d96764d948509980735a110ad4371`.
+Against Rust base `c8d2d0b5`, production is +238/-57, proof +623/-6 and
+aggregate +861/-63. Production lines 1..=480 are byte-frozen at SHA-256
+`2fd574628625d9f09ff248f784801e93e97e7f629d73d56404feb5ee7966f9ba`;
+proof begins exactly at `#[cfg(test)]` line 481.
+
+Production remains within <=240. Only the former <=620 proof and <=860
+aggregate additions are exceeded, by 3 and 1. Schedule exactly
+`WP-6-7A-host-root-apparent-repository-source-path-input-observation-proof-correction-implementation`.
+Authority is only proof lines 481+; production/API/driver/semantics and every
+second file are read-only.
+
+Freeze the complete accepted path-first Legacy/Observed owner: invalid Path
+before any child with empty epoch, exact legacy/observed source-input child,
+carrierless Need/outer, semantic Compute empty epoch, unchanged child epoch for
+every completed Source/InvalidSource/success, no merge/mismatch, eventless
+parent, child-owned lower events, exact dependency rows, compact Result-Arc+
+epoch retention, cancellation/recovery and upper nonactivation. Preserve exact/
+Slug-native/deferred classifications.
+
+Retain exactly the three named observation tests and their current 107/132/148
+line spans. Freeze every assertion, test/helper name and count, and the entry
+helper/test spans; every span remains below 200. Preserve the accepted source-
+input visibility smoke, legacy tests and source-shape assertions. Add no
+`rustfmt::skip`. No Rust change is required by the cap increase; only semantic-
+neutral import/layout/source-scan repair within proof is permitted if a fresh
+gate demonstrates it without changing assertions, helpers, tests or spans.
+
+Corrected caps are <=240 production additions, <=640 proof additions, <=880
+aggregate additions and <=1,750 physical. Entry headroom is exactly 17 proof,
+19 aggregate and 63 physical lines; the two unused production additions are
+frozen and cannot transfer. Deletions authorize no replacement breadth.
+
+Run every validation gate fresh and serially: the three observation tests;
+protected sibling smoke, legacy source-path and observed-source-input suites;
+full core; direct commands check; formatting; exact one-file allowlist, entry
+full hash before any permitted repair, frozen production-prefix hash afterward,
+partitioned accounting, physical/helper/test/name/span/no-skip/source-shape and
+diff hygiene. No earlier result is admissible; add no fixture/oracle.
+
+STOP production-prefix/entry-precondition drift, production/API/driver/
+semantic/assertion change, test/helper name/count/span change, second file,
+visibility/caller/upper activation, event/epoch/retention/lifecycle drift,
+private/malformed injection, new test/helper family or rustfmt skip, cap/
+format/test waiver, stale validation, Cargo/BUILD, milestone closure, M8/M7B or
+exact identity work. REPLAN before production/assertion change or cap widening.
+ACCEPT returns only to source-path carrier-visibility/source-observation audit.
+M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
