@@ -14132,6 +14132,80 @@ identity work. REPLAN before widening or hash drift. M7 remains partial and
 M7A -> M8 -> M7B remains. Documentation authority is capped at <=40 canonical,
 <=180 current packet, <=220 Stage and <=30 routing additions, <=470 aggregate.
 
+### Root source-input carrier-visibility design accepted (2026-08-21)
+
+Committed audit `bc78883d` proves that the accepted private source-input
+observation has zero production consumers, cannot be named by its sole future
+sibling source-path owner and needs no upper or parallel prerequisite. Schedule
+exactly
+`WP-6-7A-host-root-apparent-repository-source-input-observation-carrier-visibility-implementation`.
+
+In `root_apparent_repository_source_input.rs`, promote exactly
+`HostRootApparentRepositorySourceInputObservationKey` and its existing
+two-argument `Option<Self>` constructor to `pub(super)`. Keep its tuple field
+private and preserve root rejection plus exact Display
+`observed-HostRootApparentRepositorySourceInputKey { workspace: NormalizedAbsolutePath { path: "/workspace" }, apparent_repo: ApparentRepoName("first") }`.
+
+Promote exactly `ObservedHostRootApparentRepositorySourceInput` with private
+fields and existing derives/Dupe. Expose only concrete borrowed
+`Arc<Result<HostRootApparentRepositorySourceInput,
+HostRootApparentRepositorySourceInputError>>` and `PathObservationEpoch`
+accessors. Add no observation Result/Outcome alias; existing legacy aliases and
+their visibility remain unchanged.
+
+Rename the current typed outer to private inner
+`RootApparentRepositorySourceInputObservationError`, retaining only the opaque
+route-error `Route` variant and matching derives/manual Dupe. The driver outcome
+and terminal mapping use only that inner. Add field-private same-derived/manual-
+Dupe `pub(super) HostRootApparentRepositorySourceInputObservationError(inner)`.
+Only the observed Key `Complete(Err(inner))` boundary wraps it. The new inner,
+carrier fields/variant and lower opaque route terminal remain private; add no
+constructor, conversion, inspector, field, alias or root export.
+
+In the existing `production_edge_is_only_route_then_pure_projection`, adjust
+only source spelling and require exactly one private-inner Route mapping plus
+one opaque Key projection. All three accepted observation tests and every
+semantic/identity/event/lifecycle assertion remain unchanged; add no source-
+input test.
+
+In test-only source path, add exactly
+`root_apparent_repository_source_input_observation_surface_is_sibling_usable`.
+It imports the three promoted names plus the existing concrete source-input
+value/error types, constructs only the observed key, asserts the exact Display
+above and uses a nonexecuted function-pointer cast to prove the exact associated
+`SourcePreparationOutcome<Result<carrier, opaque outer>>` and concrete borrowed
+Result-Arc/epoch accessors. It may not construct/inspect carrier or outer, name
+the private inner/variant, compute, invoke source path or activate an edge.
+
+Rust authority is exactly source input baseline 1,716/cfg(test) 440/SHA-256
+`619374fed097c1423037ab80268ef714800364b2f967eb6b7b446f8b99cf4b10`
+and test-only source path baseline 845/cfg(test) 300/SHA-256
+`254303b96882a68329c334662d4e07bb728b0c6b0c3eb7f78adbaf44896ff200`.
+Caps are <=80 source-input production, <=50 colocated proof, <=80 source-path
+proof, <=210 aggregate and <=1,816/925 physical. Add no production helper or
+source-input test, exactly one sibling smoke below 100, no accepted-test
+enlargement, no new `rustfmt::skip` and no formatting waiver.
+
+Validate focused identity/smoke, protected observed source-input real/event/
+lifecycle and legacy source-input/source-path plus observed-route suites, full
+core, direct commands check, rustfmt and exact two-file allowlist/hash/
+accounting/physical/test-size/visibility/wrapper/source-shape/diff hygiene.
+This visibility-only change adds no oracle.
+
+Source-input values/projection/order/errors/identity/policy/invalidation/lower
+events remain exact. The opaque same-crate Result-Arc+transaction-local epoch
+handoff is Slug-native. Source-path ownership, source observation, public
+command/bootstrap activation and exact identity bytes remain deferred.
+
+STOP a third file/type/key/carrier/adapter, crate-public/root export, public
+field/observation alias/private-inner/variant/inspector, legacy alias/visibility
+change, source-path production/caller, lower redesign, semantic/order/event/
+equality/epoch/retention/cancellation drift, proof beyond wrapper spelling and
+one smoke, format/cap/test waiver, Cargo/BUILD, fixture/oracle, upper work,
+milestone closure, M8/M7B or exact identity work. REPLAN before widening or
+hash drift. ACCEPT returns only to source-path observation-owner design. M7
+remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is

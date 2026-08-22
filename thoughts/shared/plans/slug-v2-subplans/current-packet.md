@@ -1,162 +1,189 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-root-apparent-repository-source-input-observation-carrier-visibility-design`
+Packet: `WP-6-7A-host-root-apparent-repository-source-input-observation-carrier-visibility-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Audit and Rust base: pending docs commit / `ff0728ce`
+Design and Rust base: pending docs commit / `ff0728ce`
 
-## Goal and decision authority
+## Goal and authority
 
-Design only the uniquely smaller same-crate visibility prerequisite between
-the accepted private root apparent-repository source-input observation and its
-sole future consumer in the sibling source-path module. Freeze one minimal
-`pub(super)` key/carrier/field-private opaque-outer surface plus sibling compile
-proof without changing computation or activating a caller.
+Implement only the designed same-crate visibility handoff between the accepted
+private root apparent-repository source-input observation and its future
+sibling source-path owner. Promote the existing observation key/carrier through
+exact `pub(super)` nominal APIs, hide the Route terminal behind one field-
+private opaque outer, and prove sibling type usability without changing
+computation or activating a caller.
 
-Write only the canonical plan, this manifest, Stage 6 and routing log at net
-caps <=40/<=180/<=220/<=30 and <=470 aggregate additions. Rust, tests,
-fixtures, oracles, Cargo/BUILD, exports and callers are read-only in this
-packet.
+Rust authority is exactly:
 
-## Audited frontier and decision
+- `app/slug_core_v2/src/runtime/root_apparent_repository_source_input.rs`; and
+- test-only
+  `app/slug_core_v2/src/runtime/root_apparent_repository_source_path_input.rs`.
 
-Accepted `ff0728ce` adds private
-`HostRootApparentRepositorySourceInputObservationKey`,
-`ObservedHostRootApparentRepositorySourceInput` and
-`HostRootApparentRepositorySourceInputObservationError` at
-`root_apparent_repository_source_input.rs:176-439`. The observed key/carrier/
-outer have zero production consumers. Their key/new, carrier/accessors and
-typed outer are private to the source-input module, so the sibling source-path
-owner cannot name the Key associated Value.
+Every third Rust/API/export/caller/fixture/oracle/Cargo/BUILD file and all
+orchestration docs are read-only during implementation.
 
-The outer's sole `Route` variant directly names the lower opaque root-route
-observation error. Promoting that enum would reveal child terminal structure
-the source-path owner does not need. Effective Key visibility therefore
-requires a field-private nominal wrapper around a renamed private inner at the
-observed Key error projection.
+## Frozen nominal surface
 
-The legacy `HostRootApparentRepositorySourceInputKey` has exactly one
-production consumer: `HostRootApparentRepositorySourcePathInputKey` imports it
-at source-path line 27 and computes it at line 234. Source path performs its
-path normalization before this one predecessor, then owns only source-input
-terminal/view/path projection. The accepted observed source input is its exact
-future child and no second semantic or visibility prerequisite exists. Reusing
-the legacy child would discard its epoch.
+In source input, promote exactly the existing key to:
 
-The source-path key has exactly one production consumer, the existing private
-host source observation at its line 234; that observation key has zero
-production callers. Public command analysis instead uses Bzlmod
-`RootRepositoryRouteKey` and `RootRepositoryRouteObservationKey` at
-`dice.rs:4476-4494`, while root bootstrap remains imperative and dormant.
-None consumes the observed source-input surface, supplies sibling visibility
-or replaces its epoch.
+```rust
+pub(super) struct HostRootApparentRepositorySourceInputObservationKey(
+    HostRootApparentRepositorySourceInputKey,
+);
+```
 
-No crate-public API, `runtime/mod.rs` or crate-root reexport, module move,
-adapter, lower-carrier promotion, source-path owner, source-observation rewrite,
-public-command bridge or bootstrap activation is needed. Thus source-input
-carrier visibility is uniquely smaller than source-path observation ownership.
+The tuple field stays private. Promote only its existing constructor, with the
+exact signature:
 
-## Design deliverable
+```rust
+pub(super) fn new(
+    workspace: NormalizedAbsolutePath,
+    apparent_repo: ApparentRepoName,
+) -> Option<Self>
+```
 
-Freeze exactly one minimal same-crate surface:
-
-- the existing source-input observation key and only its existing two-argument
-  `Option<Self>` constructor at `pub(super)`, preserving root rejection and
-  exact `observed-{legacy Display}`;
-- the existing carrier with private fields and concrete `pub(super)` borrowed
-  `Arc<Result<HostRootApparentRepositorySourceInput,
-  HostRootApparentRepositorySourceInputError>>` and `PathObservationEpoch`
-  accessors; and
-- private inner `enum RootApparentRepositorySourceInputObservationError`,
-  retaining exactly `Route(HostRootApparentRepositoryRouteObservationError)`
-  and existing derives/Dupe; plus field-private opaque
-  `pub(super) struct HostRootApparentRepositorySourceInputObservationError(
-  RootApparentRepositorySourceInputObservationError)` with matching derives/
-  Dupe, wrapping only the observed Key error projection.
-
-Keep the private inner, carrier fields and variants private. Add no public
-field, alias, variant, inspector, outer constructor/conversion, crate-root
-export, adapter or semantic caller. Existing legacy source-input types and
-aliases stay unchanged and are not new observation surface.
-
-Freeze exactly one test-only sibling proof in
-`root_apparent_repository_source_path_input.rs`. It may construct only the
-observed source-input key for `/workspace` and `@first`, assert exact Display
+Preserve root-name rejection and `observed-{legacy Display}`. For `/workspace`
+and `@first`, Display remains exactly:
 
 ```text
 observed-HostRootApparentRepositorySourceInputKey { workspace: NormalizedAbsolutePath { path: "/workspace" }, apparent_repo: ApparentRepoName("first") }
 ```
 
-and use one nonexecuted function-pointer proof of the associated
-`SourcePreparationOutcome<Result<carrier, opaque outer>>` plus concrete
-borrowed Result-Arc/epoch accessors. It must not construct or inspect the
-carrier/outer, compute the key, name the private inner/variant, invoke source
-path or activate semantics. Production source-path imports remain unchanged.
+Promote exactly the existing carrier to
+`pub(super) struct ObservedHostRootApparentRepositorySourceInput`, retaining
+private `result` and `observations` fields and existing derives/Dupe. Expose
+only these concrete borrowed accessors:
 
-Adjust only private-inner/public-wrapper spelling in existing source-input
-source-shape proof. Preserve all identity/root/Display, Need, dependency,
-finisher, terminal, Arc, epoch, equality, validity, real-family/event and
-lifecycle/cancellation/nonactivation assertions. Production evidence must name
-the private inner `Route` mapping exactly once and the observed Key projection
-wrapper exactly once.
+```rust
+pub(super) fn result(
+    &self,
+) -> &Arc<Result<HostRootApparentRepositorySourceInput,
+                 HostRootApparentRepositorySourceInputError>>
 
-## Prospective authority, caps and validation
+pub(super) fn observations(&self) -> &PathObservationEpoch
+```
 
-Prospective implementation authority is exactly:
+Add no observation Result/Outcome alias. Existing legacy source-input aliases
+and their visibility remain unchanged. Add no carrier field, constructor,
+conversion or inspector.
 
-- `app/slug_core_v2/src/runtime/root_apparent_repository_source_input.rs`,
-  baseline 1,716 physical/tests 440, SHA-256
+Rename the existing private enum exactly to
+`RootApparentRepositorySourceInputObservationError`. It retains only
+`Route(HostRootApparentRepositoryRouteObservationError)`, the existing Debug/
+Clone/PartialEq/Eq/Allocative derives and manual Dupe. The driver outcome and
+every driver terminal continue to use this private inner.
+
+Add exactly this same-derived/manual-Dupe field-private opaque wrapper:
+
+```rust
+pub(super) struct HostRootApparentRepositorySourceInputObservationError(
+    RootApparentRepositorySourceInputObservationError,
+);
+```
+
+The observed Key associated Value remains
+`SourcePreparationOutcome<Result<ObservedHostRootApparentRepositorySourceInput,
+HostRootApparentRepositorySourceInputObservationError>>`. Only its
+`Complete(Err(inner))` projection wraps
+`HostRootApparentRepositorySourceInputObservationError(inner)`. Need, success,
+legacy, equality, validity, driver order, route request, Result Arc, epoch,
+events, retention and cancellation remain byte-equivalent. Keep the new inner,
+carrier fields/Route variant and lower opaque route terminal private. Add no
+outer constructor/conversion/inspector, observation alias, public field or
+variant.
+
+## Exact proof changes
+
+In source input, change only wrapper/source spelling in existing
+`production_edge_is_only_route_then_pure_projection`. Preserve all assertions
+in the three accepted observation tests. Its producer scan must prove exactly
+one private `RootApparentRepositorySourceInputObservationError::Route(error)`
+mapping and exactly one observed Key projection
+`HostRootApparentRepositorySourceInputObservationError(error)`. Add no source-
+input test; real-family/event and lifecycle/cancellation/nonactivation proof
+remains byte-unchanged.
+
+In source path, add exactly one test named
+`root_apparent_repository_source_input_observation_surface_is_sibling_usable`
+and explicit test-only imports of the promoted key, carrier and opaque outer,
+plus the existing concrete source-input value and error types. It constructs
+only the observed source-input key for `/workspace`, `@first` and asserts the
+exact Display above. A nonexecuted `inspect` function plus exact function-
+pointer cast names:
+
+- `<HostRootApparentRepositorySourceInputObservationKey as Key>::Value`;
+- `SourcePreparationOutcome<Result<
+  ObservedHostRootApparentRepositorySourceInput,
+  HostRootApparentRepositorySourceInputObservationError>>`; and
+- borrowed `&Arc<Result<HostRootApparentRepositorySourceInput,
+  HostRootApparentRepositorySourceInputError>>` and `&PathObservationEpoch`
+  results from `result` and `observations`.
+
+The smoke cannot construct or inspect the carrier/outer, name the private
+inner/Route variant, call compute, invoke source-path computation or activate
+any graph edge. Production source-path imports and compute stay byte-unchanged.
+
+## Baselines, caps and validation
+
+Entry baselines are exact:
+
+- source input: 1,716 physical, cfg(test) line 440, SHA-256
   `619374fed097c1423037ab80268ef714800364b2f967eb6b7b446f8b99cf4b10`;
-- test-only
-  `app/slug_core_v2/src/runtime/root_apparent_repository_source_path_input.rs`,
-  baseline 845 physical/tests 300, SHA-256
+- source path: 845 physical, cfg(test) line 300, SHA-256
   `254303b96882a68329c334662d4e07bb728b0c6b0c3eb7f78adbaf44896ff200`.
 
-Prospective caps are <=80 source-input production, <=50 source-input colocated
-proof and <=80 source-path sibling proof; <=210 aggregate semantic additions
-and physical <=1,816/925. Add no production helper or new source-input-module
-test and exactly one source-path smoke. The wrapper-only source-shape helper
-adjustment may not enlarge any accepted observation test; the smoke stays below
-100. Both files remain cohesive below the 2,000-line trigger and no hot-path or
-retained-representation change applies. Formatting is mandatory with no waiver
-or new `rustfmt::skip`.
+Caps are <=80 source-input production, <=50 source-input colocated proof,
+<=80 source-path sibling proof, <=210 aggregate semantic additions and physical
+<=1,816/925. Add no production helper or source-input test and exactly one
+source-path smoke below 100. Do not enlarge any accepted observation test; the
+adjusted source-shape helper remains below 200. Add no `rustfmt::skip` and
+require rustfmt-stable bytes with no formatting waiver. Both files remain
+cohesive below the 2,000-line trigger. This is not a hot-path or retained-
+representation change.
 
-Prospective validation is serial: the three accepted observed source-input
-tests, exact sibling smoke, protected legacy source-input/source-path and
-observed route tests, full `cargo test -p slug_core_v2`, direct dependent
-`cargo check -p slug_commands_v2`, `cargo fmt --all -- --check`, exact two-file
-allowlist/SHA/accounting/physical/test-size/effective-visibility/wrapper/source-
-shape checks and `git diff --check`. Reuse accepted source-input owner and
-same-crate opaque-wrapper evidence. Add no Bazel oracle for a visibility-only
-change.
+Run serially:
+
+1. focused
+   `observed_root_apparent_repository_source_input_identity_finisher_and_terminal_algebra`
+   and
+   `root_apparent_repository_source_input_observation_surface_is_sibling_usable`;
+2. protected observed source-input real-family/event and lifecycle tests,
+   legacy source-input/source-path tests and observed root-route suite/smoke;
+3. full `cargo test -p slug_core_v2`;
+4. direct dependent `cargo check -p slug_commands_v2`;
+5. `cargo fmt --all -- --check`; and
+6. exact two-file allowlist/entry-SHA/accounting/physical/test-size/visibility/
+   wrapper/source-shape checks plus `git diff --check`.
+
+Reuse accepted source-input-owner and same-crate opaque-wrapper evidence. A
+visibility-only change adds no Bazel oracle.
 
 ## Compatibility and stops
 
 Source-input Main/Builtin/spec projection, Need and terminal order, retained
 route identity, policies, errors, equality/invalidation and lower events remain
-**exact** Bazel 9 compatibility. The crate-internal opaque Result-Arc+epoch
-handoff is **Slug-native**. Source-path ownership, source observation,
-public-command/bootstrap activation and exact Bazel configuration/output/
-ActionKey bytes remain **unsupported/deferred**.
+**exact** Bazel 9 compatibility. The crate-internal opaque Result-Arc+
+transaction-local epoch handoff is **Slug-native**. Source-path ownership,
+source observation, public-command/bootstrap activation and exact Bazel
+configuration/output/ActionKey bytes remain **unsupported/deferred**.
 
-STOP implementation/activation in this packet; third file/type/key/carrier/
-adapter; crate-public visibility or root export; public field/alias/private-
-inner/variant exposure; source-path compute; source-input semantic/event/epoch/
-retention drift; proof beyond wrapper spelling plus one exact smoke; formatter/
-cap/test waiver; Cargo/BUILD, fixture/oracle; upper source/public/bootstrap
-work, milestone closure, M8/M7B or exact identity work. REPLAN before widening
-or hash drift.
+STOP third file/type/key/carrier/adapter, crate-public visibility/root reexport,
+public field/observation alias/private-inner/variant/inspector, change to legacy
+aliases or their visibility, source-path production or caller activation, lower
+redesign, semantic/order/event/equality/epoch/retention/cancellation drift,
+proof beyond exact wrapper spelling plus one sibling smoke, formatter/cap/test
+waiver, new `rustfmt::skip`, Cargo/BUILD, fixture/oracle, upper source/public/
+bootstrap work, milestone closure, M8/M7B or exact identity work. REPLAN before
+widening, entry-hash drift or any need to expose child terminal structure.
 
 ## Terminal
 
-Design ACCEPT may schedule only
-`WP-6-7A-host-root-apparent-repository-source-input-observation-carrier-visibility-implementation`,
-then returns to root apparent-repository source-path observation-owner design.
-M7 remains partial and M7A -> M8 -> M7B remains.
+ACCEPT returns only to docs-only root apparent-repository source-path
+observation-owner design. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Accepted owner `ff0728ce` is +941/-81 in exactly the source-input file, 1,716
-physical lines, and remains callerless. Its production prefix lines 1..=439 is
-unchanged from the accepted design at SHA-256
-`6bf7709327d6b0070ca17449f655d747f816c050e8ea3c023921ebb49c5bb9fc`.
+Committed audit `bc78883d` is docs-only +217/-194. It selected this two-file
+same-crate handoff as uniquely smaller than source-path ownership; accepted
+source-input owner `ff0728ce` remains the Rust base.
