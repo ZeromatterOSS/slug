@@ -14206,6 +14206,102 @@ milestone closure, M8/M7B or exact identity work. REPLAN before widening or
 hash drift. ACCEPT returns only to source-path observation-owner design. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Root source-path input observation-owner design accepted (2026-08-21)
+
+Accepted `c8d2d0b5` exposes the observed source-input key/carrier/concrete
+Result-Arc+epoch accessors and opaque outer to its source-path sibling without
+activating a caller. Live source-path production at lines 218-299 first runs
+pure `host_repository_relative_path`, then has exactly one DICE child. No
+visibility, merge or evidence prerequisite remains. Schedule exactly
+`WP-6-7A-host-root-apparent-repository-source-path-input-observation-implementation`.
+
+Path normalization failure is the immediate semantic Path terminal and never
+requests source input. For a valid path, the legacy child order is Need;
+source-input DICE failure -> Compute; completed source error -> Source;
+successful source without a consistent view/certificate -> InvalidSource;
+consistent Main/Builtin/selected source -> success; generated and other
+completed source errors remain Source. Every completed terminal retains the
+exact source-input Result Arc where applicable. There is no second child, join,
+merge or direct Host filesystem read.
+
+Add private
+`HostRootApparentRepositorySourcePathInputObservationKey`, nominally wrapping
+the legacy key, with the exact three-argument Option constructor, root-name
+rejection and unchanged requested `PathBuf` identity. Display is
+`observed-{legacy Display}`; `/workspace`, `@first`, `pkg/file.bzl` renders
+`observed-HostRootApparentRepositorySourcePathInputKey { workspace: NormalizedAbsolutePath { path: "/workspace" }, apparent_repo: ApparentRepoName("first"), requested_path: "pkg/file.bzl" }`.
+
+Add private `ObservedHostRootApparentRepositorySourcePathInput` retaining only
+the local Result Arc and `PathObservationEpoch`, with borrowed accessors and
+matching derives/Dupe. Add private typed outer
+`HostRootApparentRepositorySourcePathInputObservationError::Source(
+HostRootApparentRepositorySourceInputObservationError)` with matching derives/
+manual Dupe and no carrier, epoch, Merge or OperationMismatch.
+
+Factor only existing computation into
+`RootApparentRepositorySourcePathInputMode::{Legacy, Observed}`, one private
+driver and exactly one pure finisher. Both modes normalize once before the
+child. Invalid path completes with empty epoch. Legacy requests legacy source
+input with empty epoch. Observed requests only observed source input: Need is
+immediate, child opaque outer maps to carrierless Source, child success supplies
+the original Result Arc and cloned epoch, and DICE compute error remains
+semantic Compute with empty epoch. Run existing disposition/view/certificate
+algebra once; every child-complete semantic terminal/success forwards the child
+epoch unchanged. Add no union/rebuild/fallback/join/mismatch.
+
+The parent is eventless. Pure normalization owns no event; the observed child
+owns all lower batches/order; every warm parent row is batchless. Exact edges
+are legacy parent -> legacy child and observed parent -> observed child, while
+invalid path has no child. Retain only the local Result Arc plus compact epoch;
+the Result owns its required child Arc and relative path. Child carrier, mode,
+path clone, views/disposition/event scratch die before publication. Add no
+cache/store/interner/task/lock. Poll-drop publishes nothing and same-DICE
+recovery is lawful.
+
+Add exactly
+`observed_root_apparent_repository_source_path_input_identity_finisher_and_terminal_algebra`,
+`observed_root_apparent_repository_source_path_input_real_families_events_and_parity`
+and
+`observed_root_apparent_repository_source_path_input_lifecycle_cancellation_and_nonactivation`.
+They prove key/path identity, invalid-path precedence, Need/outer/compute/
+semantic/success Arc+epoch algebra; exact Main, Builtin, generated,
+selected-nonregistry and mapping/missing legacy semantic parity/lower events/
+warm silence; and held parent/child mapping/definition/policy A-B-A, lawful
+neutral epoch invalidation, same-transaction child=parent subset-global epoch,
+cancellation/recovery and upper nonactivation. Fabricate no opaque outer,
+malformed epoch or private mirror/route input.
+
+Preserve the source-input sibling smoke and legacy tests. Extend only shared
+tracker/helpers and the production-edge scan to require one legacy child, one
+observed child, one pure path normalization and no other predecessor.
+
+Authority is exactly source path baseline 889 physical/cfg(test) 300/SHA-256
+`adb0cef588ca96622da614deb35bd6c3d43d9160b8b0892b3ce05e0a4ab937e2`.
+Caps are <=240 production, <=620 proof, <=860 aggregate and <=1,750 physical;
+at most six production/eight proof helpers, exactly three tests, driver below
+150 and every changed helper/test below 200. Add no `rustfmt::skip` or format
+waiver. The cohesive sole owner stays below 2,000 and is not a hot path.
+
+Validate the exact three tests, protected sibling smoke/legacy source-path and
+observed-source-input suites, full core, direct commands check, formatting,
+exact one-file hash/allowlist/accounting/physical/helper/test/driver/source
+shape and diff hygiene. Reuse accepted Bazel source/path-capability evidence
+and Buck2 lifecycle concepts; add no oracle.
+
+Path normalization/identity, source-input projection, admitted family values,
+errors/order/equality/invalidation/lower events remain exact. The private local
+Result-Arc+epoch carrier/outer is Slug-native. Carrier visibility, source
+observation/public/bootstrap activation and exact identity bytes remain
+deferred.
+
+STOP second file/key/child/owner/adapter, visibility/export/caller, source-
+observation work, semantic/path/view/order/error/event/equality/retention drift,
+epoch merge/rebuild/mismatch, retained child/scratch/task/lock, private/
+malformed injection, fixture/oracle, cap/helper/test/format waiver, Cargo/BUILD,
+milestone closure, M8/M7B or exact identity work. REPLAN before widening or
+hash drift. ACCEPT returns only to carrier-visibility/source-observation audit.
+M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
