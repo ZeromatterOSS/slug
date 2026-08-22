@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
 use slug_bzlmod_v2::HostRepositorySourceInput;
 use slug_bzlmod_v2::HostRepositorySourceInputError;
 use slug_bzlmod_v2::SourcePreparationOutcome;
@@ -20,8 +21,11 @@ use slug_bzlmod_v2::host_repository_source_input;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathObservationEpoch;
 
 use super::root_apparent_repository_route::HostRootApparentRepositoryRouteKey;
+use super::root_apparent_repository_route::HostRootApparentRepositoryRouteObservationError;
+use super::root_apparent_repository_route::HostRootApparentRepositoryRouteObservationKey;
 use super::root_apparent_repository_route::HostRootApparentRepositoryRouteResult;
 use super::root_apparent_repository_route::HostRootApparentRepositorySourceDisposition;
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -167,25 +171,138 @@ impl fmt::Display for HostRootApparentRepositorySourceInputKey {
         fmt::Debug::fmt(self, f)
     }
 }
-fn complete(
-    value: Result<
-        HostRootApparentRepositorySourceInput,
-        HostRootApparentRepositorySourceInputError,
-    >,
-) -> HostRootApparentRepositorySourceInputOutcome {
-    SourcePreparationOutcome::Complete(Arc::new(value))
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct HostRootApparentRepositorySourceInputObservationKey(
+    HostRootApparentRepositorySourceInputKey,
+);
+impl HostRootApparentRepositorySourceInputObservationKey {
+    fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
+        HostRootApparentRepositorySourceInputKey::new(workspace, apparent_repo).map(Self)
+    }
+}
+impl fmt::Display for HostRootApparentRepositorySourceInputObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedHostRootApparentRepositorySourceInput {
+    result: Arc<HostRootApparentRepositorySourceInputResult>,
+    observations: PathObservationEpoch,
+}
+impl ObservedHostRootApparentRepositorySourceInput {
+    fn result(&self) -> &Arc<HostRootApparentRepositorySourceInputResult> {
+        &self.result
+    }
+
+    fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
 }
 
-#[async_trait]
-impl Key for HostRootApparentRepositorySourceInputKey {
-    type Value = HostRootApparentRepositorySourceInputOutcome;
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum HostRootApparentRepositorySourceInputObservationError {
+    Route(HostRootApparentRepositoryRouteObservationError),
+}
+impl Dupe for HostRootApparentRepositorySourceInputObservationError {}
+#[derive(Clone, Copy)]
+enum RootApparentRepositorySourceInputMode {
+    Legacy,
+    Observed,
+}
 
-    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let predecessor = match ctx
+type RootApparentRepositorySourceInputDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (
+            Arc<HostRootApparentRepositorySourceInputResult>,
+            PathObservationEpoch,
+        ),
+        HostRootApparentRepositorySourceInputObservationError,
+    >,
+>;
+
+fn root_apparent_repository_source_input_error(
+    key: &HostRootApparentRepositorySourceInputKey,
+    kind: HostRootApparentRepositorySourceInputErrorKind,
+) -> Arc<HostRootApparentRepositorySourceInputResult> {
+    Arc::new(Err(HostRootApparentRepositorySourceInputError {
+        workspace: key.workspace.clone(),
+        apparent_repo: key.apparent_repo.clone(),
+        kind,
+    }))
+}
+
+fn finish_root_apparent_repository_source_input(
+    key: &HostRootApparentRepositorySourceInputKey,
+    predecessor: Arc<HostRootApparentRepositoryRouteResult>,
+    observations: PathObservationEpoch,
+) -> (
+    Arc<HostRootApparentRepositorySourceInputResult>,
+    PathObservationEpoch,
+) {
+    let terminal = |kind| root_apparent_repository_source_input_error(key, kind);
+    let source = predecessor
+        .as_ref()
+        .as_ref()
+        .ok()
+        .and_then(|route| route.source_capability());
+    let result = match completed_route_disposition(predecessor.is_ok(), source.is_some()) {
+        CompletedRouteDisposition::Route => terminal(
+            HostRootApparentRepositorySourceInputErrorKind::Route(predecessor),
+        ),
+        CompletedRouteDisposition::InvalidRoute => {
+            terminal(HostRootApparentRepositorySourceInputErrorKind::InvalidRoute(predecessor))
+        }
+        CompletedRouteDisposition::Source => {
+            let disposition = match source.expect("completed disposition checked source presence") {
+                HostRootApparentRepositorySourceDisposition::Main => {
+                    HostRootApparentRepositorySourceInputDisposition::Main
+                }
+                HostRootApparentRepositorySourceDisposition::Capability(capability) => {
+                    match host_repository_source_input(capability) {
+                        Ok(input) => HostRootApparentRepositorySourceInputDisposition::Input(input),
+                        Err(error) => {
+                            return (
+                                terminal(
+                                    HostRootApparentRepositorySourceInputErrorKind::Projection {
+                                        predecessor,
+                                        error,
+                                    },
+                                ),
+                                observations,
+                            );
+                        }
+                    }
+                }
+            };
+            let certificate = HostRootApparentRepositorySourceInput {
+                workspace: key.workspace.clone(),
+                apparent_repo: key.apparent_repo.clone(),
+                predecessor: predecessor.clone(),
+                disposition,
+            };
+            if certificate.view().is_none() {
+                terminal(HostRootApparentRepositorySourceInputErrorKind::InvalidRoute(predecessor))
+            } else {
+                Arc::new(Ok(certificate))
+            }
+        }
+    };
+    (result, observations)
+}
+
+async fn compute_root_apparent_repository_source_input(
+    key: &HostRootApparentRepositorySourceInputKey,
+    mode: RootApparentRepositorySourceInputMode,
+    ctx: &mut DiceComputations<'_>,
+) -> RootApparentRepositorySourceInputDriverOutcome {
+    let (predecessor, observations) = match mode {
+        RootApparentRepositorySourceInputMode::Legacy => match ctx
             .compute(
                 &HostRootApparentRepositoryRouteKey::new(
-                    self.workspace.clone(),
-                    self.apparent_repo.clone(),
+                    key.workspace.clone(),
+                    key.apparent_repo.clone(),
                 )
                 .expect("source-input key rejects root apparent names"),
             )
@@ -194,72 +311,83 @@ impl Key for HostRootApparentRepositorySourceInputKey {
             Ok(SourcePreparationOutcome::Need(need)) => {
                 return SourcePreparationOutcome::Need(need);
             }
-            Ok(SourcePreparationOutcome::Complete(predecessor)) => predecessor,
-            Err(error) => {
-                return complete(Err(HostRootApparentRepositorySourceInputError {
-                    workspace: self.workspace.clone(),
-                    apparent_repo: self.apparent_repo.clone(),
-                    kind: HostRootApparentRepositorySourceInputErrorKind::Compute(
-                        error.to_string().into(),
-                    ),
-                }));
+            Ok(SourcePreparationOutcome::Complete(predecessor)) => {
+                (predecessor, PathObservationEpoch::empty())
             }
-        };
-        let terminal = |kind| {
-            complete(Err(HostRootApparentRepositorySourceInputError {
-                workspace: self.workspace.clone(),
-                apparent_repo: self.apparent_repo.clone(),
-                kind,
-            }))
-        };
-        let source = predecessor
-            .as_ref()
-            .as_ref()
-            .ok()
-            .and_then(|route| route.source_capability());
-        match completed_route_disposition(predecessor.is_ok(), source.is_some()) {
-            CompletedRouteDisposition::Route => {
-                return terminal(HostRootApparentRepositorySourceInputErrorKind::Route(
-                    predecessor,
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Ok((
+                    root_apparent_repository_source_input_error(
+                        key,
+                        HostRootApparentRepositorySourceInputErrorKind::Compute(
+                            error.to_string().into(),
+                        ),
+                    ),
+                    PathObservationEpoch::empty(),
+                )));
+            }
+        },
+        RootApparentRepositorySourceInputMode::Observed => match ctx
+            .compute(
+                &HostRootApparentRepositoryRouteObservationKey::new(
+                    key.workspace.clone(),
+                    key.apparent_repo.clone(),
+                )
+                .expect("source-input key rejects root apparent names"),
+            )
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return SourcePreparationOutcome::Complete(Err(
+                    HostRootApparentRepositorySourceInputObservationError::Route(error),
                 ));
             }
-            CompletedRouteDisposition::InvalidRoute => {
-                return terminal(
-                    HostRootApparentRepositorySourceInputErrorKind::InvalidRoute(predecessor),
-                );
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                (observed.result().clone(), observed.observations().clone())
             }
-            CompletedRouteDisposition::Source => {}
-        };
-        let disposition = match source.expect("completed disposition checked source presence") {
-            HostRootApparentRepositorySourceDisposition::Main => {
-                HostRootApparentRepositorySourceInputDisposition::Main
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Ok((
+                    root_apparent_repository_source_input_error(
+                        key,
+                        HostRootApparentRepositorySourceInputErrorKind::Compute(
+                            error.to_string().into(),
+                        ),
+                    ),
+                    PathObservationEpoch::empty(),
+                )));
             }
-            HostRootApparentRepositorySourceDisposition::Capability(capability) => {
-                match host_repository_source_input(capability) {
-                    Ok(input) => HostRootApparentRepositorySourceInputDisposition::Input(input),
-                    Err(error) => {
-                        return terminal(
-                            HostRootApparentRepositorySourceInputErrorKind::Projection {
-                                predecessor,
-                                error,
-                            },
-                        );
-                    }
-                }
+        },
+    };
+    SourcePreparationOutcome::Complete(Ok(finish_root_apparent_repository_source_input(
+        key,
+        predecessor,
+        observations,
+    )))
+}
+
+#[async_trait]
+impl Key for HostRootApparentRepositorySourceInputKey {
+    type Value = HostRootApparentRepositorySourceInputOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match compute_root_apparent_repository_source_input(
+            self,
+            RootApparentRepositorySourceInputMode::Legacy,
+            ctx,
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(_)) => {
+                unreachable!("legacy source input has no observation outer")
             }
-        };
-        let certificate = HostRootApparentRepositorySourceInput {
-            workspace: self.workspace.clone(),
-            apparent_repo: self.apparent_repo.clone(),
-            predecessor: predecessor.clone(),
-            disposition,
-        };
-        if certificate.view().is_none() {
-            return terminal(
-                HostRootApparentRepositorySourceInputErrorKind::InvalidRoute(predecessor),
-            );
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                assert_eq!(observations, PathObservationEpoch::empty());
+                SourcePreparationOutcome::Complete(result)
+            }
         }
-        complete(Ok(certificate))
     }
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x.complete_eq(y)
@@ -268,8 +396,52 @@ impl Key for HostRootApparentRepositorySourceInputKey {
         value.is_complete()
     }
 }
+
+#[async_trait]
+impl Key for HostRootApparentRepositorySourceInputObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostRootApparentRepositorySourceInput,
+            HostRootApparentRepositorySourceInputObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match compute_root_apparent_repository_source_input(
+            &self.0,
+            RootApparentRepositorySourceInputMode::Observed,
+            ctx,
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(
+                    ObservedHostRootApparentRepositorySourceInput {
+                        result,
+                        observations,
+                    },
+                ))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
 #[cfg(test)]
 pub(super) mod tests {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hash;
+    use std::hash::Hasher;
     use std::sync::Mutex;
 
     use dice::ActivationData;
@@ -294,6 +466,7 @@ pub(super) mod tests {
     use slug_bzlmod_v2::RepositoryPackageSourceKey;
     use slug_bzlmod_v2::RepositorySourceFileKey;
     use slug_bzlmod_v2::RootRepositoryRouteKey;
+    use slug_events_v2::EventBatch;
     use slug_loading_v2::RepositoryPackageLoadKey;
     use slug_workspace_v2::PathObservationEpoch;
     use slug_workspace_v2::PathObservationEpochKey;
@@ -311,6 +484,13 @@ pub(super) mod tests {
     use super::super::root_apparent_repository_route::HostRootApparentRepositoryRouteObservationKey;
     use super::super::root_apparent_repository_route::ObservedHostRootApparentRepositoryRoute;
     use super::*;
+
+    type ObservedContext<'a> = (
+        &'a Arc<Arc<Dice>>,
+        &'a NormalizedAbsolutePath,
+        &'a HostRootApparentRepositorySourceInputObservationKey,
+        &'a HostRootApparentRepositoryRouteObservationKey,
+    );
 
     #[test]
     fn root_apparent_repository_route_observation_surface_is_sibling_usable() {
@@ -350,32 +530,59 @@ pub(super) mod tests {
     #[derive(Default)]
     struct Tracker {
         order: Mutex<Vec<(&'static str, ActivationKind)>>,
+        observed_owner: Mutex<Vec<ActivationKind>>,
+        observed_route: Mutex<Vec<ActivationKind>>,
+        activations: Mutex<Vec<(String, ActivationKind, Option<EventBatch>)>>,
+        dependencies: Mutex<Vec<(String, Vec<String>)>>,
         events: Mutex<usize>,
         forbidden: Mutex<Vec<&'static str>>,
     }
     impl ActivationTracker for Tracker {
         fn key_activated(
             &self,
-            _: &DynKey,
-            _: &mut dyn Iterator<Item = &DynKey>,
+            key: &DynKey,
+            dependencies: &mut dyn Iterator<Item = &DynKey>,
             _: ActivationData,
         ) {
+            self.dependencies.lock().unwrap().push((
+                key.to_string(),
+                dependencies.map(ToString::to_string).collect(),
+            ));
         }
         fn tracks_rich_activations(&self) -> bool {
             true
         }
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            let kind = activation.kind();
+            let batch = activation
+                .evaluation_data()
+                .and_then(|data| data.downcast_ref::<EventBatch>())
+                .map(Dupe::dupe);
+            self.activations
+                .lock()
+                .unwrap()
+                .push((key.to_string(), kind, batch));
             let owner = key
                 .downcast_ref::<HostRootApparentRepositorySourceInputKey>()
                 .is_some();
             let route = key
                 .downcast_ref::<HostRootApparentRepositoryRouteKey>()
                 .is_some();
-            if owner || route {
+            if key
+                .downcast_ref::<HostRootApparentRepositorySourceInputObservationKey>()
+                .is_some()
+            {
+                self.observed_owner.lock().unwrap().push(kind);
+            } else if key
+                .downcast_ref::<HostRootApparentRepositoryRouteObservationKey>()
+                .is_some()
+            {
+                self.observed_route.lock().unwrap().push(kind);
+            } else if owner || route {
                 self.order
                     .lock()
                     .unwrap()
-                    .push((if owner { "owner" } else { "route" }, activation.kind()));
+                    .push((if owner { "owner" } else { "route" }, kind));
                 *self.events.lock().unwrap() += usize::from(activation.evaluation_data().is_some());
             } else if key.downcast_ref::<RootRepositoryRouteKey>().is_some() {
                 self.forbidden.lock().unwrap().push("root-route");
@@ -399,9 +606,210 @@ pub(super) mod tests {
     impl Tracker {
         fn clear(&self) {
             self.order.lock().unwrap().clear();
+            self.observed_owner.lock().unwrap().clear();
+            self.observed_route.lock().unwrap().clear();
+            self.activations.lock().unwrap().clear();
+            self.dependencies.lock().unwrap().clear();
             *self.events.lock().unwrap() = 0;
             self.forbidden.lock().unwrap().clear();
         }
+    }
+    fn observed_source_input_value(
+        outcome: &<HostRootApparentRepositorySourceInputObservationKey as Key>::Value,
+    ) -> &ObservedHostRootApparentRepositorySourceInput {
+        match outcome {
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+            value => panic!("observed source input must have a carrier: {value:?}"),
+        }
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum FinishedKind {
+        Ok,
+        Route,
+        InvalidRoute,
+        Projection,
+    }
+    fn assert_finished(
+        key: &HostRootApparentRepositorySourceInputKey,
+        route: &ObservedHostRootApparentRepositoryRoute,
+        expected: FinishedKind,
+    ) -> Arc<HostRootApparentRepositorySourceInputResult> {
+        let (result, epoch) = finish_root_apparent_repository_source_input(
+            key,
+            route.result().clone(),
+            route.observations().clone(),
+        );
+        assert_eq!(&epoch, route.observations());
+        if expected == FinishedKind::Ok {
+            assert!(result.is_ok());
+        } else {
+            let error = result.as_ref().as_ref().unwrap_err();
+            let (actual, retained) = match &error.kind {
+                HostRootApparentRepositorySourceInputErrorKind::Route(value) => {
+                    (FinishedKind::Route, value)
+                }
+                HostRootApparentRepositorySourceInputErrorKind::InvalidRoute(value) => {
+                    (FinishedKind::InvalidRoute, value)
+                }
+                HostRootApparentRepositorySourceInputErrorKind::Projection {
+                    predecessor, ..
+                } => (FinishedKind::Projection, predecessor),
+                value => panic!("unexpected finished source error: {value:?}"),
+            };
+            assert_eq!(actual, expected);
+            assert!(Arc::ptr_eq(retained, route.result()));
+        }
+        result
+    }
+    macro_rules! dependency_row {
+        ($tracker:expr, $key:expr) => {
+            $tracker
+                .dependencies
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|(name, _)| name == $key)
+                .unwrap()
+                .1
+                .clone()
+        };
+    }
+    macro_rules! event_rows {
+        ($tracker:expr) => {
+            $tracker
+                .activations
+                .lock()
+                .unwrap()
+                .iter()
+                .filter_map(|(owner, _, batch)| batch.dupe().map(|batch| (owner.clone(), batch)))
+                .collect::<Vec<(String, EventBatch)>>()
+        };
+    }
+    macro_rules! complete_after_materialization {
+        ($tx:expr, $dice:expr, $workspace:expr, $key:expr, $tracker:expr) => {{
+            let mut tx = $tx;
+            let mut outcome = tx.compute($key).await.unwrap();
+            if let SourcePreparationOutcome::Need(need) = &outcome {
+                let request = need
+                    .repository_materializations()
+                    .values()
+                    .next()
+                    .unwrap()
+                    .clone();
+                tx = materialized_transaction($dice, $workspace, request, $tracker.clone()).await;
+                $tracker.clear();
+                outcome = tx.compute($key).await.unwrap();
+            }
+            (tx, outcome)
+        }};
+    }
+    async fn materialized_transaction(
+        dice: &Arc<Dice>,
+        workspace: &NormalizedAbsolutePath,
+        request: Arc<RepositoryMaterializationRequest>,
+        tracker: Arc<Tracker>,
+    ) -> dice::DiceTransaction {
+        let mut updater = dice.updater_with_data(UserComputationData {
+            cycle_detector: Some(slug_loading_v2::bzl_load_cycle_detector()),
+            activation_tracker: Some(tracker),
+            ..Default::default()
+        });
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.clone(),
+                },
+                RepositoryMaterializationResultEpoch::new(
+                    workspace.clone(),
+                    [RepositoryMaterializationEpochEntry {
+                        request,
+                        result: RepositoryMaterializationResult::Success(
+                            RepositoryMaterializationSuccess::Local,
+                        ),
+                    }],
+                )
+                .unwrap(),
+            )])
+            .unwrap();
+        updater.commit().await
+    }
+    async fn changed_observed_state(
+        context: ObservedContext<'_>,
+        module: &str,
+        extension: &str,
+    ) -> (
+        ObservedHostRootApparentRepositorySourceInput,
+        ObservedHostRootApparentRepositoryRoute,
+    ) {
+        let tx = transaction(context.0.as_ref(), module, extension, true, None).await;
+        let (_, parent, child) =
+            completed_observed_state(context, tx, Arc::new(Tracker::default())).await;
+        (parent, child)
+    }
+    async fn completed_observed_state(
+        context: ObservedContext<'_>,
+        tx: dice::DiceTransaction,
+        tracker: Arc<Tracker>,
+    ) -> (
+        dice::DiceTransaction,
+        ObservedHostRootApparentRepositorySourceInput,
+        ObservedHostRootApparentRepositoryRoute,
+    ) {
+        let (mut tx, outcome) =
+            complete_after_materialization!(tx, context.0.as_ref(), context.1, context.2, tracker);
+        let parent = observed_source_input_value(&outcome).dupe();
+        let child = tx.compute(context.3).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(child)) = child else {
+            panic!("observed route child must have a carrier")
+        };
+        let global = tx.compute(&PathObservationEpochKey).await.unwrap();
+        assert_eq!(parent.observations(), child.observations());
+        for (demand, result) in parent.observations().observations() {
+            assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref());
+        }
+        (tx, parent, child)
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum RealSourceInputFamily {
+        Generated,
+        SelectedWorkspace,
+        SelectedCommand,
+        MappingFailure,
+        Missing,
+        Main,
+        Builtin,
+    }
+    async fn real_source_input_transaction(
+        dice: &Arc<Dice>,
+        family: RealSourceInputFamily,
+        tracker: Arc<Tracker>,
+    ) -> dice::DiceTransaction {
+        if family == RealSourceInputFamily::Builtin {
+            prepare_builtin(dice, &NormalizedAbsolutePath::new(WORKSPACE).unwrap()).await;
+        } else if family == RealSourceInputFamily::SelectedCommand {
+            let module = "module(name='bazel_tools')\nbazel_dep(name='local', version='1', repo_name='local_alias')\n";
+            let _ = transaction_with_command_override(dice, module, EXTENSION_A, "local").await;
+        } else {
+            let module = match family {
+                RealSourceInputFamily::Generated | RealSourceInputFamily::Missing => MODULE,
+                RealSourceInputFamily::SelectedWorkspace => {
+                    "module(name='bazel_tools')\nlocal_path_override(module_name='local', path='local')\nbazel_dep(name='local', version='1', repo_name='local_alias')\n"
+                }
+                RealSourceInputFamily::MappingFailure => "this is not valid Starlark\n",
+                RealSourceInputFamily::Main => {
+                    "module(name='bazel_tools', repo_name='root_self')\n"
+                }
+                _ => unreachable!(),
+            };
+            return transaction(dice, module, EXTENSION_A, true, Some(tracker)).await;
+        }
+        dice.updater_with_data(UserComputationData {
+            cycle_detector: Some(slug_loading_v2::bzl_load_cycle_detector()),
+            activation_tracker: Some(tracker),
+            ..Default::default()
+        })
+        .commit()
+        .await
     }
     pub(in crate::runtime) async fn complete_local(
         dice: &Arc<Dice>,
@@ -496,7 +904,6 @@ pub(super) mod tests {
         corrupt.workspace = NormalizedAbsolutePath::new("/other").unwrap();
         corrupt
     }
-    #[test]
     fn key_shape_is_fail_closed() {
         let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
         assert!(
@@ -538,8 +945,106 @@ pub(super) mod tests {
             matches!(error.kind, HostRootApparentRepositorySourceInputErrorKind::Compute(message) if &*message == "boom")
         );
     }
+
     #[tokio::test]
-    async fn real_main_builtin_and_generated_projection_are_owned_once() {
+    async fn observed_root_apparent_repository_source_input_identity_finisher_and_terminal_algebra()
+    {
+        key_shape_is_fail_closed();
+        production_edge_is_only_route_then_pure_projection();
+        type IKey = HostRootApparentRepositorySourceInputKey;
+        type OKey = HostRootApparentRepositorySourceInputObservationKey;
+        type RKey = HostRootApparentRepositoryRouteObservationKey;
+        let root_workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let apparent = |name| ApparentRepoName::new(name).unwrap();
+        let observed = |name| OKey::new(root_workspace.clone(), apparent(name)).unwrap();
+        let input = |name| IKey::new(root_workspace.clone(), apparent(name)).unwrap();
+        let route_key_for = |name| RKey::new(root_workspace.clone(), apparent(name)).unwrap();
+        let display_key = OKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            apparent("first"),
+        )
+        .unwrap();
+        let observed_key = observed("first");
+        let same = observed("first");
+        let other = observed("second");
+        let hash = |value: &OKey| {
+            let mut state = DefaultHasher::new();
+            value.hash(&mut state);
+            state.finish()
+        };
+        assert_eq!(
+            display_key.to_string(),
+            "observed-HostRootApparentRepositorySourceInputKey { workspace: NormalizedAbsolutePath { path: \"/workspace\" }, apparent_repo: ApparentRepoName(\"first\") }"
+        );
+        assert!(OKey::new(root_workspace.clone(), ApparentRepoName::root()).is_none());
+        assert_eq!(observed_key, same);
+        assert_ne!(observed_key, other);
+        assert_eq!(hash(&observed_key), hash(&same));
+        assert_ne!(hash(&observed_key), hash(&other));
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(Tracker::default());
+        let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+        tracker.clear();
+        let observed = tx.compute(&observed_key).await.unwrap();
+        let carrier = observed_source_input_value(&observed);
+        assert!(OKey::validity(&observed));
+        assert!(OKey::equality(&observed, &observed));
+        assert!(!carrier.observations().observations().is_empty());
+        let route_key = route_key_for("first");
+        assert_eq!(
+            dependency_row!(&tracker, &observed_key.to_string()),
+            [route_key.to_string()]
+        );
+        let route = tx.compute(&route_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(route)) = route else {
+            panic!("observed route carrier expected")
+        };
+        let finished = assert_finished(&observed_key.0, &route, FinishedKind::Projection);
+        assert_eq!(finished.as_ref(), carrier.result().as_ref());
+
+        let missing_key = input("absent");
+        let missing_route_key = route_key_for("absent");
+        let missing_route = tx.compute(&missing_route_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(missing_route)) = missing_route else {
+            panic!("missing route carrier expected")
+        };
+        assert_finished(&missing_key, &missing_route, FinishedKind::Route);
+
+        let invalid_key = input("second");
+        let main_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut main_tx = transaction(
+            &main_dice,
+            "module(name='bazel_tools', repo_name='root_self')\n",
+            EXTENSION_A,
+            true,
+            None,
+        )
+        .await;
+        let main_route_key = route_key_for("root_self");
+        let main_route = main_tx.compute(&main_route_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(main_route)) = main_route else {
+            panic!("main route carrier expected")
+        };
+        let main_key = input("root_self");
+        assert_finished(&main_key, &main_route, FinishedKind::Ok);
+        assert_finished(&invalid_key, &main_route, FinishedKind::InvalidRoute);
+
+        let need_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let _ = transaction(&need_dice, MODULE, EXTENSION_A, true, None).await;
+        let mut updater = need_dice.updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::empty(),
+            )])
+            .unwrap();
+        let need = updater.commit().await.compute(&observed_key).await.unwrap();
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!OKey::validity(&need));
+        assert!(!OKey::equality(&need, &need));
+    }
+    async fn preserve_legacy_main_builtin_and_generated_assertions() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let mut tx = transaction(
@@ -602,6 +1107,10 @@ pub(super) mod tests {
             .await;
         let builtin = tx.compute(&builtin_key).await.unwrap();
         assert!(Arc::ptr_eq(&value(&builtin).predecessor, &predecessor));
+        assert_eq!(
+            dependency_row!(&tracker, &builtin_key.to_string()),
+            [route_key.to_string()]
+        );
         assert_eq!(
             *tracker.order.lock().unwrap(),
             [
@@ -714,7 +1223,146 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
-    async fn selected_need_policy_and_route_terminal_are_retained() {
+    async fn observed_root_apparent_repository_source_input_real_families_events_and_parity() {
+        type IKey = HostRootApparentRepositorySourceInputKey;
+        type OKey = HostRootApparentRepositorySourceInputObservationKey;
+        type RKey = HostRootApparentRepositoryRouteObservationKey;
+        type EKind = HostRootApparentRepositorySourceInputErrorKind;
+        type F = RealSourceInputFamily;
+        type D<'a> = HostRootApparentRepositorySourceInputDispositionView<'a>;
+        type IE = HostRootApparentRepositorySourceInputError;
+        preserve_legacy_main_builtin_and_generated_assertions().await;
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        for family in [
+            F::Generated,
+            F::SelectedWorkspace,
+            F::SelectedCommand,
+            F::MappingFailure,
+            F::Missing,
+            F::Main,
+            F::Builtin,
+        ] {
+            let apparent = ApparentRepoName::new(match family {
+                F::Generated | F::MappingFailure => "first",
+                F::SelectedWorkspace | F::SelectedCommand => "local_alias",
+                F::Missing => "absent",
+                F::Main => "root_self",
+                F::Builtin => "bazel_tools",
+            })
+            .unwrap();
+            let observed_key = OKey::new(workspace.clone(), apparent.clone()).unwrap();
+            let child_key = RKey::new(workspace.clone(), apparent.clone()).unwrap();
+            let observed_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let context = (&observed_dice, &workspace, &observed_key, &child_key);
+            let observed_tracker = Arc::new(Tracker::default());
+            let observed_tx =
+                real_source_input_transaction(&observed_dice, family, observed_tracker.clone())
+                    .await;
+            let (mut observed_tx, carrier, child) =
+                completed_observed_state(context, observed_tx, observed_tracker.clone()).await;
+            assert_eq!(
+                dependency_row!(&observed_tracker, &observed_key.to_string()),
+                [child_key.to_string()],
+                "{family:?}"
+            );
+            let activations = observed_tracker.activations.lock().unwrap();
+            let parent = activations
+                .iter()
+                .find(|(name, _, _)| name == &observed_key.to_string())
+                .unwrap();
+            assert_eq!(parent.1, ActivationKind::Evaluated);
+            assert!(parent.2.is_none());
+            drop(activations);
+            let parent_events = event_rows!(&observed_tracker);
+            assert_eq!(carrier.observations(), child.observations());
+            let global = observed_tx.compute(&PathObservationEpochKey).await.unwrap();
+            for (demand, result) in carrier.observations().observations() {
+                assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref());
+            }
+            match (family, carrier.result().as_ref()) {
+                (F::Generated, Err(error)) => {
+                    assert!(matches!(error.kind, EKind::Projection { .. }))
+                }
+                (F::MappingFailure | F::Missing, Err(error)) => {
+                    assert!(matches!(error.kind, EKind::Route(_)))
+                }
+                (F::Main | F::Builtin, Ok(_)) => {}
+                (F::SelectedWorkspace | F::SelectedCommand, Ok(value)) => {
+                    let D::Input(input) = value.view().unwrap().disposition() else {
+                        panic!("selected input expected")
+                    };
+                    let expected = if family == F::SelectedWorkspace {
+                        slug_bzlmod_v2::HostRepositoryLocalPathPolicy::WorkspaceRelative
+                    } else {
+                        slug_bzlmod_v2::HostRepositoryLocalPathPolicy::CommandAbsolute
+                    };
+                    assert_eq!(
+                        input.view().capability().local_path_policy(),
+                        Some(expected)
+                    );
+                }
+                value => panic!("unexpected {family:?} source terminal: {value:?}"),
+            }
+            match carrier.result().as_ref() {
+                Ok(value) => assert!(Arc::ptr_eq(&value.predecessor, child.result())),
+                Err(IE {
+                    kind: EKind::Route(retained) | EKind::InvalidRoute(retained),
+                    ..
+                }) => assert!(Arc::ptr_eq(retained, child.result())),
+                Err(IE {
+                    kind: EKind::Projection { predecessor, .. },
+                    ..
+                }) => assert!(Arc::ptr_eq(predecessor, child.result())),
+                value => panic!("unexpected retained terminal: {value:?}"),
+            }
+            let direct_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let direct_tracker = Arc::new(Tracker::default());
+            let direct_tx =
+                real_source_input_transaction(&direct_dice, family, direct_tracker.clone()).await;
+            direct_tracker.clear();
+            let (_direct_tx, direct) = complete_after_materialization!(
+                direct_tx,
+                &direct_dice,
+                &workspace,
+                &child_key,
+                direct_tracker
+            );
+            assert!(matches!(direct, SourcePreparationOutcome::Complete(Ok(_))));
+            assert_eq!(parent_events, event_rows!(&direct_tracker), "{family:?}");
+            let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let legacy_tracker = Arc::new(Tracker::default());
+            let legacy_tx =
+                real_source_input_transaction(&legacy_dice, family, legacy_tracker.clone()).await;
+            let legacy_key = IKey::new(workspace.clone(), apparent).unwrap();
+            let (_legacy_tx, legacy) = complete_after_materialization!(
+                legacy_tx,
+                &legacy_dice,
+                &workspace,
+                &legacy_key,
+                legacy_tracker
+            );
+            let SourcePreparationOutcome::Complete(legacy) = legacy else {
+                panic!("{family:?}: legacy source must complete")
+            };
+            assert_eq!(legacy.as_ref(), carrier.result().as_ref(), "{family:?}");
+            observed_tracker.clear();
+            let warm = observed_tx.compute(&observed_key).await.unwrap();
+            assert!(Arc::ptr_eq(
+                observed_source_input_value(&warm).result(),
+                carrier.result()
+            ));
+            let warm = observed_tracker.activations.lock().unwrap();
+            assert!(!warm.is_empty());
+            assert!(
+                warm.iter()
+                    .all(|(_, kind, batch)| *kind == ActivationKind::Reused && batch.is_none())
+            );
+            drop(warm);
+            assert!(event_rows!(&observed_tracker).is_empty());
+        }
+    }
+
+    async fn preserve_legacy_selected_need_policy_and_route_terminal_assertions() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let module = "module(name='bazel_tools')\n\
@@ -827,13 +1475,212 @@ pub(super) mod tests {
         assert!(Arc::ptr_eq(predecessor, &route_error));
     }
 
-    #[test]
+    #[tokio::test]
+    async fn observed_root_apparent_repository_source_input_lifecycle_cancellation_and_nonactivation()
+     {
+        type OKey = HostRootApparentRepositorySourceInputObservationKey;
+        type RKey = HostRootApparentRepositoryRouteObservationKey;
+        preserve_legacy_selected_need_policy_and_route_terminal_assertions().await;
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let apparent = ApparentRepoName::new("first").unwrap();
+        let key = OKey::new(workspace.clone(), apparent.clone()).unwrap();
+        let child_key = RKey::new(workspace.clone(), apparent).unwrap();
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let context = (&dice, &workspace, &key, &child_key);
+        let tracker = Arc::new(Tracker::default());
+        let a_tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+        tracker.clear();
+        let (a_tx, a, a_child) = completed_observed_state(context, a_tx, tracker.clone()).await;
+        let a_result = a.result().clone();
+        let a_epoch = a.observations().clone();
+        let a_child_result = a_child.result().clone();
+        let a_child_epoch = a_child.observations().clone();
+
+        tracker.clear();
+        let (_a_tx, warm, warm_child) =
+            completed_observed_state(context, a_tx, tracker.clone()).await;
+        assert!(Arc::ptr_eq(warm.result(), a.result()));
+        assert!(Arc::ptr_eq(warm_child.result(), a_child.result()));
+        assert_eq!(
+            tracker.observed_owner.lock().unwrap().as_slice(),
+            [ActivationKind::Reused]
+        );
+        assert_eq!(
+            tracker.observed_route.lock().unwrap().as_slice(),
+            [ActivationKind::Reused]
+        );
+        assert!(
+            tracker
+                .activations
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|(_, _, batch)| batch.is_none())
+        );
+
+        let mapping_b = MODULE.replacen(
+            "first='first', second='second'",
+            "first='second', second='first'",
+            1,
+        );
+        let extension_b = EXTENSION_A.replacen("value='one'", "value='changed'", 1);
+        for (module, extension) in [
+            (mapping_b.as_str(), EXTENSION_A),
+            (MODULE, extension_b.as_str()),
+        ] {
+            let (changed, changed_child) = changed_observed_state(context, module, extension).await;
+            assert_ne!(changed.result(), a.result());
+            assert_ne!(changed_child.result(), a_child.result());
+            let (restored, restored_child) =
+                changed_observed_state(context, MODULE, EXTENSION_A).await;
+            assert_eq!(restored.result(), a.result());
+            assert_eq!(restored_child.result(), a_child.result());
+            assert!(!Arc::ptr_eq(restored.result(), a.result()));
+            assert!(!Arc::ptr_eq(restored_child.result(), a_child.result()));
+        }
+
+        let neutral_module = format!("{MODULE}\n");
+        let (neutral, neutral_child) =
+            changed_observed_state(context, &neutral_module, EXTENSION_A).await;
+        assert_eq!(neutral.result(), a.result());
+        assert_eq!(neutral_child.result(), a_child.result());
+        assert_ne!(neutral.observations(), a.observations());
+        assert_ne!(neutral_child.observations(), a_child.observations());
+        assert!(!Arc::ptr_eq(neutral.result(), a.result()));
+        assert!(!Arc::ptr_eq(neutral_child.result(), a_child.result()));
+        assert_ne!(neutral, a);
+        assert_ne!(neutral_child, a_child);
+        assert_eq!(a.result(), &a_result);
+        assert_eq!(a.observations(), &a_epoch);
+        assert_eq!(a_child.result(), &a_child_result);
+        assert_eq!(a_child.observations(), &a_child_epoch);
+
+        let local_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let local_module = "module(name='bazel_tools')\nlocal_path_override(module_name='local', path='local')\nbazel_dep(name='local', version='1', repo_name='local_alias')\n";
+        let local_apparent = ApparentRepoName::new("local_alias").unwrap();
+        let local_key = OKey::new(workspace.clone(), local_apparent.clone()).unwrap();
+        let local_child_key = RKey::new(workspace.clone(), local_apparent).unwrap();
+        let local_context = (&local_dice, &workspace, &local_key, &local_child_key);
+        let local_tracker = Arc::new(Tracker::default());
+        let mut local_tx = transaction(
+            &local_dice,
+            local_module,
+            EXTENSION_A,
+            true,
+            Some(local_tracker.clone()),
+        )
+        .await;
+        let (local_tx, local_a, local_child_a) =
+            completed_observed_state(local_context, local_tx, local_tracker.clone()).await;
+        drop(local_tx);
+        let command_module = "module(name='bazel_tools')\nbazel_dep(name='local', version='1', repo_name='local_alias')\n";
+        let _ =
+            transaction_with_command_override(&local_dice, command_module, EXTENSION_A, "local")
+                .await;
+        let mut command_tx = local_dice.updater().commit().await;
+        let (command_tx, command, command_child) =
+            completed_observed_state(local_context, command_tx, local_tracker.clone()).await;
+        drop(command_tx);
+        assert_ne!(command.result(), local_a.result());
+        assert_ne!(command_child.result(), local_child_a.result());
+        let _ = transaction(&local_dice, local_module, EXTENSION_A, true, None).await;
+        let mut local_restore_tx = local_dice.updater().commit().await;
+        let (local_restore_tx, local_restored, local_child_restored) =
+            completed_observed_state(local_context, local_restore_tx, local_tracker).await;
+        drop(local_restore_tx);
+        assert_eq!(local_restored.result(), local_a.result());
+        assert_eq!(local_child_restored.result(), local_child_a.result());
+        assert!(!Arc::ptr_eq(local_restored.result(), local_a.result()));
+        assert!(!Arc::ptr_eq(
+            local_child_restored.result(),
+            local_child_a.result()
+        ));
+
+        let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let cancel_tracker = Arc::new(Tracker::default());
+        let mut cancelled = transaction(
+            &cancel_dice,
+            MODULE,
+            EXTENSION_A,
+            true,
+            Some(cancel_tracker.clone()),
+        )
+        .await;
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        let cancelled_trace = format!(
+            "{:?}{:?}",
+            *cancel_tracker.activations.lock().unwrap(),
+            *cancel_tracker.dependencies.lock().unwrap()
+        );
+        assert!(!cancelled_trace.contains(&key.to_string()));
+        let recovery = transaction(
+            &cancel_dice,
+            MODULE,
+            EXTENSION_A,
+            true,
+            Some(cancel_tracker.clone()),
+        )
+        .await;
+        let (_, recovered, recovered_child) =
+            completed_observed_state(context, recovery, cancel_tracker.clone()).await;
+        assert_eq!(recovered.result(), a.result());
+        assert_eq!(recovered_child.result(), a_child.result());
+
+        let trace = format!(
+            "{:?}{:?}",
+            *cancel_tracker.activations.lock().unwrap(),
+            *cancel_tracker.dependencies.lock().unwrap()
+        );
+        for forbidden in [
+            "HostRootApparentRepositorySourcePathInputKey",
+            "HostRootApparentRepositorySourceObservationKey",
+            "root-repository-route:",
+            "repository-package-source:",
+            "repository-source-file:",
+            "host-repository-source-file:",
+            "build-command-root:",
+            "RootModuleBootstrap",
+            "bootstrap",
+        ] {
+            assert!(!trace.contains(forbidden));
+        }
+        let producer = include_str!("root_apparent_repository_source_input.rs");
+        let producer = &producer[producer
+            .find("struct HostRootApparentRepositorySourceInputObservationKey")
+            .unwrap()..producer.find("#[cfg(test)]").unwrap()];
+        for absent in [
+            "SourcePathInputKey",
+            "SourceObservationKey",
+            "RootRepositoryRouteKey",
+            "BuildCommand",
+            "RootModuleBootstrap",
+            "bootstrap",
+        ] {
+            assert!(!producer.contains(absent));
+        }
+    }
+
     fn production_edge_is_only_route_then_pure_projection() {
         let source = include_str!("root_apparent_repository_source_input.rs");
         let production = source.split("#[cfg(test)]").next().unwrap();
-        assert_eq!(production.matches(".compute(").count(), 1);
-        assert!(production.contains("HostRootApparentRepositoryRouteKey::new"));
-        assert!(production.contains("host_repository_source_input(capability)"));
+        for (needle, count) in [
+            (".compute(", 2),
+            ("HostRootApparentRepositoryRouteKey::new", 1),
+            ("HostRootApparentRepositoryRouteObservationKey::new", 1),
+            ("host_repository_source_input(capability)", 1),
+            (
+                "HostRootApparentRepositorySourceInputObservationError::Route(error)",
+                1,
+            ),
+        ] {
+            assert_eq!(production.matches(needle).count(), count, "{needle}");
+        }
         for forbidden in [
             ["RepositoryMaterialization", "ResultKey"].concat(),
             ["RepositoryMaterialization", "Key"].concat(),
@@ -850,6 +1697,19 @@ pub(super) mod tests {
             assert!(
                 !production.contains(&forbidden),
                 "forbidden edge: {forbidden}"
+            );
+        }
+        let route_source = include_str!("root_apparent_repository_route.rs");
+        for evidence in [
+            "HostRootApparentRepositoryRouteKind::SelectedRegistry",
+            "Some(HostRepositoryLocalPathPolicy::LocalUnsupported)",
+            "HostRepositorySourceCapability::from_repo_spec",
+            "view.repo_spec?",
+            "view.local_path_policy()?",
+        ] {
+            assert!(
+                route_source.contains(evidence),
+                "missing evidence: {evidence}"
             );
         }
     }
