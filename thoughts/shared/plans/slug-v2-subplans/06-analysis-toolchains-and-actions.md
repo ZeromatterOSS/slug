@@ -14636,6 +14636,101 @@ Design ACCEPT schedules exactly
 then returns to a terminal carrier/publication frontier audit. M7 remains
 partial and M7A -> M8 -> M7B remains.
 
+### Root source-observation owner design accepted (2026-08-21)
+
+Committed audit `597df31b` proves the callerless terminal owner is the smallest
+slice and no lower visibility/evidence or public-route prerequisite remains.
+Schedule exactly
+`WP-6-7A-host-root-apparent-repository-source-observation-observation-implementation`
+with one-file authority in
+`root_apparent_repository_source_observation.rs`.
+
+Add private
+`HostRootApparentRepositorySourceObservationObservationKey` wrapping the legacy
+key, with identical three-argument Option construction/root rejection/PathBuf
+identity and exact Display
+`observed-HostRootApparentRepositorySourceObservationKey { workspace: NormalizedAbsolutePath { path: "/workspace" }, apparent_repo: ApparentRepoName("first"), requested_path: "pkg/file.bzl" }`.
+
+Add private `ObservedHostRootApparentRepositorySourceObservation` with exact
+Debug/Clone/PartialEq/Eq/Allocative/Dupe, private local Result-Arc/path-epoch
+fields and borrowed accessors. Add private same-derived/manual-Dupe
+`HostRootApparentRepositorySourceObservationObservationError` with only
+`SourcePath(HostRootApparentRepositorySourcePathInputObservationError)`. It is
+carrierless. Add no alias, visibility, conversion, inspector, export or caller.
+
+One `RootApparentRepositorySourceObservationMode::{Legacy, Observed}` driver
+returns `SourcePreparationOutcome<Result<(Arc<Result>, PathObservationEpoch),
+typed outer>>` and uses exactly one pure completed-child finisher. Legacy path
+completions pair with empty epoch. Observed computes only observed path: Need and
+opaque outer return immediately, DICE failure stays semantic SourcePathCompute
+with empty epoch, and success supplies exact Result Arc+epoch.
+
+The finisher maps completed semantic/path-view terminals and Main success once,
+retaining predecessor Arc and forwarding the path epoch. Only lawful Input
+computes unchanged `HostRepositorySourceObservationKey`. It has no observed
+counterpart or epoch carrier: Need is carrierless; ObservationCompute,
+Observation, InvalidObservation and success retain exact predecessor/optional
+observation Arcs and forward the prefix unchanged. Add no second epoch/merge/
+mismatch/rebuild/fallback/parallel join or direct Host read.
+
+Legacy Key delegates, asserts empty epoch and returns its existing outcome.
+Observed Key projects only Need, typed SourcePath outer or local carrier. Both
+use `complete_eq`/`is_complete`. The parent is eventless; exact legacy/observed
+dependency rows differ only in their first child and share the conditional Host
+observation. First terminals/Main suppress the second child, lower events remain
+lower-owned and warm rows are batchless.
+
+Retain only local Result Arc+compact path epoch; the Result owns exact child
+Arcs. Child carrier/views/input/path/event scratch dies before publication.
+DICE owns serialization/equality cutoff; add no cache/task/lock and prove
+poll-drop recovery. Held mapping/policy/path/source-content A-B-A must
+distinguish path Result+epoch changes from source-content Result change with no
+invented second epoch; recovered path epochs associate only with same-
+transaction parent/global epochs.
+
+Add exactly
+`observed_root_apparent_repository_source_observation_identity_staging_and_terminal_algebra`,
+`observed_root_apparent_repository_source_observation_real_order_events_and_parity`
+and
+`observed_root_apparent_repository_source_observation_lifecycle_cancellation_and_nonactivation`.
+They prove exact identity/finisher/Arc+epoch/no-merge, real dependency order/
+Need/first-terminal suppression/Main-Builtin-Request parity/lower events/warm
+silence, held lifecycle/cancellation and public/command/bootstrap nonactivation.
+Do not fabricate the lower opaque outer; reuse accepted lower proof plus static
+private-producer/parent-mapping source shape and a real positive observed edge.
+Preserve the sibling smoke and all legacy assertions.
+
+Baseline is 932 physical/tests at 340/SHA-256
+`57f95be85cceb9a02d04ecff400b9c526837daecf2b54aa111afe3366650396a`.
+Caps are <=300 production, <=720 proof, <=1,020 aggregate additions and <=2,000
+physical; at most six production/eight proof helpers, exactly three tests,
+driver below 180 and every changed helper/test below 200. Add no skip or
+formatter/cap/test waiver. The one file remains cohesive; no hot-path/retained-
+representation change applies.
+
+Before edit verify SHA and capture accepted diagnostic baselines. Then run
+focused observed owner, full source-observation module, observed path/input,
+full core, separate runtime integration, direct commands check, formatting and
+one-file SHA/caps/helper/test/driver/source-shape/no-skip/nonactivation/diff
+checks exactly as current packet lists. Full core permits only the byte-identical
+accepted library query diagnostic; runtime permits only the
+`c8d2d0b5`-identical PathObservationEpochKey/configured-analysis-Needs failure
+with the other 12 passing. These are accounting, not waivers; STOP any changed/
+additional failure. Add no fixture/oracle.
+
+Legacy values/views/errors/order/identity/equality/invalidation/lower events
+remain exact. The private key/carrier/typed outer and Result-Arc+path epoch are
+Slug-native. Visibility/caller/public/bootstrap activation and exact identity
+bytes remain deferred.
+
+STOP second file/key/owner/adapter, visibility/export/caller/public-route
+change, observed Host-observation variant/accessor, second epoch/merge/mismatch,
+semantic/order/event/equality/retention/lifecycle drift, retained scratch/task/
+lock, injection, fixture/oracle, helper/test/cap/format waiver, changed/
+additional validation failure, milestone closure, M8/M7B or exact identity
+work. ACCEPT returns only to terminal carrier/publication consumer audit. M7
+remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is

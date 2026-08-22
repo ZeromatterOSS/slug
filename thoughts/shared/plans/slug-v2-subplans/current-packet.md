@@ -1,165 +1,187 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-root-apparent-repository-source-observation-observation-owner-design`
+Packet: `WP-6-7A-host-root-apparent-repository-source-observation-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Audit base: pending docs commit / `1b573d5c`
+Design base: pending docs commit / `597df31b`
 
 ## Goal and authority
 
-Design only the smallest private observed owner for the existing callerless
-root apparent repository source-observation key. Freeze its exact staged child
-order, terminals, epoch law, event/retention/lifecycle contract and bounded
-proof without activating any caller or public command path. Do not edit Rust,
-tests, APIs, fixtures, Cargo/BUILD or exports in this packet.
+Implement only the callerless private observed owner for root apparent
+repository source observation. Preserve the legacy result/view/error surface,
+exact path-first conditional-Host-observation staging and every public path.
 
-Documentation authority is only the canonical plan, this manifest, Stage 6
-and routing log, capped at <=40/<=180/<=220/<=30 additions respectively and
-<=470 aggregate additions. Every other file is read-only.
+Rust authority is exactly
+`app/slug_core_v2/src/runtime/root_apparent_repository_source_observation.rs`.
+Every second Rust/API/export/caller file, fixture/oracle, Cargo/BUILD and the
+four orchestration records are read-only during implementation.
 
-## Learned frontier and decision
+## Exact private types and identity
 
-Accepted `1b573d5c` exposes the observed source-path key/carrier/opaque outer to
-its source-observation sibling. Live
-`root_apparent_repository_source_observation.rs` has one legacy private key and
-exactly two staged children:
+Add private
+`HostRootApparentRepositorySourceObservationObservationKey`, nominally wrapping
+`HostRootApparentRepositorySourceObservationKey`. Its exact constructor is
+`fn new(NormalizedAbsolutePath, ApparentRepoName, PathBuf) -> Option<Self>` and
+delegates to the legacy constructor. Preserve root rejection, all three key
+fields in structural equality/hash and exact `observed-{legacy Display}`. For
+`/workspace`, `@first`, `pkg/file.bzl`, Display is:
 
-1. `HostRootApparentRepositorySourcePathInputKey` always runs first at line
-   234. Need is immediate; DICE failure becomes SourcePathCompute; completed
-   semantic failure becomes SourcePath; an inconsistent successful view becomes
-   InvalidSourcePath.
-2. Main completes successfully with no second child. Only a consistent Input
-   computes `HostRepositorySourceObservationKey` at line 293. Its Need is
-   immediate; DICE failure becomes ObservationCompute; completed semantic
-   failure becomes Observation; wrong-polarity/inconsistent success becomes
-   InvalidObservation; otherwise the certificate succeeds.
+`observed-HostRootApparentRepositorySourceObservationKey { workspace: NormalizedAbsolutePath { path: "/workspace" }, apparent_repo: ApparentRepoName("first"), requested_path: "pkg/file.bzl" }`.
 
-The result retains the exact source-path Result Arc plus zero-or-one exact
-repository-source-observation Result Arc. Existing equality/validity are
-Complete-only. The parent owns no event batch.
+Add private `ObservedHostRootApparentRepositorySourceObservation` with exact
+`Debug, Clone, PartialEq, Eq, Allocative, Dupe`, private fields
+`Arc<HostRootApparentRepositorySourceObservationResult>` and
+`PathObservationEpoch`, and borrowed `result()`/`observations()` accessors.
 
-The now-nameable observed source-path child supplies its Result Arc and
-transaction-local epoch. The second child is already the public semantic Host
-observation: its Value is
-`SourcePreparationOutcome<Arc<HostRepositorySourceObservationResult>>`, with no
-separate epoch carrier. Therefore the observed parent must forward the
-source-path prefix unchanged through every second-stage terminal/success and
-must not invent an epoch, merge, observation accessor or Bzlmod prerequisite.
+Add private
+`HostRootApparentRepositorySourceObservationObservationError` with exact
+`Debug, Clone, PartialEq, Eq, Allocative`, manual Dupe and the sole variant:
 
-`HostRootApparentRepositorySourceObservationKey` has zero production callers.
-Public command analysis independently uses Bzlmod `RootRepositoryRouteKey` and
-`RootRepositoryRouteObservationKey` at `runtime/dice.rs:4476-4494`; root
-bootstrap remains dormant. That parallel branch does not consume this terminal
-certificate. No visibility or lower evidence prerequisite remains, and the
-callerless private owner is uniquely smaller than public activation.
+`SourcePath(HostRootApparentRepositorySourcePathInputObservationError)`.
 
-Choose exactly
-`WP-6-7A-host-root-apparent-repository-source-observation-observation-owner-design`.
+It is carrierless and exposes no lower variant. Add no alias, visibility,
+export, conversion, inspector or caller.
 
-## Required owner design
+## Exact driver and finisher
 
-Freeze one private observation key nominally wrapping the legacy key, with the
-same three-argument Option constructor, root rejection, full requested
-`PathBuf` identity and exact `observed-{legacy Display}`. Add one private local
-carrier retaining only the source-observation Result Arc plus
-`PathObservationEpoch`, with borrowed accessors and Complete-only equality/
-validity. Add one private typed outer containing only the promoted lower
-source-path opaque outer; it is carrierless and exposes no lower variant.
+Add `RootApparentRepositorySourceObservationMode::{Legacy, Observed}` and one
+shared driver returning
+`SourcePreparationOutcome<Result<(Arc<HostRootApparentRepositorySourceObservationResult>, PathObservationEpoch), HostRootApparentRepositorySourceObservationObservationError>>`.
+Factor exactly one pure completed-child finisher; reuse the existing value/view,
+error kinds and certificate construction rather than duplicating them.
 
-One shared `Legacy`/`Observed` driver must preserve the exact order above.
-Legacy requests the legacy source-path child with empty epoch. Observed requests
-only the observed source-path child; Need and its opaque outer are immediate,
-while DICE compute failure remains the legacy SourcePathCompute semantic Result
-with empty epoch. A completed child supplies its exact Result Arc and epoch.
+The first stage is always source path:
 
-Run existing path view/disposition logic once. SourcePath,
-InvalidSourcePath and Main success retain/forward the path epoch. Only Input
-requests the unchanged `HostRepositorySourceObservationKey`. Its Need is
-carrierless. ObservationCompute, Observation, InvalidObservation and success
-retain the exact predecessor/observation Arcs and forward the path prefix
-unchanged. Add no observed variant of that second child, no union/merge/
-mismatch/rebuild/fallback, no direct Host read and no caller.
+- Legacy computes `HostRootApparentRepositorySourcePathInputKey` and pairs every
+  completion with `PathObservationEpoch::empty()`.
+- Observed computes only
+  `HostRootApparentRepositorySourcePathInputObservationKey`. Need returns
+  immediately. Its opaque outer maps to parent `SourcePath` with no carrier.
+  DICE compute failure remains the legacy semantic SourcePathCompute Result
+  with empty epoch. Success supplies the exact child Result Arc and epoch.
 
-The parent stays eventless. Exact dependency rows are legacy -> legacy path ->
-conditional Host observation and observed -> observed path -> conditional same
-Host observation. Main/path failures suppress the second child. Lower print or
-path-observation batches remain lower-owned and every warm parent row is
-batchless.
+The finisher maps completed path semantic failure to SourcePath, inconsistent
+successful view to InvalidSourcePath and lawful Main to success with no second
+child. All retain the exact predecessor Arc and forward the path epoch.
 
-The carrier retains only the local Result Arc plus compact epoch; its Result
-already owns the required child Arcs. Observed child carrier, views,
-disposition/input/path clones, tracker/event and construction scratch die before
-publication. Add no cache/store/interner/task/lock or command borrow. DICE owns
-serialization; poll-drop publishes no partial carrier and same-DICE recovery is
-lawful.
+Only lawful Input continues to the unchanged
+`HostRepositorySourceObservationKey`. This child has no observed counterpart or
+epoch carrier. Need returns immediately and is carrierless. DICE failure maps to
+ObservationCompute with the path prefix. Completed semantic failure maps to
+Observation, inconsistent/wrong-polarity success to InvalidObservation and a
+lawful observation to success. Every row retains the exact predecessor and,
+where present, observation Arc and forwards the path epoch unchanged.
 
-## Required proof and bounds
+There is no second epoch, union, merge, OperationMismatch, rebuild, fallback,
+parallel join or direct Host read. Legacy Key delegates to the driver, asserts
+empty epoch and returns the existing outcome. Observed Key projects only Need,
+the typed SourcePath outer or the local Result-Arc+epoch carrier. Both keys keep
+`complete_eq` equality and `is_complete` validity.
 
-Require exactly three new tests:
+## Events, retention and lifecycle
+
+The parent emits no event batch. Legacy dependencies are legacy path then
+conditional Host observation; observed dependencies are observed path then the
+same conditional Host observation. SourcePath/InvalidSourcePath/Main suppress
+the second edge. Lower events remain lower-owned in exact order and every warm
+parent row is batchless.
+
+The carrier retains only its local Result Arc plus compact path epoch. The
+Result already owns exact predecessor/optional observation Arcs. Observed path
+carrier, views, disposition/input/path clones, event/tracker and finisher scratch
+die before publication. Add no store/cache/interner/task/lock or command borrow.
+DICE owns serialization and equality cutoff. Poll-drop publishes no partial
+carrier; same-DICE recovery recomputes lawfully.
+
+Held proof must cover mapping/policy/requested-path/source-content A-B-A. Path-
+semantic changes alter Result and path epoch; source-content changes alter the
+retained Host-observation Result without inventing a second epoch; a lawful
+same-Result/different-path-epoch row invalidates the carrier. Each recovered
+path epoch associates only with its same-transaction parent and global epoch.
+Require Arc identity only for an exact same-transaction Reused row and compare
+separate transactions semantically.
+
+## Exact proof
+
+Add exactly three tests:
 
 - `observed_root_apparent_repository_source_observation_identity_staging_and_terminal_algebra`;
 - `observed_root_apparent_repository_source_observation_real_order_events_and_parity`;
 - `observed_root_apparent_repository_source_observation_lifecycle_cancellation_and_nonactivation`.
 
-They must prove key/hash/Display/root rejection/accessors/equality/validity;
-lower opaque outer, Need and every semantic terminal prefix; exact Main,
-Builtin and Request success/error legacy semantic parity; first-child and
-conditional second-child dependency order/suppression; exact retained Arcs;
-unchanged path epoch/no merge; complete lower event vectors and warm silence;
-held path/observation Result and parent carrier across mapping/policy/path/
-source-content A-B-A, semantic-neutral path-epoch invalidation, each recovered
-path epoch associated only with its same-transaction parent/global epoch,
-poll-drop recovery and zero legacy/public/bootstrap activation. Fabricate no
-opaque outer or malformed epoch and inject no private Host state.
+The identity test proves key/hash/Display/root rejection, accessors, Complete-
+only equality/validity, pure finisher terminals, exact Arc+epoch forwarding and
+no merge. It must not fabricate the lower opaque outer: reuse accepted lower
+proof and require static private-producer/parent-mapping source shape.
 
-Prospective one-file authority is exactly
-`app/slug_core_v2/src/runtime/root_apparent_repository_source_observation.rs`,
-baseline 932 physical lines, `#[cfg(test)]` at 340, SHA-256
+The real-order test proves observed parent -> observed path -> conditional Host
+observation, legacy parent -> legacy path -> the same conditional child,
+first-terminal/Need suppression, exact Main/Builtin/Request success and error
+legacy semantic parity, retained Arcs, lower event vectors and warm silence.
+
+The lifecycle test proves the held A-B-A and epoch associations above, lower
+carrier/scratch release, poll-drop recovery and zero legacy-source-observation,
+public `RootRepositoryRouteKey`/observation, command and bootstrap activation.
+Use only lawful real child values; add no malformed epoch/private injection.
+Preserve the accepted sibling smoke and every legacy test/assertion.
+
+## Baseline, caps and executable validation
+
+Entry is 932 physical lines with `#[cfg(test)]` at 340 and SHA-256
 `57f95be85cceb9a02d04ecff400b9c526837daecf2b54aa111afe3366650396a`.
 Caps are <=300 production additions, <=720 proof additions, <=1,020 aggregate
 additions and <=2,000 physical lines; at most six production/eight proof
-helpers, exactly three new tests, shared driver below 180 and every changed
-helper/test below 200. Preserve the accepted sibling smoke and legacy tests.
-Add no `rustfmt::skip` or formatter/cap/test waiver. The file remains the
-cohesive owner of its value/error/view, staged reducer, trackers and fixtures;
-no hot-path or retained-representation change applies.
+helpers, exactly three new tests, driver below 180 and every changed helper/test
+below 200. Add no `rustfmt::skip` and allow no formatter/cap/test waiver. The
+one file remains the cohesive value/error/view/reducer/test owner and is not a
+demonstrated hot path or retained-representation change.
 
-Prospective validation is the three exact tests, protected legacy source-
-observation and observed source-path/source-input suites, full core, separate
-runtime integration, direct commands check, formatting, exact one-file
-allowlist/SHA/accounting/physical/helper/test/driver/source-shape/no-skip and
-diff hygiene, serially. Full core may reproduce only the byte-identical accepted
-library query diagnostic baseline. Runtime may reproduce only the accepted
-`c8d2d0b5`-identical `PathObservationEpochKey`/configured-analysis-Needs
-failure while its other 12 tests pass. These are baseline accounting, not
-waivers; any changed/additional failure is a STOP. Reuse accepted lower and
-Bazel source-observation evidence; add no oracle.
+Before editing, verify the entry SHA and capture both accepted baseline
+diagnostics. Then run post-edit gates serially:
+
+1. `cargo test -p slug_core_v2 observed_root_apparent_repository_source_observation_ -- --nocapture`;
+2. `cargo test -p slug_core_v2 root_apparent_repository_source_observation -- --nocapture`;
+3. `cargo test -p slug_core_v2 observed_root_apparent_repository_source_path_input_ -- --nocapture`;
+4. `cargo test -p slug_core_v2 observed_root_apparent_repository_source_input_ -- --nocapture`;
+5. full `cargo test -p slug_core_v2`; only the byte-identical accepted library
+   query diagnostic baseline may fail;
+6. separately `cargo test -p slug_core_v2 --test runtime`; only the accepted
+   `c8d2d0b5`-identical `PathObservationEpochKey`/configured-analysis-Needs
+   failure may remain while the other 12 tests pass;
+7. `cargo check -p slug_commands_v2`;
+8. `cargo fmt --all -- --check`; and
+9. exact one-file allowlist, entry SHA, production/proof/aggregate/physical,
+   helper/test/driver spans and counts, dependency/source-shape/no-skip/
+   nonactivation checks plus `git diff --check`.
+
+The two known failures are baseline accounting, not waivers. Compare exact
+diagnostic bytes; any changed/additional failure is a STOP. Reuse accepted
+source-path/Host-observation and Bazel source evidence; add no fixture/oracle.
 
 ## Compatibility and stops
 
-Existing source-observation values/views/errors, child order, semantic result
-identity, equality/invalidation and lower event behavior remain **exact** Bazel
-9 compatibility. The private observed key/carrier/typed outer and Result-Arc+
-transaction-local epoch association are **Slug-native**. Carrier visibility,
-any caller/public-command/bootstrap activation and exact Bazel configuration/
+Existing source-observation values/views/errors, child order, Result identity,
+equality/invalidation and lower event behavior remain **exact** Bazel 9
+compatibility. The private observed key/carrier/typed outer and Result-Arc+
+transaction-local path epoch are **Slug-native**. Carrier visibility, any
+caller/public-command/bootstrap activation and exact Bazel configuration/
 output/ActionKey bytes remain **unsupported/deferred**.
 
-STOP Rust/tests in this audit/design packet, second file/key/owner/adapter,
-visibility/export/caller/public-route change, observed second-child variant,
-epoch merge/mismatch/rebuild, semantic/order/error/event/equality/retention/
-lifecycle drift, retained scratch/task/lock, private/malformed injection,
-fixture/oracle, cap/helper/test/format waiver, changed/additional validation
-failure, milestone closure, M8/M7B or exact identity work. REPLAN before
-widening or baseline drift.
+STOP second file/key/owner/adapter, visibility/export/caller/public-route
+change, observed Host-observation variant/accessor, second epoch/merge/mismatch/
+rebuild, legacy semantic/order/error/event/equality/retention/lifecycle drift,
+retained scratch/task/lock, private/malformed injection, fixture/oracle,
+helper/test/cap/format waiver, changed/additional validation failure, milestone
+closure, M8/M7B or exact identity work. REPLAN before widening or baseline
+drift.
 
 ## Terminal
 
-If the one-file staged owner remains feasible, ACCEPT schedules exactly
-`WP-6-7A-host-root-apparent-repository-source-observation-observation-implementation`,
-then returns to a docs-only terminal carrier/publication frontier audit. M7
-remains partial and M7A -> M8 -> M7B remains.
+ACCEPT returns only to a docs-only terminal source-observation carrier/
+publication consumer-frontier audit. M7 remains partial and
+M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Accepted `1b573d5c` changes only the two visibility files by +56/-10, leaves the
-source-observation owner callerless, and closes the sole lower visibility stop.
+Committed audit `597df31b` proves the callerless terminal owner is the uniquely
+smallest slice and freezes the one-prefix/no-merge contract and entry baseline.
