@@ -14816,6 +14816,87 @@ additional validation failure, milestone closure, M8/M7B or exact identity
 work. ACCEPT returns only to terminal carrier/publication consumer audit. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Root source-observation accepted; terminal audit selects same-crate visibility (2026-08-22)
+
+Implementation `b3eba6df`, from audit/design `597df31b`/`63dad178`, completes
+the private callerless Legacy/Observed terminal source-observation owner in
+`root_apparent_repository_source_observation.rs`.
+
+One shared driver preserves source path first and the conditional semantic Host
+observation second. Legacy supplies an empty epoch; observed consumes the
+promoted path carrier and forwards that prefix unchanged through every path or
+Host-observation terminal. Main suppresses the second child. The parent is
+eventless and retains only one local Result Arc plus the compact path epoch;
+its Result retains the exact predecessor and optional Host-observation Arcs.
+
+Accepted accounting is +299 production/+720 proof/+1,019 aggregate at 1,866
+physical lines, within all frozen caps with exactly three new tests. The three
+focused owner tests, full ten-test source module, observed source-path/input
+suites and direct commands check pass on Ubuntu 24.04 WSL. Full core has 271
+passes plus only the byte-identical accepted query diagnostic failure; separate
+runtime has 12 passes plus only the accepted PathObservationEpochKey/configured-
+analysis-Needs failure. Formatting, diff hygiene, exact scope/caps/source shape
+and terminal review pass. Independent implementation review returned `ACCEPT`.
+
+The terminal key, semantic certificate/view/result and observed carrier/outer
+remain private to their owner and have zero production callers. A future core
+package owner therefore cannot name either matching family. Direct public
+activation is not the next owner: public `RootRepositoryRoute` and
+`RepositoryPackageSource`/`RepositoryPackageLoad` admit only builtin or direct-
+local routes, while the accepted private chain also represents selected
+registry/nonregistry and extension-generated repositories.
+
+The raw certificate is also not a complete package publication boundary.
+Exact package selection still owns canonical deleted-package policy,
+`REPO.bazel`/`.bazelignore` semantics, `BUILD.bazel` before `BUILD`, and their
+ordered epochs before package source and loading. Publishing one requested path
+would bypass those semantics and would not close the earlier rules_rust
+mapping -> definition -> route/source -> generated BUILD package-epoch REPLAN.
+
+Activate only
+`WP-6-7A-host-root-apparent-repository-source-observation-observation-carrier-visibility-design`.
+Design the minimum same-crate `pub(super)` handoff: legacy semantic certificate,
+borrowed view/disposition/accessors, opaque error, Result and key/new; observed
+key/new, Result-Arc+epoch carrier/accessors and one field-private opaque outer.
+Keep fields, semantic error kind and observed inner/variant private. Wrap only
+at the observed Key boundary; add no adapter, caller or compute change.
+
+Prove the surface with exactly one test-only runtime sibling smoke. It may name
+the matching keys/associated Values, concrete Result/view, carrier accessors
+and opaque outer, but cannot construct private state, inspect a private kind,
+compute a key or activate package/public/bootstrap work. Preserve all accepted
+owner semantics and proof except minimum wrapper/source-shape spelling.
+
+Prospective authority is source observation baseline 1,866 physical/tests at
+562/SHA-256
+`a4b89ce073f70454be89cf17df35fc52d513210d0b075733902be58ee897e993`
+and test-only `runtime/mod.rs` baseline 251/SHA-256
+`c52a11c0e082e76cb604ea30798600f07ddbf023b7abfd96f590d515335093a4`.
+Caps are <=90 owner production, <=40 owner proof, <=80 sibling proof, <=210
+aggregate and physical <=1,970/340; add no production helper/owner test and
+exactly one sibling smoke below 100. Add no skip or waiver.
+
+Run the successor serially on Ubuntu 24.04 WSL: visibility smoke, accepted
+source observation/path/input suites, full core and separate runtime with only
+their byte-identical accepted baselines, direct commands check, formatting and
+exact scope/SHA/cap/visibility/wrapper/source-shape/diff gates. Windows/macOS
+implementation and validation remain deferred behind Linux support.
+
+Legacy semantic values, errors, ordering, events and equality remain exact. The
+observed Result-Arc+transaction-local epoch identity/invalidation association
+and hidden opaque handoff remain Slug-native. Package policy,
+lookup/source/load, public command/bootstrap, other platforms and exact identity
+bytes remain deferred.
+
+After visibility implementation ACCEPT, run only
+`WP-6-7A-generated-repository-package-publication-frontier-audit` to choose the
+smallest policy/lookup/source/load owner or prerequisite. STOP Rust in this
+audit/design, public/crate-root exposure, private-inner/field/variant exposure,
+new key/adapter/caller, semantic/event/equality/lifecycle drift, package/public/
+bootstrap activation, fixture/oracle, waiver, milestone closure, M8/M7B and
+exact identity work. Independent architecture review returned `ACCEPT`. M7
+remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
