@@ -14530,6 +14530,112 @@ widening, baseline drift, changed/additional validation failure or format
 exception. ACCEPT returns only to a docs-only root source-observation owner
 design/frontier audit. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Root source-observation frontier selects callerless private owner design (2026-08-21)
+
+Accepted `1b573d5c` changes only source path/source observation by +56/-10 and
+exposes the observed source-path key/carrier/opaque outer to its sibling. Source
+observation remains private, callerless and legacy; the lower visibility stop
+is closed.
+
+Live `root_apparent_repository_source_observation.rs` has exact staged order.
+It always computes legacy source path first at line 234: Need returns
+immediately, DICE failure becomes SourcePathCompute, semantic failure becomes
+SourcePath and a successful but inconsistent view becomes InvalidSourcePath.
+Main then succeeds without a second child. Only a consistent Input computes
+`HostRepositorySourceObservationKey` at line 293: Need is immediate, DICE
+failure becomes ObservationCompute, semantic failure becomes Observation,
+wrong-polarity/inconsistent success becomes InvalidObservation and a lawful
+observation succeeds. The result retains exact predecessor and optional
+observation Result Arcs; the parent owns no event batch.
+
+The promoted observed source-path child now supplies its exact Result Arc and
+transaction-local epoch. The second child is already the public semantic Host
+observation with
+`SourcePreparationOutcome<Arc<HostRepositorySourceObservationResult>>` Value
+and no epoch carrier. Thus the parent forwards the path prefix unchanged across
+every conditional second-stage terminal/success. No epoch merge, second-child
+observation variant, Bzlmod accessor or visibility prerequisite is lawful.
+
+The source-observation key has zero production callers. Public command analysis
+uses parallel Bzlmod `RootRepositoryRouteKey`/observation at
+`runtime/dice.rs:4476-4494`, and root bootstrap remains dormant. Those branches
+do not consume this certificate and cannot replace its owner. The callerless
+private terminal owner is still the uniquely smallest slice.
+
+Choose exactly
+`WP-6-7A-host-root-apparent-repository-source-observation-observation-owner-design`.
+Freeze one private observed key wrapping the legacy key, identical constructor/
+root rejection/PathBuf identity and `observed-{legacy Display}`; one private
+local Result-Arc+epoch carrier; and one private carrierless outer containing
+only the promoted source-path opaque outer. Equality/validity remain Complete-
+only.
+
+One shared Legacy/Observed driver preserves the order above. Legacy uses legacy
+path plus empty epoch. Observed uses observed path; lower Need/outer are
+immediate and DICE failure stays semantic SourcePathCompute with empty epoch.
+Every completed path terminal/Main success forwards its epoch. Input then uses
+the unchanged Host observation child; its Need is carrierless and every
+ObservationCompute/Observation/InvalidObservation/success retains exact child
+Arcs and forwards the prefix unchanged. Add no union/merge/mismatch/rebuild/
+fallback, direct Host read, visibility or caller.
+
+The parent stays eventless. Exact legacy/observed dependency vectors differ
+only in the first child and share the conditional second child. Short circuits
+suppress that child; lower batches remain lower-owned and warm parents are
+batchless. Retain only local Result Arc+compact epoch; its Result owns required
+child Arcs. Child carrier/views/input/path/event scratch die before publication.
+DICE owns serialization; add no cache/task/lock and preserve poll-drop recovery.
+
+Require exactly
+`observed_root_apparent_repository_source_observation_identity_staging_and_terminal_algebra`,
+`observed_root_apparent_repository_source_observation_real_order_events_and_parity`
+and
+`observed_root_apparent_repository_source_observation_lifecycle_cancellation_and_nonactivation`.
+They prove identity/accessors/equality/validity, typed outer and every terminal
+prefix; Main/Builtin/Request success/error parity, exact dependency order/
+suppression/Arcs/unchanged epoch/lower events/warm silence; held path/
+observation/parent A-B-A across mapping/policy/path/source-content, neutral
+path-epoch invalidation, same-transaction path-parent-global associations,
+cancellation/recovery and legacy/public/bootstrap nonactivation. Fabricate no
+opaque outer/malformed epoch or private Host input.
+
+Prospective one-file authority is source observation baseline 932 physical,
+tests at 340 and SHA-256
+`57f95be85cceb9a02d04ecff400b9c526837daecf2b54aa111afe3366650396a`.
+Caps are <=300 production, <=720 proof, <=1,020 aggregate additions and <=2,000
+physical; at most six production/eight proof helpers, exactly three new tests,
+driver below 180 and every changed helper/test below 200. Preserve sibling smoke
+and legacy tests; add no skip or format/cap/test waiver. The existing file is
+the cohesive value/error/view/reducer/test owner; no hot-path/retained-
+representation change applies.
+
+Validate the three tests, protected legacy source-observation and observed
+source-path/source-input suites, full core, separate runtime integration,
+direct commands check, formatting and exact one-file allowlist/SHA/caps/helper/
+test/driver/source-shape/no-skip/diff hygiene serially. Full core permits only
+the byte-identical accepted library query diagnostic baseline; runtime permits
+only the `c8d2d0b5`-identical PathObservationEpochKey/configured-analysis-Needs
+failure while the other 12 pass. These are accounting, not waivers; STOP any
+changed/additional failure. Reuse accepted evidence; add no oracle.
+
+Legacy values/views/errors/order/identity/equality/invalidation/lower events
+remain exact. The private observed key/carrier/typed outer and Result-Arc+epoch
+association are Slug-native. Visibility/caller/public/bootstrap activation and
+exact identity bytes remain deferred.
+
+STOP Rust/tests in this audit/design, second file/key/owner/adapter, visibility/
+export/caller/public-route change, observed second-child variant, epoch merge/
+mismatch/rebuild, semantic/order/event/equality/retention/lifecycle drift,
+retained scratch/task/lock, injection, fixture/oracle, cap/helper/test/format
+waiver, changed/additional validation failure, milestone closure, M8/M7B or
+exact identity work. Documentation authority is canonical/current/this Stage/
+routing under <=40/<=180/<=220/<=30 and <=470 aggregate additions.
+
+Design ACCEPT schedules exactly
+`WP-6-7A-host-root-apparent-repository-source-observation-observation-implementation`,
+then returns to a terminal carrier/publication frontier audit. M7 remains
+partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
