@@ -33,13 +33,13 @@ use super::root_apparent_repository_source_path_input::HostRootApparentRepositor
 use super::root_apparent_repository_source_path_input::HostRootApparentRepositorySourcePathInputResult;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostRootApparentRepositorySourceObservation {
+pub(super) struct HostRootApparentRepositorySourceObservation {
     predecessor: Arc<HostRootApparentRepositorySourcePathInputResult>,
     observation: Option<Arc<HostRepositorySourceObservationResult>>,
 }
 
 #[derive(Debug, Clone, Copy)]
-enum HostRootApparentRepositorySourceObservationDispositionView<'a> {
+pub(super) enum HostRootApparentRepositorySourceObservationDispositionView<'a> {
     Main,
     Input {
         input: &'a HostRepositorySourceInput,
@@ -48,7 +48,7 @@ enum HostRootApparentRepositorySourceObservationDispositionView<'a> {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct HostRootApparentRepositorySourceObservationView<'a> {
+pub(super) struct HostRootApparentRepositorySourceObservationView<'a> {
     apparent_repo: &'a ApparentRepoName,
     canonical_repo: &'a CanonicalRepoName,
     relative_path: &'a slug_bzlmod_v2::HostRepositoryRelativePath,
@@ -69,7 +69,7 @@ fn observation_matches_input(
 }
 
 impl HostRootApparentRepositorySourceObservation {
-    fn view(&self) -> Option<HostRootApparentRepositorySourceObservationView<'_>> {
+    pub(super) fn view(&self) -> Option<HostRootApparentRepositorySourceObservationView<'_>> {
         let predecessor = self.predecessor.as_ref().as_ref().ok()?;
         let predecessor = predecessor.view()?;
         let disposition = match (predecessor.disposition(), &self.observation) {
@@ -101,19 +101,21 @@ impl HostRootApparentRepositorySourceObservation {
 }
 
 impl<'a> HostRootApparentRepositorySourceObservationView<'a> {
-    fn apparent_repo(self) -> &'a ApparentRepoName {
+    pub(super) fn apparent_repo(self) -> &'a ApparentRepoName {
         self.apparent_repo
     }
 
-    fn canonical_repo(self) -> &'a CanonicalRepoName {
+    pub(super) fn canonical_repo(self) -> &'a CanonicalRepoName {
         self.canonical_repo
     }
 
-    fn relative_path(self) -> &'a slug_bzlmod_v2::HostRepositoryRelativePath {
+    pub(super) fn relative_path(self) -> &'a slug_bzlmod_v2::HostRepositoryRelativePath {
         self.relative_path
     }
 
-    fn disposition(self) -> HostRootApparentRepositorySourceObservationDispositionView<'a> {
+    pub(super) fn disposition(
+        self,
+    ) -> HostRootApparentRepositorySourceObservationDispositionView<'a> {
         self.disposition
     }
 }
@@ -144,7 +146,7 @@ enum HostRootApparentRepositorySourceObservationErrorKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostRootApparentRepositorySourceObservationError {
+pub(super) struct HostRootApparentRepositorySourceObservationError {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
     kind: HostRootApparentRepositorySourceObservationErrorKind,
@@ -158,7 +160,7 @@ impl fmt::Display for HostRootApparentRepositorySourceObservationError {
 
 impl std::error::Error for HostRootApparentRepositorySourceObservationError {}
 
-type HostRootApparentRepositorySourceObservationResult = Result<
+pub(super) type HostRootApparentRepositorySourceObservationResult = Result<
     HostRootApparentRepositorySourceObservation,
     HostRootApparentRepositorySourceObservationError,
 >;
@@ -166,14 +168,14 @@ type HostRootApparentRepositorySourceObservationOutcome =
     SourcePreparationOutcome<Arc<HostRootApparentRepositorySourceObservationResult>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostRootApparentRepositorySourceObservationKey {
+pub(super) struct HostRootApparentRepositorySourceObservationKey {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
     requested_path: PathBuf,
 }
 
 impl HostRootApparentRepositorySourceObservationKey {
-    fn new(
+    pub(super) fn new(
         workspace: NormalizedAbsolutePath,
         apparent_repo: ApparentRepoName,
         requested_path: PathBuf,
@@ -223,12 +225,12 @@ impl fmt::Display for HostRootApparentRepositorySourceObservationKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostRootApparentRepositorySourceObservationObservationKey(
+pub(super) struct HostRootApparentRepositorySourceObservationObservationKey(
     HostRootApparentRepositorySourceObservationKey,
 );
 
 impl HostRootApparentRepositorySourceObservationObservationKey {
-    fn new(
+    pub(super) fn new(
         workspace: NormalizedAbsolutePath,
         apparent_repo: ApparentRepoName,
         requested_path: PathBuf,
@@ -249,25 +251,32 @@ impl fmt::Display for HostRootApparentRepositorySourceObservationObservationKey 
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-struct ObservedHostRootApparentRepositorySourceObservation {
+pub(super) struct ObservedHostRootApparentRepositorySourceObservation {
     result: Arc<HostRootApparentRepositorySourceObservationResult>,
     observations: PathObservationEpoch,
 }
 
 impl ObservedHostRootApparentRepositorySourceObservation {
-    fn result(&self) -> &Arc<HostRootApparentRepositorySourceObservationResult> {
+    pub(super) fn result(&self) -> &Arc<HostRootApparentRepositorySourceObservationResult> {
         &self.result
     }
 
-    fn observations(&self) -> &PathObservationEpoch {
+    pub(super) fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum HostRootApparentRepositorySourceObservationObservationError {
+enum RootApparentRepositorySourceObservationObservationError {
     SourcePath(HostRootApparentRepositorySourcePathInputObservationError),
 }
+
+impl Dupe for RootApparentRepositorySourceObservationObservationError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(super) struct HostRootApparentRepositorySourceObservationObservationError(
+    RootApparentRepositorySourceObservationObservationError,
+);
 
 impl Dupe for HostRootApparentRepositorySourceObservationObservationError {}
 
@@ -282,7 +291,7 @@ type HostRootApparentRepositorySourceObservationDriverOutcome = SourcePreparatio
             Arc<HostRootApparentRepositorySourceObservationResult>,
             PathObservationEpoch,
         ),
-        HostRootApparentRepositorySourceObservationObservationError,
+        RootApparentRepositorySourceObservationObservationError,
     >,
 >;
 
@@ -421,7 +430,7 @@ async fn compute_root_apparent_repository_source_observation(
             }
             Ok(SourcePreparationOutcome::Complete(Err(error))) => {
                 return SourcePreparationOutcome::Complete(Err(
-                    HostRootApparentRepositorySourceObservationObservationError::SourcePath(error),
+                    RootApparentRepositorySourceObservationObservationError::SourcePath(error),
                 ));
             }
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
@@ -537,7 +546,9 @@ impl Key for HostRootApparentRepositorySourceObservationObservationKey {
         {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
             SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
+                SourcePreparationOutcome::Complete(Err(
+                    HostRootApparentRepositorySourceObservationObservationError(error),
+                ))
             }
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
                 SourcePreparationOutcome::Complete(Ok(

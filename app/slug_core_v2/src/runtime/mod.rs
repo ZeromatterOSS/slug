@@ -249,3 +249,83 @@ impl RuntimeMode {
         }
     }
 }
+
+#[cfg(test)]
+mod source_observation_surface_tests {
+    use std::sync::Arc;
+
+    use dice::Key;
+    use slug_identity_v2::ApparentRepoName;
+    use slug_workspace_v2::NormalizedAbsolutePath;
+    use slug_workspace_v2::PathObservationEpoch;
+
+    use super::root_apparent_repository_source_observation::*;
+
+    #[test]
+    fn root_apparent_repository_source_observation_surface_is_sibling_usable() {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let key = HostRootApparentRepositorySourceObservationKey::new(
+            workspace.clone(),
+            ApparentRepoName::new("first").unwrap(),
+            "pkg/file.bzl".into(),
+        )
+        .unwrap();
+        let observed_key = HostRootApparentRepositorySourceObservationObservationKey::new(
+            workspace.clone(),
+            ApparentRepoName::new("first").unwrap(),
+            "pkg/file.bzl".into(),
+        )
+        .unwrap();
+        assert_eq!(
+            key.to_string(),
+            "HostRootApparentRepositorySourceObservationKey { workspace: NormalizedAbsolutePath { path: \"/workspace\" }, apparent_repo: ApparentRepoName(\"first\"), requested_path: \"pkg/file.bzl\" }"
+        );
+        assert_eq!(
+            observed_key.to_string(),
+            "observed-HostRootApparentRepositorySourceObservationKey { workspace: NormalizedAbsolutePath { path: \"/workspace\" }, apparent_repo: ApparentRepoName(\"first\"), requested_path: \"pkg/file.bzl\" }"
+        );
+        assert!(
+            HostRootApparentRepositorySourceObservationKey::new(
+                workspace.clone(),
+                ApparentRepoName::root(),
+                "x".into(),
+            )
+            .is_none()
+        );
+        assert!(
+            HostRootApparentRepositorySourceObservationObservationKey::new(
+                workspace,
+                ApparentRepoName::root(),
+                "x".into(),
+            )
+            .is_none()
+        );
+
+        fn inspect(
+            _: &<HostRootApparentRepositorySourceObservationKey as Key>::Value,
+            _: &<HostRootApparentRepositorySourceObservationObservationKey as Key>::Value,
+            result: &HostRootApparentRepositorySourceObservationResult,
+            observed: &ObservedHostRootApparentRepositorySourceObservation,
+            _: &HostRootApparentRepositorySourceObservationError,
+            _: &HostRootApparentRepositorySourceObservationObservationError,
+        ) {
+            let _: &Arc<HostRootApparentRepositorySourceObservationResult> = observed.result();
+            let _: &PathObservationEpoch = observed.observations();
+            if let Ok(certificate) = result {
+                if let Some(view) = certificate.view() {
+                    let _ = view.apparent_repo();
+                    let _ = view.canonical_repo();
+                    let _ = view.relative_path();
+                    match view.disposition() {
+                        HostRootApparentRepositorySourceObservationDispositionView::Main => {}
+                        HostRootApparentRepositorySourceObservationDispositionView::Input {
+                            input: _,
+                            observation: _,
+                        } => {}
+                    }
+                }
+            }
+        }
+        let _: fn(_, _, _, _, _, _) = inspect;
+    }
+}
