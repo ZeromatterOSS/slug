@@ -14897,6 +14897,70 @@ bootstrap activation, fixture/oracle, waiver, milestone closure, M8/M7B and
 exact identity work. Independent architecture review returned `ACCEPT`. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Terminal source-observation carrier-visibility design accepted (2026-08-22)
+
+Audit `3d865737` and independent design review select exactly
+`WP-6-7A-host-root-apparent-repository-source-observation-observation-carrier-visibility-implementation`
+over semantic Rust base `b3eba6df`.
+
+Change only
+`root_apparent_repository_source_observation.rs` and test-only `runtime/mod.rs`.
+Promote to `pub(super)` the existing semantic certificate, borrowed
+disposition/view types and accessors, opaque semantic error, concrete Result
+alias and legacy key/new. Promote the observed key/new and Result-Arc+epoch
+carrier/accessors. Keep all fields, semantic ErrorKind, Outcome alias, driver,
+reducer and mode private.
+
+Rename the current observed outer enum to private
+`RootApparentRepositorySourceObservationObservationError`, retaining only
+`SourcePath(HostRootApparentRepositorySourcePathInputObservationError)` and its
+derives/manual Dupe. Add a field-private same-derived/manual-Dupe `pub(super)`
+wrapper with the existing
+`HostRootApparentRepositorySourceObservationObservationError` name. Driver
+outcome and lower mapping use only the inner; wrap exactly once at observed Key
+`Complete(Err(inner))`. Add no conversion, inspector, alias, adapter or caller.
+
+Add exactly one `runtime/mod.rs` test-only sibling smoke named
+`root_apparent_repository_source_observation_surface_is_sibling_usable`. It may
+construct legacy and observed keys, prove exact Display/root rejection, and
+nonexecutedly type-check both associated Values, the concrete Result,
+certificate/view/disposition accessors, carrier accessors and opaque outer. It
+cannot construct a certificate/error/carrier/outer, inspect private kinds or
+variants, compute a key or activate DICE/package/public/bootstrap work.
+
+Existing owner semantics, three observed tests, legacy proof, keys, equality,
+invalidation, dependencies, events, request/revision behavior, cancellation
+and retained state are frozen. Only owner visibility/wrapper spelling and the
+minimum source-shape assertion may change. `1b573d5c` is concept/test precedent;
+`docs/developers/dice.md` confirms the visibility-only change adds no semantic
+state. Reuse `b3eba6df`'s Bazel 9.2 evidence; add no fixture/oracle/upstream test
+or fallback.
+
+Authority baselines are source observation 1,866 physical/tests at 562/SHA-256
+`a4b89ce073f70454be89cf17df35fc52d513210d0b075733902be58ee897e993`
+and `runtime/mod.rs` 251 physical/SHA-256
+`c52a11c0e082e76cb604ea30798600f07ddbf023b7abfd96f590d515335093a4`.
+Caps are <=90 owner production, <=40 owner proof, <=80 sibling proof, <=210
+aggregate and physical <=1,970/340. Add no production helper/owner test/skip;
+the one sibling smoke stays below 100 and the cohesive owner below 2,000.
+
+Validate serially on Ubuntu 24.04 WSL: exact sibling smoke, accepted source
+observation/path/input suites, full core and separate runtime with only their
+byte-identical accepted baselines, direct commands check, formatting and exact
+scope/SHA/cap/visibility/wrapper/source-shape/diff gates. Defer Windows/macOS.
+
+Legacy semantic values/errors/order/events/equality remain exact. Observed
+Result-Arc+transaction-local epoch identity/invalidation and the opaque handoff
+remain Slug-native. Package policy/lookup/source/load, public command/bootstrap,
+other platforms and exact identity bytes remain deferred.
+
+STOP a third file, public/crate-root or private-inner exposure, new key/carrier/
+adapter/caller, compute/semantic/event/equality/lifecycle drift, package/public/
+bootstrap activation, fixture/oracle, waiver, milestone closure, M8/M7B or exact
+identity work. ACCEPT returns only to
+`WP-6-7A-generated-repository-package-publication-frontier-audit`. M7 remains
+partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
