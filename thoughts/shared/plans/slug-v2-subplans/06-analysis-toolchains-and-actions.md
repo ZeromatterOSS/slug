@@ -16007,6 +16007,24 @@ fixture/oracle changes, reverse dependencies, retained heaps, eager/global
 execution, other repository APIs, Java/JVM, milestone closure, M8/M7B and exact
 identity bytes. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated repository file-effect owner design selects producer prerequisite (2026-08-25)
+
+The cross-stage design proves a full producer-to-root implementation would mix
+five semantic boundaries and exceed one reviewable packet. Select exactly one
+callerless prerequisite: a keyless compact Bzlmod effect plan plus one loading
+selected-owner/ordinal legacy-observed producer. It reloads/authenticates the
+exact root Host repository-rule export and executes only the Bazel 9.2 string-
+path `ctx.file` slice without retaining a module, callable, heap or evaluator.
+
+Activate only
+`WP-4-5-selected-repository-file-effect-producer-implementation` across the
+seven paths and 560/650/1,210 caps frozen in current. Core, generated-definition
+views, route/source capability, source preparation, repository I/O, fixture and
+public behavior are frozen. After implementation ACCEPT, design only one
+generated plan handoff/application packet; do not infer activation now. Pinned
+`../zabel` `c7298478…` remains producer/effect guidance only. M7 remains partial
+and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is

@@ -3602,3 +3602,28 @@ Admit only exact Bazel 9.2 `repository_ctx.file` behavior required by the
 pinned two-file fixture. All other repository-context APIs stay typed
 unsupported. This packet is docs-only with cross-ledger caps in current; Stage
 4 Rust, tests, fixtures, loaders, public APIs and JVM work are frozen.
+
+### Selected repository file-effect producer design completed (2026-08-25)
+
+The cross-stage audit selects a uniquely smaller prerequisite before route/root
+activation. Implement one loading legacy/observed key pair keyed by workspace,
+the accepted selected owner and exact retained repository ordinal. It computes
+the existing owner certificate, reloads the call's defining root Host `.bzl`,
+authenticates exported rule identity/schema, and invokes that frozen
+implementation once with a compute-local context.
+
+The admitted context exposes only Bazel 9.2 string-path
+`file(path, content="", executable=True, legacy_utf8=False)` with Bazel's
+positional-only `path` and positional-or-named trailing parameters;
+`legacy_utf8` is a no-op. It records an ordered shared Bzlmod plan and rejects
+nonroot definitions, Label/path arguments, repeated/invalid paths and all other
+context APIs as unsupported/deferred.
+Retained success/error state is heap-free; Host-Bzl events stay below and the
+new key owns one local invocation print batch only after an invocation
+terminal.
+
+Activate only
+`WP-4-5-selected-repository-file-effect-producer-implementation` in the seven
+paths and 560/650/1,210 caps frozen in current. No core, route, source-
+preparation, materialization, fixture or public activation is authorized. After
+implementation ACCEPT, design only the effect-plan handoff/application packet.

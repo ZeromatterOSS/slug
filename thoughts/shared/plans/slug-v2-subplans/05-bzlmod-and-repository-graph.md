@@ -3675,3 +3675,19 @@ and only from package-source demand. Existing local/http/git request polarity,
 global generated-spec aggregates, lockfiles, native repositories and public
 APIs remain unchanged. This packet is docs-only with cross-ledger caps in
 current; all Bzlmod Rust, tests, fixtures and JVM work are frozen.
+
+### Generated repository file-effect representation designed (2026-08-25)
+
+The accepted split introduces one Bzlmod-owned, keyless shared value before any
+route/materialization work: each effect is normalized valid-Unicode relative
+`CompactString` path, exact `Arc<[u8]>` content and executable polarity; the
+plan is an ordered Arc slice with structural Eq/Hash/Allocative. Invalid and
+repeated paths fail at their call position. No callable, module, Starlark heap,
+root lease or I/O handle crosses this boundary.
+
+Loading remains the only execution owner and may import the doc-hidden value
+through the existing Bzlmod -> loading edge. Activate only
+`WP-4-5-selected-repository-file-effect-producer-implementation` in the seven
+paths and caps frozen in current. Existing global selected/generated values,
+RepoSpec, lockfile, native repository requests and consumers remain unchanged.
+After ACCEPT, design one separate Bzlmod/core route/request/application handoff.
