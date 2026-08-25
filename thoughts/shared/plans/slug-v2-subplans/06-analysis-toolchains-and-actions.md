@@ -15446,6 +15446,50 @@ opaque classifiers and epoch association are Slug-native; query/public
 publication, other platforms and exact bytes remain deferred. M7 remains
 partial and M7A -> M8 -> M7B remains.
 
+### Generated external-build Bazel 9.2 evidence prerequisite active (2026-08-25)
+
+The retained bridge retry compiles and its focused key/classifier/terminal
+algebra tests pass, but it stops at +527 production lines against the accepted
++480 cap. Three command-level discriminators also remain incomplete: generated
+package-load success, successfully mapped non-Generated fallback restoration,
+and opaque observed-lower-outer translation with the public-route prefix.
+
+Independent architecture review selected the smallest mandatory prerequisite.
+The existing hermetic `module-extension-use-repo` fixture already exercises
+`use_repo` apparent mapping, local extension repository generation, loading its
+generated `BUILD.bazel`, resolving the exported source and completing
+`build @generated//:generated.txt`. Its checked-in record is Bazel 9.1.1, so it
+cannot accept a new M1-M8 parity surface under the Stage 1 provenance contract.
+
+Run only `WP-6-7A-generated-external-build-bazel-9-2-evidence-refresh`.
+Change only that fixture's `fixture.toml` and generated `expected/oracle.json`;
+keep its workspace byte-identical. Pin Bazel 9.2.0 release and commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`; exact `ModuleFileGlobals#useRepo`,
+`SingleExtensionEvalFunction#compute`,
+`ModuleExtensionRepoMappingEntriesFunction#compute`, `PackageFunction#compute`
+and `TargetCompletor#createSucceeded` source anchors; and exact
+`ModuleExtensionResolutionTest#generatedReposHaveCorrectMappings` plus
+`BuildViewTest#testTopLevelInputFile` test anchors. Require every anchor to
+resolve at the pinned commit. Record that the fixture composes those two test
+themes rather than migrating either workspace verbatim, plus the generation
+and verification commands. Require exit 0, the canonical
+`@@+ext+generated//:generated.txt` analyzed/source-file message shape and
+successful completion. Generate then independently replay with the pinned
+binary and run focused harness, provenance, workspace-hash, scope, credential
+and diff gates.
+
+This evidence is exact only for the Bazel command exit, canonical generated
+target/source-file classification and successful completion. Harness path,
+duration, progress/server and process normalization are Slug-native. Slug
+activation, public/query generated publication, other platforms and exact
+configuration/output identity remain unsupported/deferred. Add no Rust,
+helper visibility, new fixture or unrelated oracle breadth. After evidence
+ACCEPT, retain the Rust candidate non-writable and schedule only docs-only
+`WP-6-7A-generated-package-load-bridge-proof-cap-correction-design`. That design
+may then authorize the measured cap change, existing test-only lawful
+materialization-harness visibility, generated-success fixture consumption and
+local opaque-outer command-glue algebra.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is

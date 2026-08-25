@@ -1,105 +1,88 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-generated-package-load-bridge-implementation-retry`
+Packet: `WP-6-7A-generated-external-build-bazel-9-2-evidence-refresh`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Design base: corrected design accepted 2026-08-25 / Rust `4d83a829`
+Authority base: retained bridge candidate over accepted docs `0e28f29b`
 
-Result: complete one private core bridge so the external exported-source build
-branch loads packages from extension-generated repositories while preserving
-all existing route diagnostics byte-for-byte.
+Result: refresh the existing hermetic generated-repository exported-source
+build fixture from historical Bazel 9.1.1 output to the canonical Bazel 9.2.0
+baseline before the retained bridge candidate receives its proof/cap correction.
 
-## Active implementation contract
+## Oracle-only contract
 
-Change only:
+Change exactly:
 
-1. `host_module.rs`: one doc-hidden public predicate on
-   `RootRepositoryRouteError` matching exactly Unknown/Unsupported. Keep the
-   kind and field private.
-2. `generated_repository_definition.rs`: one opaque `pub(super)` three-way
-   Missing/ContextMismatch/Other disposition on
-   `HostCanonicalRepositoryApparentMappingError`. Expose no predecessor or
-   private inner kind.
-3. new private `runtime/generated_package_route.rs`: own
-   `GeneratedPackageRouteKey` and its Observed sibling, both rejecting root and
-   displaying `generated-package-route:{workspace}:@{apparent}` with the
-   observed prefix. Share one mapping-then-definition driver. Require the
-   already-visible definition kind Generated and its RepoSpec plus validated
-   LocalUnsupported policy; construct only with `for_generated_repo_spec`.
-4. `runtime/mod.rs`: register only the private sibling module.
-5. `dice.rs`: retain only `BuildCommandErrorKind::GeneratedRoute`, build-branch
-   fallback/translation glue and the command-level discriminating proof.
+- `tests/v2_oracle/fixtures/module-extension-use-repo/fixture.toml`; and
+- `tests/v2_oracle/fixtures/module-extension-use-repo/expected/oracle.json`.
 
-Remove the dirty `root_apparent_repository_route.rs` helper completely.
+Keep all three workspace files byte-identical. Their entry SHA-256 values are:
 
-The public route child remains first. Only Unknown/Unsupported invoke the
-bridge. Generated success continues through unchanged package loading. Mapping
-Missing and any successful non-Generated definition are fallback-neutral
-Missing and restore the exact request-local public-route error. Only
-ContextMismatch/Definition/Compute become GeneratedRoute.
+- `BUILD.bazel`: `1f1994e887d6f6165509e3d4b4810fc46f90dd68613ce981baff8f8bbe004192`;
+- `MODULE.bazel`: `e5d1e9283df75188619978cb077ac0111cb9ad4da4e3c7ea7f606faf31518b21`;
+- `ext.bzl`: `395e3ca7accd421c949531a382c1ea8d01525ee36b4a36163cf03a8225854703`.
 
-Allowed files are exactly:
+The fixture remains one self-contained public-surface command:
+`build @generated//:generated.txt`. Its local module extension creates the
+repository, writes a `BUILD.bazel` that exports `generated.txt`, and imports it
+with `use_repo`. Require exit 0, the canonical
+`@@+ext+generated//:generated.txt` analyzed/source-file message shape and
+successful build completion. This discriminates apparent mapping, extension
+repository generation, generated package loading and exported-source success.
 
-- `app/slug_bzlmod_v2/src/host_module.rs`;
-- `app/slug_core_v2/src/runtime/generated_repository_definition.rs`;
-- `app/slug_core_v2/src/runtime/generated_package_route.rs` (new);
-- `app/slug_core_v2/src/runtime/mod.rs`; and
-- `app/slug_core_v2/src/runtime/dice.rs`.
+Add the Stage 1 provenance contract with Bazel release `9.2.0`, immutable
+source commit `8220c6198837d5c13d53fea211cf3282aa12408a` and these exact anchors:
 
-Freeze against `4d83a829`: <=480 production, <=420 proof and <=900 aggregate
-net additions. Physical ceilings are host module 4,825, dice 11,720, generated
-definition 4,010, runtime mod 340 and new module 720, from baselines
-4,783/11,550/3,964/331/new. Add no `rustfmt::skip`, Cargo/BUILD or fixture.
+- `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java#useRepo`;
+- `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java#compute`;
+- `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionRepoMappingEntriesFunction.java#compute`;
+- `src/main/java/com/google/devtools/build/lib/skyframe/PackageFunction.java#compute`;
+- `src/main/java/com/google/devtools/build/lib/skyframe/TargetCompletor.java#createSucceeded`;
+- `src/test/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionResolutionTest.java#generatedReposHaveCorrectMappings`; and
+- `src/test/java/com/google/devtools/build/lib/analysis/BuildViewTest.java#testTopLevelInputFile`.
 
-## Ownership and compatibility
+Require every path and named method to resolve at the pinned commit. Record that
+the fixture composes the generated-repository mapping test with the top-level
+exported-source build test into one smaller public CLI discriminator; it is not
+a verbatim migration of either workspace. Add translation notes and generation/
+verification commands. Generate and replay with `/usr/bin/bazel`, which must
+report exactly `bazel 9.2.0` before either run. Preserve `message_shape`; do not
+claim timing, process counts, output-base paths or server text.
 
-The bridge pair remains DICE-owned by workspace plus apparent repository.
-Legacy/Observed share one driver. Need and observed outer are immediate and
-carrierless; Complete retains one local Result Arc and, for Observed, only the
-left-first union of mapping then definition epochs. Equality is complete-only;
-the parent is eventless and adds no lock, cache, task or publication state.
+The entry sizes are 11 manifest lines and 34 generated JSON lines. Physical
+ceilings are 30 and 45 lines respectively, with at most 75 aggregate physical
+lines. The workspace is frozen; add no fixture, payload, harness, Rust, Cargo,
+BUILD, lockfile or unrelated oracle change.
 
-Lower observed mapping/definition outers stay opaque and carrierless. At the
-build boundary, translate a bridge outer to GeneratedRoute::Compute, retaining
-only the completed public-route prefix and fabricating no bridge carrier or
-epoch. After Need, command re-entry reacquires the public-route error through
-DICE. The bridge parent remains eventless and lock/cache/task-free.
+## Compatibility and proof
 
-Legacy route/build semantics and existing diagnostic bytes are exact.
-Doc-hidden classification, private bridge identity and observed epoch
-association are Slug-native. Query/public publication, Windows/macOS and exact
-identity bytes remain unsupported/deferred.
+The observed Bazel command exit, canonical generated target identity,
+source-file classification and successful completion are exact Bazel 9.2
+evidence. Path, duration, server/progress and process-count normalization remain
+Slug-native harness presentation. Slug command activation, public/query
+generated-repository publication, other platforms and exact configuration or
+output identity bytes remain unsupported/deferred.
 
-The fallback exists because the public Bzlmod route cannot represent an
-extension-generated repository. Delete it when the later M7A public generated-
-repository routing/publication owner consumes the accepted chain without
-dependency inversion. Generated-success and direct-local/builtin/unknown/
-unsupported regressions, including mapped non-Generated Unsupported and an
-observed-outer/prefix case, prevent expansion into a general repair path.
+Validate serially:
 
-## Proof and stops
+1. record `bazel --version` as exactly `bazel 9.2.0` and the sibling source tag
+   commit as exactly `8220c6198837d5c13d53fea211cf3282aa12408a`;
+2. independently generate with
+   `python3 -B -m tools.v2_oracle run --fixture module-extension-use-repo
+   --tool bazel --bazel /usr/bin/bazel --update-expected`;
+3. replay without `--update-expected` and require a clean comparison;
+4. inspect the generated record for exit 0, canonical target/source-file shape,
+   successful completion, Bazel 9.2 server provenance and normalized paths;
+5. run the focused oracle-harness test, fixture listing, workspace hashes,
+   exact allowlist/physical ceilings, credential/home-path scan and
+   `git diff --check`.
 
-The successor must prove key/root rejection and Display; mapping Missing,
-ContextMismatch and Other translation; definition outer/semantic pass-through;
-left-first epoch union, Need/outer carrierlessness, complete equality/validity,
-cancellation/recovery and warm silence; Generated success; and byte-identical
-direct-local, builtin, unknown and unsupported behavior. The unsupported proof
-must include a successfully mapped non-Generated definition restoring the
-exact original error. An observed-outer proof must preserve the completed
-public-route prefix, produce typed GeneratedRoute::Compute and retain no bridge
-carrier/epoch. Validate the doc-hidden cross-crate predicate in Bzlmod and
-through core as its direct dependent. Reuse accepted Bazel 9.2 evidence; add no
-fixture unless a demonstrated generated-build discriminator remains absent.
-
-Serial validation on Ubuntu 24.04 WSL is: focused classifier/key/fallback
-proofs; protected external-build suites; full Bzlmod; full core with only the
-accepted query diagnostic baseline; separate runtime with only the accepted
-PathObservationEpochKey baseline; direct commands check; formatting; exact
-allowlist/accounting/physical/cap/no-skip checks; and diff hygiene.
-
-STOP a sixth implementation file, retained route-error state, public private-
-kind/field exposure, diagnostic string matching, a third key family, query/
-public activation, new events/retention/locks, fixture growth without a
-demonstrated gap, cap/format/baseline waiver, milestone closure, M8/M7B or exact
-identity work. REPLAN before widening. After ACCEPT return to the Stage 6 owner
-plan for scheduling. M7 remains partial and M7A -> M8 -> M7B remains.
+STOP on any workspace drift, non-9.2 execution, stale 9.1.1 record, comparison
+failure, missing generated canonical label, credential-derived material,
+fixture/harness/Rust expansion or cap breach. After ACCEPT, retain the Rust
+candidate non-writable and schedule only the docs-only
+`WP-6-7A-generated-package-load-bridge-proof-cap-correction-design`. That design
+alone may authorize measured cap changes, test-only materialization-helper
+visibility, fixture consumption and command-glue algebra; do not accept or edit
+the bridge from oracle evidence alone. M7 remains partial and M7A -> M8 -> M7B
+remains.
