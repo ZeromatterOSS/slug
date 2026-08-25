@@ -14961,6 +14961,44 @@ identity work. ACCEPT returns only to
 `WP-6-7A-generated-repository-package-publication-frontier-audit`. M7 remains
 partial and M7A -> M8 -> M7B remains.
 
+### Terminal source-observation carrier-visibility implementation accepted (2026-08-23)
+
+Implementation `846ef196`, from accepted design `f859ab3b` and Rust base
+`b3eba6df`, exposes only the minimum same-crate `pub(super)` handoff for the
+accepted terminal legacy/observed source-observation owner.
+
+Promoted to `pub(super)`: the semantic certificate, borrowed
+view/disposition/accessors, opaque semantic error, concrete Result alias,
+legacy key/new, observed key/new, Result-Arc+epoch carrier/accessors and one
+field-private typed outer. The former observed outer enum is now private
+`RootApparentRepositorySourceObservationObservationError` with the sole
+`SourcePath(...)` variant; driver outcome and lower mapping use only the inner,
+and the only wrapper construction site is observed Key `Complete(Err(inner))`.
+Exactly one test-only sibling smoke
+(`root_apparent_repository_source_observation_surface_is_sibling_usable`)
+proves sibling nameability of both keys, Values, concrete Result/view, carrier
+accessors and the opaque outer; it constructs no private state and computes no
+key. No third file, production helper, caller, compute edge, Cargo/BUILD,
+fixture or oracle changed.
+
+Accounting against `b3eba6df` is +33/-22 owner lines (all production-side;
+owner proof unchanged), +80 sibling smoke, aggregate ≈+113 net at 1,877/331
+physical lines — within the <=90/<=40/<=80/<=210 and <=1,970/340 caps with no
+skip. Validation on Ubuntu 24.04 WSL: exact sibling smoke plus all 10 focused
+source-observation tests (11 passed), protected legacy/source-path/source-input
+suites 25 passed, full core 272 passes plus only the byte-identical accepted
+query diagnostic baseline failure, separate runtime 12 passes plus only the
+accepted `PathObservationEpochKey`/configured-analysis-Needs failure, direct
+command suites green (build 36, cquery 8, query minus the accepted baseline),
+serial `cargo fmt --all -- --check`, `git diff --check`, and exact scope/
+baseline-SHA/accounting/physical/visibility/wrapper/source-shape/no-skip/diff
+gates. Independent contract review against the design returned `ACCEPT`.
+
+Activate only `WP-6-7A-generated-repository-package-publication-frontier-audit`
+to choose the smallest policy/lookup/source/load owner or prerequisite; it must
+not assume raw-source publication or the current narrow public route is
+sufficient. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
