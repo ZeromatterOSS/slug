@@ -15877,6 +15877,49 @@ and demand-first core selection from `b97d6372`; then run the complete serial
 proof/baseline/fixture/review gates. STOP further cap/scope/key drift. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Selected-extension owner-pure representation REPLAN (2026-08-25)
+
+Both final-cap Phase-2 attempts stopped before editing loading/core. Concrete
+inspection shows the prior estimate omitted required owner-local containers:
+every existing loaded/prepared/pure/instantiated/validated value retains a
+workspace-global/root-only predecessor. Direct reuse would execute unrelated
+owners; copying every stage would exceed the packet and retain needless state.
+
+Independent architecture review selects a smaller two-key representation.
+Owner-pure success retains only authenticated owner inputs plus one existing
+request/calls receipt; loaded/prepared/Starlark/event state is compute-local.
+Final validation retains that pure result plus one request-level instantiated
+value in a distinct owner certificate. Extract per-request instantiate/validate
+helpers while global loops and certificate shapes remain unchanged. Generalize
+`InvocationContext` to an Arc module slice, preserving singleton global calls,
+shared tag ownership, left-first epochs and existing child/local event owners.
+
+Run docs-only
+`WP-6-7A-generated-package-selected-extension-owner-pure-representation-correction-design`.
+Keep the nine files and all physical ceilings; set semantic caps <=1,500
+production/<=800 proof/<=2,300 aggregate. Corrected Bzlmod Phase 1 is byte-
+frozen. Existing CompactString/Arc/SmallMap/Dupe/Allocative suffice; no Buck2/
+V1 import or Stage 9 update. Preserve exact Bazel 9 imported-repo behavior,
+Slug-native private carriers and directly selected unsupported owners. STOP
+Rust, global representation changes, third key, cap/scope drift, Java/JVM,
+milestone closure, M8/M7B and identity bytes. M7 remains partial.
+
+### Selected-extension owner-pure representation correction accepted (2026-08-25)
+
+Independent correction rereview accepts the exact retained-state split:
+semantic errors retain only authenticated owner inputs plus the current
+request/partial calls required by their diagnostic; observed Host-Bzl outers
+retain only prior completed semantic state, never a failed child or epoch.
+
+Activate only
+`WP-6-7A-generated-package-selected-extension-owner-pure-representation-correction-implementation`.
+Implement the two scratch-only loading keys and demand-first core under the
+unchanged physical ceilings and <=1,500 production/<=800 proof/<=2,300
+aggregate semantic caps. Preserve byte-frozen Bzlmod Phase 1, global aggregate
+representations, exact Bazel 9 authority and Zabel-guidance-only architecture.
+Run the complete serial proof/baseline/rebuilt-fixture/review gates. STOP scope,
+cap or key widening; M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is

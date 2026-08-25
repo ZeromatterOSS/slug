@@ -1,16 +1,19 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-generated-package-selected-extension-demand-owner-phase-2-final-cap-correction-implementation`
+Packet: `WP-6-7A-generated-package-selected-extension-owner-pure-representation-correction-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
 Design base: accepted owner-first design `b97d6372`, nested-child correction
-`1d71320f`, retained corrected Bzlmod Phase 1 and second terminal Phase-2 cap
-review
+`1d71320f`, retained corrected Bzlmod Phase 1, repeated no-edit Phase-2 stops
+and independent scratch-only retained-representation audit
 
-Result: retain the corrected Bzlmod phase and implement exactly two owner-keyed
-loading keys plus demand-first core activation under the final accepted caps.
+Result: implement the accepted minimal owner-pure/final-certificate
+representation without copying the workspace-global stage containers.
 
 ## Exact authority and frozen state
+
+Write only the nine named Rust surfaces and their colocated proofs. Fixtures,
+oracles, Cargo/BUILD, all other files and `../zabel` are read-only.
 
 The first implementation attempt verified every frozen precondition, performed
 no source edit and stopped because the 423-line `selected_repo_spec.rs`
@@ -51,7 +54,7 @@ clean. Freeze the live values:
 - child 1,128 lines,
   `ad47ae4e308d95ed3d55100cdd77caf2a0e067a10fb5322fb9f49338f4a0f508`.
 
-## Final implementation
+## Owner-pure implementation
 
 Retain the nested child module at
 `selected_repo_spec/selected_extension_demand.rs`. Rust child privacy lets it
@@ -69,16 +72,37 @@ Write authority and responsibility are exact:
   owner keys and the accepted demand-first core activation.
 
 Corrected Phase 1 consumes approximately +779 production/+397 proof/+1,176
-aggregate. A second read-only reuse audit confirms the minimum remaining owner-
-pure load/reacquisition/preparation/invocation, synchronous validation and core
-demand-first selection is ~430 production. Only 421 remains under <=1,200.
-Global loading keys cannot substitute because they reintroduce unrelated-owner
-evaluation. Phase 2 made no source edit.
+aggregate. Repeated Phase-2 attempts made no source edit. Direct reuse is not
+lawful because every existing loaded/prepared/pure/instantiated/validated value
+structurally retains workspace-global/root-only predecessors. A detailed audit
+puts the remaining two keys/core at >=580 production before proof.
 
 The three prior gaps are closed: typed demand disposition, explicit normalized
 versions/invalid terminal, and real owner-input projection/order/mapping/epoch/
 Need/outer proof. Keep the three live Bzlmod files byte-frozen during the
 remaining loading/core implementation.
+
+Design exactly this smaller representation:
+
+- private owner-pure success retains only `Arc<OwnerInputs>` plus the existing
+  single request/calls receipt;
+- loaded definitions, prepared module rows, Starlark heaps, traversal/event
+  buffers and Host-Bzl reacquisition state are compute-local scratch;
+- semantic errors retain only authenticated owner inputs plus the current
+  request/partial calls required for the exact diagnostic;
+- observed Host-Bzl outers retain owner inputs for the first load and owner
+  inputs plus the first completed projection for reacquisition, never the
+  failed child carrier or epoch;
+- final validation retains `Arc<OwnerPureResult>` plus one request-level
+  instantiated value in a distinct owner certificate; existing global
+  certificate representation stays unchanged;
+- extract pure `instantiate_request` and `validate_request` helpers, translating
+  their errors back into unchanged global aggregate errors in existing loops;
+- generalize `InvocationContext` to `Arc<[InvocationModule]>`; existing global
+  evaluation supplies one row, selected-owner evaluation supplies all rows with
+  one shared tag-owner token; and
+- preserve owner-input -> first HostBzl -> reacquired HostBzl left-first epochs,
+  child/local invocation event ownership and exactly two loading DICE keys.
 
 No accepted semantic contract changes. Demand authenticates typed imports and
 deduplicates repeated same-owner matches without parsing canonical spellings.
@@ -103,7 +127,7 @@ Caps are:
 | loading `lib.rs` | 112 |
 | core generated definition | 4,160 |
 
-Semantic caps are <=1,300 production, <=700 proof and <=2,000
+Semantic caps are <=1,500 production, <=800 proof and <=2,300
 aggregate from the original frozen state. All nine physical ceilings remain
 unchanged. Existing `CompactString`, canonical types, `Arc`, compact maps/sets
 and `Allocative` remain sufficient, so no Buck2/V1 import or Stage 9 row is
@@ -129,7 +153,6 @@ fixture, clean stale `slugd` before/after daemon-sensitive runs, and finish with
 formatting, diff/secret/archive/rustfmt-skip, frozen-scope, physical and semantic
 cap checks plus independent implementation review.
 
-All other files/docs/fixtures/oracles/Cargo/BUILD and `../zabel` are read-only.
 Reach independent implementation ACCEPT or formal REPLAN. STOP a root-level
 sibling, parent-private visibility widening, a third Bzlmod/
 loading key, semantic/proof weakening, cap/authority widening, delimiter
