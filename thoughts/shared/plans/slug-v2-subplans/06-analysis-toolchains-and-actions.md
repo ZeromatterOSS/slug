@@ -15564,6 +15564,89 @@ correction. Run only
 `WP-6-7A-generated-package-load-bridge-proof-cap-correction-implementation`;
 M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated package bridge command-input ownership REPLAN (2026-08-25)
+
+The proof/cap retry implemented its exact seven-file contract at +539
+production, +332 proof and +871 aggregate against `4d83a829`. Its classifier,
+three generated-route tests, two new command discriminators, core check and
+full Bzlmod suite pass. Physical sizes are 4,825/11,631/3,985/332/591/1,729/
+3,941 across host/dice/generated-definition/runtime-mod/generated-route/root-
+definition/build-tests.
+
+Terminal validation found one new forbidden full-core failure in addition to
+the accepted query baseline. The protected external-build lifecycle's
+`@unknown` route enters the bridge, whose observed canonical-mapping child
+reaches uninjected `HostModuleMirrorsInputKey`; the opaque outer correctly
+becomes `GeneratedRoute`, so the original exact `RepositoryRoute` cannot be
+restored. The rebuilt Slug reproduces the same injected-key panic on the
+accepted `module-extension-use-repo` fixture, proving the gap blocks real
+generated success rather than only a protected test. Full core is 277 passes
+plus the accepted query failure and this new failure; separate runtime remains
+12 passes plus its accepted `PathObservationEpochKey` baseline. Independent
+terminal review returned `REPLAN` because only one production line remained
+and the missing input owner lies outside the seven-file authority.
+
+The architectural audit uses `../zabel` explicitly as guidance.
+`src/load/injected_registry_options.zig` owns one normalized typed registry
+fact, `src/request/configured_request.zig` installs it at the request boundary,
+and `src/bzlmod/injected_graph_options.zig` keeps registry and lockfile
+identities distinct while composing the graph-sensitive projection. Slug must
+adapt that producer/request ownership in Rust DICE, not copy Zig code or its
+representation.
+
+Slug already has the necessary private semantic owners in
+`host_registry_inputs.rs`: normalized Host registry URLs, module mirrors and a
+typed refresh token. The public `inject_registry_request_inputs` facade in
+`registry_dice.rs` currently installs only root-module registry URLs and the
+legacy registry request generation. The native-demand owner separately injects
+root-package policy, so vendor projection is already present. Command parsing
+admits ordered `--registry` values but no module-mirror option. Therefore the
+smallest bounded successor keeps the three Host keys private, derives their URL
+and empty-mirror values from the already-admitted `RegistryUrls`, derives the
+distinct Host refresh token from the request-local registry generation, and
+extends the existing Bzlmod injection facade so all facts enter one updater
+before commit.
+
+Run only `WP-6-7A-generated-package-host-registry-input-ownership-design`.
+Keep the retained nine-file Rust candidate non-writable. The design must freeze
+the private facade, exact Update/Refresh and A/B/A proofs, protected unknown
+diagnostic, rebuilt generated fixture, hashes, delta/aggregate caps and a likely
+two-file additional authority (`host_registry_inputs.rs` and
+`registry_dice.rs`). Explicit module mirrors and broader registry metadata stay
+unsupported/deferred. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Generated package Host registry input ownership design accepted (2026-08-25)
+
+Independent review accepts the Zabel-guided producer/request boundary without
+copying its Zig code or representation. `host_registry_inputs.rs` remains the
+private owner of normalized Host URLs, mirrors and refresh token. The existing
+public `inject_registry_request_inputs` facade in `registry_dice.rs` becomes the
+sole installer of the Root URL, legacy generation, private Host URL, absent-
+mirror and typed Host refresh facts in one updater. No Host key/value or new
+facade is exported.
+
+The facade canonicalizes empty `RegistryUrls` to Bazel's default BCR before
+producing either Root or Host facts, prepares every fallible value before its
+first updater mutation, and derives `HostRegistryRefreshToken::new(generation.0)`
+without conflating the two typed DICE domains. Core changes only
+`NativeDemandRequestInputBundle::normalized_initial` to retain that same
+default value. The already-independent root-package vendor injection is
+unchanged. Explicit module mirrors remain unsupported rather than silently
+invented; zero occurrences are the exact admitted command surface.
+
+Implementation adds exactly one facade-focused proof for default/explicit URL
+agreement, ordered dedupe, absence-shaped mirrors, typed refresh A/B/A and
+private dependency rows. The protected unknown-repository lifecycle and rebuilt
+accepted generated fixture are mandatory integration discriminators. The
+retained bridge stays byte-identical except the exact core default line.
+
+Successor caps are <=45 production/<=180 proof/<=225 aggregate; cumulative
+bridge caps are <=584/<=512/<=1,096. Physical ceilings are 3,450 registry,
+11,635 dice and fixed 861 Host owner, with all other retained sizes frozen in
+the current packet. Run only
+`WP-6-7A-generated-package-host-registry-input-ownership-implementation`.
+M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
