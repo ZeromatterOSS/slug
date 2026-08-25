@@ -16058,6 +16058,22 @@ impossible projection, outer and merge injection. Activate only
 in the same scope and caps. Preserve compatibility classes, Bazel authority and
 the Zabel concept-only boundary.
 
+### Selected repository file-effect producer accepted; handoff design next (2026-08-25)
+
+Independent terminal review accepts the callerless producer at
++901 production/+747 proof/+1,648 aggregate. Full Bzlmod/loading suites pass,
+the dependent core check passes, hashes and physical caps reconcile, and no
+semantic, retained-lifetime, compatibility or authority defect remains. The
+archive checker reports only its existing committed three-thought-path baseline.
+
+Activate only docs packet
+`WP-4-5-6-generated-repository-file-effect-handoff-application-design`.
+Map the exact selected owner/ordinal into one demand-side producer call, a
+structural route/request value and atomic immutable-root application. Keep
+route identity, effect bytes, root lease and source observation distinct and
+associated. Authorize no Rust, fixture, I/O or public behavior before
+independent design acceptance. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is

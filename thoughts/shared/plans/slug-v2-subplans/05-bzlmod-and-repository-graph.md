@@ -3719,3 +3719,17 @@ lower-owner proof plus exact source shape. Activate only
 `WP-4-5-selected-repository-file-effect-producer-proof-contract-correction-implementation`
 in the same seven-file scope. Add no test injection or constructor and preserve
 930/850/1,780 plus every physical cap.
+
+### Generated repository file-effect producer accepted (2026-08-25)
+
+Independent terminal review accepts the keyless ordered Bzlmod plan and loading
+selected-call producer at +901/+747/+1,648. The value remains structural,
+heap-free and callerless; global selected/generated aggregates, RepoSpec,
+requests, lockfiles and native repositories remain unchanged. Full Bzlmod and
+loading baselines and dependent core check pass.
+
+Activate only docs packet
+`WP-4-5-6-generated-repository-file-effect-handoff-application-design`.
+Design a dependency-safe demand-only route/request handoff and immutable-root
+association. Bzlmod must not depend on loading; no Rust or materialization is
+authorized before independent acceptance.

@@ -3658,3 +3658,18 @@ impossible projection/outer/merge cases composed from accepted Host-Bzl and
 observation-algebra proof plus exact producer source-shape assertions. Activate
 only `WP-4-5-selected-repository-file-effect-producer-proof-contract-correction-implementation`
 in the same seven-file scope and unchanged caps; add no injection surface.
+
+### Selected repository file-effect producer accepted (2026-08-25)
+
+Independent terminal review accepts +901 production/+747 proof/+1,648
+aggregate at 1,402 loading-child physical lines. The exact `ctx.file` ABI,
+selected owner/ordinal isolation, reload/authentication, Legacy/Observed
+semantics, Need/epoch/event/cancellation lifecycle, sibling nonexecution and
+heap-free retained shape are proven. Full loading and Bzlmod suites and the
+dependent core check pass.
+
+Activate only docs packet
+`WP-4-5-6-generated-repository-file-effect-handoff-application-design`.
+Design the first demand-side caller and structural effect handoff; do not edit
+loading Rust, execute globally or activate route/materialization/fixture state.
+Pinned `../zabel` `c7298478…` remains concept-only ownership guidance.
