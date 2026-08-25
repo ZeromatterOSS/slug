@@ -15161,6 +15161,21 @@ identity bytes remain unsupported/deferred.
 
 M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Stale root-mapping absence-scan correction accepted (2026-08-24)
+
+Correction `663032b9` removes core's generated_repository_definition.rs from
+the lifecycle proof's source-absence loop in selected_repo_spec.rs — that
+module has legitimately consumed `HostRootRepositoryMappingObservationKey/
+Error` since accepted composition `2022a7a2`, so the scan could only fail.
+Loading's bzl_module.rs and root_apparent_repository_definition.rs remain
+scanned and clean; a source comment records why. One-file, +3/-1 test-only
+change; formatting, diff hygiene and full Bzlmod 531/531 green.
+
+Activate only
+`WP-6-7A-generated-repository-package-publication-frontier-audit-2` to choose
+the smallest generated package source/load caller owner over Rust `b42b004c`.
+M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
