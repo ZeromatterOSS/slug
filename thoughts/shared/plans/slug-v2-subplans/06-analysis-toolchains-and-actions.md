@@ -15647,6 +15647,48 @@ the current packet. Run only
 `WP-6-7A-generated-package-host-registry-input-ownership-implementation`.
 M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated package selected-extension demand-owner REPLAN (2026-08-25)
+
+The Host registry input implementation closes its intended input gap in
+retained state. The facade proof and all 533 Bzlmod unit tests plus integration
+and doc targets pass; the protected external lifecycle passes; core and runtime
+return to their exact accepted one-failure baselines. Final accounting is +566
+production/+508 proof/+1,074 aggregate from `4d83a829`.
+
+The mandatory rebuilt Bazel 9.2 fixture nevertheless reaches a second defect:
+`HostGeneratedRepositoryDefinitionKey` requests a workspace-wide validated
+extension certificate, and the global request producer rejects the unrelated
+non-root `@bazel_tools//tools/osx:xcode_configure.bzl` usage before the demanded
+root extension loads. Filtering that error in validation, skipping non-root
+usages in the global producer or ignoring unrequested outputs would falsely
+weaken a complete carrier and still let an unrelated failing root extension
+poison the requested repository. Terminal review therefore returns `REPLAN`.
+
+Bazel's `RepoDefinitionFunction` resolves the requested canonical repository
+to one `ModuleExtensionId` before requesting `SingleExtensionValue`; its usages,
+evaluation and validation keys remain per-extension. Zabel independently uses
+the same owner-first shape: `session_selected_extension_graph_demand_seeds.zig`
+derives producer-owned canonical demand seeds/owner indexes,
+`session_selected_graph_extensions_root_direct_routes.zig` retains demandable
+routes, and `session_selected_extension_source_execution.zig` executes one
+selected owner. These are architectural guidance only; Slug copies no Zig code
+or representation.
+
+Run only docs-only
+`WP-6-7A-generated-package-selected-extension-demand-owner-design`. Design a
+typed Bzlmod demand projection over recorded selected usage/import/unique-name
+facts without parsing canonical-name delimiters, then a per-selected-extension
+loading/evaluation/instantiation/validation chain and one opaque loading export
+for core's generated definition. Preserve the existing aggregate keys as
+complete, preserve exact owner inputs/outputs/imports/overrides and observed
+Need/epoch/event algebra, and keep directly demanded unsupported owners typed.
+
+Freeze the retained nine-file candidate and accepted fixture. Rust, tests,
+oracles, Cargo/BUILD and APIs are read-only during design. Requested generated-
+repository behavior remains exact; the demand representation is Slug-native;
+unrelated unadmitted extension execution remains unsupported/deferred without
+poisoning exact demand. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is

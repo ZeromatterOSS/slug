@@ -1,129 +1,125 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-generated-package-host-registry-input-ownership-implementation`
+Packet: `WP-6-7A-generated-package-selected-extension-demand-owner-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Design base: independently accepted producer/request input design over retained
-bridge candidate `df97f130` and Bazel 9.2 evidence `6fd78a21`
+Design base: retained bridge/input candidate over `4d83a829`, accepted Bazel
+9.2 fixture evidence `6fd78a21`, and terminal aggregation-order REPLAN
 
-Result: install every already-modeled private Host registry request fact before
-the generated-package bridge computes, restoring exact unknown-route fallback
-and enabling the accepted generated source build.
+Result: design the smallest producer-authenticated demand for one selected
+module extension before any definition load, evaluation, instantiation or
+validation, so an unrelated unsupported extension cannot poison an admitted
+generated repository.
 
-## Exact authority and freeze
+## Read-only authority and retained state
 
-Write only:
+This is docs-only. Write only the canonical plan, this manifest, the Stage 6
+owner and the routing log. Rust, tests, fixtures, oracles, Cargo/BUILD and
+`../zabel` are read-only.
 
-- `app/slug_bzlmod_v2/src/registry_dice.rs`; and
-- the exact `NativeDemandRequestInputBundle::normalized_initial` registry line
-  in `app/slug_core_v2/src/runtime/dice.rs`.
+Retain the nine-file candidate exactly. Its current discriminators are:
 
-Keep the remaining retained bridge candidate byte-identical. In particular,
-`app/slug_bzlmod_v2/src/host_registry_inputs.rs` is read-only: do not change or
-export its private keys, values, normalization or equality.
+- the facade proof and all 533 Bzlmod unit tests plus integrations/docs pass;
+- the protected external-build lifecycle and generated-route/bridge focused
+  proofs pass;
+- core is at its exact accepted 278/279 query baseline and runtime is at its
+  exact accepted 12/13 `PathObservationEpochKey` baseline;
+- cumulative accounting is +566 production/+508 proof/+1,074 aggregate from
+  `4d83a829`; and
+- the rebuilt `module-extension-use-repo` fixture reaches the generated route
+  but fails because unrelated selected `@bazel_tools` xcode extension usage is
+  rejected before the demanded root extension loads.
 
-Before editing require SHA-256:
+Freeze current SHA-256 values:
 
-- `registry_dice.rs` `a4fb383c38ba9860fdfa01b87133b065688cfeb94bf18f3f0d461eac47175df6`;
-- `host_registry_inputs.rs` `a253dba09c0c10e51525c268402cb237961130a867e808d0a768c5b7b15feac7`;
-- retained `dice.rs` `5645002dafde10a4a532a9257435934f5f0c7031fdd0ed394742c07adb034158`;
-- host route `185ec7685abd51851c570762e393df1d59892596854cf6c826603d00a2703c39`;
-- generated definition `8166e0c83a0f86e50d251d25b649be18cfd37020434f163a1e06dde723ba27ad`;
-- runtime mod `204fd7510b216b9794b6ce646c29ab30dcf2b453bb42c2b402a76da6f41ac651`;
-- generated route `27e6ee70e2b95c3b1e48bb6fcca8795fd2ba763cb6b0867ffd7fc9ba87f90818`;
-- root definition `a1cf060405c4a5d7be26acc4b23dda542c7c0fad20325fd6fa4b7369f8dc1f3a`;
-- build tests `cf96c012f4de303b9b0b0d94d345ecfbc395dc1a81427ea32399503474a067f1`.
-
-The accepted fixture remains byte-identical and read/execute-only.
-
-## Required implementation
-
-Extend the existing public `inject_registry_request_inputs` Bzlmod facade; add
-no second facade. Before its first updater mutation:
-
-1. canonicalize an empty `RegistryUrls` to
-   `RegistryUrls::default_bazel_registry()` so both Root and Host facts match
-   Bazel's admitted empty-argv default;
-2. normalize the workspace and call the existing private
-   `normalize_host_registry_inputs` over the canonical URL slice with zero
-   `HostModuleMirrorOccurrence`s;
-3. construct the existing typed `HostRegistryRefreshToken` from
-   `generation.0`, keeping the Host token key/type distinct from the legacy
-   registry generation; and
-4. only after every fallible preparation succeeds, inject Root registry URLs,
-   legacy registry generation, Host registry URLs, Host empty mirrors and Host
-   refresh token into the same uncommitted updater.
-
-Change core's `normalized_initial` registry value from an empty `RegistryUrls`
-to `RegistryUrls::default_bazel_registry()` so retained request equality is the
-same canonical value produced by `from_request([])`. Make no other change in
-`dice.rs`.
-
-The root-package vendor projection remains separately owned and injected.
-Update mode must not read the refresh token; Refresh mode must observe its typed
-token. Add no mirror flag, mirror metadata behavior, new key/value, retained
-collection, semantic hash, global state or materialization-generation reuse.
-
-This follows architectural guidance from:
-
-- `../zabel/src/load/injected_registry_options.zig` (typed normalized registry
-  fact);
-- `../zabel/src/request/configured_request.zig` (request-boundary installation);
+- `host_module.rs` `185ec7685abd51851c570762e393df1d59892596854cf6c826603d00a2703c39`;
+- `registry_dice.rs` `c736f60743709040ca1f7b327bd02f4ac956c5576b02db3375a106df6c9f8933`;
+- `selected_repo_spec.rs` `25a0d0855ed83bc58942b02ec7daa1fcc78b50e604695a60b0e148b1edf24cad`;
+- `dice.rs` `c10651ec7a5777dbed5db78df57a6d50b5c50f098191a44fe177379a48e8f914`;
+- `generated_repository_definition.rs` `8166e0c83a0f86e50d251d25b649be18cfd37020434f163a1e06dde723ba27ad`;
+- `runtime/mod.rs` `204fd7510b216b9794b6ce646c29ab30dcf2b453bb42c2b402a76da6f41ac651`;
+- `generated_package_route.rs` `27e6ee70e2b95c3b1e48bb6fcca8795fd2ba763cb6b0867ffd7fc9ba87f90818`;
+- `root_apparent_repository_definition.rs` `a1cf060405c4a5d7be26acc4b23dda542c7c0fad20325fd6fa4b7369f8dc1f3a`;
   and
-- `../zabel/src/bzlmod/injected_graph_options.zig` (distinct registry/lockfile
-  identities in the graph-sensitive projection).
+- `build_command_tests.rs` `cf96c012f4de303b9b0b0d94d345ecfbc395dc1a81427ea32399503474a067f1`.
 
-Do not copy Zig code or representation; Slug remains Rust-native.
+The private Host registry owner remains frozen at
+`a253dba09c0c10e51525c268402cb237961130a867e808d0a768c5b7b15feac7`.
+The accepted fixture workspace and evidence remain byte-identical.
 
-## Proof, caps and validation
+## Required design audit
 
-Add exactly one facade-focused Bzlmod proof covering:
+Trace and design one selected-extension demand chain:
 
-- empty/default and explicit URL agreement;
-- ordered first-occurrence normalization and deduplication;
-- absence-shaped empty mirrors;
-- typed refresh equality plus A/B/A invalidation; and
-- the private Host URL/mirror/refresh dependency rows.
+1. In Bzlmod, derive a producer-owned demand seed from the requested canonical
+   repository and the recorded selected extension usage/import/unique-name
+   facts. Match typed identities; never parse a `+`-delimited canonical name.
+2. Preserve the authenticated selected owner in DICE identity/equality and
+   produce exactly one extension definition-load request. A directly demanded
+   unsupported owner remains a typed terminal, while an unrelated unsupported
+   owner is not evaluated.
+3. Reuse or extract single-request finishers through Bzl loading, pure
+   invocation, repository instantiation and validation. Evaluate every usage,
+   tag, import, override and generated output belonging to that selected owner,
+   not merely the named repository output.
+4. Carry observed Need/outer/epoch semantics only along that selected chain,
+   preserve child event ownership and exact left-first epoch composition, then
+   select the requested generated repository from the owner-authenticated
+   validated result.
+5. Keep the existing workspace-wide load/invocation/instantiation/validation
+   keys semantically complete. Do not turn them into filtered or best-effort
+   carriers and do not suppress xcode at a downstream validator.
 
-Retain the existing Host normalization/equality, vendor independence and
-Update/Refresh tests. Mandatory integration gates are the protected
-`public_external_single_uses_observed_family_and_full_source_certificate`
-unknown-repository lifecycle and rebuilt Slug `module-extension-use-repo`
-fixture. Preserve the two bridge command proofs and opaque-outer behavior.
+The design must name exact Rust authority, visibility-only exports, key/value
+shapes, error algebra, event/epoch ownership, retained state, proof matrix,
+line/physical caps, hashes and serial validation for one implementation packet.
+Prefer one per-selected-extension semantic spine over adapter keys or copied
+aggregate logic. Read `docs/developers/dice.md` before specifying ownership or
+locking.
 
-Successor delta caps are <=45 production, <=180 proof and <=225 aggregate.
-Cumulative bridge caps from `4d83a829` are <=584 production, <=512 proof and
-<=1,096 aggregate. Physical ceilings are `registry_dice.rs` 3,450,
-`dice.rs` 11,635 and fixed Host owner 861; every other retained physical size
-must remain 4,825/3,985/332/591/1,729/3,941 in the frozen order above. Add no
-new `rustfmt::skip`.
+## Architectural and oracle basis
 
-Validate serially on Ubuntu 24.04 WSL:
+Bazel 9.2 is exact authority:
 
-1. the new facade proof, retained Host input tests, classifier, generated-route
-   suite, two bridge command proofs and protected external lifecycle;
-2. full `slug_bzlmod_v2`; full `slug_core_v2` with only the exact accepted query
-   diagnostic baseline; separate runtime with only the accepted
-   `PathObservationEpochKey` baseline;
-3. clean stale `slugd`, build `slug_cli_v2`, run the unchanged generated fixture
-   with the rebuilt absolute `SLUG_V2_BIN`, then clean `slugd` again;
-4. direct build/cquery/query command suites, `cargo fmt --all -- --check`,
-   `scripts/v2_archive_status.sh` with only its exact three accepted non-V2
-   thoughts-path residuals, exact SHA/allowlist/accounting/physical/no-skip/
-   utility scans, fixture byte identity, credential scan and `git diff --check`.
+- `RepoDefinitionFunction` first maps a canonical repository prefix to one
+  `ModuleExtensionId`, then requests `SingleExtensionValue.key(id)`;
+- `SingleExtensionUsagesFunction` projects graph facts for only that id;
+- `SingleExtensionFunction` evaluates and validates only that id's complete
+  usages/imports/overrides; and
+- `BazelDepGraphValue#getRepositoryMapping` derives imported canonical names
+  from typed extension identities and unique names.
 
-## Compatibility and stops
+Use `../zabel` as architectural guidance, after respecting its `AGENTS.md`:
 
-Admitted registry URL normalization, exact fallback diagnostics and generated
-source build remain exact Bazel 9 surfaces. Private Host input keys, request-
-local refresh generation and bridge identity are Slug-native. Explicit module
-mirrors, broader registry metadata application, query/public generated-
-repository publication, other platforms and exact configuration/output bytes
-remain unsupported/deferred.
+- `session_selected_extension_graph_demand_seeds.zig` derives canonical-repo
+  demand seeds and owner indexes before evaluation;
+- `session_selected_graph_extensions_root_direct_routes.zig` keeps repository
+  access demandable without evaluating every selected extension; and
+- `session_selected_extension_source_execution.zig` executes one selected
+  owner index.
 
-STOP Host-owner/lib/CLI/server/command/fixture/harness/Cargo/BUILD edits, public
-key/value export, a second registry option representation, empty-default drift,
-mirror admission, protected-test weakening, third implementation file, cap or
-hash breach, semantic redesign, milestone closure, M8/M7B or exact identity
-work. REPLAN before widening. After terminal review, commit all accepted Rust
-with the plan outcome. M7 remains partial and M7A -> M8 -> M7B remains.
+Adapt the ownership lessons to Rust DICE; copy no Zig code or representation
+and add no Zabel dependency.
+
+## Compatibility, proof and stops
+
+Requested imported generated-repository behavior is exact Bazel 9. The demand
+seed/key representation and private bridge carriers are Slug-native. Execution
+of xcode and other unadmitted non-root extensions remains unsupported/deferred;
+their mere presence must not poison an unrelated exact demand. Configuration/
+output bytes, query/public publication, explicit module mirrors and other
+platforms remain deferred.
+
+The eventual proof must include at least: requested root extension plus an
+unrelated unsupported non-root extension; two root extensions where the
+unrequested one fails; direct demand of an unsupported owner; exact generated
+repo selection/missing/duplicate behavior; Legacy/Observed parity, epochs,
+events, Need/outer/cancellation/warm A/B/A; protected unknown fallback; full
+Bzlmod/core baselines; and rebuilt accepted fixture success.
+
+Documentation net caps are <=50 canonical, <=220 current, <=240 owner and <=30
+routing, <=540 aggregate. Reach one independently reviewed implementation
+design or formal REPLAN. STOP Rust edits, downstream filtering, canonical-name
+string parsing, global-carrier weakening, duplicated semantic pipelines,
+fixture/test weakening, Java/JVM work, milestone closure, M8/M7B or exact
+identity bytes. M7 remains partial and M7A -> M8 -> M7B remains.
