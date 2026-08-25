@@ -15843,6 +15843,40 @@ boundary, complete aggregates, key counts, events/epochs, compatibility and
 fixture proof. STOP further scope/cap drift. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Selected-extension demand-owner final Phase-2 cap REPLAN (2026-08-25)
+
+The retained corrected Bzlmod phase closes all three reviewed gaps and passes
+four focused tests plus `cargo check -p slug_bzlmod_v2` without a new warning.
+It is +779 production/+397 proof/+1,176 aggregate at 13,415 parent, 460 lib and
+1,128 child, within every physical ceiling.
+
+The second Phase-2 attempt stopped before editing loading/core. Independent
+reuse audit confirms their smallest lawful owner-pure/final-validation/core
+vertical needs about 430 production lines, while <=1,200 leaves 421. Calling
+workspace-global loading keys would violate unrelated-owner isolation.
+
+Run docs-only
+`WP-6-7A-generated-package-selected-extension-demand-owner-phase-2-final-cap-correction-design`.
+Correct only semantic caps to <=1,300 production/<=700 proof/<=2,000 aggregate;
+retain the nine files, all physical ceilings, exact two Bzlmod/two loading keys,
+accepted semantics/proof/classes and fixture. Freeze the three live Bzlmod
+hashes in current. STOP Rust, further authority/physical-cap/key widening,
+global filtering, Java/JVM, milestone closure, M8/M7B and identity bytes. M7
+remains partial and M7A -> M8 -> M7B remains.
+
+### Selected-extension demand-owner final Phase-2 cap correction accepted (2026-08-25)
+
+Independent review accepts the final cap-only correction: unchanged nine-file
+authority/physical ceilings/key counts/semantics/proof, with semantic ceilings
+<=1,300 production, <=700 proof and <=2,000 aggregate. Activate only
+`WP-6-7A-generated-package-selected-extension-demand-owner-phase-2-final-cap-correction-implementation`.
+
+Freeze corrected passing Bzlmod Phase 1. Implement only the private owner-pure
+loading key, final synchronous owner-validation key, doc-hidden loading export
+and demand-first core selection from `b97d6372`; then run the complete serial
+proof/baseline/fixture/review gates. STOP further cap/scope/key drift. M7
+remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
