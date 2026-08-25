@@ -15490,6 +15490,37 @@ may then authorize the measured cap change, existing test-only lawful
 materialization-harness visibility, generated-success fixture consumption and
 local opaque-outer command-glue algebra.
 
+### Generated external-build Bazel 9.2 evidence accepted (2026-08-25)
+
+The oracle-only prerequisite is accepted after independent evidence review.
+The existing workspace stayed byte-identical at its three frozen SHA-256
+values. Its manifest is 29/30 lines, generated JSON 38/45 and aggregate 67/75.
+All seven pinned Bazel 9.2 source/test anchors resolved at immutable commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`.
+
+Generation and independent replay with `/usr/bin/bazel` 9.2.0 both returned
+`status: ok`. The record has exit 0, canonical
+`@@+ext+generated//:generated.txt` analysis and source-file classification,
+successful completion and normalized output-base/duration fields. Fixture
+listing, three focused harness metadata/provenance/CLI tests, credential/stale-
+version scans, exact scope/caps/hashes and diff hygiene passed. One broader
+unrelated harness parser test remains stale because `load-invalidation` has an
+accepted extra `restored_message_v1` row; it does not exercise or invalidate
+this fixture.
+
+This accepts exact Bazel 9.2 evidence for the generated command exit, canonical
+target/source classification and successful completion. Harness normalization
+is Slug-native. Slug activation, public/query publication, other platforms and
+exact configuration/output identity remain unsupported/deferred.
+
+Run only docs-only
+`WP-6-7A-generated-package-load-bridge-proof-cap-correction-design`. Preserve
+the retained Rust candidate and fixture non-writable. Measure the candidate,
+identify the minimum lawful test-only non-Generated materialization seam,
+consume the accepted fixture unchanged for Slug success and specify only local
+command-glue algebra for the opaque observed-outer case before one reviewed
+implementation retry.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
