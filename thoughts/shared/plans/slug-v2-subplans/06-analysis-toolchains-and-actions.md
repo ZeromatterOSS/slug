@@ -15521,6 +15521,49 @@ consume the accepted fixture unchanged for Slug success and specify only local
 command-glue algebra for the opaque observed-outer case before one reviewed
 implementation retry.
 
+### Generated package bridge proof/cap correction design accepted (2026-08-25)
+
+The retained candidate audit corrects the stopped worker's estimate. Against
+`4d83a829`, generated-route production lines 1..425 plus host 14, mapping 21,
+runtime registration 1 and dice net 70 total +531 production. Host proof 28 and
+new-route proof 166 total +194 proof; the three mapping assertion replacements
+are net zero. Aggregate is +725. Current physical sizes are
+4,825/11,620/3,985/332/591 for host/dice/generated-definition/runtime-mod/new-
+route. The retained five SHA-256 values are frozen in the current packet.
+
+The Buck2 utility-reuse audit accepts the representation unchanged: compact
+V2 identity types, `Arc<Result<...>>`, `Dupe`, `PathObservationEpoch` and
+`Allocative`; there is no new retained collection/string, interner, hash,
+cache, utility import or Stage 9 ledger row.
+
+The correction has only three additions. First, extract the inline observed
+bridge-outer branch into one private production-used
+`external_build_generated_route_outer` pure finisher preserving the completed
+public-route prefix and constructing typed GeneratedRoute::Compute with no
+carrier/epoch. Second, expose only the existing `#[cfg(test)]`
+`CompositionTracker` and `local_materialized_transaction` within
+`crate::runtime`, and let that helper take an explicit matching
+`RepositoryMaterializationSuccess`; existing callers pass Local and the archive
+proof passes Immutable. Third, add two real command proofs: archive-override
+mapped non-Generated fallback through lawful Immutable materialization in
+Legacy/Observed modes, and opaque-outer/prefix algebra through the production
+finisher.
+
+The accepted Bazel 9.2 fixture remains immutable and becomes the rebuilt Slug
+route -> generated package load -> exported-source success permanence command.
+Caps are <=540 production, <=370 proof and <=900 aggregate; physical ceilings
+are 4,825/11,720/4,010/340/720/1,740/3,950 across the seven exact Rust files.
+No new skip. Full serial validation and exact recorded baselines are frozen in
+the current packet.
+
+Legacy route/build diagnostics remain exact. Private bridge identity,
+classifiers, observed epochs and opaque-outer translation are Slug-native.
+Public/query publication, other platforms and exact configuration/output bytes
+remain unsupported/deferred. Independent architecture review accepted the
+correction. Run only
+`WP-6-7A-generated-package-load-bridge-proof-cap-correction-implementation`;
+M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
