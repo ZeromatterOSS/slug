@@ -1,14 +1,13 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-generated-package-selected-extension-demand-owner-scope-cap-correction-implementation`
+Packet: `WP-6-7A-generated-package-selected-extension-demand-owner-phase-2-cap-correction-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Design base: accepted owner-first design `b97d6372`, clean implementation STOP
-before Rust edits and independently accepted nested-child scope/cap correction
+Design base: accepted owner-first design `b97d6372`, nested-child correction
+`1d71320f`, retained passing Bzlmod Phase 1 and terminal Phase-2 cap review
 
-Result: implement the accepted selected-extension demand/owner-input and
-two-key loading semantics using a nested Bzlmod child, without adding another
-large key family to `selected_repo_spec.rs` or widening parent-private types.
+Result: correct only production/aggregate caps and three named Phase-1 proof/API
+gaps before continuing the accepted two-key loading/core implementation.
 
 ## Exact authority and frozen state
 
@@ -20,7 +19,7 @@ Bzlmod production alone is >520 lines before proof: ~110 owner/value/error,
 multi-module projection/mapping/admission. The existing workspace/root-only
 aggregates cannot lawfully replace that work.
 
-Freeze all existing implementation files exactly:
+Use this pre-Phase-1 state only as the original semantic-accounting baseline:
 
 | File | Lines | SHA-256 |
 |---|---:|---|
@@ -33,16 +32,26 @@ Freeze all existing implementation files exactly:
 | `app/slug_loading_v2/src/lib.rs` | 92 | `19b2b7179b1ea209fcb07a97d4d3114f46f11b9174b103abdbd6c396ae6ec08c` |
 | `app/slug_core_v2/src/runtime/generated_repository_definition.rs` | 3,985 | `8166e0c83a0f86e50d251d25b649be18cfd37020434f163a1e06dde723ba27ad` |
 
-The nested child
+The retained nested child
 `app/slug_bzlmod_v2/src/selected_repo_spec/selected_extension_demand.rs`
-is absent at baseline and may be created. The seven retained bridge/input candidate
+is present and frozen. The seven retained bridge/input candidate
 files outside this table and the private Host registry owner remain frozen at
 the hashes recorded by `b97d6372`; the accepted fixture/evidence stay byte-
 identical.
 
-## Implementation contract
+Phase 1 passes its four focused tests and `cargo check -p slug_bzlmod_v2`, with
+no new warning and `git diff --check` clean. Freeze:
 
-Create one nested child module at
+- parent 13,414 lines,
+  `4be0f8c9f2a27af18bc37f86c444f7df8bc9a004705f92f43b909536fdea0a08`;
+- Bzlmod lib 458 lines,
+  `f97482acc795ef2380a1e817e08d1e0f774c5c36b0a9e7e54a8462299d423cc6`;
+- child 865 lines,
+  `21836184d002301d80a47d33fef73f8909c7387ddbc6743def3e3ece1a89b162`.
+
+## Corrected implementation
+
+Retain the nested child module at
 `selected_repo_spec/selected_extension_demand.rs`. Rust child privacy lets it
 consume the parent-private selected-mapping keys, fields and types without
 changing them to `pub(crate)` or adding an adapter DICE key.
@@ -57,9 +66,20 @@ Write authority and responsibility are exact:
 - the same six loading/core files from `b97d6372`, with exactly two loading
   owner keys and the accepted demand-first core activation.
 
-All other Rust, tests, fixtures, oracles, Cargo/BUILD, plans and `../zabel` are
-read-only. Colocated tests in the nine authorized files are writable. Existing
-dirty files are retained user/agent state, not general authority.
+Phase 1 consumes approximately +722 production/+188 proof/+910 aggregate. A
+read-only reuse audit requires another ~430-520 production for owner-pure load/
+reacquisition/preparation/invocation, final synchronous validation and core
+demand-first selection. The remaining 228 under <=950 is infeasible; global
+loading keys cannot substitute because they would reintroduce unrelated-owner
+evaluation.
+
+Also require the retry to add: (1) a doc-hidden compact typed demand-error
+disposition so core distinguishes Missing from ambiguous/inconsistent/mapping
+failure without strings; and (2) explicit root version parse/normalization plus
+selected graph-key normalized nonroot versions and an invalid-version terminal.
+Complete owner-input tests must call the real projection and prove root/nonroot
+merge, tag/order, base/final polarity, root admission, observed epoch and
+Need/outer behavior.
 
 No accepted semantic contract changes. Demand authenticates typed imports and
 deduplicates repeated same-owner matches without parsing canonical spellings.
@@ -84,9 +104,8 @@ Caps are:
 | loading `lib.rs` | 112 |
 | core generated definition | 4,160 |
 
-Semantic caps are <=950 production, <=700 proof and <=1,650 aggregate from
-the frozen state. The >520 Bzlmod production floor leaves <=430 production for
-loading extraction/core activation; proof scope and its <=700 cap are
+Semantic caps are <=1,200 production, <=700 proof and <=1,900
+aggregate from the original frozen state. All nine physical ceilings remain
 unchanged. Existing `CompactString`, canonical types, `Arc`, compact maps/sets
 and `Allocative` remain sufficient, so no Buck2/V1 import or Stage 9 row is
 authorized.
@@ -111,7 +130,9 @@ fixture, clean stale `slugd` before/after daemon-sensitive runs, and finish with
 formatting, diff/secret/archive/rustfmt-skip, frozen-scope, physical and semantic
 cap checks plus independent implementation review.
 
-STOP a root-level sibling, parent-private visibility widening, a third Bzlmod/
+All other files, docs, fixtures/oracles, Cargo/BUILD and `../zabel` are read-
+only. Reach independent implementation ACCEPT or formal REPLAN. STOP a root-
+level sibling, parent-private visibility widening, a third Bzlmod/
 loading key, semantic/proof weakening, cap/authority widening, delimiter
 parsing, global-carrier filtering, Java/JVM, milestone closure, M8/M7B and exact
 identity-byte work. `REPLAN` before widening. M7 remains partial and

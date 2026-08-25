@@ -15804,6 +15804,45 @@ visibility widening, extra Bzlmod/loading key, global-carrier weakening,
 scope/cap/proof drift, Java/JVM, milestone closure, M8/M7B and exact identity
 bytes. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Selected-extension demand-owner Phase-2 cap REPLAN (2026-08-25)
+
+Retained Bzlmod Phase 1 creates only the accepted nested child and narrow
+parent/lib exports. It compiles without new warnings; four focused tests pass;
+physical sizes are 13,414 parent, 458 lib and 865 child. Accounting is about
++722 production/+188 proof/+910 aggregate.
+
+Independent review accepts the privacy boundary, two Bzlmod key families,
+typed import authentication/same-owner dedupe, ordered owner projection,
+mapping polarity, root admission with shared nonroot uses, carrierless Need/
+outer, epoch forwarding and global-carrier non-retention. It returns `REPLAN`
+because only 228 production lines remain, while owner-pure loading, synchronous
+validation and core need ~430-520. Global loading reuse is unlawful.
+
+Run docs-only
+`WP-6-7A-generated-package-selected-extension-demand-owner-phase-2-cap-correction-design`.
+Raise only semantic caps to <=1,200 production/<=700 proof/<=1,900 aggregate;
+keep all physical ceilings and nine-file authority. Require a typed demand
+disposition for core, explicit normalized module versions/invalid terminal and
+real owner-input projection/epoch/Need/outer/mapping/order proof. Freeze Phase
+1 and all other candidate files. STOP Rust, key/scope/physical-cap widening,
+proof weakening, global filtering, Java/JVM, milestone closure, M8/M7B and
+identity bytes. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Selected-extension demand-owner Phase-2 cap correction accepted (2026-08-25)
+
+Independent rereview accepts the live Phase-1 freeze and distinguishes it from
+the original accounting baseline. Activate only
+`WP-6-7A-generated-package-selected-extension-demand-owner-phase-2-cap-correction-implementation`
+with unchanged nine-file authority/physical ceilings and corrected <=1,200
+production/<=700 proof/<=1,900 aggregate caps.
+
+First add the typed demand disposition, explicit version normalization/invalid
+terminal and real owner-input proof. Then implement exactly two loading keys
+and demand-first core as accepted in `b97d6372`. Preserve the nested privacy
+boundary, complete aggregates, key counts, events/epochs, compatibility and
+fixture proof. STOP further scope/cap drift. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
