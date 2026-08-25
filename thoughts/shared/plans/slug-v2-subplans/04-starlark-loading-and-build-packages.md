@@ -3627,3 +3627,20 @@ Activate only
 paths and 560/650/1,210 caps frozen in current. No core, route, source-
 preparation, materialization, fixture or public activation is authorized. After
 implementation ACCEPT, design only the effect-plan handoff/application packet.
+
+### Selected repository file-effect producer cap STOP (2026-08-25)
+
+The formatted seven-file candidate compiles and passes four focused tests, but
+its required loading owner, nominal terminals and exact Starlark ABI use 900
+production lines versus the stale 560 cap. Only 168 proof lines exist; the
+accepted owner/ordinal, reload-drift, Legacy/Observed, epoch, lifecycle, event
+and retained-shape matrix remains mandatory.
+
+Independent review accepts the cap-only correction to 930/850/1,780 and the
+exact per-file limits in current. Activate only
+`WP-4-5-selected-repository-file-effect-producer-implementation-retry` over the
+same seven paths. Named `path` remains an ordinary positional-only Starlark
+binding rejection before the context method. No semantic compression, caller,
+route, materialization, fixture or public activation is authorized. Pinned
+`../zabel` `c7298478…` remains concept-only guidance for the natural selected-
+call owner and heap-free effect result.

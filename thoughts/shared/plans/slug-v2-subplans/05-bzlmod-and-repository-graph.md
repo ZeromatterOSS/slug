@@ -3691,3 +3691,19 @@ through the existing Bzlmod -> loading edge. Activate only
 paths and caps frozen in current. Existing global selected/generated values,
 RepoSpec, lockfile, native repository requests and consumers remain unchanged.
 After ACCEPT, design one separate Bzlmod/core route/request/application handoff.
+
+### Generated repository file-effect producer cap STOP (2026-08-25)
+
+The retained keyless Bzlmod representation is 119 production and 75 proof
+lines; its `lib.rs` seam is nine production lines. It remains the accepted
+compact ordered effect boundary, and its doc-hidden plan builder remains only
+invocation scratch for the existing Bzlmod -> loading dependency direction.
+It is not a user API and no additional value or key is admitted.
+
+Independent review accepts the whole-packet correction to 930/850/1,780, with
+Bzlmod child/lib physical ceilings 300/475. Activate only
+`WP-4-5-selected-repository-file-effect-producer-implementation-retry` over the
+same seven paths. Existing RepoSpec, selected/global values, requests, native
+repositories, lockfiles and consumers stay unchanged. Pinned `../zabel`
+`c7298478…` remains concept-only producer/effect-boundary guidance; copy no
+representation or implementation.

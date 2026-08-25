@@ -1,181 +1,85 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-selected-repository-file-effect-producer-implementation`
+Packet: `WP-4-5-selected-repository-file-effect-producer-implementation-retry`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owners: `04-starlark-loading-and-build-packages.md` and
 `05-bzlmod-and-repository-graph.md`
-Design base: `e45dbcf8` plus the retained selected-owner/source-preflight Rust
-candidate and independently accepted producer/application split
+Base: design `72714f25` plus retained compiled seven-file producer candidate
 
-Result: implement one callerless selected-call DICE producer that reacquires
-and authenticates the exact repository rule, executes the admitted string-only
-`repository_ctx.file` subset, and returns a heap-free ordered effect plan.
+Result: complete the exact retained producer and its mandatory unfinished proof
+under the independently accepted corrected budgets.
 
-## Frozen scope and baseline
+## Concrete STOP and frozen candidate
 
-The full fixture vertical is too broad for one packet: Starlark ABI, paired
-DICE ownership, a cross-crate structural value, generated-route handoff and
-secure root publication are five distinct proof boundaries. This packet closes
-only the first three. No production caller is activated; a later docs design
-owns route/request handoff and immutable-root application.
+The implementation worker stopped at the packet's cap gate after formatting,
+compile and four focused tests. No scope or semantic defect was found. Exact
+formatted additions against the frozen working baselines are:
 
-Write authority is exactly:
+| Path | Production | Proof | Total | Physical/hash |
+|---|---:|---:|---:|---|
+| new Bzlmod effect child | 119 | 75 | 194 | 194; `9d4ef0bc…` |
+| Bzlmod `lib.rs` | 9 | 0 | 9 | 469; `0d33a0ba…` |
+| new loading producer child | 729 | 93 | 822 | 822; `4db1cb95…` |
+| frozen-rule seam | 16 | 0 | 16 | 649; `4ac465f1…` |
+| instantiated-call seam | 4 | 0 | 4 | 2,094; `f85cde59…` |
+| certificate seam | 8 | 0 | 8 | 1,951; `fed3d8cb…` |
+| loading `lib.rs` | 15 | 0 | 15 | 119; `af17ce93…` |
+| **Total** | **900** | **168** | **1,068** | |
 
-- new `app/slug_bzlmod_v2/src/generated_repository_file_effect.rs`;
-- `app/slug_bzlmod_v2/src/lib.rs`, 460 lines,
-  `c697e9341eb1990c6ef47c157d0967e6a9ea1d4c94e71ad2c6415f5c9c7674ab`;
-- new
-  `app/slug_loading_v2/src/module_extension_repository_file_effect.rs`;
-- `app/slug_loading_v2/src/module_extension_repository_rule.rs`, 633 lines,
-  `b1bf1e89f23d66ecf2ffb4dfb5e0cad1ac17e375e53514662840d51c465fb380`;
-- `app/slug_loading_v2/src/module_extension_repository_instantiation.rs`,
-  2,090 lines,
-  `9cfda25c7be7837be7911176d7ae9359523b69a02e3baa5f446a3373514f7b66`;
-- `app/slug_loading_v2/src/module_extension_repository_validation.rs`, 1,943
-  lines, `7265f96aeb5d2b1e856c4bef69a88e4596bbe6b8497b93fe7ad5968555be6c15`;
-  and
-- `app/slug_loading_v2/src/lib.rs`, 104 lines,
-  `4d03dcfbbbc5a4d7a8cbcbb885219a37412543539061680f2a3d4a30d2c22b13`.
+The required owner/value/error/key/Starlark ABI cannot fit <=560 production
+without removing nominal terminals, Legacy/Observed ownership or explicit
+argument semantics. The existing <=650 proof cap is also too small: 500–650
+more lines are conservatively required for the already-mandated key/lifecycle
+matrix.
 
-All other dirty Rust and fixture bytes are retained and non-writable. Within
-the five existing files, change only module/doc-hidden reexports and these
-crate-private seams: frozen rule projection/implementation accessors,
-instantiated repository call accessor, and certificate repository-by-ordinal
-accessor. Do not reshape any accepted selected/global value.
+The cap-correction design froze all seven candidate files byte-for-byte. All
+other dirty Rust and fixture bytes remain frozen during this implementation
+retry.
 
-## Shared effect value
+## Accepted cap-only correction
 
-The new Bzlmod child defines doc-hidden nominal values only; it adds no key:
+Independent review accepts exactly these corrected ceilings:
 
-- `GeneratedRepositoryFileEffect` retains a normalized valid-Unicode
-  repository-relative `CompactString`, exact `Arc<[u8]>` content and executable
-  polarity;
-- `GeneratedRepositoryFileEffectPlan` retains an ordered
-  `Arc<[GeneratedRepositoryFileEffect]>`; and
-- `GeneratedRepositoryFileEffectPlanError` distinguishes invalid path from
-  repeated-path unsupported scope.
+- <=930 production, <=850 proof and <=1,780 aggregate added Rust lines;
+- new Bzlmod child <=300 physical lines and Bzlmod `lib.rs` <=475;
+- new loading child <=1,450, rule <=680, instantiation <=2,125, validation
+  <=1,990 and loading `lib.rs` <=120 physical lines.
 
-Construct each effect at the `ctx.file` call so invalid-path/repetition order is
-not deferred until invocation completion. A valid path is nonempty and
-relative, contains only nonempty normal `/`-separated segments, and contains no
-`.`/`..`, backslash, NUL or trailing slash. Preserve call order exactly and
-reject a repeated normalized path before recording the second effect. Content
-is the exact UTF-8 byte sequence of Slug's valid-Unicode string; ASCII fixture
-bytes are exact Bazel 9. Derive full structural Clone/Eq/Hash/Allocative over
-path, bytes, executable and order. Expose borrowed accessors only.
+These retain only 30 production lines of correction headroom and bound the
+remaining proof to 682 additional lines. They do not authorize a new semantic
+type, key, event family, retained value, file, caller or behavior. The public
+doc-hidden plan builder remains invocation scratch required by the accepted
+loading -> Bzlmod dependency direction; it is not a user API.
 
-Reuse `CompactString`, `Arc`, `SmallSet` as invocation scratch, and
-`Allocative`; add no interner, cache, digest, retained map, Buck2/V1 import or
-Stage 9 row.
+Resume exactly the same implementation.
+Production may change only for a demonstrated compile/proof defect within the
+same accepted ABI/owner/error structure; every such change must be counted
+against the 30-line headroom. Complete the original proof matrix:
 
-## Loading producer
+- named trailing forms, positional-only named-path rejection, duplicate/order
+  diagnostics, Label/path and unknown-member rejection;
+- exact owner+ordinal/MissingOrdinal/no-sibling selection;
+- defining label/export/kind/schema/implementation reload and A/B/A drift;
+- Legacy/Observed parity, certificate-left/HostBzl-right epochs, Need/outer/
+  merge/semantic split, equality/validity and cancellation/recovery;
+- evaluated/warm invocation events; and
+- retained-shape absence of module/callable/heap/context/evaluator/I/O state.
 
-Add exactly one legacy/observed key pair:
+Named-path rejection stays at ordinary Starlark argument binding before the
+context method; do not convert it to a local collector error or match diagnostic
+strings. Preserve all exact/Slug-native/unsupported classifications and Bazel
+9.2/`../zabel` authorities from `72714f25` unchanged.
 
-`HostSelectedRepositoryFileEffectKey { workspace, owner, ordinal }`
-
-and `HostSelectedRepositoryFileEffectObservationKey`. `owner` is the existing
-`Arc<HostSelectedExtensionOwner>` and `ordinal` is the exact flattened ordinal
-already selected by the generated-definition producer. Complete success is a
-nominal value retaining the exact owner certificate, ordinal and shared plan.
-The observed carrier retains that Result Arc plus `PathObservationEpoch`.
-
-Compute in this order:
-
-1. demand the existing selected-owner certificate legacy/observed key using
-   the supplied workspace/owner;
-2. select exactly `ordinal`, retaining MissingOrdinal as a typed semantic
-   error; do not search by canonical name or execute another call;
-3. derive a root Host `.bzl` label from the call's defining canonical label;
-   nonroot defining repositories are typed unsupported in this first slice;
-4. demand the existing Host-Bzl legacy/observed key and merge its observed
-   epoch after the certificate epoch, left-first;
-5. select the exported value by the retained exported rule name, downcast to
-   `FrozenRepositoryRuleDefinition`, and compare defining label, exported name
-   and ordered attribute schema with the retained call projection;
-6. keep the reacquired frozen module alive only on the compute stack, allocate
-   one invocation-local repository context/collector, and invoke the exact
-   frozen implementation once; and
-7. require a `None` return, freeze the ordered plan and drop evaluator, context,
-   callable and module before constructing the retained value.
-
-The context exposes only:
-
-`file(path: str, /, content: str = "", executable: bool = True, legacy_utf8: bool = False)`.
-
-`path` is mandatory positional-only. The other three parameters retain Bazel's
-positional-or-named acceptance and defaults; `legacy_utf8` is accepted and
-ignored exactly as Bazel 9.2. Preserve ordinary duplicate positional/named and
-argument-order diagnostics. Label/path arguments, repeated/invalid paths and
-every other repository-context member are outside the admitted slice and fail
-closed under Path/Invocation owner errors without diagnostic-string dispatch.
-Preserve the partial ordered effects only inside a heap-free semantic error
-when needed to prove first-failure order.
-
-Use a nominal error graph that distinguishes certificate semantic/compute,
-ordinal, defining-label unsupported, Host-Bzl semantic/compute, projection
-drift, path/repetition, invocation and non-None result. An observed Host-Bzl
-outer or epoch merge error retains only the completed certificate plus ordinal,
-never a failed child/module/heap. Need is carrierless. Cancellation publishes
-no result or batch.
-
-Host-Bzl load events remain at the existing child. When event capture is
-enabled, the new key owns exactly one local complete invocation print batch on
-success or semantic invocation terminal; pre-invocation outer/Need/cancellation
-owns none. Warm equality reuse publishes no duplicate batch. Add no effect
-event type or command-line publication.
-
-## Proof, caps and compatibility
-
-Focused proof must cover:
-
-- exact two-file fixture-shaped order, ASCII bytes and default executable true;
-- positional-or-named content/executable/legacy-UTF8 arguments, defaults,
-  duplicate argument/order diagnostics, positional-only path and named-path
-  rejection;
-- invalid, absolute, parent, backslash, empty and repeated paths at exact call
-  order; Label/path values and unknown context members rejected;
-- exact owner/ordinal selection with missing ordinal and no sibling execution;
-- defining-label/export/kind/schema/implementation reload authentication and
-  A/B/A drift/restoration;
-- Legacy/Observed parity, certificate-then-HostBzl epoch association,
-  Need/outer/merge/semantic split, equality/validity and cancellation recovery;
-- evaluated versus warm invocation event batches; and
-- source/shape proof that no retained success/error/carrier contains
-  `FrozenModule`, `FrozenValue`, Starlark heap/context/evaluator or I/O handle.
-
+Write authority is exactly the seven Rust paths listed in the frozen table plus
+completion ledgers. Preserve the recorded entry hashes until an authorized
+proof or demonstrated same-contract production correction changes a file.
 Run formatting; focused Bzlmod/loading proof; full Bzlmod then full loading
 serially; dependent core check; `scripts/v2_archive_status.sh`; `git diff
---check`; exact seven-file scope/hash/accounting; forbidden-secret/stale-JVM
-scans; and independent implementation review. Do not run the terminal fixture:
-this callerless prerequisite intentionally has not changed its materialization
-failure.
+--check`; exact scope/hash/accounting; forbidden-secret/stale-JVM scans; and
+independent implementation review. Do not run the terminal fixture: this
+callerless prerequisite intentionally has not changed materialization.
 
-Caps are <=560 production, <=650 proof and <=1,210 aggregate added Rust lines.
-Physical ceilings are <=300 for the new Bzlmod child, <=475 Bzlmod `lib.rs`,
-<=1,150 for the new loading child, <=680 rule, <=2,125 instantiation, <=1,990
-validation and <=120 loading `lib.rs`. Add no `rustfmt::skip`.
-
-The fixture's distinct ASCII string-path `ctx.file` calls, defaults, bytes,
-order and executable polarity are **exact Bazel 9**. Private key/error/carrier,
-valid-Unicode path/content representation and epoch association are
-**Slug-native**. Nonroot rule definitions, Label/path arguments, repeated paths,
-all other `repository_ctx` members, route/materialization activation, generated
-query breadth, other platforms and exact configuration/output identity are
-**unsupported/deferred**.
-
-Pinned Bazel 9.2 commit `8220c619…` authority is `RepoRule#instantiate`,
-repository-rule definition reload/export and
-`StarlarkBaseExternalContext#createFile`. Pinned `../zabel` commit `c7298478…`
-is concept-only guidance for one `{origin, canonical repository, ordinal}`
-producer, evaluated `.bzl` reload and heap-free effect result. Copy no Zig code,
-representation, scheduler, digest, manifest/root format or output vector.
-
-STOP a core/source-preparation/host-module/route/repository-I/O edit, caller or
-fixture activation, second key family, canonical-name rescan, retained Starlark
-state, unobserved Host read, direct filesystem write, new store/cache/lock/task,
-global aggregate change, public API, native repository change, other context
-API, cap/proof waiver, Java/JVM, milestone closure, M8/M7B or identity-byte
-work. `REPLAN` before widening. After implementation ACCEPT, design only the
-generated effect-plan route/request/materialization handoff; M7 remains partial
-and M7A -> M8 -> M7B remains.
+STOP cap-free semantic changes, scope growth, compression that weakens
+ownership/errors, caller/materialization/fixture activation, core/route/source-
+preparation changes, public API, Java/JVM, M7 closure, M8/M7B and identity-byte
+work. `REPLAN` any further production excess or proof/physical cap failure.

@@ -16025,6 +16025,21 @@ generated plan handoff/application packet; do not infer activation now. Pinned
 `../zabel` `c7298478…` remains producer/effect guidance only. M7 remains partial
 and M7A -> M8 -> M7B remains.
 
+### Selected repository file-effect producer cap correction (2026-08-25)
+
+The implementation worker correctly stopped after formatting, compile and four
+focused tests: the exact seven-file candidate is +900 production/+168 proof,
+while the accepted owner structure requires another 500–650 proof lines. No
+compile- or test-discovered semantic defect requires a design change.
+
+Independent review accepts <=930 production, <=850 proof and <=1,780 aggregate,
+with physical limits 300/475/1,450/680/2,125/1,990/120 in the current packet's
+seven-path order. Activate only
+`WP-4-5-selected-repository-file-effect-producer-implementation-retry`. These
+ceilings authorize the original ABI/DICE/lifecycle proof only; they do not
+activate the core route, request, immutable-root application, fixture or any
+public behavior. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
