@@ -1432,3 +1432,75 @@ Slug implementation, other fixture or expected record changed.
 
 Run next only the docs-only
 `WP-6-7A-immutable-configured-action-owner-context-design`.
+
+### Fixture-growth hygiene checkpoint (2026-08-25, corrected payload expansion)
+
+Status: `ACCEPT` for the mandatory review from recorded reset `51540963` to
+last fixture-tree commit `3ac0a85b`. This closes the overdue threshold before
+the selected-registry source oracle adds any file.
+
+Fresh tracked-archive synthesis corrects the prior reset rollup. At
+`51540963`, `tests/v2_oracle/fixtures` contains 1,189 regular files, 24
+symlinks and 41,449 newline bytes; the canonical payload expands to 163 files
+and 984 newline bytes. The exact logical baseline is therefore 1,352 regular
+files, 24 symlinks, 42,433 newline-counted lines and 864 command rows—not the
+previously published 1,361/24/42,520/864. That earlier total was nine files and
+87 lines high; no tracked asset is removed by this accounting correction.
+
+At `3ac0a85b`, the physical fixture tree is 1,244/24/46,109 and the payload
+expands to 168 files/1,424 lines. The corrected logical endpoint is therefore
+1,412 regular files, 24 symlinks, 47,533 lines and 959 rows: exact growth of
++60 regular files, zero links, +5,100 lines and +95 rows. Raw fixture plus
+payload Git scope is 78 touched files and +5,218/-111 lines. Including the five
+changed harness/support paths gives 83 and +6,090/-134: 77 fixture paths at
++4,762/-110 plus payload and harness/support at +1,328/-24. Payload container
+and harness representation lines are reviewed but are not double-counted as
+expanded fixture files.
+
+Thirteen row-bearing packets account for the 95 rows: attr candidates
+`4ea8f6c7` (+18); cquery filter/subset/executable/delegation
+`31f75b38`/`13d0b1c0`/`28d3fad4`/`f3471f17` (+4/+12/+12/+6);
+toolchain topology `5ce69c92` (+7); FileWrite aquery/build/run
+`e10ae7df`/`f55c5e77`/`3e24a00d` (+4/+3/+3); root extension usages
+`af46bc00` (+5); in-flight loading `2ffad088` (+5); exec-group action owner
+`8eecf172` (+5); and rules_rust owner `b7390392` (+11). Corrections
+`29e43ce1`, `f9347ff4` and `6fd78a21` retain row counts; `3ac0a85b` changes
+only fail-closed tool-specific assertion dispatch.
+
+The fifteen affected final fixtures are `query-attr-observable-candidates`,
+`cquery-filter-label`, `cquery-some-root-selection`,
+`cquery-executables-rule-capability`, `toolchain-resolution-first-platform`,
+`cquery-delegation-topology`, `filewrite-aquery-root-order`,
+`load-invalidation`, `simple-rule-action`, `run-basic`,
+`root-extension-usage-semantics`, `loading-inflight-source-lock`,
+`exec-groups-action-platform`, `rules-rust-073-toolchain-owner` and
+`module-extension-use-repo`.
+
+Every retained row remains discriminating within its recorded owner: attr
+schema candidates; configured label/subset/executable/toolchain/delegation
+topology; FileWrite owner/order/build/run/invalidation; root extension usage;
+serialized in-flight loading; action platform/ActionKey sensitivity;
+rules_rust bootstrap ownership; and generated-repository success. The last two
+do not witness the newly selected source-only observable: rules_rust crosses
+deferred declarations and `module-extension-use-repo` is generated-repository
+evidence.
+
+Final-blob inspection found no cross-fixture duplicate nonempty file touched by
+the interval and no identical fixture TOML or expected JSON. All 60 new logical
+paths are nonempty; the only sub-20-byte files are the four demanded
+source-lock/delegation markers. Exact duplicate-blob groups remain 115 while
+members fall 553 to 551; exact multi-file subtree groups/roots remain 78/229;
+no added or changed asset joins either set. Command mutations grow 324 to 347
+plus one concurrent-group mutation; manifest roots remain 117; expected
+manifest entries grow 210 to 213; expected command records grow 847 to 943.
+The +96 expected records versus +95 rows is the previously empty one-row
+exec-group expectation generated beside its five new rows. Row, mutation,
+manifest, expected-field and asset reachability review found no removable
+nondiscriminating entry. The pruning allowlist and affected replay set are both
+`none`; accepted generation and packet-local replays remain their behavioral
+evidence.
+
+Independent history and architecture/hygiene audits returned `ACCEPT`. The new
+fixture-growth reset is `3ac0a85b`. The selected-registry source oracle in
+current is packet one and remains below +100 files/+10,000 lines; review again
+before packet six or an earlier size trigger.
