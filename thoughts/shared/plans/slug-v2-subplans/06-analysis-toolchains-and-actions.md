@@ -15176,6 +15176,60 @@ Activate only
 the smallest generated package source/load caller owner over Rust `b42b004c`.
 M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated-repository publication frontier audit-2 accepted (2026-08-24)
+
+Read-only audit over Rust `b42b004c`. Learned facts:
+
+- Two candidate consumers exist today, both acquiring their repository route
+  through public `RootRepositoryRouteKey`: the loading-query external package
+  graph (`slug_query_v2/src/loading_environment.rs:251`) and the external
+  exported-source build branch (`dice.rs:4476`). Both fail at the route step
+  for extension-generated repositories, because
+  `project_root_repository_route` admits only local-path overrides.
+- Dependency directions: core depends on query and on bzlmod; loading depends
+  on bzlmod; query does not depend on core. A bridge that resolves an apparent
+  name through core's accepted `HostCanonicalRepositoryApparentMapping` chain
+  and constructs the route via `for_generated_repo_spec` can only live in
+  core. Query placement requires forbidden dependency inversion; bzlmod
+  placement is impossible because the per-canonical `RepoSpec`s live in
+  loading's public `HostValidatedGeneratedRepositorySpecs`, and bzlmod cannot
+  depend on loading.
+- Downstream package owners need nothing else:
+  `RepositoryPackageSource(Observation)Key` and
+  `RepositoryPackageLoad(Observation)Key` accept any nonroot route with a
+  matching canonical name; the build branch already runs both modes end to end
+  for direct-local externals (`51127df8`, `bd4fb8db`).
+
+Decision: the smallest first activated consumer is the external
+exported-source **build branch in core**, extended so a nonroot label whose
+public route key returns Unsupported/Unknown falls back to one same-crate
+bridge child: resolve the apparent name through the accepted canonical
+apparent-mapping family, construct the route with `for_generated_repo_spec`,
+then continue into the unchanged `RepositoryPackageLoad` flow. The query path
+stays deferred until bootstrap closure needs it — activating it early widens
+surface without a Bazel 9.2 discriminator beyond what accepted external-build
+evidence already carries.
+
+Non-decisions: no public/crate-root bridge export; no direct-local/builtin
+behavior change; no query activation; no fixture growth unless the design
+demonstrates a gap against the accepted direct-local external-build fixtures;
+Windows/macOS and exact identity bytes stay deferred.
+
+Compatibility classes: legacy build semantics remain exact; Slug-native
+observed carrier/epoch association and doc-hidden route construction unchanged
+in identity; query publication, other platforms and exact bytes remain
+unsupported/deferred.
+
+Schedule exactly `WP-6-7A-generated-package-load-bridge-design`, docs-only. It
+must freeze the bridge child's key shape, Need/terminal ordering, epoch union,
+fallback polarity preserving exact direct-local diagnostics, caps, allowlist
+(dice.rs plus test-only proof), validation and REPLAN stops per the
+plan-authoring guide. STOP Rust edits in this audit, public exposure, query
+activation, fixture/oracle growth, milestone closure, M8/M7B and exact
+identity work. REPLAN if the bridge cannot bound one cohesive child or if
+fallback polarity would alter existing diagnostics. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
