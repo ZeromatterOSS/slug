@@ -16157,6 +16157,38 @@ authority; Slug JSON presentation is Slug-native. Pinned `../zabel`
 `c7298478…` remains architecture guidance only and supplies no comparator,
 fixture or output semantics. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated repository file-effect vertical accepted; M7A frontier audit resumed (2026-08-25)
+
+Harness implementation `3ac0a85b`, from accepted correction design
+`0c7bb56e`, adds fail-closed matching-tool message shapes at +59 production,
++98 proof and +157 aggregate. Physical sizes are 558/184/2,748/30. Common
+assertions remain universal; half-specified and unknown-tool contracts fail;
+Bazel and Slug each consume only their matching shape.
+
+Four focused tests pass. The full oracle module has 122 unaffected passes plus
+three inherited stale fixture-count/REAPI rows and one pre-existing Python
+`os.name`/`WindowsPath` host-test defect in untouched code. Both mandatory
+fixture replays return `status: ok`: Bazel 9.2 preserves canonical generated
+target/source/completion messages, while Slug exits zero with the exact
+`dice_exported_source_file` terminal. Oracle/workspace bytes and all seven Rust
+hashes remain frozen. Independent terminal review returns `ACCEPT`.
+
+Activate only docs-only
+`WP-6-7A-bootstrap-critical-repository-ruleset-frontier-audit`. Starting from
+the accepted exact 33-package developer graph and its named repository sources,
+rules_rust/provider/toolchain needs, trace the current admitted repository-rule,
+loading, analysis/action and bootstrap consumers only far enough to identify
+the uniquely smallest remaining M7A repository/ruleset owner. Check whether a
+smaller pinned Bazel 9.2 evidence or verbatim `@bazel_tools` content prerequisite
+must precede design.
+
+Use pinned `../zabel` `c7298478…` only for natural producer/demand/publication
+ownership guidance; it supplies no Bazel semantics or implementation. Reach
+exactly one independently reviewed owner design, one bounded prerequisite or
+formal `REPLAN`. Authorize no Rust, test, fixture, oracle, `@bazel_tools`
+content, M8/M7B or milestone closure during the audit. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is

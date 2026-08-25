@@ -3781,3 +3781,20 @@ current. Preserve the Bazel 9.2 oracle and workspace byte-for-byte, select only
 the matching tool's shape assertions, and fail closed when a tool-aware command
 omits either tool contract. Zabel remains concept-only guidance, not output
 authority.
+
+### Generated repository file-effect vertical accepted (2026-08-25)
+
+The selected owner/ordinal effect producer, structural generated route/request
+and atomic immutable-root application are accepted together with harness commit
+`3ac0a85b`. Bazel and Slug replays of `module-extension-use-repo` both return
+`status: ok`; the oracle JSON and workspace remain byte-frozen.
+
+Tool-specific assertions are fail-closed and presentation-only. They do not
+change repository identity, Bzlmod selection, lockfile state, effect bytes or
+the exact Bazel 9.2 semantic claim. Independent review accepts +59/+98/+157 and
+the frozen Rust hashes.
+
+Run only the docs-only bootstrap-critical repository/ruleset frontier audit in
+current. Select one natural M7A owner or evidence prerequisite from the exact
+developer graph; do not widen repository APIs or enter M8/M7B. Pinned Zabel is
+architectural guidance only.

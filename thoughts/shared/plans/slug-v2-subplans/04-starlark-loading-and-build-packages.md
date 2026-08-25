@@ -3721,3 +3721,23 @@ Keep common exit-zero, preserve Bazel's exact canonical generated-target/source
 classification and completion assertions, and require Slug's exact successful
 JSON exported-source terminal for the same argv. Pinned `../zabel` remains
 architecture guidance only and supplies no harness or output semantics.
+
+### Generated repository file-effect vertical accepted (2026-08-25)
+
+Implementation `3ac0a85b`, from harness design `0c7bb56e`, closes the mandatory
+generated-source discriminator without changing Rust. Common exit-zero remains
+shared; Bazel retains its canonical target/source/completion assertions; Slug
+matches only its exact successful `dice_exported_source_file` JSON terminal.
+Both fixture replays return `status: ok`.
+
+The four-file harness correction is +59 production/+98 proof/+157 aggregate at
+558/184/2,748/30 physical lines. Focused proof passes four tests; 122 unaffected
+oracle tests pass, with only inherited stale fixture-count/host-path rows.
+Independent terminal review accepts the fail-closed tool selection and all
+frozen Rust hashes.
+
+Activate only docs packet
+`WP-6-7A-bootstrap-critical-repository-ruleset-frontier-audit`. Trace the exact
+M8 developer graph back to the smallest remaining M7A repository/ruleset
+semantic owner. Do not generalize `repository_ctx`, activate public breadth or
+claim M7A closure. Zabel remains concept-only architectural guidance.
