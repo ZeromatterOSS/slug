@@ -1,155 +1,132 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-6-generated-repository-file-effect-handoff-application-implementation`
+Packet: `WP-4-5-6-generated-repository-file-effect-handoff-application-proof-accounting-correction-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owners: `04-starlark-loading-and-build-packages.md`,
 `05-bzlmod-and-repository-graph.md` and
 `06-analysis-toolchains-and-actions.md`
-Base: accepted producer record `b360be14` and retained Rust candidate
+Base: accepted producer `b360be14`, accepted handoff design `d52336de` and the
+exact retained Rust candidate below
 
-Result: freeze one demand-only selected-effect route/request/application
-vertical without adding a DICE key or changing native repository behavior.
+Result: preserve the structurally accepted demand-only effect handoff, correct
+two fail-closed materializer boundaries and complete its lawful direct/composed
+proof without reconstructing unavailable dirty-baseline blobs.
 
-## Frozen authority baseline
+## Retained candidate and write authority
 
-Future Rust authority is exactly:
+The seven-file candidate is frozen at these exact current values:
 
-| Path | Baseline lines | SHA-256 |
-|---|---:|---|
-| `app/slug_bzlmod_v2/src/host_module.rs` | 4,825 | `185ec7685abd51851c570762e393df1d59892596854cf6c826603d00a2703c39` |
-| `app/slug_bzlmod_v2/src/source_preparation.rs` | 16,811 | `7357686adb4171ebe0a2c7ddadf518f22c67ac36aebcda471c2e393f7dc5e878` |
-| `app/slug_bzlmod_v2/src/host_package.rs` | 5,001 | `bca9046c7f0088102c0c2b7e7c1a7607788056d3ef48ffbe739506fab14f0ac0` |
-| `app/slug_core_v2/src/runtime/generated_repository_definition.rs` | 4,027 | `368dd75d6f9d8c52f9858b176a09820660ea1920777408bf61641a5067e48359` |
-| `app/slug_core_v2/src/runtime/root_apparent_repository_definition.rs` | 1,729 | `a1cf060405c4a5d7be26acc4b23dda542c7c0fad20325fd6fa4b7369f8dc1f3a` |
-| `app/slug_core_v2/src/runtime/generated_package_route.rs` | 591 | `27e6ee70e2b95c3b1e48bb6fcca8795fd2ba763cb6b0867ffd7fc9ba87f90818` |
-| `app/slug_core_v2/src/runtime/repository_io.rs` | 5,523 | `f6a8ecb870b460fd06dcf8edbcd589dd1edd4809b77cdbdb66976a7ecdcaa19e` |
+| Path | Lines | SHA-256 | Retry authority | Physical ceiling |
+|---|---:|---|---|---:|
+| `app/slug_bzlmod_v2/src/host_module.rs` | 4,872 | `56a7ffe34f8f26c3e70b02deed12268198599060cc455127f2edd3bddab22506` | frozen | 4,872 |
+| `app/slug_bzlmod_v2/src/source_preparation.rs` | 16,849 | `e17ffccdb402f4cad227d421b53b5d5952e39b8707a6980a8c2ef66b3cee9faf` | proof only | 17,050 |
+| `app/slug_bzlmod_v2/src/host_package.rs` | 5,009 | `1921abc6f0fedc0f7c0d14504168980f1063deec82bcfff9b64c2c3c6b8cc5b8` | frozen | 5,009 |
+| `app/slug_core_v2/src/runtime/generated_repository_definition.rs` | 4,083 | `a87b856c9bc8b279d134f01229cb3bc240f451f41c8741beefffb7aca7df3566` | frozen | 4,083 |
+| `app/slug_core_v2/src/runtime/root_apparent_repository_definition.rs` | 1,735 | `033d545f96e571f1fcfb628ec7c9e90813f6662a5623a5e12ed5c6fa0fc256e1` | frozen | 1,735 |
+| `app/slug_core_v2/src/runtime/generated_package_route.rs` | 675 | `073591147e0d406c609c96c630773fa05f7b4de42864b0a93a7f2e6746660975` | proof only | 1,150 |
+| `app/slug_core_v2/src/runtime/repository_io.rs` | 5,900 | `648e1b840562596ceae2754d18c3e19f0eb27850e62a9ed6badf4deabd091390` | two production fixes plus proof | 6,500 |
 
-All other Rust, tests and fixtures are retained and non-writable. Independent
-review accepts this exact authority, representation and proof contract.
+All other Rust, tests, fixtures, oracles, Cargo/BUILD files and APIs are
+retained and non-writable. Preserve every structural choice accepted in
+`d52336de`: plan in route/capability/request kind; authenticated owner+ordinal;
+mapping -> definition -> effect order; no second scan; no loading edit; private
+temporary-root application; distinct structural, source-association and
+physical identity domains.
 
-## Structural handoff
+## Exact production corrections
 
-Add `RepositoryMaterializationKind::GeneratedFileEffects` containing the exact
-`GeneratedRepositoryFileEffectPlan`. Do not add a field to
-`RepositoryMaterializationRequest`: all existing constructors remain unchanged,
-full request equality already includes `kind`, and canonical request ID remains
-the physical namespace. Same-ID/different-plan requests therefore conflict
-rather than alias.
+Change only `repository_io.rs` production:
 
-Retain the plan directly in `RootRepositorySource::Generated` and require it in
-`RootRepositoryRoute::for_generated_repo_spec`. Carry it through one private
-materialization-flavor field on `HostRepositorySourceCapability`; do not change
-the public `HostRepositorySourceCapabilitySource::{Builtin, RepoSpec}` shape.
-Include the plan in manual route and capability hashing. Project a generated
-capability directly to the new materialization kind; never pass its custom
-repository rule through the local/http/git `request_kind` classifier.
+1. `NativeGeneratedRepositoryFileEffectsIo::set_mode` must return a typed
+   materialization failure under `cfg(not(unix))`. Non-POSIX executable mode is
+   unsupported/deferred and must not silently succeed.
+2. `validate_native_request` must reject
+   `GeneratedFileEffects` paired with a recognized Bazel-tools local, HTTP or
+   Git native rule as `RepositorySessionError::KindMismatch`. A custom
+   generated repository-rule spec remains the only admitted pairing.
 
-Do not expose loading certificate internals. At core's existing authenticated
-demand -> certificate join, retain `demand.owner().clone()` beside certificate
-and unique ordinal in `HostGeneratedRepositoryDefinition`. Forward only a
-core-private borrowed `{ owner, ordinal }` seed through canonical and root-
-apparent definition views. Perform no second canonical-name scan.
+No other production change is authorized. In particular, do not change the
+plan representation, route/request identity, source digest, I/O sequencing,
+session selection, repository capability, observed carrier or public surface.
 
-## Demand owner and observation order
+## Corrected accounting
 
-`GeneratedPackageRouteKey` and its observed sibling remain the sole natural
-demand-side owner. Only after mapping and root-apparent definition resolve to
-Generated, compute the accepted loading effect key over workspace, retained
-owner and ordinal. Merge observations left-first in exact order:
+Four frozen entry contents were retained dirty state and are not Git-reachable;
+their recorded hashes and line counts cannot recover exact added/deleted-line
+partitions. Do not fabricate the original 500/850 accounting. The conservative
+mechanical comparison with `b360be14`, including the untracked 675-line route,
+is `+1,451/-106` across the seven files. Charge all 1,451 additions as retained
+production.
 
-`mapping -> definition/certificate -> selected effect`.
+The retry may add at most 30 production, 1,250 proof and 1,280 aggregate lines
+from the hashes above. Conservative cumulative ceilings are therefore 1,500
+production, 1,250 proof and 2,750 aggregate. Add no `rustfmt::skip`; proof
+helpers remain private and test-only.
 
-Forward Need carrierlessly. An effect observed outer remains an opaque route
-outer; an effect semantic error becomes a typed generated-route terminal that
-retains the exact producer error. Loading retains its invocation print batch;
-route/source parents publish none. Non-Generated definitions remain fallback-
-neutral Missing and never activate the effect key.
+## Required direct proof
 
-Construct the route only from a successful exact plan. Downstream package and
-source keys remain unchanged: they project one generated immutable request,
-return it through the existing materialization Need, and after success observe
-the existing immutable observation instance.
+Use lawful constructors and production functions to prove:
 
-## Atomic generated-plan application
+- route/capability Eq and manual Hash include the complete plan; full request
+  Eq includes ordered path, content and executable polarity; the request gains
+  no Hash implementation and result-key Hash remains ID-only;
+- full-request and epoch comparison distinguish same-ID changed plans,
+  reject conflicting concurrent requests and restore A/B/A;
+- generated session stale-token discard, selection, warm reuse, changed-plan
+  root replacement and A/B/A restoration;
+- exact two-file bytes/order, `0755`/`0644` POSIX modes, preflight before root
+  allocation, all six I/O failures and source-association framing;
+- recognized local/http/git plus generated-kind mismatch and custom generated
+  pairing success;
+- real Legacy/Observed route Need, effect semantic terminal, child-only event
+  ownership, non-Generated nonactivation and mapping -> definition -> effect
+  order with the producer frontier present; and
+- immutable instance/source consumption without a second materialization or
+  rule execution.
 
-Extend only the existing core repository session/materializer. The native
-dispatcher recognizes `GeneratedFileEffects` without reloading a rule. Before
-creating or writing a published root:
+An observed effect outer and cancellation cannot be independently constructed
+at this route without violating lower-key invariants. Compose those two rows
+from the accepted loading producer's direct outer/cancellation proof plus exact
+route source-shape assertions showing carrierless propagation and no parent
+event publication. Every source-shape assertion must inspect only the
+production prefix before the terminal `#[cfg(test)] mod tests` marker;
+test-only imports/helpers before that marker do not authorize whole-file
+matching, and matching the assertion's own literal is not proof. Apply the same
+bounded source-shape rule to prove the `cfg(not(unix))` branch returns a typed
+failure and no longer falls through to success. Do not add an injection
+surface. Do not require three distinct epoch rows: certificate and Host-Bzl
+observations may lawfully dedupe; prove left-first association over the actual
+nonempty rows.
 
-- revalidate every path as nonempty normalized relative valid Unicode;
-- reject duplicates and file/ancestor collisions such as `a` with `a/b`;
-- compute a domain-separated, length-framed SHA-256 source association from
-  ordered path bytes, content bytes and executable polarity; and
-- allocate one fresh private `TempDir`, create parents, create each file once,
-  write exact bytes, flush and set POSIX mode `0755` for executable or `0644`
-  for non-executable.
+## Validation and compatibility
 
-Do not retain the framing scratch bytes. Any validation, create, write, flush or
-mode failure drops the private root. Only after I/O completes may the existing
-post-I/O session-token validation assign an observation instance and add the
-root to provisional session state. Existing selection acceptance atomically
-retains selected roots and releases every other provisional root; cancellation,
-stale token and abort discard the candidate.
+Run formatting on the three writable files; focused Bzlmod/core proof; full
+Bzlmod, loading and core suites serially; `cargo build -p slug_cli_v2`; clean
+stale `slugd` before and after the retained generated-source fixture; run that
+fixture unchanged; then run archive status, diff/scope/hash/accounting and
+independent terminal review. The inherited mixed-horizon selected-graph test
+that once failed in the full suite and immediately passed alone is tracked as
+an order-sensitive baseline risk, not waived or attributed to this packet.
 
-Map generated completion to the existing Immutable success and source-
-observation path. The private source association is not Bazel ActionKey,
-configuration checksum, REAPI digest or route identity. The complete plan stays
-structural in route/request DICE equality; the digest only identifies actual
-generated source content.
-
-## Proof, caps and compatibility
-
-Proof must cover:
-
-- exact two-file bytes/order/default executable true and explicit false mode;
-- route/capability Eq and manual Hash include path/content/order/mode; full
-  request Eq includes the plan; result-key hashing stays ID-only; epoch/full-
-  request comparison distinguishes changed plans and restores A/B/A;
-- exact retained owner+ordinal with no rescan or non-Generated effect activation;
-- Legacy/Observed mapping -> definition -> effect order, Need/outer/semantic
-  polarity, left-first epoch association, child-only events and cancellation;
-- generated request projection bypassing native rule classification while
-  local/http/git/Builtin behavior stays byte-identical;
-- invalid/duplicate/ancestor collision preflight before writes, create/write/
-  flush/mode failures, source-association framing and no scratch retention;
-- session-token race, discard, selection, warm reuse, changed-plan root
-  replacement and A/B/A restoration; and
-- immutable-instance source/package reads plus the accepted fixture after CLI
-  rebuild, or an exact newly exposed typed successor boundary.
-
-Implementation caps are <=500 production, <=850 proof and <=1,350 aggregate
-added Rust lines. Physical ceilings in table order are <=5,000/17,000/5,110/
-4,160/1,780/900/6,000. Add no `rustfmt::skip`.
-
-The admitted fixture's ordered ASCII bytes and executable polarity are **exact
-Bazel 9.2**. Valid-Unicode paths, owner/ordinal, structural plan/request
-identity, source association, staging and immutable-root publication are
+The fixture's ordered ASCII bytes and executable polarity on POSIX are
+**exact Bazel 9.2**. Valid-Unicode paths, owner/ordinal, structural route and
+request identity, source association, staging and immutable publication are
 **Slug-native**. Other repository-context members, overwrite/delete/symlink/
-download/execute effects, nonroot rule definitions, Label/StarlarkPath, non-
-POSIX mode behavior, broader platform paths, public query breadth and exact
-Bazel configuration/output bytes remain **unsupported/deferred**.
+download/execute, nonroot rule definitions, Label/StarlarkPath, non-POSIX mode
+application, broader platforms, public query breadth and exact Bazel
+configuration/output bytes remain **unsupported/deferred**.
 
 Pinned Bazel 9.2 is behavioral authority. Pinned `../zabel` commit
-`c7298478e2e56262a2f438e9c065325744c9f0fc` is concept-only guidance for a
-natural selected producer, private output owner and immutable effect handoff.
-Copy no Zig code, representation, scheduler, digest, manifest/root layout or
-output vector.
+`c7298478e2e56262a2f438e9c065325744c9f0fc` remains concept-only guidance:
+selected demand seeds choose one natural owner, generated effect materialization
+owns one private candidate, and acceptance transfers only immutable output
+state after validation. Copy no Zig code, representation, scheduler, digest,
+manifest/root layout, output vector or cache policy.
 
-Implement only this seven-file vertical. Run formatting; focused Bzlmod/core
-proof; full Bzlmod, loading and core serially;
-rebuild `slug_cli_v2`; clean `slugd` before/after the retained fixture; run the
-fixture, archive status, diff/scope/hash/accounting and independent review.
-
-`repository_io.rs` may add one private generated-effect I/O trait/native
-implementation and colocated `cfg(test)` scripted implementation, following the
-existing archive-materializer pattern. It exists only to prove root/parent/
-create/write/flush/chmod failures and must retain no handle or enter DICE/API
-identity. Add no other injection seam.
-
-STOP a request field, plan bytes in RepoSpec attributes, side table keyed by
-canonical repo/request ID, owner/ordinal in physical request ID, public
-capability-source variant, certificate-internal export, core rule reload,
-parent event replay, non-Generated effect call, new key/store/cache/lock/task,
-Bzlmod -> loading dependency, retained Starlark/root/I/O handle, direct DICE
-filesystem write, fixture edit, public behavior, Java/JVM, M7 closure, M8/M7B
-and identity-byte work. `REPLAN` before widening or exceeding a cap.
+STOP a fourth writable file, request field, plan bytes in RepoSpec attributes,
+side table, physical-ID semantic widening, public capability variant,
+certificate-internal export, core rule reload, parent event replay,
+non-Generated effect call, new key/store/cache/lock/task, loading change,
+Bzlmod -> loading reversal, retained evaluator/I/O handle, direct DICE write,
+fixture edit, public behavior, Java/JVM, M7 closure, M8/M7B and identity-byte
+work. `REPLAN` before widening or exceeding any cap.

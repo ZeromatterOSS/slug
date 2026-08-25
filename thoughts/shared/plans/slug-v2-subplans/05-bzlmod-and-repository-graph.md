@@ -3747,3 +3747,21 @@ Independent review accepts the seven files/caps in current. Activate only
 `WP-4-5-6-generated-repository-file-effect-handoff-application-implementation`.
 Global specs/aggregates, lockfiles, native requests and Bzlmod -> loading
 dependencies remain unchanged.
+
+### Generated effect route/request proof/accounting correction (2026-08-25)
+
+Independent terminal review accepts the retained Bzlmod representation and
+route/request structure. Four retained dirty baselines are not Git-reachable,
+so current records conservatively charge all 1,451 mechanically visible
+additions from `b360be14` as production instead of fabricating the original
+500/850 split.
+
+Activate only
+`WP-4-5-6-generated-repository-file-effect-handoff-application-proof-accounting-correction-implementation`.
+`host_module.rs` and `host_package.rs` are hash-frozen; only
+`source_preparation.rs` proof may change in Bzlmod. Prove structural
+route/capability Eq+manual Hash and full-request Eq, same-ID changed-plan
+conflict and A/B/A while adding no request Hash, preserving result-key ID-only
+Hash and retaining generated projection's native-rule bypass. Add no new value,
+key, request field, capability variant, RepoSpec payload, public surface or
+Bzlmod -> loading dependency.

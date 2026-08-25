@@ -3687,3 +3687,21 @@ Independent review accepts the exact seven files/caps in current. Activate only
 `WP-4-5-6-generated-repository-file-effect-handoff-application-implementation`.
 No loading edit, second scan, non-Generated execution, parent event replay or
 public activation is admitted.
+
+### Generated effect handoff proof/accounting correction (2026-08-25)
+
+The retained handoff candidate keeps the accepted selected owner+ordinal and
+loading producer unchanged. Independent terminal review found no loading
+production defect, but the original dirty predecessor blobs cannot recover an
+exact production/proof addition split and the upper route proof is incomplete.
+
+Freeze all loading Rust. Activate only
+`WP-4-5-6-generated-repository-file-effect-handoff-application-proof-accounting-correction-implementation`
+with proof-only authority in `source_preparation.rs` and
+`generated_package_route.rs`, plus the two bounded `repository_io.rs`
+production corrections specified in current. Prove real route Need, semantic,
+events, non-Generated nonactivation and order directly; compose unreachable
+observed-outer/cancellation rows from the accepted producer proof plus exact
+route source shape. Add no injection, loading caller, event replay or new key.
+Pinned `../zabel` `c7298478…` remains concept-only guidance for selected demand
+and private accepted-effect ownership.

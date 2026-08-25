@@ -16090,6 +16090,41 @@ Preserve native local/http/git/Builtin behavior, event ownership, cancellation/
 discard, structural identity domains, Bazel 9.2 authority and Zabel's concept-
 only role.
 
+### Generated effect handoff proof/accounting REPLAN and correction (2026-08-25)
+
+The seven-file implementation candidate passes focused Bzlmod/core checks, but
+terminal review returns `REPLAN` and freezes it. Production is structurally
+sound except two bounded core fail-closed defects: non-Unix mode application
+silently returns success although that surface is unsupported/deferred, and
+generated effect kind accepts recognized local/http/git native specs instead
+of returning `KindMismatch`.
+
+Four retained entry blobs are not Git-reachable, so exact original additions
+cannot be reconstructed. The mechanical `b360be14` comparison is +1,451/-106;
+charge every addition as retained production. Freeze the seven current hashes
+in current and activate only
+`WP-4-5-6-generated-repository-file-effect-handoff-application-proof-accounting-correction-implementation`.
+Write authority is proof-only `source_preparation.rs` and
+`generated_package_route.rs`, plus exactly the two production fixes and proof
+in `repository_io.rs`; the other four files are byte-frozen.
+
+Retry caps are <=30 production, <=1,250 proof and <=1,280 aggregate from the
+current hashes; conservative cumulative caps are <=1,500/<=1,250/<=2,750.
+Directly prove request/epoch conflict, session discard/reuse/replacement, route
+Need/semantic/events/non-Generated/order and native-spec mismatch. Compose only
+the unreachable observed-outer/cancellation rows from accepted lower loading
+proof plus exact route source shape, with no injection. Source-shape proof must
+slice before the terminal `#[cfg(test)] mod tests` marker and cannot match its
+own assertion text, including explicit proof that the `cfg(not(unix))` branch
+returns a typed failure rather than falling through to success. Actual
+observation deduplication need not fabricate three distinct epoch rows.
+
+Exact Bazel 9.2 remains behavior authority. Pinned `../zabel` `c7298478…`
+guides only selected demand, private candidate ownership and post-validation
+immutable transfer; copy no Zig representation, scheduler, digest or layout.
+Other repository effects and non-POSIX mode behavior remain unsupported/
+deferred. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
