@@ -1,0 +1,25 @@
+[fixture]
+name = "selected-registry-extension-source-owner"
+description = "Bazel 9.2 root-selected registry extension source with producer-local self and mapped recursive loads."
+comparison = "message_shape"
+oracle_notes = "The root selects only owner@1.0 and has neither a BUILD package nor a mapped_dep mapping. owner@1.0 alone maps mapped_dep@1.0. A clean top-level print combines values from //shared:local.bzl and @mapped_dep//:mapped.bzl before Bazel authenticates the named no-op module_extension export."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegularRunnableExtension.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/BzlLoadFunction.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/BzlLoadValue.java",
+  "src/test/java/com/google/devtools/build/lib/skyframe/BzlLoadFunctionTest.java",
+]
+translation_notes = "RegularRunnableExtension loads the definition with keyForBzlmod before export inspection. Recursive loads use the current selected producer's full repository mapping. Root-view resolution cannot pass because the root lacks both child views. This fixture contains no owner/mapped repository-rule, tag/schema, repository effect, or generated repository semantics."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture selected-registry-extension-source-owner --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture selected-registry-extension-source-owner --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "root_selected_source_uses_owner_self_and_mapped_views_before_clean_export"
+argv = ["mod", "show_extension", "owner//:extension.bzl%probe", "--lockfile_mode=off", "--registry=file://%workspace%/registry"]
+expected_exit = 0
+stdout_contains = ["@@owner+//:extension.bzl%probe", "Usage in <root>"]
+stderr_contains = ["SELECTED_REGISTRY_MARKER:local:mapped"]

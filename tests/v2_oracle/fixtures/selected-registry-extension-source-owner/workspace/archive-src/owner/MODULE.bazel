@@ -1,0 +1,3 @@
+module(name = "owner", version = "1.0")
+
+bazel_dep(name = "mapped_dep", version = "1.0", repo_name = "mapped_dep")

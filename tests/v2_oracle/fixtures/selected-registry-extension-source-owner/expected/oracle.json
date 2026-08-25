@@ -1,0 +1,44 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "mod",
+        "show_extension",
+        "owner//:extension.bzl%probe",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_extension",
+        "owner//:extension.bzl%probe",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "root_selected_source_uses_owner_self_and_mapped_views_before_clean_export",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n no actions running\nDEBUG: <output_base>/external/owner+/extension.bzl:4:6: SELECTED_REGISTRY_MARKER:local:mapped",
+      "normalized_stdout": "## @@owner+//:extension.bzl%probe:\n\nFetched repositories:\n\n## Usage in <root> from <workspace>/MODULE.bazel:4\nuse_repo(\n  probe,\n)",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n no actions running\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/ob/selected-registry-extension-source-owner/bazel/external/owner+/extension.bzl:4:6: SELECTED_REGISTRY_MARKER:local:mapped\n",
+      "stdout": "## @@owner+//:extension.bzl%probe:\n\nFetched repositories:\n\n## Usage in <root> from /run/media/system/Colossus/dev/slug/target/v2o/runs/selected-registry-extension-source-owner/20260825-155946-676755-bazel/workspace/MODULE.bazel:4\nuse_repo(\n  probe,\n)\n\n"
+    }
+  ],
+  "fixture": "selected-registry-extension-source-owner",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

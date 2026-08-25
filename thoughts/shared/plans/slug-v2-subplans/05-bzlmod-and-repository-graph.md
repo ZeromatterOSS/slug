@@ -3864,3 +3864,19 @@ inputs. The evidence does not admit actual rules_rust declarations, schemas,
 repository effects or upper consumers. Zabel remains concept-only guidance for
 producer-owned semantic descriptors and immutable realization; it supplies no
 behavioral expectation.
+
+### Selected-definition producer-view evidence accepted; r2 design accepted (2026-08-25)
+
+Pinned Bazel 9.2 accepts the root-selected clean extension only when the owner
+source resolves both its self cross-package child and its mapped selected child
+through the producer's retained view. Generation and two distinct fresh-root
+replays pass; no repository rule, tag/schema or generated repository executes.
+
+The corrected design therefore retains the exact canonical selected
+definition, `RepoSpec`, source policy, self name and ordered mapping as one
+Bzlmod-owned structural input. It projects one distinct selected-source route;
+loading may consume it but cannot infer visibility from a physical path or
+repair it through mutable repository state. Zabel's pinned design remains
+concept-only architectural guidance for this layering. Activate only the
+six-file r2 implementation in current and preserve the real rules_rust
+declaration stop.

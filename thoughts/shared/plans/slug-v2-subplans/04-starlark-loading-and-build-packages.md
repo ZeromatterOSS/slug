@@ -3795,3 +3795,18 @@ The later loading design remains six-file and producer-view based, but it may
 be corrected only after this evidence accepts. Actual rules_rust still stops
 exactly at `repository_rule(doc=...)`. Pinned Zabel `c7298478…` continues to
 guide typed producer-view consumption only; Bazel 9.2 owns the oracle bytes.
+
+### Selected-registry source oracle accepted; corrected loading owner active (2026-08-25)
+
+The exact 46-file Bazel-only fixture passes generation and two independent
+fresh-root replays. Its root cannot see either recursive child, so the combined
+marker and clean export authenticate selected-owner association, same-owner
+cross-package loading and the mapped child's producer view without crossing
+repository-rule or tag/schema semantics.
+
+The corrected six-file design retains loading as the sole byte/evaluation and
+event owner while consuming Bzlmod's typed selected-definition fact. Root
+loading remains byte-stable; mapped edges switch producer view; scratch remains
+compute-local; complete modules/manifests/epochs remain at existing owners.
+Pinned Zabel guides this producer/source split only. Run the r2 implementation
+in current; actual rules_rust keeps its existing declaration terminal.

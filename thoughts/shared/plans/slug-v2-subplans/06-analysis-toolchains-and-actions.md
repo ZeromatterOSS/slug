@@ -18035,3 +18035,19 @@ the mandatory fixture-hygiene reset. Keep all Rust frozen. Successful evidence
 returns to a corrected six-file design; it does not admit actual rules_rust or
 advance M8/M7B. Bazel 9.2 remains behavior authority and pinned Zabel remains
 concept-only producer/view guidance.
+
+### Selected-registry source oracle and corrected six-file design accepted (2026-08-25)
+
+The mandatory hygiene reset and exact one-row oracle are accepted. Pinned
+Bazel 9.2 generation and two fresh-root replays prove root association,
+producer-local self and mapped loads, and clean export without entering the
+deferred declaration/toolchain stack. The fixture remains Bazel-only and all
+Rust stayed frozen during evidence work.
+
+Independent design review preserves the existing six-file ownership and caps,
+but replaces the invalid successful-rules_rust proof with the clean owner/
+mapped oracle plus direct DICE proof. Actual rules_rust must continue stopping
+at `repository_rule(doc=...)`; no upper M8 consumer is admitted. Pinned Zabel
+guides producer-owned descriptors, immutable realization and typed loading
+consumption only. Run
+`WP-4-5-6-7A-selected-registry-extension-bzl-source-owner-implementation-r2`.

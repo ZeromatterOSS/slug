@@ -1,0 +1,1 @@
+module(name = "mapped_dep", version = "1.0")

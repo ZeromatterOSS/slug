@@ -30,18 +30,34 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; selected-registry source oracle active** | generated `repository_ctx.file` producer, demand-side route/request, atomic immutable-root application and tool-aware Bazel/Slug generated-source fixture are accepted through `3ac0a85b`; the external selected-definition source ownership design is sound; pinned Bazel source/tests prove producer-local Bzlmod mapping but accepted fixtures do not compose the corrected observable | one hermetic Bazel 9.2 row must isolate root-selected association, same-repository cross-package load, mapped selected child and clean extension export before the six-file Rust design is corrected | run only `WP-1-4-5-6-7A-selected-registry-extension-source-observable-oracle`, including the overdue fixture-hygiene reset; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; corrected selected-registry source owner active** | generated `repository_ctx.file` vertical is accepted through `3ac0a85b`; fixture hygiene is reset through that commit; the exact 46-file Bazel 9.2 selected-registry source oracle proves root association, producer-local cross-package and mapped loads, and clean export; the corrected six-file design is accepted | implement only the private selected-registry definition source owner; actual rules_rust still stops at unadmitted `repository_rule(doc=...)` and collection schemas | run only `WP-4-5-6-7A-selected-registry-extension-bzl-source-owner-implementation-r2`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-1-4-5-6-7A-selected-registry-extension-source-observable-oracle](./slug-v2-subplans/current-packet.md).
+[WP-4-5-6-7A-selected-registry-extension-bzl-source-owner-implementation-r2](./slug-v2-subplans/current-packet.md).
 
-After the mandatory fixture-hygiene reset, add one Bazel-only local-registry
-row proving the corrected source/export observable without repository-rule or
-tag/schema semantics. Rust remains frozen; actual rules_rust still stops at its
-deferred declaration boundary.
+Implement the corrected six-file private source owner against the accepted
+Bazel-only producer-view oracle. Preserve actual rules_rust's exact deferred
+declaration terminal and do not activate public command or repository-rule
+breadth.
+
+### M7 selected-registry source oracle accepted; corrected owner active (2026-08-25)
+
+The mandatory fixture audit accepts corrected growth from `51540963` through
+`3ac0a85b` and resets hygiene there. Packet one adds exactly 46 regular files,
+zero links, 152 text lines, one command and 20,480 artifact bytes. Pinned Bazel
+9.2 generation plus two distinct fresh-root replays all return `status: ok`.
+The row can succeed only through the selected owner's self and mapped views.
+
+The corrected design keeps the canonical selected definition, `RepoSpec`,
+source policy and ordered mapping as Bzlmod-owned structural inputs; loading
+consumes that typed source fact and owns recursive evaluation. This follows
+pinned `../zabel` architecture guidance without copying Zig implementation or
+using it as output authority. Run only the six-file implementation in current.
+Actual rules_rust declarations, schemas/effects and upper consumers remain
+unsupported/deferred; M7 remains partial.
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 

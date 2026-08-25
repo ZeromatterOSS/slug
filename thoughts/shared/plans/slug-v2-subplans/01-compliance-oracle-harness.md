@@ -1504,3 +1504,35 @@ Independent history and architecture/hygiene audits returned `ACCEPT`. The new
 fixture-growth reset is `3ac0a85b`. The selected-registry source oracle in
 current is packet one and remains below +100 files/+10,000 lines; review again
 before packet six or an earlier size trigger.
+
+### Selected-registry extension source oracle accepted (2026-08-25)
+
+The local-only `selected-registry-extension-source-owner` fixture is exactly 46
+regular files, zero links and one command. Its newline-counted text is 152
+lines; `fixture.toml` is 25, generated `oracle.json` is 44, and the two
+deterministic ustar artifacts are 20,480 bytes aggregate. Rebuilt archive bytes
+match SHA-256
+`3eb1297d8541f07e01b9cb3cee8b8887c984e8186a3b2c4ccb2a78549bf8d062`
+for owner and
+`55e79cebd249ee60ce0a8d5ecb3b46cdd93fc786d5004fefb88e9540c1a7fd1d`
+for mapped_dep and their recorded SRI values.
+
+Pinned `/usr/bin/bazel` 9.2.0 generation returned `status: ok`; exact no-update
+replays from distinct fresh roots
+`/tmp/slug-selected-registry-replay-c.1i592w` and
+`/tmp/slug-selected-registry-replay-d.DmFdyh` also passed. Normalized evidence
+contains `SELECTED_REGISTRY_MARKER:local:mapped`, the canonical extension id
+and root usage. There is no mutation, manifest, online registry or Slug row.
+
+Schema/list discovery and direct replay pass. The available uv harness has 122
+unaffected passes and four independently pre-existing stale assertions:
+the accepted extra `load-invalidation.restored_message_v1` row, a POSIX-host
+test that constructs `Path` while `os.name` is mocked to `nt`, and two
+one-record `simple-rule-action` assumptions after that fixture grew to three.
+This packet changes none of those fixtures, harness tests or code.
+
+This exact evidence admits only root-owned non-isolated selected-registry
+definition loading, producer-local self/mapped recursive source views and a
+clean extension export. Harness normalization remains **Slug-native**. Actual
+rules_rust declarations/schemas/effects and Slug activation remain
+unsupported/deferred. The fixture is packet one after reset `3ac0a85b`.

@@ -1,0 +1,4 @@
+module(name = "root", version = "0.1")
+
+bazel_dep(name = "owner", version = "1.0")
+probe = use_extension("@owner//:extension.bzl", "probe")
