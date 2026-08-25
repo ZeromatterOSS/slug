@@ -3733,3 +3733,17 @@ Activate only docs packet
 Design a dependency-safe demand-only route/request handoff and immutable-root
 association. Bzlmod must not depend on loading; no Rust or materialization is
 authorized before independent acceptance.
+
+### Generated effect route/request design (2026-08-25)
+
+Carry the exact plan in `RootRepositorySource::Generated`, one private source-
+capability flavor and `RepositoryMaterializationKind::GeneratedFileEffects`.
+Do not add a request field or capability-source variant. Full request equality
+therefore owns plan invalidation without changing 39 existing constructors;
+canonical request ID remains only the physical namespace. Generated request
+projection bypasses the native local/http/git classifier.
+
+Independent review accepts the seven files/caps in current. Activate only
+`WP-4-5-6-generated-repository-file-effect-handoff-application-implementation`.
+Global specs/aggregates, lockfiles, native requests and Bzlmod -> loading
+dependencies remain unchanged.

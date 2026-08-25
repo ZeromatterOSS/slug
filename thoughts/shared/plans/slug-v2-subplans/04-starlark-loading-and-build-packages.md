@@ -3673,3 +3673,17 @@ Activate only docs packet
 Design the first demand-side caller and structural effect handoff; do not edit
 loading Rust, execute globally or activate route/materialization/fixture state.
 Pinned `../zabel` `c7298478…` remains concept-only ownership guidance.
+
+### Selected-effect demand handoff design (2026-08-25)
+
+The existing core generated route is the sole natural first caller. It retains
+the already-authenticated demand owner plus unique ordinal through private core
+views, then computes the accepted loading effect key only for a Generated
+definition after mapping/definition success. Observations merge mapping ->
+definition -> effect; Need and observed outers stay carrierless and loading
+keeps its print batch.
+
+Independent review accepts the exact seven files/caps in current. Activate only
+`WP-4-5-6-generated-repository-file-effect-handoff-application-implementation`.
+No loading edit, second scan, non-Generated execution, parent event replay or
+public activation is admitted.

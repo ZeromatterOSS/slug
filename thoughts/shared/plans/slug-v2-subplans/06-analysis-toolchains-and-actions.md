@@ -16074,6 +16074,22 @@ route identity, effect bytes, root lease and source observation distinct and
 associated. Authorize no Rust, fixture, I/O or public behavior before
 independent design acceptance. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated effect immutable application design (2026-08-25)
+
+One seven-file vertical is bounded. The core generated route consumes the
+accepted effect owner; Bzlmod route/request identity carries the plan in a new
+materialization kind; the existing core materializer prevalidates all paths and
+collisions, writes one private temporary root, derives a domain-separated
+length-framed source association, and publishes only through existing
+provisional-root/session acceptance. Package/source keys stay unchanged.
+
+Independent review accepts 500/850/1,350 and the exact physical ceilings in
+current. Activate only
+`WP-4-5-6-generated-repository-file-effect-handoff-application-implementation`.
+Preserve native local/http/git/Builtin behavior, event ownership, cancellation/
+discard, structural identity domains, Bazel 9.2 authority and Zabel's concept-
+only role.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
