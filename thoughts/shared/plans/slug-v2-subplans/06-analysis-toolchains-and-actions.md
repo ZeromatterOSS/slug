@@ -17996,3 +17996,26 @@ entry baselines after one focused manifest correction. Activate only
 `WP-4-5-6-7A-selected-registry-extension-bzl-source-owner-implementation` with
 the six-file authority/caps and proof matrix in current. M7 remains partial and
 M7A -> M8 -> M7B remains.
+
+### Selected-registry extension source implementation contract REPLAN (2026-08-25)
+
+The implementation preflight verified all six frozen entry hashes and made no
+Rust edit or Cargo run. It found one material contract contradiction after the
+manifest-only baseline correction: rules_rust 0.73 evaluates
+`repository_rule(doc = ..., implementation = ...)` at `rust/extensions.bzl`
+lines 49-52 before module-extension export. Slug rejects nonempty repository-
+rule `doc`; transitive rules_rust declarations later reach collection schemas
+that are also outside the packet.
+
+The selected-definition source association, self/mapped recursive-load design,
+DICE ownership and six-file feasibility remain accepted. What fails is the
+observable claim: successful actual rules_rust export/pure reacquisition cannot
+be required while declaration/schema semantics remain deferred.
+
+Activate only docs packet
+`WP-4-5-6-7A-selected-registry-extension-bzl-source-observable-scope-correction-design`.
+Find a discriminating minimal selected-registry source/load observable or a
+uniquely smaller evidence prerequisite, preserve the exact real rules_rust
+declaration terminal, and authorize no Rust before independent review. Pinned
+Zabel `c7298478…` remains producer/source-ownership guidance only. M7 remains
+partial and M7A -> M8 -> M7B remains.

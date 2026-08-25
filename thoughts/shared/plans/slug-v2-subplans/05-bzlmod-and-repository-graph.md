@@ -3819,3 +3819,16 @@ This follows pinned Zabel `c7298478…`: Bzlmod owns selected semantic descripto
 and visibility, repository code owns immutable realization, and loading
 consumes typed source facts. Bazel 9.2 alone defines behavior. Run only the
 implementation packet in current; do not widen repository-rule execution.
+
+### Selected-definition association retained through observable REPLAN (2026-08-25)
+
+Implementation preflight confirms that the retained canonical selected-module
+definition can resolve self and mapped loads without a hidden route or
+materialization prerequisite. No Bzlmod ownership change is needed. The stop is
+only the invalid requirement that actual rules_rust complete export inspection
+despite its earlier unadmitted repository-rule declarations.
+
+Freeze Rust. The current docs correction must isolate one discriminating
+selected-registry source observable while keeping the producer-owned RepoSpec,
+canonical identity and ordered view exactly as designed. Zabel remains
+concept-only guidance; Bazel 9.2 remains behavior authority.

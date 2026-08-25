@@ -3761,3 +3761,15 @@ guides only the producer-owned source/consumer-owned loading split. Activate
 only `WP-4-5-6-7A-selected-registry-extension-bzl-source-owner-implementation`
 in current; repository-rule schemas/APIs, builtin content and public activation
 remain deferred.
+
+### Selected-registry source implementation observable REPLAN (2026-08-25)
+
+The no-edit implementation preflight found that real rules_rust evaluates
+top-level `repository_rule(doc=...)` before extension export, then reaches
+collection-valued repository-rule schemas. Both are explicitly deferred and
+currently rejected. The selected-source loading owner remains correct, but the
+packet cannot require successful rules_rust export or pure reacquisition.
+
+Run only the docs scope-correction design in current. Select a focused external
+selected-registry source/load observable, preserve the exact rules_rust
+declaration terminal, and do not widen loading declaration/schema semantics.
