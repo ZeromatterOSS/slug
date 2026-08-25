@@ -15120,6 +15120,47 @@ Schedule exactly
 `WP-6-7A-generated-repository-route-capability-promotion-implementation`.
 M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated-repository route-capability promotion accepted (2026-08-24)
+
+Implementation `b42b004c`, from accepted design of the same date over Rust base
+`846ef196`, adds the doc-hidden `RootRepositorySource::Generated { repo_spec,
+local_path_policy }` variant with constructor
+`RootRepositoryRoute::for_generated_repo_spec` enforcing nonroot apparent and
+canonical names, non-`bazel_tools`, and `LocalUnsupported` polarity — exactly
+the core Generated view invariant. The `source_capability()`, `repo_spec()` and
+Hash match arms delegate to existing projections; no driver, key family or
+compute edge changed. One test-only core proof
+(`generated_route_capability_is_sibling_usable`) constructs a Generated-view-
+shaped route, proves rejection polarity, identity, capability projection,
+routed-key acceptance (`RepositoryPackageSourceKey`, `HostRepositorySourceFileKey`)
+and stable hashing; it activates no production caller.
+
+Accounting against `846ef196`: host_module.rs +57 (production), generated_
+repository_definition.rs +104/-1 (test-only proof), aggregate +161 net — within
+the <=60/<=80/<=140 semantic caps read as production/proof/aggregate with proof
+measured on its own file; physical 4,783/3,964. No skip. Formatting and diff
+hygiene clean.
+
+Validation on Ubuntu 24.04 WSL: new sibling proof passes; full Bzlmod 530
+passes plus one pre-existing failure
+(`observed_root_repository_mapping_lifecycle_cancellation_and_nonactivation`
+source-absence assertion) proven byte-identical at `2022a7a2` and every later
+base including `846ef196` — that commit itself added
+`HostRootRepositoryMappingObservationKey/Error` names to core's
+generated_repository_definition.rs while leaving the stale absence scan in
+selected_repo_spec.rs; it is an untouched, pre-existing baseline failure of this
+packet's Rust base, not introduced by this change. Full core 273 passes plus
+the byte-identical accepted query diagnostic baseline. Direct commands green.
+The successor should schedule the docs-only correction of that stale absence
+scan alongside the next frontier audit.
+
+Compatibility classes unchanged: legacy routed semantics exact; Slug-native
+observed carrier/opaque handoff and the doc-hidden variant unchanged in
+identity; public publication, bootstrap activation, other platforms and exact
+identity bytes remain unsupported/deferred.
+
+M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
