@@ -44,7 +44,27 @@ def _contains_failures(label: str, needles: tuple[str, ...], text: str) -> list[
     return [f"{label} did not contain {needle!r}" for needle in needles if needle not in text]
 
 
-def _compare_command_shape(command: FixtureCommand, actual: dict[str, Any]) -> list[str]:
+def _tool_shape(command: FixtureCommand, tool: Any) -> tuple[tuple[str, ...], ...] | None:
+    bazel = (
+        command.bazel_stdout_contains,
+        command.bazel_stderr_contains,
+        command.bazel_stdout_patterns,
+        command.bazel_stderr_patterns,
+    )
+    slug = (
+        command.slug_stdout_contains,
+        command.slug_stderr_contains,
+        command.slug_stdout_patterns,
+        command.slug_stderr_patterns,
+    )
+    if not any(bazel) and not any(slug):
+        return ()
+    if not any(bazel) or not any(slug) or tool not in {"bazel", "slug"}:
+        return None
+    return bazel if tool == "bazel" else slug
+
+
+def _compare_command_shape(command: FixtureCommand, actual: dict[str, Any], tool: Any) -> list[str]:
     failures: list[str] = []
     if command.expected_exit is not None and actual.get("exit_code") != command.expected_exit:
         failures.append(f"{command.name}: exit code {actual.get('exit_code')} != {command.expected_exit}")
@@ -52,11 +72,20 @@ def _compare_command_shape(command: FixtureCommand, actual: dict[str, Any]) -> l
     failures.extend(f"{command.name}: {failure}" for failure in _contains_failures("stderr", command.stderr_contains, actual.get("normalized_stderr", "")))
     failures.extend(f"{command.name}: {failure}" for failure in _pattern_failures("stdout", command.stdout_patterns, actual.get("normalized_stdout", "")))
     failures.extend(f"{command.name}: {failure}" for failure in _pattern_failures("stderr", command.stderr_patterns, actual.get("normalized_stderr", "")))
+    tool_shape = _tool_shape(command, tool)
+    if tool_shape is None:
+        failures.append(f"{command.name}: tool-specific shape contract is incomplete for {tool!r}")
+    elif tool_shape:
+        stdout_contains, stderr_contains, stdout_patterns, stderr_patterns = tool_shape
+        failures.extend(f"{command.name}: {failure}" for failure in _contains_failures("stdout", stdout_contains, actual.get("normalized_stdout", "")))
+        failures.extend(f"{command.name}: {failure}" for failure in _contains_failures("stderr", stderr_contains, actual.get("normalized_stderr", "")))
+        failures.extend(f"{command.name}: {failure}" for failure in _pattern_failures("stdout", stdout_patterns, actual.get("normalized_stdout", "")))
+        failures.extend(f"{command.name}: {failure}" for failure in _pattern_failures("stderr", stderr_patterns, actual.get("normalized_stderr", "")))
     return failures
 
 
-def _compare_expected_command(command: FixtureCommand, expected: dict[str, Any], actual: dict[str, Any]) -> list[str]:
-    failures = _compare_command_shape(command, actual)
+def _compare_expected_command(command: FixtureCommand, expected: dict[str, Any], actual: dict[str, Any], tool: Any) -> list[str]:
+    failures = _compare_command_shape(command, actual, tool)
     if expected.get("exit_code") != actual.get("exit_code"):
         failures.append(f"{command.name}: exit code {actual.get('exit_code')} != oracle {expected.get('exit_code')}")
     if command.compare == "exact":
@@ -124,9 +153,9 @@ def compare_result(fixture: Fixture, actual: dict[str, Any], expected: dict[str,
 
     for index, (command, actual_command) in enumerate(zip(fixture.commands, actual_commands)):
         if expected_commands:
-            failures.extend(_compare_expected_command(command, expected_commands[index], actual_command))
+            failures.extend(_compare_expected_command(command, expected_commands[index], actual_command, actual.get("tool")))
         else:
-            failures.extend(_compare_command_shape(command, actual_command))
+            failures.extend(_compare_command_shape(command, actual_command, actual.get("tool")))
         if (
             actual.get("tool") == "slug"
             and fixture.reapi.remote_executor

@@ -42,6 +42,14 @@ class FixtureCommand:
     stderr_patterns: tuple[str, ...] = ()
     stdout_contains: tuple[str, ...] = ()
     stderr_contains: tuple[str, ...] = ()
+    bazel_stdout_patterns: tuple[str, ...] = ()
+    bazel_stderr_patterns: tuple[str, ...] = ()
+    bazel_stdout_contains: tuple[str, ...] = ()
+    bazel_stderr_contains: tuple[str, ...] = ()
+    slug_stdout_patterns: tuple[str, ...] = ()
+    slug_stderr_patterns: tuple[str, ...] = ()
+    slug_stdout_contains: tuple[str, ...] = ()
+    slug_stderr_contains: tuple[str, ...] = ()
     manifest_roots: tuple[str, ...] = ()
     mutations: tuple[Mutation, ...] = ()
 
@@ -407,8 +415,7 @@ def load_fixture(path: Path) -> Fixture:
         if not isinstance(command_name, str) or not command_name:
             raise ValueError("commands.name must be a non-empty string")
         command_manifest_roots = _as_str_list(command.get("manifest_roots"), "commands.manifest_roots")
-        commands.append(
-            FixtureCommand(
+        parsed_command = FixtureCommand(
                 name=command_name,
                 argv=argv,
                 compare=_compare_mode(command.get("compare"), compare),
@@ -430,10 +437,22 @@ def load_fixture(path: Path) -> Fixture:
                 stderr_patterns=_as_str_list(command.get("stderr_patterns"), "commands.stderr_patterns"),
                 stdout_contains=_as_str_list(command.get("stdout_contains"), "commands.stdout_contains"),
                 stderr_contains=_as_str_list(command.get("stderr_contains"), "commands.stderr_contains"),
+                bazel_stdout_patterns=_as_str_list(command.get("bazel_stdout_patterns"), "commands.bazel_stdout_patterns"),
+                bazel_stderr_patterns=_as_str_list(command.get("bazel_stderr_patterns"), "commands.bazel_stderr_patterns"),
+                bazel_stdout_contains=_as_str_list(command.get("bazel_stdout_contains"), "commands.bazel_stdout_contains"),
+                bazel_stderr_contains=_as_str_list(command.get("bazel_stderr_contains"), "commands.bazel_stderr_contains"),
+                slug_stdout_patterns=_as_str_list(command.get("slug_stdout_patterns"), "commands.slug_stdout_patterns"),
+                slug_stderr_patterns=_as_str_list(command.get("slug_stderr_patterns"), "commands.slug_stderr_patterns"),
+                slug_stdout_contains=_as_str_list(command.get("slug_stdout_contains"), "commands.slug_stdout_contains"),
+                slug_stderr_contains=_as_str_list(command.get("slug_stderr_contains"), "commands.slug_stderr_contains"),
                 manifest_roots=command_manifest_roots,
                 mutations=_parse_mutations(command.get("mutations")),
             )
-        )
+        bazel_shape = any((parsed_command.bazel_stdout_patterns, parsed_command.bazel_stderr_patterns, parsed_command.bazel_stdout_contains, parsed_command.bazel_stderr_contains))
+        slug_shape = any((parsed_command.slug_stdout_patterns, parsed_command.slug_stderr_patterns, parsed_command.slug_stdout_contains, parsed_command.slug_stderr_contains))
+        if bazel_shape != slug_shape:
+            raise ValueError("tool-specific command shape requires both Bazel and Slug assertions")
+        commands.append(parsed_command)
 
     http_registry = bool(fixture_data.get("http_registry", False))
     http_registry_port = _as_optional_int(

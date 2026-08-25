@@ -1667,6 +1667,104 @@ def test_compare_checks_only_declared_startup_capture_fields() -> None:
     assert "captured: startup_announcements is missing from oracle" in failures
 
 
+def test_compare_selects_only_matching_tool_message_shape() -> None:
+    command = FixtureCommand(
+        name="tool-shape",
+        argv=("build", "@generated//:generated.txt"),
+        compare="message_shape",
+        expected_exit=0,
+        stdout_contains=("common",),
+        bazel_stderr_contains=("Bazel source file",),
+        slug_stderr_patterns=(r'^\{"success":true\}$',),
+    )
+    fixture = Fixture(
+        name="tool-shape",
+        root=Path("/fixture"),
+        workspace=Path("/fixture/workspace"),
+        expected=Path("/fixture/expected"),
+        commands=(command,),
+    )
+
+    def result(tool: str, stderr: str) -> dict[str, object]:
+        return {
+            "tool": tool,
+            "commands": [{
+                "exit_code": 0,
+                "normalized_stdout": "common",
+                "normalized_stderr": stderr,
+            }],
+        }
+
+    assert compare_result(fixture, result("bazel", "Bazel source file"), None) == []
+    assert compare_result(fixture, result("slug", '{"success":true}'), None) == []
+    assert compare_result(fixture, result("bazel", '{"success":true}'), None) == [
+        "tool-shape: stderr did not contain 'Bazel source file'"
+    ]
+    assert compare_result(fixture, result("slug", "Bazel source file"), None) == [
+        'tool-shape: stderr did not match /^\\{"success":true\\}$/'
+    ]
+
+
+def test_compare_rejects_incomplete_or_unknown_tool_shape_contract() -> None:
+    command = FixtureCommand(
+        name="tool-shape",
+        argv=("build", "//:target"),
+        compare="message_shape",
+        bazel_stderr_contains=("Bazel",),
+    )
+    fixture = Fixture(
+        name="tool-shape",
+        root=Path("/fixture"),
+        workspace=Path("/fixture/workspace"),
+        expected=Path("/fixture/expected"),
+        commands=(command,),
+    )
+    actual = {
+        "tool": "bazel",
+        "commands": [{"exit_code": 0, "normalized_stdout": "", "normalized_stderr": "Bazel"}],
+    }
+    assert compare_result(fixture, actual, None) == [
+        "tool-shape: tool-specific shape contract is incomplete for 'bazel'"
+    ]
+    complete = FixtureCommand(
+        name="tool-shape",
+        argv=("build", "//:target"),
+        compare="message_shape",
+        bazel_stderr_contains=("Bazel",),
+        slug_stderr_contains=("Slug",),
+    )
+    fixture = Fixture(**{**fixture.__dict__, "commands": (complete,)})
+    actual["tool"] = "other"
+    assert compare_result(fixture, actual, None) == [
+        "tool-shape: tool-specific shape contract is incomplete for 'other'"
+    ]
+
+
+def test_fixture_parser_requires_both_tool_shape_contracts() -> None:
+    fixture_root = scratch_dir("tool-shape-parser")
+    (fixture_root / "fixture.toml").write_text(
+        """
+[fixture]
+name = "tool-shape-parser"
+
+[[commands]]
+argv = ["build", "//:target"]
+bazel_stderr_contains = ["Bazel"]
+""".strip(),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="requires both Bazel and Slug"):
+        load_fixture(fixture_root)
+
+
+def test_generated_source_fixture_has_distinct_bazel_and_slug_shapes() -> None:
+    command = load_fixture(FIXTURES / "module-extension-use-repo").commands[0]
+    assert "@@+ext+generated//:generated.txt is a source file" in command.bazel_stderr_contains
+    assert command.slug_stderr_patterns == (
+        r'\A\{"success":true,"command":"build","target_count":1,"loaded_package_count":1,"analyzed_target_count":0,"declared_action_count":0,"runtime_mode":"one-shot","completed_boundary":"dice_exported_source_file"\}\n?\Z',
+    )
+
+
 def test_normalize_text_strips_host_specific_noise() -> None:
     workspace = scratch_dir("normalize") / "workspace"
     workspace.mkdir()
