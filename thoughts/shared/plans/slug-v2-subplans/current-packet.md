@@ -1,57 +1,48 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-generated-repository-package-publication-frontier-audit`
+Packet: `WP-6-7A-generated-repository-package-policy-lookup-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Design base: pending docs commit / Rust `846ef196`
+Design base: audit accepted 2026-08-24 / Rust `846ef196`
 
-Result: read-only audit choosing the smallest policy/lookup/source/load owner or
-prerequisite that can eventually publish exact generated-repository packages
-(extension chains such as `@rust_toolchains`) through the accepted
-source-observation carrier. Linux under WSL is the only platform target;
-Windows and macOS remain deferred.
+Result: docs-only design for the smallest same-crate core generated-repository
+package lookup owner — canonical deleted-package policy, `REPO.bazel` plus
+`.bazelignore` semantics, ordered `BUILD.bazel` then `BUILD` selection, and
+complete epoch composition — consuming the now-visible private route/
+source-observation surface. Linux under WSL is the only platform target.
 
-## Active audit contract
+## Frontier facts (accepted audit, 2026-08-24)
 
-Rust is read-only. The audit may change only scheduling/plan documents.
+The core private chain reaches `Generated` routes end to end and is sibling-
+nameable after `846ef196`, with zero production callers. Public bzlmod
+`RootRepositoryRoute` admits only DirectLocal/BuiltinBazelTools; root package
+policy checks deleted packages against `CanonicalRepoName::root()` only;
+marker/BUILD-order semantics exist only inside the root/direct-local lookup.
+Raw-source publication would bypass all of these and is rejected.
 
-Accepted `846ef196` exposes the legacy semantic certificate/view/result/key and
-observed key/carrier/opaque outer to a same-crate runtime sibling with zero
-production callers. The consumer frontier stands: existing public
-`RootRepositoryRoute` and its package source/load owners admit only builtin or
-direct-local roots and cannot represent the extension-generated
-`@rust_toolchains` chain; raw-source publication alone is not sufficient.
+## Active design contract
 
-The audit must:
+Docs only; every Rust file, Cargo/BUILD, fixture and oracle is read-only.
 
-- name every prerequisite for exact generated BUILD loading: canonical
-  deleted-package policy, `REPO.bazel` plus `.bazelignore`, and ordered
-  `BUILD.bazel` then `BUILD` selection with complete epoch composition;
-- choose the smallest next owner or prerequisite packet — do not assume that
-  raw-source publication or the current narrow public route suffices;
-- classify each surface exact / Slug-native / unsupported-deferred; and
-- schedule exactly one successor with an observable result, allowlist, caps,
-  validation and REPLAN stops per the plan-authoring guide.
+The design must:
 
-STOP any Rust edit, public/crate-root exposure, package/public/bootstrap
-activation, new key/carrier/adapter/caller, fixture/oracle growth, milestone
-closure, M8/M7B or exact identity work. REPLAN before widening or if no bounded
-smallest owner exists.
+- name one cohesive core lookup key family (legacy + observed modes) whose
+  natural producer owns generated-package identity for a canonical repo;
+- reuse root marker/BUILD-order discriminating evidence unchanged for the
+  generated families; add no fixture/oracle unless a demonstrated gap appears;
+- keep deleted-package policy, repository-ignore, and BUILD selection in the
+  natural policy/lookup owners without duplicating root policy state;
+- compose complete epochs left-first with outer > compatible Need > semantic
+  ordering; parents retain one local Result Arc plus compact epoch only;
+- classify exact / Slug-native / unsupported-deferred per the guide;
+- bound file allowlist, caps, validation and REPLAN stops; and
+- defer public publication, bzlmod route widening, package source/load reuse,
+  command/bootstrap activation and other platforms explicitly.
 
-## Research and ownership
+STOP any Rust edit, new caller/adapter/key beyond the named family, public/
+crate-root exposure, fixture growth without a demonstrated gap, milestone
+closure, M8/M7B or exact identity work. REPLAN if no bounded single-owner
+lookup exists or if bzlmod/core dependency inversion becomes unavoidable.
 
-Reuse the accepted Bazel 9.2 source/Host-observation evidence and lifecycle
-proof carried by `b3eba6df`/`846ef196`; this audit changes no user-visible
-behavior and adds no fixture, oracle or upstream test. Existing
-source-observation keys remain the natural DICE producers; the Result Arc plus
-transaction-local epoch remains the sole retained value. There is no fallback.
-
-## Authority
-
-Docs-only write authority: this manifest plus the owner plan's scheduling tail.
-Every other file is read-only. No Cargo/BUILD changes are permitted, so the
-validation gate is documentation structure/diff hygiene plus consistency with
-Live Status and the routing log.
-
-After the audit ACCEPT, schedule its chosen successor as the current packet.
-M7 remains partial and M7A -> M8 -> M7B remains.
+After design ACCEPT, schedule exactly one implementation successor. M7 remains
+partial and M7A -> M8 -> M7B remains.

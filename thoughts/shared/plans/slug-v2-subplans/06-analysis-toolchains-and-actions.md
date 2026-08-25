@@ -14999,6 +14999,62 @@ to choose the smallest policy/lookup/source/load owner or prerequisite; it must
 not assume raw-source publication or the current narrow public route is
 sufficient. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated-repository package-publication frontier audit accepted (2026-08-24)
+
+The read-only audit over Rust `846ef196` traced the full candidate surface.
+
+Accepted state: the core private chain now represents extension-generated
+repositories end to end — `HostValidatedModuleExtensionRepositories`
+(loading) -> `HostRootApparentRepositoryDefinition` ->
+`HostRootApparentRepositoryRoute` with the `Generated` kind ->
+`HostRootApparentRepositorySourceInput` -> `...SourcePathInput` ->
+`...SourceObservation` — and `846ef196` made that terminal family nameable by a
+same-crate sibling. It still has zero production callers.
+
+Publication gaps confirmed, not assumed:
+
+1. Public bzlmod `RootRepositoryRoute` owns only `RootRepositorySource::
+   DirectLocal | BuiltinBazelTools`; `project_root_repository_route` returns
+   `Unsupported` for every non-local-path-override dependency, so
+   `RepositoryPackageSourceKey`/`RepositoryPackageLoadKey` cannot be constructed
+   for `@rust_toolchains`-style apparent names. Private core route kinds cannot
+   cross into bzlmod without dependency inversion.
+2. Root package policy is root-repository-only: `RootPackageLookupInputs`
+   deleted-package membership is checked against
+   `PackageIdentifier::new(CanonicalRepoName::root(), ..)` in both
+   `HostRootPackageLookupKey` and `RepositoryPackageSourceKey`'s lookup child,
+   and `HostRepositoryIgnoreKey` observes only the root workspace. Canonical
+   generated-repo deleted-package policy has no owner.
+3. `REPO.bazel`/`.bazelignore` marker semantics and the ordered
+   `BUILD.bazel`-then-`BUILD` selection exist only inside the root/direct-local
+   lookup driver; a generated package publication that started from the raw
+   source certificate would bypass them and compose incomplete epochs.
+4. The terminal source-observation carrier observes requested load-source
+   paths, not package BUILD identity; it cannot substitute for a package
+   lookup/source owner.
+
+Decision and non-decisions: the smallest next owner is one same-crate core
+generated-repository **package lookup** design — canonical deleted-package
+policy, `REPO.bazel`/`.bazelignore` markers, ordered `BUILD.bazel` then `BUILD`
+selection, and complete epoch composition — consuming the now-visible route/
+source-observation surface rather than republishing raw certificates. Public
+publication, bzlmod-side route widening, package source/load reuse, and
+command/bootstrap activation are deliberately not chosen and stay deferred;
+no Bazel 9.2 evidence gap blocks the design because root marker/BUILD-order
+semantics already carry accepted discriminating evidence and the generated
+families reuse it unchanged.
+
+Compatibility classes: legacy semantic values/errors/order/equality remain
+exact; the observed Result-Arc+epoch association, opaque handoff and new
+private lookup keys remain Slug-native; public publication, other platforms and
+exact identity bytes remain unsupported/deferred.
+
+Schedule exactly `WP-6-7A-generated-repository-package-policy-lookup-design`,
+docs-only. STOP Rust edits, public/crate-root exposure, new callers, fixture/
+oracle growth, milestone closure, M8/M7B and exact identity work. REPLAN if the
+design cannot bound a cohesive single-owner lookup without duplicating root
+policy state. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
