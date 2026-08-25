@@ -15973,6 +15973,40 @@ STOP a second file, route/source-preparation/core/loading change, semantic or
 event/epoch drift, waiver, milestone closure, M8/M7B and identity bytes. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated repository file-effect owner REPLAN (2026-08-25)
+
+The retained one-file source-preflight correction passes its focused polarity,
+direct-local lifecycle and module-error proof, and the rebuilt CLI. The pinned
+Bazel 9.2 generated-source fixture advances past the prior reconstructed root
+route and now stops at the pre-existing custom-rule materialization fallback.
+Bzlmod request projection and core native materialization each admit only
+local/http/git; neither owns a user repository-rule callable or file effects.
+
+The selected owner certificate retains the exact instantiated call and unique
+ordinal, while the public `RepoSpec` intentionally erases the callable. No
+production `repository_ctx`, file-effect plan or custom-rule application owner
+exists. A local fallback-arm edit, attribute-based file synthesis or retained
+Starlark heap would violate exactness and ownership. Formally `REPLAN` the
+source-preflight implementation while retaining all Rust and fixture bytes.
+
+Run only docs packet
+`WP-4-5-6-generated-repository-file-effect-owner-design`. Design one loading-
+owned selected-call reload/authentication/execution key, one compact Bzlmod-
+owned ordered file-effect representation, and one demand-only handoff through
+the generated route into core's existing immutable root publication. Admit
+only the Bazel 9.2 `repository_ctx.file` subset required by the fixture; every
+other repository-context API is typed unsupported. Resolve exact arguments,
+defaults, paths, content, executable mode, errors, events, epochs, cancellation,
+warm reuse, structural identity and materialization integrity before Rust.
+
+Pinned `../zabel` `c7298478…` guides only the natural selected-call producer
+and immutable effect handoff. Copy no Zig implementation, representation,
+scheduler, digest or root layout. Write only canonical/current/Stages 4, 5 and
+6/routing under 40/280/180/180/240/30 and 950 aggregate lines. STOP Rust,
+fixture/oracle changes, reverse dependencies, retained heaps, eager/global
+execution, other repository APIs, Java/JVM, milestone closure, M8/M7B and exact
+identity bytes. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is

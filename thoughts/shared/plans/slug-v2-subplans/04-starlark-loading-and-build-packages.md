@@ -3580,3 +3580,25 @@ observation compute terminals, exact retained Arcs, shallow clone boundary,
 structural equality/Need/events proof, and every no-Bzlmod/caller/loading/
 package/command/legacy-demand/new-I/O/reverse-edge/JVM stop. Stage 4 behavior
 remains unchanged until independent implementation acceptance.
+
+### Selected repository-rule file-effect owner design active (2026-08-25)
+
+The accepted August 12 repository-rule call protocol remains exactly raw,
+heap-free invocation capture; it did not authorize later implementation
+execution. The generated-package fixture now proves the missing successor is a
+selected-call effect owner, not another call-capture or definition leaf.
+
+Run only cross-stage docs packet
+`WP-4-5-6-generated-repository-file-effect-owner-design`. The future natural
+loading owner must start from the authenticated selected-owner certificate plus
+unique call ordinal, reload the defining observed Host `.bzl`, authenticate the
+exported rule projection, invoke its frozen implementation once with a
+compute-local context, and retain only a shared compact file-effect plan.
+Loaded modules, `FrozenValue`s and Starlark heaps remain scratch. Host-Bzl load
+events remain below; the invocation owns one complete local batch; Need,
+cancellation and failed observed outers publish no partial plan.
+
+Admit only exact Bazel 9.2 `repository_ctx.file` behavior required by the
+pinned two-file fixture. All other repository-context APIs stay typed
+unsupported. This packet is docs-only with cross-ledger caps in current; Stage
+4 Rust, tests, fixtures, loaders, public APIs and JVM work are frozen.

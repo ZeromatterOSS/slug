@@ -3653,3 +3653,25 @@ retained Arcs, shallow clone boundary, structural equality/Need/events proof,
 and every no-Bzlmod-change/caller/loading/package/command/legacy-demand/new-I/O/
 reverse-edge/JVM stop. Stage 5 behavior remains unchanged until independent
 implementation acceptance.
+
+### Generated repository file-effect representation design active (2026-08-25)
+
+The selected extension owner and instantiated `RepoSpec` are accepted, but
+`RepoSpec` intentionally contains only rule identity and converted attributes.
+It cannot carry the defining Starlark callable or produced repository bytes.
+The live fixture now reaches the native-only materialization fallback, proving
+the missing boundary.
+
+Run only cross-stage docs packet
+`WP-4-5-6-generated-repository-file-effect-owner-design`. Design one compact
+Bzlmod-owned value that loading can produce and core can consume: an ordered
+Arc slice of normalized repository-relative path, exact content bytes and
+executable polarity. Its full structural value participates in route/request
+identity and invalidation. No callable, module, heap, root lease or I/O handle
+may cross this boundary, and Bzlmod must not depend on loading.
+
+The effect plan is admitted only for one authenticated generated repository
+and only from package-source demand. Existing local/http/git request polarity,
+global generated-spec aggregates, lockfiles, native repositories and public
+APIs remain unchanged. This packet is docs-only with cross-ledger caps in
+current; all Bzlmod Rust, tests, fixtures and JVM work are frozen.
