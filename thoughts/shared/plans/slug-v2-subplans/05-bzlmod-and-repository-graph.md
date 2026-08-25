@@ -3765,3 +3765,19 @@ conflict and A/B/A while adding no request Hash, preserving result-key ID-only
 Hash and retaining generated projection's native-rule bypass. Add no new value,
 key, request field, capability variant, RepoSpec payload, public surface or
 Bzlmod -> loading dependency.
+
+### Generated effect handoff terminal REPLAN; oracle shape correction (2026-08-25)
+
+The retained Bzlmod route/request representation and corrected core
+materializer are accepted and byte-frozen. Direct proof covers structural plan
+identity, conflict/restoration, native-kind rejection and immutable-root
+application. Broad Bzlmod/loading validation passes; core retains only its
+accepted stale visibility-diagnostic assertion.
+
+The generated-source Slug command now exits zero at
+`dice_exported_source_file`, but the fixture comparator applies Bazel-only
+stderr assertions to both tools. Activate only the four-file harness packet in
+current. Preserve the Bazel 9.2 oracle and workspace byte-for-byte, select only
+the matching tool's shape assertions, and fail closed when a tool-aware command
+omits either tool contract. Zabel remains concept-only guidance, not output
+authority.

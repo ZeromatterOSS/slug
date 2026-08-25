@@ -16125,6 +16125,38 @@ immutable transfer; copy no Zig representation, scheduler, digest or layout.
 Other repository effects and non-POSIX mode behavior remain unsupported/
 deferred. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated effect handoff terminal REPLAN; tool-aware oracle design accepted (2026-08-25)
+
+The retry adds only the two authorized fail-closed production fixes and lawful
+proof. Final retry accounting is +21/-1 production and +646 proof, for
++667/-1 aggregate; conservative cumulative ceilings and every physical/hash
+freeze pass. Full Bzlmod and loading suites pass. Full core is 286/287 with
+only the long-recorded stale generic visibility assertion against the
+committed precise wrong-kind diagnostic. CLI rebuild and formatting pass.
+
+The generated-source Slug command itself exits zero and emits its exact
+successful `dice_exported_source_file` JSON terminal. The unchanged fixture
+harness nevertheless exits nonzero because common `stderr_contains` and
+`stderr_patterns` encode Bazel's presentation and are applied to Slug.
+Independent terminal review returns `REPLAN`; accepting the JSON by inspection
+would waive a mandatory gate.
+
+Independent review accepts the smallest successor. Freeze all Rust and the
+oracle JSON/workspace. Add Bazel-/Slug-specific stdout/stderr contains/pattern
+fields in the existing fixture command representation, parse them strictly,
+apply common plus only the actual tool's fields, and fail closed when any
+tool-specific contract omits either Bazel or Slug assertions. Migrate only the
+existing fixture's Bazel shape and add an anchored exact Slug success JSON
+shape with the common exit-zero unchanged. Prove matching selection,
+cross-tool nonapplication and missing-contract rejection.
+
+Activate only
+`WP-4-5-6-generated-source-oracle-tool-specific-message-shape-correction-implementation`
+across the four paths/caps in current. Bazel 9.2 remains exact behavioral
+authority; Slug JSON presentation is Slug-native. Pinned `../zabel`
+`c7298478…` remains architecture guidance only and supplies no comparator,
+fixture or output semantics. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is

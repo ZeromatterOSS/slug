@@ -3705,3 +3705,19 @@ observed-outer/cancellation rows from the accepted producer proof plus exact
 route source shape. Add no injection, loading caller, event replay or new key.
 Pinned `../zabel` `c7298478…` remains concept-only guidance for selected demand
 and private accepted-effect ownership.
+
+### Generated effect handoff terminal REPLAN; oracle shape correction (2026-08-25)
+
+The corrected handoff candidate is structurally accepted. Full Bzlmod and
+loading suites pass, full core has only its byte-identical recorded query
+diagnostic baseline, and the rebuilt Slug command exits zero at the exact
+`dice_exported_source_file` boundary. The unchanged oracle harness still exits
+nonzero because its Bazel-only stderr presentation assertions are applied to
+Slug. Independent terminal review rejects a manual waiver.
+
+Freeze every Rust file. Activate only
+`WP-4-5-6-generated-source-oracle-tool-specific-message-shape-correction-implementation`.
+Keep common exit-zero, preserve Bazel's exact canonical generated-target/source
+classification and completion assertions, and require Slug's exact successful
+JSON exported-source terminal for the same argv. Pinned `../zabel` remains
+architecture guidance only and supplies no harness or output semantics.

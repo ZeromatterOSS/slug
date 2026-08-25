@@ -30,17 +30,17 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; generated file-effect handoff correction retry active** | selected-call producer accepted; retained route/request/immutable-root candidate is structurally sound under independent review | two fail-closed materializer corrections plus lawful direct/composed proof remain | implement only `WP-4-5-6-generated-repository-file-effect-handoff-application-proof-accounting-correction-implementation`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; generated-source oracle tool-shape correction active** | selected-call producer and generated route/request/immutable-root application are structurally accepted; rebuilt Slug exits zero at `dice_exported_source_file` | the Bazel-recorded fixture applies Bazel-only stderr assertions to Slug and therefore reports a false harness failure | implement only `WP-4-5-6-generated-source-oracle-tool-specific-message-shape-correction-implementation`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-5-6-generated-repository-file-effect-handoff-application-proof-accounting-correction-implementation](./slug-v2-subplans/current-packet.md).
+[WP-4-5-6-generated-source-oracle-tool-specific-message-shape-correction-implementation](./slug-v2-subplans/current-packet.md).
 
-Preserve the retained demand-owned handoff; correct only non-POSIX mode and
-native-rule/generated-kind fail-closed behavior, then complete its lawful
-direct/composed proof under conservative accounting.
+Freeze the accepted Rust candidate. Preserve Bazel's exact canonical-target,
+source-classification and completion assertions while adding a fail-closed
+Slug-specific exact exported-source success shape for the same fixture.
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 
