@@ -15750,6 +15750,60 @@ downstream suppression, global-carrier weakening, a third loading key, copied
 semantics, cap/scope widening, Java/JVM, milestone closure, M8/M7B and exact
 identity bytes. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Selected-extension demand-owner implementation scope/cap REPLAN (2026-08-25)
+
+The first implementation pass over accepted design `b97d6372` verified all
+eight frozen hashes and stopped before any Rust edit. The selected-repository
+file had only 423 lines of physical headroom, but its mandatory Bzlmod surface
+requires conservatively >520 production lines before proof: owner/value/error
+types, two Legacy/Observed key families with carriers/drivers, and typed
+multi-module projection/mapping/admission. Reusing the global workspace/root-
+only aggregates would violate the accepted completeness and filtering stops.
+
+Independent audit returns `REPLAN` and selects one nested child module:
+`app/slug_bzlmod_v2/src/selected_repo_spec/selected_extension_demand.rs`.
+As a child it can access parent-private mapping state without a root-level
+sibling, `pub(crate)` widening or an adapter DICE key. Restrict the parent to a
+module declaration/reexports, Bzlmod `lib.rs` to doc-hidden cross-crate exports,
+and the child to both Bzlmod key families, owner projection and colocated proof.
+The six accepted loading/core files remain the only other authority; exactly
+two Bzlmod and two loading keys remain.
+
+Run only docs-only
+`WP-6-7A-generated-package-selected-extension-demand-owner-scope-cap-correction-design`.
+Design physical caps 13,440 parent, 480 Bzlmod lib, 1,150 new child and the
+unchanged loading/core ceilings; semantic caps <=950 production, <=700 proof
+and <=1,650 aggregate. Change no accepted semantics, proof matrix, compatibility
+class, fixture, oracle, event/epoch ownership or retained state. Rust and the
+new child path remain read-only/absent during design. STOP cap-only growth in
+the 13,397-line parent, root-level sibling/visibility widening, extra keys,
+semantic weakening, Java/JVM, milestone closure, M8/M7B and identity bytes.
+M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Selected-extension demand-owner scope/cap correction accepted (2026-08-25)
+
+Independent review accepts the docs-only correction after the clean no-edit
+implementation STOP. Create only nested child
+`selected_repo_spec/selected_extension_demand.rs`; child privacy permits direct
+use of the parent-private selected mapping graph without a root sibling,
+`pub(crate)` widening, adapter DICE key or further global aggregation.
+
+Activate only
+`WP-6-7A-generated-package-selected-extension-demand-owner-scope-cap-correction-implementation`.
+The parent is limited to declaration/reexports, Bzlmod lib to doc-hidden cross-
+crate exports, and the child to both Bzlmod key families, owner projection and
+colocated proofs. Loading/core authority and the exact two loading keys remain
+`b97d6372`. Physical caps are 13,440 parent, 480 Bzlmod lib, 1,150 child and the
+previous loading/core ceilings; semantic caps are <=950 production, <=700
+proof and <=1,650 aggregate.
+
+Every owner/mapping/multi-module, Need/outer/epoch/event/retention,
+compatibility and proof requirement from `b97d6372` remains unchanged. No
+Buck2/V1 utility or Stage 9 row is needed. STOP root-level sibling, parent
+visibility widening, extra Bzlmod/loading key, global-carrier weakening,
+scope/cap/proof drift, Java/JVM, milestone closure, M8/M7B and exact identity
+bytes. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
