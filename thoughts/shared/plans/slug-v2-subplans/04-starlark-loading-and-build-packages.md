@@ -3741,3 +3741,23 @@ Activate only docs packet
 M8 developer graph back to the smallest remaining M7A repository/ruleset
 semantic owner. Do not generalize `repository_ctx`, activate public breadth or
 claim M7A closure. Zabel remains concept-only architectural guidance.
+
+### Bootstrap frontier selects selected-registry extension Bzl source owner (2026-08-25)
+
+The exact developer graph first fails before repository-rule semantics:
+definition requests reject root `@rules_rust//rust:extensions.bzl`, and the
+root-only loader cannot consume that selected registry source. The existing
+external loader also rejects rules_rust's first same-repository cross-package
+and mapped-repository loads.
+
+Loading is the natural byte/evaluation owner, but it must consume an opaque
+Bzlmod-selected definition/source association rather than infer a physical
+root. Implement one selected-source Bzl owner shared by loaded-definition
+projection and pure reacquisition. Preserve request -> source -> recursive-load
+epoch order, child-only Bzl events, complete-only reuse and root behavior.
+
+Pinned Bazel 9.2 remains exact behavior authority. Pinned Zabel `c7298478…`
+guides only the producer-owned source/consumer-owned loading split. Activate
+only `WP-4-5-6-7A-selected-registry-extension-bzl-source-owner-implementation`
+in current; repository-rule schemas/APIs, builtin content and public activation
+remain deferred.

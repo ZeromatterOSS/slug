@@ -17933,3 +17933,66 @@ one implementation successor. STOP a second prerequisite/owner, Bzlmod changes,
 event movement, retained Starlark heap, upper activation, proof waiver,
 milestone closure, M8/M7B and exact identity bytes. REPLAN before widening. M7
 remains partial and M7A -> M8 -> M7B remains.
+
+### Bootstrap-critical repository/ruleset frontier audit selects external selected-definition source owner (2026-08-25)
+
+The docs-only `WP-6-7A-bootstrap-critical-repository-ruleset-frontier-audit`
+traced the exact 14 V2 + 19 retained developer closure to root
+`use_extension("@rules_rust//rust:extensions.bzl", "rust")`. This is the first
+unadmitted owner: definition-request production rejects every nonroot label;
+the loaded-definition and pure consumers then assume a root label; and the
+existing external Bzl evaluator rejects rules_rust's first mapped
+`@bazel_features//:features.bzl` and same-repository cross-package loads.
+
+The downstream gaps are real but not first. rules_rust next reaches nonempty
+`repository_rule(doc=...)`, collection tag/repository-rule schemas and calls,
+then environment/path/download/repository effects, generated toolchains,
+providers/actions/input trees and crate_universe. Absent broader
+`@bazel_tools` content is likewise not a pre-source-association prerequisite.
+
+The selected bounded design assigns the semantic association to Bzlmod's
+existing `HostCanonicalSelectedModuleDefinition` and byte/evaluation ownership
+to one loading selected-source Bzl evaluator. A request retains the exact
+selected definition from its already-owned routes. Recursive loads preserve
+the current definition for self labels and resolve mapped apparent labels
+through that definition to the mapped selected definition or existing builtin
+route. Each child therefore consumes its producer's exact `RepoSpec`, source
+policy, canonical identity and ordered mapping without path inference, global
+registry lookup or mutable repository repair.
+
+Child order is request association -> source -> declared recursive loads ->
+export projection. Observed epochs merge left-first before semantic inspection;
+the Bzl child alone owns evaluation events. Retained state is the request/
+definition association, structural selected route, frozen module/transitive
+manifest, projection, Result Arc and epoch. Parse/evaluator/resolution scratch
+is compute-local. Need/typed outer/semantic terminals stop immediately;
+complete-only equality/validity, cancellation nonpublication, warm silence and
+A/B/A restoration remain mandatory.
+
+Semantic identity includes workspace, owner/isolation, canonical definition
+label/export, selected module/RepoSpec/source policy, ordered repository view,
+package/target, source bytes and transitive manifest. Apparent/display spelling
+and physical paths are projections. Bazel checksum/ActionKey and REAPI/CAS
+domains are untouched.
+
+Compatibility is **exact** for Bazel 9.2 root-owned non-isolated selected-
+registry definition admission and self/mapped source loads needed by pinned
+rules_rust; **Slug-native** for typed DICE carriers, event/epoch representation
+and Rust heap ownership; and **unsupported/deferred** for nonroot/isolated,
+selected-nonregistry/generated definition sources, repository-rule declaration
+and execution breadth, toolchains/providers/actions, crate_universe, M8/M7B and
+exact configuration/output bytes.
+
+Pinned Bazel 9.2 `RegularRunnableExtension.load` is the behavior anchor, and
+accepted `rules-rust-073-toolchain-owner` evidence already discriminates the
+successful external definition closure. Pinned Zabel `c7298478…` is concept-
+only architectural guidance: selected semantic identity/repository views stay
+producer-owned, physical roots stay out of semantic identity, immutable source
+facts flow to loading, and no consumer publishes an input bridge. No Zig bytes
+or semantics are copied.
+
+Independent review accepts the ownership, six-file scope and frozen dirty
+entry baselines after one focused manifest correction. Activate only
+`WP-4-5-6-7A-selected-registry-extension-bzl-source-owner-implementation` with
+the six-file authority/caps and proof matrix in current. M7 remains partial and
+M7A -> M8 -> M7B remains.

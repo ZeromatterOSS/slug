@@ -3798,3 +3798,24 @@ Run only the docs-only bootstrap-critical repository/ruleset frontier audit in
 current. Select one natural M7A owner or evidence prerequisite from the exact
 developer graph; do not widen repository APIs or enter M8/M7B. Pinned Zabel is
 architectural guidance only.
+
+### Selected-registry extension definition source association designed (2026-08-25)
+
+The bootstrap audit selects the existing canonical selected-module definition
+as the natural producer association for external extension source loading. A
+root-owned, non-isolated request may retain that opaque selected definition
+only after unique selected-registry validation. Its canonical repository,
+`RepoSpec`, local policy, self name and ordered repository mapping remain one
+structural DICE input; loading may not reconstruct them from paths or mutable
+repository state.
+
+The association resolves same-repository and mapped-repository recursive loads
+through each selected module's own retained view, switching producer context at
+every mapped edge. A distinct selected source route feeds the existing physical
+materialization/source owner. Root, direct-local, generated and builtin source
+polarities remain separate.
+
+This follows pinned Zabel `c7298478…`: Bzlmod owns selected semantic descriptor
+and visibility, repository code owns immutable realization, and loading
+consumes typed source facts. Bazel 9.2 alone defines behavior. Run only the
+implementation packet in current; do not widen repository-rule execution.
