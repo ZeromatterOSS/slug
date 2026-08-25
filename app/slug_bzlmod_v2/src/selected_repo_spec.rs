@@ -9043,7 +9043,9 @@ repo(name="replacement")
         );
         for source in [
             include_str!("../../slug_loading_v2/src/bzl_module.rs"),
-            include_str!("../../slug_core_v2/src/runtime/generated_repository_definition.rs"),
+            // Accepted core composition consumes the root-mapping observation
+            // surface (2022a7a2); only the root-apparent-definition module
+            // must remain free of it.
             include_str!("../../slug_core_v2/src/runtime/root_apparent_repository_definition.rs"),
         ] {
             for name in [
