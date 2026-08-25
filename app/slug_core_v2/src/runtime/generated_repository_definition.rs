@@ -3857,4 +3857,108 @@ second=module_extension(implementation=second_impl)
                 )
         ));
     }
+
+    /// Test-only sibling proof: core can construct a public
+    /// `RootRepositoryRoute` from the accepted Generated route-view shape and
+    /// drive the existing routed package owners without any production caller
+    /// or compute edge.
+    #[test]
+    fn generated_route_capability_is_sibling_usable() {
+        use compact_str::CompactString;
+        use slug_bzlmod_v2::HostRepositoryLocalPathPolicy;
+        use slug_bzlmod_v2::OverrideAttributeValue;
+        use slug_bzlmod_v2::RepoRuleId;
+        use slug_bzlmod_v2::RepoSpec;
+        use slug_bzlmod_v2::RootRepositoryRoute;
+        use slug_identity_v2::CanonicalLabel;
+        use slug_identity_v2::PackageIdentifier;
+        use slug_identity_v2::PackagePath;
+        use starlark_map::small_map::SmallMap;
+
+        fn local_repository_spec(path: &str) -> RepoSpec {
+            RepoSpec {
+                rule_id: RepoRuleId {
+                    bzl_file: CanonicalLabel::parse(
+                        "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                    )
+                    .unwrap(),
+                    rule_name: CompactString::new("local_repository"),
+                },
+                attributes: Arc::new(SmallMap::from_iter([(
+                    CompactString::new("path"),
+                    OverrideAttributeValue::String(path.into()),
+                )])),
+            }
+        }
+
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let apparent = ApparentRepoName::new("rust_toolchains").unwrap();
+        let canonical = CanonicalRepoName::new("rules_rust++rust+rust_toolchains").unwrap();
+
+        // Rejection polarity: wrong policy and root apparent name.
+        assert!(
+            RootRepositoryRoute::for_generated_repo_spec(
+                workspace.dupe(),
+                apparent.clone(),
+                canonical.clone(),
+                local_repository_spec("dep"),
+                HostRepositoryLocalPathPolicy::WorkspaceRelative,
+            )
+            .is_none()
+        );
+        assert!(
+            RootRepositoryRoute::for_generated_repo_spec(
+                workspace.dupe(),
+                ApparentRepoName::root(),
+                canonical.clone(),
+                local_repository_spec("dep"),
+                HostRepositoryLocalPathPolicy::LocalUnsupported,
+            )
+            .is_none()
+        );
+        let route = RootRepositoryRoute::for_generated_repo_spec(
+            workspace.dupe(),
+            apparent.clone(),
+            canonical.clone(),
+            local_repository_spec("dep"),
+            HostRepositoryLocalPathPolicy::LocalUnsupported,
+        )
+        .expect("generated view shape constructs a route");
+
+        // Identity and capability projection.
+        assert_eq!(route.workspace(), &workspace);
+        assert_eq!(route.apparent_repo(), &apparent);
+        assert_eq!(route.canonical_repo(), &canonical);
+        assert!(!route.is_builtin_bazel_tools());
+        let capability = route.source_capability();
+        let _ = format!("{capability:?}");
+
+        // The existing routed package owners accept the generated route.
+        let package = PackageIdentifier::new(canonical.clone(), PackagePath::parse("pkg").unwrap());
+        assert!(RepositoryPackageSourceKey::new(route.clone(), package).is_some());
+
+        // Nonexecuted exact type-check across routed key surfaces.
+        fn drives_routed_owners(_: &HostRepositorySourceFileKey, _: &RepositoryPackageSourceKey) {}
+        fn hash_and_display(value: &RootRepositoryRoute) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        }
+        let _ = |route: &RootRepositoryRoute| {
+            drives_routed_owners(
+                &HostRepositorySourceFileKey::new(route.clone(), "REPO.bazel".into()),
+                &RepositoryPackageSourceKey::new(
+                    route.clone(),
+                    PackageIdentifier::new(
+                        route.canonical_repo().clone(),
+                        PackagePath::parse("pkg").unwrap(),
+                    ),
+                )
+                .unwrap(),
+            )
+        };
+        let hash_a = hash_and_display(&route);
+        let hash_b = hash_and_display(&route);
+        assert_eq!(hash_a, hash_b);
+    }
 }

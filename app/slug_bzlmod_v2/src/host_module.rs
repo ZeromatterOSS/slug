@@ -976,6 +976,14 @@ impl Key for RootModuleLoadingAnchorObservationKey {
 pub enum RootRepositorySource {
     DirectLocal(RepoSpec),
     BuiltinBazelTools(BuiltinBazelToolsRouteIdentity),
+    /// Extension-generated repository routed from core's accepted private
+    /// generated-definition view. Constructed only through
+    /// [`RootRepositoryRoute::for_generated_repo_spec`], which enforces the
+    /// nonroot/non-bazel_tools/LocalUnsupported invariant.
+    Generated {
+        repo_spec: RepoSpec,
+        local_path_policy: crate::HostRepositoryLocalPathPolicy,
+    },
 }
 
 #[doc(hidden)]
@@ -1133,6 +1141,13 @@ impl Hash for RootRepositorySource {
         match self {
             Self::DirectLocal(spec) => hash_repo_spec(spec, state),
             Self::BuiltinBazelTools(identity) => identity.hash(state),
+            Self::Generated {
+                repo_spec,
+                local_path_policy,
+            } => {
+                hash_repo_spec(repo_spec, state);
+                local_path_policy.hash(state);
+            }
         }
     }
 }
@@ -1194,6 +1209,16 @@ impl RootRepositoryRoute {
                     crate::HostRepositoryLocalPathPolicy::WorkspaceRelative,
                 )
             }
+            RootRepositorySource::Generated {
+                repo_spec,
+                local_path_policy,
+            } => HostRepositorySourceCapability::from_repo_spec(
+                self.workspace.dupe(),
+                self.apparent_repo.clone(),
+                self.canonical_repo.clone(),
+                repo_spec,
+                *local_path_policy,
+            ),
             RootRepositorySource::BuiltinBazelTools(identity) => {
                 HostRepositorySourceCapability::builtin(
                     self.workspace.dupe(),
@@ -1230,9 +1255,41 @@ impl RootRepositoryRoute {
         matches!(self.source, RootRepositorySource::BuiltinBazelTools(_))
     }
 
+    /// Constructs the route for an extension-generated repository from core's
+    /// accepted generated-definition view. The module name is the apparent
+    /// name's owning extension repository segment; polarity must be
+    /// `LocalUnsupported`, matching the private core view invariant exactly.
+    #[doc(hidden)]
+    pub fn for_generated_repo_spec(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+        canonical_repo: CanonicalRepoName,
+        repo_spec: RepoSpec,
+        local_path_policy: crate::HostRepositoryLocalPathPolicy,
+    ) -> Option<Self> {
+        if apparent_repo.is_root()
+            || canonical_repo.is_root()
+            || canonical_repo.as_str() == "bazel_tools"
+            || local_path_policy != crate::HostRepositoryLocalPathPolicy::LocalUnsupported
+        {
+            return None;
+        }
+        Some(Self {
+            workspace,
+            module_name: CompactString::new(apparent_repo.as_str()),
+            apparent_repo,
+            canonical_repo,
+            source: RootRepositorySource::Generated {
+                repo_spec,
+                local_path_policy,
+            },
+        })
+    }
+
     pub(crate) fn repo_spec(&self) -> &RepoSpec {
         match &self.source {
             RootRepositorySource::DirectLocal(spec) => spec,
+            RootRepositorySource::Generated { repo_spec, .. } => repo_spec,
             RootRepositorySource::BuiltinBazelTools(_) => {
                 panic!("built-in bazel_tools has no RepoSpec")
             }
