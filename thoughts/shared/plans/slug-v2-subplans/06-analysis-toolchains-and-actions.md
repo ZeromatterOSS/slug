@@ -16040,6 +16040,24 @@ ceilings authorize the original ABI/DICE/lifecycle proof only; they do not
 activate the core route, request, immutable-root application, fixture or any
 public behavior. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Selected repository file-effect proof-contract correction (2026-08-25)
+
+The retained retry passes seven loading and two Bzlmod focused tests at
++901/+562/+1,463, but the old matrix requires stale certificate/module and
+contradictory epoch states that lawful constructors reject below this key.
+Independent review therefore returns `REPLAN` without finding a production
+defect.
+
+Run only docs packet
+`WP-4-5-selected-repository-file-effect-producer-proof-contract-correction-design`.
+Independent review accepts direct upper proof for real Need, sibling
+nonexecution, semantic-event ownership, key identity and retained shape, with
+accepted lower Host-Bzl/observation-algebra evidence plus exact source shape for
+impossible projection, outer and merge injection. Activate only
+`WP-4-5-selected-repository-file-effect-producer-proof-contract-correction-implementation`
+in the same scope and caps. Preserve compatibility classes, Bazel authority and
+the Zabel concept-only boundary.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is

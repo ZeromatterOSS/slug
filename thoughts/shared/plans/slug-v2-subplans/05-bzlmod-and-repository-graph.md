@@ -3707,3 +3707,15 @@ same seven paths. Existing RepoSpec, selected/global values, requests, native
 repositories, lockfiles and consumers stay unchanged. Pinned `../zabel`
 `c7298478…` remains concept-only producer/effect-boundary guidance; copy no
 representation or implementation.
+
+### Generated repository file-effect proof-contract STOP (2026-08-25)
+
+The Bzlmod effect value remains unchanged at 119 production/75 proof lines and
+is not the proof blocker. Run only docs packet
+`WP-4-5-selected-repository-file-effect-producer-proof-contract-correction-design`.
+Independent review accepts direct proof for every lawful upper behavior, with
+impossible stale-snapshot and contradictory-epoch states composed from existing
+lower-owner proof plus exact source shape. Activate only
+`WP-4-5-selected-repository-file-effect-producer-proof-contract-correction-implementation`
+in the same seven-file scope. Add no test injection or constructor and preserve
+930/850/1,780 plus every physical cap.

@@ -3644,3 +3644,17 @@ binding rejection before the context method. No semantic compression, caller,
 route, materialization, fixture or public activation is authorized. Pinned
 `../zabel` `c7298478…` remains concept-only guidance for the natural selected-
 call owner and heap-free effect result.
+
+### Selected repository file-effect proof-contract STOP (2026-08-25)
+
+The retained retry is +901 production/+562 proof, passes seven focused loading
+tests and fixes named `legacy_utf8` exactly, but lawful transactions cannot
+deliver stale projection fields or contradictory observation epochs to this
+key. Run only docs packet
+`WP-4-5-selected-repository-file-effect-producer-proof-contract-correction-design`.
+Independent review accepts real upper proof for Need/no-batch, sibling
+nonexecution, semantic-event ownership, key identity and retained shape, with
+impossible projection/outer/merge cases composed from accepted Host-Bzl and
+observation-algebra proof plus exact producer source-shape assertions. Activate
+only `WP-4-5-selected-repository-file-effect-producer-proof-contract-correction-implementation`
+in the same seven-file scope and unchanged caps; add no injection surface.
