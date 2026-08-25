@@ -1,52 +1,68 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-generated-package-load-bridge-design`
+Packet: `WP-6-7A-generated-package-load-bridge-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Design base: audit-2 accepted 2026-08-24 / Rust `b42b004c`
+Design base: bridge design accepted 2026-08-24 / Rust `b42b004c`
 
-Result: docs-only design for one same-crate core bridge child that lets the
-external exported-source build branch load packages from extension-generated
-repositories. Linux under WSL is the only platform target.
+Result: implement one same-crate core bridge child so the external
+exported-source build branch loads packages from extension-generated
+repositories, with byte-exact preservation of all existing diagnostics.
+Linux under WSL is the only platform target.
 
-## Frontier facts (audit-2, 2026-08-24)
+## Active implementation contract
 
-The build branch (dice.rs:4476) and the query external package graph both
-acquire routes through public `RootRepositoryRouteKey`, which admits only
-local-path overrides. The doc-hidden Generated route constructor
-(`for_generated_repo_spec`) exists in bzlmod; per-canonical `RepoSpec`s live in
-loading's `HostValidatedGeneratedRepositorySpecs`; only core can see both.
-`RepositoryPackageLoad(Observation)Key` accepts any nonroot route with a
-matching canonical name and runs unchanged end to end for direct-local
-externals (`51127df8`, `bd4fb8db`).
+Design record: "Generated-package load bridge design accepted (2026-08-24)" in
+the Stage 6 owner plan.
 
-## Active design contract
+Change only:
 
-Docs only; all Rust read-only. The design must:
+1. `app/slug_core_v2/src/runtime/dice.rs`:
+   - add private `GeneratedPackageRouteKey` +
+     `GeneratedPackageRouteObservationKey` (root apparent rejection at
+     construction; Display `generated-package-route:{workspace}:@{apparent}`
+     and observed prefix), with typed semantic error kinds
+     Missing / ContextMismatch / Definition / Compute and no private-inner
+     exposure;
+   - driver: canonical-apparent-mapping child (context root) ->
+     root-apparent-definition child -> require Generated view with RepoSpec and
+     LocalUnsupported -> construct via `for_generated_repo_spec`; Need
+     immediate/carrierless; left-first epoch union; eventless parent; one
+     local Result Arc + compact epoch retained;
+   - fallback polarity in `drive_external_exported_source_build_branch`: the
+     public route child runs first; only Unknown/Unsupported kinds (legacy
+     error kind or observed outer result) fall back to the bridge; all other
+     terminals keep today's exact bytes; bridge failure yields new typed
+     `BuildCommandErrorKind::GeneratedRoute`; downstream children unchanged.
 
-- freeze exactly one bridge child key family (legacy + observed) whose natural
-  producer resolves an apparent name through the accepted
-  `HostCanonicalRepositoryApparentMapping` family and yields either a routed
-  public `RootRepositoryRoute::for_generated_repo_spec` value or a typed
-  semantic terminal;
-- freeze fallback polarity inside the build branch: the public route key is
-  tried first and its exact existing diagnostics are preserved verbatim for
-  direct-local/builtin/unknown cases; the bridge child runs only on the two
-  generated-route error kinds;
-- preserve Need > compatible outer > semantic ordering and left-first epoch
-  union; parents retain one local Result Arc plus compact epoch only;
-- name the file allowlist (expected: dice.rs driver + test-only proof),
-  production/proof/aggregate caps, serial WSL validation, and REPLAN stops;
-- classify exact / Slug-native / unsupported-deferred; and
-- defer explicitly: query-path activation, public bridge export,
-  fixture/oracle growth unless a demonstrated gap appears, other platforms,
-  exact identity bytes.
+Everything else frozen: no query activation, no public export, no second key
+family, no direct-local/builtin drift, no Cargo/BUILD or fixture change.
+A new private sibling module for the bridge is permitted only if dice.rs size
+demands it — record which choice was made.
 
-STOP any Rust edit now, second owner/key family, private-inner exposure,
-semantic/event/equality drift, cap or format waiver, milestone closure, M8/M7B
-or exact identity work. REPLAN if no cohesive single child exists, if fallback
-polarity would alter existing diagnostics, or if the bridge needs loading's
-retained certificate rather than its public view.
+Caps against `b42b004c`: <=120 production, <=240 proof, <=360 aggregate. No
+`rustfmt::skip`.
 
-After ACCEPT schedule exactly one implementation successor. M7 remains partial
-and M7A -> M8 -> M7B remains.
+## Compatibility classes
+
+Legacy build semantics exact. Slug-native: observed carrier/epoch association,
+doc-hidden route construction, new private key family. Unsupported/deferred:
+query-path publication, other platforms, exact identity bytes.
+
+## Validation
+
+Serial on Ubuntu 24.04 WSL: new bridge proofs (rejection polarity,
+mapping-Missing, definition-error pass-through, Generated success, fallback
+byte-exactness for direct-local/builtin/unknown); protected external-build
+suites; full core with only the accepted query diagnostic baseline; separate
+runtime with only the accepted PathObservationEpochKey baseline; Bzlmod full
+green; direct commands; formatting; allowlist/accounting/caps/no-skip;
+diff hygiene.
+
+STOP a third owner/key family, query/public activation, private-inner exposure
+beyond pub(super), semantic/event/equality/lifecycle drift, fixture growth
+without demonstrated gap, cap/format waiver, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening or baseline drift.
+
+After ACCEPT, return to the Stage 6 owner plan for scheduling; M7 remains
+partial and M7A -> M8 -> M7B remains.

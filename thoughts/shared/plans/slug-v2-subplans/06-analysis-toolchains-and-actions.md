@@ -15224,10 +15224,85 @@ Schedule exactly `WP-6-7A-generated-package-load-bridge-design`, docs-only. It
 must freeze the bridge child's key shape, Need/terminal ordering, epoch union,
 fallback polarity preserving exact direct-local diagnostics, caps, allowlist
 (dice.rs plus test-only proof), validation and REPLAN stops per the
-plan-authoring guide. STOP Rust edits in this audit, public exposure, query
-activation, fixture/oracle growth, milestone closure, M8/M7B and exact
-identity work. REPLAN if the bridge cannot bound one cohesive child or if
-fallback polarity would alter existing diagnostics. M7 remains partial and
+plan-authoring guide. STOP Rust edits in this audit, public exposure, query activation, fixture/oracle
+growth, milestone closure, M8/M7B and exact identity work. REPLAN if the bridge
+cannot bound one cohesive child or if fallback polarity would alter existing
+diagnostics. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Generated-package load bridge design accepted (2026-08-24)
+
+Docs-only design over Rust `b42b004c`. Learned facts:
+
+- `drive_external_exported_source_build_branch` already drives both modes
+  through one macro (`compute_external_build_child!`, dice.rs:4435) that maps
+  Need/outer/semantic terminals and unions epochs left-first; the route child
+  is its first step.
+- `RootRepositoryRouteErrorKind` has exactly `Unknown { apparent_repo }` and
+  `Unsupported { apparent_repo, module_name }` as nonroot failure kinds;
+  direct-local success and all other diagnostics must remain byte-exact.
+- Core's private chain is fully sibling-nameable:
+  `HostRootApparentRepositoryDefinitionKey::new(workspace, apparent)` ->
+  view (kind/repo_spec/local_path_policy, with `definition_policy_matches`
+  enforcing Generated == LocalUnsupported) -> `for_generated_repo_spec`.
+  `pub(super)` suffices for a bridge living in `runtime/mod.rs`-adjacent core.
+- The build branch's downstream children take only a
+  `slug_bzlmod_v2::RootRepositoryRoute` plus package path.
+
+Decision: add exactly one private same-crate key family in
+`app/slug_core_v2/src/runtime/dice.rs` (or an adjacent new private module if
+dice.rs size requires it — allowed by explicit exception, not by widening):
+
+- `GeneratedPackageRouteKey { workspace, apparent_repo }` (Legacy) and
+  `GeneratedPackageRouteObservationKey(...)` (Observed), rejecting root
+  apparent names at construction. Display: `generated-package-route:{workspace}:@{apparent}`
+  and `observed-...`.
+- Value: routed `RootRepositoryRoute` on success; typed semantic error kinds
+  `Missing` (mapping lookup Missing), `ContextMismatch`, `Definition(error)`,
+  `Compute(message)` — mirroring the accepted canonical-apparent-mapping
+  algebra without exposing any private inner.
+- Driver: compute the existing `HostCanonicalRepositoryApparentMapping(Observation)Key`
+  with context repo root; on Found, compute
+  `HostRootApparentRepositoryDefinition(Observation)Key`; require its view to
+  be kind Generated with a `RepoSpec` and `LocalUnsupported`; construct via
+  `for_generated_repo_spec`; retain one local Result Arc plus the unioned
+  epoch; parent eventless; Need immediate and carrierless.
+
+Fallback polarity inside `drive_external_exported_source_build_branch`: keep
+the existing route child first. On Legacy `Ok(Err(e))` where kind is Unknown or
+Unsupported — or Observed outer whose result is those kinds — compute the
+bridge child instead of failing; every other terminal keeps today's exact
+diagnostic bytes. Bridge success substitutes the generated route into the
+unchanged subsequent children; bridge failure produces new typed
+`BuildCommandErrorKind::GeneratedRoute` diagnostics (new surface, no existing
+text changes).
+
+Non-decisions: no query activation; no public export of the bridge keys; no
+direct-local/builtin drift; no fixture growth unless validation shows the
+accepted external-build fixtures cannot discriminate the generated path (then
+one minimal extension-repo fixture follows the Stage 1 provenance contract);
+Windows/macOS and exact identity bytes stay deferred.
+
+Compatibility classes: legacy build semantics exact; Slug-native observed
+carrier/epoch association, doc-hidden route construction and the new private
+key family; query publication, other platforms and exact identity bytes
+unsupported/deferred.
+
+Prospective authority: exactly `dice.rs` (or dice.rs + one new private module)
+plus test-only proof colocated there. Caps <=120 production, <=240 proof,
+<=360 aggregate; helper/test size gates per guide. Validate serially on Ubuntu
+24.04 WSL: new bridge proofs (rejection polarity, mapping-Missing,
+definition-error pass-through, Generated success, fallback byte-exactness for
+direct-local/builtin/unknown), protected external-build suites, full core with
+only the accepted query diagnostic baseline, separate runtime baseline, direct
+commands, formatting, allowlist/accounting/caps, diff hygiene.
+
+STOP a third owner/key family beyond the named pair, query/public activation,
+private-inner exposure beyond pub(super), semantic/event/equality/lifecycle
+drift, fixture growth without demonstrated gap, waiver, milestone closure,
+M8/M7B, exact identity work. REPLAN before widening or baseline drift.
+
+Schedule exactly
+`WP-6-7A-generated-package-load-bridge-implementation`. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
