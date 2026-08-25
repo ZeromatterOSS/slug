@@ -1,48 +1,69 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-generated-repository-package-policy-lookup-design`
+Packet: `WP-6-7A-generated-repository-route-capability-promotion-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Design base: audit accepted 2026-08-24 / Rust `846ef196`
+Design base: design accepted 2026-08-24 / Rust `846ef196`
 
-Result: docs-only design for the smallest same-crate core generated-repository
-package lookup owner — canonical deleted-package policy, `REPO.bazel` plus
-`.bazelignore` semantics, ordered `BUILD.bazel` then `BUILD` selection, and
-complete epoch composition — consuming the now-visible private route/
-source-observation surface. Linux under WSL is the only platform target.
+Result: implement the doc-hidden `RootRepositorySource::Generated` route
+capability so core's accepted generated-route view can construct a public
+`RootRepositoryRoute` and drive the existing routed bzlmod package owners
+unchanged. Linux under WSL is the only platform target.
 
-## Frontier facts (accepted audit, 2026-08-24)
+## Active implementation contract
 
-The core private chain reaches `Generated` routes end to end and is sibling-
-nameable after `846ef196`, with zero production callers. Public bzlmod
-`RootRepositoryRoute` admits only DirectLocal/BuiltinBazelTools; root package
-policy checks deleted packages against `CanonicalRepoName::root()` only;
-marker/BUILD-order semantics exist only inside the root/direct-local lookup.
-Raw-source publication would bypass all of these and is rejected.
+Design record: "Generated-repository package-policy-lookup design accepted
+(2026-08-24)" in the Stage 6 owner plan.
 
-## Active design contract
+Change only:
 
-Docs only; every Rust file, Cargo/BUILD, fixture and oracle is read-only.
+1. `app/slug_bzlmod_v2/src/host_module.rs`:
+   - add `RootRepositorySource::Generated { repo_spec, local_path_policy }`
+     with the same derives/manual impls as the existing variants;
+   - add one `#[doc(hidden)]` constructor restricted to nonroot apparent and
+     canonical names, non-`bazel_tools` canonical, and
+     `HostRepositoryLocalPathPolicy::LocalUnsupported`;
+   - extend `source_capability()` and every exhaustive match (hash/debug/eq
+     arms) with the Generated arm delegating to the existing
+     `from_repo_spec` path; and
+   - preserve exact Display/identity of existing routes.
+2. One test-only proof in
+   `app/slug_core_v2/src/runtime/generated_repository_definition.rs`'s test
+   module proving that a Generated-view-shaped route constructs, hashes,
+   displays, produces its source capability, and names/drives the existing
+   routed keys (`HostRouteRepoFileKey`, `ExternalRepositoryPackageLookupKey`)
+   in nonexecuted type/function checks — without activating any production
+   caller or compute edge.
 
-The design must:
+Everything else is frozen: no third file, no driver edit beyond the capability
+match arm, no new lookup key family, no public activation, no Cargo/BUILD,
+fixture or oracle change. Existing builtin/direct-local behavior remains
+byte-exact.
 
-- name one cohesive core lookup key family (legacy + observed modes) whose
-  natural producer owns generated-package identity for a canonical repo;
-- reuse root marker/BUILD-order discriminating evidence unchanged for the
-  generated families; add no fixture/oracle unless a demonstrated gap appears;
-- keep deleted-package policy, repository-ignore, and BUILD selection in the
-  natural policy/lookup owners without duplicating root policy state;
-- compose complete epochs left-first with outer > compatible Need > semantic
-  ordering; parents retain one local Result Arc plus compact epoch only;
-- classify exact / Slug-native / unsupported-deferred per the guide;
-- bound file allowlist, caps, validation and REPLAN stops; and
-- defer public publication, bzlmod route widening, package source/load reuse,
-  command/bootstrap activation and other platforms explicitly.
+Caps against `846ef196`: <=60 production, <=80 proof, <=140 aggregate.
+Add no `rustfmt::skip`.
 
-STOP any Rust edit, new caller/adapter/key beyond the named family, public/
-crate-root exposure, fixture growth without a demonstrated gap, milestone
-closure, M8/M7B or exact identity work. REPLAN if no bounded single-owner
-lookup exists or if bzlmod/core dependency inversion becomes unavoidable.
+## Compatibility classes
 
-After design ACCEPT, schedule exactly one implementation successor. M7 remains
+Legacy routed semantic values/errors/order/equality remain exact. The observed
+Result-Arc+epoch association, opaque handoff and the new doc-hidden variant
+remain Slug-native. Public publication, bootstrap activation, other platforms
+and exact identity bytes remain unsupported/deferred.
+
+## Validation
+
+Serial on Ubuntu 24.04 WSL: the new sibling proof; focused routed repo-file/
+ignore/lookup suites (`slug_bzlmod_v2 --lib`); protected root package suites;
+full Bzlmod; full core with only the byte-identical accepted query diagnostic
+baseline; separate runtime with only the accepted
+`PathObservationEpochKey`/configured-analysis-Needs failure; direct commands
+check; formatting; exact two-file allowlist/accounting/cap/no-skip gates;
+`git diff --check`.
+
+STOP a third file, production caller/compute-edge activation, semantic/event/
+equality drift, private exposure beyond the named variant/constructor, fixture/
+oracle growth, cap or format waiver, milestone closure, M8/M7B or exact
+identity work. REPLAN before widening or baseline drift.
+
+After ACCEPT, return to the Stage 6 owner plan for scheduling; M7 remains
 partial and M7A -> M8 -> M7B remains.

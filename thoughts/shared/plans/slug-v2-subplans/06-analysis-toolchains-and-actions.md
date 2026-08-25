@@ -15055,6 +15055,71 @@ oracle growth, milestone closure, M8/M7B and exact identity work. REPLAN if the
 design cannot bound a cohesive single-owner lookup without duplicating root
 policy state. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated-repository package-policy-lookup design accepted (2026-08-24)
+
+Docs-only design over Rust `846ef196`. Learned facts:
+
+- Every routed bzlmod owner — `HostRepositoryPathKey`,
+  `HostRepositorySourceFileKey`, `HostRouteRepoFileKey`,
+  `HostRouteRepositoryIgnoreKey`, `ExternalRepositoryPackageLookupKey`,
+  `RepositoryPackageSourceKey`, `RepositoryPackageLoadKey` — is keyed on public
+  `RootRepositoryRoute`, not on its `DirectLocal | BuiltinBazelTools` source.
+  Their drivers consume only workspace, canonical repo, package identity and
+  `source_capability()`.
+- `HostRepositorySourceCapability::from_repo_spec` accepts any nonroot
+  apparent/canonical pair with a `RepoSpec` and local-path policy; core's
+  accepted `Generated` route kind carries exactly a validated `repo_spec` plus
+  `HostRepositoryLocalPathPolicy::LocalUnsupported` (the core route view
+  invariant).
+- Deleted-package membership flows through injected `RootPackagePolicyInputs`
+  projections and is checked against full `PackageIdentifier`s; the set is
+  workspace-scoped injected input, not root-repo-specific logic.
+  Repository-ignore and ordered `BUILD.bazel`-then-`BUILD` selection live
+  inside the routed lookup driver and already compose epochs left-first.
+
+Decision: expose one doc-hidden `RootRepositorySource::Generated { repo_spec,
+local_path_policy }` construction path on public `RootRepositoryRoute`,
+restricted at construction to nonroot apparent/canonical names, non-
+`bazel_tools`, and `LocalUnsupported` polarity — exactly the core view
+invariant. Core's future generated package consumer builds the route from the
+accepted `HostRootApparentRepositoryRoute` view; every downstream routed owner
+(`HostRouteRepoFileKey`, repository-ignore, deleted-package lookup,
+`ExternalRepositoryPackageLookupKey`, `RepositoryPackageSourceKey`,
+`RepositoryPackageLoadKey`) then runs unchanged with zero duplicated policy
+state. No new lookup key family, no driver edit beyond the one capability
+match arm, no compute-edge or caller change.
+
+Non-decisions: no public activation or command/bootstrap caller; no behavior
+change for builtin/direct-local routes; no new fixture/oracle (root routed
+evidence covers generated families because the driver paths are identical);
+other platforms and exact identity bytes stay deferred.
+
+Compatibility classes: legacy routed semantic values/errors/order/equality
+remain exact; observed Result-Arc+epoch association and the Slug-native opaque
+handoff are unchanged; public publication, bootstrap activation and other
+platforms remain unsupported/deferred.
+
+Prospective implementation authority: exactly `host_module.rs` (new variant,
+constructor, capability arm, derived-impl arms), plus one test-only proof in
+core proving that a Generated-view-shaped route constructs and drives the
+existing routed REPO-file/lookup keys without activating production callers.
+Caps <=60 production, <=80 proof, <=140 aggregate. Validate serially on Ubuntu
+24.04 WSL: focused routed repo-file/ignore/lookup suites, protected root
+package suites, full Bzlmod and full core with byte-identical accepted
+baselines, formatting, diff hygiene, allowlist/accounting gates. STOP any third
+Rust file, production caller activation, semantic/event drift, fixture growth,
+milestone closure, M8/M7B or exact identity work; REPLAN before widening.
+
+Residual risk: `host_package.rs` already exceeds the 2,000-line complexity
+trigger but this design edits only `host_module.rs` and adds no central file;
+hot-path gates do not apply (no demonstrated hot path changes). Request/
+revision behavior, epoch union and memory lifetime are unchanged because all
+drivers are reused verbatim.
+
+Schedule exactly
+`WP-6-7A-generated-repository-route-capability-promotion-implementation`.
+M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
