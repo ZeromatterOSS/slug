@@ -15305,6 +15305,147 @@ Schedule exactly
 `WP-6-7A-generated-package-load-bridge-implementation`. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
+### Generated-package load bridge implementation scope REPLAN (2026-08-25)
+
+The retained implementation candidate over `4d83a829` cannot be accepted under
+the design's one-file authority. `cargo check -p slug_core_v2` stops with eight
+errors before tests. The observed bridge key has no `Key` implementation, the
+new build error variant is absent, and the draft tries to inspect private
+mapping fields and kinds. More importantly, two facts assumed sibling-nameable
+by the accepted design are not visible at the required boundaries:
+
+- `RootRepositoryRouteErrorKind` and the error field are private to
+  `slug_bzlmod_v2`, so core cannot distinguish the exact `Unknown | Unsupported`
+  fallback set without a new doc-hidden cross-crate predicate; and
+- `HostCanonicalRepositoryApparentMappingErrorKind` and its field are private
+  to `generated_repository_definition.rs`, so a sibling bridge cannot preserve
+  distinct Missing, ContextMismatch and other-definition terminals without one
+  opaque same-crate classifier.
+
+The dirty `root_apparent_repository_route.rs` helper is unrelated and targets
+the wrong enum. `HostRootApparentRepositoryDefinitionKind` and its Generated
+variant are already `pub(super)`, while the definition view already exposes the
+canonical repo, RepoSpec and validated `LocalUnsupported` policy. The existing
+observed mapping and definition keys/carriers likewise already expose their
+Result Arcs and epochs to runtime siblings. No further owner promotion, field
+or inner-error exposure is required.
+
+Independent Sol architecture review returns `REPLAN`. Retain the four-file
+candidate as non-writable design evidence. Run only
+`WP-6-7A-generated-package-load-bridge-visibility-and-split-correction-design`.
+That docs-only packet must freeze:
+
+1. one doc-hidden read-only predicate on `RootRepositoryRouteError` for exactly
+   Unknown or Unsupported, without exporting the private kind;
+2. one `pub(super)` three-way Missing/ContextMismatch/Other disposition for
+   `HostCanonicalRepositoryApparentMappingError`, without exposing its private
+   predecessor or inner kind;
+3. removal of the unrelated route-module edit and a mandatory cohesive private
+   `runtime/generated_package_route.rs` owner, because `dice.rs` is already
+   above the 2,000-line complexity trigger and combines command presentation
+   with many semantic key families; and
+4. exact fallback polarity: public route first; only Unknown/Unsupported enter
+   the bridge; Generated success continues to unchanged package loading;
+   mapping Missing or a successful non-Generated definition is fallback-neutral
+   Missing and restores the original public-route error byte-for-byte;
+   ContextMismatch/Definition/Compute use the new typed GeneratedRoute error.
+
+For Observed mode, lower mapping/definition outer terminals remain opaque to
+the bridge and carrierless. The `dice.rs` command glue translates that opaque
+bridge outer to typed `GeneratedRoute::Compute`, retains only the already-
+completed public-route prefix epoch, and fabricates no bridge carrier or epoch.
+The original public-route error is request-local scratch, never a retained
+bridge fact: after a bridge Need the build branch re-enters, recomputes the
+public route through DICE, and reacquires the exact error before resuming.
+
+The fallback ledger is explicit. The violated invariant is that the public
+Bzlmod route cannot yet represent an extension-generated repository. The
+bridge is deleted when the later M7A generated-repository public routing/
+publication owner consumes the accepted mapping/definition/package chain
+without dependency inversion. The generated-success plus direct-local,
+builtin, unknown, mapped-non-Generated unsupported, observed-outer/prefix and
+ordinary unsupported diagnostic regressions prevent the fallback from becoming
+a broader repair path.
+
+The correction design may authorize only `host_module.rs`,
+`generated_repository_definition.rs`, `runtime/mod.rs`, new private
+`runtime/generated_package_route.rs`, and the bounded fallback/error glue and
+proof in `dice.rs`. It must specify DICE identity, complete-only equality,
+carrierless Need/outer, left-first epoch union, one Result Arc plus compact
+epoch retention, cancellation/recovery, no locks/events, public/direct-local
+nonactivation and downstream cross-crate compile coverage. Baseline
+`4d83a829` physical sizes are host module 4,783, dice 11,550, generated
+definition 3,964 and runtime mod 331. The corrected implementation caps are
+<=480 production, <=420 proof and <=900 aggregate net additions, with physical
+ceilings 4,825/11,720/4,010/340 and <=720 for the new module. Add no
+`rustfmt::skip`. Validate serially with focused classifier/key/fallback proofs,
+protected external-build suites, full Bzlmod, full core with only the accepted
+query diagnostic baseline, separate runtime with only the accepted
+PathObservationEpochKey baseline, direct commands, formatting, allowlist/cap/
+no-skip checks and diff hygiene. Reuse accepted Bazel 9.2 repository/package
+evidence; add no fixture unless a demonstrated generated-build discriminator
+remains missing.
+
+Legacy route and build diagnostics remain exact. The private bridge keys,
+observed carrier/epoch association and doc-hidden classifiers are Slug-native.
+Query activation, other platforms and exact identity bytes remain unsupported/
+deferred. STOP Rust edits, string matching on diagnostics, public kind/field
+exposure, new semantic ownership, a third key family, fixture speculation,
+milestone closure, M8/M7B or exact identity work during the correction design.
+M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Generated-package bridge visibility/split correction design accepted (2026-08-25)
+
+The correction design over retained Rust candidate `4d83a829` is accepted after
+independent architecture review and one focused correction rereview.
+
+The cross-crate surface is exactly one doc-hidden read-only
+`RootRepositoryRouteError` predicate for Unknown/Unsupported. Core adds one
+opaque same-crate Missing/ContextMismatch/Other mapping-error disposition. No
+private error kind, predecessor or field is exposed. The unrelated dirty
+route-kind helper is removed; the already-visible root apparent-definition
+Generated kind/view supplies the required RepoSpec and validated
+`LocalUnsupported` policy.
+
+The bridge pair moves into one new private
+`runtime/generated_package_route.rs` module. Its key identity is workspace plus
+nonroot apparent repository. Legacy/Observed share one staged driver over
+canonical apparent mapping then root apparent definition. Need and opaque outer
+are immediate/carrierless. Complete retains one local Result Arc and only the
+mapping-left/definition-right epoch union in Observed mode; equality and
+validity are complete-only. The parent adds no event, lock, cache, task or
+publication owner.
+
+The public route remains first. Only Unknown/Unsupported invoke the bridge.
+Generated success continues through the unchanged package loader. Mapping
+Missing and successful non-Generated definitions are fallback-neutral Missing
+and restore the request-local original route error byte-for-byte. Context
+mismatch, semantic definition failure and compute failure use typed
+GeneratedRoute. Opaque observed outer translates at command glue to
+GeneratedRoute::Compute while retaining only the already-completed public-route
+prefix; no carrier or epoch is fabricated. After Need, command re-entry
+reacquires the public-route error through DICE.
+
+Implementation authority is exactly `host_module.rs`,
+`generated_repository_definition.rs`, new `generated_package_route.rs`,
+`runtime/mod.rs` and `dice.rs`; it must remove the dirty
+`root_apparent_repository_route.rs` edit. Baseline `4d83a829` caps are <=480
+production, <=420 proof, <=900 aggregate, with physical ceilings
+4,825/11,720/4,010/340/720 for host/dice/generated-definition/runtime-mod/new-
+module. Add no `rustfmt::skip`, Cargo/BUILD or fixture change.
+
+Run only `WP-6-7A-generated-package-load-bridge-implementation-retry`. Prove
+classifier exactness, key identity/root rejection/Display, all mapping and
+definition terminal translations, left-first epoch and carrierlessness,
+cancellation/recovery/warm behavior, Generated success, mapped non-Generated
+fallback and byte-identical direct-local/builtin/unknown/unsupported behavior.
+Run focused proofs, protected external build suites, full Bzlmod/core/runtime
+with only recorded baselines, direct commands, formatting and exact scope/cap/
+no-skip/diff gates. Legacy diagnostics remain exact; private bridge identity,
+opaque classifiers and epoch association are Slug-native; query/public
+publication, other platforms and exact bytes remain deferred. M7 remains
+partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
