@@ -3896,3 +3896,24 @@ Correct authority by adding exactly that seventh file; no second sibling or
 constructor is admitted, and aggregate caps stay 850 production, 1,050 proof
 and 1,900 total. Run only r3 after independent review. Pinned Zabel guides the
 producer-owned typed association, but Bazel 9.2 alone defines behavior.
+
+### Request-owned selected-definition source accepted (2026-08-25)
+
+Both constructors of `HostSelectedExtensionDefinitionLoadRequest` now retain
+the opaque canonical selected definition produced from the unique root-owner
+view. Owner-input retention carries that same request into pure reacquisition;
+no container reconstruction or mutable/global lookup exists. The structural
+selected route owns the definition, `RepoSpec`, source policy and ordered
+mapping, and equality includes the retained definition so a changed producer
+view cannot reuse a stale child source.
+
+The owner-input path admits only the root-owned, non-isolated selected-registry
+case and keeps selected nonregistry/generated, unsupported builtin, missing,
+duplicate and invalid-mapping boundaries fail closed. Direct proof covers both
+request construction and retained owner inputs; the complete 543-test Bzlmod
+unit suite and integrations pass.
+
+Pinned Zabel `c7298478…` remains concept-only guidance for producer-owned
+descriptors and nonsemantic physical realization. Bazel 9.2 defines behavior.
+Return only to the docs-only bootstrap-critical repository/ruleset frontier
+audit; do not widen Bzlmod selection or repository-rule semantics.

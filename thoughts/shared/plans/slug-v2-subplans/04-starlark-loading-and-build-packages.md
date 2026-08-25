@@ -3824,3 +3824,23 @@ would reconstruct producer visibility outside request identity and lifetime.
 Activate only the corrected seven-file r3 packet in current. Pinned Zabel
 remains concept-only architectural guidance for the producer/source split;
 Bazel 9.2 remains behavior authority.
+
+### Selected-registry source owner accepted; loading frontier closed (2026-08-25)
+
+The request-owned selected source now dispatches definition loading and both
+pure reacquisitions through one loading owner. Same-repository loads retain the
+current selected definition; mapped loads switch to the child definition's
+structural route and producer view. Root loading preserves its original Bzl
+errors, while selected loading has a distinct typed carrier.
+
+The bounded source-shape proof authenticates the loaded-definition dispatch
+only inside its production function, and the pure proof covers both
+reacquisition sites. Existing external-Bzl cancellation, event, epoch, error
+and A/B/A lifecycles plus the complete loading suite pass. No evaluator heap,
+global cache/interner, task or DirectLocal disguise is retained.
+
+This is the pinned Zabel-guided layering: semantic mappings stay with their
+producer and loading consumes an immutable already-selected view; no Zig code
+or behavior is adopted. Bazel 9.2 remains exact authority. Loading has no next
+implementation packet; return only to the docs-only bootstrap-critical
+repository/ruleset frontier audit.

@@ -18069,3 +18069,35 @@ DICE ownership, exact oracle and the real rules_rust declaration terminal are
 otherwise unchanged. Activate only
 `WP-4-5-6-7A-selected-registry-extension-bzl-source-owner-implementation-r3`
 after independent review. Zabel remains architecture guidance only.
+
+### Selected-registry extension source owner accepted; M7A audit resumes (2026-08-25)
+
+The r3 implementation is accepted at 4,984/5,009/13,668/1,195/471/9,309/2,486
+physical lines. Conservative isolated additions are exactly 775
+(112+1+256+72+2+255+77), so they fit the 850 production cap even without
+separating proof and therefore also fit the 1,050 proof and 1,900 aggregate
+caps. No helper or test exceeds 100 lines.
+
+The selected definition association is request-owned at both constructors;
+the route is structurally selected rather than DirectLocal; self loads retain
+the producer and mapped loads switch to each child producer's route. Loaded
+definition and pure paths preserve root/selected typed errors, Need/outer
+short-circuiting, epoch order, child-only events, cancellation and warm/A/B/A
+behavior. Full Bzlmod/loading validation, the dependent core check and diff
+hygiene pass. Independent architecture review returns `ACCEPT`.
+
+Compatibility is **exact** for Bazel 9.2 root-owned, non-isolated selected-
+registry association and producer-view source loads through clean export;
+**Slug-native** for the Rust/DICE route, carrier, epoch and heap ownership; and
+**unsupported/deferred** for nonroot/isolated, selected nonregistry/generated,
+repository-rule declaration/schema/execution, toolchains/providers/actions,
+crate_universe, M8/M7B and exact configuration/output bytes.
+
+Pinned Zabel `c7298478…` supplied architecture guidance only: Bzlmod owns the
+selected semantic descriptor and mappings, physical realization is not
+semantic authority, and loading consumes an immutable selected view. Bazel 9.2
+alone owns behavioral compatibility. Activate only docs packet
+`WP-6-7A-bootstrap-critical-repository-ruleset-frontier-audit-r2`; trace from
+the now-admitted source owner through the unchanged real rules_rust
+`repository_rule(doc=...)` terminal and select one smallest owner or evidence
+prerequisite. Authorize no Rust and preserve M7A -> M8 -> M7B.
