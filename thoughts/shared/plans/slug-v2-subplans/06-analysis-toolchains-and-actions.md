@@ -15920,6 +15920,59 @@ representations, exact Bazel 9 authority and Zabel-guidance-only architecture.
 Run the complete serial proof/baseline/rebuilt-fixture/review gates. STOP scope,
 cap or key widening; M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated package source-preflight polarity REPLAN (2026-08-25)
+
+The retained selected-owner implementation passes its focused Bzlmod/loading/
+core proof, and independent correction review accepts the generated-definition
+producer assertions. Its mandatory rebuilt Bazel 9.2
+`module-extension-use-repo` fixture still stops before materialization with a
+direct-local MODULE route error.
+
+Read-only tracing proves the generated bridge and owner-demand graph are not
+the failing owners. Core constructs the correct
+`RootRepositorySource::Generated` route for `@generated` and passes it through
+`RepositoryPackageLoadKey`. The existing `RepositoryPackageSourceKey` then
+unconditionally calls `direct_local_module_support(_observed)`, which
+reconstructs `RootRepositoryRouteKey(@generated)`. Root mapping correctly has
+no direct-local route for that extension-only apparent name, so the nested
+MODULE inspection returns `Input(Route(_))`.
+
+The defect predates selected-owner Phase 2 and lies in clean
+`app/slug_bzlmod_v2/src/host_package.rs`, outside the active packet's frozen
+nine-file authority. No in-scope loading/core correction can preserve the
+required package-policy/lookup/source chain while repairing it. Formally
+`REPLAN` the implementation and retain every Rust candidate and accepted
+fixture byte-for-byte. Design only
+`WP-6-7A-generated-package-source-preflight-polarity-correction-design`.
+
+### Generated package source-preflight polarity correction accepted (2026-08-25)
+
+Independent architecture review accepts `RepositoryPackageSourceKey` as the
+natural correction owner. Change only `host_package.rs`: one private pure
+discriminator treats `RootRepositorySource::Generated` as already owning its
+route and skips only the direct-local MODULE-support preflight with an empty
+scratch observation prefix. DirectLocal and BuiltinBazelTools retain their
+existing Legacy/Observed support child, Need/error/event/epoch behavior. The
+existing lookup, materialization, BUILD selection and source-read children stay
+unchanged; add no key, value, error, export, cache or command repair.
+
+The accepted immutable fixture supplies exact Bazel 9.2 generated-source build
+evidence. Pinned `../zabel` commit
+`c7298478e2e56262a2f438e9c065325744c9f0fc` is concept-only guidance: its
+natural generated-repository producer and selected generated-demand routes do
+not reconstruct a second root identity before physical/source demand. Copy no
+Zig code, representation, scheduler or output.
+
+Activate only
+`WP-6-7A-generated-package-source-preflight-polarity-correction-implementation`
+at <=20 production/<=120 proof/<=140 aggregate additions and <=5,110 physical
+lines. Preserve all retained Rust/fixture state, prove all three source
+polarities, run protected direct-local/builtin and full serial baselines,
+rebuild the CLI and rerun the fixture before independent implementation review.
+STOP a second file, route/source-preparation/core/loading change, semantic or
+event/epoch drift, waiver, milestone closure, M8/M7B and identity bytes. M7
+remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
