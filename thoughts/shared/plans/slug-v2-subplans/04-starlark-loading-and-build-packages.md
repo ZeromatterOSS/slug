@@ -3773,3 +3773,25 @@ packet cannot require successful rules_rust export or pure reacquisition.
 Run only the docs scope-correction design in current. Select a focused external
 selected-registry source/load observable, preserve the exact rules_rust
 declaration terminal, and do not widen loading declaration/schema semantics.
+
+### Selected-registry source observable requires one oracle (2026-08-25)
+
+The correction audit found no accepted composite proof. The rules_rust fixture
+crosses the deferred declaration/toolchain stack; the nonroot extension
+fixture has no root request or recursive selected-source loads. Pinned Bazel
+9.2's Bzlmod load regression proves mapped resolution, but not root association,
+self cross-package loading and clean named extension export together.
+
+Run only
+`WP-1-4-5-6-7A-selected-registry-extension-source-observable-oracle`.
+After the overdue fixture-hygiene reset, add one Bazel-only local-registry row:
+root requests `@owner//:extension.bzl%probe`; owner source loads
+`//shared:local.bzl` and `@mapped_dep//:mapped.bzl`, prints the combined marker
+and exports a no-op module extension. Root has neither mapped dependency nor
+shared package, so success cannot be produced from its view. No repository
+rule, tag/schema, generated repository, Slug run or Rust is admitted.
+
+The later loading design remains six-file and producer-view based, but it may
+be corrected only after this evidence accepts. Actual rules_rust still stops
+exactly at `repository_rule(doc=...)`. Pinned Zabel `c7298478…` continues to
+guide typed producer-view consumption only; Bazel 9.2 owns the oracle bytes.

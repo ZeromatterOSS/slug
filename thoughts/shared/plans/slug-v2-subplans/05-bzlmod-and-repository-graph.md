@@ -3832,3 +3832,35 @@ Freeze Rust. The current docs correction must isolate one discriminating
 selected-registry source observable while keeping the producer-owned RepoSpec,
 canonical identity and ordered view exactly as designed. Zabel remains
 concept-only guidance; Bazel 9.2 remains behavior authority.
+
+### Selected-definition association awaits composite Bazel evidence (2026-08-25)
+
+The read-only correction audit preserves the natural Bzlmod owner and finds one
+evidence gap, not another semantic prerequisite. Pinned Bazel 9.2 loads regular
+extensions through `keyForBzlmod`; `BzlLoadFunction` resolves every declaration
+against the current repository's full mapping and recurses with the same key
+kind; `testLoadBzlFileFromBzlmod` proves selected self and mapped entries. No
+accepted fixture composes those facts with a real root extension usage and a
+declaration-free export.
+
+Run only the oracle in current. Its root directly selects only `owner@1.0`.
+The archive-backed owner directly selects `mapped_dep@1.0`, and its extension
+loads one same-owner cross-package child plus the mapped child's source before
+printing a combined marker and exporting `probe`. The root deliberately lacks
+both child views. One successful `mod show_extension` row therefore
+authenticates the retained selected association and producer-view switch
+without executing repository rules.
+
+The fixture must first close the overdue hygiene review from `51540963` to
+last fixture-tree commit `3ac0a85b`; only after that reset may it add the new
+46-file/one-row subtree as packet one. It uses only local registry stubs and
+two deterministic artifacts, never BCR/network fallback. Existing fixtures,
+payload/harness code and all Rust remain frozen.
+
+After oracle acceptance, return to a fresh corrected six-file source-owner
+design rather than reactivating `dc85f527`. Preserve selected definition,
+RepoSpec/source policy, canonical identity and ordered mapping as structural
+inputs. The evidence does not admit actual rules_rust declarations, schemas,
+repository effects or upper consumers. Zabel remains concept-only guidance for
+producer-owned semantic descriptors and immutable realization; it supplies no
+behavioral expectation.

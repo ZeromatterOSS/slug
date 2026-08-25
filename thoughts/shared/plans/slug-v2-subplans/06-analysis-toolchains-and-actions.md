@@ -18019,3 +18019,19 @@ uniquely smaller evidence prerequisite, preserve the exact real rules_rust
 declaration terminal, and authorize no Rust before independent review. Pinned
 Zabel `c7298478…` remains producer/source-ownership guidance only. M7 remains
 partial and M7A -> M8 -> M7B remains.
+
+### Selected-registry source oracle prerequisite (2026-08-25)
+
+Two independent audits select one smaller Bazel-only oracle before the source
+owner is redesigned. The one row composes root `use_extension`, archive-backed
+selected owner source, a same-owner cross-package load, a mapped selected child
+load and a clean no-op module-extension export. The selected owner/mapped
+sources contain no repository-rule, tag/schema, toolchain, provider, action or
+generated-repository semantics.
+
+Run only
+`WP-1-4-5-6-7A-selected-registry-extension-source-observable-oracle`, including
+the mandatory fixture-hygiene reset. Keep all Rust frozen. Successful evidence
+returns to a corrected six-file design; it does not admit actual rules_rust or
+advance M8/M7B. Bazel 9.2 remains behavior authority and pinned Zabel remains
+concept-only producer/view guidance.
