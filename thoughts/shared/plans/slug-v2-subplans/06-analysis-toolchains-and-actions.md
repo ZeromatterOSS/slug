@@ -15689,6 +15689,67 @@ repository behavior remains exact; the demand representation is Slug-native;
 unrelated unadmitted extension execution remains unsupported/deferred without
 poisoning exact demand. M7 remains partial and M7A -> M8 -> M7B remains.
 
+### Generated package selected-extension demand-owner design accepted (2026-08-25)
+
+The docs-only design over terminal REPLAN `518abd45` is independently accepted.
+It follows Bazel 9.2's `ModuleExtensionId`-before-`SingleExtensionValue` order
+and Zabel's selected demand-seed/owner-index/execution split, adapting only the
+ownership shape to Rust DICE and copying no Zig representation or dependency.
+
+Bzlmod adds a compact opaque structural owner over the existing typed extension
+id and collision-resolved unique namespace. A workspace/request-canonical
+demand key authenticates exact producer-recorded imports without parsing `+`;
+same-owner repeats deduplicate, while Missing, distinct-owner Ambiguous and
+namespace inconsistency stay typed. A workspace/owner input key projects one
+definition request plus all graph-ordered root and non-root module usages,
+tags, imports and overrides sharing that id. It retains each module's final
+mapping for tag coercion and distinct definition-repository final/base mappings
+for coercion versus repository namespace construction.
+
+Mapping-visible admission is owner-local: the selected owner must have a root
+usage, no isolation, a root-repository Bzl label and one name token. Non-root
+uses sharing that admitted id remain complete `ctx.modules` inputs; only a
+non-root-only demanded owner is unsupported. Definition environment/OS/arch/
+facts rejection remains after load at pure invocation. Neither Bzlmod value
+retains the global mappings aggregate, so unrelated changes may recompute the
+projection but equality can suppress downstream invalidation.
+
+Loading adds exactly two owner-keyed DICE keys. The private owner-pure key owns
+owner-input consumption, one-definition Host-Bzl load/reacquisition, per-module
+tag preparation and one invocation with `Arc<[InvocationModule]>`; it owns the
+single local invocation event batch while Host-Bzl children keep theirs. The
+doc-hidden final validation key synchronously reuses single-request
+instantiation and validation finishers and remains eventless. Existing complete
+workspace-wide keys are neither filtered nor weakened.
+
+Core authenticates demand first, requests final owner validation second,
+merges observed epochs demand-left/owner-right and applies the existing unique
+canonical output selection. Need retains nothing. Child outers retain only
+semantic Arcs completed before that child—most importantly, core's owner outer
+retains only demand—and never fabricate a failed child carrier or epoch.
+Complete epochs merge strictly left-first; semantic/compute terminals retain
+the completed prefix; warm/cancel and child event ownership stay exact.
+
+Implement only
+`WP-6-7A-generated-package-selected-extension-demand-owner-implementation`
+in the eight files frozen in the current packet. Caps are <=620 production,
+<=700 proof and <=1,320 aggregate, with physical ceilings 13,820 selected,
+450 Bzlmod lib, 9,500 Bzl module, 2,490 module extension, 2,200 instantiation,
+1,960 validation, 112 loading lib and 4,160 generated definition. Existing
+`CompactString`, canonical identities, `Arc`, compact maps/sets and
+`Allocative` suffice; no Buck2/V1 import or Stage 9 ledger row is added.
+
+Requested imported generated repositories remain exact Bazel 9; private owner/
+DICE/epoch representation is Slug-native; directly selected unadmitted owner
+execution remains unsupported/deferred. Require typed lookup and same-owner
+sharing, unrelated unsupported/failing owner isolation, direct unsupported,
+complete multi-module `ctx.modules`, output/override selection, Legacy/Observed
+terminal/epoch/event/lifecycle proof, full Bzlmod/loading/core baselines and the
+rebuilt unchanged Bazel 9.2 fixture. STOP delimiter parsing, root-only inputs,
+downstream suppression, global-carrier weakening, a third loading key, copied
+semantics, cap/scope widening, Java/JVM, milestone closure, M8/M7B and exact
+identity bytes. M7 remains partial and M7A -> M8 -> M7B remains.
+
 ### Root apparent-definition proof-contract REPLAN retry-2 (2026-08-21)
 
 Retain the partial one-file candidate at 1,676 physical lines: production is
