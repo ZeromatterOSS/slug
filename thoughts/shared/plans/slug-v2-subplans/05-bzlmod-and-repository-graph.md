@@ -3880,3 +3880,19 @@ repair it through mutable repository state. Zabel's pinned design remains
 concept-only architectural guidance for this layering. Activate only the
 six-file r2 implementation in current and preserve the real rules_rust
 declaration stop.
+
+### Request-owned selected-definition association authority correction (2026-08-25)
+
+The restored r2 preflight found that
+`selected_repo_spec/selected_extension_demand.rs` directly constructs the
+request retained by `HostSelectedExtensionOwnerInputs` for pure reacquisition.
+The opaque selected-definition/source association therefore belongs on that
+request and must be initialized at this constructor as well as the constructor
+already authorized in `selected_repo_spec.rs`. Reconstructing it from a
+container or global table would split canonical producer visibility from the
+request's structural identity and lifetime.
+
+Correct authority by adding exactly that seventh file; no second sibling or
+constructor is admitted, and aggregate caps stay 850 production, 1,050 proof
+and 1,900 total. Run only r3 after independent review. Pinned Zabel guides the
+producer-owned typed association, but Bazel 9.2 alone defines behavior.

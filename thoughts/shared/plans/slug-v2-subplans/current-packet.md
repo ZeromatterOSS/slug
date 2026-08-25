@@ -1,17 +1,27 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-6-7A-selected-registry-extension-bzl-source-owner-implementation-r2`
+Packet: `WP-4-5-6-7A-selected-registry-extension-bzl-source-owner-implementation-r3`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owners: `04-starlark-loading-and-build-packages.md`,
 `05-bzlmod-and-repository-graph.md`, and
 `06-analysis-toolchains-and-actions.md`
-Base: corrected design after accepted selected-registry source oracle
+Base: one-constructor authority correction after restored r2 preflight
 
 Result: implement the first selected-registry module-extension definition
 source owner and producer-view recursive loads without widening
 repository-rule declarations or execution.
 
 ## Corrected accepted design
+
+The r2 implementation preflight exposed one authority omission and then
+restored every partial edit to the exact frozen hashes below.
+`HostSelectedExtensionOwnerInputs` directly constructs and retains an
+individual `HostSelectedExtensionDefinitionLoadRequest` in
+`selected_extension_demand.rs` for pure reacquisition. Because the selected
+source association is request-owned, that constructor must initialize the same
+opaque association. Reconstructing it later from a container or global lookup
+would split producer visibility from request identity and lifetime. No second
+sibling or constructor is authorized.
 
 The exact 33-package developer graph first leaves the accepted M7A surface at
 root `use_extension("@rules_rust//rust:extensions.bzl", "rust")`.
@@ -58,7 +68,8 @@ non-isolated extension request whose definition repository resolves to one
 selected registry module:
 
 1. Validate a unique canonical selected-definition association and retain it
-   opaquely with the request. Unsupported owner/isolation, selected
+   opaquely with every request constructor, including owner-input retention for
+   pure reacquisition. Unsupported owner/isolation, selected
    nonregistry/generated sources, missing or duplicate routes, invalid mapping
    and unsupported builtin definitions fail closed.
 2. Project one structural selected-source route from the exact `RepoSpec`,
@@ -117,11 +128,12 @@ checksum/ActionKey and REAPI/CAS digests are untouched.
 ## Authority, budgets and proof
 
 Read `docs/developers/dice.md` and the repo-local Buck2 utility-reuse skill
-before editing. Rust authority is exactly:
+before editing. Seven-file Rust authority is exactly:
 
 - `app/slug_bzlmod_v2/src/host_module.rs`
 - `app/slug_bzlmod_v2/src/host_package.rs`
 - `app/slug_bzlmod_v2/src/selected_repo_spec.rs`
+- `app/slug_bzlmod_v2/src/selected_repo_spec/selected_extension_demand.rs`
 - `app/slug_bzlmod_v2/src/lib.rs`
 - `app/slug_loading_v2/src/bzl_module.rs`
 - `app/slug_loading_v2/src/module_extension.rs`
@@ -136,6 +148,7 @@ lines. Exact accepted dirty entry state is:
 | `host_module.rs` | 4,872 | `56a7ffe34f8f26c3e70b02deed12268198599060cc455127f2edd3bddab22506` | 5,050 |
 | `host_package.rs` | 5,009 | `1921abc6f0fedc0f7c0d14504168980f1063deec82bcfff9b64c2c3c6b8cc5b8` | 5,180 |
 | `selected_repo_spec.rs` | 13,415 | `ad8c89c9d4613db408ae7429e51e3a59ae2e865a90f0daaf896dc2fe9624c333` | 13,900 |
+| `selected_extension_demand.rs` | 1,128 | `ad47ae4e308d95ed3d55100cdd77caf2a0e067a10fb5322fb9f49338f4a0f508` | 1,210 |
 | `slug_bzlmod_v2/src/lib.rs` | 469 | `0d33a0bacb5d8f6725cca664e9398abf8cecdf4274f18aa51c49d9fffe0641ee` | 525 |
 | `bzl_module.rs` | 9,120 | `20737363c9048fa5b5f81e6b8d4cdeb139e413ae0f053abc0cdaa1cc85cb9a58` | 9,900 |
 | `module_extension.rs` | 2,430 | `9d82768900f3459dda85cf7599a4b7f518717d986d9f570bcbbec634eef1a4c9` | 2,800 |
@@ -161,5 +174,6 @@ Rebuild `slug_cli_v2` only if an authorized change affects that path.
 STOP repository-rule declaration/schema/invocation changes, new
 `repository_ctx` APIs, `@bazel_tools` content, public command activation,
 fixture/oracle edits, Java/JVM, unrelated cleanup, milestone closure, M8/M7B
-and exact identity bytes. `REPLAN` before widening files, caps, compatibility
-or admitting a second owner.
+and exact identity bytes. Do not add a second sibling/constructor or reconstruct
+the request association through a container/global lookup. `REPLAN` before
+widening files, caps, compatibility or admitting a second owner.

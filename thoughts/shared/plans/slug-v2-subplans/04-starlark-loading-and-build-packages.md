@@ -3810,3 +3810,17 @@ loading remains byte-stable; mapped edges switch producer view; scratch remains
 compute-local; complete modules/manifests/epochs remain at existing owners.
 Pinned Zabel guides this producer/source split only. Run the r2 implementation
 in current; actual rules_rust keeps its existing declaration terminal.
+
+### Selected-registry source-owner r2 authority REPLAN; r3 active (2026-08-25)
+
+The r2 implementation preflight exposed one Bzlmod constructor outside its
+six-file authority and restored every partial Rust edit to the accepted frozen
+hashes. Loading ownership is unchanged: it remains the sole byte/evaluation
+and event owner consuming a typed producer fact, with root loading preserved.
+
+The selected source association must live on each individual request because
+the pure-reacquisition owner retains that request. A container/global lookup
+would reconstruct producer visibility outside request identity and lifetime.
+Activate only the corrected seven-file r3 packet in current. Pinned Zabel
+remains concept-only architectural guidance for the producer/source split;
+Bazel 9.2 remains behavior authority.

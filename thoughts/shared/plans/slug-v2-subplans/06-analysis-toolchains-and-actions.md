@@ -18051,3 +18051,21 @@ at `repository_rule(doc=...)`; no upper M8 consumer is admitted. Pinned Zabel
 guides producer-owned descriptors, immutable realization and typed loading
 consumption only. Run
 `WP-4-5-6-7A-selected-registry-extension-bzl-source-owner-implementation-r2`.
+
+### Selected-registry source-owner r2 authority REPLAN; r3 correction (2026-08-25)
+
+Implementation preflight found one exact authority contradiction after partial
+edits and restored all six authorized paths to their frozen hashes. The
+request-level source association is also required by the direct
+`HostSelectedExtensionDefinitionLoadRequest` constructor in
+`selected_repo_spec/selected_extension_demand.rs`; its owner retains the
+request for pure reacquisition. A container/global reconstruction would weaken
+structural request identity and producer-view lifetime.
+
+The correction adds only that 1,128-line file at frozen SHA-256
+`ad47ae4e308d95ed3d55100cdd77caf2a0e067a10fb5322fb9f49338f4a0f508`
+with a 1,210-line ceiling. Compatibility, seven-file aggregate caps, proof,
+DICE ownership, exact oracle and the real rules_rust declaration terminal are
+otherwise unchanged. Activate only
+`WP-4-5-6-7A-selected-registry-extension-bzl-source-owner-implementation-r3`
+after independent review. Zabel remains architecture guidance only.
