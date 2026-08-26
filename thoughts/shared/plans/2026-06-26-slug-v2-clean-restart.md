@@ -30,17 +30,45 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; post-RunEnvironmentInfo clippy-tail audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; `5f8dd852`, `fc9473b1`, `993ba5e4`, and `45b479e56` accept clippy's complete aspect, fixed OutputGroupInfo and RunEnvironmentInfo declaration globals, exact lint-test child loading, lazy helper and `rust_clippy` rule | the authenticated `clippy.bzl:463-596` tail still needs a recursive source-order and imported-producer audit | run only docs audit `WP-4-7A-post-run-environment-info-clippy-tail-audit`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; clippy-test tail proof selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; `5f8dd852`, `fc9473b1`, `993ba5e4`, and `45b479e56` accept clippy's complete aspect, fixed OutputGroupInfo and RunEnvironmentInfo declaration globals, exact lint-test child loading, lazy helper and `rust_clippy` rule | `clippy.bzl:463-596` uses only admitted loading shapes, but its recursive producer identities and complete frozen tail need one discriminating proof | implement only proof packet `WP-4-7A-clippy-test-tail-loading-proof`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-post-run-environment-info-clippy-tail-audit](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-clippy-test-tail-loading-proof](./slug-v2-subplans/current-packet.md).
 
-Audit authenticated `clippy.bzl:463-596` in source order after the now-exact
-lint-test child returns. Prove the first unsupported expression or the entire
-tail freeze, then select one bounded implementation or `REPLAN`.
+Prove exact `clippy.bzl:463-596` freezes with the accepted prefix and
+producer-owned lint/provider/common imports. Change only the loading test; add
+no production behavior.
+
+### M7 post-RunEnvironmentInfo clippy-tail audit accepts proof-only closure (2026-08-26)
+
+The authenticated source-order audit finds no new production terminal in
+`clippy.bzl:463-596`. The documented `RustClippyTestInfo`, ordered string list,
+one required/advertised test aspect, child-based attribute merge, label-list
+provider/aspect/transition schema, test capability and two
+`config.bool(flag = True)` declarations all match already-accepted loading
+contracts. Provider-constructor calls remain inside lazy helpers.
+
+The bounded remaining gap is proof, not behavior: recursively retain the exact
+lint-test exports and the provider/common producer identities, append the exact
+unabridged tail to the accepted clippy prefix, and discriminate every retained
+aspect/rule/build-setting edge. Run only
+`WP-4-7A-clippy-test-tail-loading-proof`, changing one test file under
+0/260/260 caps.
+
+Exact compatibility is source-order tail freeze and the authenticated
+producer/field/order identities. Existing Rust frozen/Arc ownership and
+fail-closed invocation diagnostics are Slug-native. All helper execution and
+configured provider/aspect/transition/test/build-setting/action semantics
+remain unsupported/deferred.
+
+Clean `../zabel` `0795445f…` guides only the architecture: producer-module and
+export-name provider identity, declaration-owned rules and detached
+build-setting descriptors support reuse of Slug's existing owners. No Zig
+code, representation, capture, configured behavior, algorithm or diagnostic
+is copied. Bazel 9.2 remains sole behavior authority.
 
 ### M7 RunEnvironmentInfo declaration and exact lint-test child accepted; clippy-tail audit selected (2026-08-26)
 

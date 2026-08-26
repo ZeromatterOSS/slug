@@ -5247,6 +5247,33 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Post-RunEnvironmentInfo clippy-tail audit accepts proof-only closure (2026-08-26)
+
+The source-order audit authenticates complete rules_rust 0.73.0
+`clippy.bzl:463-596` and its `lint_test.bzl`, `providers.bzl` and `common.bzl`
+producers. No new production terminal exists: the documented test provider,
+ordered output-group list, required/advertised aspect, child-owned attribute
+merge, label-list provider/aspect/transition schema, test rule and two true
+Boolean build settings all reuse admitted loading contracts. The two provider
+constructions are confined to lazy helper bodies.
+
+Run only proof packet `WP-4-7A-clippy-test-tail-loading-proof`. In the existing
+loading test file, combine the accepted clippy prefix with exact unabridged
+tail source and recursively loaded lint/provider/common exports. Prove
+pointer-identical imports and every retained aspect/rule/build-setting edge;
+change no production code. Caps are 0 production, 260 proof and 260 total.
+
+Exact compatibility covers the authenticated source-order freeze and producer
+identities. Existing Rust frozen/Arc ownership and fail-closed diagnostics are
+Slug-native. Helper execution and configured provider matching, aspect
+application, transition, test runner/actions/runfiles, build-setting values and
+CLI flags remain unsupported/deferred.
+
+Clean `../zabel` `0795445f…` guides producer-module/export-name provider
+identity, declaration-owned rules and detached build-setting descriptors only.
+No Zig code, representation, capture, configured behavior, algorithm or
+diagnostic is copied. Bazel 9.2 remains sole behavior authority.
+
 ### RunEnvironmentInfo declaration and exact lint-test child accepted; clippy-tail audit selected (2026-08-26)
 
 Commit `45b479e56` adds a dedicated zero-state `RunEnvironmentInfo` token only
