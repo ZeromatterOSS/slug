@@ -5247,6 +5247,42 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Post-clippy parent audit selects exact lints proof (2026-08-26)
+
+Exact `rust/defs.bzl` loads toolchain, clippy, common and lints in source order.
+Clippy already completed common and providers, making
+`rust/private/lints.bzl` the first newly evaluated child. Its SHA-256 is
+`0c6dcf615bb9f43d57c4056253f89a9f1bed0b16b9e17d8eed64da85d1b05677`;
+the cached provider child remains
+`57a59ec9a60b9709df197333c94bac464b572af63bc78f560ce32570b6d84ac6`.
+
+The lint implementation body and `LintsInfo(...)` construction are lazy. The
+only eager declaration is a documented rule with ordered `rustc`,
+`rustc_check_cfg`, `clippy`, `rustdoc` attributes of kinds StringDict,
+StringListDict, StringDict and StringDict. All omit defaults and use existing
+`None` declaration defaults; typed empty dictionaries arise only in the
+already-accepted later invocation projection. Slug already owns these
+constructors, docs and frozen schema projection. Pinned Bazel 9.2's
+`StarlarkAttrModule` and rule-class tests confirm the constructor kinds and
+dictionary defaults.
+
+Run only proof packet `WP-4-7A-lints-child-loading-proof`, changing
+`host_package_load_tests.rs` under 0/220/220 caps. Freeze the exact unabridged
+98-line child with the accepted loaded-child helper; prove exact LintsInfo
+producer identity, exact implementation source binding, rule export identity,
+ordered schema kinds and omitted (`None`) declaration defaults, and helper
+nonexecution. Stop when lints returns.
+
+Exact compatibility covers recursive source freeze and producer/order/schema
+identity. Existing frozen Rust storage and proof probes are Slug-native.
+Configured dictionary values, rule/helper execution, provider construction and
+configured action behavior remain unsupported/deferred.
+
+Clean `../zabel` `0795445f…` guides only producer-owned imported provider
+identity and declaration-owned attribute order. No Zig code, representation,
+owner pointer, capture, algorithm, diagnostic or behavior is copied. Bazel 9.2
+remains authoritative. This proof changes no retained utility or accounting.
+
 ### Imported frozen lint descriptors accepted; parent audit selected (2026-08-26)
 
 Commit `db51996b9` accepts the exact imported plain `LINT_TEST_COMMON_ATTRS`

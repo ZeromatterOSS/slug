@@ -30,17 +30,47 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; post-clippy parent frontier audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; `5f8dd852`, `fc9473b1`, `993ba5e4`, `45b479e56`, and `db51996b9` accept clippy's complete aspect and rule tail, fixed OutputGroupInfo and RunEnvironmentInfo declaration globals, exact lint-test child loading, imported plain frozen attributes and imported frozen transitions | the next newly evaluated child after complete `rust/private/clippy.bzl` has not yet been authenticated | audit only `WP-4-7A-post-clippy-parent-frontier-audit`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; exact lints child proof selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; `5f8dd852`, `fc9473b1`, `993ba5e4`, `45b479e56`, and `db51996b9` accept clippy's complete aspect and rule tail, fixed OutputGroupInfo and RunEnvironmentInfo declaration globals, exact lint-test child loading, imported plain frozen attributes and imported frozen transitions | exact source-order audit identifies `rust/private/lints.bzl` as the first new child; its loading shapes are admitted but lack recursive exact-source proof | implement only proof packet `WP-4-7A-lints-child-loading-proof`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-post-clippy-parent-frontier-audit](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-lints-child-loading-proof](./slug-v2-subplans/current-packet.md).
 
-Authenticate the next newly evaluated child after exact `clippy.bzl` returns to
-`rust/defs.bzl`, then classify its first unsupported loading surface without
-editing Rust.
+Freeze exact rules_rust 0.73.0 `rust/private/lints.bzl` with its already-loaded
+provider child, prove ordered dictionary schemas and producer identities, and
+stop when this child returns.
+
+### M7 post-clippy audit selects exact lints proof (2026-08-26)
+
+Authenticated `rust/defs.bzl` loads toolchain, clippy, common and lints in that
+order. Clippy already completed common and providers, so `rust/private/lints.bzl`
+is the first newly evaluated child after clippy returns. Its exact SHA-256 is
+`0c6dcf615bb9f43d57c4056253f89a9f1bed0b16b9e17d8eed64da85d1b05677`.
+The sole provider load is cached; the function body and its `LintsInfo(...)`
+call are lazy. The only eager declaration is `rust_lint_config`, with ordered
+StringDict/StringListDict/StringDict/StringDict attributes and docs, all on
+already-admitted loading surfaces.
+
+Run only proof packet `WP-4-7A-lints-child-loading-proof` in
+`host_package_load_tests.rs` under 0 production, 220 proof and 220 total
+addition caps. Use the exact unabridged 98-line source and the existing loaded-
+child harness. Prove the imported `LintsInfo` is pointer-identical to its
+provider-child export, the exact implementation source binding and rule export
+identity, ordered names/kinds and omitted (`None`) declaration defaults, and
+successful freeze without invoking the helper.
+
+Exact compatibility is recursive exact-source freeze and producer/order/schema
+identity. Existing frozen Rust storage and proof probes are Slug-native.
+Configured lint dictionaries, rule/helper execution, provider construction and
+configured action behavior remain unsupported/deferred.
+
+Clean `../zabel` `0795445f…` guides only producer-owned imported provider
+identity and declaration-owned attribute order. Copy no Zig code,
+representation, owner pointer, capture, algorithm, diagnostic or behavior.
+Bazel 9.2 remains sole behavior authority. The proof adds no retained utility,
+hashing, collection, clone path or memory-ledger entry.
 
 ### M7 imported frozen lint descriptors accepted; parent audit selected (2026-08-26)
 
