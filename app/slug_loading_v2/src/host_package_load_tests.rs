@@ -3215,6 +3215,106 @@ clippy_output_diagnostics = rule(
 )
 "###;
 
+const LINTS_SOURCE: &str = r###""""Rules for defining lints to apply to various Rust targets"""
+
+load("//rust/private:providers.bzl", "LintsInfo")
+
+def _rust_lint_config(ctx):
+    """Implementation of the `rust_lint_config` rule.
+
+    Args:
+        ctx (ctx): The rule's context object.
+
+    Returns:
+        list: The LintsInfo provider.
+    """
+
+    allowed_levels = ["allow", "warn", "deny", "forbid", "force-warn"]
+
+    rustc_flags = []
+    for lint, level in ctx.attr.rustc.items():
+        if level not in allowed_levels:
+            fail("Invalid rustc lint level '{0}'".format(level))
+        rustc_flags.append("--{LEVEL}={LINT}".format(LEVEL = level, LINT = lint))
+    for name, values in ctx.attr.rustc_check_cfg.items():
+        if len(values) != 0:
+            values_list = ", ".join(["\"{0}\"".format(v) for v in values])
+            values_arg = ", values({0})".format(values_list)
+        else:
+            values_arg = ""
+        rustc_flags.append("--check-cfg=cfg({NAME}{VALUES})".format(NAME = name, VALUES = values_arg))
+
+    clippy_flags = []
+    for lint, level in ctx.attr.clippy.items():
+        if level not in allowed_levels:
+            fail("Invalid clippy lint level '{0}'".format(level))
+        clippy_flags.append("--{LEVEL}=clippy::{LINT}".format(LEVEL = level, LINT = lint))
+
+    rustdoc_flags = []
+    for lint, level in ctx.attr.rustdoc.items():
+        if level not in allowed_levels:
+            fail("Invalid rustdoc lint level '{0}'".format(level))
+        rustdoc_flags.append("--{LEVEL}=rustdoc::{LINT}".format(LEVEL = level, LINT = lint))
+
+    return LintsInfo(
+        rustc_lint_flags = rustc_flags,
+        rustc_lint_files = [],
+        clippy_lint_flags = clippy_flags,
+        clippy_lint_files = [],
+        rustdoc_lint_flags = rustdoc_flags,
+        rustdoc_lint_files = [],
+    )
+
+# buildifier: disable=unsorted-dict-items
+rust_lint_config = rule(
+    implementation = _rust_lint_config,
+    attrs = {
+        "rustc": attr.string_dict(
+            doc = "Set of 'rustc' lints to 'allow', 'expect', 'warn', 'force-warn', 'deny', or 'forbid'.",
+        ),
+        "rustc_check_cfg": attr.string_list_dict(
+            doc = "Set of 'cfg' names and list of values to expect.",
+        ),
+        "clippy": attr.string_dict(
+            doc = "Set of 'clippy' lints to 'allow', 'expect', 'warn', 'force-warn', 'deny', or 'forbid'.",
+        ),
+        "rustdoc": attr.string_dict(
+            doc = "Set of 'rustdoc' lints to 'allow', 'expect', 'warn', 'force-warn', 'deny', or 'forbid'.",
+        ),
+    },
+    doc = """\
+Defines a group of lints that can be applied when building Rust targets.
+
+For example, you can define a single group of lints:
+
+```python
+load("@rules_rust//rust:defs.bzl", "rust_lint_config")
+
+rust_lint_config(
+    name = "workspace_lints",
+    rustc = {
+        "unknown_lints": "allow",
+        "unexpected_cfgs": "warn",
+    },
+    rustc_check_cfg = {
+        "bazel": [],
+        "fuzzing": [],
+        "mz_featutres": ["laser", "rocket"],
+    },
+    clippy = {
+        "box_default": "allow",
+        "todo": "warn",
+        "unused_async": "warn",
+    },
+    rustdoc = {
+        "unportable_markdown": "allow",
+    },
+)
+```
+""",
+)
+"###;
+
 const CLIPPY_TOOLCHAINS: &str = "[str(Label('//rust:toolchain_type')), config_common.toolchain_type('@bazel_tools//tools/cpp:toolchain_type', mandatory = False)]";
 
 fn clippy_owner() -> BzlModuleIdentity {
@@ -3263,6 +3363,86 @@ fn eval_bzl_with_loaded_children(
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;
     drop(evaluator);
     Ok(module.freeze()?)
+}
+
+#[test]
+fn exact_lints_child_freezes_with_provider_identity_and_ordered_schema() {
+    assert_eq!(
+        format!("{:x}", Sha256::digest(LINTS_SOURCE.as_bytes())),
+        "0c6dcf615bb9f43d57c4056253f89a9f1bed0b16b9e17d8eed64da85d1b05677"
+    );
+    let owner = |name: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(&format!("@@rules_rust+//rust/private:{name}.bzl")).unwrap(),
+        workspace_path: PathBuf::from(format!("/rules_rust/rust/private/{name}.bzl")),
+        repository_mapping: Arc::from([]),
+    };
+    let providers_owner = owner("providers");
+    let providers = eval_bzl_with_identity(
+        r#"LintsInfo = provider(
+    doc = "LintsInfo holds the 'allow', 'warn', etc. config for rustc, clippy, and rustdoc lints.",
+    fields = {
+        "clippy_lint_files": "List[File]: files with rustc args for clippy targets.",
+        "clippy_lint_flags": "List[String]: rustc flags to specify when building clippy targets.",
+        "rustc_lint_files": "List[File]: list of files with rustc flags to specify when building rust_* targets.",
+        "rustc_lint_flags": "List[String]: rustc flags to specify when building rust_* targets.",
+        "rustdoc_lint_files": "List[File]: files with rustc args for rustdoc target.",
+        "rustdoc_lint_flags": "List[String]: rustc flags to specify when building rust_doc targets.",
+    },
+)
+"#,
+        providers_owner.clone(),
+    )
+    .unwrap();
+    let module = eval_bzl_with_loaded_children(
+        LINTS_SOURCE,
+        owner("lints"),
+        &[(
+            "//rust/private:providers.bzl",
+            providers_owner,
+            providers.dupe(),
+        )],
+    )
+    .unwrap();
+    assert!(
+        module
+            .get("LintsInfo")
+            .unwrap()
+            .value()
+            .ptr_eq(providers.get("LintsInfo").unwrap().value())
+    );
+    let rule = module
+        .get("rust_lint_config")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    assert_eq!(rule.capability().rule_class, "rust_lint_config");
+    let declared = &rule.schema[rule.schema.len() - 4..];
+    assert_eq!(
+        declared
+            .iter()
+            .map(|attribute| attribute.name.as_str())
+            .collect::<Vec<_>>(),
+        ["rustc", "rustc_check_cfg", "clippy", "rustdoc"]
+    );
+    assert_eq!(
+        declared
+            .iter()
+            .map(|attribute| attribute.kind)
+            .collect::<Vec<_>>(),
+        [
+            AttributeKind::StringDict,
+            AttributeKind::StringListDict,
+            AttributeKind::StringDict,
+            AttributeKind::StringDict,
+        ]
+    );
+    assert!(declared.iter().all(|attribute| {
+        !attribute.mandatory
+            && attribute.configurable
+            && attribute.default.is_none()
+            && !attribute.executable
+            && !attribute.exec_configuration
+    }));
 }
 
 #[test]
