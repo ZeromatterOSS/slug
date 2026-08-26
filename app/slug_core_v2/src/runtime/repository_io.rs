@@ -708,14 +708,10 @@ impl RepositoryMaterializer {
         token: RepositorySessionToken,
         request: Arc<RepositoryMaterializationRequest>,
         generation: RepositoryMaterializationGeneration,
-        capture: impl FnOnce(&dyn Fn() -> bool) -> Result<(), ArchiveMaterializationError>,
+        capture: impl FnOnce(&dyn Fn() -> bool) -> Result<Materialized, ArchiveMaterializationError>,
     ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
         self.materialize_native_with(token, request, generation, || {
-            materialized_attempt(capture(&|| self.session_is_active(token)).and_then(|()| {
-                Err(ArchiveMaterializationError::materialization(
-                    super::repository_archive::SELECTED_BCR_EXTRACTION_DEFERRED,
-                ))
-            }))
+            materialized_attempt(capture(&|| self.session_is_active(token)))
         })
     }
 
@@ -1267,6 +1263,17 @@ impl RepositoryIo for LocalRepositoryIo {
                     observation_instance,
                 })
             }
+            Materialized::AssociatedImmutable {
+                source_identity,
+                root,
+            } => {
+                let (generation_root, observation_instance) = self.retain(root)?;
+                Ok(RepositoryIoOutcome::Immutable {
+                    source_identity,
+                    generation_root,
+                    observation_instance,
+                })
+            }
         }
     }
 }
@@ -1277,6 +1284,10 @@ pub(super) enum Materialized {
     },
     Immutable {
         bytes: Vec<u8>,
+        root: tempfile::TempDir,
+    },
+    AssociatedImmutable {
+        source_identity: Arc<str>,
         root: tempfile::TempDir,
     },
 }
@@ -1564,6 +1575,13 @@ fn materialized_attempt(
         Ok(Materialized::Immutable { bytes, root }) => {
             RepositoryMaterializationAttempt::Immutable { bytes, root }
         }
+        Ok(Materialized::AssociatedImmutable {
+            source_identity,
+            root,
+        }) => RepositoryMaterializationAttempt::GeneratedImmutable {
+            source_identity,
+            root,
+        },
         Err(error) => match error.stage {
             ArchiveFailureStage::Spec => RepositoryMaterializationAttempt::SpecError(error.message),
             ArchiveFailureStage::Transport => {

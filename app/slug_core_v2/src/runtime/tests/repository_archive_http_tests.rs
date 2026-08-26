@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::future::pending;
 use std::io::Read;
+use std::io::Seek;
+use std::io::SeekFrom;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::net::TcpListener;
@@ -14,6 +16,7 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
+use super::super::repository_io::ArchiveFailureStage;
 use super::*;
 
 #[derive(Clone)]
@@ -646,5 +649,45 @@ fn production_owner_has_no_task_client_global_provider_or_full_body_path() {
     }
     assert!(source.contains("http1::handshake"));
     assert!(source.contains("ring::default_provider"));
-    assert!(source.contains(".close()"));
+    assert!(source.contains("Result<tempfile::NamedTempFile"));
+}
+
+#[test]
+fn module_capture_uses_its_own_sri_limit_and_transport_stage() {
+    let body = b"registry module bytes";
+    let server = Server::new(vec![Reply::fixed(200, body)]);
+    let environment = TestEnvironment::new([("registry.test".into(), vec![server.address])]);
+    let module_url = url("registry.test", &server, "/MODULE.bazel");
+    let mut capture = capture_urls(
+        std::slice::from_ref(&module_url),
+        Sha256::digest(body).into(),
+        MODULE_CAPTURE_LIMIT,
+        "MODULE",
+        &runtime(),
+        &|| true,
+        &environment,
+    )
+    .unwrap();
+    let mut captured = Vec::new();
+    capture.as_file_mut().seek(SeekFrom::Start(0)).unwrap();
+    capture.as_file_mut().read_to_end(&mut captured).unwrap();
+    assert_eq!(captured, body);
+    drop(capture);
+    assert_captures_deleted(&environment);
+
+    let bad = Server::new(vec![Reply::fixed(200, body)]);
+    let environment = TestEnvironment::new([("bad.test".into(), vec![bad.address])]);
+    let error = capture_urls(
+        &[url("bad.test", &bad, "/MODULE.bazel")],
+        [0; 32],
+        MODULE_CAPTURE_LIMIT,
+        "MODULE",
+        &runtime(),
+        &|| true,
+        &environment,
+    )
+    .unwrap_err();
+    assert_eq!(error.stage, ArchiveFailureStage::Transport);
+    assert!(error.message.contains("MODULE capture failed"));
+    assert_captures_deleted(&environment);
 }

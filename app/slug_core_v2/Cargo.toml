@@ -16,6 +16,7 @@ bytes = { workspace = true }
 dice = { workspace = true }
 dice_futures = { workspace = true }
 dupe = { workspace = true }
+flate2 = { workspace = true }
 hex = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true }
@@ -36,6 +37,7 @@ slug_query_v2 = { workspace = true }
 sha2 = { workspace = true }
 starlark = { workspace = true }
 starlark_map = { workspace = true }
+tar = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 tokio-rustls = { version = "0.26.4", default-features = false }

@@ -28,6 +28,7 @@ use super::repository_archive::SelectedBcrTarGz;
 use super::repository_io::ArchiveMaterializationError;
 
 const CAPTURE_LIMIT: u64 = 128 * 1024 * 1024;
+const MODULE_CAPTURE_LIMIT: u64 = 1024 * 1024;
 const MAX_ADDRESSES: usize = 64;
 const MAX_REDIRECTS: usize = 39;
 
@@ -254,13 +255,11 @@ impl Environment for NativeEnvironment {
     }
 }
 
-/// The returned success owns no bytes or path: the verified capture has been
-/// explicitly closed and deleted before this function returns.
 pub(super) fn capture_selected_bcr(
     plan: &SelectedBcrTarGz,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
-) -> Result<(), ArchiveMaterializationError> {
+) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
     let environment = NativeEnvironment::new()?;
     capture_selected_bcr_with(plan, runtime, active, &environment)
 }
@@ -270,21 +269,66 @@ fn capture_selected_bcr_with(
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
     environment: &impl Environment,
-) -> Result<(), ArchiveMaterializationError> {
+) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    capture_urls(
+        &plan.urls,
+        plan.integrity,
+        environment.limits().capture_bytes,
+        "archive",
+        runtime,
+        active,
+        environment,
+    )
+}
+
+pub(super) fn capture_selected_bcr_module(
+    plan: &SelectedBcrTarGz,
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    let environment = NativeEnvironment::new()?;
+    capture_urls(
+        std::slice::from_ref(&plan.module_url),
+        plan.module_integrity,
+        MODULE_CAPTURE_LIMIT,
+        "MODULE",
+        runtime,
+        active,
+        &environment,
+    )
+}
+
+fn capture_urls(
+    urls: &[String],
+    integrity: [u8; 32],
+    capture_limit: u64,
+    subject: &'static str,
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+    environment: &impl Environment,
+) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
     let mut last = None;
-    for url in plan.urls.iter() {
+    for url in urls {
         if !active() {
             return Err(ArchiveMaterializationError::transport(
                 "repository session is no longer active",
             ));
         }
-        match capture_one(url, plan.integrity, runtime, active, environment) {
-            Ok(()) => return Ok(()),
+        match capture_one(
+            url,
+            integrity,
+            capture_limit,
+            subject,
+            runtime,
+            active,
+            environment,
+        ) {
+            Ok(capture) => return Ok(capture),
             Err(error) => last = Some(error),
         }
     }
     Err(ArchiveMaterializationError::transport(format!(
-        "selected-registry BCR archive capture failed: {}",
+        "selected-registry BCR {subject} capture failed: {}",
         last.unwrap_or_else(|| "no archive URL".into())
     )))
 }
@@ -292,10 +336,12 @@ fn capture_selected_bcr_with(
 fn capture_one(
     original: &str,
     integrity: [u8; 32],
+    capture_limit: u64,
+    subject: &'static str,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
     environment: &impl Environment,
-) -> Result<(), String> {
+) -> Result<tempfile::NamedTempFile, String> {
     let mut capture = environment.capture()?;
     let mut url = url::Url::parse(original).map_err(|error| error.to_string())?;
     for redirect in 0..=MAX_REDIRECTS {
@@ -342,12 +388,11 @@ fn capture_one(
                 return Err(error);
             }
         };
-        if content_length.is_some_and(|length| length > environment.limits().capture_bytes) {
+        if content_length.is_some_and(|length| length > capture_limit) {
             drop(body);
             let _ = finish(runtime, connection, sender, environment.limits());
             return Err(format!(
-                "BCR archive exceeds {} byte capture limit",
-                environment.limits().capture_bytes
+                "BCR {subject} exceeds {capture_limit} byte capture limit"
             ));
         }
         let mut hasher = Sha256::new();
@@ -355,6 +400,8 @@ fn capture_one(
             runtime,
             active,
             environment.limits(),
+            capture_limit,
+            subject,
             &mut body,
             &mut connection,
             &mut capture,
@@ -368,12 +415,9 @@ fn capture_one(
             .flush()
             .map_err(|error| format!("flushing capture: {error}"))?;
         if hasher.finalize().as_slice() != integrity {
-            return Err("BCR archive SHA-256 SRI mismatch".into());
+            return Err(format!("BCR {subject} SHA-256 SRI mismatch"));
         }
-        capture
-            .close()
-            .map_err(|error| format!("deleting verified capture: {error}"))?;
-        return Ok(());
+        return Ok(capture);
     }
     Err("BCR archive rejected the 40th redirect".into())
 }
@@ -382,6 +426,8 @@ fn capture_body(
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
     limits: Limits,
+    capture_limit: u64,
+    subject: &'static str,
     body: &mut Incoming,
     connection: &mut Option<Pin<Box<HttpConnection>>>,
     capture: &mut tempfile::NamedTempFile,
@@ -398,12 +444,9 @@ fn capture_body(
         if let Ok(data) = frame.into_data() {
             written = written
                 .checked_add(data.len() as u64)
-                .filter(|size| *size <= limits.capture_bytes)
+                .filter(|size| *size <= capture_limit)
                 .ok_or_else(|| {
-                    format!(
-                        "BCR archive exceeds {} byte capture limit",
-                        limits.capture_bytes
-                    )
+                    format!("BCR {subject} exceeds {capture_limit} byte capture limit")
                 })?;
             capture
                 .write_all(&data)

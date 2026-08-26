@@ -22,6 +22,7 @@ pub mod reapi;
 mod registry_io;
 mod repository_archive;
 mod repository_archive_http;
+mod repository_archive_realize;
 mod repository_io;
 mod request_revision;
 mod root_apparent_repository_definition;

@@ -15,6 +15,7 @@ use slug_bzlmod_v2::RepositoryMaterializationKind;
 use slug_bzlmod_v2::RepositoryMaterializationRequest;
 use slug_bzlmod_v2::RepositoryMaterializationRequestId;
 use slug_bzlmod_v2::RepositoryMaterializationResult;
+use slug_bzlmod_v2::RepositoryMaterializationSuccess;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NormalizedAbsolutePath;
@@ -1364,6 +1365,7 @@ fn selected_bcr_capture_has_session_scoped_stage_reuse_recapture_and_stale_owner
         let token = materializer.begin().unwrap();
         materializer.preflight_native(token, []).unwrap();
         let request = selected_bcr_request(&workspace, "cycling", mirror);
+        let expected_identity: Arc<str> = Arc::from(format!("identity-{mirror}"));
         materializer
             .materialize_selected_bcr_capture_for_test(
                 token,
@@ -1372,17 +1374,21 @@ fn selected_bcr_capture_has_session_scoped_stage_reuse_recapture_and_stale_owner
                 |active| {
                     assert!(active());
                     captures.set(captures.get() + 1);
-                    Ok(())
+                    Ok(Materialized::AssociatedImmutable {
+                        source_identity: expected_identity.clone(),
+                        root: tempfile::tempdir().unwrap(),
+                    })
                 },
             )
             .unwrap();
         assert!(matches!(
             materializer.active_result_for_test(token, "cycling"),
-            RepositoryMaterializationResult::MaterializationError {
-                generation: actual,
-                ref message,
-            } if actual == RepositoryMaterializationGeneration(generation)
-                && message.as_str() == SELECTED_BCR_EXTRACTION_DEFERRED
+            RepositoryMaterializationResult::Success(
+                RepositoryMaterializationSuccess::Immutable {
+                    ref source_identity,
+                    ..
+                }
+            ) if source_identity.as_ref() == format!("identity-{mirror}")
         ));
         if generation == 9 {
             materializer
@@ -1412,7 +1418,10 @@ fn selected_bcr_capture_has_session_scoped_stage_reuse_recapture_and_stale_owner
                     materializer.preflight_native(next, []).unwrap();
                     replacement.set(Some(next));
                     assert!(!active());
-                    Ok(())
+                    Ok(Materialized::AssociatedImmutable {
+                        source_identity: Arc::from("identity-stale"),
+                        root: tempfile::tempdir().unwrap(),
+                    })
                 },
             )
             .unwrap_err();
