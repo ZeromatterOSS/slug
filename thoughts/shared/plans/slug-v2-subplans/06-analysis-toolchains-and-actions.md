@@ -18234,3 +18234,11 @@ versions and proves Ring-only provider selection. Implement the accepted direct
 connection and provisional-root lifetime without registry/global-provider
 changes. Runtime/session semantics and Zabel's ownership-only guidance remain
 unchanged.
+
+### Native archive candidate/runtime correction (2026-08-25)
+
+The rejected candidate used blocking raw HTTP, no existing-runtime direct-Hyper
+frame owner or token probes, root-before-SRI ordering, wrong redirects and no
+archive-owner relocation. It compiled and two narrow tests passed but did not
+satisfy the accepted lifetime/proof contract. The candidate was removed;
+current is docs-only and Zabel scheduling remains unimported.

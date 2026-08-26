@@ -1,168 +1,121 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-6-7A-selected-registry-bcr-archive-materialization-implementation`
+Packet: `WP-5-6-7A-selected-registry-bcr-producer-shape-runtime-correction`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: private archive HTTP transport/realizer, sole repository materializer,
-native command session and exact Cargo dependency closure
-Base: `c7365840`
+Owners: selected BCR RepoSpec producer, private archive transport/realizer and
+sole repository materializer
+Base: `07359828`
 
-Result: implement the exact rules_rust 0.73.0 BCR archive slice and advance two
-fresh real commands to the same next honest terminal. Do not implement generic
-`http_archive`.
+Result: reconcile the exact produced BCR shape and reject the nonconforming
+implementation candidate, then freeze one corrected implementation packet or
+`REPLAN`. This packet is docs-only.
 
-## Accepted architecture
+## Accepted predecessor
 
-`RepositoryMaterializationRequest` and its complete `RepoSpec` remain
-structural. The producer-owned selected-registry view remains distinct from
-physical realization and joins its provisional root only at the accepted
-loading boundary. Pinned `../zabel` commit `c7298478…` guides that ownership
-shape only; copy no Zig code, scheduler, transport, cache, archive, digest,
-path, output or behavior. Pinned Bazel 9.2 commit `8220c619…` is behavior
-authority.
+The root selected-registry route/load vertical, semantic/physical separation,
+direct-connection lifecycle design and exact Cargo dependency closure remain
+accepted. Pinned Bazel 9.2 commit `8220c619…` owns behavior. Pinned
+`../zabel` commit `c7298478…` guides only producer-owned selected semantic
+view versus physical realization and the natural immutable-view/root join.
+Copy no Zabel code, transport, scheduler, cache, archive, digest, path, output
+or behavior.
 
-Add one private archive-only `ArchiveHttpTransport`. It retains an explicit
-Ring/native-root Rustls configuration or initialization failure, but no legacy
-client, pool, executor, socket or task. Never install a process-global crypto
-provider and do not change `HyperRegistryIo`.
+## Correction trigger
 
-`NativeDemandCommand::progress_inner` remains synchronous outside DICE. It
-passes the existing current-thread runtime into the sole materializer; runtime
-state never enters request identity. Existing pre/post-I/O token checks remain,
-with brief released active-token probes between transfer steps. No mutex spans
-DNS, runtime entry, capture write, extraction, DICE or callback work.
+The implementation packet incorrectly admitted only absent archive `type`.
+Slug's accepted selected RepoSpec producer in
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs` emits every structural archive
+field from selected registry source facts. Its direct archive proof asserts
+`type = "tar.gz"`; the real rules_rust source uses that canonical form. It
+also emits empty-string `strip_prefix`, empty patch/overlay maps,
+`remote_patch_strip = Int(0)`, one registry MODULE URL/SRI, ordered URLs and
+archive SRI. Erasing or pretending those fields are absent is forbidden.
 
-For each HTTPS attempt:
+The retained candidate compiled and two extraction tests passed, but is
+rejected before integration:
 
-1. Outside Tokio, resolve the authority synchronously to immutable socket
-   addresses, then recheck the token. Resolution is a completed command step,
-   never a Tokio blocking task.
-2. Create a per-attempt `HttpConnector` over that resolver with a 30-second
-   connect ceiling; wrap it in HTTPS-only, HTTP/1-only TLS. Preserve the original
-   hostname for TLS/Host and send origin-form path/query.
-3. Bounded runtime entries connect/handshake, drive headers, and yield at most
-   one body frame while polling the same pinned direct HTTP/1 `Connection`.
-   Connection/sender/body remain command-stack state. No executor, spawn, async
-   filesystem or digest work runs in an entry.
-4. Between frames synchronously hash/write the capture, enforce its ceiling and
-   recheck the token. Header/frame-idle ceilings are 30 seconds. Drop sender/body
-   at terminal and drive shutdown for at most 5 seconds. Timeout/drop closes the
-   in-tree socket/futures; nothing detaches.
-5. Apply redirects/fallback synchronously. Each changed authority is freshly
-   resolved and each attempt owns a fresh capture.
+- it replaced all native `http_archive` dispatch with the BCR parser, breaking
+  the accepted local file/tar branch rather than selecting between two plans;
+- it used blocking raw `TcpStream`/Rustls HTTP parsing, not the accepted direct
+  Hyper connection pinned across existing-runtime entries, and had no
+  mid-transfer active-token probes;
+- it followed all 3xx with a five-hop limit rather than exact
+  301/302/303/307 and 40 redirects;
+- it created the root before archive SRI verification and did not advance to
+  the next source URL after every admitted transport/SRI failure;
+- it reused generated-immutable naming, did not relocate the 838-line archive
+  owner/proof, left `repository_io.rs` above its ceiling and supplied only two
+  focused tests.
 
-## Exact BCR shape and realization
+The candidate and its dependency prerequisite were removed entirely with
+`apply_patch`; the live checkout is clean at the exact `07359828` source,
+manifest and lock hashes.
 
-Admit only:
+## Decisions required
 
-- rule `@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive`;
-- nonempty ordered HTTPS `urls`; one SHA-256 `integrity` SRI;
-- absent `type`, every source URL ending `.tar.gz` or `.tgz`;
-- empty `strip_prefix`, `remote_patches`, `remote_file_urls` and
-  `remote_file_integrity`; zero `remote_patch_strip`;
-- one HTTPS `remote_module_file_urls` entry and one SHA-256
-  `remote_module_file_integrity` SRI; and
-- no other attribute.
+1. Freeze the exact BCR parser shape as the producer emits it: required
+   `type = "tar.gz"`, required empty-string `strip_prefix`, required empty
+   maps, required zero integer patch strip, ordered nonempty HTTPS URLs, archive
+   SHA-256 SRI and one HTTPS MODULE URL/SRI. Reject absent/wrongly typed/extra
+   fields for this demonstrated slice.
+2. Preserve the accepted local parser as a separate first-class plan. Dispatch
+   by exact mutually exclusive shape and retain its diagnostics/tests
+   byte-for-byte; neither parser may partially accept then reinterpret the
+   other.
+3. Retain the accepted HTTP owner: archive-only explicit Ring/native-roots TLS,
+   synchronous command-owned immutable resolution, direct
+   `hyper::client::conn::http1` state pinned across bounded entries on the
+   existing runtime, one frame returned per entry, synchronous capture/hash
+   writes between entries, active-token probes and driven shutdown. Raw manual
+   HTTP, a new runtime, legacy client, task or async filesystem is forbidden.
+4. Freeze exact fallback/redirect semantics: only 301/302/303/307, relative or
+   absolute HTTPS Location, 40 redirects, fresh authority resolution/capture,
+   and next source URL after URI/DNS/connect/TLS/status/redirect/header/body/
+   idle/shutdown/SRI failure. Create no extraction root before archive SRI.
+5. Retain bounded GNU tar extraction, mode/path/link/duplicate/collision safety,
+   verified MODULE replacement, exact archive identity, existing materializer
+   publication and final validation. Use a preidentified-immutable name.
+6. Require relocation of the contiguous existing archive owner/proof so
+   `repository_io.rs` meets its ceiling. Restore the full discriminating proof
+   matrix; two happy-path extraction tests are insufficient.
+7. Retain the accepted exact 77-line Cargo lock delta, Ring-only graph and
+   eight-file authority, but update the implementation packet's parser evidence
+   and any necessary line ceilings from the complete call trace.
 
-Preserve the accepted one-`file://`, hex-`sha256`, exact-`tar`, optional-
-strip local branch and diagnostics/proof; relocate it without reinterpretation.
+## Evidence and proof
 
-Try source URLs in order. Follow only 301/302/303/307 with relative/absolute
-`Location`, remain HTTPS and allow at most 40 redirects. URI/DNS/connect/TLS/
-status/redirect/header/body/idle/shutdown/SRI failure advances to the next URL;
-after all fail publish one generation-scoped transport result. Stream each
-attempt to a fresh capture with no archive `Vec`.
+Reuse the selected producer proof, exact rules_rust source/artifact, accepted
+Bazel setter/downloader/decompressor anchors and existing local archive tests.
+Add no oracle fixture. A corrected packet must prove:
 
-Verify SHA-256 before root creation. On Unix, decode gzip/GNU tar synchronously.
-Admit valid-Unicode regular files/directories after leading-`./` removal;
-reject absolute/parent traversal, links, specials, normalized duplicates,
-ancestor/type collisions and escape. Preserve regular-file Unix permission
-bits. Fail BCR extraction closed on non-Unix. Enforce 128 MiB compressed,
-512 MiB uncompressed, 8,192 entries and 4,096 path bytes.
-
-After extraction, fetch the registry MODULE with identical redirect/stream/SRI
-rules and a 1 MiB body ceiling, then atomically replace root `MODULE.bazel`
-mode `0644`. Failure drops scratch and publishes nothing. Return verified
-archive SHA-256 hex as source identity; complete `RepoSpec`, including MODULE
-SRI, remains structural. Use a correctly named preidentified-immutable internal
-attempt, not generated-repository naming.
-
-The exact real artifact remains 67,196,890 compressed bytes, 224,337,920
-uncompressed bytes, 4,493 entries, 27 executables and SHA-256
-`2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`.
-Use it only for command proof; add no fixture.
-
-## Exact file/dependency authority
-
-Modify exactly:
-
-| File | Entry lines | Entry SHA-256 | Ceiling |
-|------|------------:|---------------|--------:|
-| `Cargo.lock` | 4,875 | `ee9acebd876bedaf474e28c5f14894aa7dec7afb257e2de4b2da903dd8c39800` | 4,960 |
-| `app/slug_core_v2/Cargo.toml` | 45 | `6e91459a3b014d5c43a0be92c184448563cd4d71c34aaf92b05479d1f2bd6169` | 58 |
-| `app/slug_core_v2/src/runtime/mod.rs` | 332 | `204fd7510b216b9794b6ce646c29ab30dcf2b453bb42c2b402a76da6f41ac651` | 338 |
-| `app/slug_core_v2/src/runtime/dice.rs` | 11,636 | `8c791759a07abd6eb6f43e34264437570258257faf23270c3055de3ca5f2a626` | 11,670 |
-| `app/slug_core_v2/src/runtime/repository_io.rs` | 6,140 | `76f03638d41d5f901b762a0e627cd05290f350fcfcd04e28caaa2e708e94ec9c` | 5,450 |
-| `app/slug_core_v2/src/runtime/archive_http_transport.rs` | absent | absent | 650 |
-| `app/slug_core_v2/src/runtime/repository_archive.rs` | absent | absent | 1,450 |
-| `app/slug_core_v2/src/runtime/tests/repository_archive_tests.rs` | absent | absent | 2,250 |
-
-Enable workspace `base64`, `flate2`, `tar`, `tower-service`, plus direct
-Rustls 0.23 with default features off and only `ring`. Use archive-local
-`builder_with_provider(ring::default_provider())`; never `install_default`.
-
-The lock diff is exactly 77 additions: five core names (`base64 0.21.7`,
-`flate2`, `rustls`, `tar`, `tower-service`) and new packages
-`adler2 2.0.1`, `crc32fast 1.5.1`, `filetime 0.2.29`, `flate2 1.1.9`,
-`miniz_oxide 0.8.9`, `simd-adler32 0.3.10`, `tar 0.4.46`, `xattr 1.6.1`
-with Cargo-resolved metadata. Preserve every existing entry, especially
-`wasip2 1.0.4+wasi-0.2.12`. Expected candidate is 4,952 lines/SHA-256
-`ecedcf984bf6704dbbb48a62cb56ec56bbc0f221d09db573fea96706bf7bf710`
-before source edits, and must not drift afterward.
-
-Relocate the existing archive owner/proof rather than duplicate it. Caps:
-<=1,300 new semantic production lines, <=1,500 proof lines, <=1,900 relocated
-unchanged lines, <=4,700 aggregate additions; production helpers <=150 lines,
-tests <=180. No Git/generated/dormant-`RepositoryIo` cleanup.
-
-## Required proof
-
-Focused proof discriminates:
-
-- exact BCR attributes/SRI and every deferred/extra rejection; local archive
-  byte-equivalence;
-- ordered failure fallback; relative/absolute redirects, HTTPS downgrade,
-  invalid Location, 40 bound and stop-after-success;
-- resolver address/port, TLS hostname/Host, origin-form, timeouts and fresh
-  authority resolution;
-- multi-frame capture writes outside runtime, no archive `Vec`, body limits,
-  held-open peer and completed sender/connection shutdown;
-- GNU header/leading-`./`, files/dirs/modes, MODULE replacement and identity;
-- traversal/duplicate/link/special/collision/entry/path/size cleanup cases;
-- zero executor/spawn/async-fs/global-provider, Ring-only/no AWS-LC, no registry
-  drift, no lock across I/O, stale-token rejection, warm reuse and A/B/A; and
-- static absence of subprocess/direct path/DICE-time I/O/second materializer.
-
-Use loopback HTTP only below production HTTPS parsing or injected seams. Run
-formatter/diff hygiene, feature-tree proof, focused transport/archive/session
-tests, full `slug_core_v2 --lib`, direct server/CLI compile checks, then rebuild
-`slug_cli_v2`. Clean exact `slugd` and replay two fresh wildcard-removed
-`rules-rust-073-toolchain-owner` roots. Both must verify identical archive and
-MODULE bytes and reach the same next honest terminal. Cargo runs serially with
-`--locked` after the one exact lock update.
+- the exact produced `type`/empty/zero fields and local/BCR mutual exclusion;
+- existing-runtime direct-Hyper frame lifecycle, token probes and shutdown;
+- ordered fallback plus exact redirect set/count and SRI-before-root ordering;
+- local byte-equivalence, real GNU tar/modes/MODULE bytes, safety/limit cleanup;
+- Ring-only lock graph, no registry/global-provider drift, warm/A/B/A reuse;
+- two fresh wildcard-removed rules_rust commands reaching the same next honest
+  terminal.
 
 ## Compatibility and STOP
 
-- **Exact:** local archive behavior and admitted Bazel 9.2 BCR URL/redirect/SRI/
-  gzip-GNU-tar bytes/Unix modes/MODULE replacement.
-- **Slug-native:** Ring HTTP/1 transport, synchronous resolution, bounds,
+- **Exact:** accepted local archive and produced Bazel 9.2 BCR RepoSpec/URL/SRI/
+  gzip-GNU-tar/MODULE behavior.
+- **Slug-native:** direct Ring HTTP/1 representation, synchronous DNS, bounds,
   diagnostics, session sequencing and root lifetime.
-- **Unsupported/deferred:** generic archives, HTTP/downgrade, auth/proxy/netrc,
-  patches/overlays, links/specials, non-Unix BCR, generic repository rules,
-  wildcard registration, repository-rule effects, toolchains/actions, M8/M7B.
+- **Unsupported/deferred:** all generic archive/repository/auth/patch/link/
+  non-Unix/toolchain/action/M8/M7B breadth already deferred.
 
-STOP hash/file/dependency/cap mismatch, lock drift beyond exact 77 additions,
-AWS-LC/dual/global provider, registry change, legacy client/task/Tokio DNS/
-async-fs, unjoined connection, network/extraction in DICE, lock across I/O,
-unbounded/full buffer, second materializer, semantic path, subprocess/Java/JVM,
-fixture mutation, broader behavior, second successor or milestone closure.
-`REPLAN` before widening.
+Write authority is canonical/current, Stage 5, Stage 6 and at most one routing
+row. Rust, Cargo, tests, fixtures, generated/vendor content, registry code and
+`@bazel_tools` are read-only. Documentation caps are <=40 canonical, <=220
+current, <=100 per stage, one routing row and <=460 aggregate.
+
+Validate exact producer/Bazel facts, clean restored hashes, full call/lifetime
+trace, scheduling, structure and `git diff --check`; obtain independent review
+before selecting implementation.
+
+STOP any live Rust/Cargo edit, producer-field erasure, local-branch regression,
+raw/manual or legacy HTTP, new runtime/task/Tokio DNS/async fs, unjoined
+connection, root-before-SRI, wrong redirect/fallback, registry/global-provider
+change, lock/cap waiver, subprocess/Java/JVM, broader behavior, second successor
+or milestone closure. `REPLAN` before widening.

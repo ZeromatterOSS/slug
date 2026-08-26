@@ -4049,3 +4049,11 @@ no existing version changes. Implement the complete structural `RepoSpec` and
 physical archive root only through current's sole materializer. Bazel owns
 archive behavior; pinned Zabel continues to guide semantic/physical ownership
 only.
+
+### Selected-registry BCR producer-shape correction (2026-08-25)
+
+The accepted producer emits required `type = "tar.gz"`, empty-string strip,
+empty patch/overlay maps and zero patch strip. The prior packet's absent-type
+shape was wrong. Its candidate also replaced the accepted local archive plan.
+Current is docs-only: freeze mutually exclusive complete local/BCR plans while
+retaining Zabel's semantic-view/physical-root guidance only.

@@ -30,17 +30,29 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; root selected external loading accepted; BCR archive implementation active** | generated `repository_ctx.file` vertical and selected-registry source/root-load owners are accepted through `207b225b`; HTTP lifecycle and exact dependency closure are accepted through `c7365840` | the sole materializer still lacks the exact rules_rust HTTPS/SRI/gzip-GNU-tar/registry-MODULE slice | implement only `WP-5-6-7A-selected-registry-bcr-archive-materialization-implementation`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; root selected external loading accepted; BCR producer/runtime correction active** | generated `repository_ctx.file` vertical and selected-registry source/root-load owners are accepted through `207b225b`; HTTP lifecycle and exact dependency closure remain accepted | the rejected candidate exposed required `type = "tar.gz"` and violated the accepted local-plan/direct-Hyper/runtime boundary | design only `WP-5-6-7A-selected-registry-bcr-producer-shape-runtime-correction`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-5-6-7A-selected-registry-bcr-archive-materialization-implementation](./slug-v2-subplans/current-packet.md).
+[WP-5-6-7A-selected-registry-bcr-producer-shape-runtime-correction](./slug-v2-subplans/current-packet.md).
 
-Implement the exact rules_rust BCR archive slice with the accepted direct Ring
-HTTP lifecycle and exact 77-line lock addition. Preserve local archive,
-registry and repository-session semantics.
+Reconcile the exact produced BCR fields and reject the nonconforming candidate.
+Freeze one corrected implementation packet or `REPLAN`; authorize no Rust or
+Cargo edit.
+
+### M7 BCR producer/runtime correction active (2026-08-25)
+
+The producer's direct proof and real source require `type = "tar.gz"` plus
+explicit empty/zero structural fields. The packet incorrectly required absent
+type. Its candidate also replaced the accepted local plan, used blocking raw
+HTTP rather than the accepted existing-runtime direct-Hyper lifecycle, created
+a root before SRI and missed ceilings/proof. It was removed; the tree is clean.
+
+Current is docs-only. Preserve the accepted dependency closure and pinned
+`../zabel` ownership guidance; Bazel 9.2 and Slug's accepted producer own the
+exact fields/behavior. M7A -> M8 -> M7B is unchanged.
 
 ### M7 BCR dependency closure accepted; implementation active (2026-08-25)
 
