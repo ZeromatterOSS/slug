@@ -1,102 +1,134 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-output-group-info-global-audit`
+Packet: `WP-4-7A-output-group-info-declaration-global-loading`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: authenticate the first missing fixed native-provider global reached by
-the exact clippy helper, then select one bounded loading implementation or
-`REPLAN`. This is a docs-only audit.
+Result: add the fixed `.bzl` `OutputGroupInfo` declaration token required to
+compile the exact lazy clippy helper, freeze the following rule, and stop
+before output-group construction or the next provider.
 
-## Accepted starting point and disproven candidate
+## Accepted starting point and source stop
 
-Base is `fc9473b1` (`Load clippy aspect toolchain requirements`). The complete
-`rust_clippy_aspect` freezes through rules_rust 0.73.0 `clippy.bzl` line 404.
-The next helper begins at line 406; the source SHA-256 is
+Base is `54ef6cdc` (`Audit OutputGroupInfo declaration global`); implementation
+state is clean `fc9473b1`. The complete `rust_clippy_aspect` freezes through
+rules_rust 0.73.0 `clippy.bzl` line 404. The exact helper begins at line 406 and
+currently fails compilation because `OutputGroupInfo` is absent.
+
+Admit compilation of `_rust_clippy_rule_impl` at lines 406-409 and freeze
+`rust_clippy = rule(...)` through line 461. Stop before
+`RustClippyTestInfo = provider(...)` at line 463. The source SHA-256 is
 `a778d2ddc77587ffbffc72efcdaa458a1ffae0763e500da1c876b9b567b2a686`.
 
-The independently accepted proof-only `WP-4-7A-clippy-rule-loading` candidate
-was attempted and disproved before acceptance. The exact helper body fails at
-compile time with `Variable OutputGroupInfo not found`. Function laziness
-prevents invocation but not global name resolution. Its partial test edit was
-fully reverted; there is no Rust or proof delta to carry forward.
-
-## Audit authorities and questions
+## Fixed behavior and architecture authorities
 
 Bazel 9.2 clean commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` is sole behavior authority. Audit:
+`8220c6198837d5c13d53fea211cf3282aa12408a` is sole behavior authority:
 
-- `StarlarkGlobalsImpl.getFixedBzlToplevels`, which installs
-  `OutputGroupInfo.STARLARK_CONSTRUCTOR` directly in the fixed `.bzl`
-  environment and omits it from fixed BUILD-file globals;
-- `OutputGroupInfoApi` and `OutputGroupInfo.OutputGroupInfoProvider`, which
-  define one callable native `BuiltinProvider` named `OutputGroupInfo`;
-- `BuiltinProvider` identity/key semantics needed to distinguish this fixed
-  provider from module/export-owned user providers and other native providers;
-- constructor validation and focused tests only far enough to place a strict
-  unsupported boundary around named output groups, depsets/artifacts and
-  configured values.
-
-Answer whether Slug's existing `AnalysisBuiltinCallable` can truthfully expose
-the fixed declaration identity while construction remains unsupported, or
-whether a small dedicated native-provider declaration token is required. Do
-not collapse native provider identity into `ProviderId`, whose source-label
-plus export-name domain is explicitly for user providers.
+- `StarlarkGlobalsImpl.getFixedBzlToplevels` installs
+  `OutputGroupInfo.STARLARK_CONSTRUCTOR` directly in fixed `.bzl` globals;
+- fixed BUILD-file globals omit that name;
+- `OutputGroupInfoApi` names a native callable provider;
+- `OutputGroupInfo.OutputGroupInfoProvider` extends `BuiltinProvider`;
+- `BuiltinProvider.equals` and `BuiltinProvider.Key.equals` use the concrete
+  provider class as process-stable native identity;
+- constructor conversion of named group values to artifact nested sets belongs
+  to configured semantics and is outside this packet.
 
 Clean `../zabel` commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` is architecture guidance only.
-Inspect its process-stable `BuiltinProviderId.output_group_info`, provider
-binding and separation between declaration identity and configured value. Copy
-no Zig code, numeric discriminant, enum layout, parser, constructor, configured
-capture, diagnostic or behavior. Bazel 9.2 decides compatibility.
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` is guidance only. Its
+`BuiltinProviderId.output_group_info` and separate binding/value paths support
+keeping native declaration identity distinct from module/export-owned user
+providers and later configured values. Copy no Zig code, numeric discriminant,
+enum layout, callable implementation, value model, diagnostic or behavior.
 
-## Compatibility target for a selected implementation
+## Decision and compatibility
 
-- **Exact candidate:** `.bzl` name availability, omission from BUILD globals,
-  callable native-provider declaration identity, distinctness from user
-  providers and other fixed providers, and lazy capture by the clippy helper.
-- **Slug-native candidate:** an evaluator-free Rust representation for the
-  fixed declaration token, with explicit memory accounting if retained.
-- **Unsupported/deferred:** constructing nonempty or empty OutputGroupInfo
-  values unless separately proved necessary; named-group validation;
-  depset/artifact conversion; fields, indexing, iteration and membership;
-  returning the provider from a rule/aspect; configured target/aspect lookup,
-  attachment, merge and output selection.
+Add a dedicated zero-state `OutputGroupInfo` native-provider declaration value
+beside Slug's loading provider definitions. Its concrete Rust Starlark value
+type provides Slug-native internal separation; it is not a `ProviderId` and not
+the generic `AnalysisBuiltinCallable`. Observable Bazel class-based equality
+and hashability are deferred. It displays exactly as
+`<function OutputGroupInfo>`, freezes without an evaluator and implements
+invocation only to fail closed with an unsupported loading diagnostic.
 
-The audit must narrow these candidates rather than assume them. In particular,
-callability in Bazel does not authorize configured construction in Slug.
+Install the value only in complete `.bzl` globals (`bool_config = true`), not
+BUILD globals. The exact clippy helper may resolve and capture it, but loading
+must not invoke the helper or construct an output-group value.
 
-## Allowlist and deliverable
+- **Exact:** fixed `.bzl` name placement; BUILD absence; exact
+  `<function OutputGroupInfo>` representation; evaluator-free capture/freeze;
+  exact helper and `rust_clippy` declaration loading through line 461.
+- **Slug-native:** a zero-sized Rust Starlark declaration token whose distinct
+  concrete type prevents conflation with user providers inside this slice and
+  whose unsupported invocation fails closed.
+- **Unsupported/deferred:** every `OutputGroupInfo(...)` call, including empty;
+  observable provider equality and hashability across values/globals;
+  named group validation; depset/artifact conversion; provider values, fields,
+  indexing, iteration and membership; return from rule/aspect implementations;
+  configured target/aspect lookup, attachment, merge and output selection; the
+  following clippy-test provider/rule/runner/actions.
 
-Only these documentation files may change:
+The Buck2 utility review selects a zero-state `Allocative` simple value. No
+collection, compact string, Arc, interner, cache, clone path, hashing owner,
+memory-accounting extension or Stage 9 ledger update is warranted.
 
-- `.codex/skills/slug-agent-orchestration/references/routing-log.md`
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
-- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
+## Allowlist, proof and caps
 
-The deliverable must record:
+Only these files may change:
 
-1. exact Bazel source/test anchors for placement, native identity and callable
-   behavior;
-2. the current Slug global/provider owners and why the chosen owner does not
-   conflate user and native provider identity;
-3. the precise Zabel guidance used and excluded;
-4. Buck2 utility/retained-memory review if a new representation is selected;
-5. one bounded implementation packet with file allowlist, base hashes, line
-   caps, exact/Slug-native/deferred classifications, discriminating proof,
-   serial validation and independent review, or `REPLAN`.
+| File | Base SHA-256 | Base lines | Final ceiling |
+|---|---|---:|---:|
+| `app/slug_loading_v2/src/provider.rs` | `6a452de998de926287f01c172aa8e77b1a7c99a742f6e2f09cfbadac2cc09c93` | 964 | 1,009 |
+| `app/slug_loading_v2/src/package.rs` | `8a948df6b7c504b2f1dc468f31f63e7eeadd49c6d0bf77d9538dbd8f6caedbeb` | 6,183 | 6,203 |
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `4215f59e3d3cbc51f06f19b82c610630541fa79c62a958c8851d5c9838ee9e73` | 6,798 | 6,948 |
 
-No Cargo, Bazel oracle, daemon or smoke command is required for this docs-only
-audit. Run `git diff --check` and `scripts/v2_archive_status.sh`; only its three
-known archive-only misses may remain.
+Caps are 45 production, 150 proof and 195 total additions; deletions do not buy
+addition budget. No new function may exceed 120 lines.
 
-STOP and `REPLAN` for any Rust/test edit; dirty authority; Java/JVM work;
-configured provider/target/aspect work; output-group construction or artifact
-semantics; copied Zabel content; invented Bazel behavior; an unbounded native
-provider framework; another source expression; or a non-bounded implementation.
+Required proof:
+
+1. Prove the fixed token resolves and freezes in `.bzl`, is absent from BUILD,
+   renders exactly as `<function OutputGroupInfo>`, downcasts to its dedicated
+   native type rather than a user provider, and rejects invocation before
+   producing a value. Do not assert equality or hashability.
+2. Extend `CLIPPY_ASPECT_SOURCE` with the exact helper and rule through line
+   461. Do not stub `OutputGroupInfo`, abbreviate the helper or reduce the rule.
+3. Assert the exported ordinary `rust_clippy` class, no toolchains, and its sole
+   `deps` label-list with omitted fields, two ordered provider identities and
+   complete attached `rust_clippy_aspect` identity.
+4. Preserve clippy mutation proofs and the existing pre-recording rejection for
+   provider/aspect-bearing target invocation. Prove neither helper nor native
+   provider constructor executes during module freeze.
+
+No new oracle is needed: pinned Bazel source fixes the native global contract,
+and the exact rules_rust source extract discriminates the live boundary.
+
+## Serial validation and STOP
+
+Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
+`CARGO_BUILD_JOBS=1`:
+
+- focused OutputGroupInfo, clippy and provider/aspect-bearing rule tests;
+- `cargo test -p slug_loading_v2 --lib --locked`;
+- `cargo test -p slug_loading_v2 --test bzl_invalidation --locked`;
+- `cargo test -p slug_loading_v2 --test build_file_loading --locked`;
+- `cargo check --locked -p slug_analysis_v2 -p slug_core_v2`;
+- `cargo build -p slug_cli_v2 --locked` before any rebuilt-binary smoke;
+- `cargo fmt --all -- --check`, `git diff --check`, and
+  `scripts/v2_archive_status.sh` with only its three known archive-only misses.
+
+Independent terminal review must verify the native/user identity separation,
+`.bzl`-only placement, constructor nonactivation, exact source/stop, complete
+attached-aspect identity, compatibility boundary, Zabel guidance-only role,
+utility decision, validation and caps.
+
+STOP and `REPLAN` for a constructor value; configured provider/target/aspect or
+artifact semantics; reuse of user `ProviderId`; generic native-provider
+framework; DICE/analysis/action work; helper execution; the following provider
+or rule; Java/JVM work; copied Zabel content; another file; or a cap violation.
 
 ## Immediate predecessor
 
-`fc9473b1` accepted the complete clippy aspect using one shared typed
-rule/aspect requirement slice. All local gates and independent review passed.
+`54ef6cdc` records the compile-time blocker and audited identity boundary after
+fully reverting the disproven proof-only candidate.

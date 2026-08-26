@@ -30,18 +30,19 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; OutputGroupInfo declaration-global audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; `5f8dd852` accepts clippy's exact 11-label aspect map and `fc9473b1` accepts its complete mixed-toolchain aspect | compiling the following lazy helper requires Bazel's fixed `.bzl` `OutputGroupInfo` provider global | run only docs audit `WP-4-7A-output-group-info-global-audit`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; OutputGroupInfo declaration-global loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; `5f8dd852` accepts clippy's exact 11-label aspect map and `fc9473b1` accepts its complete mixed-toolchain aspect | compiling the following lazy helper requires Bazel's fixed `.bzl` `OutputGroupInfo` provider global | run only `WP-4-7A-output-group-info-declaration-global-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-output-group-info-global-audit](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-output-group-info-declaration-global-loading](./slug-v2-subplans/current-packet.md).
 
-Audit Bazel's fixed `.bzl` `OutputGroupInfo` provider identity and declaration
-placement, then select one bounded loading-only implementation or `REPLAN`.
+Install one fixed `.bzl` native-provider declaration token, keep all
+construction and configured semantics unsupported, and freeze the exact clippy
+helper/rule through line 461.
 
-### M7 clippy rule proof replanned; OutputGroupInfo global audit selected (2026-08-26)
+### M7 OutputGroupInfo global audit accepts bounded loading (2026-08-26)
 
 Commit `fc9473b1` shares one evaluator-detached
 `ToolchainTypeRequirement` slice between rule and aspect declarations. It
@@ -66,17 +67,27 @@ resolution. The partial test edit was fully reverted, leaving a clean tree.
 Pinned Bazel 9.2 installs `OutputGroupInfo.STARLARK_CONSTRUCTOR` directly in
 the fixed `.bzl` environment. Its `BuiltinProvider` class supplies stable
 provider identity, while named-group construction and artifact-depset
-conversion belong to configured analysis. Run only docs audit
-`WP-4-7A-output-group-info-global-audit`: authenticate placement, identity,
-callability and the smallest loading-only boundary before selecting an
-implementation or `REPLAN`. Do not resume the clippy rule proof during the
-audit.
+conversion belong to configured analysis. `BuiltinProvider.equals` and its Key
+compare the concrete provider class, so Slug must not reuse its
+module/export-owned user `ProviderId` or pretend that the generic
+`AnalysisBuiltinCallable` is a provider identity.
+
+Run only `WP-4-7A-output-group-info-declaration-global-loading`. Add one
+zero-state native-provider declaration token in the loading provider owner,
+install it only in complete `.bzl` globals, and make every constructor call
+fail closed. Extend the exact clippy source proof through its helper and rule;
+the helper may capture the token but may not execute. Stop before
+`RustClippyTestInfo` and all output-group values/configured behavior. Match the
+exact `<function OutputGroupInfo>` representation, but defer observable
+equality/hashability; the distinct Rust type is Slug-native internal identity.
 
 Clean `../zabel` `0795445f…` remains guidance only: its process-stable
 `BuiltinProviderId.output_group_info` keeps native-provider identity separate
 from module/export-owned user providers. That is an ownership clue, not a
-compatibility decision. No Zig code, discriminant, layout, constructor,
-configured value or behavior may be copied; Bazel 9.2 remains sole authority.
+compatibility decision. Slug uses its own zero-sized Rust type and copies no
+Zig code, discriminant, layout, constructor, configured value or behavior.
+Bazel 9.2 remains sole authority. The Buck2 utility review selects a zero-state
+`Allocative` value and no collection, interner, cache or ledger update.
 
 ### M7 clippy aspect attributes accepted; toolchain requirements selected (2026-08-26)
 

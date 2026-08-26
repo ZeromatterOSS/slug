@@ -5247,7 +5247,7 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
-### Clippy rule proof replanned; OutputGroupInfo global audit selected (2026-08-26)
+### OutputGroupInfo global audit accepts bounded loading (2026-08-26)
 
 Commit `fc9473b1` replaces the aspect's singular label with the same immutable
 typed requirement slice used by rules. One shared evaluator-aware parser
@@ -5279,21 +5279,31 @@ sets. The clippy helper only captures the provider global as a later indexing
 key: no constructor, group, artifact or configured target is evaluated while
 the module freezes.
 
-Run only docs packet `WP-4-7A-output-group-info-global-audit`. Authenticate
-the provider's fixed identity, `.bzl`-only placement, callable/type surface and
-fail-closed loading boundary. Decide whether the existing analysis-builtin
-callable owner can represent this fixed provider without lying about identity,
-or select one bounded native-provider declaration token. Do not edit Rust,
-resume the clippy rule proof, construct output-group values, or admit configured
-lookup/merge/selection during the audit.
+Pinned `BuiltinProvider.equals` and `BuiltinProvider.Key.equals` compare the
+concrete native provider class. Slug's `ProviderId` instead owns a user
+provider's defining module label and exported name, and its
+`AnalysisBuiltinCallable` is a generic callable rather than a provider identity.
+Neither is a truthful owner for the fixed declaration token.
+
+Run only `WP-4-7A-output-group-info-declaration-global-loading`. Add one
+zero-state, evaluator-free `OutputGroupInfo` native-provider callable in the
+loading provider module and install it only in complete `.bzl` globals. Its
+distinct Rust Starlark value type provides only Slug-native internal separation;
+observable Bazel provider equality/hashability remains deferred. Its display
+matches `<function OutputGroupInfo>`, and every invocation fails closed because
+the selected source only captures it in a lazy body. Then extend the exact
+clippy source proof through the helper and `rust_clippy` declaration, stopping
+before `RustClippyTestInfo`. Do not construct empty or named output groups or
+admit fields, artifacts, configured lookup, merge or selection.
 
 Clean `../zabel` `0795445f…` supplies guidance only. Its process-stable
 `BuiltinProviderId.output_group_info` distinguishes native provider identity
 from module/export-owned user providers and later configured values. Slug may
 adopt that phase/identity separation in Rust, but copies no Zig code,
 discriminant, layout, constructor, configured capture or behavior. Bazel 9.2
-remains sole authority. Any retained identity change must trigger the Buck2
-utility review before implementation.
+remains sole authority. The Buck2 utility review selects the zero-state
+`Allocative` declaration value; no collection, interner, cache, clone path or
+Stage 9 ledger update is warranted.
 
 ### Clippy aspect attributes accepted; typed aspect toolchains selected (2026-08-26)
 
