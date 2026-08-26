@@ -4094,3 +4094,17 @@ path, socket or transport fact enters the structural `RepoSpec`, DICE equality
 or retained materializer state; no root can be published. Pinned Zabel guides
 this semantic-view/scratch separation only, while Bazel 9.2 owns URL, redirect,
 fallback and integrity behavior.
+
+### Selected-registry verified capture accepted; realization audit active (2026-08-25)
+
+Commit `3bc02039` owns bounded ordered HTTPS capture, streaming SHA-256 SRI,
+explicit verified-capture deletion and the generation-scoped deferred-
+extraction terminal beneath the sole materializer. The dormant path remains
+offline; no transfer scratch enters semantic identity or retained state.
+
+Run only docs packet `WP-5-7A-selected-registry-bcr-archive-realization-audit`.
+Re-derive gzip/tar entry admission, executable modes, registry MODULE
+replacement, provisional-root cleanup/promotion and the exact dependency/file
+boundary from the accepted capture owner. Pinned Zabel remains architectural
+guidance for semantic-view/complete-physical-realization separation only;
+Bazel 9.2 owns every compatibility claim.
