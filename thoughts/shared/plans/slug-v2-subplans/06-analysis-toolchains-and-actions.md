@@ -18242,3 +18242,10 @@ frame owner or token probes, root-before-SRI ordering, wrong redirects and no
 archive-owner relocation. It compiled and two narrow tests passed but did not
 satisfy the accepted lifetime/proof contract. The candidate was removed;
 current is docs-only and Zabel scheduling remains unimported.
+
+### Native archive plan/split implementation selected (2026-08-25)
+
+Relocate the existing archive owner/proof and add only an inactive immutable BCR
+plan. A valid plan returns an explicit deferred-transport result; it owns no
+runtime, connection, capture or root. This bounded seam preserves repository
+session behavior and Zabel's ownership-only guidance before transport returns.

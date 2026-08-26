@@ -4057,3 +4057,10 @@ empty patch/overlay maps and zero patch strip. The prior packet's absent-type
 shape was wrong. Its candidate also replaced the accepted local archive plan.
 Current is docs-only: freeze mutually exclusive complete local/BCR plans while
 retaining Zabel's semantic-view/physical-root guidance only.
+
+### Selected-registry BCR plan/local split selected (2026-08-25)
+
+Implement one private mutually exclusive LocalTar/SelectedBcrTarGz plan owner.
+The BCR plan requires the producer's complete `type = "tar.gz"`, empty/zero,
+URL and SRI fields but performs no physical work. Local materialization remains
+exact. Zabel guides the view/realization separation only; Bazel owns fields.
