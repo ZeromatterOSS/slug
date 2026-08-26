@@ -30,17 +30,53 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; bounded Bazel `provider(doc=...)` loading support selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commit `54d28477` accepts bounded Bazel keyword-only syntax/binding; commit `1a527089` accepts exact `.bzl` `struct` placement plus the live named construction, field-read and frozen-export slice; the provider-doc audit authenticates call acceptance and its nonsemantic build identity | accept named string/`None` `doc` only at the existing provider global, preserve callable schema/export identity and prove recursive freeze; documentation extraction and later provider-instance/analysis breadth remain deferred | run only `WP-4-7A-bazel-provider-doc-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; bounded Bazel `rule(doc=...)` loading support selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits `54d28477`, `1a527089` and `a81b5823` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations and provider-doc call acceptance with unchanged identity; the rule-doc audit authenticates the next call and its nonsemantic build projection | accept named string/`None` `doc` only at the existing rule global, preserve rule schema/capability and prove recursive freeze; documentation extraction and later rule/provider analysis breadth remain deferred | run only `WP-4-7A-bazel-rule-doc-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-provider-doc-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-bazel-rule-doc-loading](./slug-v2-subplans/current-packet.md).
 
-Accept only Bazel's named string/`None` `doc` argument at the existing provider
-global, leave semantic callable identity/schema ownership unchanged, and prove
-documented provider export through a recursive `.bzl` load.
+Accept only Bazel's named string/`None` `doc` argument at the existing rule
+global, leave semantic rule schema/capability ownership unchanged, and prove
+documented rule-definition export through a recursive `.bzl` load.
+
+### M7 Bazel `provider(doc=...)` support accepted; rule-doc frontier active (2026-08-26)
+
+Commit `a81b5823` accepts omitted, string and explicit `None` provider docs at
+the existing global adapter, rejects other values, and deliberately retains no
+documentation. Frozen provider schema plus source-label/exported-name identity
+remain unchanged. Focused tests pass 2/2, all 242 loading tests pass, locked
+core check, rebuilt CLI, formatting and hygiene pass, and independent review
+returned `ACCEPT` after the diff was reduced within every packet cap.
+
+Fresh disposable rules_rust query and build advance through all 18 provider
+declarations. Their public terminals remain the existing repository-session
+wrappers (`query_error` exit 7 and `build_runtime_error` exit 2). The accepted
+source/load-order trace identifies the next internal declaration at
+`rust/private/lto.bzl:40`: `rust_lto_flag = rule(doc = ...,
+build_setting = config.string(flag = True), ...)`.
+
+Pinned Bazel 9.2 `StarlarkRuleFunctionsApi.rule`,
+`StarlarkRuleClassFunctions.createRule`,
+`StarlarkRuleClassFunctionsTest.testRuleDoc`, `RuleClass` and
+`RuleInfoExtractor` establish that named-only `doc` is `string | None`,
+defaults to `None`, is trimmed and retained for separate documentation
+extraction. Slug's frozen rule owner already contains every admitted
+build-semantic field and has no documentation consumer.
+
+Run only `WP-4-7A-bazel-rule-doc-loading`: consume and validate `doc` at the
+existing rule adapter, preserve the frozen schema/capability, prove recursive
+freeze and do not admit another rule parameter. Exact compatibility is call
+acceptance/type rejection on the live loading route. Rust storage and
+nonrequired diagnostics are Slug-native; doc retention/extraction, other rule
+parameters, broader provider/rule analysis, toolchains/actions, M8/M7B and
+exact output bytes remain unsupported/deferred.
+
+Pinned Zabel `c7298478…` guides one complete call-shape owner projected to the
+existing build-semantic frozen rule, without a metadata side store. It supplies
+no rule behavior or representation; pinned Bazel 9.2 remains sole authority.
 
 ### M7 Bazel provider `doc` audit accepted (2026-08-26)
 

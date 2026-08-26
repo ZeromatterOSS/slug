@@ -4164,3 +4164,43 @@ Pinned Zabel `c7298478…` guides keeping the complete globals owner and
 projecting only build-semantic provider identity/schema into retained values,
 without a second metadata registry. No Zabel code, representation or behavior
 is copied. M7 stays partial and M7A -> M8 -> M7B remains.
+
+### Bazel provider `doc` accepted; rule documentation frontier active (2026-08-26)
+
+Commit `a81b5823` adds named `doc` to the existing provider adapter, accepts
+omission, strings and explicit Starlark `None`, rejects every other value and
+retains no prose. The frozen callable continues to own only its sorted field
+schema and source-label/exported-name identity. Recursive string/`None` export
+and non-string failure proofs pass, as do all 242 loading tests, locked core
+check, rebuilt CLI, formatting and hygiene. Independent implementation review
+returned `ACCEPT` after the diff was corrected to fit all packet caps.
+
+Fresh disposable rules_rust query and build load all 18 documented providers
+and preserve their established public repository-session wrappers. The HTTPS
+trace materializes only the exact rules_rust archive before failure. Recursive
+source order then reaches `rust/private/rustc.bzl`, which loads
+`rust/private/lto.bzl`; after its documented `RustLtoInfo` provider, line 40
+calls `rust_lto_flag = rule(doc = ..., build_setting =
+config.string(flag = True), ...)`. Slug's current `rule` adapter rejects the
+extra named `doc` before changing the frozen rule definition.
+
+Pinned Bazel 9.2 `StarlarkRuleFunctionsApi.rule` declares named-only `doc` as
+`string | None` with `None` default. `StarlarkRuleClassFunctions.createRule`
+trims and stores a present string through `RuleClass.Builder`, and
+`StarlarkRuleClassFunctionsTest.testRuleDoc` authenticates short, multiline
+and omitted docs. `RuleInfoExtractor` is the separate documentation consumer;
+no admitted Slug command observes this prose.
+
+Run only `WP-4-7A-bazel-rule-doc-loading`. Add string/explicit-`None`
+validation to the existing call-shape adapter, deliberately project only the
+unchanged build-semantic rule schema/capability into `FrozenRuleDefinition`,
+and prove recursive freeze plus non-string rejection. Do not retain docs or
+admit another rule parameter.
+
+Exact compatibility is rule-doc call acceptance/type rejection for the live
+build-setting declaration. Rust storage and nonrequired diagnostics are
+Slug-native. Bazel doc retention/Stardoc, other missing rule parameters,
+broader provider/rule analysis, toolchains/actions, M8/M7B and exact output
+bytes remain unsupported/deferred. Pinned Zabel `c7298478…` guides the one
+complete adapter/narrow semantic projection only; Bazel 9.2 remains sole
+behavior authority.

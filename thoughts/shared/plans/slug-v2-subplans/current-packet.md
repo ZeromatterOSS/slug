@@ -1,87 +1,86 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-bazel-provider-doc-loading`
+Packet: `WP-4-7A-bazel-rule-doc-loading`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: Stage 4 `package_globals::provider` adapter and retained provider callable
-Base: `1a527089`
+Owners: Stage 4 `package_globals::rule` adapter and retained rule definition
+Base: `a81b5823`
 
 Result: accept Bazel's named string/`None` `doc` argument on the existing
-provider global, preserve the current semantic callable identity/schema and
-prove frozen export through recursive `.bzl` loading. Do not implement
-documentation extraction or provider-instance breadth.
+`rule` global, preserve the current semantic rule schema/capability and prove
+documented definitions freeze through recursive `.bzl` loading. Do not add a
+documentation extractor or widen rule analysis.
 
 ## Learned facts and authority
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
 is sole behavior authority:
 
-- `StarlarkRuleFunctionsApi.provider` declares named `doc` as `string | None`
-  with `None` default. `fields` and `init` are separate named parameters.
-- `StarlarkRuleClassFunctions.provider` trims present documentation and stores
-  it through `StarlarkProvider.Builder`; `None` stores nothing and a non-string
-  fails argument conversion.
-- `StarlarkProvider.getDocumentation` serves Java documentation consumers, but
-  `ProviderApi` exposes no Starlark attribute. Exported callable equality/hash
-  use only the `.bzl` key and exported name.
-- `StarlarkRuleClassFunctionsTest.declaredProviderDocumentation`,
-  `declaredProvidersDoc` and `declaredProvidersBadTypeForDoc` authenticate
-  trimming, acceptance and rejection. `StarlarkProviderTest` authenticates
-  stored metadata. `StarlarkDocumentationTest` and
-  `ModuleInfoExtractorTest.providerDocstring` prove that retention belongs to
-  the separate Bazel documentation surface.
+- `StarlarkRuleFunctionsApi.rule` declares named-only `doc` as `string | None`
+  with `None` default, independently of `implementation`, `attrs`,
+  `build_setting`, `toolchains` and the other rule parameters.
+- `StarlarkRuleClassFunctions.createRule` converts a present string, trims it
+  with `Starlark.trimDocString`, and stores it through
+  `RuleClass.Builder.setStarlarkDocumentation`; a non-string fails argument
+  conversion and `None` stores nothing.
+- `StarlarkRuleClassFunctionsTest.testRuleDoc` authenticates short, multiline
+  trimmed and omitted documentation. `RuleInfoExtractor` is the separate
+  documentation consumer; loaded rule invocation and configured analysis do
+  not read this prose.
 
 The accepted rules_rust 0.73.0 archive SHA-256 is
 `2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`.
-`rust/private/providers.bzl` makes 18 top-level declarations, each with a
-string `doc` and dictionary `fields`; there is no `init`, list schema or
-instance construction. Freezing exports all callables. `common.bzl` loads six
-and stores them in the already accepted `rust_common` struct before any rule
-implementation runs.
+After the now-accepted provider declarations load, `rust/private/rustc.bzl`
+recursively loads `rust/private/lto.bzl`. That module first creates documented
+`RustLtoInfo`, then its line-40 `rust_lto_flag = rule(...)` supplies a string
+`doc`, one implementation, and the already admitted
+`config.string(flag = True)` build setting. Fresh query and build reach this
+declaration; their public wrappers remain `query_error` exit 7 and
+`build_runtime_error` exit 2 at the repository-session boundary.
 
-Slug already validates dictionary field documentation as strings, reduces it
-to sorted semantic field names, and freezes `UserProviderCallable` with a
-structural source-label/exported-name `ProviderId`. Bazel provider identity
-also excludes documentation. No admitted Slug command extracts docs.
+Slug's `package_globals::rule` already converts the admitted parameters into
+one `RuleDefinition`: implementation, toolchain requirements, complete
+attribute schema, executable/test/build-setting bits, and export-time rule
+class. Freeze retains only those build-semantic facts and its `RuleCapability`.
+No admitted Slug command extracts rule documentation.
 
 Pinned `../zabel` commit
 `c7298478e2e56262a2f438e9c065325744c9f0fc` is architecture guidance only.
 Its complete retained semantics owner and narrow consumer projections support
-keeping one global adapter and projecting only build-semantic provider schema
-and identity. Copy no Zabel code, representation, fingerprint, scheduler or
-behavior; Bazel remains provider authority.
+keeping one call-shape adapter and projecting only build-semantic rule facts
+into the frozen definition. Copy no Zabel code, representation, fingerprint,
+scheduler or behavior; Bazel remains rule authority.
 
 ## Decision and non-decisions
 
-In `package.rs`, add named `doc: Option<Value<'v>>` immediately before the
-existing named `fields` parameter of `package_globals::provider`. The outer
-`Option` represents omission; validate any present value as explicit Starlark
-`None` or a string, then consume it in that adapter and continue delegating the
-unchanged field map/evaluator to `UserProviderCallable::from_evaluator`.
+In `package.rs`, add named `doc: Option<Value<'v>>` to
+`package_globals::rule`. Validate a present value as explicit Starlark `None`
+or a string, consume it at that adapter, and construct the existing
+`RuleDefinition` unchanged.
 
-Do not retain documentation in `UserProviderCallable`, add an accessor or add a
-metadata registry. This packet admits build/query loading behavior, where doc
-is not observable and does not affect Bazel identity. Bazel doc trimming,
-retention and extraction remain explicitly unsupported/deferred; a future
-documentation command must `REPLAN` and retain provider plus field docs from
-their declaration owner.
+Do not retain documentation, add an accessor or add a metadata registry. This
+packet admits build/query loading, where docs neither alter invocation nor
+configured analysis. Bazel trimming, retention and Stardoc extraction remain
+unsupported/deferred; a future documentation command must `REPLAN` and retain
+rule plus attribute docs from their declaration owner.
 
-Do not change `provider.rs`, `ProviderId`, provider fields/instances, analysis,
-globals placement, BUILD/MODULE/REPO behavior, DICE keys, source observations,
-events or error translation. Do not admit `fields` list/`None` or `init`.
+Do not change `RuleDefinitionGen`, `FrozenRuleDefinition`, `RuleCapability`,
+attribute schemas, rule invocation/analysis, provider behavior, globals
+placement, BUILD/MODULE/REPO behavior, DICE keys, source observations, events
+or error translation. Do not admit any other missing `rule` parameter.
 
 ## Ownership, revision and lifetime
 
-`package_globals::provider` remains the complete call-shape adapter and
-`UserProviderCallable` remains the sole owner of admitted semantic field schema
-and exported identity. The existing source observation invalidates any doc
-edit before module evaluation. Because prose is not an admitted build fact,
-the retained callable may remain semantically equal after a prose-only edit.
+`package_globals::rule` remains the complete call-shape adapter and the frozen
+rule definition remains the sole owner of admitted semantic schema/capability.
+Existing source observation invalidates a doc edit before module evaluation;
+because prose is not an admitted build fact, the frozen semantic projection
+may remain equal after a prose-only edit.
 
 No request input, revision certificate, overlapping-request behavior,
 publication or equality rule changes. No memory is added: globals remain
-evaluation-local and the frozen callable retains only its existing
-DICE-owned identity/schema. Cancellation, evaluator lifetime and module
-ownership remain unchanged. No fallback, cache, task or dependency is added.
+evaluation-local and the frozen rule retains only its existing DICE-owned
+semantic facts. Cancellation, evaluator lifetime and module ownership remain
+unchanged. No fallback, cache, task or dependency is added.
 
 ## Files and caps
 
@@ -89,26 +88,26 @@ Allowed files, with base SHA-256 and final line ceiling:
 
 | File | Base SHA-256 | Cap |
 |---|---|---:|
-| `app/slug_loading_v2/src/package.rs` | `f692707b38aea95db52095fd7f650d86a4a3937b4dc4ad67f69b2d1a4fc6a0f0` | 5,120 |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `85640fe02edfeffc8a2bfd0a78d9f1c8cbd58b0303d1bcd571cc6723df11e884` | 3,880 |
+| `app/slug_loading_v2/src/package.rs` | `93f04926e7bda7e2d6d12bdb6eaa7e628a0e0dde4a2001f4f2fa8c714afe1c87` | 5,125 |
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `3e4c944731ad50cccea263426262b6ec10665a0bfe2a329f0b966a671026d0ea` | 3,930 |
 
 Production additions are <=5, proof additions <=65 and total additions <=70.
 Both files exceed the authoring-guide size trigger, but the production change
 is one parameter at the existing sole global adapter and the proof belongs in
-the existing recursive external-Bzl harness. Physical splitting would widen
-scope without separating a responsibility.
+the existing recursive external-Bzl harness. Splitting unrelated loading or
+test orchestration would widen scope without separating a responsibility.
 
 ## Proof and validation
 
-Add focused recursive external-Bzl proofs that documented providers with
-string and `None` docs bind, export and freeze with the expected source-label
-and exported-name identities. Add a non-string `doc` rejection through the
-same evaluator boundary. Do not expose documentation merely to inspect it.
+Add focused recursive external-Bzl proofs that rule definitions with string
+and `None` docs bind, export and freeze as rule values while retaining the live
+build-setting shape. Add a non-string `doc` rejection through the same
+evaluator boundary. Do not expose documentation merely to inspect it.
 
 Run:
 
 - `cargo fmt --check` and `git diff --check`;
-- the focused external-Bzl provider-doc tests;
+- the focused external-Bzl rule-doc tests;
 - full `cargo test -p slug_loading_v2`;
 - `cargo check -p slug_core_v2 --locked`;
 - `cargo build -p slug_cli_v2 --locked`;
@@ -122,17 +121,17 @@ fixture or copied archive is authorized.
 ## Compatibility and STOP
 
 - **Exact:** named string/`None` `doc` acceptance, non-string rejection, and
-  unchanged provider binding/export/freeze identity for the live dictionary
-  `fields` loading route.
+  unchanged rule binding/export/freeze semantics for the live build-setting
+  declaration route.
 - **Slug-native:** Rust storage, valid-Unicode strings, internal error
   representation and nonrequired diagnostic wording.
 - **Unsupported/deferred:** Bazel doc trimming/storage and Stardoc extraction,
-  field-documentation access, `fields` list/`None`, `init`, broader provider
-  instances/analysis, later rules_rust toolchains/actions, M8/M7B and exact
+  attribute-documentation access, every other missing rule parameter, broader
+  provider/rule analysis, later rules_rust toolchains/actions, M8/M7B and exact
   output bytes.
 
 STOP on dirty overlap, edits outside the two-file allowlist, documentation
-retention/accessors/side stores, provider identity/schema changes, environment
-widening, instance/analysis changes, source vendoring, Java/JVM, dependency
-drift, public documentation claims or scope above the caps. `REPLAN` before
-crossing a boundary.
+retention/accessors/side stores, rule schema/capability changes, environment
+widening, analysis changes, source vendoring, Java/JVM, dependency drift,
+public documentation claims or scope above the caps. `REPLAN` before crossing
+a boundary.
