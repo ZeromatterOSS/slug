@@ -17,9 +17,9 @@ Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
 is sole behavior authority:
 
 - `StarlarkRuleFunctionsApi.aspect` defines a `.bzl` global whose
-  `implementation` is callable, whose fixed `attr_aspects` is an ordered
-  sequence, whose `toolchains` is a sequence of requirements, and whose `doc`
-  is string-or-`None`.
+  `implementation` is a Starlark function, whose fixed `attr_aspects` is an
+  ordered sequence, whose `toolchains` is a sequence of requirements, and
+  whose `doc` is string-or-`None`.
 - `StarlarkRuleClassFunctions.aspect` requires `.bzl` initialization,
   resolves toolchain labels in the defining module context and constructs a
   `StarlarkDefinedAspect` without running its implementation.
@@ -80,7 +80,8 @@ side registry or clone-sensitive cache.
 Add `aspect` only to complete `.bzl` loading globals. Accept the exact fixed
 constructor subset adjacent to the first live declaration:
 
-- callable `implementation`, positional or named as Bazel permits;
+- user-defined Starlark-function `implementation`, positional or named as
+  Bazel permits;
 - omitted or fixed list-of-string `attr_aspects`;
 - omitted `toolchains` or one direct list-of-string requirement, resolved
   canonically in the defining `.bzl` context; and
@@ -151,10 +152,11 @@ Extend focused proof that:
   exports and freezes with its six ordered attribute names, canonical
   toolchain label, defining module and exported name;
 - a recursive importing module observes the same producer identity and fields;
-- positional and named callable implementation plus omitted defaults work,
-  while a noncallable implementation, malformed fixed lists, non-string doc
-  and every unsupported parameter fail closed; an unexported nested result
-  freezes without falsely acquiring producer export identity;
+- positional and named Starlark-function implementation plus omitted defaults
+  work, while a native/other non-Starlark-function implementation, malformed
+  fixed lists, non-string doc and every unsupported parameter fail closed; an
+  unexported nested result freezes without falsely acquiring producer export
+  identity;
 - `aspect` is absent from BUILD, including an imported factory call; and
 - accepted String/Boolean/StringList descriptor definitions and their target
   rejection boundaries remain unchanged.
@@ -181,7 +183,8 @@ proof.
 
 ## Compatibility and STOP
 
-- **Exact:** `.bzl` placement, callable implementation ABI, fixed ordered
+- **Exact:** `.bzl` placement, user-defined Starlark-function implementation
+  ABI, fixed ordered
   string `attr_aspects`, one direct string toolchain requirement,
   string/`None` doc validation, first top-level export identity and recursive
   frozen import for the admitted constructor subset.

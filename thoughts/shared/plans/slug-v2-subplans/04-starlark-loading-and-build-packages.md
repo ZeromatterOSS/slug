@@ -4317,10 +4317,10 @@ later rule calls and the later `rustfmt`, `clippy` and `unpretty` aspects.
 Pinned Bazel 9.2 `StarlarkRuleFunctionsApi.aspect`,
 `StarlarkRuleClassFunctions.aspect`, `StarlarkDefinedAspect.export`,
 `StarlarkDefinedAspectsTest` and `StarlarkRuleClassFunctionsTest` establish a
-`.bzl`-only declaration, callable implementation, fixed ordered propagation
-attributes, a defining-context toolchain requirement, string/`None`
-documentation and first producer export identity. No implementation runs
-while the declaration loads or freezes.
+`.bzl`-only declaration, user-defined Starlark-function implementation, fixed
+ordered propagation attributes, a defining-context toolchain requirement,
+string/`None` documentation and first producer export identity. No
+implementation runs while the declaration loads or freezes.
 
 Run only `WP-4-7A-bazel-aspect-definition-loading`: add the exact fixed
 constructor subset adjacent to the first live declaration and retain
