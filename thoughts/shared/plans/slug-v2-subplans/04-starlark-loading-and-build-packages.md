@@ -5247,6 +5247,56 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Post-toolchain source-order audit accepted; aspect requirements selected (2026-08-26)
+
+Slug's external Bzl driver first parses and resolves every direct load, then
+awaits each child serially in `AstModule::loads()` source order. It returns at
+the first Need or semantic terminal. `ExternalBzlModuleEvalKey` is structural
+over route and repository Bzl label, and the canonical-manifest regression
+proves duplicate direct loads and warm transactions reuse completed child
+values while preserving first-seen direct/reachable order.
+
+That live contract authenticates the source route after `4aed2438`:
+`rust/private/toolchain.bzl` returns through alias-only
+`rust/rust_toolchain.bzl`; `rust/toolchain.bzl` finishes its source-ordered
+analyzer, rustfmt, stdlib and toolchain wrappers, whose recursive children are
+already complete; and the first load in `rust/defs.bzl` completes before its
+second load reaches `rust/private/clippy.bzl`. The selected archive hashes in
+the audit manifest all match.
+
+Clippy's first import newly evaluates bazel_skylib 1.8.2
+`lib/structs.bzl` at SHA-256
+`c3fa79b9246582cb57c1bd9cbed999afbee822915d5888009bc0a197c43e9749`;
+its one function body is lazy and its sole top-level `struct` uses the accepted
+surface. The other six imports are completed dependencies of the toolchain,
+rust-analyzer or rustfmt branches. Lines 48-74 use accepted provider and
+string-list build-setting surfaces. Lines 76-309 are lazy function bodies,
+and lines 311-314 are comments. Every argument of `rust_clippy_aspect` before
+its toolchain list uses an accepted attribute/provider/fragment surface. The
+first newly unsupported operation is therefore lines 370-373: the list
+evaluates a canonical String and a typed optional `config_common` requirement,
+but Slug's `Option<UnpackList<&str>>` aspect binder cannot accept the latter or
+retain both requirements.
+
+Pinned Bazel 9.2 `StarlarkRuleFunctionsApi`,
+`StarlarkRuleClassFunctions.parseToolchainTypes`, and
+`StarlarkRuleClassFunctionsTest.testAspectAddToolchain` establish mixed
+String/Label/typed input, defining-thread label conversion, stable distinct
+order, mandatory default/retention and strictest-wins duplicates. Run only
+`WP-4-7A-bazel-aspect-toolchain-requirements-loading`: share the existing
+typed requirement representation and parser with aspects, retain the two
+requirements through freeze, prove the exact source aspect, and stop at its
+line 404 close. Duplicates, configured aspect propagation/resolution and the
+following `rust_clippy` rule remain deferred.
+
+Clean `../zabel` `0795445f…` usefully confirms one
+`ToolchainTypeRequirement` slice on both rule and aspect declarations and
+detached defining-module label ownership. That informs Slug's shared Rust
+owner only. No Zig code, evaluator layout, diagnostic or behavior is copied;
+Bazel 9.2 remains authoritative. The Buck2 utility audit keeps the existing
+`CanonicalLabel`, Boolean, `Arc<[T]>` and `Allocative` pattern, so no utility
+import or Stage 9 ledger update is warranted.
+
 ### Config-common toolchain requirement accepted; caller audit selected (2026-08-26)
 
 Commit `4aed2438` introduces one evaluator-free `RuleToolchainRequirement`

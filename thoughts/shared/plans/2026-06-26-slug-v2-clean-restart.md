@@ -30,19 +30,50 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; post-toolchain source audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements | authenticate the caller return, next child and first newly reached unsupported expression; clippy is only the source-text candidate | run only `WP-4-7A-post-toolchain-source-order-audit`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; aspect toolchain requirements selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; the source-order audit authenticates clippy as the next child | admit clippy's mixed mandatory/optional aspect toolchain list and freeze that aspect | run only `WP-4-7A-bazel-aspect-toolchain-requirements-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-post-toolchain-source-order-audit](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-bazel-aspect-toolchain-requirements-loading](./slug-v2-subplans/current-packet.md).
 
-Audit the recursive return through the alias-only toolchain wrappers, verify
-the completed `rust/toolchain.bzl` boundary, and authenticate the actual next
-child and first newly evaluated unsupported expression before selecting
-another implementation. `rust/private/clippy.bzl` is only the source-text
-candidate until manifest/cache order is proved.
+Accept String, Label and typed requirements in aspect toolchain lists, retain
+canonical label plus mandatory state on the frozen aspect, and freeze the
+source `rust_clippy_aspect`. Stop before the following `rust_clippy` rule.
+
+### M7 post-toolchain source order accepted; aspect requirements selected (2026-08-26)
+
+The external `.bzl` driver resolves all parent loads before child lookup, then
+computes children serially in AST source order and returns at the first child
+terminal. Its structural route-plus-label DICE keys and manifest regression
+prove repeated completed children are reused. Consequently the completed
+private toolchain returns through the alias-only public wrapper; the remaining
+`rust/toolchain.bzl` children are already-complete analyzer/rustfmt/toolchain
+modules; and `rust/defs.bzl` next evaluates `rust/private/clippy.bzl`.
+
+Clippy's first import evaluates bazel_skylib 1.8.2 `lib/structs.bzl`, whose
+sole top-level struct uses the accepted surface; its other six imports reuse
+completed children. Its provider and two string-list build-setting rules
+freeze, while function bodies and documentation examples stay lazy. The first
+unsupported expression is the line 370-373
+mixed aspect toolchain list: Slug's current aspect binder accepts at most one
+String, so it rejects the already-evaluated typed optional C++ requirement.
+Pinned Bazel 9.2 accepts String, Label and typed requirements for both rule and
+aspect declarations, retains stable distinct order and mandatory state, and
+uses strictest-wins duplicate normalization.
+
+Run only `WP-4-7A-bazel-aspect-toolchain-requirements-loading`. Generalize the
+existing rule-named retained record into one shared toolchain requirement,
+reuse the value-list parser for aspects, retain both source requirements on the
+transient and frozen aspect, and stop after `rust_clippy_aspect` line 404.
+Duplicate normalization and configured aspect application remain deferred.
+
+Clean `../zabel` `0795445f…` guided the shared rule/aspect declaration-owned
+typed requirement and evaluator-detached label/mandatory state. Slug retains
+its existing Rust `CanonicalLabel`, Boolean, immutable `Arc` slice and
+`Allocative`; no Zig code, layout, diagnostics or behavior is copied. Bazel
+9.2 remains sole behavior authority.
 
 ### M7 config-common toolchain requirement accepted; caller audit selected (2026-08-26)
 
