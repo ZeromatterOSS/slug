@@ -5247,6 +5247,37 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Data-attribute docs accepted; integer allowed values selected (2026-08-26)
+
+Commit `8d3f9b6e` accepts string/`None` documentation on the remaining int,
+string-list, string-dict and string-list-dict constructors used by
+`rust_toolchain`. Documentation is validated at the existing adapter and
+discarded from retained semantics. Distinct docs freeze to equal rule schemas,
+wrong types reject, and the source-shaped prefix reaches its first `values`
+argument. All 210 loading tests, configured analysis, locked checks, rebuilt
+CLI and hygiene pass at 8 production and 61 proof additions; independent
+terminal review returned `ACCEPT`.
+
+The next evaluated row at `rust/private/toolchain.bzl:727-738` is
+`attr.int(values = [-1, 0, 1], default = -1)`. Pinned Bazel 9.2 defines
+named-only `values` as an integer sequence, installs no predicate for an empty
+sequence, and checks every possible explicitly supplied rule-instance value
+against the nonempty set while leaving ordinary defaults unchecked. Its
+focused `testAttrIntValues` distinguishes members from nonmembers.
+
+Run only `WP-4-7A-bazel-int-allowed-values-loading`: normalize and detach the
+integer set into the existing declaration, frozen-rule and package schema
+owners, then enforce explicit/select candidates before target
+recording. Preserve empty as no constraint and reject unsupported projections
+instead of dropping the fact. Source order must stop at `linker_preference`
+line 768, whose string allowed values remain unadmitted.
+
+Clean `../zabel` `0795445f…` guides the declaration-owned constraint and
+evaluator-detachment boundary only. The Buck2 utility audit selects the
+existing immutable `Arc<[T]>` and `Allocative` schema pattern; it adds no
+utility import, interner, cache or ledger row. No Zig code, layout or behavior
+is copied, and Bazel 9.2 remains sole compatibility authority.
+
 ### Rust stdlib filegroup accepted; data-attribute docs selected (2026-08-26)
 
 Commit `75709828` adds one normalized `allow_files` Boolean to the existing
