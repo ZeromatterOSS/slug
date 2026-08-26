@@ -30,18 +30,48 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; scalar-label provider predicate selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; `9685d9a7`, `52d2c6f2`, `297c2286`, `919ecfa5`, `4d7a9bbb`, `9c51999f`, `f65c9ce0`, `2ebc6fe1`, `152caa6f`, `b0cd7855`, `4bdd64bf`, `75709828`, `8d3f9b6e`, `563699ab`, `80425ce9`, and `b1edbe0e` retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, and scalar-label file allowance | retain the singleton scalar-label provider predicates in `rust_toolchain`; `config_common.toolchain_type` remains deferred | run only `WP-4-7A-bazel-label-provider-predicate-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; config-common toolchain requirement selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; `9685d9a7`, `52d2c6f2`, `297c2286`, `919ecfa5`, `4d7a9bbb`, `9c51999f`, `f65c9ce0`, `2ebc6fe1`, `152caa6f`, `b0cd7855`, `4bdd64bf`, `75709828`, `8d3f9b6e`, `563699ab`, `80425ce9`, `b1edbe0e`, and `ef910068` retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance, and singleton scalar-label provider predicates | retain the optional C++ toolchain-type requirement that completes `rust/private/toolchain.bzl` | run only `WP-4-7A-bazel-config-common-toolchain-type-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-label-provider-predicate-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-bazel-config-common-toolchain-type-loading](./slug-v2-subplans/current-packet.md).
 
-Admit one exported provider in the scalar-label predicate, reuse the existing
-normalized provider-identity schema, and advance the complete rules_rust
-`rust_toolchain` attribute map to its first `config_common.toolchain_type`
-expression without invoking the implementation.
+Retain Bazel's typed label-plus-mandatory toolchain requirement, admit the
+optional C++ requirement on `rust_toolchain`, and complete top-level evaluation
+of `rust/private/toolchain.bzl` without invoking the implementation or
+pretending optional configured resolution is supported.
+
+### M7 scalar-label provider predicate accepted; toolchain requirement selected (2026-08-26)
+
+Commit `ef910068` admits omitted/empty and one exported provider in a flat
+scalar-label predicate, retains its canonical provider identity in the existing
+nested immutable schema, and rejects broader shapes and unsupported projections.
+Both source provider rows freeze, constrained target invocation fails before
+recording, and all 215 loading tests plus downstream gates pass within 22
+production, 88 proof and 110 total additions. Independent terminal review
+returned `ACCEPT`.
+
+Source order now reaches the sole rule-level
+`config_common.toolchain_type("@bazel_tools//tools/cpp:toolchain_type",
+mandatory=False)` call, after which only the `rust_toolchain` documentation and
+the end of `rust/private/toolchain.bzl` remain. Pinned Bazel 9.2 constructs a
+typed requirement from String or Label input, resolves strings in the defining
+`.bzl` repository mapping, defaults `mandatory` true, and retains false through
+`rule(toolchains=...)`.
+
+Run only `WP-4-7A-bazel-config-common-toolchain-type-loading`. Introduce one
+Rust label-plus-mandatory requirement shared by the declaration, frozen rule
+and package schema, keep existing string requirements mandatory, and reject
+optional target invocation before publication. Duplicate normalization,
+aspects, configured optional resolution and other `config_common` members stay
+deferred. Re-audit the caller after the child completes.
+
+Clean `../zabel` `0795445f…` guides the same declaration-owned typed requirement
+and evaluator-detached canonical capture. Slug uses its own Rust
+`CanonicalLabel`, Boolean and immutable `Arc` slice; no Zig code, layout or
+behavior is copied. Bazel 9.2 remains sole behavior authority.
 
 ### M7 scalar-label file allowance accepted; provider predicate selected (2026-08-26)
 

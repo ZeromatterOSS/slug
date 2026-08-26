@@ -5247,6 +5247,42 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Scalar-label provider predicate accepted; toolchain requirement selected (2026-08-26)
+
+Commit `ef910068` admits omitted/empty and one exported provider in a flat
+scalar-label predicate. The exported identity is detached into the existing
+nested immutable provider schema; non-provider, unexported, multiple and nested
+forms reject, as do nonempty repository/tag projections and constrained target
+invocation. Both rules_rust provider rows freeze. All 215 loading tests and
+downstream gates pass at 22 production and 88 proof additions; independent
+terminal review returned `ACCEPT`.
+
+The next and final evaluated expression in `rust/private/toolchain.bzl` is the
+singleton rule requirement
+`config_common.toolchain_type("@bazel_tools//tools/cpp:toolchain_type",
+mandatory=False)`. Pinned Bazel 9.2 owns this as a typed label-plus-mandatory
+value, accepts String or Label input, resolves a String in the defining `.bzl`
+mapping, treats bare rule toolchain labels as mandatory, and preserves false in
+the rule class. Duplicate labels use strictest-wins normalization, which is not
+needed by this source row.
+
+Run only `WP-4-7A-bazel-config-common-toolchain-type-loading`: add the bounded
+`.bzl` namespace/value, replace bare retained rule labels with one compact
+label-plus-mandatory record, and accept distinct String, Label and typed rule
+requirements. Reject duplicate declarations rather than approximate Bazel's
+strictest merge. Optional target invocation must fail before recording because
+configured optional resolution is deferred. Aspect toolchains and every other
+`config_common` member remain out of scope. Re-audit the caller after the child
+finishes.
+
+Clean `../zabel` `0795445f…` supplies architectural guidance only: its rule
+declaration owns typed toolchain requirements and its later capture detaches
+canonical label plus mandatory state. Slug uses its own Rust
+`CanonicalLabel`/Boolean/`Arc` representation and copies no Zig code, layout,
+diagnostic or configured behavior. The Buck2 utility audit selects existing
+compact immutable owners; no new collection, interner, hash or ledger row is
+needed. Bazel 9.2 remains sole authority.
+
 ### Scalar-label file allowance accepted; provider predicate selected (2026-08-26)
 
 Commit `b1edbe0e` admits Boolean/`None` scalar-label file allowance, checks the
