@@ -1,124 +1,144 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-post-utils-eager-values-parent-import-frontier-audit`
+Packet: `WP-4-7A-rules-rust-find-toolchain-export-loading-proof`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: audit the exact rules_rust `utils.bzl` child-to-`rust.bzl` boundary
-after the accepted eager-value proof, authenticate the fifteen parent-imported
-function exports and their compiler/freeze closure, and select one bounded next
-proof or record `REPLAN`.
+Result: freeze the earliest parent-needed function definition in exact
+rules_rust `utils.bzl` source, prove its pointer-identical binding through a
+proof-only `rust.bzl` consumer, and invoke no function.
 
-## Accepted base and exact frontier
+## Learned facts and closure audit
 
-Base is `adde01290` (`Prove exact rules rust utils eager values`). It embeds
-five separately hashed, unabridged source slices totaling 124 lines from the
+Base is `d4e264cdc` (`Select post-utils parent import audit`). Commit
+`adde01290` already freezes five exact eager-value/dependency slices from the
 authenticated 1,032-line rules_rust 0.73.0 `rust/private/utils.bzl`, SHA-256
 `8aa49b9312d4ae5c4aed033aba65392a039a681b3ee21ca83da0f05acac28ace`.
-Under exact producer `@@rules_rust+//rust/private:utils.bzl`, the proof freezes:
+It does not establish the whole child or utility invocation.
 
-- the exact ordered six-string `UNSUPPORTED_FEATURES` list;
-- `_FORCE_DISABLE_CC_TOOLCHAIN = False`;
-- the exact ordered 31 encodings and derived 63 substitutions;
-- pointer-identical `substitutions_for_testing`; and
-- pointer-identical `encode_raw_string_for_testing` as a frozen function.
+The authenticated 1,821-line parent `rust/private/rust.bzl`, SHA-256
+`a645bd5db6344bd3c0997dcf73600475c0af53fb4dd025890be24b8e1e2dbfd8`,
+imports fifteen utils functions at exact lines 40-57. Their source-complete
+compiler/freeze closures are:
 
-The exact lines 692-740 `_replace_all` body is present solely because the lazy
-encode function resolves that global during compilation/freeze. No utility was
-invoked, and the proof does not establish the complete utils module.
+| Exact utils lines | Parent import | Direct nonlocal closure |
+|---:|---|---|
+| 61-70 | `find_toolchain` | admitted predeclared `Label` only |
+| 214-227 | `determine_output_hash` | predeclared `abs`, `hash`, `repr` |
+| 262-264 | `deduplicate` | dict comprehension and `.keys()` |
+| 315-348 | `expand_dict_value_locations` | helper lines 268-313 |
+| 410-445 | `compute_crate_name` | helpers at 374-408, 573-740 and eager substitutions |
+| 447-477 | `dedent` | string/list methods and builtins only |
+| 536-554 | `transform_deps` | five provider loads plus rules_cc `CcInfo` |
+| 556-571 | `transform_link_deps` | `DepVariantInfo` and rules_cc `CcInfo` |
+| 742-765 | `can_build_metadata` | provider load plus `can_use_metadata_for_pipelining` |
+| 766-786 | `can_use_metadata_for_pipelining` | field reads/builtins only |
+| 788-816 | `crate_root_src` | helper lines 818-833 |
+| 835-876 | `determine_lib_name` | field reads/builtins only |
+| 878-917 | `transform_sources` | paths load plus helper lines 937-965 |
+| 919-935 | `get_edition` | predeclared `getattr`/`fail` only |
+| 967-991 | `generate_output_diagnostics` | `RustcOutputDiagnosticsInfo` load |
 
-The authenticated parent `rust/private/rust.bzl` is 1,821 lines, SHA-256
-`a645bd5db6344bd3c0997dcf73600475c0af53fb4dd025890be24b8e1e2dbfd8`.
-Its exact lines 40-57, SHA-256
-`1ad3406b7c58cc7d74e1e86991fdb6aeadbd836d32926fc54eee9583295ab500`,
-import these fifteen names in this order:
+The earliest parent-needed definition is exact lines 61-70. Its ten unabridged
+lines hash to
+`75fe3e764290fcfcec78cc25d25b4d2486708dafabb112f5d1e44b8e21081be1`.
+The function body resolves only admitted predeclared `Label`; no same-module
+helper, loaded binding or eager composite is required to compile and freeze it.
 
-`can_build_metadata`, `can_use_metadata_for_pipelining`, `compute_crate_name`,
-`crate_root_src`, `dedent`, `deduplicate`, `determine_lib_name`,
-`determine_output_hash`, `expand_dict_value_locations`, `find_toolchain`,
-`generate_output_diagnostics`, `get_edition`, `transform_deps`,
-`transform_link_deps`, `transform_sources`.
+## Authorities and decision
 
-None of those fifteen parent bindings is accepted merely by the eager proof.
-Do not return to parent line 59 until a bounded child export proof is accepted.
-
-## Authorities and compatibility discipline
-
-Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, its pinned
-`ResolverTest` global/load-closure regressions and `function.star` frozen-state
-regression, plus the authenticated rules_rust source are sole exact behavior
-authority. Audit compilation/freeze separately from function invocation.
+Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, pinned
+`ResolverTest.testBindingScopeAndIndex_functionBlock` and
+`testBindingScopeAndIndex_loads`, and the authenticated rules_rust source are
+sole exact authority. They distinguish a frozen function/global binding from
+executing the body.
 
 Clean `../zabel` commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` is architectural guidance only.
-Use its defining-module reachability traversal to check that selected exported
-functions retain every referenced load/global needed after evaluator closure.
-Copy no Zig code, representation, owner pointer, ordering/capture algorithm,
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only recursively retaining
+functions reachable from a loaded defining module after evaluator closure.
+Copy no Zig code, representation, owner pointer, traversal/order algorithm,
 diagnostic, identity or behavior.
 
-- **Exact:** accepted five-slice bytes, eager values/aliases, authenticated
-  utils/parent hashes, exact parent load slice, names and order, and any bounded
-  source-derived function export selected by this audit.
-- **Slug-native:** Rust frozen-value representation and audit documentation.
-- **Unsupported/deferred:** complete utils freeze; invocation/results/diagnostics
-  of every utility; configured toolchain/action/allocator behavior; parent line
-  59 onward; and later rules_rust source.
+Select only `find_toolchain` because it is the earliest source-defined parent
+import and its compiler closure is independently complete. Evaluate the exact
+slice under producer `@@rules_rust+//rust/private:utils.bzl`; then use a clearly
+proof-only module under producer `@@rules_rust+//rust/private:rust.bzl` with the
+actual relative load spelling `:utils.bzl` to retain the import. Invoke neither
+the function nor `Label`.
 
-The Buck2 utility review selects no action because this packet is docs-only and
-changes no retained data structure, hash, compact collection/string, interner,
-clone path, graph storage or memory accounting.
+## Compatibility
 
-## Allowlist, audit and caps
+- **Exact:** exact lines 61-70 bytes/hash, exact child producer, frozen function
+  type, actual relative load spelling, exact parent producer, and pointer-
+  identical imported binding.
+- **Slug-native:** proof-only parent consumer and starlark-rust frozen function
+  representation.
+- **Unsupported/deferred:** invoking `find_toolchain`; its configured toolchain
+  lookup and result/diagnostics; exact complete parent load; all other utils
+  exports/bodies; whole-module freeze; and parent line 59 onward.
 
-Only these files may change:
+No production fallback, DICE key, request overlay, retained runtime memory,
+async work, fixture, hot path or Buck2-derived utility changes. Those checklist
+items are inapplicable to this proof-only packet.
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
-- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
-- `.codex/skills/slug-agent-orchestration/references/routing-log.md` only for a
-  genuinely reusable/unusual routing decision or `REPLAN`.
+## Allowlist, proof and caps
 
-Caps are 0 production and 0 proof additions. Documentation growth must remain
-bounded to the authenticated audit result.
+Only this file may change:
 
-Required audit:
+| File | Base SHA-256 | Base lines | Final ceiling |
+|---|---|---:|---:|
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `4698fbdc38ebd78bf6363d43ee167b127669fa10e8d8b8cbcd650981be591970` | 8,362 | 8,482 |
 
-1. Resume from the accepted eager slices inside utils; do not silently treat
-   the whole 1,032-line child as frozen or skip directly to parent line 59.
-2. Map the fifteen parent-imported functions to their exact definitions in
-   utils and inventory every load, global, helper and eager composite referenced
-   by their bodies. Distinguish direct from transitive compiler/freeze closure.
-3. Account for accepted child bindings and eager aliases without duplicating
-   them. Identify the smallest source-complete subset that can compile/freeze
-   one coherent parent-needed export family without invoking a helper.
-4. Check the pinned Bazel resolver/frozen-closure evidence and applicable
-   rules_rust tests. Reuse accepted evidence; require a new oracle only for a
-   demonstrated observable gap.
-5. Classify exact, Slug-native and deferred surfaces, including proof-only
-   projections, function identity and all invocation/configured behavior.
-6. Select one bounded implementation/proof packet with explicit allowlist,
-   caps, validation and stops, or record `REPLAN` if no bounded Rust-native
-   slice exists.
+Caps are 0 production, 120 proof and 120 total additions; deletions do not buy
+addition budget. Keep the test function at or below 80 lines. The exact source
+constant is exempt from the function limit.
 
-Request/revision, DICE, retained-memory, async ownership, fixture growth and
-hot-path measurement are inapplicable: this docs-only audit changes no runtime
-key, request, allocation, fixture or measured path. Any selected successor must
-re-evaluate the applicable checklist items for its actual surface.
+Required proof:
 
-## Validation and STOP
+1. Embed exact unabridged `utils.bzl` lines 61-70 and verify the SHA-256 above.
+2. Freeze only that slice under exact producer
+   `@@rules_rust+//rust/private:utils.bzl`; assert `find_toolchain` has type
+   `function`. Add no source stub, helper body or function invocation.
+3. Evaluate one proof-only parent consumer under exact producer
+   `@@rules_rust+//rust/private:rust.bzl` using
+   `load(":utils.bzl", "find_toolchain")`; expose the binding without calling
+   it and prove frozen pointer identity with the child export.
+4. Preserve the accepted eager values and every prior loading proof.
 
-Run `git diff --check`, verify only allowlisted documentation changed, and run
-`scripts/v2_archive_status.sh` with only its three known archive-only misses.
-Independent terminal review must verify the accepted/eager boundary, exact
-fifteen-name parent load, transitive compiler/freeze audit requirement,
-compatibility classes, bounded successor, Zabel guidance-only role and scope.
+No new oracle fixture is needed. Authenticated source plus pinned Bazel resolver
+tests discriminate function/global/load binding; configured toolchain behavior
+is deliberately skipped because it remains unsupported here.
 
-STOP and `REPLAN` for Rust changes, utility invocation, an implicit whole-file
-claim, skipped compiler dependency, parent-body work, configured/toolchain/
-action semantics, Java/JVM work, copied Zabel content or dirty authority.
+The 8,362-line test file exceeds the documentation complexity trigger but is
+the cohesive owner of exact external-Bzl loading fixtures. This packet adds one
+ten-line source constant and one sub-80-line test; splitting the fixture owner
+or adding production orchestration would widen scope.
+
+## Serial validation and STOP
+
+Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
+`CARGO_BUILD_JOBS=1`:
+
+- focused exact `find_toolchain` export proof;
+- `cargo test -p slug_loading_v2 --lib --locked`;
+- `cargo test -p slug_loading_v2 --test bzl_invalidation --locked`;
+- `cargo test -p slug_loading_v2 --test build_file_loading --locked`;
+- `cargo check --locked -p slug_analysis_v2 -p slug_core_v2`;
+- `cargo build -p slug_cli_v2 --locked`;
+- `cargo fmt --all -- --check`, `git diff --check`, and
+  `scripts/v2_archive_status.sh` with only its three known archive-only misses.
+
+Independent terminal review must verify slice bytes/hash, producer/load
+identities, pointer identity, lazy nonexecution, caps, prior-proof preservation,
+Zabel guidance-only role and validation.
+
+STOP and `REPLAN` for production change; `find_toolchain`/`Label` invocation;
+toolchain/configured behavior; another utils export; full parent load/body;
+identity/registry/DICE work; Java/JVM work; copied Zabel content; dirty
+authority; skipped compiler dependency; or cap violation.
 
 ## Immediate predecessor
 
-`adde01290` accepted the five exact eager-value/dependency slices with 227 unit,
-24 invalidation and 31 BUILD-loading tests green. Independent review verified
-hashes, ordered values, alias identity and non-invocation under the packet caps.
+`d4e264cdc` authenticated all fifteen parent-imported exports and selected the
+earliest independently complete compiler/freeze closure. It authorized no Rust
+or invocation work.

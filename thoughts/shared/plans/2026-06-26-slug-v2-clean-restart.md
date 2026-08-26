@@ -30,17 +30,46 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; post-utils eager-values export audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; `5f8dd852`, `fc9473b1`, `993ba5e4`, `45b479e56`, `db51996b9`, `227257a90`, `8440742f7`, `ee9ef5254`, and `adde01290` accept clippy's complete aspect/rule tail, exact lints/paths/find-toolchain children, fixed OutputGroupInfo and RunEnvironmentInfo declaration globals, imported plain frozen attributes/transitions, retained provider/schema identities, frozen exported functions, canonical eager toolchain declarations, and exact utils eager values/aliases | the exact eager utils slices do not establish the whole 1,032-line child or the fifteen functions imported by `rust.bzl` | run only docs packet `WP-4-7A-post-utils-eager-values-parent-import-frontier-audit`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; exact utils find-toolchain export proof selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; `5f8dd852`, `fc9473b1`, `993ba5e4`, `45b479e56`, `db51996b9`, `227257a90`, `8440742f7`, `ee9ef5254`, and `adde01290` accept clippy's complete aspect/rule tail, exact lints/paths/find-toolchain children, fixed OutputGroupInfo and RunEnvironmentInfo declaration globals, imported plain frozen attributes/transitions, retained provider/schema identities, frozen exported functions, canonical eager toolchain declarations, and exact utils eager values/aliases | the whole utils child and fifteen parent imports remain unaccepted; the earliest independently complete export is `find_toolchain` | implement only proof packet `WP-4-7A-rules-rust-find-toolchain-export-loading-proof`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-post-utils-eager-values-parent-import-frontier-audit](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-rules-rust-find-toolchain-export-loading-proof](./slug-v2-subplans/current-packet.md).
 
-Audit the exact `utils.bzl` child-to-`rust.bzl` boundary after the accepted eager
-values, authenticate the fifteen imported function exports and their compiler/
-freeze closure, then select one bounded proof or `REPLAN`.
+Freeze exact rules_rust `utils.bzl` lines 61-70, prove `find_toolchain` retains
+pointer identity through a proof-only `rust.bzl` import, invoke no function, and
+stop before the other fourteen exports.
+
+### M7 post-utils audit selects exact find-toolchain export proof (2026-08-26)
+
+Audit `d4e264cdc` maps all fifteen functions imported by exact parent
+`rust.bzl:40-57` to their source-complete compiler/freeze closures. Seven are
+leaf functions over predeclared globals or field/string operations; the others
+require same-module helpers, accepted eager composites, loaded providers or
+bazel_skylib paths. None is treated as invoked or configured behavior.
+
+The earliest parent-needed definition is `utils.bzl:61-70`
+`find_toolchain`, whose ten exact lines hash to
+`75fe3e764290fcfcec78cc25d25b4d2486708dafabb112f5d1e44b8e21081be1`.
+Its body resolves only the already-admitted `Label` predeclared global. Run only
+`WP-4-7A-rules-rust-find-toolchain-export-loading-proof` in the existing test
+owner under 0 production, 120 proof and 120 total addition caps. Freeze the
+exact slice under the utils producer, then import it with actual `:utils.bzl`
+spelling in a proof-only exact-parent consumer and prove pointer identity. Call
+neither `find_toolchain` nor `Label`.
+
+Exact compatibility covers the slice bytes/hash, child and parent producers,
+actual relative load spelling, frozen function type and imported identity. The
+proof-only parent and Rust frozen representation are Slug-native. Function
+invocation/result/diagnostics, configured toolchain lookup, the other exports,
+whole utils freeze and parent body remain deferred.
+
+Pinned Bazel 9.2 resolver tests authenticate global and loaded-closure binding.
+Clean `../zabel` `0795445f…` guides only retaining reachable defining-module
+functions after closure; no Zig code, representation, algorithm, diagnostic,
+identity or behavior is copied.
 
 ### M7 exact rules_rust utils eager values accepted; export audit selected (2026-08-26)
 

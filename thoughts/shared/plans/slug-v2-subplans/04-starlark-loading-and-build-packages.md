@@ -5247,6 +5247,27 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Post-utils parent-import audit selects exact find-toolchain export (2026-08-26)
+
+Audit `d4e264cdc` maps the fifteen exact `rust.bzl:40-57` imports across utils.
+Seven are leaf functions over predeclared globals or field/string operations;
+eight require same-module helpers, accepted eager composites, loaded providers
+or bazel_skylib paths. The earliest parent-needed definition is
+`find_toolchain` at exact utils lines 61-70, SHA-256
+`75fe3e764290fcfcec78cc25d25b4d2486708dafabb112f5d1e44b8e21081be1`,
+with only the admitted `Label` predeclared dependency.
+
+Run only `WP-4-7A-rules-rust-find-toolchain-export-loading-proof` in the
+existing loading test owner under 0/120/120 caps. Freeze the ten exact source
+lines under the utils producer, then load only that export using actual
+`:utils.bzl` spelling in a proof-only exact-parent consumer and prove frozen
+pointer identity. Invoke neither function nor `Label`; do not claim configured
+toolchain lookup, another export, whole utils freeze or parent source.
+
+Pinned Bazel resolver tests remain exact authority. Clean `../zabel`
+`0795445f…` guides only defining-module function reachability; no Zig code,
+representation, algorithm, diagnostic, identity or behavior is copied.
+
 ### Exact utils eager values accepted; parent-import frontier audit selected (2026-08-26)
 
 Commit `adde01290` freezes five exact rules_rust 0.73.0 `utils.bzl` slices
