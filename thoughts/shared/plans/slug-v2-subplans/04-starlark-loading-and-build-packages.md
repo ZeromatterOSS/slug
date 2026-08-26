@@ -5247,6 +5247,35 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Exact lints child accepted; next parent audit selected (2026-08-26)
+
+Commit `227257a90` freezes exact unabridged rules_rust 0.73.0
+`rust/private/lints.bzl` with its provider child. The authenticated source hash,
+pointer-identical `LintsInfo`, rule export, ordered dictionary kinds,
+nonmandatory/configurable policy and omitted declaration defaults are directly
+proved. The exact source binding freezes without executing the helper or
+constructing the provider.
+
+All 224 loading units, both 24/31 integration suites, dependent core checks,
+rebuilt CLI and hygiene pass at 180 proof-only additions and 7,574 final lines.
+Independent terminal review returned `ACCEPT`.
+
+Run only docs packet `WP-4-7A-post-lints-parent-frontier-audit`. Resume exact
+`rust/defs.bzl` direct-load order after lints returns, account for cached
+children, authenticate the next newly evaluated child and classify its first
+unsupported loading expression. Edit no Rust and do not enter configured
+provider/rule/action semantics.
+
+Exact compatibility covers recursive lints source freeze and provider/export/
+ordered schema identity. Existing frozen Rust storage/probes are Slug-native.
+Helper/rule execution, provider construction and configured dictionaries remain
+unsupported/deferred.
+
+Clean `../zabel` `0795445f…` guided only producer-owned provider identity and
+declaration-owned attribute order. No Zig code, representation, owner pointer,
+capture, algorithm, diagnostic or behavior was copied. Bazel 9.2 remains sole
+authority, with no retained utility or accounting change.
+
 ### Post-clippy parent audit selects exact lints proof (2026-08-26)
 
 Exact `rust/defs.bzl` loads toolchain, clippy, common and lints in source order.
