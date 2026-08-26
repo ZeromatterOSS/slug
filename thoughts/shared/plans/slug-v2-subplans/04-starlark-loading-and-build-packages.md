@@ -5247,6 +5247,34 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Post-lints audit selects exact bazel_skylib paths proof (2026-08-26)
+
+Exact `rust/defs.bzl` next reaches `rust/private/rust.bzl` at SHA-256
+`a645bd5db6344bd3c0997dcf73600475c0af53fb4dd025890be24b8e1e2dbfd8`.
+Its first direct child is new bazel_skylib 1.8.2 `lib/paths.bzl`, 320 lines at
+SHA-256
+`96cce43871d8228126a12ceff771351f9030b1e9d029f2185853aa6541766a83`.
+The child has no loads. Ten functions are declared lazily; four integer
+constants and the final `paths = struct(...)` are the only other eager values.
+The existing Slug parser, standard globals, struct and recursive frozen-value
+owner cover every loading shape.
+
+Run only proof packet `WP-4-7A-bazel-skylib-paths-loading-proof`, changing one
+loading test file under 0/420/420 caps. Embed the exact source and prove its
+hash, producer identity, exact ten-member name set and frozen function value for
+each binding. Invoke no path helper and stop when the child returns.
+
+Exact compatibility covers source freeze and exported member/function binding.
+Generic frozen Rust storage and current constructor-order iteration are
+Slug-native. Pinned Bazel 9.2 sorts schemaless struct keys, so field iteration
+order is not exact; path helper behavior and the parent frontier remain
+unsupported/deferred.
+
+Clean `../zabel` `0795445f…` guides only closure-graph reachability from an
+exported composite through module freeze. No Zig code, representation, field
+ordering, owner pointer, capture algorithm, diagnostic or behavior is copied.
+Bazel remains authoritative and no retained utility or accounting changes.
+
 ### Exact lints child accepted; next parent audit selected (2026-08-26)
 
 Commit `227257a90` freezes exact unabridged rules_rust 0.73.0
