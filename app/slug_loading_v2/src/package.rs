@@ -457,7 +457,7 @@ impl NativeToolchainTarget {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
 pub(crate) enum BuildSettingKind {
     Integer { flag: bool },
-    String,
+    String { flag: bool, allow_multiple: bool },
     Boolean { flag: bool },
     StringList { flag: bool, repeatable: bool },
 }
@@ -466,7 +466,7 @@ impl BuildSettingKind {
     fn attribute_kind(self) -> AttributeKind {
         match self {
             Self::Integer { .. } => AttributeKind::Integer,
-            Self::String => AttributeKind::String,
+            Self::String { .. } => AttributeKind::String,
             Self::Boolean { .. } => AttributeKind::Boolean,
             Self::StringList { .. } => AttributeKind::StringList,
         }
@@ -523,7 +523,11 @@ impl StarlarkRuleImplementation {
         &self.values
     }
     pub fn is_root_string_build_setting(&self) -> bool {
-        self.build_setting_kind == Some(BuildSettingKind::String)
+        self.build_setting_kind
+            == Some(BuildSettingKind::String {
+                flag: true,
+                allow_multiple: false,
+            })
     }
     pub fn root_string_build_setting_default(&self) -> Option<&str> {
         self.is_root_string_build_setting().then(|| {
@@ -2477,6 +2481,20 @@ impl FrozenRuleDefinition {
         ) {
             anyhow::bail!("boolean build setting rule invocation is not supported");
         }
+        if matches!(
+            self.build_setting_kind,
+            Some(
+                BuildSettingKind::String { flag: false, .. }
+                    | BuildSettingKind::String {
+                        allow_multiple: true,
+                        ..
+                    }
+            )
+        ) {
+            anyhow::bail!(
+                "non-flag or allow-multiple string build setting rule invocation is not supported"
+            );
+        }
         Ok(())
     }
 }
@@ -4163,7 +4181,10 @@ impl fmt::Display for BuildFileConfigModule {
     }
 }
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct RootStringBuildSetting;
+struct RootStringBuildSetting {
+    flag: bool,
+    allow_multiple: bool,
+}
 starlark::starlark_simple_value!(RootStringBuildSetting);
 impl fmt::Display for RootStringBuildSetting {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -4214,7 +4235,10 @@ fn root_string_build_setting(flag: bool) -> anyhow::Result<RootStringBuildSettin
     if !flag {
         anyhow::bail!("only config.string(flag = True) is supported")
     }
-    Ok(RootStringBuildSetting)
+    Ok(RootStringBuildSetting {
+        flag: true,
+        allow_multiple: false,
+    })
 }
 
 #[starlark_module]
@@ -4228,9 +4252,13 @@ fn config_methods(builder: &mut MethodsBuilder) {
 
     fn string(
         #[starlark(this)] _config: Value,
-        #[starlark(default = false)] flag: bool,
+        #[starlark(require = named, default = false)] flag: bool,
+        #[starlark(require = named, default = false)] allow_multiple: bool,
     ) -> anyhow::Result<RootStringBuildSetting> {
-        root_string_build_setting(flag)
+        Ok(RootStringBuildSetting {
+            flag,
+            allow_multiple,
+        })
     }
 
     fn bool(
@@ -4954,8 +4982,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         let build_setting_kind = build_setting.and_then(|value| {
             if let Some(setting) = RootIntBuildSetting::from_value(value) {
                 Some(BuildSettingKind::Integer { flag: setting.flag })
-            } else if RootStringBuildSetting::from_value(value).is_some() {
-                Some(BuildSettingKind::String)
+            } else if let Some(setting) = RootStringBuildSetting::from_value(value) {
+                Some(BuildSettingKind::String {
+                    flag: setting.flag,
+                    allow_multiple: setting.allow_multiple,
+                })
             } else if let Some(setting) = RootBoolBuildSetting::from_value(value) {
                 Some(BuildSettingKind::Boolean { flag: setting.flag })
             } else if let Some(setting) = RootStringListBuildSetting::from_value(value) {
@@ -4969,7 +5000,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         });
         if build_setting.is_some() && build_setting_kind.is_none() {
             anyhow::bail!(
-                "only rule(build_setting = config.int(), config.string(flag = True), config.bool(), or config.string_list()) is supported"
+                "only rule(build_setting = config.int(), config.string(), config.bool(), or config.string_list()) is supported"
             )
         }
         let declared_builtin_names =

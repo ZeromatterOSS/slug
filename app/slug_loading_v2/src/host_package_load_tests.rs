@@ -2563,6 +2563,78 @@ async fn external_bzl_module_freezes_typed_bazel_config_definitions() {
 }
 
 #[tokio::test]
+async fn external_bzl_module_freezes_config_string_definitions() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "root.bzl",
+            b"load(':support.bzl', 'string_flag', 'string_setting', 'string_false', 'string_multiple', 'setting_multiple')\nFLAG = string_flag\nSETTING = string_setting\nFALSE = string_false\nMULTIPLE = string_multiple\nSETTING_MULTIPLE = setting_multiple\n",
+        ),
+        (
+            "support.bzl",
+            b"def _impl(ctx): fail('string implementation must stay lazy')\nstring_flag=rule(implementation=_impl, build_setting=config.string(flag=True))\nstring_setting=rule(implementation=_impl, build_setting=config.string())\nstring_false=rule(implementation=_impl, build_setting=config.string(flag=False, allow_multiple=False))\nstring_multiple=rule(implementation=_impl, build_setting=config.string(flag=True, allow_multiple=True))\nsetting_multiple=rule(implementation=_impl, build_setting=config.string(allow_multiple=True))\n",
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, 3971).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+    let module = &external_terminal(&outcome).module;
+    for (export, rule_class, flag, allow_multiple) in [
+        ("FLAG", "string_flag", true, false),
+        ("SETTING", "string_setting", false, false),
+        ("FALSE", "string_false", false, false),
+        ("MULTIPLE", "string_multiple", true, true),
+        ("SETTING_MULTIPLE", "setting_multiple", false, true),
+    ] {
+        let rule = module
+            .get(export)
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        assert_eq!(rule.capability().rule_class, rule_class);
+        assert_eq!(
+            rule.build_setting_kind,
+            Some(BuildSettingKind::String {
+                flag,
+                allow_multiple,
+            })
+        );
+        let default = rule
+            .schema
+            .iter()
+            .find(|schema| schema.name == "build_setting_default")
+            .unwrap();
+        assert!(
+            default.kind == AttributeKind::String && default.mandatory && !default.configurable
+        );
+        let help = rule
+            .schema
+            .iter()
+            .find(|schema| schema.name == "help")
+            .unwrap();
+        assert!(!help.mandatory && !help.configurable);
+    }
+    let kind = |name| {
+        module
+            .get(name)
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap()
+            .build_setting_kind
+    };
+    assert_eq!(kind("SETTING"), kind("FALSE"));
+}
+
+#[tokio::test]
 async fn external_bzl_module_freezes_config_int_definitions() {
     let files: &[(&str, &[u8])] = &[
         (
@@ -3486,6 +3558,21 @@ fn bazel_config_typed_descriptors_are_bzl_only_and_require_supported_flags() {
     ] {
         assert!(eval_global(source, &bzl).is_err(), "{source}");
     }
+    eval_global(
+        "ST=config.string(flag=True)\nSO=config.string()\nSF=config.string(flag=False, allow_multiple=False)\nSM=config.string(flag=True, allow_multiple=True)\nOM=config.string(allow_multiple=True)",
+        &bzl,
+    )
+    .unwrap();
+    for source in [
+        "X=config.string(True)",
+        "X=config.string(flag=None)",
+        "X=config.string(flag=1)",
+        "X=config.string(allow_multiple=None)",
+        "X=config.string(allow_multiple=1)",
+        "X=config.string(unknown=True)",
+    ] {
+        assert!(eval_global(source, &bzl).is_err(), "{source}");
+    }
     for source in [
         "X=config.string_list(True)",
         "X=config.string_list(flag=None)",
@@ -3512,6 +3599,14 @@ fn bazel_config_typed_descriptors_are_bzl_only_and_require_supported_flags() {
         );
     }
     let build = build_file_loading_globals();
+    eval_global("S=config.string(flag=True)", &build).unwrap();
+    for source in [
+        "S=config.string()",
+        "S=config.string(flag=True, allow_multiple=True)",
+        "S=config.string(flag=True, unknown=True)",
+    ] {
+        assert!(eval_global(source, &build).is_err(), "{source}");
+    }
     for (source, missing) in [
         ("S=config.string(flag=True)\nI=config.int()", "int"),
         (
@@ -3525,6 +3620,45 @@ fn bazel_config_typed_descriptors_are_bzl_only_and_require_supported_flags() {
     ] {
         let error = eval_global(source, &build).unwrap_err();
         assert!(error.contains(missing), "{error}");
+    }
+}
+
+#[tokio::test]
+async fn repository_package_rejects_unsupported_config_string_rules_before_recording() {
+    for (facts, descriptor) in [
+        (3974, "config.string()"),
+        (3975, "config.string(flag=True, allow_multiple=True)"),
+        (3976, "config.string(allow_multiple=True)"),
+    ] {
+        let defs = format!(
+            "def _impl(ctx): fail('string implementation must stay lazy')\nstring_rule=rule(implementation=_impl, build_setting={descriptor})\n"
+        );
+        let files: &[(&str, &[u8])] = &[
+            (
+                "BUILD.bazel",
+                b"load(':defs.bzl', 'string_rule')\nstring_rule(name='blocked', build_setting_default='value')\n",
+            ),
+            ("defs.bzl", defs.as_bytes()),
+        ];
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut transaction = transaction(
+            &dice,
+            EpochBuilder::external_sources(files, facts).build(),
+            false,
+            None,
+        )
+        .await;
+        let route = external_route(&mut transaction).await;
+        let outcome = transaction
+            .compute(&RepositoryPackageLoadKey::new(
+                route,
+                PackagePath::parse("").unwrap(),
+            ))
+            .await
+            .unwrap();
+        assert!(repository_package_error(&outcome).contains(
+            "non-flag or allow-multiple string build setting rule invocation is not supported"
+        ));
     }
 }
 
