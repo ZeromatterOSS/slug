@@ -465,14 +465,14 @@ pub(crate) enum BuildSettingKind {
     StringList { flag: bool, repeatable: bool },
 }
 
-/// One rule-level toolchain type requirement detached from its Starlark value.
+/// One rule/aspect toolchain type requirement detached from its Starlark value.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct RuleToolchainRequirement {
+pub struct ToolchainTypeRequirement {
     label: CanonicalLabel,
     mandatory: bool,
 }
 
-impl RuleToolchainRequirement {
+impl ToolchainTypeRequirement {
     pub fn label(&self) -> &CanonicalLabel {
         &self.label
     }
@@ -482,13 +482,13 @@ impl RuleToolchainRequirement {
     }
 }
 
-impl fmt::Display for RuleToolchainRequirement {
+impl fmt::Display for ToolchainTypeRequirement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.label.fmt(f)
     }
 }
 
-impl PartialEq<CanonicalLabel> for RuleToolchainRequirement {
+impl PartialEq<CanonicalLabel> for ToolchainTypeRequirement {
     fn eq(&self, other: &CanonicalLabel) -> bool {
         self.label == *other
     }
@@ -510,7 +510,7 @@ pub struct StarlarkRuleImplementation {
     #[allocative(skip)]
     implementation: FrozenValue,
     dependencies: Arc<[CanonicalLabel]>,
-    required_toolchains: Arc<[RuleToolchainRequirement]>,
+    required_toolchains: Arc<[ToolchainTypeRequirement]>,
     schema: Arc<[AttributeSchema]>,
     values: Arc<[AttributeValue]>,
     capability: Arc<RuleCapability>,
@@ -543,7 +543,7 @@ impl StarlarkRuleImplementation {
 
     /// Toolchain-type requirements declared by the defining `rule()` call.
     /// These are loading-only retained metadata, not ordinary dependencies.
-    pub fn required_toolchains(&self) -> &[RuleToolchainRequirement] {
+    pub fn required_toolchains(&self) -> &[ToolchainTypeRequirement] {
         &self.required_toolchains
     }
 
@@ -958,7 +958,7 @@ impl PackageRecorder {
         &self,
         name: String,
         implementation: FrozenValue,
-        required_toolchains: Arc<[RuleToolchainRequirement]>,
+        required_toolchains: Arc<[ToolchainTypeRequirement]>,
         capability: Arc<RuleCapability>,
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
@@ -1783,7 +1783,7 @@ fn package_output_label(base_package: &str, raw: &str) -> anyhow::Result<Canonic
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct StarlarkToolchainTypeRequirement(RuleToolchainRequirement);
+struct StarlarkToolchainTypeRequirement(ToolchainTypeRequirement);
 
 impl fmt::Display for StarlarkToolchainTypeRequirement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1804,14 +1804,14 @@ impl<'v> StarlarkValue<'v> for StarlarkToolchainTypeRequirement {
     }
 }
 
-fn direct_rule_toolchain_label(
+fn direct_toolchain_label(
     value: &str,
     source: &BzlModuleIdentity,
 ) -> anyhow::Result<CanonicalLabel> {
     let target = value.rsplit_once(':').map(|(_, target)| target);
     let recursive = target.is_none() && (value == "..." || value.ends_with("/..."));
     if recursive || matches!(target, Some("all" | "all-targets" | "*")) {
-        anyhow::bail!("rule(toolchains = ...) requires a direct target label: {value}");
+        anyhow::bail!("toolchains requires a direct target label: {value}");
     }
     if value.starts_with("@@") {
         CanonicalLabel::parse(value).map_err(anyhow::Error::msg)
@@ -1830,15 +1830,15 @@ fn direct_rule_toolchain_label(
     }
 }
 
-fn rule_toolchain_requirement(
+fn toolchain_requirements(
     value: Option<Value>,
     eval: &Evaluator<'_, '_, '_>,
-) -> anyhow::Result<Arc<[RuleToolchainRequirement]>> {
+) -> anyhow::Result<Arc<[ToolchainTypeRequirement]>> {
     let Some(value) = value else {
         return Ok(Arc::from([]));
     };
-    let values = ListRef::from_value(value)
-        .ok_or_else(|| anyhow::anyhow!("rule(toolchains = ...) requires a list"))?;
+    let values =
+        ListRef::from_value(value).ok_or_else(|| anyhow::anyhow!("toolchains requires a list"))?;
     let context = BzlEvaluationContext::from_evaluator(eval)?;
     let source = context.source_identity_for_call(eval)?;
     let mut requirements = Vec::with_capacity(values.len());
@@ -1847,66 +1847,27 @@ fn rule_toolchain_requirement(
         let requirement = if let Some(value) = StarlarkToolchainTypeRequirement::from_value(value) {
             value.0.clone()
         } else if let Some(value) = StarlarkLabel::from_value(value) {
-            RuleToolchainRequirement {
+            ToolchainTypeRequirement {
                 label: value.canonical().clone(),
                 mandatory: true,
             }
         } else if let Some(value) = value.unpack_str() {
-            RuleToolchainRequirement {
-                label: direct_rule_toolchain_label(value, source)?,
+            ToolchainTypeRequirement {
+                label: direct_toolchain_label(value, source)?,
                 mandatory: true,
             }
         } else {
-            anyhow::bail!(
-                "rule(toolchains = ...) entries must be Strings, Labels, or toolchain_type values"
-            );
+            anyhow::bail!("toolchains entries must be Strings, Labels, or toolchain_type values");
         };
         if !labels.insert(requirement.label.clone()) {
             anyhow::bail!(
-                "duplicate rule toolchain requirement is not supported: {}",
+                "duplicate toolchain requirement is not supported: {}",
                 requirement.label
             );
         }
         requirements.push(requirement);
     }
     Ok(requirements.into())
-}
-
-fn aspect_toolchain_requirement(
-    values: Option<UnpackList<&str>>,
-    defining_label: &CanonicalLabel,
-) -> anyhow::Result<Option<CanonicalLabel>> {
-    let values = values.map_or_else(Vec::new, |values| values.items);
-    let raw = match values.as_slice() {
-        [] => return Ok(None),
-        [raw] => *raw,
-        _ => anyhow::bail!(
-            "the admitted aspect(toolchains = ...) slice requires at most one target label"
-        ),
-    };
-    if raw.starts_with("@@") {
-        let canonical = CanonicalLabel::parse(raw).map_err(anyhow::Error::msg)?;
-        if canonical.package().repo() != defining_label.package().repo() {
-            anyhow::bail!(
-                "the admitted aspect toolchain label must name the defining repository: {raw}"
-            );
-        }
-        return Ok(Some(canonical));
-    }
-    let provisional = package_context_label(defining_label.package().package().as_str(), raw)
-        .map_err(|_| {
-            anyhow::anyhow!(
-                "aspect(toolchains = ...) requires a direct label in the defining repository: {raw}"
-            )
-        })?;
-    if defining_label.package().repo().is_root() {
-        Ok(Some(provisional))
-    } else {
-        provisional
-            .rebind_provisional_root_repository(defining_label.package().repo())
-            .map(Some)
-            .map_err(anyhow::Error::msg)
-    }
 }
 
 fn package_global(
@@ -2496,7 +2457,7 @@ fn coerce_starlark_value(
 struct RuleDefinitionGen<V> {
     implementation: V,
     #[trace(unsafe_ignore)]
-    required_toolchains: Arc<[RuleToolchainRequirement]>,
+    required_toolchains: Arc<[ToolchainTypeRequirement]>,
     #[trace(unsafe_ignore)]
     schema: Arc<[RuleAttributeSchemaGen<V>]>,
     executable: bool,
@@ -2511,7 +2472,7 @@ struct RuleDefinitionGen<V> {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct FrozenRuleDefinition {
     implementation: FrozenValue,
-    required_toolchains: Arc<[RuleToolchainRequirement]>,
+    required_toolchains: Arc<[ToolchainTypeRequirement]>,
     pub(crate) schema: Arc<[FrozenRuleAttributeSchema]>,
     capability: Arc<RuleCapability>,
     pub(crate) build_setting_kind: Option<BuildSettingKind>,
@@ -2533,7 +2494,7 @@ impl fmt::Display for FrozenRuleDefinition {
 
 impl FrozenRuleDefinition {
     #[cfg(test)]
-    pub(crate) fn required_toolchains(&self) -> &[RuleToolchainRequirement] {
+    pub(crate) fn required_toolchains(&self) -> &[ToolchainTypeRequirement] {
         &self.required_toolchains
     }
 
@@ -2673,7 +2634,7 @@ struct AspectDefinitionGen<V> {
     attributes: Arc<[RuleAttributeSchemaGen<V>]>,
     required_aspect: Option<V>,
     #[trace(unsafe_ignore)]
-    required_toolchain: Option<CanonicalLabel>,
+    required_toolchains: Arc<[ToolchainTypeRequirement]>,
     #[trace(unsafe_ignore)]
     required_providers: Arc<[Arc<[ProviderId]>]>,
     #[trace(unsafe_ignore)]
@@ -2695,7 +2656,7 @@ pub(crate) struct FrozenAspectDefinition {
     pub(crate) attr_aspects: Arc<[CompactString]>,
     pub(crate) attributes: Arc<[FrozenRuleAttributeSchema]>,
     pub(crate) required_aspect: Option<FrozenValue>,
-    pub(crate) required_toolchain: Option<CanonicalLabel>,
+    pub(crate) required_toolchains: Arc<[ToolchainTypeRequirement]>,
     pub(crate) required_providers: Arc<[Arc<[ProviderId]>]>,
     pub(crate) advertised_providers: Arc<[ProviderId]>,
     pub(crate) required_fragments: Arc<[CompactString]>,
@@ -2737,7 +2698,7 @@ impl<'v> Freeze for AspectDefinition<'v> {
                 .required_aspect
                 .map(|aspect| aspect.freeze(freezer))
                 .transpose()?,
-            required_toolchain: self.required_toolchain,
+            required_toolchains: self.required_toolchains,
             required_providers: self.required_providers,
             advertised_providers: self.advertised_providers,
             required_fragments: self.required_fragments,
@@ -4518,7 +4479,7 @@ fn config_common_methods(builder: &mut MethodsBuilder) {
         } else {
             anyhow::bail!("config_common.toolchain_type() takes a Label or String");
         };
-        Ok(StarlarkToolchainTypeRequirement(RuleToolchainRequirement {
+        Ok(StarlarkToolchainTypeRequirement(ToolchainTypeRequirement {
             label,
             mandatory,
         }))
@@ -5424,7 +5385,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         schema.extend(user_schema);
         Ok(RuleDefinition {
             implementation,
-            required_toolchains: rule_toolchain_requirement(toolchains, eval)?,
+            required_toolchains: toolchain_requirements(toolchains, eval)?,
             schema: schema.into(),
             executable,
             test,
@@ -5478,7 +5439,7 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
         implementation: Value<'v>,
         #[starlark(require = named)] attr_aspects: Option<UnpackList<&str>>,
         #[starlark(require = named)] attrs: Option<SmallMap<String, Value<'v>>>,
-        #[starlark(require = named)] toolchains: Option<UnpackList<&str>>,
+        #[starlark(require = named)] toolchains: Option<Value<'v>>,
         #[starlark(require = named)] required_providers: Option<Value<'v>>,
         #[starlark(require = named)] requires: Option<Value<'v>>,
         #[starlark(require = named)] provides: Option<Value<'v>>,
@@ -5513,7 +5474,7 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
             CanonicalLabel::parse(&canonical_source).map_err(anyhow::Error::msg)?;
         let attributes = aspect_attributes(attrs, &defining_label)?;
         let required_aspect = aspect_required_aspect(requires)?;
-        let required_toolchain = aspect_toolchain_requirement(toolchains, &defining_label)?;
+        let required_toolchains = toolchain_requirements(toolchains, eval)?;
         let required_providers = aspect_required_providers(required_providers)?;
         let advertised_providers = aspect_advertised_providers(provides)?;
         let required_fragments: Arc<[CompactString]> = match fragments {
@@ -5528,7 +5489,7 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
             attr_aspects,
             attributes,
             required_aspect,
-            required_toolchain,
+            required_toolchains,
             required_providers,
             advertised_providers,
             required_fragments,

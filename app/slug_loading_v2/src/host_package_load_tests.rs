@@ -2752,10 +2752,7 @@ async fn external_bzl_module_freezes_and_imports_fixed_aspect_definition() {
     assert!(aspect.attributes.is_empty());
     assert!(aspect.required_aspect.is_none());
     assert!(aspect.advertised_providers.is_empty());
-    assert_eq!(
-        aspect.required_toolchain.as_ref().unwrap(),
-        &CanonicalLabel::parse("@@dep+//rust:toolchain_type").unwrap()
-    );
+    assert_mandatory_aspect_toolchain(&aspect, "@@dep+//rust:toolchain_type");
     assert_eq!(
         aspect.defining_label,
         CanonicalLabel::parse("@@dep+//:support.bzl").unwrap()
@@ -2767,6 +2764,15 @@ async fn external_bzl_module_freezes_and_imports_fixed_aspect_definition() {
     let nested = FrozenListRef::from_value(module.get("NESTED").unwrap().value()).unwrap();
     let nested = nested[0].downcast_ref::<FrozenAspectDefinition>().unwrap();
     assert!(nested.exported_name.is_none());
+    assert!(nested.required_toolchains.is_empty());
+}
+
+fn assert_mandatory_aspect_toolchain(aspect: &FrozenAspectDefinition, label: &str) {
+    let [requirement] = aspect.required_toolchains.as_ref() else {
+        panic!("expected one aspect toolchain requirement");
+    };
+    assert_eq!(requirement.label().to_string(), label);
+    assert!(requirement.mandatory());
 }
 
 fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
@@ -2806,10 +2812,7 @@ fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
         CanonicalLabel::parse("@@dep+//rust/private:rustfmt.bzl").unwrap()
     );
     assert_eq!(aspect.exported_name.as_deref(), Some("rustfmt_aspect"));
-    assert_eq!(
-        aspect.required_toolchain.as_ref(),
-        Some(&CanonicalLabel::parse("@@dep+//rust/rustfmt:toolchain_type").unwrap())
-    );
+    assert_mandatory_aspect_toolchain(aspect, "@@dep+//rust/rustfmt:toolchain_type");
     let required = aspect
         .required_aspect
         .unwrap()
@@ -2830,6 +2833,10 @@ fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
 }
 
 const CLIPPY_ASPECT_SOURCE: &str = r#"
+ClippyInfo = provider(doc = "clippy", fields = {"output": "output"})
+CrateInfo = provider()
+TestCrateInfo = provider()
+rust_common = struct(crate_info = CrateInfo, test_crate_info = TestCrateInfo)
 def _clippy_aspect_impl(target, ctx):
     fail("clippy implementation must stay lazy")
 rust_clippy_aspect = aspect(
@@ -2845,9 +2852,17 @@ rust_clippy_aspect = aspect(
         "_per_crate_rustc_flag": attr.label(default = Label("//rust/settings:per_crate_rustc_flag")),
         "_process_wrapper": attr.label(doc = "wrapper", default = Label("//util/process_wrapper"), executable = True, cfg = "exec"),
     },
+    provides = [ClippyInfo],
+    required_providers = [[rust_common.crate_info], [rust_common.test_crate_info]],
+    fragments = ["cpp"],
     toolchains = TOOLCHAINS,
+    doc = "Executes the clippy checker on specified targets.",
 )
+def _rust_clippy_rule_impl(ctx):
+    fail("following rule helper must stay lazy")
 "#;
+
+const CLIPPY_TOOLCHAINS: &str = "[str(Label('//rust:toolchain_type')), config_common.toolchain_type('@bazel_tools//tools/cpp:toolchain_type', mandatory = False)]";
 
 fn clippy_owner() -> BzlModuleIdentity {
     BzlModuleIdentity {
@@ -2861,8 +2876,8 @@ fn clippy_owner() -> BzlModuleIdentity {
 }
 
 #[test]
-fn clippy_aspect_freezes_exact_private_label_map_before_toolchains() {
-    let source = CLIPPY_ASPECT_SOURCE.replace("TOOLCHAINS", "['//rust:toolchain_type']");
+fn clippy_aspect_freezes_complete_source_declaration() {
+    let source = CLIPPY_ASPECT_SOURCE.replace("TOOLCHAINS", CLIPPY_TOOLCHAINS);
     let module = eval_bzl_with_identity(&source, clippy_owner()).unwrap();
     let aspect = module
         .get("rust_clippy_aspect")
@@ -2912,11 +2927,27 @@ fn clippy_aspect_freezes_exact_private_label_map_before_toolchains() {
         assert_eq!(attribute.executable, name == "_process_wrapper");
         assert_eq!(attribute.exec_configuration, name == "_process_wrapper");
     }
+    let [rust, cpp] = aspect.required_toolchains.as_ref() else {
+        panic!("expected the source's two aspect toolchain requirements");
+    };
+    assert_eq!(
+        rust.label().to_string(),
+        "@@rules_rust+//rust:toolchain_type"
+    );
+    assert!(rust.mandatory());
+    assert_eq!(
+        cpp.label().to_string(),
+        "@@bazel_tools+//tools/cpp:toolchain_type"
+    );
+    assert!(!cpp.mandatory());
+    assert_eq!(aspect.required_providers.len(), 2);
+    assert_eq!(aspect.advertised_providers.len(), 1);
+    assert_eq!(aspect.required_fragments.as_ref(), ["cpp"]);
 }
 
 #[test]
-fn clippy_aspect_rejects_source_mutations_and_stops_at_mixed_toolchains() {
-    let admitted = CLIPPY_ASPECT_SOURCE.replace("TOOLCHAINS", "['//rust:toolchain_type']");
+fn clippy_aspect_rejects_source_mutations() {
+    let admitted = CLIPPY_ASPECT_SOURCE.replace("TOOLCHAINS", CLIPPY_TOOLCHAINS);
     for (from, to) in [
         (
             "\"_capture_output\": attr.label",
@@ -2975,18 +3006,54 @@ fn clippy_aspect_rejects_source_mutations_and_stops_at_mixed_toolchains() {
     ] {
         assert!(eval_bzl_with_identity(&source, clippy_owner()).is_err());
     }
+}
 
-    let mixed = CLIPPY_ASPECT_SOURCE.replace(
-        "TOOLCHAINS",
-        "[str(Label('//rust:toolchain_type')), config_common.toolchain_type('@bazel_tools//tools/cpp:toolchain_type', mandatory = False)]",
+#[test]
+fn aspect_toolchain_requirements_retain_mapping_order_and_mandatory_identity() {
+    let source = r#"
+def impl(target, ctx): return []
+MIXED = aspect(implementation = impl, toolchains = [":local", Label("@bazel_tools//tools:label"), config_common.toolchain_type("//tools:optional", mandatory = False)])
+TRUE = aspect(implementation = impl, toolchains = [config_common.toolchain_type("//tools:same", mandatory = True)])
+FALSE = aspect(implementation = impl, toolchains = [config_common.toolchain_type("//tools:same", mandatory = False)])
+"#;
+    let module = eval_bzl_with_identity(source, clippy_owner()).unwrap();
+    let mixed = module
+        .get("MIXED")
+        .unwrap()
+        .downcast::<FrozenAspectDefinition>()
+        .unwrap();
+    let expected = [
+        ("@@rules_rust+//rust/private:local", true),
+        ("@@bazel_tools+//tools:label", true),
+        ("@@rules_rust+//tools:optional", false),
+    ];
+    assert_eq!(mixed.required_toolchains.len(), expected.len());
+    for (requirement, (label, mandatory)) in mixed.required_toolchains.iter().zip(expected) {
+        assert_eq!(requirement.label().to_string(), label);
+        assert_eq!(requirement.mandatory(), mandatory);
+    }
+    let get = |name| {
+        module
+            .get(name)
+            .unwrap()
+            .downcast::<FrozenAspectDefinition>()
+            .unwrap()
+    };
+    assert_ne!(
+        get("TRUE").required_toolchains,
+        get("FALSE").required_toolchains
     );
-    let error = eval_bzl_with_identity(&mixed, clippy_owner())
-        .unwrap_err()
-        .to_string();
-    assert!(
-        error.contains("toolchains") || error.contains("string"),
-        "{error}"
-    );
+
+    for source in [
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, toolchains=1)",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, toolchains=[None])",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, toolchains=['//:same', Label('//:same')])",
+    ] {
+        assert!(
+            eval_bzl_with_identity(source, clippy_owner()).is_err(),
+            "{source}"
+        );
+    }
 }
 
 fn assert_frozen_rustfmt_test_aspect(aspect: &FrozenAspectDefinition) {
@@ -4605,7 +4672,6 @@ fn bazel_aspect_definition_validates_admitted_fixed_abi_and_build_absence() {
     for source in [
         "A=aspect(implementation=print)",
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, attr_aspects=['*', 'deps'])",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, toolchains=['//:one', '//:two'])",
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, doc=1)",
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, provides=[])",
     ] {
@@ -4695,10 +4761,7 @@ fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
         .unwrap()
         .downcast::<FrozenAspectDefinition>()
         .unwrap();
-    assert_eq!(
-        aspect.required_toolchain.as_ref(),
-        Some(&CanonicalLabel::parse("@@dep+//rust:toolchain_type").unwrap())
-    );
+    assert_mandatory_aspect_toolchain(&aspect, "@@dep+//rust:toolchain_type");
 }
 
 #[test]
