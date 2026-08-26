@@ -42,8 +42,9 @@ Load and freeze the fixed `rust/private/lint_test.bzl:45-62` common attribute
 dictionary. Resolve its raw `@bazel_tools` scalar label default through the
 innermost defining module's immutable mapping, retain its already-constructed
 `Label("//rust/private/lint_test_runner")` default without re-resolution, and
-prove both canonical values in the selected recursive route. Stop before
-target invocation, transition application and `rustfmt.bzl`'s aspect breadth.
+prove both canonical values by composing the accepted selected-route mapping
+with a caller-aware external-module freeze. Stop before target invocation,
+transition application and `rustfmt.bzl`'s aspect breadth.
 
 ### M7 post-rust-analyzer audit selects defining-module scalar label defaults (2026-08-26)
 
@@ -91,6 +92,20 @@ are Slug-native. Label lists/dicts, computed or late-bound defaults, target
 invocation, transition allowlist/application semantics, rustfmt aspects,
 configured dependencies, providers, actions, M8/M7B and exact output identity
 remain unsupported/deferred.
+
+The first implementation attempt exposed a proof-harness boundary rather than
+a missing production mapping. The selected loading fixture deliberately names
+its synthetic root module `bazel_tools`; consequently that fixture maps the
+apparent built-in name to the root. Renaming it activates the complete pinned
+`@bazel_tools` MODULE dependency closure and first requests absent
+`rules_license` registry evidence, while an explicit override reaches Slug's
+existing unsupported `ExplicitBuiltinOverride` boundary. Do not grow the
+fixture or alter mapping behavior for this packet. Compose the already-accepted
+Bzlmod proof that a real selected non-root route resolves `bazel_tools` to the
+built-in snapshot with a focused caller-aware loading context that freezes the
+exact lint-test dictionary. Keep the recursive selected fixture for the
+`rules_rust -> dep+` producer/Label path. This proof correction adds no code
+owner and does not change the compatibility classification.
 
 ### M7 detect-sysroot rule accepted; recursive frontier audit selected (2026-08-26)
 

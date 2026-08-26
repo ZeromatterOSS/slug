@@ -10,8 +10,9 @@ Result: complete declaration-time loading and freezing of the fixed
 `rust/private/lint_test.bzl:45-62`. Resolve its raw `@bazel_tools` scalar label
 default through the innermost defining module's immutable repository mapping,
 preserve its already-constructed relative `Label` default as canonical typed
-identity, and prove both values through the selected recursive route. Do not
-invoke a target, apply the transition, or broaden the later rustfmt aspect.
+identity, and prove both values by composing accepted selected-route mapping
+evidence with caller-aware external-module freeze. Do not invoke a target,
+apply the transition, or broaden the later rustfmt aspect.
 
 ## Accepted starting point and first absent fact
 
@@ -43,7 +44,7 @@ typed value. A raw-string-only fix would stop one expression later and would
 not complete the newly selected module, so this packet admits exactly both
 scalar label-default forms through one existing owner.
 
-The exact frozen results in the selected route are:
+The exact frozen results for the admitted defining identity are:
 
 - `_allowlist_function_transition` defaults to
   `@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist`;
@@ -52,6 +53,39 @@ The exact frozen results in the selected route are:
   is `rules_rust`; and
 - `_runner` retains executable true plus the accepted exec-configuration
   marker. No implementation function executes.
+
+## Learned proof-harness boundary
+
+The first implementation proof found that the selected loading fixture is not
+a valid direct discriminator for the built-in spelling. Its synthetic root is
+declared as `module(name='bazel_tools')`, so the selected dependency's implicit
+`bazel_tools` dependency resolves to that root rather than canonical
+`@@bazel_tools`. Renaming the synthetic root to an ordinary name activates the
+complete pinned built-in MODULE dependency closure and fails first on absent
+`rules_license` registry evidence. An explicit local override separately hits
+Slug's existing `ExplicitBuiltinOverride` unsupported boundary. Growing either
+path would add unrelated fixture/source breadth and is forbidden here.
+
+This is not a production mapping absence. `NonrootModuleBuilder::build`
+already injects the singleton built-in dependency after user declarations;
+selected graph transformation retains it; `HostSelectedRepositoryMapping`
+owns it in the existing ordered `SmallMap`; and the accepted
+`selected_definition_source_is_request_owned_and_route_structural` Bzlmod test
+proves a selected non-root route maps `bazel_tools` to the built-in snapshot.
+The route projection carries that same mapping Arc into `BzlModuleIdentity`,
+where it already participates in equality/hash and manifest fingerprinting.
+
+The corrected proof is compositional and adds no semantic owner:
+
+- reuse the accepted Bzlmod selected-route/built-in-child regression;
+- keep the synthetic selected loading route only for the distinct
+  `rules_rust -> dep+` producer identity and typed Label preservation; and
+- evaluate/freeze the exact fixed lint-test dictionary in a focused
+  caller-aware `BzlLoadManifest` whose defining identity contains the admitted
+  `bazel_tools -> bazel_tools` mapping.
+
+Do not mutate the synthetic root, add registry responses, admit explicit
+built-in overrides, or change selected mapping construction in this packet.
 
 ## Authorities and compatibility classification
 
@@ -132,26 +166,29 @@ representation changes.
 
 ## Discriminating proof
 
-Extend the existing selected-registry fixture/helper without growing its
-142-line route test:
+Use two loading proofs without growing the existing 142-line selected route
+test:
 
 - retain root apparent name `dep_alias`, defining-module self-name
-  `rules_rust`, and canonical repository `dep+` as three distinct identities;
-- assert the selected mapping also contains `bazel_tools -> bazel_tools`;
-- construct the exact fixed transition and four-entry
-  `LINT_TEST_COMMON_ATTRS`, project that dictionary into one test-only frozen
-  rule definition, and export it recursively;
-- inspect the frozen schema to prove the two exact canonical defaults,
-  `_runner` executable/exec markers, the prior boolean default and absence of
-  implementation execution; and
+  `rules_rust`, and canonical repository `dep+` as three distinct identities,
+  then freeze a typed `Label("//rust/private/lint_test_runner")` default through
+  that recursive producer route;
+- in a focused external-module evaluator, construct an exact defining
+  `BzlModuleIdentity` plus `BzlLoadManifest` with canonical repo `dep+` and
+  the admitted `bazel_tools -> bazel_tools` mapping, evaluate the fixed
+  transition/four-entry `LINT_TEST_COMMON_ATTRS`, project the dictionary into
+  one test-only frozen rule, and inspect both exact canonical defaults,
+  `_runner` executable/exec markers, the boolean default and lazy bodies;
 - add a focused absent/conflicting apparent-mapping rejection through the raw
   scalar attribute-default converter before module freeze.
 
 The proof must discriminate preservation from stringification: the runner
 Label is created in the defining module and reaches the schema as
 `@@dep+//rust/private:lint_test_runner`; do not pass `str(Label(...))` to the
-attribute default. Reuse accepted pinned-source evidence; add no fixture,
-network request or Bazel run.
+attribute default. Reuse the accepted Bzlmod test
+`selected_definition_source_is_request_owned_and_route_structural` as the
+route-to-built-in mapping proof. Add no fixture, registry response, network
+request or Bazel run.
 
 ## Allowlist and growth caps
 
@@ -174,7 +211,9 @@ Run Cargo commands serially with one shared target directory:
 
 ```text
 CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 root_package_loads_selected_registry_bzl_through_admitted_route
+CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 label_attribute_defaults_keep_defining_module_identity
 CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 label_attribute_default_rejects_unadmitted_apparent_mapping
+CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2 selected_definition_source_is_request_owned_and_route_structural
 CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2
 CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo check --locked -p slug_core_v2
 CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo build -p slug_cli_v2
@@ -191,10 +230,11 @@ review.
 Independent terminal review is mandatory before commit. The reviewer must
 inspect the full base-to-worktree diff and explicitly verify source-order
 selection, the Bazel string-versus-Label distinction, defining-module mapping,
+the synthetic-root proof boundary, accepted Bzlmod built-in-route composition,
 exact canonical values, no Label re-resolution, missing/conflicting failure,
 lazy implementation boundary, file/function/addition caps, serial validation
-and absence of a new semantic owner. A plain `ACCEPT` or actionable `REJECT`
-is required; correct every rejection and re-review.
+and absence of a new semantic owner. A plain `ACCEPT` or actionable `REJECT` is
+required; correct every rejection and re-review.
 
 ## STOP / `REPLAN`
 

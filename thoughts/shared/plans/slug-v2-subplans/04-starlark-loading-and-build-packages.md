@@ -4397,6 +4397,21 @@ mapping behavior, evaluator rule or DICE relation is copied; pinned Bazel 9.2
 remains sole behavior authority. The utility audit selects Slug's existing
 identity, mapping, enum and frozen owners without a new retained data structure.
 
+Implementation proof correction: the selected loading fixture names its
+synthetic root module `bazel_tools`, so its apparent built-in name intentionally
+aliases the root. Renaming that root activates the complete pinned built-in
+MODULE dependency closure and first requires absent `rules_license` registry
+evidence; an explicit local override is separately unsupported. This does not
+show a production mapping gap. Non-root MODULE finalization already injects
+the singleton built-in, selected routes retain it in their ordered `SmallMap`,
+and the accepted `selected_definition_source_is_request_owned_and_route_structural`
+test proves the resulting built-in child route. Reuse that evidence, keep the
+synthetic recursive fixture for the selected `rules_rust -> dep+` typed-Label
+path, and freeze the exact `@bazel_tools` dictionary in a focused caller-aware
+manifest context. Do not expand the registry fixture, change mapping identity,
+or add another owner. This is a proof split only; exact/Slug-native/deferred
+classification and implementation scope are unchanged.
+
 ### Detect-sysroot rule accepted; post-rust-analyzer frontier audit selected (2026-08-26)
 
 Commit `129ff448` makes the accepted pure `.bzl` Label resolver crate-visible
