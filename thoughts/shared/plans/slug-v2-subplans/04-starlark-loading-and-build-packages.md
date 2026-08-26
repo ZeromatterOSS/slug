@@ -4258,7 +4258,7 @@ the enum replaces one bool, preserves existing `Allocative`/Arc/compact-string
 ownership and adds no allocation, collection, hash or interner. Bazel 9.2
 remains sole behavior authority.
 
-### Nonrepeatable StringList accepted; repeatable definition selected (2026-08-26)
+### Repeatable StringList accepted; post-descriptor frontier audit selected (2026-08-26)
 
 Commit `573c25c7` accepts only named `config.bool(flag = True)` in `.bzl`,
 keeps bool absent from BUILD, and retains String versus Boolean as one compact
@@ -4298,21 +4298,28 @@ before `PackageRecorder`. Focused proof and all 248 loading tests pass with
 locked core check, rebuilt CLI and hygiene. Final growth is 34/89/123 within
 90/90/180; terminal review returns `ACCEPT` after explicit-false flag proof.
 
-The next source-order definition at `rust/private/rustc.bzl:3120` sets
-`repeatable=True`. Run only
-`WP-4-7A-bazel-config-string-list-repeatable-loading`: put the boolean on the
-existing evaluation descriptor and retained StringList variant, preserve
-false normalization, list schema, BUILD absence and pre-recording target
-failure. The two-file caps are 30 production, 60 proof and 90 total. No target,
-analysis, CLI, transition, configuration, toolchain, action, DICE, event,
-dependency or fixture change is authorized.
+Commit `68e458b4` puts the repeatability boolean on the existing evaluation
+descriptor and retained StringList variant. False/true definitions compare
+unequal while sharing list schema; BUILD remains string-only and every list
+target still fails before `PackageRecorder`. Focused proof and all 248 loading
+tests pass with locked core check, rebuilt CLI, hygiene and archive baseline.
+Final growth is 14 production, 23 proof and 37 total; independent terminal
+review returns `ACCEPT`.
+
+Fresh disposable query/build still surface only the generic repository-session
+wrappers. Run docs-only
+`WP-4-7A-rules-rust-post-string-list-frontier-audit`: trace deterministic
+recursive archive loading beyond the complete descriptor inventory, separate
+the internal typed stop from public presentation, and select exactly one
+bounded producer/retained value/consumer slice or `REPLAN`. Do not edit Rust or
+infer Boolean/StringList target activation without the trace.
 
 Pinned Zabel `c7298478…` continues direct architectural guidance: its rule
 projection structurally compares the complete typed build-setting declaration,
 and its list-setting proof keeps value type and repeatability distinct. Slug
 therefore keeps one complete retained declaration owner and thin projections;
 no Zabel code, representation or behavior is copied. Bazel 9.2 remains sole
-compatibility authority. Exact compatibility includes both descriptor
+compatibility authority. Exact compatibility includes all live descriptor
 call/freeze/schema forms only; Rust representation and fail-closed errors are
-Slug-native; all list targets/analysis/CLI, later rules_rust semantics,
-M8/M7B and exact output bytes remain deferred.
+Slug-native; Boolean/StringList targets and analysis/CLI, later rules_rust
+semantics, M8/M7B and exact output bytes remain deferred.

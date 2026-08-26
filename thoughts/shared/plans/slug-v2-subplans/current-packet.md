@@ -1,168 +1,124 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-bazel-config-string-list-repeatable-loading`
+Packet: `WP-4-7A-rules-rust-post-string-list-frontier-audit`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: Stage 4 complete `config` global and retained rule-definition semantics
-Base: `6811fa84`
+Owners: Stage 4 recursive ruleset loading and the first missing typed semantic owner
+Base: `68e458b4`
 
-Result: accept the first live Bazel
-`config.string_list(flag = True, repeatable = True)` descriptor, retain the
-repeatability dimension structurally alongside nonrepeatable StringList, and
-prove both definitions freeze distinctly. Every list-setting target remains
-unsupported and must fail before recording.
+Result: authenticate the first rules_rust source-order stop after complete
+String/Boolean/StringList descriptor-definition loading and select exactly one
+bounded implementation packet or `REPLAN`. This packet is read-only and
+changes no Rust.
 
-## Learned facts and authority
+## Accepted basis
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-is sole behavior authority:
-
-- `StarlarkConfigApi.string_list` declares named-only boolean `flag` and
-  `repeatable` parameters, both defaulting to `False`.
-- `StarlarkConfig.stringListSetting` rejects `repeatable = True` unless
-  `flag = True`, then creates a `BuildSetting` with `Type.STRING_LIST` and a
-  separately retained repeatability bit.
-- `RuleClass.Builder` derives mandatory, nonconfigurable
-  `build_setting_default` from that descriptor type. The
-  `ConfigSettingTest.starlarkListFlagSingleValue` rows authenticate a
-  nonrepeatable list default; `buildsettings_repeatableWorks` and the parsing
-  tests prove repeatable accumulation and the invalid-combination row proves
-  `repeatable=True` requires `flag=True`.
-- `StarlarkOptionsParser` consumes the retained repeatability bit only for CLI
-  parsing. This packet owns descriptor identity only; target/analysis/CLI
-  behavior remains outside it.
-- Bazel installs fixed `config` through the `.bzl` bootstrap. Slug's accepted
-  BUILD projection remains string-only and must not gain `string_list`.
+is sole behavior authority. Commits `573c25c7`, `6811fa84`, and `68e458b4`
+accept the live named `.bzl` String, Boolean, nonrepeatable StringList and
+repeatable StringList descriptor definitions. Repeatability is structurally
+retained through recursive freeze/equality while both list forms select a
+list-typed `build_setting_default`. Boolean and every StringList target still
+fail before `PackageRecorder`; only the earlier String target/analysis slice is
+admitted.
 
 The accepted rules_rust 0.73.0 archive SHA-256 is
 `2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`.
-Commit `6811fa84` accepts the nonrepeatable definitions at lines 3093 and 3108.
-Source order next reaches the first `repeatable = True` use at line 3120;
-later `rustc.bzl`, `clippy.bzl`, and `unpretty.bzl` definitions use both forms.
-The existing public query/build terminals remain the accepted
-repository-session wrappers rather than successful public loads.
+The descriptor inventory includes every `config.string_list` form in
+`rust/private/rustc.bzl`, `clippy.bzl`, and `unpretty.bzl`; line 3120 was the
+first repeatable occurrence. Source inventory, not the generic public wrapper,
+must determine what recursive evaluation or BUILD loading reaches next.
 
-Slug now retains `BuildSettingKind::StringList` distinctly through rule
-construction, freeze, structural equality, list-default schema and recorded
-implementation. `RootStringListBuildSetting` is evaluation-local and zero
-sized because only normalized false is admitted. Every list invocation fails
-before `PackageRecorder`; string analysis remains a narrow accessor.
+Fresh disposable query/build after removing the separately parked wildcard
+registration still return the established public `query_error` exit 7 and
+`build_runtime_error` exit 2 with `repository session failed`. Unmodified query
+still stops earlier on the registration-label boundary. These are public
+wrappers, not evidence of the internal first semantic stop.
 
 Pinned `../zabel` commit
 `c7298478e2e56262a2f438e9c065325744c9f0fc` is architecture guidance only.
-Its `projectRuleModule` validates a complete typed build-setting declaration
-structurally against the invocation, while its allow-multiple/repeatable test
-keeps `value_type`, `allow_multiple`, and `repeatable` distinct. That supports
-one retained Slug declaration owner and thin schema/analysis projections, not
-an evaluator-local marker or side registry. Copy no Zabel code, representation,
-scheduler, runtime or behavior; Bazel remains sole compatibility authority.
+Its recursive module projection validates one complete typed rule declaration
+against invocation, and its configuration design keeps declaration, effective
+value, and consumer projections separate. Use those ownership lessons to
+reject evaluator-local markers, side registries, or command-side repairs.
+Copy no Zabel code, representation, runtime, scheduler or behavior; exact
+claims require pinned Bazel 9.2.
 
-The Buck2 utility-reuse audit selects no import or Stage 9 ledger update. One
-boolean field on the existing descriptor and enum variant uses existing
-`Allocative`, `Copy`, freeze and equality paths and adds no allocation,
-collection, hash domain, interner or clone-sensitive container.
+## Audit and decision rule
 
-## Decision and non-decisions
+Trace the accepted archive in deterministic recursive load order beyond all
+StringList descriptor definitions. Separate:
 
-In `package.rs`, give the evaluation-local StringList descriptor its normalized
-repeatability bit and accept named `.bzl` calls with `flag = True` and either
-boolean repeatability value. Continue rejecting false/omitted `flag` and
-positional arguments. Keep `BuildFileConfigModule` string-only.
+- `.bzl` parse/global/call-shape or freeze failures;
+- rule-definition schema failures;
+- BUILD invocation/default coercion and target-publication failures;
+- configured analysis/`ctx.build_setting_value` failures; and
+- command/repository-session presentation that masks a lower typed terminal.
 
-Widen only the existing enum variant to
-`BuildSettingKind::StringList { repeatable: bool }`. Carry the bit through the
-existing sole definition, freeze, equality, schema and implementation field;
-schema continues to project `AttributeKind::StringList` independent of the
-bit. Omission and explicit `False` remain equal, while `True` compares unequal.
+Inventory every candidate occurrence before choosing one owner. If the first
+stop is Boolean/StringList target invocation, trace Bazel `RuleClass`, default
+coercion, `StarlarkRuleContext.getBuildSettingValue`, configuration lookup and
+the exact rules_rust defaults/consumers. Determine whether a definition-only,
+invocation-only, or invocation-plus-analysis slice is semantically complete;
+do not publish a target whose configured consumer cannot fail closed at the
+next boundary.
 
-Reject StringList rule invocation at the callable boundary before
-`PackageRecorder::starlark_rule`, just like the boolean fail-closed boundary.
-Do not change accepted String invocation/analysis or Boolean definitions.
+If the first stop is another global, rule parameter, provider, attribute,
+transition, toolchain or repository surface, trace its pinned Bazel producer,
+retained identity, immediate consumers and discriminating tests instead. Select
+the smallest source-ordered semantic owner, not a convenient adjacent feature.
 
-Do not implement list-setting target invocation, `ctx.build_setting_value`,
-CLI parsing/accumulation, transitions,
-`config_setting`, configuration identity, providers, toolchains, actions,
-other `config` methods, BUILD/MODULE/REPO global placement, DICE keys, events,
-or public error translation. Do not infer kind or repeatability from defaults.
+Inspect Slug's producer, frozen/retained value, equality/invalidation path,
+request/publication boundary and fail-closed behavior. Reuse accepted evidence
+before adding an oracle. If no bounded Rust-native slice preserves the declared
+compatibility class, record `REPLAN`.
 
-## Ownership, revision and lifetime
+## Ownership, memory and prior art
 
-The complete `.bzl` config module owns descriptor call shape. The frozen rule
-definition remains the sole retained owner of the normalized descriptor kind;
-schema and analysis are projections. Repeatable and nonrepeatable StringList
-definitions compare unequal even when every other field matches.
+No semantic owner changes during this audit. For the selected implementation,
+name the producer, retained value, schema/analysis projections, request-local
+facts, invalidation and publication boundary. Classify any memory as evaluator
+scratch, DICE-retained semantic state, command state or async transfer and name
+release/cancellation behavior.
 
-Existing observed source dependencies invalidate definition edits before
-evaluation. No request projection, revision certificate, overlapping-request
-behavior, final validation boundary, DICE dependency or publication changes.
-The descriptor is evaluator-local; the copied enum remains DICE-retained with
-the loaded definition. Existing defaults use immutable compact list storage.
-No service cache, command/scratch retention, async transfer, task, fallback,
-eviction or shutdown duty is added.
+Apply the Buck2 utility-reuse skill if the selected packet changes retained
+data, hashing, compact collections/strings, interning, clone cost or memory
+accounting. Record a Stage 9 decision only when reuse/import changes; do not add
+a collection, hash domain, interner or allocation without evidence. Classify
+Zabel as concept/test only unless a separately reviewed leaf exists.
 
-## Files and caps
+## Files, proof and validation
 
-Allowed files, with base SHA-256 and final line ceiling:
+This audit may edit only:
 
-| File | Base SHA-256 | Cap |
-|---|---|---:|
-| `app/slug_loading_v2/src/package.rs` | `508ecd79e23ea52ab1a1bebb891f5dbdcd1041cd37f707ab24cdf678d19473ec` | 5,267 |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `0745f5e12051151c599e36aa5df39139121506f65d67d75193362adccd6b0f43` | 4,171 |
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`;
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
 
-Production additions are <=30, proof additions <=60 and total additions
-<=90. Both files exceed the authoring-guide size trigger, but `package.rs`
-already owns this complete config/rule/schema/invocation path and the proof
-extends its existing recursive external-Bzl/package harness. A split would
-create a second semantics owner for a single enum variant and descriptor.
+Any selected implementation must record exact base hashes, final line
+ceilings, addition caps, file allowlist, observable result, exclusions,
+compatibility classes, proof and `REPLAN` stops. Existing large-file ownership
+must be justified or split under the authoring guide.
 
-## Proof and validation
-
-Extend focused proof that:
-
-- recursive `.bzl` export/freeze retains repeatable and nonrepeatable
-  StringList as unequal kinds while both select `AttributeKind::StringList`;
-- omission, explicit `repeatable = False`, and `repeatable = True` succeed with
-  `flag=True`, while positional arguments and false/omitted `flag` fail closed;
-- BUILD cannot resolve `config.string_list`, while accepted BUILD string and
-  `.bzl` bool behavior remain unchanged; and
-- invoking a repeatable list-setting rule with a list default still fails
-  before any target is recorded, while nonrepeatable and prior types remain
-  green.
-
-Run serially:
-
-- `cargo fmt --check` and `git diff --check`;
-- focused config-string-list loading tests;
-- full `cargo test -p slug_loading_v2`;
-- `cargo check -p slug_core_v2 --locked`;
-- `cargo build -p slug_cli_v2 --locked`;
-- `scripts/v2_archive_status.sh`, preserving only its known three-path
-  thoughts classification if unchanged; and
-- with clean `slugd` lifecycle and fresh output roots, the existing disposable
-  rules_rust query/build, recording the next source-order stop separately from
-  the unchanged public repository-session wrappers.
-
-Pinned source/tests and the accepted archive already discriminate this
-definition contract. No new oracle fixture, copied source or network change is
-authorized; skipped upstream repeatable/analysis tests exercise deferred
-phases, while the nonrepeatable default test is adapted into the focused
-typed-schema proof.
+Run `git diff --check`, plan/current alignment and
+`scripts/v2_archive_status.sh`, preserving only its known three-path thoughts
+classification if unchanged. Read-only source tracing and fresh disposable
+smokes are allowed; no Cargo, Bazel oracle, fixture, network mutation or daemon
+change is required unless a demonstrated evidence gap demands it.
 
 ## Compatibility and STOP
 
-- **Exact:** `.bzl`-only named `config.string_list(flag = True, repeatable =
-  True|False)` construction, BUILD absence, structurally distinct repeatable
-  identity, common list-typed default schema and recursive bind/export/freeze
-  on the live source route.
-- **Slug-native:** compact enum/evaluator representation, fail-closed target
-  and repeatable errors, valid-Unicode handling and nonrequired diagnostics.
-- **Unsupported/deferred:** omitted/false `flag`, all StringList
-  targets/analysis/CLI values/transitions/config matching,
-  `ctx.build_setting_value`, later rules_rust/toolchain/action surfaces,
-  M8/M7B and exact output bytes.
+- **Exact:** accepted `.bzl` String/Boolean/StringList descriptor definitions,
+  including structural repeatability and list schema; the audit may
+  authenticate but not implement the next Bazel surface.
+- **Slug-native:** retained Rust representations, valid-Unicode handling,
+  fail-closed nonadmitted boundaries and nonrequired diagnostics.
+- **Unsupported/deferred:** Boolean/StringList targets and configured values,
+  CLI parsing/accumulation, transitions/config matching unless selected after
+  audit; later rules_rust/toolchain/action surfaces, M8/M7B and exact output
+  bytes.
 
-STOP on dirty overlap, edits outside the two-file allowlist, repeatability
-outside the existing descriptor/kind owner, list target recording,
-analysis/configuration/CLI changes, side metadata, BUILD visibility, String or
-Boolean regression, source vendoring, Java/JVM, dependency drift, fixture
-growth, public-success claims or any cap breach. `REPLAN` before crossing a
-boundary.
+STOP on Rust changes, an inferred terminal based only on the public wrapper,
+target publication without its complete fail-closed consumer boundary,
+behavior sourced from Zabel, BUILD/global widening without Bazel authority,
+new oracle work without a gap, dirty overlap, or inability to state one
+bounded implementation/`REPLAN` with exact evidence and caps.
