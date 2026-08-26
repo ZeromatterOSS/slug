@@ -5247,6 +5247,31 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Imported-transition correction exposes frozen common attributes (2026-08-26)
+
+The exact tail candidate first cleared imported `platform_transition`, then
+stopped at `rule(attrs=...)` because `platform` is the first plain frozen
+descriptor in `LINT_TEST_COMMON_ATTRS`. Slug's rule adapter discarded the
+frozen half of `AttributeDefinition::from_value`. The 9-production/248-proof
+candidate was completely removed and both accepted hashes restored.
+
+Run only `WP-4-7A-imported-frozen-attribute-transition-clippy-tail-loading`.
+Project the existing frozen transition fields and only plain frozen attribute
+fields into their current transient wrappers. Rich frozen attributes remain
+fail-closed. Rerun the exact clippy tail and producer-identity proof under
+55/260/315 caps; add no new retained representation or configured semantics.
+
+Exact compatibility covers imported plain attribute validity/fields and
+imported transition implementation/output. Rust wrapper reconstruction and the
+rich frozen boundary are Slug-native. Identity bytes, evaluation/configuration
+hashing and configured provider/aspect/test/build-setting/action behavior remain
+unsupported/deferred.
+
+Clean `../zabel` `0795445f…` guides producer-owned attribute/transition
+publication only. No Zig owner pointer, representation, identity, capture,
+algorithm or behavior is copied. Bazel 9.2 remains sole authority; existing
+Arc/CompactString/default values need no new utility or memory-ledger entry.
+
 ### Clippy-tail proof exposes imported frozen-transition prerequisite (2026-08-26)
 
 The exact recursive proof selected by `f4cfaacb3` stopped at
