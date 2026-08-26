@@ -453,6 +453,7 @@ impl NativeToolchainTarget {
 pub(crate) enum BuildSettingKind {
     String,
     Boolean,
+    StringList,
 }
 
 impl BuildSettingKind {
@@ -460,6 +461,7 @@ impl BuildSettingKind {
         match self {
             Self::String => AttributeKind::String,
             Self::Boolean => AttributeKind::Boolean,
+            Self::StringList => AttributeKind::StringList,
         }
     }
 }
@@ -3701,6 +3703,16 @@ impl fmt::Display for RootBoolBuildSetting {
 }
 #[starlark_value(type = "config_bool")]
 impl<'v> StarlarkValue<'v> for RootBoolBuildSetting {}
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct RootStringListBuildSetting;
+starlark::starlark_simple_value!(RootStringListBuildSetting);
+impl fmt::Display for RootStringListBuildSetting {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("config.string_list")
+    }
+}
+#[starlark_value(type = "config_string_list")]
+impl<'v> StarlarkValue<'v> for RootStringListBuildSetting {}
 
 fn root_string_build_setting(flag: bool) -> anyhow::Result<RootStringBuildSetting> {
     if !flag {
@@ -3726,6 +3738,20 @@ fn config_methods(builder: &mut MethodsBuilder) {
             anyhow::bail!("only config.bool(flag = True) is supported")
         }
         Ok(RootBoolBuildSetting)
+    }
+
+    fn string_list(
+        #[starlark(this)] _config: Value,
+        #[starlark(require = named, default = false)] flag: bool,
+        #[starlark(require = named, default = false)] repeatable: bool,
+    ) -> anyhow::Result<RootStringListBuildSetting> {
+        if !flag {
+            anyhow::bail!("only config.string_list(flag = True) is supported")
+        }
+        if repeatable {
+            anyhow::bail!("repeatable config.string_list is not supported")
+        }
+        Ok(RootStringListBuildSetting)
     }
 }
 #[starlark_module]
@@ -3796,6 +3822,11 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         if self.build_setting_kind == Some(BuildSettingKind::Boolean) {
             return Err(starlark::Error::new_other(anyhow::anyhow!(
                 "boolean build setting rule invocation is not supported"
+            )));
+        }
+        if self.build_setting_kind == Some(BuildSettingKind::StringList) {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "string-list build setting rule invocation is not supported"
             )));
         }
         for attribute in names.keys() {
@@ -4423,13 +4454,15 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 Some(BuildSettingKind::String)
             } else if RootBoolBuildSetting::from_value(value).is_some() {
                 Some(BuildSettingKind::Boolean)
+            } else if RootStringListBuildSetting::from_value(value).is_some() {
+                Some(BuildSettingKind::StringList)
             } else {
                 None
             }
         });
         if build_setting.is_some() && build_setting_kind.is_none() {
             anyhow::bail!(
-                "only rule(build_setting = config.string(flag = True) or config.bool(flag = True)) is supported"
+                "only rule(build_setting = config.string(flag = True), config.bool(flag = True), or nonrepeatable config.string_list(flag = True)) is supported"
             )
         }
         let declared_builtin_names =

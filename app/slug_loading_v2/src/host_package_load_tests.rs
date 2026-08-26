@@ -2369,12 +2369,15 @@ async fn external_bzl_module_rejects_non_string_rule_doc() {
 }
 
 #[tokio::test]
-async fn external_bzl_module_freezes_typed_bazel_config_bool_definition() {
+async fn external_bzl_module_freezes_typed_bazel_config_definitions() {
     let files: &[(&str, &[u8])] = &[
-        ("root.bzl", b"load(\":support.bzl\", \"bool_rule\")\nBOOL = bool_rule\n"),
+        (
+            "root.bzl",
+            b"load(\":support.bzl\", \"bool_rule\", \"list_rule\")\nBOOL = bool_rule\nLIST = list_rule\n",
+        ),
         (
             "support.bzl",
-            b"def _impl(ctx): return []\nbool_rule = rule(implementation = _impl, build_setting = config.bool(flag = True))\n",
+            b"def _impl(ctx): return []\nbool_rule = rule(implementation = _impl, build_setting = config.bool(flag = True))\nlist_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True))\n",
         ),
     ];
     let dice = Dice::builder().build(DetectCycles::Enabled);
@@ -2390,20 +2393,42 @@ async fn external_bzl_module_freezes_typed_bazel_config_bool_definition() {
         .compute(&external_bzl_key(route, "", "root.bzl"))
         .await
         .unwrap();
-    let rule = external_terminal(&outcome)
-        .module
+    let module = &external_terminal(&outcome).module;
+    let bool_rule = module
         .get("BOOL")
         .unwrap()
         .downcast::<FrozenRuleDefinition>()
         .unwrap();
-    assert_eq!(rule.build_setting_kind, Some(BuildSettingKind::Boolean));
     assert_eq!(
-        rule.schema
+        bool_rule.build_setting_kind,
+        Some(BuildSettingKind::Boolean)
+    );
+    assert_eq!(
+        bool_rule
+            .schema
             .iter()
             .find(|schema| schema.name == "build_setting_default")
             .unwrap()
             .kind,
         AttributeKind::Boolean
+    );
+    let list_rule = module
+        .get("LIST")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    assert_eq!(
+        list_rule.build_setting_kind,
+        Some(BuildSettingKind::StringList)
+    );
+    assert_eq!(
+        list_rule
+            .schema
+            .iter()
+            .find(|schema| schema.name == "build_setting_default")
+            .unwrap()
+            .kind,
+        AttributeKind::StringList
     );
 }
 fn evaluate_config_global(source: &str, globals: &Globals) -> Result<(), String> {
@@ -2416,22 +2441,39 @@ fn evaluate_config_global(source: &str, globals: &Globals) -> Result<(), String>
 }
 
 #[test]
-fn bazel_config_bool_is_bzl_only_and_requires_flag_true() {
+fn bazel_config_typed_descriptors_are_bzl_only_and_require_supported_flags() {
     let bzl = loading_globals();
     for source in [
         "X=config.bool()",
         "X=config.bool(flag=1==2)",
         "X=config.bool(True)",
+        "X=config.string_list()",
+        "X=config.string_list(flag=False)",
+        "X=config.string_list(True)",
+        "X=config.string_list(flag=True, repeatable=True)",
     ] {
         let error = evaluate_config_global(source, &bzl).unwrap_err();
         assert!(error.contains("supported") || error.contains("positional"));
     }
-    let error = evaluate_config_global(
-        "S=config.string(flag=True)\nB=config.bool(flag=True)",
-        &build_file_loading_globals(),
+    evaluate_config_global(
+        "L=config.string_list(flag=True)\nE=config.string_list(flag=True, repeatable=False)",
+        &bzl,
     )
-    .unwrap_err();
-    assert!(error.contains("bool"));
+    .unwrap();
+    let build = build_file_loading_globals();
+    for (source, missing) in [
+        (
+            "S=config.string(flag=True)\nB=config.bool(flag=True)",
+            "bool",
+        ),
+        (
+            "S=config.string(flag=True)\nL=config.string_list(flag=True)",
+            "string_list",
+        ),
+    ] {
+        let error = evaluate_config_global(source, &build).unwrap_err();
+        assert!(error.contains(missing), "{error}");
+    }
 }
 
 #[tokio::test]
@@ -2465,6 +2507,40 @@ async fn repository_package_rejects_config_bool_rule_before_target_recording() {
     assert!(
         repository_package_error(&outcome)
             .contains("boolean build setting rule invocation is not supported")
+    );
+}
+
+#[tokio::test]
+async fn repository_package_rejects_config_string_list_rule_before_target_recording() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(\":defs.bzl\", \"list_rule\")\nlist_rule(name = \"blocked\", build_setting_default = [\"value\"])\n",
+        ),
+        (
+            "defs.bzl",
+            b"def _impl(ctx): return []\nlist_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True))\n",
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, 399).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    assert!(
+        repository_package_error(&outcome)
+            .contains("string-list build setting rule invocation is not supported")
     );
 }
 
