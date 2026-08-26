@@ -2853,13 +2853,28 @@ fn aspect_attributes<'v>(
         return Ok(Arc::from([]));
     };
     let names = attrs.keys().map(String::as_str).collect::<Vec<_>>();
-    if names != ["_config", "_process_wrapper"] {
-        anyhow::bail!(
-            "only the fixed _config and _process_wrapper aspect attributes are supported"
-        );
+    let rustfmt = ["_config", "_process_wrapper"];
+    let clippy = [
+        "_capture_output",
+        "_clippy_error_format",
+        "_clippy_flag",
+        "_clippy_flags",
+        "_clippy_output_diagnostics",
+        "_config",
+        "_error_format",
+        "_extra_rustc_flag",
+        "_incompatible_change_clippy_error_format",
+        "_per_crate_rustc_flag",
+        "_process_wrapper",
+    ];
+    let is_rustfmt = names == rustfmt;
+    if !is_rustfmt && names != clippy {
+        anyhow::bail!("only the fixed rustfmt and clippy aspect attributes are supported");
     }
+    let attribute_count = names.len();
+    drop(names);
     let repo = defining_label.package().repo().as_str();
-    let mut schemas = Vec::with_capacity(2);
+    let mut schemas = Vec::with_capacity(attribute_count);
     for (name, value) in attrs {
         let definition = AttributeDefinition::from_value(value)
             .and_then(|value| match value {
@@ -2868,9 +2883,70 @@ fn aspect_attributes<'v>(
             })
             .ok_or_else(|| anyhow::anyhow!("aspect attribute `{name}` must use attr.label()"))?;
         let (label, allow_single_file, executable, exec_configuration) = match name.as_str() {
+            "_capture_output" => (
+                format!("@@{repo}//rust/settings:capture_clippy_output"),
+                None,
+                false,
+                false,
+            ),
+            "_clippy_error_format" => (
+                format!("@@{repo}//rust/settings:clippy_error_format"),
+                None,
+                false,
+                false,
+            ),
+            "_clippy_flag" => (
+                format!("@@{repo}//rust/settings:clippy_flag"),
+                None,
+                false,
+                false,
+            ),
+            "_clippy_flags" => (
+                format!("@@{repo}//rust/settings:clippy_flags"),
+                None,
+                false,
+                false,
+            ),
+            "_clippy_output_diagnostics" => (
+                format!("@@{repo}//rust/settings:clippy_output_diagnostics"),
+                None,
+                false,
+                false,
+            ),
             "_config" => (
-                format!("@@{repo}//rust/settings:rustfmt.toml"),
+                format!(
+                    "@@{repo}//rust/settings:{}",
+                    if is_rustfmt {
+                        "rustfmt.toml"
+                    } else {
+                        "clippy.toml"
+                    }
+                ),
                 Some(AllowSingleFile::True),
+                false,
+                false,
+            ),
+            "_error_format" => (
+                format!("@@{repo}//rust/settings:error_format"),
+                None,
+                false,
+                false,
+            ),
+            "_extra_rustc_flag" => (
+                format!("@@{repo}//rust/settings:extra_rustc_flag"),
+                None,
+                false,
+                false,
+            ),
+            "_incompatible_change_clippy_error_format" => (
+                format!("@@{repo}//rust/settings:incompatible_change_clippy_error_format"),
+                None,
+                false,
+                false,
+            ),
+            "_per_crate_rustc_flag" => (
+                format!("@@{repo}//rust/settings:per_crate_rustc_flag"),
+                None,
                 false,
                 false,
             ),
@@ -2889,10 +2965,14 @@ fn aspect_attributes<'v>(
             || definition.mandatory
             || !definition.configurable
             || definition.configurable_set
+            || definition.allow_files
             || definition.allow_single_file != allow_single_file
+            || !matches!(definition.allowed_values, AllowedAttributeValues::None)
             || definition.default.as_ref() != Some(&expected_default)
             || definition.executable != executable
             || definition.exec_configuration != exec_configuration
+            || !definition.required_providers.is_empty()
+            || definition.attached_aspect.is_some()
             || definition.transition.is_some()
         {
             anyhow::bail!("aspect attribute `{name}` does not match the admitted fixed schema");

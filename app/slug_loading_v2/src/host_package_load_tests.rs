@@ -2829,6 +2829,166 @@ fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
     );
 }
 
+const CLIPPY_ASPECT_SOURCE: &str = r#"
+def _clippy_aspect_impl(target, ctx):
+    fail("clippy implementation must stay lazy")
+rust_clippy_aspect = aspect(
+    implementation = _clippy_aspect_impl,
+    attrs = {
+        "_capture_output": attr.label(doc = "capture", default = Label("//rust/settings:capture_clippy_output")),
+        "_clippy_error_format": attr.label(doc = "clippy format", default = "//rust/settings:clippy_error_format"),
+        "_clippy_flag": attr.label(doc = "flag", default = Label("//rust/settings:clippy_flag")), "_clippy_flags": attr.label(doc = "flags", default = Label("//rust/settings:clippy_flags")),
+        "_clippy_output_diagnostics": attr.label(doc = "diagnostics", default = "//rust/settings:clippy_output_diagnostics"),
+        "_config": attr.label(doc = "config", allow_single_file = True, default = Label("//rust/settings:clippy.toml")),
+        "_error_format": attr.label(doc = "rustc format", default = "//rust/settings:error_format"), "_extra_rustc_flag": attr.label(default = Label("//rust/settings:extra_rustc_flag")),
+        "_incompatible_change_clippy_error_format": attr.label(doc = "incompatible", default = "//rust/settings:incompatible_change_clippy_error_format"),
+        "_per_crate_rustc_flag": attr.label(default = Label("//rust/settings:per_crate_rustc_flag")),
+        "_process_wrapper": attr.label(doc = "wrapper", default = Label("//util/process_wrapper"), executable = True, cfg = "exec"),
+    },
+    toolchains = TOOLCHAINS,
+)
+"#;
+
+fn clippy_owner() -> BzlModuleIdentity {
+    BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_rust+//rust/private:clippy.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_rust/rust/private/clippy.bzl"),
+        repository_mapping: Arc::from([(
+            ApparentRepoName::new("bazel_tools").unwrap(),
+            CanonicalRepoName::new("bazel_tools+").unwrap(),
+        )]),
+    }
+}
+
+#[test]
+fn clippy_aspect_freezes_exact_private_label_map_before_toolchains() {
+    let source = CLIPPY_ASPECT_SOURCE.replace("TOOLCHAINS", "['//rust:toolchain_type']");
+    let module = eval_bzl_with_identity(&source, clippy_owner()).unwrap();
+    let aspect = module
+        .get("rust_clippy_aspect")
+        .unwrap()
+        .downcast::<FrozenAspectDefinition>()
+        .unwrap();
+    let expected = [
+        ("_capture_output", "rust/settings:capture_clippy_output"),
+        ("_clippy_error_format", "rust/settings:clippy_error_format"),
+        ("_clippy_flag", "rust/settings:clippy_flag"),
+        ("_clippy_flags", "rust/settings:clippy_flags"),
+        (
+            "_clippy_output_diagnostics",
+            "rust/settings:clippy_output_diagnostics",
+        ),
+        ("_config", "rust/settings:clippy.toml"),
+        ("_error_format", "rust/settings:error_format"),
+        ("_extra_rustc_flag", "rust/settings:extra_rustc_flag"),
+        (
+            "_incompatible_change_clippy_error_format",
+            "rust/settings:incompatible_change_clippy_error_format",
+        ),
+        (
+            "_per_crate_rustc_flag",
+            "rust/settings:per_crate_rustc_flag",
+        ),
+        ("_process_wrapper", "util/process_wrapper:process_wrapper"),
+    ];
+    assert_eq!(aspect.attributes.len(), expected.len());
+    for (attribute, (name, target)) in aspect.attributes.iter().zip(expected) {
+        assert_eq!(attribute.name, name);
+        assert_eq!(attribute.kind, AttributeKind::Label);
+        assert!(!attribute.mandatory && attribute.configurable && !attribute.allow_files);
+        assert!(matches!(
+            attribute.allowed_values,
+            AllowedAttributeValues::None
+        ));
+        assert!(attribute.required_providers.is_empty());
+        assert!(attribute.attached_aspect.is_none() && attribute.transition.is_none());
+        assert!(
+            matches!(attribute.default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == format!("@@rules_rust+//{target}"))
+        );
+        assert_eq!(
+            attribute.allow_single_file,
+            (name == "_config").then_some(AllowSingleFile::True)
+        );
+        assert_eq!(attribute.executable, name == "_process_wrapper");
+        assert_eq!(attribute.exec_configuration, name == "_process_wrapper");
+    }
+}
+
+#[test]
+fn clippy_aspect_rejects_source_mutations_and_stops_at_mixed_toolchains() {
+    let admitted = CLIPPY_ASPECT_SOURCE.replace("TOOLCHAINS", "['//rust:toolchain_type']");
+    for (from, to) in [
+        (
+            "\"_capture_output\": attr.label",
+            "\"capture_output\": attr.label",
+        ),
+        (
+            "default = Label(\"//rust/settings:capture_clippy_output\")",
+            "configurable = False, default = Label(\"//rust/settings:capture_clippy_output\")",
+        ),
+        (
+            "default = \"//rust/settings:clippy_error_format\"",
+            "default = \"//rust/settings:wrong\"",
+        ),
+        (
+            "attr.label(doc = \"flag\", default = Label(\"//rust/settings:clippy_flag\"))",
+            "attr.label(doc = \"flag\")",
+        ),
+        ("attr.label(doc = \"flags\"", "attr.string(doc = \"flags\""),
+        (
+            "doc = \"diagnostics\", default",
+            "doc = \"diagnostics\", allow_files = True, default",
+        ),
+        (
+            "doc = \"rustc format\", default",
+            "doc = \"rustc format\", cfg = \"exec\", default",
+        ),
+        (
+            "doc = \"wrapper\", default",
+            "doc = \"wrapper\", providers = [1], default",
+        ),
+        (
+            "doc = \"wrapper\", default",
+            "doc = \"wrapper\", aspects = [1], default",
+        ),
+        (
+            "cfg = \"exec\"",
+            "cfg = transition(implementation = _clippy_aspect_impl, inputs = [], outputs = [\"//:setting\"] )",
+        ),
+        (
+            "executable = True, cfg = \"exec\"",
+            "executable = False, cfg = \"exec\"",
+        ),
+    ] {
+        let source = admitted.replacen(from, to, 1);
+        assert_ne!(source, admitted, "mutation anchor must remain live: {from}");
+        assert!(
+            eval_bzl_with_identity(&source, clippy_owner()).is_err(),
+            "{from}"
+        );
+    }
+
+    for source in [
+        admitted.replacen("        \"_capture_output\": attr.label(doc = \"capture\", default = Label(\"//rust/settings:capture_clippy_output\")),\n", "", 1),
+        admitted.replacen("        \"_process_wrapper\":", "        \"_extra\": attr.label(default = Label(\"//:extra\")),\n        \"_process_wrapper\":", 1),
+        admitted.replace("\"_capture_output\"", "\"_temporary\"").replace("\"_clippy_error_format\"", "\"_capture_output\"").replace("\"_temporary\"", "\"_clippy_error_format\""),
+    ] {
+        assert!(eval_bzl_with_identity(&source, clippy_owner()).is_err());
+    }
+
+    let mixed = CLIPPY_ASPECT_SOURCE.replace(
+        "TOOLCHAINS",
+        "[str(Label('//rust:toolchain_type')), config_common.toolchain_type('@bazel_tools//tools/cpp:toolchain_type', mandatory = False)]",
+    );
+    let error = eval_bzl_with_identity(&mixed, clippy_owner())
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("toolchains") || error.contains("string"),
+        "{error}"
+    );
+}
+
 fn assert_frozen_rustfmt_test_aspect(aspect: &FrozenAspectDefinition) {
     assert_eq!(
         aspect.attr_aspects.as_ref(),
