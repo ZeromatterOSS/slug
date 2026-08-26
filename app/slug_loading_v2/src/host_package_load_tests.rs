@@ -3293,6 +3293,40 @@ fn bazel_cc_common_private_bridge_is_bzl_only_owner_checked_and_opaque() {
 }
 
 #[test]
+fn bazel_cc_common_compiler_sentinel_freezes_exported_wrapper() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_common.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_cc/cc/private/cc_common.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let source = r#"
+native_cc_common = cc_common
+EXPORTED_CC_COMMON = struct(
+    do_not_use_tools_cpp_compiler_present = native_cc_common.do_not_use_tools_cpp_compiler_present,
+)
+DIRECT_NONE = native_cc_common.do_not_use_tools_cpp_compiler_present == None
+CAPTURED_NONE = EXPORTED_CC_COMMON.do_not_use_tools_cpp_compiler_present == None
+PRESENT = hasattr(native_cc_common, "do_not_use_tools_cpp_compiler_present")
+UNKNOWN_ABSENT = not hasattr(native_cc_common, "unselected_native_field")
+"#;
+    let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
+    for name in ["DIRECT_NONE", "CAPTURED_NONE", "PRESENT", "UNKNOWN_ABSENT"] {
+        assert_eq!(
+            module.get(name).unwrap().unpack_bool(),
+            Some(true),
+            "{name}"
+        );
+    }
+    assert!(
+        eval_bzl_with_identity(
+            "X = cc_common.do_not_use_tools_cpp_compiler_present()",
+            owner,
+        )
+        .is_err()
+    );
+}
+
+#[test]
 fn bazel_empty_header_info_freezes_rules_cc_compilation_context_row() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_info.bzl").unwrap(),

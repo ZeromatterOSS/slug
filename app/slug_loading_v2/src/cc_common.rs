@@ -44,6 +44,10 @@ impl fmt::Display for CcCommonModule {
 
 #[starlark_value(type = "cc_common")]
 impl<'v> StarlarkValue<'v> for CcCommonModule {
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        (attribute == "do_not_use_tools_cpp_compiler_present").then_some(Value::new_none())
+    }
+
     fn get_methods() -> Option<&'static Methods> {
         static METHODS: MethodsStatic = MethodsStatic::new();
         METHODS.methods(cc_common_methods)
