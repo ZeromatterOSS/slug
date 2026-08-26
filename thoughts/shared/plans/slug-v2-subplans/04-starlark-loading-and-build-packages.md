@@ -5247,6 +5247,37 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Rust stdlib filegroup accepted; data-attribute docs selected (2026-08-26)
+
+Commit `75709828` adds one normalized `allow_files` Boolean to the existing
+attribute declaration, frozen rule and target schema owners. Omitted,
+explicit `None` and false normalize to no-file; true normalizes to any-file.
+The source-shaped rules_rust `rust_stdlib_filegroup` declaration freezes and
+projects its mandatory, non-single-artifact `srcs` schema without admitting a
+file target or running its implementation. All 209 loading units, configured
+analysis, locked checks, rebuilt CLI and hygiene pass at 37 production and 84
+proof additions; independent terminal review returned `ACCEPT`.
+
+Source order next begins the larger `rust_toolchain` rule at line 664.
+Allocator, binary, cargo, channel and clippy descriptors use accepted shapes.
+The first missing evaluated argument is `doc` on the `debug_info`
+`attr.string_dict` at line 695. Later in the same rule, string-list,
+string-list-dict and int descriptors also carry string documentation, while
+Slug currently accepts docs only on label, label-list, bool and string.
+
+Run only `WP-4-7A-bazel-data-attribute-doc-loading`: validate string/`None`
+documentation through the existing helper for int, string-list, string-dict
+and string-list-dict, discard it from semantic identity, and prove wrong types
+reject. Stop at line 727, where `attr.int(values = [-1, 0, 1])` first requires
+a retained allowed-value predicate. Documentation extraction and allowed-value
+enforcement remain deferred.
+
+Clean `../zabel` `0795445f…` is architectural guidance for the same transient
+validation-and-discard boundary only; no Zig code or behavior is copied. No
+retained structure, collection, hashing, interning or memory accounting changes,
+so the Buck2 utility audit requires no new utility or ledger row. Bazel 9.2
+remains sole behavior authority.
+
 ### Cc_common wrapper accepted; label-list file allowance selected (2026-08-26)
 
 Commit `4bdd64bf` adds only the deprecated
