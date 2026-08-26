@@ -456,6 +456,7 @@ impl NativeToolchainTarget {
 /// The containing package keeps its source `.bzl` module alive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
 pub(crate) enum BuildSettingKind {
+    Integer { flag: bool },
     String,
     Boolean,
     StringList { repeatable: bool },
@@ -464,6 +465,7 @@ pub(crate) enum BuildSettingKind {
 impl BuildSettingKind {
     fn attribute_kind(self) -> AttributeKind {
         match self {
+            Self::Integer { .. } => AttributeKind::Integer,
             Self::String => AttributeKind::String,
             Self::Boolean => AttributeKind::Boolean,
             Self::StringList { .. } => AttributeKind::StringList,
@@ -2463,6 +2465,12 @@ impl FrozenRuleDefinition {
                 attribute.name
             );
         }
+        if matches!(
+            self.build_setting_kind,
+            Some(BuildSettingKind::Integer { .. })
+        ) {
+            anyhow::bail!("integer build setting rule invocation is not supported");
+        }
         Ok(())
     }
 }
@@ -2795,7 +2803,7 @@ pub(crate) struct RuleAttributeSchemaGen<V> {
     #[trace(unsafe_ignore)]
     pub(crate) mandatory: bool,
     #[trace(unsafe_ignore)]
-    configurable: bool,
+    pub(crate) configurable: bool,
     #[trace(unsafe_ignore)]
     pub(crate) default: Option<CoercedAttributeValue>,
     pub(crate) transition: Option<TransitionDefinitionGen<V>>,
@@ -4159,6 +4167,18 @@ impl fmt::Display for RootStringBuildSetting {
 #[starlark_value(type = "config_string")]
 impl<'v> StarlarkValue<'v> for RootStringBuildSetting {}
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct RootIntBuildSetting {
+    flag: bool,
+}
+starlark::starlark_simple_value!(RootIntBuildSetting);
+impl fmt::Display for RootIntBuildSetting {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("config.int")
+    }
+}
+#[starlark_value(type = "config_int")]
+impl<'v> StarlarkValue<'v> for RootIntBuildSetting {}
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct RootBoolBuildSetting;
 starlark::starlark_simple_value!(RootBoolBuildSetting);
 impl fmt::Display for RootBoolBuildSetting {
@@ -4190,6 +4210,13 @@ fn root_string_build_setting(flag: bool) -> anyhow::Result<RootStringBuildSettin
 
 #[starlark_module]
 fn config_methods(builder: &mut MethodsBuilder) {
+    fn int(
+        #[starlark(this)] _config: Value,
+        #[starlark(require = named, default = false)] flag: bool,
+    ) -> anyhow::Result<RootIntBuildSetting> {
+        Ok(RootIntBuildSetting { flag })
+    }
+
     fn string(
         #[starlark(this)] _config: Value,
         #[starlark(default = false)] flag: bool,
@@ -4924,7 +4951,9 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             anyhow::bail!("rule doc must be a string or None");
         }
         let build_setting_kind = build_setting.and_then(|value| {
-            if RootStringBuildSetting::from_value(value).is_some() {
+            if let Some(setting) = RootIntBuildSetting::from_value(value) {
+                Some(BuildSettingKind::Integer { flag: setting.flag })
+            } else if RootStringBuildSetting::from_value(value).is_some() {
                 Some(BuildSettingKind::String)
             } else if RootBoolBuildSetting::from_value(value).is_some() {
                 Some(BuildSettingKind::Boolean)
@@ -4938,7 +4967,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         });
         if build_setting.is_some() && build_setting_kind.is_none() {
             anyhow::bail!(
-                "only rule(build_setting = config.string(flag = True), config.bool(flag = True), or nonrepeatable config.string_list(flag = True)) is supported"
+                "only rule(build_setting = config.int(), config.string(flag = True), config.bool(flag = True), or config.string_list(flag = True)) is supported"
             )
         }
         let declared_builtin_names =

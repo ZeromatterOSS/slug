@@ -2525,6 +2525,64 @@ async fn external_bzl_module_freezes_typed_bazel_config_definitions() {
 }
 
 #[tokio::test]
+async fn external_bzl_module_freezes_config_int_definitions() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "root.bzl",
+            b"load(':support.bzl', 'int_flag', 'int_setting', 'int_setting_explicit_false')\nFLAG=int_flag\nSETTING=int_setting\nEXPLICIT_FALSE=int_setting_explicit_false\n",
+        ),
+        (
+            "support.bzl",
+            b"def _impl(ctx): fail('integer implementation must stay lazy')\nint_flag=rule(implementation=_impl, build_setting=config.int(flag=True))\nint_setting=rule(implementation=_impl, build_setting=config.int())\nint_setting_explicit_false=rule(implementation=_impl, build_setting=config.int(flag=False))\n",
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, 3971).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+    let module = &external_terminal(&outcome).module;
+    for (alias, rule_class, flag) in [
+        ("FLAG", "int_flag", true),
+        ("SETTING", "int_setting", false),
+        ("EXPLICIT_FALSE", "int_setting_explicit_false", false),
+    ] {
+        let rule = module
+            .get(alias)
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        assert_eq!(rule.capability().rule_class, rule_class);
+        assert_eq!(
+            rule.build_setting_kind,
+            Some(BuildSettingKind::Integer { flag })
+        );
+        let default = rule
+            .schema
+            .iter()
+            .find(|schema| schema.name == "build_setting_default")
+            .unwrap();
+        assert_eq!(default.kind, AttributeKind::Integer);
+        assert!(default.mandatory && !default.configurable);
+        let help = rule
+            .schema
+            .iter()
+            .find(|schema| schema.name == "help")
+            .unwrap();
+        assert_eq!(help.kind, AttributeKind::String);
+        assert!(!help.mandatory && !help.configurable);
+    }
+}
+
+#[tokio::test]
 async fn external_bzl_module_freezes_and_imports_fixed_aspect_definition() {
     let files: &[(&str, &[u8])] = &[
         (
@@ -3369,6 +3427,19 @@ fn eval_global(source: &str, globals: &Globals) -> Result<(), String> {
 #[test]
 fn bazel_config_typed_descriptors_are_bzl_only_and_require_supported_flags() {
     let bzl = loading_globals();
+    eval_global(
+        "T=config.int(flag=True)\nO=config.int()\nF=config.int(flag=False)",
+        &bzl,
+    )
+    .unwrap();
+    for source in [
+        "X=config.int(True)",
+        "X=config.int(flag=None)",
+        "X=config.int(flag=1)",
+        "X=config.int(unknown=True)",
+    ] {
+        assert!(eval_global(source, &bzl).is_err(), "{source}");
+    }
     for source in [
         "X=config.bool()",
         "X=config.bool(flag=1==2)",
@@ -3387,6 +3458,7 @@ fn bazel_config_typed_descriptors_are_bzl_only_and_require_supported_flags() {
     .unwrap();
     let build = build_file_loading_globals();
     for (source, missing) in [
+        ("S=config.string(flag=True)\nI=config.int()", "int"),
         (
             "S=config.string(flag=True)\nB=config.bool(flag=True)",
             "bool",
@@ -3398,6 +3470,42 @@ fn bazel_config_typed_descriptors_are_bzl_only_and_require_supported_flags() {
     ] {
         let error = eval_global(source, &build).unwrap_err();
         assert!(error.contains(missing), "{error}");
+    }
+}
+
+#[tokio::test]
+async fn repository_package_rejects_config_int_rules_before_target_recording() {
+    for (facts, descriptor) in [(3972, "config.int(flag=True)"), (3973, "config.int()")] {
+        let defs = format!(
+            "def _impl(ctx): fail('integer implementation must stay lazy')\nint_rule=rule(implementation=_impl, build_setting={descriptor})\n"
+        );
+        let files: &[(&str, &[u8])] = &[
+            (
+                "BUILD.bazel",
+                b"load(':defs.bzl', 'int_rule')\nint_rule(name='blocked', build_setting_default=1)\n",
+            ),
+            ("defs.bzl", defs.as_bytes()),
+        ];
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut transaction = transaction(
+            &dice,
+            EpochBuilder::external_sources(files, facts).build(),
+            false,
+            None,
+        )
+        .await;
+        let route = external_route(&mut transaction).await;
+        let outcome = transaction
+            .compute(&RepositoryPackageLoadKey::new(
+                route,
+                PackagePath::parse("").unwrap(),
+            ))
+            .await
+            .unwrap();
+        assert!(
+            repository_package_error(&outcome)
+                .contains("integer build setting rule invocation is not supported")
+        );
     }
 }
 
