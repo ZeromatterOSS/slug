@@ -30,19 +30,60 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; current rust-analyzer toolchain-rule audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain declaration schema | audit the next `current_rust_analyzer_toolchain = rule(...)`, including its explicit apparent self-repository Label and retained toolchain requirement; target invocation, configured exec dependencies, aspect application and bool/list targets/analysis remain deferred | run only `WP-4-7A-current-rust-analyzer-toolchain-rule-audit`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; current rust-analyzer toolchain-rule loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain declaration schema; the mapping audit selects one bounded defining-module vertical | load and freeze `current_rust_analyzer_toolchain = rule(...)` through the selected module's apparent-self mapping and retain its canonical toolchain requirement; target invocation, `ctx.toolchains`, configured dependencies, aspect application and bool/list targets/analysis remain deferred | run only `WP-4-7A-current-rust-analyzer-toolchain-rule-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-current-rust-analyzer-toolchain-rule-audit](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-current-rust-analyzer-toolchain-rule-loading](./slug-v2-subplans/current-packet.md).
 
-Audit the next source-order rule at
-`rust/private/rust_analyzer.bzl:404-433`. Authenticate the explicit
-`@rules_rust` Label's defining repository mapping and the retained `toolchains`
-requirement, then select one bounded declaration-loading implementation or
-`REPLAN`. Do not execute the implementation or enter configured analysis.
+Load and recursively freeze the rule at
+`rust/private/rust_analyzer.bzl:423-429`. Carry the selected registry route's
+existing repository mapping into each defining `.bzl` module, resolve the
+explicit apparent-self Label and retain its canonical one-element toolchain
+requirement. Do not invoke the rule, access `ctx.toolchains` or enter analysis.
+
+### M7 current rust-analyzer toolchain-rule audit selects defining-module mapping (2026-08-26)
+
+Pinned Bazel 9.2 `BazelModuleContext`,
+`LabelConverter.forBzlEvaluatingThread`, `Label.parseWithPackageContext`,
+`StarlarkRuleClassFunctions.parseToolchainTypes`, and focused Bzl-load/Label/
+rule-toolchain tests establish the fixed call. The shared Label builtin uses
+the innermost executing `.bzl` module's selected repository mapping, including
+an explicit self-name entry; `str(Label(...))` produces canonical `@@...`
+spelling. A plain string requirement is mandatory, and ordered first-label
+deduplication does not change the fixed one-element list.
+
+Slug's selected-registry route already owns the ordered apparent-to-canonical
+mapping and includes it in route equality/hash. Recursive child routes already
+select each child's own mapping. The gap is downstream: `BzlModuleIdentity`,
+the recursive manifest and evaluator context retain only label/path, while the
+bounded Label builtin rejects explicit repositories and the rule-toolchain
+converter cannot accept the resulting canonical string.
+
+Run only `WP-4-7A-current-rust-analyzer-toolchain-rule-loading`. Reuse the
+route's existing mapping Arc in each frozen module identity, include it in
+manifest fingerprinting, select the full defining identity at native-call
+source/`DefInfo` resolution, admit only mapped `@name//package:target` Label
+construction, and accept the canonical `str(Label(...))` handoff in the
+existing frozen rule requirement owner. Missing/conflicting mappings fail
+closed. Direct apparent rule-toolchain strings, wider Label forms, target
+invocation, `ctx.toolchains`, selection, analysis and later declarations remain
+deferred.
+
+Exact compatibility covers the fixed selected-registry apparent-self lookup,
+canonical handoff, one mandatory direct requirement, recursive freeze and
+producer export identity. Arc storage, complete-mapping over-invalidation,
+fingerprint framing and nonrequired diagnostics are Slug-native. Other mapping
+producers and the wider toolchain API remain unsupported/deferred.
+
+Pinned Zabel `c7298478…` guided only the architecture: retain immutable
+canonical repository plus apparent mapping with the defining module, let a
+shared Label builtin consult the currently executing module, and project one
+canonical declaration result. Its native toolchain declaration is not treated
+as the behavior analogue. No Zig code, representation, mapping rule, evaluator
+or DICE relation is copied; Bazel 9.2 remains sole behavior authority.
 
 ### M7 rust-analyzer toolchain declaration accepted; apparent-self Label audit selected (2026-08-26)
 

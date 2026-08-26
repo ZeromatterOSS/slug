@@ -4342,6 +4342,51 @@ Slug-native; `Label`, the complete live expression, application plus
 Boolean/StringList targets and analysis/CLI, M8/M7B and exact output bytes
 remain deferred.
 
+### Current rust-analyzer toolchain-rule audit selects defining-module mapping (2026-08-26)
+
+Pinned Bazel 9.2 authenticates the exact
+`current_rust_analyzer_toolchain = rule(...)` declaration at accepted
+rules_rust lines 423-429. `BazelModuleContext` owns each `.bzl` module's label
+and repository mapping; `LabelConverter.forBzlEvaluatingThread` selects the
+innermost executing module, so imported functions retain their defining
+mapping. Apparent self-names resolve through explicit mapping entries,
+`str(Label(...))` emits canonical `@@...` spelling, and a plain string passed
+to `parseToolchainTypes` is one mandatory requirement. Ordered/strictest
+deduplication is authenticated but dormant for the fixed one-element list.
+
+Slug's selected external route already owns the ordered mapping as an Arc and
+recursive child routes already carry each child's own selected mapping. The
+mapping participates in route/DICE equality but is discarded when the route
+becomes a `BzlModuleIdentity`; evaluator caller provenance therefore supplies
+only a canonical source label. The bounded Label builtin rejects the explicit
+repository, and the rule-toolchain converter separately cannot accept the
+canonical string handoff.
+
+Run only `WP-4-7A-current-rust-analyzer-toolchain-rule-loading`: retain the
+existing route mapping Arc with each recursive module identity, fingerprint it,
+select the full identity through the existing native-call-source/`DefInfo`
+path, resolve only mapped `@name//package:target`, and retain the resulting
+canonical one-element requirement in the existing frozen rule owner. Prove a
+module-local `rules_rust` self-name mapping to a deliberately different
+canonical repository, recursive imported ownership, and missing/conflicting
+failure. Do not guess aliases or add a second map, DICE compute or I/O path.
+
+Exact compatibility covers the fixed selected-registry apparent-self Label,
+canonical string handoff, one mandatory requirement, recursive freeze and
+producer export identity. Arc storage, complete-mapping over-invalidation,
+fingerprint framing and nonrequired diagnostics are Slug-native. Other route
+families, direct apparent rule-toolchain strings, Label/toolchain input breadth,
+target invocation, `ctx.toolchains`, selection, configured dependencies,
+analysis/actions and later declarations remain deferred.
+
+Pinned Zabel `c7298478…` is architectural guidance only. Its retained module
+repository context supports the same explicit-input/currently-executing-module
+shape, and its declaration resolver reinforces a thin canonical projection;
+the latter is a native `toolchain(...)` surface, not behavioral authority for
+`rule(toolchains)`. No Zig code, mapping behavior, storage or DICE relation is
+adopted. Bazel 9.2 remains sole behavior authority, and the utility-reuse audit
+selects Slug's existing Arc and canonical identity owners.
+
 ### Rust-analyzer toolchain declaration accepted; apparent-self Label audit selected (2026-08-26)
 
 Commit `eda81a4d` accepts and freezes the exact six-attribute
