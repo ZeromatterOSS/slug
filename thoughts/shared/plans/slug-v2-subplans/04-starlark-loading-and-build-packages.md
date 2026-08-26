@@ -5247,6 +5247,37 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Exact bazel_skylib paths child accepted; parent audit selected (2026-08-26)
+
+Commit `8440742f7` freezes exact unabridged bazel_skylib 1.8.2
+`lib/paths.bzl` under producer `@@bazel_skylib+//lib:paths.bzl`. Its authenticated
+SHA-256 is
+`96cce43871d8228126a12ceff771351f9030b1e9d029f2185853aa6541766a83`.
+The exported `paths` struct retains the exact ten source-bound members as frozen
+function values. Proof sorts only names for set comparison, invokes no helper
+and claims no exact field iteration order.
+
+All 225 loading units, both 24/31 integration suites, dependent core checks,
+rebuilt CLI and hygiene pass. Growth is 361 proof-only lines, ending at 7,935
+below the 7,994 ceiling. Independent terminal review returned `ACCEPT`.
+
+Run only docs packet `WP-4-7A-post-paths-rust-parent-frontier-audit`. Return to
+exact `rust/private/rust.bzl` source order after paths. Account for the already-
+admitted `@bazel_skylib//rules:common_settings.bzl` and all subsequent cached
+children before authenticating the first newly evaluated module and selecting
+its first unsupported eager loading expression or `REPLAN`. Edit no Rust and do
+not enter configured semantics.
+
+Exact compatibility covers exact-source freeze, producer identity and the ten
+name-to-function bindings. Generic frozen Rust representation and sorted proof
+comparison are Slug-native. Exact struct iteration order and path-helper
+behavior remain deferred.
+
+Clean `../zabel` `0795445f…` guided only closure reachability through an exported
+composite after module freeze. No Zig code, representation, ordering, owner
+pointer, capture algorithm, diagnostic or behavior was copied. Bazel 9.2
+remains sole behavior authority, with no retained utility or accounting change.
+
 ### Post-lints audit selects exact bazel_skylib paths proof (2026-08-26)
 
 Exact `rust/defs.bzl` next reaches `rust/private/rust.bzl` at SHA-256

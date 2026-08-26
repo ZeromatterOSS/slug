@@ -1,122 +1,98 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-bazel-skylib-paths-loading-proof`
+Packet: `WP-4-7A-post-paths-rust-parent-frontier-audit`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: freeze exact bazel_skylib 1.8.2 `lib/paths.bzl`, prove its exported
-function bindings survive module freeze, and stop when this child returns.
+Result: resume exact `rust/private/rust.bzl` source order after the accepted
+paths child, account for cached admitted children, and select the first newly
+unsupported eager loading expression or record `REPLAN`.
 
-## Learned facts and source order
+## Accepted base and audit frontier
 
-Base is `f301d89d3` (`Select post-lints parent audit`). Exact `rust/defs.bzl`
-next reaches `rust/private/rust.bzl`, 1,821 lines at SHA-256
+Base is `8440742f7` (`Prove exact bazel skylib paths loading`). It freezes exact
+bazel_skylib 1.8.2 `lib/paths.bzl` under
+`@@bazel_skylib+//lib:paths.bzl`, proving its exported ten-member function
+composite without invoking a helper or claiming exact field iteration order.
+
+Resume the authenticated 1,821-line rules_rust 0.73.0
+`rust/private/rust.bzl`, SHA-256
 `a645bd5db6344bd3c0997dcf73600475c0af53fb4dd025890be24b8e1e2dbfd8`.
-Its first direct child is previously unseen bazel_skylib 1.8.2
-`lib/paths.bzl`, 320 lines at SHA-256
-`96cce43871d8228126a12ceff771351f9030b1e9d029f2185853aa6541766a83`.
-The child has no recursive loads.
+Its next direct child is `@bazel_skylib//rules:common_settings.bzl`, already
+admitted completely through the earlier toolchain route at SHA-256
+`f3bcedef4b2b2cbe9750d61852917954499c4ba5e83d79fb975ec5814eb76d20`.
+Do not select duplicate implementation work there.
 
-The exact paths child declares ten functions. Their bodies contain standard
-Starlark string/list/zip operations but remain lazy. Four integer state
-constants and the final `paths = struct(...)` are the only other eager values.
-That struct retains all ten functions.
+## Authorities and compatibility discipline
 
-## Authorities and decision
-
-Bazel 9.2 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` is sole behavior authority.
-`StructProvider` and pinned `StarlarkRuleClassFunctionsTest` establish a struct
-holding callable function fields. Bazel's schemaless `StarlarkInfoNoSchema`
-sorts field keys for its table; do not infer exact observable order from source
-order.
-
-Slug already owns standard function/default/variadic syntax, integer constants,
-the `.bzl` `struct` global and recursive frozen Starlark values. Add no
-production behavior. The proof embeds the exact child, freezes it under the
-exact producer identity and observes the exported composite without invoking
-its functions.
+Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` and the
+authenticated rules_rust/bazel_skylib sources are sole behavior authority.
+Replay direct-load and recursive child order exactly. For each child, cite the
+accepted packet that closes it or authenticate its source bytes/hash before
+classifying its first unsupported eager expression.
 
 Clean `../zabel` commit
 `0795445f3ab60f4e49070bdd0b94425c5610f73a` is architectural guidance only.
-Its module-freeze traversal principle says closures retained by an exported
-composite must remain reachable after the defining evaluator closes. This
-guides the proof shape only. Copy no Zig code, representation, field ordering,
-owner pointer, identity, capture algorithm, diagnostic or behavior. Bazel 9.2
-decides compatibility.
+Use its module-boundary and frozen closure-graph concepts to check whether a
+cached child is genuinely complete. Copy no Zig code, representation, owner
+pointer, field order, capture algorithm, diagnostic, identity or behavior.
 
-The Buck2 utility review selects no action. This packet adds only an exact test
-source and assertions; it changes no retained data structure, hash, compact
-collection/string, interner, clone path, graph storage or memory accounting.
-The large test file remains the cohesive owner of exact external-Bzl loading
-fixtures; the exact 320-line constant is isolated and the test stays below 120
-lines.
+- **Exact:** authenticated parent/child source order and already accepted exact
+  loading slices.
+- **Slug-native:** Rust evaluator/frozen-value representation and the audit's
+  documentation structure.
+- **Unsupported/deferred:** any first unadmitted eager expression selected by
+  this audit; all lazy bodies and configured rule/provider/action behavior
+  unless separately accepted.
 
-## Compatibility
-
-- **Exact:** exact unabridged paths source freeze, exact producer identity,
-  exact ten-member name set and each source-bound member surviving as a frozen
-  function value.
-- **Slug-native:** starlark-rust frozen value/closure representation and current
-  constructor-order struct iteration.
-- **Unsupported/deferred:** exact Bazel struct iteration/order; invoking any
-  path function; its path/string result or diagnostic behavior; and the parent
-  `rust.bzl` frontier after paths returns.
+The Buck2 utility review selects no action because this is docs-only and changes
+no retained data structure, hash, collection/string, interner, clone path,
+graph storage or memory accounting.
 
 ## Allowlist, proof and caps
 
-Only this file may change:
+Only these files may change:
 
-| File | Base SHA-256 | Base lines | Final ceiling |
-|---|---|---:|---:|
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `e08900d8db938c7c29b8722b8213f2d1a8226e90129730015895ebbe5418a3c6` | 7,574 | 7,994 |
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
+- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md` only if the
+  audit yields a genuinely reusable or unusual routing decision.
 
-Caps are 0 production, 420 proof and 420 total additions; deletions do not buy
-addition budget. Keep the test function at or below 120 lines; the exact source
-constant may exceed that limit.
+Caps are 0 production and 0 proof additions. Documentation growth must remain
+bounded to the authenticated audit result.
 
-Required proof:
+Required audit:
 
-1. Embed exact unabridged bazel_skylib 1.8.2 `lib/paths.bzl:1-320` and verify
-   its SHA-256 against the authenticated source.
-2. Freeze it with exact producer identity
-   `@@bazel_skylib+//lib:paths.bzl`; successful freeze must retain the exported
-   composite without invoking a helper.
-3. Prove the exact field-name set `basename`, `dirname`, `is_absolute`, `join`,
-   `normalize`, `is_normalized`, `relativize`, `replace_extension`,
-   `split_extension`, `starts_with`.
-4. Prove the source binds each name to a function and every field remains a
-   frozen value of type `function`. Compare a sorted name set; do not claim
-   Bazel-exact iteration order or inspect unavailable private function exports.
-5. Preserve every accepted keyword-only, struct, clippy, lints, lint-test and
-   rustfmt proof.
+1. Resume immediately after `lib/paths.bzl` returns; do not restart at a later
+   public ruleset or skip a direct child.
+2. Account for complete cached children from accepted evidence, beginning with
+   `rules/common_settings.bzl`; do not duplicate their implementation.
+3. Authenticate the first newly evaluated child and recursively follow its own
+   load order before examining its body.
+4. Identify the first unsupported eager loading expression and its narrow
+   producer/consumer proof boundary, or record `REPLAN` if no bounded Rust-
+   native packet exists.
+5. Update the canonical status, stage subplan and this manifest to name one
+   next packet with exact/Slug-native/unsupported classification.
 
-No new oracle is needed: authenticated source, pinned Bazel struct tests and
-the exact frozen composite proof discriminate the missing coverage.
+No new oracle is required for the docs audit. Any selected parity change must
+name existing accepted discriminating Bazel 9.2 evidence or require a later
+pinned-source/oracle proof.
 
-## Serial validation and STOP
+## Validation and STOP
 
-Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
-`CARGO_BUILD_JOBS=1`:
+Run `git diff --check`, verify only allowlisted documentation changed, and run
+`scripts/v2_archive_status.sh` with only its three known archive-only misses.
+Independent terminal review must verify source order, cached-child accounting,
+selected boundary, compatibility classification, Zabel's guidance-only role
+and scope.
 
-- focused exact paths-child proof;
-- `cargo test -p slug_loading_v2 --lib --locked`;
-- `cargo test -p slug_loading_v2 --test bzl_invalidation --locked`;
-- `cargo test -p slug_loading_v2 --test build_file_loading --locked`;
-- `cargo check --locked -p slug_analysis_v2 -p slug_core_v2`;
-- `cargo build -p slug_cli_v2 --locked`;
-- `cargo fmt --all -- --check`, `git diff --check`, and
-  `scripts/v2_archive_status.sh` with only its three known archive-only misses.
-
-Independent terminal review must verify source bytes/hash, source order,
-producer/member/function proof, lazy nonexecution, the non-exact ordering
-boundary, Zabel guidance-only role, utility decision, validation and caps.
-
-STOP and `REPLAN` for a production change; function invocation; an exact field-
-order claim; another child; identity/registry/DICE work; Java/JVM work; copied
-Zabel content; dirty authority; skipped source order; or cap violation.
+STOP and `REPLAN` for Rust changes, skipped source order, a duplicate packet for
+an already accepted child, configured semantics, Java/JVM work, copied Zabel
+content, dirty authority or an unbounded next packet.
 
 ## Immediate predecessor
 
-`f301d89d3` selected the post-lints audit. It authenticated paths as the first
-new child of `rust.bzl` and found only a missing exact recursive freeze proof.
+`8440742f7` accepted the exact paths-child recursive freeze proof under all
+caps and validation, then stopped as required when that child returned.
