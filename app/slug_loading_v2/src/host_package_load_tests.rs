@@ -2189,6 +2189,42 @@ async fn external_bzl_module_full_route_keys_are_unequal_while_canonical_labels_
         "@@dep+//:defs.bzl"
     );
 }
+
+#[tokio::test]
+async fn external_bzl_module_evaluates_recursive_bazel_keyword_only_parameters() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "root.bzl",
+            b"load(\":support.bzl\", \"RESULT\")\nEXPORTED = RESULT\n",
+        ),
+        (
+            "support.bzl",
+            b"def _support(*, std = False, host_tools = False):\n    return std and not host_tools\nRESULT = _support(std = True)\n",
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, 392).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+    assert_eq!(
+        external_terminal(&outcome)
+            .module
+            .get("EXPORTED")
+            .unwrap()
+            .unpack_bool(),
+        Some(true)
+    );
+}
+
 #[tokio::test]
 async fn external_bzl_module_retains_canonical_manifest_lifetime_and_local_events() {
     let files: &[(&str, &[u8])] = &[

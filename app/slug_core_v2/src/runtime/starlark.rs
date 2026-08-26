@@ -46,12 +46,13 @@ fn module_file_globals(globals: &mut GlobalsBuilder) {
 /// Stages 4 and 5; this function only establishes the actual starlark-rust
 /// parse/evaluation boundary required by the configured-build chain.
 pub(crate) fn evaluate_file(path: &Path, source: &str, is_module: bool) -> anyhow::Result<()> {
-    let ast = AstModule::parse(
-        &path.display().to_string(),
-        source.to_owned(),
-        &Dialect::Standard,
-    )
-    .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    let dialect = if is_module {
+        &Dialect::Standard
+    } else {
+        &Dialect::Bazel
+    };
+    let ast = AstModule::parse(&path.display().to_string(), source.to_owned(), dialect)
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
     let globals = if is_module {
         GlobalsBuilder::standard().with(module_file_globals).build()
     } else {
@@ -62,4 +63,43 @@ pub(crate) fn evaluate_file(path: &Path, source: &str, is_module: bool) -> anyho
         .eval_module(ast, &globals)
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bazel_build_dialect_binds_keyword_only_parameters() {
+        evaluate_file(
+            Path::new("BUILD.bazel"),
+            "def support(*, std = False, host_tools = False):\n    return std and not host_tools\ndef variadic(*args, enabled = False):\n    return enabled\nRESULT = support(std = True) and variadic(1, enabled = True) and (lambda *, value: value)(value = True)\n",
+            false,
+        )
+        .unwrap();
+        let positional = evaluate_file(
+            Path::new("BUILD.bazel"),
+            "def support(*, std = False): pass\nsupport(True)\n",
+            false,
+        )
+        .unwrap_err();
+        assert!(positional.to_string().contains("extra positional"));
+        let missing = evaluate_file(
+            Path::new("BUILD.bazel"),
+            "def support(*, std): pass\nsupport()\n",
+            false,
+        )
+        .unwrap_err();
+        assert!(missing.to_string().contains("Missing named-only parameter"));
+    }
+    #[test]
+    fn module_branch_does_not_admit_bare_star_parameters() {
+        let error = evaluate_file(
+            Path::new("MODULE.bazel"),
+            "def support(*, std = False): pass\n",
+            true,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("not allowed in this dialect"));
+    }
 }

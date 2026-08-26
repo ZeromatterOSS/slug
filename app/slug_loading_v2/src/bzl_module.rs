@@ -660,7 +660,7 @@ fn evaluate_host_package_attempt(
     let ast = match AstModule::parse_with_string_encoding(
         &input.build_file.display().to_string(),
         input.source.as_ref().clone(),
-        &Dialect::Standard,
+        &Dialect::Bazel,
         StringEncoding::BazelInternal,
     ) {
         Ok(ast) => ast,
@@ -2223,7 +2223,7 @@ async fn compute_host_bzl_module(
     let ast = match AstModule::parse_with_string_encoding(
         &source_name,
         source_text.as_ref().clone(),
-        &Dialect::Standard,
+        &Dialect::Bazel,
         StringEncoding::BazelInternal,
     ) {
         Ok(ast) => ast,
@@ -4050,7 +4050,7 @@ async fn compute_external_bzl_module(
     let ast = match AstModule::parse_with_string_encoding(
         &source_name,
         source_text.as_ref().clone(),
-        &Dialect::Standard,
+        &Dialect::Bazel,
         StringEncoding::BazelInternal,
     ) {
         Ok(ast) => ast,
@@ -4630,7 +4630,7 @@ async fn compute_root_package(
     let ast = match AstModule::parse_with_string_encoding(
         &source_name,
         source_text.as_ref().clone(),
-        &Dialect::Standard,
+        &Dialect::Bazel,
         StringEncoding::BazelInternal,
     ) {
         Ok(ast) => ast,
@@ -5182,7 +5182,7 @@ impl RepositoryPackageLoadKey {
             let ast = match AstModule::parse_with_string_encoding(
                 &logical_build_file.display().to_string(),
                 source.as_ref().clone(),
-                &Dialect::Standard,
+                &Dialect::Bazel,
                 StringEncoding::BazelInternal,
             ) {
                 Ok(ast) => ast,
@@ -5614,7 +5614,7 @@ impl Key for BzlParseKey {
             let ast = AstModule::parse(
                 &self.path.display().to_string(),
                 source.as_ref().clone(),
-                &Dialect::Standard,
+                &Dialect::Bazel,
             )
             .map_err(|error| {
                 let module = self
@@ -5757,7 +5757,7 @@ impl Key for BzlModuleEvalKey {
                 let ast = AstModule::parse(
                     &self.path.display().to_string(),
                     parsed.source.clone(),
-                    &Dialect::Standard,
+                    &Dialect::Bazel,
                 )
                 .map_err(|error| LoadingError::new(error.to_string()))?;
                 let module = Module::new();
@@ -5884,7 +5884,7 @@ impl Key for PackageLoadKey {
             let ast = match AstModule::parse(
                 &build_file.display().to_string(),
                 source.as_ref().clone(),
-                &Dialect::Standard,
+                &Dialect::Bazel,
             ) {
                 Ok(ast) => ast,
                 Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
@@ -5934,7 +5934,7 @@ impl Key for PackageLoadKey {
                 let ast = AstModule::parse(
                     &build_file.display().to_string(),
                     source.as_ref().clone(),
-                    &Dialect::Standard,
+                    &Dialect::Bazel,
                 )
                 .map_err(|error| LoadingError::new(error.to_string()))?;
                 let package_label = self

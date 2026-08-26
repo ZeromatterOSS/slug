@@ -108,6 +108,23 @@ impl Dialect {
         _non_exhaustive: (),
     };
 
+    /// Follow Bazel's BUILD and `.bzl` language dialect.
+    ///
+    /// Bazel admits bare `*` keyword-only parameters while retaining the
+    /// remaining standard syntax restrictions represented here.
+    pub const Bazel: Self = Self {
+        enable_def: true,
+        enable_lambda: true,
+        enable_load: true,
+        enable_keyword_only_arguments: true,
+        enable_positional_only_arguments: false,
+        enable_types: DialectTypes::Disable,
+        enable_load_reexport: true,
+        enable_top_level_stmt: false,
+        enable_f_strings: false,
+        _non_exhaustive: (),
+    };
+
     /// This option is deprecated. Extend `Standard` instead.
     #[doc(hidden)]
     pub const Extended: Self = Self {

@@ -451,6 +451,36 @@ mod tests {
     }
 
     #[test]
+    fn test_named_only_in_bazel_dialect() {
+        let mut expected = Dialect::Standard;
+        expected.enable_keyword_only_arguments = true;
+        assert_eq!(Dialect::Bazel, expected);
+        assert!(Dialect::Bazel.enable_def && Dialect::Bazel.enable_lambda);
+        assert!(Dialect::Bazel.enable_load && Dialect::Bazel.enable_load_reexport);
+        assert!(!Dialect::Bazel.enable_positional_only_arguments);
+        assert_eq!(
+            Dialect::Bazel.enable_types,
+            crate::syntax::DialectTypes::Disable
+        );
+        assert!(!Dialect::Bazel.enable_top_level_stmt && !Dialect::Bazel.enable_f_strings);
+        for program in [
+            "def test(*, x, y=1): return (x, y)",
+            "def test(*args, x, y=1): return (args, x, y)",
+            "value = lambda *, x, y=1: (x, y)",
+        ] {
+            AstModule::parse("test.star", program.to_owned(), &Dialect::Bazel).unwrap();
+        }
+        for program in [
+            "def test(*): pass",
+            "def test(*, x, *args): pass",
+            "def test(x, /): pass",
+            "lambda /, x: x",
+        ] {
+            assert!(AstModule::parse("test.star", program.to_owned(), &Dialect::Bazel).is_err());
+        }
+    }
+
+    #[test]
     fn test_positional_only_in_standard_dialect_def() {
         fails_dialect(
             "positional_only_in_standard_dialect_def",
