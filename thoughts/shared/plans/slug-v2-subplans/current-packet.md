@@ -137,11 +137,15 @@ Only these files may change from base `8d3f9b6e`:
 | `app/slug_loading_v2/src/host_package_load_tests.rs` | `35506442b4bec593be917eec16e44182005e5c57dd9e40cef838b8795649be5f` | 6,005 | 6,175 | ABI, identity, enforcement and source-prefix proof |
 
 Production additions are capped at 95, proof additions at 160 and total
-additions at 255. Deletions do not buy addition budget. No new or touched
-function may exceed 120 lines. `package.rs` and the proof file exceed the
-2,000-line trigger, but the schema plumbing belongs in the existing declaration
-and target-call owners and the recursive loading proof belongs beside adjacent
-rules_rust tests; splitting would create duplicate owners and widen the packet.
+additions at 255. Deletions do not buy addition budget. No new function may
+exceed 120 lines. The pre-existing `FrozenRuleDefinition::invoke` is the sole
+grandfathered larger owner: this packet may add at most 10 formatted lines to
+it, limited to projecting the constraint into `AttributeSchema` and calling a
+bounded validation helper. No other restructuring or behavior may enter that
+function. `package.rs` and the proof file exceed the 2,000-line trigger, but
+the schema plumbing belongs in the existing declaration and target-call owners
+and the recursive loading proof belongs beside adjacent rules_rust tests;
+splitting would create duplicate owners and widen the packet.
 
 Plan-only selection edits are limited to the canonical plan, Stage 4 subplan
 and this manifest and are excluded from implementation caps.
