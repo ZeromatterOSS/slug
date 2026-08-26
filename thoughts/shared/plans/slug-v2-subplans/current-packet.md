@@ -1,128 +1,157 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-bazel-label-global-audit`
+Packet: `WP-4-7A-bazel-label-global-loading`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: Stage 4 recursive `.bzl` loading and evaluator-visible label values
-Base: `840d28e7`
+Owners: shared loading Label value, recursive Bzl provenance and fixed aspect adapter
+Base: `650075d8`
 
-Result: produce a docs-only, source-authenticated implementation decision for
-the smallest exact Bazel `Label(...)` slice needed by the accepted rules_rust
-`rust_analyzer_aspect` declaration. Do not edit Rust or claim that the live
-declaration loads during this packet.
+Result: add the smallest exact `.bzl` `Label(...)` construction and canonical
+stringification vertical needed to load the complete fixed
+`rust_analyzer_aspect` declaration. Resolve imported-function calls against
+their defining `.bzl`, never merely the outer evaluator. Stop before later
+rules_rust declarations, general repository mapping or aspect application.
 
-## Learned facts to authenticate
+## Learned facts and authority
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-is sole behavior authority. Inspect:
+is sole behavior authority:
 
-- `StarlarkRuleFunctionsApi.Label` for `.bzl` placement, the one positional
-  string-or-Label input and constructor contract;
+- `StarlarkRuleFunctionsApi.Label` installs a `.bzl` constructor with one
+  positional string-or-Label input; Label input is returned unchanged.
 - `BazelModuleContext.ofInnermostBzlOrFail` and
-  `StarlarkRuleClassFunctions.label` for the innermost executing Starlark
-  function's defining-module context, package-relative parsing and
-  repository-mapping use;
-- `cmdline.Label` for canonical identity, `str`, `repr`, equality/hash and the
-  exposed property/method boundary; and
-- `StarlarkRuleClassFunctionsTest.testLabel`, `testLabelIdempotence`,
-  `testLabelSameInstance`, `testLabelNameAndPackage` plus
-  `StarlarkIntegrationTest.testLabelConstructorFailsInBuildFile` for focused
-  observable discrimination.
+  `StarlarkRuleClassFunctions.label` select the innermost executing Starlark
+  function's module, not the builtin exporter or outer evaluator.
+- `cmdline.Label` owns repository/package/target identity and canonical `str`;
+  focused class-function tests authenticate construction, idempotence and the
+  already-admitted narrow value properties.
+- `StarlarkIntegrationTest.testLabelConstructorFailsInBuildFile` proves that a
+  loaded alias still rejects in BUILD.
 
-The accepted rules_rust 0.73.0 archive SHA-256 is
+The accepted rules_rust archive SHA-256 is
 `2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`.
-Its first source-order use is exactly
-`str(Label("//rust:toolchain_type"))` inside
-`rust/private/rust_analyzer.bzl:210`; record which Label behaviors that
-expression needs and stop before later aspect declarations or rule calls.
+Its first remaining source-order expression is
+`str(Label("//rust:toolchain_type"))` at
+`rust/private/rust_analyzer.bzl:210` inside the already-admitted fixed aspect.
 
-Inspect the live Slug checkout rather than inventing a second identity domain:
-
-- `slug_identity_v2::CanonicalLabel` and its repository/package/target
-  ownership;
-- `BzlEvaluationContext`, including whether its source label is enough for the
-  admitted top-level same-repository form, why its current outer-module
-  installation is insufficient for imported functions, and where typed frame
-  provenance plus a future complete repository mapping would belong;
-- the existing module-extension `InvocationLabel` Starlark wrapper and all of
-  its consumers, deciding whether reuse, rename/move or avoidance preserves a
-  natural shared owner; and
-- recursive external-Bzl evaluation/freeze plus BUILD calls through a loaded
-  alias, so the builtin reads the current evaluator rather than its exporter.
+Slug's vendored Starlark `DefInfo` already retains the definition `CodeMap`.
+Expose one typed native-caller definition-filename accessor; never parse
+diagnostic stack text. `BzlLoadManifest.reachable` already pairs each retained
+recursive module's exact logical path with its canonical label. The top-level
+manifest root handles direct calls/aliases; an imported function must map its
+definition filename through that closure or fail closed. BUILD has no
+`BzlEvaluationContext` and therefore rejects before frame resolution.
 
 Pinned `../zabel` commit
 `c7298478e2e56262a2f438e9c065325744c9f0fc` is concept/test guidance only.
-Inspect `generic_label.zig` and `generic_label_value.zig`: their useful
-architectural lessons are canonical identity retained by the Label value and
-a shared builtin resolved against the executing function's defining module
-context rather than the outer evaluator or builtin exporter. Do not copy
-Zabel code, mapping observers, runtime,
-scheduler, side stores or behavior. Bazel 9.2 remains authoritative.
+Its generic Label layer retains canonical identity in the value while a shared
+builtin consults executing-definition module context. Do not copy its parser,
+repository mapping, observer, runtime, scheduler or storage. Bazel 9.2 remains
+authoritative.
 
-The Buck2 utility-reuse audit is mandatory because a Starlark Label is retained
-identity and the repository already has a label wrapper. Prefer the existing
-`CanonicalLabel`, compact strings and Starlark frozen/value owners. Record a
-concrete reuse/split decision and whether any new interning or cache is
-necessary; default to none.
+The Buck2 utility-reuse audit selects the existing `CanonicalLabel`, compact
+strings, Starlark simple/frozen value and Arc-backed manifest closure. Move and
+rename the existing `InvocationLabel` into one small shared loading module;
+update both consumers. Add no second wrapper, interner, hash domain, cache,
+registry or Stage 9 ledger entry.
 
-## Questions and decision output
+## Decision and non-decisions
 
-The audit must answer:
+Add `Label` only to complete `.bzl` globals. Admit:
 
-1. Can exact compatibility be bounded to `.bzl` construction from the live
-   repository-less absolute string, canonical `str`, and BUILD rejection while
-   every apparent/canonical external spelling, relative spelling, Label input,
-   property/method and attribute conversion remains fail-closed?
-2. Does `CanonicalLabel` already supply the required immutable equality/hash
-   identity, and which display projection makes `str(Label(...))` acceptable
-   to the fixed aspect toolchain adapter?
-3. How will a shared/re-exported builtin consult the currently executing
-   Starlark function's typed defining-module provenance, and why can no outer
-   evaluator, direct alias, importer or BUILD call supply the wrong context?
-4. Should the existing `InvocationLabel` move to a small shared loading-owned
-   module, be generalized in place, or be avoided? Name every consumer and
-   avoid duplicate wrappers over the same canonical identity.
-5. Which exact Rust/test files, line and addition caps, validation commands,
-   STOP conditions and residual unsupported surface make the successor
-   implementation packet independently executable?
+- one positional string in `//package:target` or `:target` form;
+- an existing shared Starlark Label input, returned as the same value;
+- defining-repository/package resolution from the top-level manifest root or
+  typed caller-definition filename;
+- the already-accepted Label value's canonical str/repr/hash/equality,
+  `name`, `package`, repository-name aliases and `same_package_label`; and
+- the fixed aspect adapter's acceptance of a canonical string only when its
+  repository equals the aspect's defining repository.
 
-If a bounded exact implementation exists, replace this manifest with that
-implementation packet and align the canonical and Stage 4 plans. Otherwise
-record `REPLAN` or an unsupported boundary. Classify every result as exact,
-Slug-native or unsupported/deferred.
+The `:target` form is included to discriminate imported-function ownership.
+Reject bare strings, explicit `@`/`@@` repositories, malformed labels, missing
+frame-to-manifest mappings and BUILD calls. Do not add repository mapping,
+non-visible repositories, special-package behavior, new Label properties or
+methods, attribute conversion/defaults, rule aspect parameters, propagation,
+selection, analysis, actions or later rules_rust call shapes.
 
-The proof matrix must distinguish (a) the live top-level call, (b) a directly
-re-exported `Label` alias, including BUILD rejection, and (c) an imported
-function whose body calls `Label`, which Bazel resolves in that function's
-defining `.bzl` module. Identify an existing typed function-frame source or
-`REPLAN`; the outer `Evaluator.extra` module label is not sufficient evidence.
+## Ownership, revision and lifetime
 
-## Ownership, revision and lifetime audit
+The calling Bzl module/function is the producer of resolution context. The
+existing manifest root/reachable identities are the sole path-to-canonical
+source; `BzlEvaluationContext` holds only an evaluation-scratch projection.
+The resulting shared Label value owns one `CanonicalLabel`, whose repository,
+package and target drive equality/hash. Display is a projection, never a
+second identity.
 
-Name the call-time producer, evaluator context and retained Label value. Any
-admitted canonical repository/package/target bytes must be owned by the value
-and participate in Starlark equality/hash; display is a projection, not
-identity. Repository mappings remain tracked semantic inputs and may not be
-guessed from paths or repaired command-side.
+Existing recursive Bzl DICE keys observe every source and retain the manifest
+and frozen module closure. Source or load edits invalidate the context before
+evaluation; no new key, observation, request overlay, filesystem inference or
+command repair is added. Concurrent requests keep their existing transaction
+isolation.
 
-State evaluator-scratch versus frozen-module lifetime, DICE invalidation,
-overlapping-request behavior and release. The audit may add no key, cache,
-registry, task, I/O, observation or async ownership.
+Context maps and native-caller filename strings are evaluator scratch. A Label
+assigned into a module is frozen/DICE-retained with that module and released
+with it. No service cache, command retention, async transfer, cancellation,
+task, eviction or shutdown duty is added.
 
-## Files, proof and STOP
+## Files and caps
 
-Only these docs may change:
+Only these Rust files may change, against the listed base SHA-256:
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`;
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
+| File | Base SHA-256 | Final line cap |
+|---|---|---:|
+| `starlark-rust/starlark/src/eval/runtime/evaluator.rs` | `67b701eb2ec7af89a58843d41d11a176a33b6ae7ce66fbff924e591b1f6c9378` | 1,225 |
+| `app/slug_loading_v2/src/lib.rs` | `af17ce9306a10779e6faffd49fb4951e8d9485fafe907165707ddbede289f918` | 120 |
+| `app/slug_loading_v2/src/starlark_label.rs` | new | 155 |
+| `app/slug_loading_v2/src/module_extension.rs` | `3b823dd2f971332955162d2b74bf6ad97a205eead5ada0573d899ef7ab83abcb` | 2,430 |
+| `app/slug_loading_v2/src/module_extension_repository_rule.rs` | `4ac465f184b5c2df37e1dae1c4493cb6d75eefef1b379d3220ad13023b08a35e` | 655 |
+| `app/slug_loading_v2/src/provider.rs` | `7b625396c3b841f3b498532993100b765996bef99f819aa49ea2e1bbf57f689d` | 575 |
+| `app/slug_loading_v2/src/bzl_module.rs` | `10accf93f7a960834c118812f83f6abc7d805a260e07d9c6e056ed39362abc8a` | 9,660 |
+| `app/slug_loading_v2/src/package.rs` | `a8c407a6320b4cba288510b458c9dcaeb7415a9488f87ca2ec625206e46e9e1c` | 5,425 |
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `79a635c5c25f991daf870a762d040670abe3195c5d52b10e6b22396b28813b51` | 4,375 |
 
-The final audit selection may add at most 100 lines to the canonical plan and
-120 lines to Stage 4; keep this manifest at or below 180 lines. Run
-`git diff --check`, plan-alignment search and `scripts/v2_archive_status.sh`.
-Require independent terminal review before commit.
+Cap production additions at 300, proof additions at 140 and total additions at
+440. The oversized loading files remain cohesive owners: `bzl_module.rs`
+constructs manifests/evaluators, `package.rs` assembles the global set/fixed
+aspect adapter, and the test file owns recursive loading proof. The Label value
+itself is split from the oversized module-extension file because it now has a
+second consumer. No touched function may exceed 150 lines. `REPLAN` before a
+tenth Rust file or any cap breach.
 
-STOP on Rust or fixture edits, behavior sourced from Zabel, Java/JVM, network
-mutation, a duplicate semantic Label owner, guessed repository mapping,
-captured exporter context, BUILD visibility, aspect application, a public
-success claim, outer-evaluator context substituted for function provenance or
-any cap breach. `REPLAN` rather than widening the audit.
+## Proof and validation
+
+Prove:
+
+- the typed runtime accessor reports a Starlark caller's definition filename
+  and reports no function for a direct module-scope native call;
+- top-level live construction/stringification completes the fixed aspect with
+  canonical toolchain identity;
+- a direct re-exported builtin alias uses the calling top-level module, while
+  an imported function with `Label(":owned")` uses its defining package;
+- the same alias rejects in BUILD and an absent frame-manifest entry fails;
+- Label input is idempotent; malformed/bare/explicit-repository inputs reject;
+  and existing module-extension Label ABI tests remain unchanged.
+
+Run serially: `cargo fmt --all -- --check`, focused Label/aspect/runtime tests,
+full `cargo test -p slug_loading_v2`, focused vendored Starlark tests,
+`cargo check -p slug_core_v2 --locked`, `cargo build -p slug_cli_v2 --locked`,
+`git diff --check` and `scripts/v2_archive_status.sh`. Clean stale `slugd`
+before/after any smoke. Pinned source and local focused tests suffice; broader
+upstream Label tests are skipped because repository mapping, special cases and
+wider methods are unsupported. Do not add an oracle fixture or run Bazel.
+
+## Compatibility and STOP
+
+- **Exact:** the admitted `.bzl` placement/input forms, typed defining-function
+  context, Label idempotence/value surface, canonical str and fixed-aspect
+  same-repository toolchain projection, plus BUILD alias rejection.
+- **Slug-native:** Rust representation, no cross-call object interning,
+  valid-Unicode strings and nonrequired diagnostics.
+- **Unsupported/deferred:** every excluded Label spelling/mapping/API and all
+  aspect attachment/application/analysis, later rules, bool/list targets,
+  M8/M7B and exact output bytes.
+
+STOP on dirty overlap, wrong/exporter/outer-evaluator context, stack-text or
+path inference, duplicate Label identity, guessed mapping, BUILD visibility,
+aspect execution/application, Zabel behavior/code, Java/JVM, fixture/network/
+dependency drift, public-success claims or cap breach. `REPLAN` before widening.

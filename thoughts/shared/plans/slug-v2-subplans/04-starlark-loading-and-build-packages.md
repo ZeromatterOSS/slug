@@ -4375,3 +4375,39 @@ consults the executing function's defining module context rather than the
 outer evaluator or builtin exporter. Its mapping observer/side effects and
 runtime are not candidates for import. Bazel 9.2 remains sole compatibility
 authority.
+
+### Bazel `Label` audit accepted; bounded loading implementation selected (2026-08-26)
+
+The audit confirms the live expression needs construction from
+`"//rust:toolchain_type"`, canonical `str` and the aspect adapter's acceptance
+of that same-repository canonical string. A package-relative `:target` form is
+also admitted solely to discriminate Bazel's defining-function context from
+the outer evaluator. Label input is idempotent. Bare labels, explicit apparent
+or canonical repository spellings, repository mappings and wider methods stay
+deferred.
+
+Slug has a typed bounded route. Vendored Starlark `DefInfo` retains the
+definition `CodeMap`; add one narrow evaluator accessor returning that filename
+for the Starlark function directly calling a native builtin. The existing flat
+`BzlLoadManifest.reachable` pairs every recursively retained module's exact
+logical source path with its canonical label. Extend evaluator-scratch
+`BzlEvaluationContext` with that projection: function calls look up their
+definition filename, top-level direct aliases use the manifest root and every
+missing/mismatched source fails closed. BUILD lacks this context. No call-stack
+text parsing, filesystem inference, new DICE key or repository-map guess is
+needed.
+
+Move `InvocationLabel` unchanged into a small shared loading-owned Label
+module and rename it; update both module-extension consumers and add the `.bzl`
+constructor there. This preserves the already-accepted canonical owner,
+string/repr/hash/equality, `name`, `package`, repository-name aliases and
+`same_package_label` surface without a duplicate wrapper or new interner. The
+Buck2 utility audit selects existing `CanonicalLabel`, compact/frozen values
+and Arc manifest owners only.
+
+Run only `WP-4-7A-bazel-label-global-loading`. Proof must distinguish a live
+top-level call, a direct alias, an imported function defined in another
+package, BUILD alias rejection, missing frame-map rejection, input boundaries
+and the complete fixed aspect declaration. Pinned Zabel `c7298478…` supplies
+concept/test guidance for value/context ownership only; no code or behavior is
+copied, and Bazel 9.2 remains sole authority.
