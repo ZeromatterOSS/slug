@@ -4108,3 +4108,26 @@ replacement, provisional-root cleanup/promotion and the exact dependency/file
 boundary from the accepted capture owner. Pinned Zabel remains architectural
 guidance for semantic-view/complete-physical-realization separation only;
 Bazel 9.2 owns every compatibility claim.
+
+### Selected-registry bounded archive realization selected (2026-08-25)
+
+The read-only audit accepts one exact selected-artifact implementation packet.
+It streams the verified rules_rust 0.73.0 capture through Rust gzip/GNU-tar
+into one callback-owned provisional root, admits only its demonstrated UTF-8
+regular/directory and GNU-long-name forms with raw physical-header iteration
+under explicit expansion/path/entry ceilings, then independently captures and
+verifies the registry MODULE before
+returning a complete immutable root to the existing token recheck.
+
+The complete structural `RepoSpec` remains the request/equality owner. A
+domain-separated Slug-native source association covers archive and MODULE
+content digests; no capture or temp path enters semantic state. Transport,
+decode, MODULE, unwind and stale paths drop all scratch; only success is
+retained by the sole materializer. The exact isolated `flate2`/`tar` lock
+closure adds eight packages without existing-version drift.
+
+Run only `WP-5-7A-selected-registry-bcr-archive-realization`. Generic
+`http_archive`, PAX/non-Unicode names, links/specials, nonempty strip/patch/
+overlay and broader ruleset work remain deferred. Pinned Zabel commit
+`c7298478…` guides the producer-owned selected-view/completed-immutable-root
+separation only; Bazel 9.2 owns archive and MODULE compatibility behavior.

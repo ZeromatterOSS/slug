@@ -30,17 +30,40 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; selected-BCR verified capture accepted; archive-realization audit active** | generated `repository_ctx.file` vertical and selected-registry source/root-load owners are accepted through `207b225b`; the mutually exclusive local/BCR plan seam is accepted in `1807b1d4`; ordered direct-HTTP/1 capture, SRI verification, cleanup and session staging are accepted in `3bc02039` | gzip/tar realization, executable modes, registry MODULE replacement and immutable-root publication remain deferred | run only `WP-5-7A-selected-registry-bcr-archive-realization-audit`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; bounded selected-BCR archive realization selected** | generated `repository_ctx.file` vertical and selected-registry source/root-load owners are accepted through `207b225b`; the mutually exclusive local/BCR plan seam is accepted in `1807b1d4`; ordered direct-HTTP/1 capture, SRI verification, cleanup and session staging are accepted in `3bc02039`; the realization audit freezes the exact rules_rust 0.73.0 artifact, dependency closure and complete-root owner | implement bounded gzip/GNU-tar realization, executable modes, independent registry MODULE replacement and immutable-root publication | run only `WP-5-7A-selected-registry-bcr-archive-realization`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-5-7A-selected-registry-bcr-archive-realization-audit](./slug-v2-subplans/current-packet.md).
+[WP-5-7A-selected-registry-bcr-archive-realization](./slug-v2-subplans/current-packet.md).
 
-Audit the accepted verified-capture bridge and select one bounded realization
-design packet or `REPLAN`. This packet is docs-only: do not extract, fetch or
-replace MODULE, create a root, change dependencies or widen generic archives.
+Implement only the audited rules_rust 0.73.0 selected-BCR gzip/GNU-tar shape,
+independent registry MODULE replacement and complete immutable-root return.
+Keep generic archives, links/specials/PAX, patches/overlays and M8 deferred.
+
+### M7 selected-BCR archive realization selected (2026-08-25)
+
+The audit accepts one bounded Rust-native implementation. The evidenced
+artifact is 67,196,890 compressed bytes, 224,337,920 gzip bytes and 4,493
+logical UTF-8 regular/directory entries; it needs GNU long names, 0644/0755
+regular modes and no PAX, links, specials, absolute/parent or duplicate paths.
+Its registry MODULE is an independent 4,481-byte SHA-256-SRI transfer after
+extraction and before publication.
+
+The verified archive capture stays callback-local and feeds one provisional
+`TempDir`; the complete root alone reaches the existing post-callback token
+check. A domain-separated Slug-native association covers both verified content
+digests, never the temp path. The selected 256 MiB expansion/payload, 64 MiB
+entry, 8,192-physical-header, 256-byte path, 32-component and 1 MiB MODULE
+ceilings are admitted divergences. `flate2`/`tar` add exactly eight locked
+packages with no existing-version drift.
+
+Pinned `../zabel` commit `c7298478…` guided this ownership decision: its
+selected repository source joins a producer-owned semantic view to completed
+materialization, and its generated materialization retains the complete
+immutable root in the physical payload. No Zabel behavior or representation
+is copied; pinned Bazel 9.2 remains sole archive/MODULE behavior authority.
 
 ### M7 selected-BCR verified capture accepted; realization audit active (2026-08-25)
 
