@@ -30,18 +30,47 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; provider initializer loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes the file's final lazy rule; `2cbdb148` completes lint-test common attributes; `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` freeze the three rustfmt aspects and dependency declaration; `9685d9a7`, `52d2c6f2`, `297c2286`, `919ecfa5`, and `4d7a9bbb` retain complete typed descriptors and the owner-checked rules_cc private bridge | admit only the initialized-provider loading shape needed by rules_cc artifact categories; all configured C++ semantics remain deferred | run only `WP-4-7A-bazel-provider-initializer-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; provider schema loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; `9685d9a7`, `52d2c6f2`, `297c2286`, `919ecfa5`, `4d7a9bbb`, and `9c51999f` retain complete typed descriptors, the private rules_cc bridge, and initialized artifact-category providers | admit only non-initialized schemaless/list schemas and arbitrary loading values needed to freeze the next rules_cc child; all configured C++ semantics remain deferred | run only `WP-4-7A-bazel-provider-schema-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-provider-initializer-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-bazel-provider-schema-loading](./slug-v2-subplans/current-packet.md).
 
-Admit only the `.bzl` initialized-provider declaration and construction shape
-needed for rules_cc artifact categories. Preserve the existing configured
-string-provider representation; do not add a C++ provider, toolchain, action or
-analysis consumer.
+Admit only non-initialized schemaless/list provider declarations and arbitrary
+optional loading values needed to freeze rules_cc
+`create_extra_link_time_library.bzl`. Preserve the configured string-provider
+projection and stop before `cc_internal.create_header_info()`.
+
+### M7 provider initializer accepted; provider schemas selected (2026-08-26)
+
+Commit `9c51999f` accepts the initialized-provider declaration, normal/raw
+construction, original-argument forwarding, dictionary/schema validation,
+optional fields, shared assignment-bound identity and freezeable arbitrary
+values required by rules_cc artifact categories. The new family remains
+loading-only and cannot downcast as the configured string provider. Focused
+proof, all 202 loading units, the configured regression, locked core check,
+rebuilt CLI and hygiene pass. Final growth is 300 production and 97 proof
+additions. Independent review restored the legacy unbound-provider diagnostic
+and returned `ACCEPT`.
+
+Recursive loading next reaches
+`cc/private/link/create_extra_link_time_library.bzl` through `cc_info.bzl`.
+Its first absent call is `provider("ExtraLinkTimeLibraryInfo")`; the same child
+also declares a string-list schema and immediately constructs a documented-map
+provider with `libraries = []`. Run only
+`WP-4-7A-bazel-provider-schema-loading`: distinguish schemaless from schemaful
+definitions, accept optional arbitrary direct loading values, reuse compact
+schema ordinals, and preserve the existing all-string configured projection.
+Stop before `cc_info.bzl` calls `cc_internal.create_header_info()`.
+
+Clean `../zabel` commit `0795445f…` is architectural guidance only. Its
+provider schema leaf distinguishes schemaless/schemaful ownership, while one
+provider definition owns schema, initializer, publication owner and export
+identity. Slug follows that owner/kind split through starlark-rust and retained
+Buck2 utilities without copying Zig code or behavior. Bazel 9.2 remains sole
+compatibility authority.
 
 ### M7 cc_common private bridge accepted; provider initializer selected (2026-08-26)
 

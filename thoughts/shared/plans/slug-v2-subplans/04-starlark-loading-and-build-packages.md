@@ -5247,6 +5247,45 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Provider initializer accepted; provider schemas selected (2026-08-26)
+
+Commit `9c51999f` accepts the rules_cc initialized artifact-category provider.
+One assignment-bound callable owns normal/raw construction and identity; normal
+calls forward original arguments through the initializer, raw calls bypass it,
+dictionary results are schema-checked with optional fields, and arbitrary
+Starlark values freeze in compact schema slots. The initialized instance stays
+separate from the configured string provider. Focused proof, all 202 loading
+units, the configured regression, locked core check, rebuilt CLI and hygiene
+pass. Growth is 300 production and 97 proof additions. Independent review
+restored the pre-existing unbound-provider diagnostic and returned `ACCEPT`.
+
+Recursive source order then enters rules_cc 0.2.17
+`cc/private/link/create_extra_link_time_library.bzl` through
+`cc/private/cc_info.bzl`. Its accepted `cc_helper_internal` and `cc_internal`
+loads are followed by two schemaless provider declarations, a string-list
+schema, and a documented provider whose top-level `_EMPTY` instance contains a
+list. The first missing expression is line 34
+`provider("ExtraLinkTimeLibraryInfo")`; accepting declarations alone would not
+freeze the child because `_EMPTY` also requires arbitrary direct field values.
+
+Run only `WP-4-7A-bazel-provider-schema-loading`. Normalize omitted/`None` as
+schemaless and unique string lists as schemaful, retain arbitrary optional
+loading values, reject positional and unknown schema fields, and distinguish
+an empty schema from schemaless. Preserve the existing documented/full-string
+configured projection; every other new instance remains loading-only. Stop
+after this child freezes, before `cc_info.bzl` invokes
+`cc_internal.create_header_info()` or any C++ semantic method.
+
+Pinned Bazel 9.2 `StarlarkRuleFunctionsApi.provider`,
+`StarlarkRuleClassFunctions.provider`, `StarlarkProvider.RawArgumentProcessor`,
+`StarlarkInfoNoSchema`/`WithSchema`, and their declaration/schema/optional-field
+tests are exact authority. Clean `../zabel` `0795445f…` guides only the
+architecture: one definition owns schema kind, initializer, publication owner
+and identity; schemaful values use canonical field positions while schemaless
+values necessarily retain dynamic names. Slug reuses `Arc<CompactString>`,
+ordinal `SmallMap` slots, `Value`/`FrozenValue`, `Dupe` and `Allocative`; it
+copies no Zig code, runtime, allocator, digest or behavior.
+
 ### cc_common private bridge accepted; provider initializer selected (2026-08-26)
 
 Commit `4d7a9bbb` installs the public `cc_common` wrapper only in complete
