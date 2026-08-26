@@ -3917,3 +3917,26 @@ Pinned Zabel `c7298478…` remains concept-only guidance for producer-owned
 descriptors and nonsemantic physical realization. Bazel 9.2 defines behavior.
 Return only to the docs-only bootstrap-critical repository/ruleset frontier
 audit; do not widen Bzlmod selection or repository-rule semantics.
+
+### Root selected-route projection required before root BUILD consumption (2026-08-25)
+
+The live M7A audit finds one missing producer between the accepted selected
+definition and root package loading. `RootRepositoryRouteKey` currently
+projects builtin `bazel_tools` and root direct-local overrides only; every
+registry-selected root dependency returns its typed Unsupported terminal.
+Consequently loading has no lawful selected route for
+`@rules_rust//rust:defs.bzl`.
+
+Run only the cross-stage docs design
+`WP-4-5-7A-root-package-external-bzl-load-owner-design`. Freeze the smallest
+Stage 5 projection from accepted root mapping and canonical selected definition
+to the existing structural selected route, including RepoSpec/source policy
+and ordered producer mapping in equality/invalidation. Preserve builtin and
+direct-local projections byte-for-byte. Loading consumes this result; it does
+not infer it from canonical spelling, physical materialization or a global
+selected table.
+
+Independent scheduling review accepts this producer step inside one cross-
+stage design; a RootPackageLoad-only implementation would be `REPLAN`. Pinned
+Zabel's package-source/resolved-view architecture is concept-only guidance.
+Bazel 9.2 remains behavioral authority.

@@ -3844,3 +3844,24 @@ producer and loading consumes an immutable already-selected view; no Zig code
 or behavior is adopted. Bazel 9.2 remains exact authority. Loading has no next
 implementation packet; return only to the docs-only bootstrap-critical
 repository/ruleset frontier audit.
+
+### Bootstrap audit REPLAN: root package external Bzl loading is next (2026-08-25)
+
+The resumed live replay corrects the prior declaration-first assumption. The
+unchanged rules_rust command first stops on parked M8 wildcard toolchain
+registration. With only that line removed in a disposable copy, root BUILD
+evaluation rejects `@rules_rust//rust:defs.bzl` in
+`resolve_host_load_label`; `repository_rule(doc=...)` is later.
+
+`RootPackageLoadKey` remains the natural package owner, but it currently sends
+every direct load through root Host Bzl keys. The accepted repository-package
+path already demonstrates the required split: the package driver owns source
+order and package evaluation, while a route-owned external Bzl child owns its
+source, recursive module closure, events and manifest.
+
+Run only `WP-4-5-7A-root-package-external-bzl-load-owner-design`. Loading may
+consume one structural root route and the existing external Bzl owner, but it
+must not reconstruct mappings, selected definitions, RepoSpecs or paths.
+Preserve root/self behavior, left-first epochs, child event ownership, Need/
+outer/semantic stops and complete-only lifecycle identity. Pinned Zabel guides
+the immutable already-resolved-module layering only; Bazel 9.2 owns behavior.

@@ -18101,3 +18101,33 @@ alone owns behavioral compatibility. Activate only docs packet
 the now-admitted source owner through the unchanged real rules_rust
 `repository_rule(doc=...)` terminal and select one smallest owner or evidence
 prerequisite. Authorize no Rust and preserve M7A -> M8 -> M7B.
+
+### Bootstrap-critical frontier audit r2 REPLAN (2026-08-25)
+
+The audit corrects its accepted-entry terminal after rebuilding the V2 CLI and
+replaying actual rules_rust. The unchanged fixture first stops on the parked
+M8 wildcard `register_toolchains("@rust_toolchains//:all")` shape. Removing
+only that line in a disposable copy exposes the next M7A terminal during root
+BUILD evaluation: the root Host loader rejects
+`@rules_rust//rust:defs.bzl`. The repository-rule `doc` declaration in
+`rust/extensions.bzl` remains real but downstream.
+
+Root package loading has only root Host Bzl children. External repository
+package loading already consumes a structural `RootRepositoryRoute` and the
+external Bzl owner, but `RootRepositoryRouteKey` itself still returns
+Unsupported for a registry-selected root dependency. Therefore a loader-only
+patch would reconstruct semantic routing and is rejected.
+
+Independent review accepts the uniquely smaller cross-stage design
+`WP-4-5-7A-root-package-external-bzl-load-owner-design`: first project the
+accepted root mapping and canonical selected definition into the structural
+selected route; then let `RootPackageLoadKey` consume that route for an
+external Bzl child while retaining package/source order. No separate oracle is
+required before design. Wildcard registration, repository-rule doc/schema/
+invocation/effects and later toolchain/action breadth remain deferred.
+
+Pinned Bazel 9.2 is behavioral authority. Pinned Zabel `c7298478…` contributes
+only its architectural rule that package-source ownership resolves direct
+loads before the runtime consumes immutable modules; it supplies no Slug
+representation or compatibility bytes. M7 remains partial and M7A -> M8 ->
+M7B remains.
