@@ -4342,6 +4342,41 @@ Slug-native; `Label`, the complete live expression, application plus
 Boolean/StringList targets and analysis/CLI, M8/M7B and exact output bytes
 remain deferred.
 
+### First rustfmt aspect requirements accepted; second aspect audit selected (2026-08-26)
+
+Commit `d4d4d6dc` retains exactly the first rustfmt aspect's two singleton
+required-provider alternatives and fixed `cpp` fragment in the existing frozen
+aspect owner. Recursive proof keeps the two `providers.bzl` export IDs through
+`common.bzl` and rustfmt imports; omitted state stays empty, wider and invalid
+shapes fail closed, export identity remains producer-owned, and the
+implementation stays lazy. All 192 loading unit tests and the remaining 37
+integrations pass, with locked core check, rebuilt CLI and hygiene. The sole
+full-suite failure is the already-proven baseline-stale `@external` assertion.
+Independent terminal review returned `ACCEPT` after exact-shape tightening.
+
+Source order skips `_rustfmt_aspect_impl` at lines 129-150 and reaches
+`rustfmt_aspect = aspect(...)` at lines 152-192. The first unknown argument is
+the fixed two-entry `attrs` dictionary at lines 170-182. The same declaration
+then reuses the accepted two-singleton provider predicate, adds the first
+`requires = [rustfmt_srcs_aspect]` edge, reuses fixed `cpp`, and supplies an
+already-admitted canonical Label/string toolchain spelling.
+
+Run only docs packet `WP-4-7A-rustfmt-second-aspect-audit`. Authenticate pinned
+Bazel's aspect-specific attribute validation and retained schema, the two
+defining-module typed Label defaults, required-aspect object/class identity,
+first-export ownership, ordering and cycle boundary. Determine whether one
+bounded declaration-only packet can reuse Slug's attribute schema and frozen
+aspect owner without applying either aspect or wiring propagation. Classify
+exact, Slug-native and deferred surfaces and name the next source-order stop.
+
+Pinned Zabel `c7298478…` supplies architectural guidance only: inspect its
+complete `AspectDefinition`, named attribute retention and separate
+`AspectExportIdentity`, plus only required-aspect consumers relevant to owner
+shape. Do not copy Zig code, representation, evaluator behavior, cache,
+analysis algorithm or compatibility claims. Bazel 9.2 remains sole behavior
+authority. No new DICE key, registry, mapping, cache, I/O, interner, hash or
+lifetime owner is authorized by the audit.
+
 ### Lint-test attributes accepted; first rustfmt aspect requirements selected (2026-08-26)
 
 Commit `2cbdb148` validates/discards the fixed lint bool documentation and

@@ -1,199 +1,128 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rustfmt-first-aspect-requirements-loading`
+Packet: `WP-4-7A-rustfmt-second-aspect-audit`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: loading-owned frozen aspect declaration and exported provider identity
-Base: `2cbdb148`
+Owners: docs-only loading/aspect architecture audit
+Base: `d4d4d6dc`
 
-Result: load and freeze the first declaration in accepted rules_rust 0.73.0
-`rust/private/rustfmt.bzl:96-127`. Extend the existing frozen aspect owner with
-the fixed two-alternative `required_providers` predicate and the fixed `cpp`
-configuration-fragment requirement. Preserve each provider's defining-module
-export identity through the recursive imported `rust_common` value. Do not
-apply an aspect, inspect a target's advertised providers, materialize
-`ctx.fragments`, or advance into the second rustfmt aspect.
+Result: authenticate the declaration-time semantics needed by accepted
+rules_rust 0.73.0 `rust/private/rustfmt.bzl:152-192`, identify the exact first
+unsupported expression after the accepted first aspect, and select one bounded
+implementation packet or `REPLAN`. Make no Rust, fixture, oracle or behavior
+change.
 
-## Accepted starting point and first absent fact
+## Accepted starting point and source order
 
-Commit `2cbdb148` completes and freezes `rust/private/lint_test.bzl`. Recursive
-external-Bzl evaluation returns to `rust/private/rustfmt.bzl`: function bodies
-at lines 13-94 remain lazy, and the fixed `RustfmtTargetInfo = provider(...)`
-at lines 96-102 already freezes. The implementation body at lines 104-117 is
-also lazy. Slug reaches the first `rustfmt_srcs_aspect = aspect(...)` at lines
-119-127 and rejects `required_providers` as the first unknown argument;
-`fragments` is the adjacent second missing declaration fact.
+Commit `d4d4d6dc` freezes `rustfmt_srcs_aspect` with exactly two singleton
+provider alternatives and fixed `cpp`, retaining the provider identities from
+`rust/private/providers.bzl` through `common.bzl` and the consuming rustfmt
+module. Its implementation remains lazy.
 
-The accepted expression supplies exactly two singleton alternatives in source
-order, `rust_common.crate_info` or `rust_common.test_crate_info`, and one
-fragment name, `cpp`. `common.bzl:26` imports `CrateInfo` and `TestCrateInfo`
-from `providers.bzl`, then places those exact values into `rust_common` at lines
-70-79. Their structural identities therefore remain the first exports in
-`providers.bzl`, not `common.bzl` or the consuming rustfmt module. The aspect
-implementation must not run while the module loads or freezes.
+Source order then skips the lazy `_rustfmt_aspect_impl` body at lines 129-150
+and reaches `rustfmt_aspect = aspect(...)` at lines 152-192. The existing aspect
+global accepts `implementation` and `doc`; `attrs` at lines 170-182 is the
+first unknown argument. The same fixed call later reuses the now-accepted
+provider predicate and fragment, then supplies the first required-aspect edge
+at line 187. Its single toolchain expression uses an already-accepted
+canonical Label/string handoff. This audit must verify that sequence against
+the live evaluator rather than assuming all later arguments are otherwise
+complete.
 
-## Bazel authority and Zabel architectural guidance
+## Required authorities
 
 Pinned Bazel 9.2 commit
 `8220c6198837d5c13d53fea211cf3282aa12408a` is the sole behavior authority.
 The accepted rules_rust archive SHA-256 is
 `2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`.
-Use only those pinned objects and archive, not sibling HEADs.
+Use only those pinned objects and archive.
 
-The minimum authenticated Bazel chain is:
+Inspect at minimum:
 
-- `StarlarkRuleFunctionsApi.aspect` declares named `required_providers` and
-  `fragments` sequences with empty defaults;
-- `StarlarkAttrModule.buildProviderPredicate` treats an outer sequence as OR
-  alternatives and each inner provider sequence as an AND set, validates
-  exported provider constructors, and retains their provider keys;
-- `StarlarkRuleClassFunctions.aspect` constructs the provider predicate and an
-  immutable fragment-name set without running the implementation;
-- `StarlarkDefinedAspect` retains both facts with the definition and transfers
-  them into `AspectDefinition` only when the aspect is later applied; and
-- `StarlarkRuleClassFunctionsTest.aspectRequiredProvidersSingle`,
-  `aspectRequiredProvidersAlternatives`, and
-  `StarlarkDefinedAspectsTest.aspectAllowsFragmentsToBeSpecified` authenticate
-  predicate shape and fragment declaration behavior. Analysis-phase
-  propagation and fragment access tests are deliberately not imported because
-  those phases remain unsupported here.
+- `StarlarkRuleFunctionsApi.aspect` parameter contracts for `attrs`,
+  `requires`, provider predicates, fragments and toolchains;
+- `StarlarkRuleClassFunctions.aspect` descriptor construction, aspect-specific
+  attribute restrictions, required-aspect validation and declaration creation;
+- `StarlarkDefinedAspect` export identity, retained attributes, required-aspect
+  class ownership, equality/hash and definition construction;
+- focused `StarlarkRuleClassFunctionsTest` and
+  `StarlarkDefinedAspectsTest` cases for implicit aspect attributes, missing
+  defaults, invalid attribute kinds, imported/required aspect identity, cycles
+  and ordering; and
+- Slug's existing `AttributeDefinitionGen`, `RuleAttributeSchemaGen`,
+  `AspectDefinitionGen`, `FrozenAspectDefinition`, caller-aware label-default
+  conversion and fail-closed configured-analysis boundary.
 
 Pinned Zabel commit
 `c7298478e2e56262a2f438e9c065325744c9f0fc` is architectural guidance only.
-Its `build_rule_declaration.zig` keeps `required_providers` and `fragments`
-inside the complete producer-owned `AspectDefinition`, keeps
-`AspectExportIdentity` separate, and retains imported provider identities
-instead of rebinding them at the consumer. Slug follows that ownership split
-using its existing provider IDs and frozen aspect lifetime. No Zig code,
-representation, evaluator behavior, cache or analysis rule may be copied;
-Bazel 9.2 remains sole compatibility authority.
+Inspect `build_rule_declaration.zig`'s complete `AspectDefinition`, named
+attribute retention and distinct `AspectExportIdentity`, plus only directly
+relevant required-aspect consumers. Determine whether Slug can reuse its
+existing frozen attribute schema and producer-owned aspect identity without a
+side registry or importer rebinding. Do not copy Zig code, representation,
+runtime behavior, cache, analysis algorithm or compatibility conclusions;
+Bazel remains sole behavior authority.
 
-## Compatibility classification
+## Audit questions and compatibility classification
 
-- **Exact:** acceptance, validation and freeze of the fixed nested
-  `required_providers = [[rust_common.crate_info],
-  [rust_common.test_crate_info]]`; preservation of both exported provider
-  identities and alternative order; acceptance and retention of fixed
-  `fragments = ["cpp"]`; the first aspect's existing implementation,
-  documentation and export identity; lazy implementation behavior.
-- **Slug-native:** existing `ProviderId`, `CompactString`, Arc-backed frozen
-  representation, Rust equality/ordering used for duplicate normalization,
-  complete-module fingerprint over-invalidation and nonrequired diagnostics.
-- **Unsupported/deferred:** flat provider predicates, native providers, empty
-  or wider predicates, duplicate-edge observability, `required_aspect_providers`,
-  `provides`, `requires`, aspect attrs, other fragment names, aspect selection,
-  propagation/application, advertised-provider matching, `ctx.fragments`,
-  configured targets, toolchains/actions, the second and later rustfmt aspects,
-  M8/M7B and exact Bazel configuration/output identity.
+Answer all of these before selecting implementation:
 
-## Natural owner, lifetime and non-decisions
+1. Which exact fields from the two fixed private label descriptors survive
+   aspect declaration and freeze, and which checks differ from `rule(attrs)`?
+2. Does each constructed Label default remain owned by the rustfmt defining
+   module, including package and exec-configuration identity?
+3. Does `requires = [rustfmt_srcs_aspect]` retain the required aspect object,
+   its first-export producer identity, or a derived class key, and when are
+   cycles rejected?
+4. Can the existing frozen aspect owner retain both fixed attributes and one
+   required-aspect edge without executing either implementation or wiring
+   configured propagation?
+5. What is the first unsupported expression after those fields, if they are
+   admitted, and does completing this call require any public/cross-crate
+   consumer?
 
-`UserProviderCallable::export_as` and `FrozenUserProviderCallable` already own
-one structural `ProviderId` consisting of producer module label plus first
-exported name. Add only a crate-private transient ID projection so aspect
-validation can clone that existing identity; do not construct an ID from
-display text or importer context. `AspectDefinitionGen` and
-`FrozenAspectDefinition` remain the sole declaration/freeze owners. Retain the
-predicate as an Arc outer slice of Arc provider-ID alternatives and fragments
-as one Arc compact-string slice. These are DICE-retained semantic module data
-released with the frozen recursive Bzl value; they borrow no evaluator heap or
-request scratch.
+Classify every selected behavior as **exact**, **Slug-native**, or
+**unsupported/deferred**. At minimum, aspect application, provider matching,
+required-aspect propagation, configured dependencies, `ctx.fragments`,
+toolchain selection, actions, later rustfmt declarations, M8/M7B and exact
+Bazel configuration/output identity remain deferred unless the audit proves a
+smaller declaration-only boundary.
 
-No DICE key, source observer, repository mapping, I/O, cache, interner, hash
-domain, lock, async task or command result changes. Existing recursive module
-identity/fingerprint invalidates the whole declaration when any defining Bzl
-source or route identity changes. No fallback is introduced. The Buck2
-utility audit selects existing Arc slices, `CompactString`, `ProviderId`,
-`SmallSet`/sort-and-dedup patterns and `Allocative`; no new retained utility or
-representation family is admitted.
+## Ownership, utility and scope gates
 
-## Implementation boundary
+Prefer the existing attribute descriptor/schema owner, provider IDs,
+`AspectDefinitionGen`/`FrozenAspectDefinition`, canonical labels, compact
+strings and Arc slices. Required-aspect identity must remain producer-owned;
+an importer, consuming rule, BUILD package or configured-analysis command must
+not reconstruct it. Retained values must freeze with the recursive Bzl module
+and borrow no evaluator heap or request scratch.
 
-1. Expose the already-bound `ProviderId` from transient
-   `UserProviderCallable` as a crate-private borrowed projection. Reuse the
-   existing frozen callable `id()` projection.
-2. Add a loading-private converter that accepts only the fixed nested-list
-   predicate shape, downcasts every element to an exported transient or frozen
-   user-provider callable, clones its `ProviderId`, normalizes duplicates
-   within one alternative, and retains outer source order. Reject unexported,
-   mixed, empty-inner, non-provider and native-provider values.
-3. Add named `required_providers` and `fragments` inputs to the existing
-   `.bzl`-only `aspect` global. Omitted values remain empty. For this packet,
-   nonempty provider predicates must match the nested user-provider form and
-   nonempty fragments must be the fixed singleton `cpp` declaration.
-4. Freeze both fields inside the existing aspect definition and expose only
-   crate-private test projections. Preserve all accepted constructor behavior,
-   first-export identity and BUILD absence.
-5. Do not retain raw Starlark lists, do not add a provider side registry, do
-   not reconstruct provider IDs, and do not wire either declaration fact into
-   configured analysis.
+Read the Buck2 utility ledger only if the selected design changes a retained
+collection, identity, hashing, clone cost or memory accounting. Record the
+reuse decision in the implementation packet. No DICE key, mapping, source
+observer, cache, I/O, interner, global registry, lock or async owner is
+authorized by this audit.
 
-## Discriminating proof
+## Docs-only allowlist and validation
 
-- Evaluate a caller-aware recursive chain where `providers.bzl` first exports
-  two distinct providers, `common.bzl` imports and wraps those exact values in
-  `rust_common`, and `rustfmt.bzl` imports that struct, defines the exact
-  `RustfmtTargetInfo`, and freezes the exact first rustfmt aspect. Assert the
-  IDs `@@dep+//rust/private:providers.bzl%CrateInfo` and
-  `@@dep+//rust/private:providers.bzl%TestCrateInfo` in outer source order,
-  fixed `cpp`, producer aspect identity and a failing lazy body that never
-  executes.
-- Prove that importer aliases do not rewrite provider IDs and that changing
-  one producer module label changes only that retained provider identity.
-- Prove omitted values remain empty and reject a transient unexported
-  provider, mixed/nonnested/non-provider predicate, empty inner alternative,
-  non-`cpp` fragment, and the same aspect call from BUILD globals.
-- Keep the accepted aspect-definition and lint-label tests green. Add no
-  fixture, registry response, network request or Bazel run.
+Only these files may change from base `d4d4d6dc`:
 
-## Allowlist and growth caps
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
+- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
 
-Only these files may change from base `2cbdb148`:
-
-| File | Base SHA-256 | Base lines | Final line cap | Purpose |
-|---|---|---:|---:|---|
-| `app/slug_loading_v2/src/provider.rs` | `89b4dcc6857aeec22d32c16a8025dda65848759b9c5cf8daf0ebc2a64d43d41a` | 589 | 600 | borrowed transient provider-ID projection |
-| `app/slug_loading_v2/src/package.rs` | `8184bc6373e816e85954d0dd3b1425993a1150b9758b5f24aed146646e4b1a8f` | 5,522 | 5,642 | retained aspect predicate/fragments and bounded conversion |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `6d833b6f0ecd43bce120a02ea830fcde5d78851ae8fbd4c42bd8ea290c8041e9` | 4,644 | 4,774 | recursive identity/freeze and rejection proofs |
-
-Additions are capped at 125 production lines, 130 proof lines and 255 total
-lines. Deletions do not buy addition budget. No touched function may exceed
-150 lines. `package.rs` already exceeds the 2,000-line review trigger, but the
-existing aspect declaration owner remains cohesive for two adjacent fields;
-creating a second aspect module or metadata registry would split one semantic
-owner. STOP if the converter cannot remain a small private helper.
-
-## Serial validation and review
-
-Run Cargo commands serially with one shared target directory:
-
-```text
-CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 rustfmt_first_aspect
-CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 bazel_aspect_definition_validates_admitted_fixed_abi_and_build_absence
-CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 label_attribute_defaults_keep_defining_module_identity
-CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2
-CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo check --locked -p slug_core_v2
-CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo build -p slug_cli_v2
-cargo fmt --check
-git diff --check
-scripts/v2_archive_status.sh
-```
-
-The archive checker may report only its known three retained thoughts paths
-plus active packet files. Recheck hashes and count additions, physical lines
-and touched-function lengths before review. Independent terminal review is
-mandatory before commit and must verify source order, pinned Bazel behavior,
-pinned Zabel guidance-only use, provider producer identity, nested predicate
-shape/order, fixed fragment, lazy implementation, frozen lifetime, BUILD
-absence, caps, serial validation and absence of a new semantic side owner.
+Validate pinned object existence, accepted archive provenance, source line
+order, canonical/manifest packet-ID agreement, `git diff --check`, document
+structure and file allowlist. A selected implementation packet must include
+exact proof, file hashes/line caps, production/test addition caps, function
+caps, serial validation, residual risk and STOP conditions. Independent review
+is mandatory before commit.
 
 ## STOP / `REPLAN`
 
-STOP and `REPLAN` if completion requires a file outside the allowlist; native
-or unexported provider identity; flat, empty-inner or wider provider-predicate
-breadth; any fragment beyond fixed `cpp`; raw evaluator-value retention;
-provider-ID reconstruction; aspect application, provider matching,
-propagation, configured fragments, analysis/actions; a new DICE key, mapping,
-cache, I/O path, interner, hash or lifetime owner; Java/JVM work; Zabel code or
-behavior adoption; an unpinned source; a new fixture/oracle/network request; a
-cap violation; or a public rules_rust success claim. After the first rustfmt
-aspect freezes, stop and select the next source-order audit separately.
+STOP and `REPLAN` if a bounded declaration-only design cannot preserve
+attribute defaults and required-aspect producer identity in the existing
+frozen aspect lifetime; if the fixed call requires aspect application,
+propagation, configured analysis or actions; if it requires a new DICE key,
+registry, cache, I/O path, mapping, interner, hash or lifetime owner; if proof
+requires a new oracle/fixture/network request; if behavior depends on Zabel;
+or if any Java/JVM component would enter Slug.
