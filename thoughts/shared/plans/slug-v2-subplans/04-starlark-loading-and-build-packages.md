@@ -5247,6 +5247,42 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### OutputGroupInfo declaration and rust_clippy accepted; tail audit selected (2026-08-26)
+
+Commit `993ba5e4` adds a zero-state native-provider declaration token with the
+exact `<function OutputGroupInfo>` representation only to `.bzl` globals. It
+freezes without evaluator state and rejects every constructor call. Its Rust
+type supplies only Slug-native internal separation; observable equality/hash,
+provider values, fields, indexing, artifacts and configured consumers remain
+deferred.
+
+The exact clippy helper captures that token without executing. The following
+`rust_clippy` rule freezes through line 461 with one `deps` label-list, two
+ordered provider alternatives and the exact same frozen
+`rust_clippy_aspect` producer value. All 221 loading units, 24 invalidation
+tests, 31 BUILD-loading tests, locked checks, rebuilt CLI and hygiene pass;
+independent terminal review returned `ACCEPT`. Growth is 28 production and 124
+proof additions within caps.
+
+The remaining source begins with documented two-field `RustClippyTestInfo`, a
+two-string output-group list, lazy aspect/rule helpers, a test aspect requiring
+the accepted clippy aspect, a `rust_clippy_test` declaration using imported
+`LINT_TEST_COMMON_ATTRS` plus `platform_transition`, and two Boolean
+build-setting rules. Most shapes resemble accepted provider, rustfmt-test and
+config-bool slices, but the complete imported producer graph and first actual
+terminal have not been proved.
+
+Run only docs packet `WP-4-7A-post-rust-clippy-source-audit`. Authenticate the
+remaining line 463-596 source in order, all imported lint-test identities and
+the existing Slug owners. Select one bounded exact loading closure or `REPLAN`;
+do not edit Rust, invoke helpers, construct OutputGroupInfo, or claim configured
+test/aspect/action behavior during the audit.
+
+Clean `../zabel` `0795445f…` remains architecture guidance only. Its separate
+provider definition/value and declaration-owned attribute/aspect/rule shapes
+may guide owner reuse, but no Zig code, layout, provider value, configured
+capture, action or behavior is copied. Bazel 9.2 remains sole authority.
+
 ### OutputGroupInfo global audit accepts bounded loading (2026-08-26)
 
 Commit `fc9473b1` replaces the aspect's singular label with the same immutable
