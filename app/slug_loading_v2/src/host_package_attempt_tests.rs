@@ -457,6 +457,24 @@ async fn distinguishes_per_include_and_all_excluded_diagnostics() {
 }
 
 #[tokio::test]
+async fn build_environment_does_not_expose_bzl_struct_builtin() {
+    let mut transaction = new_transaction(prelude()).await;
+    let outcome = transaction
+        .compute(&key("pkg", "VALUE = struct(enabled = True)\n"))
+        .await
+        .unwrap();
+    let terminal = complete(&outcome);
+    let Err(HostPackageAttemptError::Loading(error)) = &terminal.result else {
+        panic!("expected BUILD evaluation failure: {:?}", terminal.result)
+    };
+    assert!(
+        error.message.contains("Variable `struct` not found"),
+        "{}",
+        error.message
+    );
+}
+
+#[tokio::test]
 async fn terminal_failures_retain_typed_payload_and_only_the_print_prefix() {
     let source =
         "print(\"prefix\")\nfilegroup(name = \"partial\")\nglob([\"bad\"])\nprint(\"after\")\n";

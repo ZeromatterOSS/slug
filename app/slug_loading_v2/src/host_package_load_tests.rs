@@ -73,6 +73,7 @@ use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
+use starlark::values::structs::StructRef;
 use starlark_map::small_map::SmallMap;
 
 use super::ExternalBzlCycleIdentity;
@@ -2191,15 +2192,15 @@ async fn external_bzl_module_full_route_keys_are_unequal_while_canonical_labels_
 }
 
 #[tokio::test]
-async fn external_bzl_module_evaluates_recursive_bazel_keyword_only_parameters() {
+async fn external_bzl_module_evaluates_recursive_bazel_keyword_only_structs() {
     let files: &[(&str, &[u8])] = &[
         (
             "root.bzl",
-            b"load(\":support.bzl\", \"RESULT\")\nEXPORTED = RESULT\n",
+            b"load(\":support.bzl\", \"RESULT\")\nCHECKED = RESULT.std and not RESULT.host_tools\nEXPORTED = RESULT\n",
         ),
         (
             "support.bzl",
-            b"def _support(*, std = False, host_tools = False):\n    return std and not host_tools\nRESULT = _support(std = True)\n",
+            b"def _support(*, std = False, host_tools = False):\n    return struct(std = std, host_tools = host_tools)\nRESULT = _support(std = True)\n",
         ),
     ];
     let dice = Dice::builder().build(DetectCycles::Enabled);
@@ -2215,13 +2216,20 @@ async fn external_bzl_module_evaluates_recursive_bazel_keyword_only_parameters()
         .compute(&external_bzl_key(route, "", "root.bzl"))
         .await
         .unwrap();
+    let module = &external_terminal(&outcome).module;
+    assert_eq!(module.get("CHECKED").unwrap().unpack_bool(), Some(true));
+    let exported_value = module.get("EXPORTED").unwrap();
+    let exported = StructRef::from_value(exported_value.value()).unwrap();
+    let fields = exported
+        .iter()
+        .map(|(name, value)| (name.as_str().to_owned(), value.unpack_bool()))
+        .collect::<Vec<_>>();
     assert_eq!(
-        external_terminal(&outcome)
-            .module
-            .get("EXPORTED")
-            .unwrap()
-            .unpack_bool(),
-        Some(true)
+        fields,
+        [
+            ("std".to_owned(), Some(true)),
+            ("host_tools".to_owned(), Some(false))
+        ]
     );
 }
 

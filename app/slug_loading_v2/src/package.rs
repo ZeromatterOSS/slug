@@ -4700,8 +4700,8 @@ impl AllocFrozenValue for NativeModule {
     }
 }
 
-pub(crate) fn loading_globals() -> Globals {
-    let mut globals = GlobalsBuilder::extended_by(&[LibraryExtension::Print])
+fn complete_loading_globals(extensions: &[LibraryExtension]) -> Globals {
+    let mut globals = GlobalsBuilder::extended_by(extensions)
         .with(package_globals)
         .with(select_globals);
     globals.set("native", NativeModule);
@@ -4711,6 +4711,14 @@ pub(crate) fn loading_globals() -> Globals {
     globals.set("DefaultInfo", AnalysisBuiltinCallable::new("DefaultInfo"));
     globals.set("depset", AnalysisBuiltinCallable::new("depset"));
     globals.build()
+}
+
+pub(crate) fn loading_globals() -> Globals {
+    complete_loading_globals(&[LibraryExtension::Print, LibraryExtension::StructType])
+}
+
+pub(crate) fn build_file_loading_globals() -> Globals {
+    complete_loading_globals(&[LibraryExtension::Print])
 }
 
 #[cfg(test)]

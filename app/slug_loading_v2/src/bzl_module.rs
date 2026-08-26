@@ -121,6 +121,7 @@ use crate::package::ModuleExtensionDefinitionProjection;
 use crate::package::ModuleExtensionTagCoercionError;
 use crate::package::PackageRecorder;
 use crate::package::PackageTargetKind;
+use crate::package::build_file_loading_globals;
 use crate::package::loading_globals;
 use crate::package::prepare_module_extension_tag_attributes;
 use crate::package::validate_module_extension_tag_schema;
@@ -683,7 +684,7 @@ fn evaluate_host_package_attempt(
             .collect(),
     };
     let print_capture = input.capture_events.then(LoadingPrintCapture::default);
-    let globals = loading_globals();
+    let globals = build_file_loading_globals();
     let evaluation = {
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&recorder);
@@ -5957,7 +5958,7 @@ impl Key for PackageLoadKey {
                         .collect(),
                 };
                 let print_capture = capture_events.then(LoadingPrintCapture::default);
-                let globals = loading_globals();
+                let globals = build_file_loading_globals();
                 {
                     let mut evaluator = Evaluator::new(&module);
                     evaluator.extra = Some(&recorder);
