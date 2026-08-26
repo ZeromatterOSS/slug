@@ -4064,3 +4064,19 @@ Implement one private mutually exclusive LocalTar/SelectedBcrTarGz plan owner.
 The BCR plan requires the producer's complete `type = "tar.gz"`, empty/zero,
 URL and SRI fields but performs no physical work. Local materialization remains
 exact. Zabel guides the view/realization separation only; Bazel owns fields.
+
+### Selected-registry BCR semantic plan accepted; transport audit active (2026-08-25)
+
+Commit `1807b1d4` preserves the producer's complete structural `RepoSpec` and
+decodes its ordered URL/SRI/MODULE facts into a private immutable plan. No
+physical path, runtime, capture or root enters that value. Malformed BCR shapes
+fail as stable spec results; exact shapes stop at a generation-scoped deferred
+transport result. The accepted local archive surface remains separate and
+byte/diagnostic exact.
+
+Run only docs packet `WP-5-7A-selected-registry-bcr-transport-entry-audit`.
+Re-derive one smallest physical owner from the live split and exact Cargo
+state; do not erase producer fields, add a selected side table or widen generic
+repository rules. Pinned Zabel remains concept-only guidance for keeping the
+semantic descriptor above physical realization. Bazel 9.2 remains behavioral
+authority.

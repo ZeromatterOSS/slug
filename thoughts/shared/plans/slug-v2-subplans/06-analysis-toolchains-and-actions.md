@@ -18249,3 +18249,21 @@ Relocate the existing archive owner/proof and add only an inactive immutable BCR
 plan. A valid plan returns an explicit deferred-transport result; it owns no
 runtime, connection, capture or root. This bounded seam preserves repository
 session behavior and Zabel's ownership-only guidance before transport returns.
+
+### Native archive plan/split accepted; transport-entry audit active (2026-08-25)
+
+Commit `1807b1d4` reduces the mixed repository I/O owner below 5,000 lines and
+places local archive production/proof in one private archive module. The exact
+selected BCR plan reaches only the generation-scoped deferred transport result;
+it performs no DNS, runtime, capture, extraction, MODULE or root work. Focused
+archive/parser/session proof passes, and the sole full-core failure is
+independently baseline-reproduced.
+
+The fresh wildcard-removed rules_rust command reaches the repository-session
+non-success terminal, while the public error wrapper intentionally hides the
+inner deferred message. Current is docs-only: trace the live synchronous
+progress/runtime/session boundary, revalidate the direct HTTP lifecycle and
+exact dependency closure, and select one bounded transport entry or `REPLAN`.
+Do not widen CLI diagnostics, registry behavior, DICE identity or generic
+archives. Zabel guides ownership/lifetime layering only; Bazel 9.2 owns
+transport/archive behavior. M7 remains partial and M7A -> M8 -> M7B remains.
