@@ -85,6 +85,7 @@ use starlark::values::ValueLike;
 use starlark::values::dict::DictRef;
 use starlark::values::list::FrozenListRef;
 use starlark::values::structs::StructRef;
+use starlark::values::tuple::TupleRef;
 use starlark_map::small_map::SmallMap;
 
 use super::BzlLoadManifest;
@@ -3772,6 +3773,140 @@ paths = struct(
 )
 "###;
 
+const UTILS_UNSUPPORTED_FEATURES_SOURCE: &str = r###"UNSUPPORTED_FEATURES = [
+    "thin_lto",
+    "module_maps",
+    "use_header_modules",
+    "fdo_instrument",
+    "fdo_optimize",
+    # This feature is unsupported by definition. The authors of C++ toolchain
+    # configuration can place any linker flags that should not be applied when
+    # linking Rust targets in a feature with this name.
+    "rules_rust_unsupported_feature",
+]
+"###;
+
+const UTILS_FORCE_DISABLE_SOURCE: &str = r###"_FORCE_DISABLE_CC_TOOLCHAIN = False
+"###;
+
+const UTILS_SUBSTITUTIONS_SOURCE: &str = r###"_encodings = (
+    (":", "x"),
+    ("!", "excl"),
+    ("%", "prc"),
+    ("@", "ao"),
+    ("^", "caret"),
+    ("`", "bt"),
+    (" ", "sp"),
+    ("\"", "dq"),
+    ("#", "octo"),
+    ("$", "dllr"),
+    ("&", "amp"),
+    ("'", "sq"),
+    ("(", "lp"),
+    (")", "rp"),
+    ("*", "astr"),
+    ("-", "d"),
+    ("+", "pl"),
+    (",", "cm"),
+    (";", "sm"),
+    ("<", "la"),
+    ("=", "eq"),
+    (">", "ra"),
+    ("?", "qm"),
+    ("[", "lbk"),
+    ("]", "rbk"),
+    ("{", "lbe"),
+    ("|", "pp"),
+    ("}", "rbe"),
+    ("~", "td"),
+    ("/", "y"),
+    (".", "pd"),
+)
+
+# For each of the above encodings, we generate two substitution rules: one that
+# ensures any occurrences of the encodings themselves in the package/target
+# aren't clobbered by this translation, and one that does the encoding itself.
+# We also include a rule that protects the clobbering-protection rules from
+# getting clobbered.
+_substitutions = [("_z", "_zz_")] + [
+    subst
+    for (pattern, replacement) in _encodings
+    for subst in (
+        ("_{}_".format(replacement), "_z{}_".format(replacement)),
+        (pattern, "_{}_".format(replacement)),
+    )
+]
+
+# Expose the substitutions for testing only.
+substitutions_for_testing = _substitutions
+"###;
+
+const UTILS_ENCODE_SOURCE: &str = r###"def _encode_raw_string(str):
+    """Encodes a string using the above encoding format.
+
+    Args:
+        str (string): The string to be encoded.
+
+    Returns:
+        An encoded version of the input string.
+    """
+    return _replace_all(str, _substitutions)
+
+# Expose the underlying encoding function for testing only.
+encode_raw_string_for_testing = _encode_raw_string
+"###;
+
+const UTILS_REPLACE_ALL_SOURCE: &str = r###"def _replace_all(string, substitutions):
+    """Replaces occurrences of the given patterns in `string`.
+
+    There are a few reasons this looks complicated:
+    * The substitutions are performed with some priority, i.e. patterns that are
+      listed first in `substitutions` are higher priority than patterns that are
+      listed later.
+    * We also take pains to avoid doing replacements that overlap with each
+      other, since overlaps invalidate pattern matches.
+    * To avoid hairy offset invalidation, we apply the substitutions
+      right-to-left.
+    * To avoid the "_quote" -> "_quotequote_" rule introducing new pattern
+      matches later in the string during decoding, we take the leftmost
+      replacement, in cases of overlap.  (Note that no rule can induce new
+      pattern matches *earlier* in the string.) (E.g. "_quotedot_" encodes to
+      "_quotequote_dot_". Note that "_quotequote_" and "_dot_" both occur in
+      this string, and overlap.).
+
+    Args:
+        string (string): the string in which the replacements should be performed.
+        substitutions: the list of patterns and replacements to apply.
+
+    Returns:
+        A string with the appropriate substitutions performed.
+    """
+
+    # Find the highest-priority pattern matches for each string index, going
+    # left-to-right and skipping indices that are already involved in a
+    # pattern match.
+    plan = {}
+    matched_indices_set = {}
+    for pattern_start in range(len(string)):
+        if pattern_start in matched_indices_set:
+            continue
+        for (pattern, replacement) in substitutions:
+            if not string.startswith(pattern, pattern_start):
+                continue
+            length = len(pattern)
+            plan[pattern_start] = (length, replacement)
+            matched_indices_set.update([(pattern_start + i, True) for i in range(length)])
+            break
+
+    # Execute the replacement plan, working from right to left.
+    for pattern_start in sorted(plan.keys(), reverse = True):
+        length, replacement = plan[pattern_start]
+        after_pattern = pattern_start + length
+        string = string[:pattern_start] + replacement + string[after_pattern:]
+
+    return string
+"###;
+
 const CLIPPY_TOOLCHAINS: &str = "[str(Label('//rust:toolchain_type')), config_common.toolchain_type('@bazel_tools//tools/cpp:toolchain_type', mandatory = False)]";
 
 fn clippy_owner() -> BzlModuleIdentity {
@@ -3910,6 +4045,73 @@ fn exact_rules_cc_find_toolchain_child_freezes_eager_constants_and_functions() {
         Some(CoercedAttributeValue::Label(label))
             if label.to_string() == "@@rules_cc+//cc:current_cc_toolchain"
     ));
+}
+
+#[test]
+#[rustfmt::skip]
+fn exact_rules_rust_utils_eager_values_freeze_without_invocation() {
+    for (source, expected) in [
+        (UTILS_UNSUPPORTED_FEATURES_SOURCE, "e649bad3018c5c5048307adc8066152ef5bbbecdda89a69f51d1896be3ee3b8b"),
+        (UTILS_FORCE_DISABLE_SOURCE, "d5a539c2509332b4891e9cbffee2cd7e3230eeb79dd58ebd14be56661b79dc0d"),
+        (UTILS_SUBSTITUTIONS_SOURCE, "e0526a4d2bc5bc9d04544ecdbde305667c5a015b0c7f4597858891ae668f7b85"),
+        (UTILS_ENCODE_SOURCE, "b5ad15479c25ae84b1dba206ffc924d455003aaff98b5371773a3104f08d9027"),
+        (UTILS_REPLACE_ALL_SOURCE, "e5643897c866136bd788b242be0c983a2ae3aab511a1b7676c2d118be0200cd2"),
+    ] {
+        assert_eq!(format!("{:x}", Sha256::digest(source.as_bytes())), expected);
+    }
+    let source = [
+        UTILS_UNSUPPORTED_FEATURES_SOURCE,
+        UTILS_FORCE_DISABLE_SOURCE,
+        UTILS_SUBSTITUTIONS_SOURCE,
+        UTILS_ENCODE_SOURCE,
+        UTILS_REPLACE_ALL_SOURCE,
+        "UTILS_EAGER_PROOF = struct(force_disable = _FORCE_DISABLE_CC_TOOLCHAIN, substitutions = _substitutions, encode = _encode_raw_string)\n",
+    ].join("\n");
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_rust+//rust/private:utils.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_rust/rust/private/utils.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let module = eval_bzl_with_identity(&source, owner).unwrap();
+    let features = FrozenListRef::from_value(module.get("UNSUPPORTED_FEATURES").unwrap().value()).unwrap();
+    assert_eq!(
+        features.iter().map(|value| value.to_value().unpack_str().unwrap()).collect::<Vec<_>>(),
+        ["thin_lto", "module_maps", "use_header_modules", "fdo_instrument", "fdo_optimize", "rules_rust_unsupported_feature"]
+    );
+    let proof_value = module.get("UTILS_EAGER_PROOF").unwrap();
+    let proof = StructRef::from_value(proof_value.value()).unwrap();
+    let proof_field = |name: &str| {
+        proof.iter().find_map(|(field, value)| (field.as_str() == name).then_some(value)).unwrap()
+    };
+    assert_eq!(proof_field("force_disable").unpack_bool(), Some(false));
+    let substitutions_binding = module.get("substitutions_for_testing").unwrap();
+    let substitutions_value = substitutions_binding.value();
+    assert!(substitutions_value.ptr_eq(proof_field("substitutions")));
+    let substitutions = FrozenListRef::from_value(substitutions_value).unwrap();
+    assert_eq!(substitutions.len(), 63);
+    let actual = substitutions.iter().map(|value| {
+        let pair = TupleRef::from_value(value.to_value()).unwrap();
+        let pair = pair.iter().map(|value| value.unpack_str().unwrap()).collect::<Vec<_>>();
+        assert_eq!(pair.len(), 2);
+        (pair[0].to_owned(), pair[1].to_owned())
+    }).collect::<Vec<_>>();
+    let encodings = [
+        (":", "x"), ("!", "excl"), ("%", "prc"), ("@", "ao"), ("^", "caret"), ("`", "bt"), (" ", "sp"), ("\"", "dq"),
+        ("#", "octo"), ("$", "dllr"), ("&", "amp"), ("'", "sq"), ("(", "lp"), (")", "rp"), ("*", "astr"), ("-", "d"),
+        ("+", "pl"), (",", "cm"), (";", "sm"), ("<", "la"), ("=", "eq"), (">", "ra"), ("?", "qm"), ("[", "lbk"),
+        ("]", "rbk"), ("{", "lbe"), ("|", "pp"), ("}", "rbe"), ("~", "td"), ("/", "y"), (".", "pd"),
+    ];
+    let expected = std::iter::once(("_z".to_owned(), "_zz_".to_owned())).chain(
+        encodings.into_iter().flat_map(|(pattern, replacement)| [
+            (format!("_{replacement}_"), format!("_z{replacement}_")),
+            (pattern.to_owned(), format!("_{replacement}_")),
+        ])
+    ).collect::<Vec<_>>();
+    assert_eq!(actual, expected);
+    let encode_binding = module.get("encode_raw_string_for_testing").unwrap();
+    let encode = encode_binding.value();
+    assert_eq!(encode.get_type(), "function");
+    assert!(encode.ptr_eq(proof_field("encode")));
 }
 
 #[test]
