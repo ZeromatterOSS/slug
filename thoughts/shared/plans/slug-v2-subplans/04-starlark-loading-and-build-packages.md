@@ -4361,21 +4361,33 @@ then reuses the accepted two-singleton provider predicate, adds the first
 `requires = [rustfmt_srcs_aspect]` edge, reuses fixed `cpp`, and supplies an
 already-admitted canonical Label/string toolchain spelling.
 
-Run only docs packet `WP-4-7A-rustfmt-second-aspect-audit`. Authenticate pinned
-Bazel's aspect-specific attribute validation and retained schema, the two
-defining-module typed Label defaults, required-aspect object/class identity,
-first-export ownership, ordering and cycle boundary. Determine whether one
-bounded declaration-only packet can reuse Slug's attribute schema and frozen
-aspect owner without applying either aspect or wiring propagation. Classify
-exact, Slug-native and deferred surfaces and name the next source-order stop.
+Commit `d66059ac` selected the docs audit; it now selects
+`WP-4-7A-rustfmt-second-aspect-loading`. Pinned Bazel 9.2 proves the two fixed
+private Label descriptors are built and retained after implicit-default checks.
+Their defining-module canonical defaults, single-file policy, exec transition
+and executable bit remain independent declaration fields. `requires` retains
+the required Starlark aspect object; `StarlarkDefinedAspect` derives its class
+only during later definition construction, and applied-path assembly owns
+duplicate/cycle checks.
 
-Pinned Zabel `c7298478…` supplies architectural guidance only: inspect its
-complete `AspectDefinition`, named attribute retention and separate
-`AspectExportIdentity`, plus only required-aspect consumers relevant to owner
-shape. Do not copy Zig code, representation, evaluator behavior, cache,
+Pinned Zabel `c7298478…` supplies architectural guidance only. Its complete
+`AspectDefinition` retains named attributes and the required value, while
+`AspectExportIdentity` separately records producer module plus first export
+and module freeze follows the required child. Slug can therefore reuse its
+existing frozen rule-attribute schema and retain the complete required aspect
+value in the consumer's frozen-module lifetime, with no registry or importer
+rebinding. Do not copy Zig code, representation, evaluator behavior, cache,
 analysis algorithm or compatibility claims. Bazel 9.2 remains sole behavior
-authority. No new DICE key, registry, mapping, cache, I/O, interner, hash or
-lifetime owner is authorized by the audit.
+authority.
+
+The implementation admits exactly `_config` then `_process_wrapper`, their
+fixed policies/defaults, and one already-exported required aspect. Omitted
+values preserve earlier aspects. Public/wider attributes, configurable or
+computed defaults, multiple/unexported requirements, class derivation,
+application/propagation, configured fragments/dependencies, actions and later
+rustfmt declarations remain deferred. Reuse Arc slices, compact strings,
+canonical Labels, frozen values and `Allocative`; add no DICE key, registry,
+mapping, cache, I/O, interner, hash or lifetime owner.
 
 ### Lint-test attributes accepted; first rustfmt aspect requirements selected (2026-08-26)
 

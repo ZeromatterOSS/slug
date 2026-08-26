@@ -30,18 +30,49 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; second rustfmt aspect audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes the file's final lazy rule; `2cbdb148` completes lint-test common attributes; `d4d4d6dc` freezes the first rustfmt aspect's fixed requirements | authenticate the second rustfmt aspect's fixed private attrs and required-aspect edge; aspect application, propagation, configured fragments, actions and later declarations remain deferred | run only docs packet `WP-4-7A-rustfmt-second-aspect-audit`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; second rustfmt aspect loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes the file's final lazy rule; `2cbdb148` completes lint-test common attributes; `d4d4d6dc` freezes the first rustfmt aspect's fixed requirements; `d66059ac` selects the authenticated second-aspect audit | freeze the second rustfmt aspect without applying either aspect; aspect propagation, configured fragments, actions and later declarations remain deferred | run only `WP-4-7A-rustfmt-second-aspect-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-rustfmt-second-aspect-audit](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-rustfmt-second-aspect-loading](./slug-v2-subplans/current-packet.md).
 
-Audit accepted rules_rust `rust/private/rustfmt.bzl:152-192`. Authenticate the
-fixed private aspect attributes, their defining-module Label defaults and the
-one `requires = [rustfmt_srcs_aspect]` producer-identity edge. Select one
-bounded declaration-only implementation or `REPLAN`; make no Rust change.
+Freeze accepted rules_rust `rust/private/rustfmt.bzl:152-192` with the fixed
+private aspect attributes, their defining-module Label defaults and the one
+`requires = [rustfmt_srcs_aspect]` producer-identity edge. Make no aspect
+application, propagation, configured-fragment or action change.
+
+### M7 second rustfmt aspect audit accepted; loading selected (2026-08-26)
+
+Commit `d66059ac` selected the source-order audit. Pinned Bazel 9.2 proves
+`aspect(attrs)` builds and retains implicit attributes after requiring their
+defaults, while `requires` retains the required aspect object and derives its
+class only during later definition construction. Duplicate/cycle path checks
+belong to applied-aspect assembly, not this declaration-only slice.
+
+The fixed `_config` and `_process_wrapper` descriptors are private Labels.
+Their already-typed defaults remain owned by the rustfmt defining module;
+single-file, exec-configuration and executable policy survive independently.
+The required value is the already first-exported `rustfmt_srcs_aspect`, so the
+consumer must freeze that complete producer object instead of reconstructing a
+class key or importer identity.
+
+Pinned Zabel `c7298478…` guides this ownership shape only: its complete
+`AspectDefinition` retains named attributes and the required value, while a
+separate `AspectExportIdentity` records producer module plus first exported
+name and module freeze follows the required child. Slug will reuse its existing
+frozen attribute schema and aspect value lifetime; no Zig code, behavior,
+representation, cache or analysis algorithm is copied. Bazel 9.2 remains the
+sole behavior authority.
+
+Run only `WP-4-7A-rustfmt-second-aspect-loading`. Exact compatibility is
+limited to the two fixed descriptors and one exported required producer edge.
+Existing Arc/compact/frozen storage and public underscore names are
+Slug-native. Public/wider attributes, multiple required aspects, cycle
+observability, aspect class derivation, application/propagation, configured
+dependencies/fragments, actions, later rustfmt declarations, M8/M7B and exact
+output identity remain unsupported/deferred.
 
 ### M7 first rustfmt aspect requirements accepted; second aspect audit selected (2026-08-26)
 
