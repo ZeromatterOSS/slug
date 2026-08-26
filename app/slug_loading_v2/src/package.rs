@@ -2526,6 +2526,9 @@ struct AspectDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     attr_aspects: Arc<[CompactString]>,
     #[trace(unsafe_ignore)]
+    attributes: Arc<[RuleAttributeSchemaGen<V>]>,
+    required_aspect: Option<V>,
+    #[trace(unsafe_ignore)]
     required_toolchain: Option<CanonicalLabel>,
     #[trace(unsafe_ignore)]
     required_providers: Arc<[Arc<[ProviderId]>]>,
@@ -2544,6 +2547,8 @@ struct AspectDefinitionGen<V> {
 pub(crate) struct FrozenAspectDefinition {
     implementation: FrozenValue,
     pub(crate) attr_aspects: Arc<[CompactString]>,
+    pub(crate) attributes: Arc<[FrozenRuleAttributeSchema]>,
+    pub(crate) required_aspect: Option<FrozenValue>,
     pub(crate) required_toolchain: Option<CanonicalLabel>,
     pub(crate) required_providers: Arc<[Arc<[ProviderId]>]>,
     pub(crate) required_fragments: Arc<[CompactString]>,
@@ -2574,6 +2579,17 @@ impl<'v> Freeze for AspectDefinition<'v> {
         Ok(FrozenAspectDefinition {
             implementation: self.implementation.freeze(freezer)?,
             attr_aspects: self.attr_aspects,
+            attributes: self
+                .attributes
+                .iter()
+                .cloned()
+                .map(|schema| schema.freeze(freezer))
+                .collect::<FreezeResult<Vec<_>>>()?
+                .into(),
+            required_aspect: self
+                .required_aspect
+                .map(|aspect| aspect.freeze(freezer))
+                .transpose()?,
             required_toolchain: self.required_toolchain,
             required_providers: self.required_providers,
             required_fragments: self.required_fragments,
@@ -2618,6 +2634,84 @@ fn aspect_required_providers(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[P
         })
         .collect::<anyhow::Result<Vec<_>>>()
         .map(Arc::from)
+}
+
+fn aspect_required_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let values = ListRef::from_value(value)
+        .ok_or_else(|| anyhow::anyhow!("aspect requires must be a list"))?;
+    let [required] = values.content() else {
+        anyhow::bail!("only one required aspect is supported");
+    };
+    let exported = required
+        .downcast_ref::<AspectDefinition>()
+        .is_some_and(|aspect| aspect.exported_name.get().is_some())
+        || required
+            .downcast_ref::<FrozenAspectDefinition>()
+            .is_some_and(|aspect| aspect.exported_name.is_some());
+    if !exported {
+        anyhow::bail!("aspect requires must contain one exported aspect");
+    }
+    Ok(Some(*required))
+}
+
+fn aspect_attributes<'v>(
+    attrs: Option<SmallMap<String, Value<'v>>>,
+    defining_label: &CanonicalLabel,
+) -> anyhow::Result<Arc<[RuleAttributeSchema<'v>]>> {
+    let Some(attrs) = attrs else {
+        return Ok(Arc::from([]));
+    };
+    let names = attrs.keys().map(String::as_str).collect::<Vec<_>>();
+    if names != ["_config", "_process_wrapper"] {
+        anyhow::bail!(
+            "only the fixed _config and _process_wrapper aspect attributes are supported"
+        );
+    }
+    let repo = defining_label.package().repo().as_str();
+    let mut schemas = Vec::with_capacity(2);
+    for (name, value) in attrs {
+        let definition = AttributeDefinition::from_value(value)
+            .and_then(|value| match value {
+                starlark::__macro_refs::Either::Left(value) => Some(value),
+                starlark::__macro_refs::Either::Right(_) => None,
+            })
+            .ok_or_else(|| anyhow::anyhow!("aspect attribute `{name}` must use attr.label()"))?;
+        let (label, allow_single_file, executable, exec_configuration) = match name.as_str() {
+            "_config" => (
+                format!("@@{repo}//rust/settings:rustfmt.toml"),
+                Some(AllowSingleFile::True),
+                false,
+                false,
+            ),
+            "_process_wrapper" => (
+                format!("@@{repo}//util/process_wrapper:process_wrapper"),
+                None,
+                true,
+                true,
+            ),
+            _ => unreachable!(),
+        };
+        let expected_default = CoercedAttributeValue::Label(
+            CanonicalLabel::parse(&label).map_err(anyhow::Error::msg)?,
+        );
+        if definition.kind != AttributeKind::Label
+            || definition.mandatory
+            || !definition.configurable
+            || definition.configurable_set
+            || definition.allow_single_file != allow_single_file
+            || definition.default.as_ref() != Some(&expected_default)
+            || definition.executable != executable
+            || definition.exec_configuration != exec_configuration
+            || definition.transition.is_some()
+        {
+            anyhow::bail!("aspect attribute `{name}` does not match the admitted fixed schema");
+        }
+        schemas.push(declared_attribute_schema(name, definition));
+    }
+    Ok(schemas.into())
 }
 
 #[starlark_value(type = "aspect")]
@@ -2676,6 +2770,25 @@ pub(crate) struct RuleAttributeSchemaGen<V> {
 }
 type RuleAttributeSchema<'v> = RuleAttributeSchemaGen<Value<'v>>;
 type FrozenRuleAttributeSchema = RuleAttributeSchemaGen<FrozenValue>;
+
+fn declared_attribute_schema<'v>(
+    name: String,
+    definition: &AttributeDefinition<'v>,
+) -> RuleAttributeSchema<'v> {
+    RuleAttributeSchema {
+        name: name.into(),
+        kind: definition.kind,
+        mandatory: definition.mandatory,
+        configurable: definition.configurable,
+        default: definition.default.clone(),
+        transition: definition.transition.clone(),
+        builtin: false,
+        configurable_set: false,
+        allow_single_file: definition.allow_single_file.clone(),
+        executable: definition.executable,
+        exec_configuration: definition.exec_configuration,
+    }
+}
 
 // These are loading-owned RuleClass members, rather than public `attr.*`
 // descriptors.  Keeping the finite shape here lets target invocation retain
@@ -4771,19 +4884,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                         "attribute '{name}' has the 'configurable' argument set, which is not allowed in rule definitions"
                     );
                 }
-                user_schema.push(RuleAttributeSchema {
-                    name: CompactString::new(name),
-                    kind: definition.kind,
-                    mandatory: definition.mandatory,
-                    configurable: definition.configurable,
-                    default: definition.default.clone(),
-                    transition: definition.transition.clone(),
-                    builtin: false,
-                    configurable_set: false,
-                    allow_single_file: definition.allow_single_file.clone(),
-                    executable: definition.executable,
-                    exec_configuration: definition.exec_configuration,
-                });
+                user_schema.push(declared_attribute_schema(name, definition));
             }
         }
         let has_transition = user_schema.iter().any(|schema| schema.transition.is_some());
@@ -4847,8 +4948,10 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
     fn aspect<'v>(
         implementation: Value<'v>,
         #[starlark(require = named)] attr_aspects: Option<UnpackList<&str>>,
+        #[starlark(require = named)] attrs: Option<SmallMap<String, Value<'v>>>,
         #[starlark(require = named)] toolchains: Option<UnpackList<&str>>,
         #[starlark(require = named)] required_providers: Option<Value<'v>>,
+        #[starlark(require = named)] requires: Option<Value<'v>>,
         #[starlark(require = named)] fragments: Option<UnpackList<&str>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -4878,6 +4981,8 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
         };
         let defining_label =
             CanonicalLabel::parse(&canonical_source).map_err(anyhow::Error::msg)?;
+        let attributes = aspect_attributes(attrs, &defining_label)?;
+        let required_aspect = aspect_required_aspect(requires)?;
         let required_toolchain = aspect_toolchain_requirement(toolchains, &defining_label)?;
         let required_providers = aspect_required_providers(required_providers)?;
         let required_fragments: Arc<[CompactString]> = match fragments {
@@ -4890,6 +4995,8 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
         Ok(AspectDefinitionGen {
             implementation,
             attr_aspects,
+            attributes,
+            required_aspect,
             required_toolchain,
             required_providers,
             required_fragments,
