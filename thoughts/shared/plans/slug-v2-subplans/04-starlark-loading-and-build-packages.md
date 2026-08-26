@@ -5247,6 +5247,41 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Post-paths audit selects exact rules_cc find-toolchain proof (2026-08-26)
+
+Exact `rust/private/rust.bzl` returns from paths through already-admitted
+bazel_skylib common settings, rules_cc CcInfo and rules_rust common/providers.
+Its first new direct child is `rust/private/rust_allocator_libraries.bzl`, 302
+lines at SHA-256
+`ae4acb50ac6a1b922254a07346d97b4649810d33836f2be4824fd0b7a81e536e`.
+After cached rules_cc children it enters new `rust/private/utils.bzl`, 1,032
+lines at SHA-256
+`8aa49b9312d4ae5c4aed033aba65392a039a681b3ee21ca83da0f05acac28ace`.
+
+Utils first passes cached bazel_skylib paths and reaches rules_cc 0.2.17
+`cc/find_cc_toolchain.bzl`, 131 lines at SHA-256
+`3f62d3ea99f59674f71dbc669c80dd0dc5ef14637933d727b74f0bd556334655`.
+Its only child is the admitted `cc_common` wrapper. The eager body defines the
+canonical C++ toolchain type Label, one label attribute/default in
+`CC_TOOLCHAIN_ATTRS`, and three lazy functions, all on admitted generic shapes.
+
+Run only `WP-4-7A-rules-cc-find-cc-toolchain-loading-proof`, changing the one
+loading test file under 0/300/300 caps. Freeze exact source under the exact
+rules_cc producer/child identities and prove the source-defined name/type set,
+canonical toolchain label, singleton declaration map and canonical label default through
+a proof-only consumer. Invoke no toolchain helper and stop when this child
+returns.
+
+Exact compatibility covers exact-source freeze, identities, exports and eager
+label/declaration facts. Frozen Rust representation and proof projection are
+Slug-native. Helper execution, configured toolchain selection, exact display
+text and later utils/allocator/parent bodies remain deferred.
+
+Clean `../zabel` `0795445f…` guides only frozen reachability of exported closures
+and the declaration dictionary. No Zig code, representation, owner pointer,
+ordering, capture algorithm, diagnostic, identity or behavior is copied. Bazel
+9.2 remains sole authority; the utility review selects no retained change.
+
 ### Exact bazel_skylib paths child accepted; parent audit selected (2026-08-26)
 
 Commit `8440742f7` freezes exact unabridged bazel_skylib 1.8.2

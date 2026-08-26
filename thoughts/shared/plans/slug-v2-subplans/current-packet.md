@@ -1,98 +1,133 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-post-paths-rust-parent-frontier-audit`
+Packet: `WP-4-7A-rules-cc-find-cc-toolchain-loading-proof`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: resume exact `rust/private/rust.bzl` source order after the accepted
-paths child, account for cached admitted children, and select the first newly
-unsupported eager loading expression or record `REPLAN`.
+Result: freeze exact rules_cc 0.2.17 `cc/find_cc_toolchain.bzl`, prove its eager
+label/attribute constants and exported function bindings survive module freeze,
+and stop when this child returns.
 
-## Accepted base and audit frontier
+## Learned facts and source order
 
-Base is `8440742f7` (`Prove exact bazel skylib paths loading`). It freezes exact
-bazel_skylib 1.8.2 `lib/paths.bzl` under
-`@@bazel_skylib+//lib:paths.bzl`, proving its exported ten-member function
-composite without invoking a helper or claiming exact field iteration order.
+Base is `a5574d201` (`Select post-paths parent audit`). Exact
+`rust/private/rust.bzl` resumes after paths through already-admitted
+`@bazel_skylib//rules:common_settings.bzl`, rules_cc `cc_info.bzl`, and
+rules_rust `common.bzl`/`providers.bzl`.
 
-Resume the authenticated 1,821-line rules_rust 0.73.0
-`rust/private/rust.bzl`, SHA-256
-`a645bd5db6344bd3c0997dcf73600475c0af53fb4dd025890be24b8e1e2dbfd8`.
-Its next direct child is `@bazel_skylib//rules:common_settings.bzl`, already
-admitted completely through the earlier toolchain route at SHA-256
-`f3bcedef4b2b2cbe9750d61852917954499c4ba5e83d79fb975ec5814eb76d20`.
-Do not select duplicate implementation work there.
+The first new direct child is rules_rust 0.73.0
+`rust/private/rust_allocator_libraries.bzl`, 302 lines at SHA-256
+`ae4acb50ac6a1b922254a07346d97b4649810d33836f2be4824fd0b7a81e536e`.
+Its cached `cc_common`/`CcInfo` children return before the previously unseen
+`rust/private/utils.bzl`, 1,032 lines at SHA-256
+`8aa49b9312d4ae5c4aed033aba65392a039a681b3ee21ca83da0f05acac28ace`.
 
-## Authorities and compatibility discipline
+Utils first loads cached bazel_skylib paths and then rules_cc 0.2.17
+`cc/find_cc_toolchain.bzl`, 131 lines at SHA-256
+`3f62d3ea99f59674f71dbc669c80dd0dc5ef14637933d727b74f0bd556334655`.
+That child's sole `//cc/common:cc_common.bzl` load is already admitted.
 
-Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` and the
-authenticated rules_rust/bazel_skylib sources are sole behavior authority.
-Replay direct-load and recursive child order exactly. For each child, cite the
-accepted packet that closes it or authenticate its source bytes/hash before
-classifying its first unsupported eager expression.
+The exact child eagerly defines
+`CC_TOOLCHAIN_TYPE = Label("@bazel_tools//tools/cpp:toolchain_type")` and
+singleton `CC_TOOLCHAIN_ATTRS` containing `_cc_toolchain = attr.label(default =
+Label("@rules_cc//cc:current_cc_toolchain"))`. Its three functions
+`find_cc_toolchain`, `find_cpp_toolchain` and `use_cc_toolchain` remain lazy.
+
+## Authorities and decision
+
+Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is sole behavior
+authority. The authenticated rules_cc source fixes source order, constants and
+exports. Previously accepted Bazel Label/attribute/rule evidence fixes canonical
+label resolution and declaration projection. Invoke no helper, so no configured
+toolchain oracle is needed.
+
+Slug already owns the required load, Label, dictionary, label-attribute/default,
+function and recursive freeze shapes. Add no production behavior. Embed exact
+source and use the existing loaded-child evaluator. A proof-only consumer may
+load the constants into a rule declaration so the retained singleton schema and
+canonical default can be observed without calling a toolchain helper.
 
 Clean `../zabel` commit
 `0795445f3ab60f4e49070bdd0b94425c5610f73a` is architectural guidance only.
-Use its module-boundary and frozen closure-graph concepts to check whether a
-cached child is genuinely complete. Copy no Zig code, representation, owner
-pointer, field order, capture algorithm, diagnostic, identity or behavior.
+Its module-freeze graph principle says exported closures and a nested
+declaration dictionary must retain their reachable values after the evaluator
+closes. This guides proof shape only. Copy no Zig code, representation, owner
+pointer, field ordering, capture algorithm, diagnostic, identity or behavior.
 
-- **Exact:** authenticated parent/child source order and already accepted exact
-  loading slices.
-- **Slug-native:** Rust evaluator/frozen-value representation and the audit's
-  documentation structure.
-- **Unsupported/deferred:** any first unadmitted eager expression selected by
-  this audit; all lazy bodies and configured rule/provider/action behavior
-  unless separately accepted.
-
-The Buck2 utility review selects no action because this is docs-only and changes
-no retained data structure, hash, collection/string, interner, clone path,
+The Buck2 utility review selects no action. This is proof-only and changes no
+retained data structure, hash, compact collection/string, interner, clone path,
 graph storage or memory accounting.
+
+## Compatibility
+
+- **Exact:** exact unabridged source freeze; canonical producer and child
+  identities; exact source-defined export/type set; canonical
+  `CC_TOOLCHAIN_TYPE`; and
+  the singleton label declaration/default retained by `CC_TOOLCHAIN_ATTRS`.
+- **Slug-native:** starlark-rust frozen value/closure representation and the
+  proof-only consuming rule projection.
+- **Unsupported/deferred:** invoking any exported helper; configured or legacy
+  C++ toolchain lookup; exact Label/attribute display text; and every later
+  utils, allocator or parent expression after this child returns.
 
 ## Allowlist, proof and caps
 
-Only these files may change:
+Only this file may change:
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
-- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
-- `.codex/skills/slug-agent-orchestration/references/routing-log.md` only if the
-  audit yields a genuinely reusable or unusual routing decision.
+| File | Base SHA-256 | Base lines | Final ceiling |
+|---|---|---:|---:|
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `a8fccee5660d823d9ab3c67be160e04f8328ffd4b0e1ab572fe3365a3075146b` | 7,935 | 8,235 |
 
-Caps are 0 production and 0 proof additions. Documentation growth must remain
-bounded to the authenticated audit result.
+Caps are 0 production, 300 proof and 300 total additions; deletions do not buy
+addition budget. Keep the test function at or below 120 lines; the exact 131-
+line source constant is exempt from the function limit.
 
-Required audit:
+Required proof:
 
-1. Resume immediately after `lib/paths.bzl` returns; do not restart at a later
-   public ruleset or skip a direct child.
-2. Account for complete cached children from accepted evidence, beginning with
-   `rules/common_settings.bzl`; do not duplicate their implementation.
-3. Authenticate the first newly evaluated child and recursively follow its own
-   load order before examining its body.
-4. Identify the first unsupported eager loading expression and its narrow
-   producer/consumer proof boundary, or record `REPLAN` if no bounded Rust-
-   native packet exists.
-5. Update the canonical status, stage subplan and this manifest to name one
-   next packet with exact/Slug-native/unsupported classification.
+1. Embed exact unabridged rules_cc 0.2.17
+   `cc/find_cc_toolchain.bzl:1-131` and verify its SHA-256.
+2. Freeze under producer `@@rules_cc+//cc:find_cc_toolchain.bzl` with its sole
+   cached child at `@@rules_cc+//cc/common:cc_common.bzl`; preserve the exact
+   direct load spelling and invoke no exported helper.
+3. Prove the exact source-defined export/type set: `CC_TOOLCHAIN_ATTRS` as
+   `dict`, `CC_TOOLCHAIN_TYPE` as `Label`, and the three named functions as `function`.
+   Sort only names for comparison; claim no module iteration order.
+4. Prove `CC_TOOLCHAIN_TYPE` resolves canonically to
+   `@@bazel_tools+//tools/cpp:toolchain_type` under an explicit producer mapping.
+5. Through a proof-only consumer, prove `CC_TOOLCHAIN_ATTRS` is a singleton
+   `_cc_toolchain` Label declaration whose default resolves canonically to
+   `@@rules_cc+//cc:current_cc_toolchain`; do not invoke an implementation.
+6. Preserve every accepted keyword-only, struct, rules_cc, descriptor, clippy,
+   lints, lint-test, rustfmt and paths proof.
 
-No new oracle is required for the docs audit. Any selected parity change must
-name existing accepted discriminating Bazel 9.2 evidence or require a later
-pinned-source/oracle proof.
+No new oracle is needed: authenticated source and accepted Bazel Label/
+attribute evidence discriminate this loading-only gap.
 
-## Validation and STOP
+## Serial validation and STOP
 
-Run `git diff --check`, verify only allowlisted documentation changed, and run
-`scripts/v2_archive_status.sh` with only its three known archive-only misses.
-Independent terminal review must verify source order, cached-child accounting,
-selected boundary, compatibility classification, Zabel's guidance-only role
-and scope.
+Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
+`CARGO_BUILD_JOBS=1`:
 
-STOP and `REPLAN` for Rust changes, skipped source order, a duplicate packet for
-an already accepted child, configured semantics, Java/JVM work, copied Zabel
-content, dirty authority or an unbounded next packet.
+- focused exact find-toolchain child proof;
+- `cargo test -p slug_loading_v2 --lib --locked`;
+- `cargo test -p slug_loading_v2 --test bzl_invalidation --locked`;
+- `cargo test -p slug_loading_v2 --test build_file_loading --locked`;
+- `cargo check --locked -p slug_analysis_v2 -p slug_core_v2`;
+- `cargo build -p slug_cli_v2 --locked`;
+- `cargo fmt --all -- --check`, `git diff --check`, and
+  `scripts/v2_archive_status.sh` with only its three known archive-only misses.
+
+Independent terminal review must verify source bytes/hash, recursive order,
+producer/child identities, exact source-defined export/types, canonical labels,
+singleton declaration proof, lazy nonexecution, Zabel guidance-only role, validation and
+caps.
+
+STOP and `REPLAN` for a production change; helper invocation; configured
+toolchain behavior; another new child; identity/registry/DICE work; Java/JVM
+work; copied Zabel content; dirty authority; skipped source order; or cap
+violation.
 
 ## Immediate predecessor
 
-`8440742f7` accepted the exact paths-child recursive freeze proof under all
-caps and validation, then stopped as required when that child returned.
+`a5574d201` accepted the post-paths docs rollover. This audit accounted for all
+cached direct children and selected the first unseen recursive child only.
