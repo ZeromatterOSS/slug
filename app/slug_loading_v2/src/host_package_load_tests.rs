@@ -2557,6 +2557,7 @@ async fn external_bzl_module_freezes_and_imports_fixed_aspect_definition() {
     );
     assert!(aspect.attributes.is_empty());
     assert!(aspect.required_aspect.is_none());
+    assert!(aspect.advertised_providers.is_empty());
     assert_eq!(
         aspect.required_toolchain.as_ref().unwrap(),
         &CanonicalLabel::parse("@@dep+//rust:toolchain_type").unwrap()
@@ -2574,12 +2575,72 @@ async fn external_bzl_module_freezes_and_imports_fixed_aspect_definition() {
     assert!(nested.exported_name.is_none());
 }
 
+fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
+    assert_eq!(aspect.attributes.len(), 2);
+    let config = &aspect.attributes[0];
+    assert_eq!(config.name, "_config");
+    assert_eq!(config.kind, AttributeKind::Label);
+    assert!(matches!(
+        config.allow_single_file,
+        Some(AllowSingleFile::True)
+    ));
+    assert!(
+        matches!(config.default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == "@@dep+//rust/settings:rustfmt.toml")
+    );
+    assert!(!config.executable && !config.exec_configuration);
+    let process_wrapper = &aspect.attributes[1];
+    assert_eq!(process_wrapper.name, "_process_wrapper");
+    assert_eq!(process_wrapper.kind, AttributeKind::Label);
+    assert!(process_wrapper.allow_single_file.is_none());
+    assert!(
+        matches!(process_wrapper.default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == "@@dep+//util/process_wrapper:process_wrapper")
+    );
+    assert!(process_wrapper.executable && process_wrapper.exec_configuration);
+    assert_eq!(aspect.required_providers.len(), 2);
+    assert_eq!(
+        aspect.required_providers[0][0].to_string(),
+        "@@dep+//rust/private:providers.bzl%CrateInfo"
+    );
+    assert_eq!(
+        aspect.required_providers[1][0].to_string(),
+        "@@dep+//rust/private:providers.bzl%TestCrateInfo"
+    );
+    assert!(aspect.advertised_providers.is_empty());
+    assert_eq!(aspect.required_fragments.as_ref(), ["cpp"]);
+    assert_eq!(
+        aspect.defining_label,
+        CanonicalLabel::parse("@@dep+//rust/private:rustfmt.bzl").unwrap()
+    );
+    assert_eq!(aspect.exported_name.as_deref(), Some("rustfmt_aspect"));
+    assert_eq!(
+        aspect.required_toolchain.as_ref(),
+        Some(&CanonicalLabel::parse("@@dep+//rust/rustfmt:toolchain_type").unwrap())
+    );
+    let required = aspect
+        .required_aspect
+        .unwrap()
+        .downcast_ref::<FrozenAspectDefinition>()
+        .unwrap();
+    assert_eq!(
+        required.defining_label,
+        CanonicalLabel::parse("@@dep+//rust/private:rustfmt.bzl").unwrap()
+    );
+    assert_eq!(
+        required.exported_name.as_deref(),
+        Some("rustfmt_srcs_aspect")
+    );
+    assert_eq!(
+        required.required_providers[0][0].to_string(),
+        "@@dep+//rust/private:providers.bzl%CrateInfo"
+    );
+}
+
 #[tokio::test]
-async fn external_bzl_module_freezes_rustfmt_second_aspect_requirements() {
+async fn external_bzl_module_freezes_rustfmt_test_aspect_provides() {
     let files: &[(&str, &[u8])] = &[
         (
             "rust/private/root.bzl",
-            b"load(':rustfmt.bzl', 'rustfmt_aspect')\nIMPORTED = rustfmt_aspect\n",
+            b"load(':rustfmt.bzl', 'RUSTFMT_TEST_ASPECT')\nIMPORTED = RUSTFMT_TEST_ASPECT\n",
         ),
         ("rust/private/BUILD.bazel", b""),
         (
@@ -2634,6 +2695,20 @@ rustfmt_aspect = aspect(
     fragments = ["cpp"],
     toolchains = [str(Label("//rust/rustfmt:toolchain_type"))],
 )
+RustfmtTestInfo = provider(
+    doc = "Rustfmt check outputs collected from the underlying rustfmt aspect.",
+    fields = {"checks": "depset[File]", "direct": "depset[File]"},
+)
+def _rustfmt_test_aspect_impl(target, ctx):
+    fail("test aspect implementation must stay lazy")
+_rustfmt_test_aspect = aspect(
+    implementation = _rustfmt_test_aspect_impl,
+    attr_aspects = ["deps", "proc_macro_deps", "crate"],
+    requires = [rustfmt_aspect],
+    provides = [RustfmtTestInfo],
+    doc = "Rolls up markers produced by rustfmt_aspect.",
+)
+RUSTFMT_TEST_ASPECT = _rustfmt_test_aspect
 "#,
         ),
     ];
@@ -2655,64 +2730,31 @@ rustfmt_aspect = aspect(
         .unwrap()
         .downcast::<FrozenAspectDefinition>()
         .unwrap();
-    assert_eq!(aspect.attributes.len(), 2);
-    let config = &aspect.attributes[0];
-    assert_eq!(config.name, "_config");
-    assert_eq!(config.kind, AttributeKind::Label);
-    assert!(matches!(
-        config.allow_single_file,
-        Some(AllowSingleFile::True)
-    ));
-    assert!(
-        matches!(config.default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == "@@dep+//rust/settings:rustfmt.toml")
-    );
-    assert!(!config.executable && !config.exec_configuration);
-    let process_wrapper = &aspect.attributes[1];
-    assert_eq!(process_wrapper.name, "_process_wrapper");
-    assert_eq!(process_wrapper.kind, AttributeKind::Label);
-    assert!(process_wrapper.allow_single_file.is_none());
-    assert!(
-        matches!(process_wrapper.default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == "@@dep+//util/process_wrapper:process_wrapper")
-    );
-    assert!(process_wrapper.executable && process_wrapper.exec_configuration);
-    assert_eq!(aspect.required_providers.len(), 2);
-    assert_eq!(aspect.required_providers[0].len(), 1);
-    assert_eq!(aspect.required_providers[1].len(), 1);
     assert_eq!(
-        aspect.required_providers[0][0].to_string(),
-        "@@dep+//rust/private:providers.bzl%CrateInfo"
+        aspect.attr_aspects.as_ref(),
+        ["deps", "proc_macro_deps", "crate"]
     );
+    assert!(aspect.attributes.is_empty());
+    assert!(aspect.required_providers.is_empty());
+    assert_eq!(aspect.advertised_providers.len(), 1);
     assert_eq!(
-        aspect.required_providers[1][0].to_string(),
-        "@@dep+//rust/private:providers.bzl%TestCrateInfo"
+        aspect.advertised_providers[0].to_string(),
+        "@@dep+//rust/private:rustfmt.bzl%RustfmtTestInfo"
     );
-    assert_eq!(aspect.required_fragments.as_ref(), ["cpp"]);
     assert_eq!(
         aspect.defining_label,
         CanonicalLabel::parse("@@dep+//rust/private:rustfmt.bzl").unwrap()
     );
-    assert_eq!(aspect.exported_name.as_deref(), Some("rustfmt_aspect"));
     assert_eq!(
-        aspect.required_toolchain.as_ref(),
-        Some(&CanonicalLabel::parse("@@dep+//rust/rustfmt:toolchain_type").unwrap())
+        aspect.exported_name.as_deref(),
+        Some("_rustfmt_test_aspect")
     );
     let required = aspect
         .required_aspect
         .unwrap()
         .downcast_ref::<FrozenAspectDefinition>()
         .unwrap();
-    assert_eq!(
-        required.defining_label,
-        CanonicalLabel::parse("@@dep+//rust/private:rustfmt.bzl").unwrap()
-    );
-    assert_eq!(
-        required.exported_name.as_deref(),
-        Some("rustfmt_srcs_aspect")
-    );
-    assert_eq!(
-        required.required_providers[0][0].to_string(),
-        "@@dep+//rust/private:providers.bzl%CrateInfo"
-    );
+    assert_frozen_rustfmt_aspect(required);
 }
 
 #[test]
@@ -2753,6 +2795,20 @@ fn rustfmt_second_aspect_rejects_unadmitted_declaration_shapes() {
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, requires=[1])",
         "def impl(target, ctx): return []\nB=aspect(implementation=impl)\nC=aspect(implementation=impl)\nA=aspect(implementation=impl, requires=[B, C])",
         "def impl(target, ctx): return []\nNESTED=[aspect(implementation=impl)]\nA=aspect(implementation=impl, requires=[NESTED[0]])",
+    ] {
+        assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
+    }
+}
+
+#[test]
+fn rustfmt_test_aspect_rejects_unadmitted_provides_shapes() {
+    for source in [
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, provides=[])",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, provides=1)",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, provides=[1])",
+        "P=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, provides=[P, P])",
+        "P=provider()\nQ=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, provides=[P, Q])",
+        "NESTED=[provider()]\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, provides=NESTED)",
     ] {
         assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
     }

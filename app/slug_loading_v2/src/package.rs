@@ -2533,6 +2533,8 @@ struct AspectDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     required_providers: Arc<[Arc<[ProviderId]>]>,
     #[trace(unsafe_ignore)]
+    advertised_providers: Arc<[ProviderId]>,
+    #[trace(unsafe_ignore)]
     required_fragments: Arc<[CompactString]>,
     #[trace(unsafe_ignore)]
     defining_label: CanonicalLabel,
@@ -2551,6 +2553,7 @@ pub(crate) struct FrozenAspectDefinition {
     pub(crate) required_aspect: Option<FrozenValue>,
     pub(crate) required_toolchain: Option<CanonicalLabel>,
     pub(crate) required_providers: Arc<[Arc<[ProviderId]>]>,
+    pub(crate) advertised_providers: Arc<[ProviderId]>,
     pub(crate) required_fragments: Arc<[CompactString]>,
     pub(crate) defining_label: CanonicalLabel,
     pub(crate) exported_name: Option<CompactString>,
@@ -2592,6 +2595,7 @@ impl<'v> Freeze for AspectDefinition<'v> {
                 .transpose()?,
             required_toolchain: self.required_toolchain,
             required_providers: self.required_providers,
+            advertised_providers: self.advertised_providers,
             required_fragments: self.required_fragments,
             defining_label: self.defining_label,
             exported_name: self.exported_name.into_inner(),
@@ -2599,17 +2603,17 @@ impl<'v> Freeze for AspectDefinition<'v> {
     }
 }
 
-fn aspect_required_provider_id(value: Value) -> anyhow::Result<ProviderId> {
+fn aspect_provider_id(value: Value) -> anyhow::Result<ProviderId> {
     if let Some(provider) = value.downcast_ref::<UserProviderCallable>() {
         return provider
             .id()
             .cloned()
-            .ok_or_else(|| anyhow::anyhow!("aspect required providers must be exported"));
+            .ok_or_else(|| anyhow::anyhow!("aspect providers must be exported"));
     }
     if let Some(provider) = value.downcast_ref::<FrozenUserProviderCallable>() {
         return Ok(provider.id().clone());
     }
-    anyhow::bail!("aspect required providers must be user provider constructors")
+    anyhow::bail!("aspect providers must be user provider constructors")
 }
 
 fn aspect_required_providers(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[ProviderId]>]>> {
@@ -2630,10 +2634,22 @@ fn aspect_required_providers(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[P
             if providers.len() != 1 {
                 anyhow::bail!("aspect required_providers alternatives must be singletons");
             }
-            Ok(Arc::from([aspect_required_provider_id(providers[0])?]))
+            Ok(Arc::from([aspect_provider_id(providers[0])?]))
         })
         .collect::<anyhow::Result<Vec<_>>>()
         .map(Arc::from)
+}
+
+fn aspect_advertised_providers(value: Option<Value>) -> anyhow::Result<Arc<[ProviderId]>> {
+    let Some(value) = value else {
+        return Ok(Arc::from([]));
+    };
+    let providers = ListRef::from_value(value)
+        .ok_or_else(|| anyhow::anyhow!("aspect provides must be a list"))?;
+    let [provider] = providers.content() else {
+        anyhow::bail!("only one advertised aspect provider is supported");
+    };
+    Ok(Arc::from([aspect_provider_id(*provider)?]))
 }
 
 fn aspect_required_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>> {
@@ -4952,6 +4968,7 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] toolchains: Option<UnpackList<&str>>,
         #[starlark(require = named)] required_providers: Option<Value<'v>>,
         #[starlark(require = named)] requires: Option<Value<'v>>,
+        #[starlark(require = named)] provides: Option<Value<'v>>,
         #[starlark(require = named)] fragments: Option<UnpackList<&str>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -4985,6 +5002,7 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
         let required_aspect = aspect_required_aspect(requires)?;
         let required_toolchain = aspect_toolchain_requirement(toolchains, &defining_label)?;
         let required_providers = aspect_required_providers(required_providers)?;
+        let advertised_providers = aspect_advertised_providers(provides)?;
         let required_fragments: Arc<[CompactString]> = match fragments {
             None => Arc::from([]),
             Some(fragments) if fragments.items.as_slice() == ["cpp"] => {
@@ -4999,6 +5017,7 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
             required_aspect,
             required_toolchain,
             required_providers,
+            advertised_providers,
             required_fragments,
             defining_label,
             exported_name: OnceCell::new(),
