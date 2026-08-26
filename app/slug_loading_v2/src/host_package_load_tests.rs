@@ -3423,13 +3423,7 @@ SECOND = rule(implementation = _impl, attrs = _attrs("different documentation"))
             "{invalid}"
         );
     }
-    assert!(
-        eval_bzl_with_identity(
-            "X = config_common.toolchain_type('//tools:toolchain_type', mandatory = False)",
-            owner
-        )
-        .is_err()
-    );
+    assert!(eval_bzl_with_identity("X = config_common.FeatureFlagInfo", owner).is_err());
 }
 
 #[test]
@@ -3437,7 +3431,10 @@ fn bazel_integer_allowed_values_freeze_rust_toolchain_prefix() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_rust+//rust/private:toolchain.bzl").unwrap(),
         workspace_path: PathBuf::from("/rules_rust/rust/private/toolchain.bzl"),
-        repository_mapping: Arc::from([]),
+        repository_mapping: Arc::from([(
+            ApparentRepoName::new("bazel_tools").unwrap(),
+            CanonicalRepoName::new("bazel_tools").unwrap(),
+        )]),
     };
     let source = r#"
 def _impl(ctx): fail("implementation must stay lazy")
@@ -3465,7 +3462,7 @@ LABEL_PROVIDERS_EMPTY = rule(implementation = _impl, attrs = {"x": attr.label(pr
 LABEL_PROVIDERS_ONE = rule(implementation = _impl, attrs = {"x": attr.label(providers = [RustLtoInfo])})
 rust_toolchain = rule(implementation = _impl, attrs = {
     "experimental_use_allocator_libraries_with_mangled_symbols": attr.int(doc = "allocator", values = [-1, 0, 1], default = -1), "experimental_use_cc_common_link": attr.label(default = Label("//rust/settings:cc_common_link"), doc = "cc link"), "extra_exec_rustc_flags": attr.string_list(doc = "exec flags"), "extra_rustc_flags_for_crate_types": attr.string_list_dict(doc = "crate flags"), "global_allocator_library": attr.label(default = Label("//rust/private/cc:global_allocator_library"), doc = "allocator library"), "iso_date": attr.string(doc = "date", default = ""), "linker": attr.label(doc = "linker", cfg = "exec", allow_single_file = True), "linker_preference": attr.string(doc = "preferred", values = ["cc", "rust"]), "linker_type": attr.string(doc = "type", values = ["direct", "indirect"]), "llvm_cov": attr.label(doc = "llvm-cov", cfg = "exec", allow_single_file = True), "llvm_lib": attr.label(doc = "libLLVM", allow_files = True, cfg = "exec"), "llvm_profdata": attr.label(doc = "profdata", allow_single_file = True, cfg = "exec"), "llvm_tools": attr.label(doc = "tools", allow_files = True), "lto": attr.label(providers = [RustLtoInfo], default = Label("//rust/settings:lto"), doc = "lto"), "opt_level": attr.string_dict(doc = "levels", default = {"dbg":"0","fastbuild":"0","opt":"3"}), "per_crate_rustc_flags": attr.string_list(doc = "flags"), "require_explicit_unstable_features": attr.label(default = Label("//rust/settings:require_explicit_unstable_features"), doc = "unstable"), "rust_doc": attr.label(doc = "rustdoc", allow_single_file = True, cfg = "exec", mandatory = True), "rust_objcopy": attr.label(doc = "objcopy", allow_single_file = True, cfg = "exec"), "rust_std": attr.label(doc = "std", mandatory = True), "rustc": attr.label(doc = "rustc", allow_single_file = True, cfg = "exec", mandatory = True), "rustc_lib": attr.label(doc = "rustc libs", cfg = "exec"), "rustfmt": attr.label(doc = "rustfmt", allow_single_file = True, cfg = "exec"), "staticlib_ext": attr.string(doc = "static", mandatory = True), "stdlib_linkflags": attr.string_list(doc = "linkflags", mandatory = True), "strip_level": attr.string_dict(doc = "strip", default = {"dbg":"none","fastbuild":"none","opt":"debuginfo"}), "target_json": attr.string(doc = "json"), "target_triple": attr.string(doc = "triple"), "version": attr.string(doc = "version", default = ""), "_codegen_units": attr.label(default = Label("//rust/settings:codegen_units")), "_experimental_compile_rustdoc_tests": attr.label(default = Label("//rust/settings:experimental_compile_rustdoc_tests")), "_experimental_use_allocator_libraries_with_mangled_symbols_setting": attr.label(default = Label("//rust/settings:experimental_use_allocator_libraries_with_mangled_symbols"), providers = [BuildSettingInfo], doc = "allocator setting"), "_experimental_use_coverage_metadata_files": attr.label(default = Label("//rust/settings:experimental_use_coverage_metadata_files")), "_experimental_use_global_allocator": attr.label(default = Label("//rust/settings:experimental_use_global_allocator"), doc = "allocator"), "_incompatible_do_not_include_data_in_compile_data": attr.label(default = Label("//rust/settings:incompatible_do_not_include_data_in_compile_data"), doc = "data"), "_incompatible_do_not_include_transitive_data_in_compile_inputs": attr.label(default = Label("//rust/settings:incompatible_do_not_include_transitive_data_in_compile_inputs"), doc = "transitive"), "_linker_preference": attr.label(default = Label("//rust/settings:toolchain_linker_preference")), "_no_std": attr.label(default = Label("//rust/settings:no_std")), "_pipelined_compilation": attr.label(default = Label("//rust/settings:pipelined_compilation")), "_rename_first_party_crates": attr.label(default = Label("//rust/settings:rename_first_party_crates")), "_third_party_dir": attr.label(default = Label("//rust/settings:third_party_dir")), "_toolchain_generated_sysroot": attr.label(default = Label("//rust/settings:toolchain_generated_sysroot"), doc = "sysroot"),
-})
+}, toolchains = [config_common.toolchain_type("@bazel_tools//tools/cpp:toolchain_type", mandatory = False)])
 "#;
     let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
     let snapshot = |rule_name: &str, attribute_name: &str| {
@@ -3592,6 +3589,17 @@ rust_toolchain = rule(implementation = _impl, attrs = {
             .to_string(),
         "@@rules_rust+//rust/private:toolchain.bzl%BuildSettingInfo"
     );
+    let rust_toolchain = module
+        .get("rust_toolchain")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    assert_eq!(rust_toolchain.required_toolchains().len(), 1);
+    assert_eq!(
+        rust_toolchain.required_toolchains()[0].label().to_string(),
+        "@@bazel_tools//tools/cpp:toolchain_type"
+    );
+    assert!(!rust_toolchain.required_toolchains()[0].mandatory());
     for invalid in ["None", "1", "['1']", "[True]", "{}", "[2147483648]"] {
         let source = format!("X = attr.int(values = {invalid})");
         assert!(
@@ -3633,13 +3641,7 @@ rust_toolchain = rule(implementation = _impl, attrs = {
             "{invalid}"
         );
     }
-    assert!(
-        eval_bzl_with_identity(
-            "X = config_common.toolchain_type('//tools:toolchain_type', mandatory = False)",
-            owner.clone()
-        )
-        .is_err()
-    );
+    assert!(eval_bzl_with_identity("X = config_common.FeatureFlagInfo", owner.clone()).is_err());
     assert!(
         eval_bzl_with_identity(
             "def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.int(values = [1])})",
@@ -4612,6 +4614,94 @@ fn bazel_label_rejects_unadmitted_inputs_and_missing_function_provenance() {
     evaluator.extra = Some(&context);
     let error = evaluator.eval_module(ast, &loading_globals()).unwrap_err();
     assert!(error.to_string().contains("ambiguous"), "{error}");
+}
+
+#[test]
+fn bazel_config_common_toolchain_type_retains_typed_rule_requirements() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@owner+//pkg:defs.bzl").unwrap(),
+        workspace_path: PathBuf::from("/workspace/owner/pkg/defs.bzl"),
+        repository_mapping: Arc::from([(
+            ApparentRepoName::new("alias").unwrap(),
+            CanonicalRepoName::new("mapped+").unwrap(),
+        )]),
+    };
+    let module = eval_bzl_with_identity(
+        r#"
+def impl(ctx): return []
+DEFAULT = config_common.toolchain_type(":default")
+EXPLICIT = config_common.toolchain_type(Label("@alias//tools:explicit"), mandatory = True)
+OPTIONAL = config_common.toolchain_type("//tools:optional", mandatory = False)
+DEFAULT_MANDATORY = DEFAULT.mandatory
+OPTIONAL_MANDATORY = OPTIONAL.mandatory
+OPTIONAL_LABEL = str(OPTIONAL.toolchain_type)
+R = rule(implementation = impl, toolchains = [":plain", Label("//tools:label"), EXPLICIT, OPTIONAL])
+"#,
+        owner.clone(),
+    )
+    .unwrap();
+    assert_eq!(
+        module.get("DEFAULT_MANDATORY").unwrap().unpack_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        module.get("OPTIONAL_MANDATORY").unwrap().unpack_bool(),
+        Some(false)
+    );
+    assert_eq!(
+        module.get("OPTIONAL_LABEL").unwrap().unpack_str(),
+        Some("@@owner+//tools:optional")
+    );
+    let rule = module
+        .get("R")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    let requirements = rule.required_toolchains();
+    assert_eq!(requirements.len(), 4);
+    assert_eq!(requirements[0].label().to_string(), "@@owner+//pkg:plain");
+    assert_eq!(requirements[1].label().to_string(), "@@owner+//tools:label");
+    assert_eq!(
+        requirements[2].label().to_string(),
+        "@@mapped+//tools:explicit"
+    );
+    assert_eq!(
+        requirements[3].label().to_string(),
+        "@@owner+//tools:optional"
+    );
+    assert!(requirements[..3].iter().all(|value| value.mandatory()));
+    assert!(!requirements[3].mandatory());
+
+    for source in [
+        "X = config_common.toolchain_type(None)",
+        "X = config_common.toolchain_type(1)",
+        "X = config_common.toolchain_type([], mandatory = False)",
+        "def impl(ctx): return []\nR = rule(implementation = impl, toolchains = [None])",
+        "def impl(ctx): return []\nR = rule(implementation = impl, toolchains = [\"//:same\", Label(\"//:same\")])",
+    ] {
+        assert!(
+            eval_bzl_with_identity(source, owner.clone()).is_err(),
+            "{source}"
+        );
+    }
+    assert!(eval_global("X = config_common", &build_file_loading_globals()).is_err());
+}
+
+#[tokio::test]
+async fn repository_package_rejects_optional_toolchain_before_recording() {
+    let files: &[(&str, &[u8])] = &[
+        ("BUILD.bazel", b"load(':defs.bzl','probe')\nprobe(name='blocked')\n"),
+        (
+            "defs.bzl",
+            b"def impl(ctx): return []\nprobe=rule(implementation=impl, toolchains=[config_common.toolchain_type('//tools:type', mandatory=False)])\n",
+        ),
+    ];
+    let outcome = load_repository_package_fixture(files, 427).await;
+    let error = repository_package_error(&outcome);
+    assert!(
+        error.contains("optional rule toolchain requirements"),
+        "{error}"
+    );
 }
 
 #[tokio::test]

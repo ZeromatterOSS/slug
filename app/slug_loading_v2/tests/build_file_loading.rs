@@ -2922,8 +2922,11 @@ fn rule_toolchains_and_toolchain_info_fail_closed_outside_the_fixture_subset() {
     let cases = [
         ("toolchains = \":demo_type\"", "list"),
         ("toolchains = (\":demo_type\",)", "list"),
-        ("toolchains = [1]", "expected `list[str]`"),
-        ("toolchains = [\"@external//:type\"]", "external repository"),
+        (
+            "toolchains = [1]",
+            "entries must be Strings, Labels, or toolchain_type values",
+        ),
+        ("toolchains = [\"@external//:type\"]", "not visible"),
         ("toolchains = [\"...\"]", "direct target label"),
         ("toolchains = [\":all\"]", "direct target label"),
     ];

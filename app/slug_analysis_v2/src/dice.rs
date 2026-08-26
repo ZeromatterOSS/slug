@@ -2701,7 +2701,12 @@ impl ConfiguredNodeAnalysisKey {
                     CoercedAttributeValue::String(value) => Some(value.clone()),
                     _ => None,
                 });
-            (rule.required_toolchains().first().cloned(), marker)
+            (
+                rule.required_toolchains()
+                    .first()
+                    .map(|requirement| requirement.label().clone()),
+                marker,
+            )
         };
         let candidate_execution_platforms = match root_rule_execution_platforms(
             ctx,

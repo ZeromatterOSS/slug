@@ -465,6 +465,35 @@ pub(crate) enum BuildSettingKind {
     StringList { flag: bool, repeatable: bool },
 }
 
+/// One rule-level toolchain type requirement detached from its Starlark value.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RuleToolchainRequirement {
+    label: CanonicalLabel,
+    mandatory: bool,
+}
+
+impl RuleToolchainRequirement {
+    pub fn label(&self) -> &CanonicalLabel {
+        &self.label
+    }
+
+    pub fn mandatory(&self) -> bool {
+        self.mandatory
+    }
+}
+
+impl fmt::Display for RuleToolchainRequirement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.label.fmt(f)
+    }
+}
+
+impl PartialEq<CanonicalLabel> for RuleToolchainRequirement {
+    fn eq(&self, other: &CanonicalLabel) -> bool {
+        self.label == *other
+    }
+}
+
 impl BuildSettingKind {
     fn attribute_kind(self) -> AttributeKind {
         match self {
@@ -481,7 +510,7 @@ pub struct StarlarkRuleImplementation {
     #[allocative(skip)]
     implementation: FrozenValue,
     dependencies: Arc<[CanonicalLabel]>,
-    required_toolchains: Arc<[CanonicalLabel]>,
+    required_toolchains: Arc<[RuleToolchainRequirement]>,
     schema: Arc<[AttributeSchema]>,
     values: Arc<[AttributeValue]>,
     capability: Arc<RuleCapability>,
@@ -514,7 +543,7 @@ impl StarlarkRuleImplementation {
 
     /// Toolchain-type requirements declared by the defining `rule()` call.
     /// These are loading-only retained metadata, not ordinary dependencies.
-    pub fn required_toolchains(&self) -> &[CanonicalLabel] {
+    pub fn required_toolchains(&self) -> &[RuleToolchainRequirement] {
         &self.required_toolchains
     }
 
@@ -929,7 +958,7 @@ impl PackageRecorder {
         &self,
         name: String,
         implementation: FrozenValue,
-        required_toolchains: Arc<[CanonicalLabel]>,
+        required_toolchains: Arc<[RuleToolchainRequirement]>,
         capability: Arc<RuleCapability>,
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
@@ -1753,34 +1782,94 @@ fn package_output_label(base_package: &str, raw: &str) -> anyhow::Result<Canonic
     Ok(label)
 }
 
-fn rule_toolchain_requirement(
-    values: Option<UnpackList<&str>>,
-    eval: &Evaluator<'_, '_, '_>,
-) -> anyhow::Result<Arc<[CanonicalLabel]>> {
-    let values = values.map_or_else(Vec::new, |values| values.items);
-    if values.is_empty() {
-        return Ok(Arc::from([]));
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct StarlarkToolchainTypeRequirement(RuleToolchainRequirement);
+
+impl fmt::Display for StarlarkToolchainTypeRequirement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("config_common.toolchain_type")
     }
+}
+
+starlark::starlark_simple_value!(StarlarkToolchainTypeRequirement);
+
+#[starlark_value(type = "toolchain_type")]
+impl<'v> StarlarkValue<'v> for StarlarkToolchainTypeRequirement {
+    fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match name {
+            "toolchain_type" => Some(heap.alloc_simple(StarlarkLabel::new(self.0.label.clone()))),
+            "mandatory" => Some(Value::new_bool(self.0.mandatory)),
+            _ => None,
+        }
+    }
+}
+
+fn direct_rule_toolchain_label(
+    value: &str,
+    source: &BzlModuleIdentity,
+) -> anyhow::Result<CanonicalLabel> {
+    let target = value.rsplit_once(':').map(|(_, target)| target);
+    let recursive = target.is_none() && (value == "..." || value.ends_with("/..."));
+    if recursive || matches!(target, Some("all" | "all-targets" | "*")) {
+        anyhow::bail!("rule(toolchains = ...) requires a direct target label: {value}");
+    }
+    if value.starts_with("@@") {
+        CanonicalLabel::parse(value).map_err(anyhow::Error::msg)
+    } else if value.starts_with('@') || value.starts_with("//") || value.starts_with(':') {
+        resolve_label(value, source)
+    } else {
+        let provisional = package_context_label(source.label.package().package().as_str(), value)?;
+        let repo = source.label.package().repo();
+        if repo.is_root() {
+            Ok(provisional)
+        } else {
+            provisional
+                .rebind_provisional_root_repository(repo)
+                .map_err(anyhow::Error::msg)
+        }
+    }
+}
+
+fn rule_toolchain_requirement(
+    value: Option<Value>,
+    eval: &Evaluator<'_, '_, '_>,
+) -> anyhow::Result<Arc<[RuleToolchainRequirement]>> {
+    let Some(value) = value else {
+        return Ok(Arc::from([]));
+    };
+    let values = ListRef::from_value(value)
+        .ok_or_else(|| anyhow::anyhow!("rule(toolchains = ...) requires a list"))?;
     let context = BzlEvaluationContext::from_evaluator(eval)?;
     let source = context.source_identity_for_call(eval)?;
-    values
-        .iter()
-        .map(|value| {
-            let target = value.rsplit_once(':').map(|(_, target)| target);
-            let recursive = target.is_none() && (*value == "..." || value.ends_with("/..."));
-            if recursive || matches!(target, Some("all" | "all-targets" | "*")) {
-                anyhow::bail!("rule(toolchains = ...) requires a direct target label: {value}");
+    let mut requirements = Vec::with_capacity(values.len());
+    let mut labels = SmallSet::new();
+    for value in values.iter() {
+        let requirement = if let Some(value) = StarlarkToolchainTypeRequirement::from_value(value) {
+            value.0.clone()
+        } else if let Some(value) = StarlarkLabel::from_value(value) {
+            RuleToolchainRequirement {
+                label: value.canonical().clone(),
+                mandatory: true,
             }
-            if value.starts_with("@@") {
-                CanonicalLabel::parse(value).map_err(anyhow::Error::msg)
-            } else if value.starts_with('@') {
-                resolve_label(value, source)
-            } else {
-                package_context_label(source.label.package().package().as_str(), value)
+        } else if let Some(value) = value.unpack_str() {
+            RuleToolchainRequirement {
+                label: direct_rule_toolchain_label(value, source)?,
+                mandatory: true,
             }
-        })
-        .collect::<anyhow::Result<Vec<_>>>()
-        .map(Into::into)
+        } else {
+            anyhow::bail!(
+                "rule(toolchains = ...) entries must be Strings, Labels, or toolchain_type values"
+            );
+        };
+        if !labels.insert(requirement.label.clone()) {
+            anyhow::bail!(
+                "duplicate rule toolchain requirement is not supported: {}",
+                requirement.label
+            );
+        }
+        requirements.push(requirement);
+    }
+    Ok(requirements.into())
 }
 
 fn aspect_toolchain_requirement(
@@ -2407,7 +2496,7 @@ fn coerce_starlark_value(
 struct RuleDefinitionGen<V> {
     implementation: V,
     #[trace(unsafe_ignore)]
-    required_toolchains: Arc<[CanonicalLabel]>,
+    required_toolchains: Arc<[RuleToolchainRequirement]>,
     #[trace(unsafe_ignore)]
     schema: Arc<[RuleAttributeSchemaGen<V>]>,
     executable: bool,
@@ -2422,7 +2511,7 @@ struct RuleDefinitionGen<V> {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct FrozenRuleDefinition {
     implementation: FrozenValue,
-    required_toolchains: Arc<[CanonicalLabel]>,
+    required_toolchains: Arc<[RuleToolchainRequirement]>,
     pub(crate) schema: Arc<[FrozenRuleAttributeSchema]>,
     capability: Arc<RuleCapability>,
     pub(crate) build_setting_kind: Option<BuildSettingKind>,
@@ -2444,7 +2533,7 @@ impl fmt::Display for FrozenRuleDefinition {
 
 impl FrozenRuleDefinition {
     #[cfg(test)]
-    pub(crate) fn required_toolchains(&self) -> &[CanonicalLabel] {
+    pub(crate) fn required_toolchains(&self) -> &[RuleToolchainRequirement] {
         &self.required_toolchains
     }
 
@@ -2454,6 +2543,13 @@ impl FrozenRuleDefinition {
     }
 
     fn reject_deferred_attribute_invocation(&self) -> anyhow::Result<()> {
+        if self
+            .required_toolchains
+            .iter()
+            .any(|requirement| !requirement.mandatory)
+        {
+            anyhow::bail!("optional rule toolchain requirements are not supported at invocation");
+        }
         if let Some(attribute) = self
             .schema
             .iter()
@@ -4317,6 +4413,47 @@ impl<'v> StarlarkValue<'v> for AttrModule {
 }
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct ConfigCommonModule;
+starlark::starlark_simple_value!(ConfigCommonModule);
+impl fmt::Display for ConfigCommonModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("config_common")
+    }
+}
+
+#[starlark_module]
+fn config_common_methods(builder: &mut MethodsBuilder) {
+    fn toolchain_type<'v>(
+        #[starlark(this)] _config_common: Value<'v>,
+        name: Value<'v>,
+        #[starlark(require = named, default = true)] mandatory: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<StarlarkToolchainTypeRequirement> {
+        let label = if let Some(label) = StarlarkLabel::from_value(name) {
+            label.canonical().clone()
+        } else if let Some(raw) = name.unpack_str() {
+            let source =
+                BzlEvaluationContext::from_evaluator(eval)?.source_identity_for_call(eval)?;
+            resolve_label(raw, source)?
+        } else {
+            anyhow::bail!("config_common.toolchain_type() takes a Label or String");
+        };
+        Ok(StarlarkToolchainTypeRequirement(RuleToolchainRequirement {
+            label,
+            mandatory,
+        }))
+    }
+}
+
+#[starlark_value(type = "config_common")]
+impl<'v> StarlarkValue<'v> for ConfigCommonModule {
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(config_common_methods)
+    }
+}
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct ConfigModule;
 starlark::starlark_simple_value!(ConfigModule);
 impl fmt::Display for ConfigModule {
@@ -5143,7 +5280,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         implementation: Value<'v>,
         attrs: Option<SmallMap<String, Value<'v>>>,
         build_setting: Option<Value<'v>>,
-        toolchains: Option<UnpackList<&str>>,
+        toolchains: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(default = false)] executable: bool,
         #[starlark(default = false)] test: bool,
@@ -5591,6 +5728,7 @@ fn complete_loading_globals(extensions: &[LibraryExtension], bool_config: bool) 
     globals.set("attr", AttrModule);
     if bool_config {
         globals.set("config", ConfigModule);
+        globals.set("config_common", ConfigCommonModule);
         aspect_globals(&mut globals);
         cc_common_globals(&mut globals);
         label_globals(&mut globals);
