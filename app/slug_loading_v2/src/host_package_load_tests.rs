@@ -78,6 +78,8 @@ use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
+use starlark::values::ValueLike;
+use starlark::values::list::FrozenListRef;
 use starlark::values::structs::StructRef;
 use starlark_map::small_map::SmallMap;
 
@@ -106,7 +108,9 @@ use crate::LoadingPreparationOutcome;
 use crate::RootPackageLoadKey;
 use crate::cycle_detector::bzl_load_cycle_detector;
 use crate::package::BuildSettingKind;
+use crate::package::FrozenAspectDefinition;
 use crate::package::FrozenRuleDefinition;
+use crate::provider::BzlEvaluationContext;
 use crate::provider::FrozenUserProviderCallable;
 
 fn workspace() -> NormalizedAbsolutePath {
@@ -2449,10 +2453,121 @@ async fn external_bzl_module_freezes_typed_bazel_config_definitions() {
         AttributeKind::StringList
     );
 }
-fn evaluate_config_global(source: &str, globals: &Globals) -> Result<(), String> {
+
+#[tokio::test]
+async fn external_bzl_module_freezes_and_imports_fixed_aspect_definition() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "root.bzl",
+            b"load(\":support.bzl\", \"rust_analyzer_aspect\", \"UNEXPORTED\")\nIMPORTED = rust_analyzer_aspect\nNESTED = UNEXPORTED\n",
+        ),
+        (
+            "support.bzl",
+            b"def _impl(target, ctx): return []\nrust_analyzer_aspect = aspect(attr_aspects = [\"srcs\", \"deps\", \"proc_macro_deps\", \"crate\", \"actual\", \"proto\"], implementation = _impl, toolchains = [\"//rust:toolchain_type\"], doc = \"Rust analyzer\")\nUNEXPORTED = [aspect(implementation = _impl)]\n",
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, 400).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+    let module = &external_terminal(&outcome).module;
+    let imported = module.get("IMPORTED").unwrap();
+    let aspect = imported.downcast::<FrozenAspectDefinition>().unwrap();
+    assert_eq!(
+        aspect.attr_aspects.join(","),
+        "srcs,deps,proc_macro_deps,crate,actual,proto"
+    );
+    assert_eq!(
+        aspect.required_toolchain.as_ref().unwrap(),
+        &CanonicalLabel::parse("@@dep+//rust:toolchain_type").unwrap()
+    );
+    assert_eq!(
+        aspect.defining_label,
+        CanonicalLabel::parse("@@dep+//:support.bzl").unwrap()
+    );
+    assert_eq!(
+        aspect.exported_name.as_deref().unwrap(),
+        "rust_analyzer_aspect"
+    );
+    let nested = FrozenListRef::from_value(module.get("NESTED").unwrap().value()).unwrap();
+    let nested = nested[0].downcast_ref::<FrozenAspectDefinition>().unwrap();
+    assert!(nested.exported_name.is_none());
+}
+
+#[test]
+fn bazel_aspect_definition_validates_admitted_fixed_abi_and_build_absence() {
+    eval_global(
+        "def impl(target, ctx): return []\nNAMED=aspect(implementation=impl)\nPOSITIONAL=aspect(impl, attr_aspects=[])\nNESTED=[aspect(implementation=impl)]",
+        &loading_globals(),
+    )
+    .unwrap();
+    for source in [
+        "A=aspect(implementation=print)",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, attr_aspects=['*', 'deps'])",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, toolchains=['//:one', '//:two'])",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, doc=1)",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, provides=[])",
+    ] {
+        assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
+    }
+    let error = eval_global(
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl)",
+        &build_file_loading_globals(),
+    )
+    .unwrap_err();
+    assert!(error.contains("aspect"), "{error}");
+    let error = eval_global(
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, toolchains=[str(Label('//rust:toolchain_type'))])",
+        &loading_globals(),
+    )
+    .unwrap_err();
+    assert!(
+        error.contains("Label") && error.contains("not found"),
+        "{error}"
+    );
+}
+
+#[tokio::test]
+async fn repository_package_rejects_bzl_aspect_factory_in_build_context() {
+    let files: &[(&str, &[u8])] = &[
+        ("BUILD.bazel", b"load(\":defs.bzl\", \"make_aspect\")\nBLOCKED = make_aspect()\n"),
+        ("defs.bzl", b"def _impl(target, ctx): return []\ndef make_aspect(): return aspect(implementation = _impl)\n"),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, 401).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    assert!(repository_package_error(&outcome).contains("aspect may only be called in a .bzl"));
+}
+
+fn eval_global(source: &str, globals: &Globals) -> Result<(), String> {
     let ast = AstModule::parse("BUILD.bazel", source.to_owned(), &Dialect::Bazel).unwrap();
     let module = Module::new();
-    Evaluator::new(&module)
+    let context = BzlEvaluationContext::new("//:defs.bzl");
+    let mut evaluator = Evaluator::new(&module);
+    evaluator.extra = Some(&context);
+    evaluator
         .eval_module(ast, globals)
         .map(|_| ())
         .map_err(|error| error.to_string())
@@ -2469,10 +2584,10 @@ fn bazel_config_typed_descriptors_are_bzl_only_and_require_supported_flags() {
         "X=config.string_list(flag=False)",
         "X=config.string_list(True)",
     ] {
-        let error = evaluate_config_global(source, &bzl).unwrap_err();
+        let error = eval_global(source, &bzl).unwrap_err();
         assert!(error.contains("supported") || error.contains("positional"));
     }
-    evaluate_config_global(
+    eval_global(
         "L=config.string_list(flag=True)\nE=config.string_list(flag=True, repeatable=False)\nR=config.string_list(flag=True, repeatable=True)",
         &bzl,
     )
@@ -2488,7 +2603,7 @@ fn bazel_config_typed_descriptors_are_bzl_only_and_require_supported_flags() {
             "string_list",
         ),
     ] {
-        let error = evaluate_config_global(source, &build).unwrap_err();
+        let error = eval_global(source, &build).unwrap_err();
         assert!(error.contains(missing), "{error}");
     }
 }

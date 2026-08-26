@@ -1764,6 +1764,34 @@ fn rule_toolchain_requirement(
         .map(Into::into)
 }
 
+fn aspect_toolchain_requirement(
+    values: Option<UnpackList<&str>>,
+    defining_label: &CanonicalLabel,
+) -> anyhow::Result<Option<CanonicalLabel>> {
+    let values = values.map_or_else(Vec::new, |values| values.items);
+    let raw = match values.as_slice() {
+        [] => return Ok(None),
+        [raw] => *raw,
+        _ => anyhow::bail!(
+            "the admitted aspect(toolchains = ...) slice requires at most one target label"
+        ),
+    };
+    let provisional = package_context_label(defining_label.package().package().as_str(), raw)
+        .map_err(|_| {
+            anyhow::anyhow!(
+                "aspect(toolchains = ...) requires a direct label in the defining repository: {raw}"
+            )
+        })?;
+    if defining_label.package().repo().is_root() {
+        Ok(Some(provisional))
+    } else {
+        provisional
+            .rebind_provisional_root_repository(defining_label.package().repo())
+            .map(Some)
+            .map_err(anyhow::Error::msg)
+    }
+}
+
 fn package_global(
     default_visibility: Option<UnpackListOrTuple<&str>>,
     default_deprecation: Option<&str>,
@@ -2447,6 +2475,85 @@ impl<'v> StarlarkValue<'v> for RuleDefinition<'v> {
             "rule() definitions may only be called after their .bzl module is frozen"
         )))
     }
+}
+
+/// The declaration returned by Bazel's `aspect()` global while its defining
+/// `.bzl` module is still evaluating. Aspect implementations are retained for
+/// later analysis, but loading never executes them.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
+struct AspectDefinitionGen<V> {
+    implementation: V,
+    #[trace(unsafe_ignore)]
+    attr_aspects: Arc<[CompactString]>,
+    #[trace(unsafe_ignore)]
+    required_toolchain: Option<CanonicalLabel>,
+    #[trace(unsafe_ignore)]
+    defining_label: CanonicalLabel,
+    #[trace(unsafe_ignore)]
+    exported_name: OnceCell<CompactString>,
+}
+
+/// Frozen aspect identity owned by the defining Bzl module. Imported aliases
+/// preserve this producer identity instead of acquiring an importer identity.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+#[allow(dead_code)] // Retained now; configured-aspect consumers are deliberately deferred.
+pub(crate) struct FrozenAspectDefinition {
+    implementation: FrozenValue,
+    pub(crate) attr_aspects: Arc<[CompactString]>,
+    pub(crate) required_toolchain: Option<CanonicalLabel>,
+    pub(crate) defining_label: CanonicalLabel,
+    pub(crate) exported_name: Option<CompactString>,
+}
+
+type AspectDefinition<'v> = AspectDefinitionGen<Value<'v>>;
+
+impl<V> fmt::Display for AspectDefinitionGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<aspect>")
+    }
+}
+
+impl fmt::Display for FrozenAspectDefinition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<aspect>")
+    }
+}
+
+starlark::starlark_complex_values!(AspectDefinition);
+
+impl<'v> Freeze for AspectDefinition<'v> {
+    type Frozen = FrozenAspectDefinition;
+
+    fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
+        Ok(FrozenAspectDefinition {
+            implementation: self.implementation.freeze(freezer)?,
+            attr_aspects: self.attr_aspects,
+            required_toolchain: self.required_toolchain,
+            defining_label: self.defining_label,
+            exported_name: self.exported_name.into_inner(),
+        })
+    }
+}
+
+#[starlark_value(type = "aspect")]
+impl<'v> StarlarkValue<'v> for AspectDefinition<'v> {
+    type Canonical = FrozenAspectDefinition;
+
+    fn export_as(
+        &self,
+        variable_name: &str,
+        _eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<()> {
+        if self.exported_name.get().is_none() {
+            let _ = self.exported_name.set(variable_name.into());
+        }
+        Ok(())
+    }
+}
+
+#[starlark_value(type = "aspect")]
+impl<'v> StarlarkValue<'v> for FrozenAspectDefinition {
+    type Canonical = Self;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -4560,6 +4667,51 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     }
 }
 
+#[starlark_module]
+fn aspect_globals(builder: &mut GlobalsBuilder) {
+    fn aspect<'v>(
+        implementation: Value<'v>,
+        #[starlark(require = named)] attr_aspects: Option<UnpackList<&str>>,
+        #[starlark(require = named)] toolchains: Option<UnpackList<&str>>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AspectDefinition<'v>> {
+        if implementation.parameters_spec().is_none() {
+            anyhow::bail!("aspect implementation must be a Starlark function");
+        }
+        if doc.is_some_and(|value| !value.is_none() && value.unpack_str().is_none()) {
+            anyhow::bail!("aspect doc must be a string or None");
+        }
+        let attr_aspects: Arc<[CompactString]> = attr_aspects
+            .map_or_else(Vec::new, |values| values.items)
+            .into_iter()
+            .map(CompactString::new)
+            .collect::<Vec<_>>()
+            .into();
+        if attr_aspects.len() != 1 && attr_aspects.iter().any(|name| name == "*") {
+            anyhow::bail!("'*' must be the only string in 'attr_aspects' list");
+        }
+        let context = BzlEvaluationContext::from_evaluator(eval)
+            .map_err(|_| anyhow::anyhow!("aspect may only be called in a .bzl module"))?;
+        let source_label = context.source_label();
+        let canonical_source = if source_label.starts_with("@@") {
+            source_label.to_owned()
+        } else {
+            format!("@@{source_label}")
+        };
+        let defining_label =
+            CanonicalLabel::parse(&canonical_source).map_err(anyhow::Error::msg)?;
+        let required_toolchain = aspect_toolchain_requirement(toolchains, &defining_label)?;
+        Ok(AspectDefinitionGen {
+            implementation,
+            attr_aspects,
+            required_toolchain,
+            defining_label,
+            exported_name: OnceCell::new(),
+        })
+    }
+}
+
 fn is_repository_rule_attribute_name(name: &str) -> bool {
     name.bytes()
         .enumerate()
@@ -4830,6 +4982,7 @@ fn complete_loading_globals(extensions: &[LibraryExtension], bool_config: bool) 
     globals.set("attr", AttrModule);
     if bool_config {
         globals.set("config", ConfigModule);
+        aspect_globals(&mut globals);
     } else {
         globals.set("config", BuildFileConfigModule);
     }
