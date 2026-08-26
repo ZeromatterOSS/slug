@@ -1,164 +1,111 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-run-environment-info-declaration-global-loading`
+Packet: `WP-4-7A-post-run-environment-info-clippy-tail-audit`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: install the fixed `.bzl` `RunEnvironmentInfo` declaration token needed
-to compile the exact rules_rust lint-test helper module, prove that module
-freezes without invoking its helpers, and stop before the clippy-test tail.
+Result: replay the now-complete lint-test child return into rules_rust
+`rust/private/clippy.bzl`, authenticate every remaining evaluated declaration
+through line 596, identify the first unsupported expression or prove the tail
+freezes, and select one bounded implementation or `REPLAN`. This is docs-only.
 
-## Accepted starting point and source stop
+## Accepted starting point and audit horizon
 
-Base is `37aeab638` (`Audit post-rust_clippy source frontier`); implementation
-state is clean `993ba5e4`. The accepted source-shaped rustfmt proof recreated
-`LINT_TEST_COMMON_ATTRS`, `platform_transition` and deliberately failing helper
-bodies inside `rustfmt.bzl`; it did not compile the real defining
-`rust/private/lint_test.bzl` helper bodies.
+Base is `45b479e56` (`Load RunEnvironmentInfo declaration global`). Exact
+rules_rust 0.73.0 `rust/private/lint_test.bzl` now compiles and freezes through
+line 159 with all four `clippy.bzl:19-25` imports pointer-identical to their
+defining child exports. Neither helper nor any native-provider constructor
+executes.
 
-The real clippy module loads `//rust/private:lint_test.bzl` at
-`clippy.bzl:19-25` before evaluating `RustClippyTestInfo` at line 463. The
-defining module has no child loads. Its `lint_test_aspect_impl` resolves the now
-accepted `OutputGroupInfo` and `depset` names at lines 82-100. Its
-`lint_test_rule_impl` then resolves `DefaultInfo` and `depset`, but compilation
-first stops at absent `RunEnvironmentInfo` on line 154. The following
-`OutputGroupInfo` call at line 158 is already name-resolvable and remains lazy.
+The authenticated source hashes remain:
 
-The authenticated sources are:
-
-- rules_rust 0.73.0 `rust/private/lint_test.bzl`, lines 1-159, SHA-256
+- `lint_test.bzl`:
   `4f4fade9218980db0296f99e5d199059c91ebebc7b9745bee18ad58c37b551c8`;
-- `rust/private/clippy.bzl`, lines 19-25 and 463-596, SHA-256
-  `a778d2ddc77587ffbffc72efcdaa458a1ffae0763e500da1c876b9b567b2a686`;
-- `rust/private/rustfmt.bzl`, SHA-256
-  `71ad2f08f5cf2d7a88ee983339c4371309d2ef2b0c407dcc1266bbe83155fb7a`.
+- `clippy.bzl`:
+  `a778d2ddc77587ffbffc72efcdaa458a1ffae0763e500da1c876b9b567b2a686`.
 
-Admit the fixed declaration and exact helper compilation through
-`lint_test.bzl:159`. Stop when the child returns to `clippy.bzl`; do not
-evaluate or claim the remaining line 463-596 tail in this packet.
+After the child returns, audit `clippy.bzl:463-596` strictly in source order:
 
-## Fixed behavior and architecture authorities
+- `RustClippyTestInfo`, a documented two-field provider;
+- `_CLIPPY_OUTPUT_GROUPS`, a two-string immutable list;
+- two lazy helpers using the four authenticated child exports;
+- `_rust_clippy_test_aspect`, requiring the accepted clippy aspect and
+  advertising `RustClippyTestInfo`;
+- `rust_clippy_test`, merging the child-owned common attrs with one
+  provider/aspect/transition-bearing `targets` label list;
+- `capture_clippy_output` and `clippy_output_diagnostics`, each using a Boolean
+  build-setting descriptor and an imported provider in its lazy helper.
+
+Stop at the first unsupported evaluated expression. Similarity to the accepted
+rustfmt/config/provider shapes is evidence to inspect, not proof of closure.
+
+## Authorities and required audit
 
 Bazel 9.2 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` is sole behavior authority. The
-object is locally available and must be read explicitly with `git show`; do not
-change the clean `../bazel` checkout from its current unrelated commit.
+`8220c6198837d5c13d53fea211cf3282aa12408a` remains sole behavior authority.
+Read the locally available object explicitly with `git show` without changing
+the clean `../bazel` checkout. Reuse already-pinned provider, aspect, rule,
+attribute, transition, dictionary and build-setting evidence only after
+showing each live expression uses the same contract and producer identity.
 
-- `StarlarkGlobalsImpl.getFixedBzlToplevels:91-107` installs
-  `RunEnvironmentInfo.PROVIDER` beside `DefaultInfo.PROVIDER` and
-  `OutputGroupInfo.STARLARK_CONSTRUCTOR`; fixed BUILD globals omit it.
-- `RunEnvironmentInfo:36-104` defines one singleton native provider whose
-  constructor owns fixed and inherited environment values.
-- `RunEnvironmentInfoApi:35-109` gives the provider its public name and
-  callable constructor schema.
-- `BuiltinProvider:39-101` makes the concrete provider class authoritative for
-  equality/key identity and renders it as `<function RunEnvironmentInfo>`.
-- Starlark's module scope resolver checks names in function bodies during
-  compilation, before a helper can be invoked.
+Inspect live Slug owners and accepted proofs for:
+
+- documented provider schema and defining-module provider identity;
+- immutable top-level list freezing;
+- aspect `requires`/`provides`, export identity and complete required-aspect
+  closure;
+- exact `dict(base, **overlay)` ordering and child-owned base values;
+- label-list provider alternatives, attached aspect and custom transition;
+- test-rule capability and both `config.bool(flag = True)` definitions;
+- every imported provider/helper identity used by lazy function bodies;
+- fail-closed BUILD target invocation before configured metadata is dropped.
 
 Clean `../zabel` commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` is architecture guidance only. Its
-`BuiltinProviderId.run_environment_info`, native/starlark provider-identity
-split, one provider-definition owner and separate loading binding support a
-distinct declaration token rather than a user-provider ID or generic analysis
-callable. Copy no Zig code, discriminant, enum layout, constructor, provider
-value, configured lowering, test-environment behavior, diagnostic or hash.
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` is architecture guidance only.
+Consult its single declaration-owned provider/attribute/aspect/rule definitions
+and detached consumer projections only to decide reuse and phase boundaries.
+Copy no Zig code, representation, provider value, configured capture,
+transition, action, diagnostic or behavior. Bazel 9.2 decides compatibility.
 
-## Decision and compatibility
+## Compatibility questions
 
-Add a dedicated zero-state `RunEnvironmentInfo` native-provider declaration
-value beside `OutputGroupInfo` in Slug's loading provider owner. Its concrete
-Rust Starlark type supplies Slug-native internal separation from both the
-existing native token and module/export-owned user providers. It displays
-exactly as `<function RunEnvironmentInfo>`, freezes without evaluator state and
-fails closed on every invocation before producing a value.
+Classify any selected closure explicitly:
 
-Install it only in complete `.bzl` globals (`bool_config = true`), not BUILD
-globals. The exact lint-test helpers may resolve and capture the token, but
-must not execute during loading.
+- **Exact candidate:** source-order loading/freeze of declarations whose Bazel
+  contract and producer/import identities are fully authenticated.
+- **Slug-native candidate:** existing Rust frozen values, Arc ownership and
+  admitted fail-closed invocation boundaries.
+- **Unsupported/deferred:** helper/rule/aspect execution; constructed
+  `OutputGroupInfo` or `RunEnvironmentInfo`; configured provider matching,
+  aspect application, transition, test runner/actions/runfiles; build-setting
+  configured values; and any expression after the proven stop.
 
-- **Exact:** fixed `.bzl` placement and BUILD absence; exact printable
-  representation; evaluator-free name resolution/capture; source-order
-  compilation and recursive export of exact `lint_test.bzl` through line 159.
-- **Slug-native:** the zero-sized Rust declaration token and its fail-closed
-  invocation boundary; distinct concrete Rust types provide internal native
-  declaration separation within the admitted loading slice.
-- **Unsupported/deferred:** every `RunEnvironmentInfo(...)` construction,
-  including empty/default construction; observable provider equality and
-  hashability; environment/inherited-environment validation or values;
-  `testing.TestEnvironment`; configured provider return/lowering; executable
-  and test environment behavior; all helper execution, actions, runfiles,
-  depsets and output-group values; configured aspect/provider/transition
-  semantics; and all `clippy.bzl:463-596` declarations.
+## Allowlist and deliverable
 
-The Buck2 utility review selects the existing zero-state `Allocative` simple
-value pattern. No collection, string, slice, interner, cache, clone path, hash
-owner, graph storage or memory ledger changes; no Stage 9 ledger update.
+Only these documentation files may change:
 
-## Allowlist, proof and caps
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md`;
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`;
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
 
-Only these files may change:
+The deliverable must record exact selected-source lines and producer identities,
+the first unsupported evaluated expression or proof of tail closure, Bazel
+anchors and existing Slug owners, the precise Zabel guidance used/excluded, a
+Buck2 retained-memory review if representation changes are proposed, and one
+bounded implementation packet with hashes/caps/proof/serial validation/review
+or `REPLAN`.
 
-| File | Base SHA-256 | Base lines | Final ceiling |
-|---|---|---:|---:|
-| `app/slug_loading_v2/src/provider.rs` | `319fb513cd6450d6f26e2471dd5429b2f22feebf12e6b083075cf7f5a6673ec4` | 990 | 1,025 |
-| `app/slug_loading_v2/src/package.rs` | `9a09888463baffa893514ce54b0f0f675085839c573fafbebd512ed61a63329d` | 6,185 | 6,205 |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `650589be17c52a6bced33271e495c48d699880bf71e5c4cc7e21b9b3876e837d` | 6,918 | 7,148 |
+No Cargo, daemon, oracle or smoke run is required. Run `git diff --check` and
+`scripts/v2_archive_status.sh`; only its three known archive-only misses may
+remain.
 
-Caps are 35 production, 220 proof and 255 total additions; deletions do not buy
-addition budget. No new function may exceed 120 lines; keep the 159-line
-source fixture in a module constant.
-
-Required proof:
-
-1. Prove the fixed token resolves and freezes in `.bzl`, is absent from BUILD,
-   renders exactly as `<function RunEnvironmentInfo>`, downcasts to its
-   dedicated native type rather than `OutputGroupInfo` or a user provider, and
-   rejects invocation before producing a value. Assert no equality/hash parity.
-2. Recursively load an exact, unabridged `lint_test.bzl` child through a parent
-   using the exact `clippy.bzl:19-25` four-symbol load. Preserve all lines
-   1-159, including `rlocationpath`, both helper bodies, common attributes,
-   transition and provider constructions; do not abbreviate or stub any
-   body/global.
-3. Prove the parent imports the child-owned `LINT_TEST_COMMON_ATTRS`,
-   `platform_transition`, `lint_test_aspect_impl` and `lint_test_rule_impl`
-   values, and that both helpers freeze without invocation. The proof must
-   retain the exact `RunEnvironmentInfo(environment = {...})` expression, the
-   preceding `DefaultInfo` and following `OutputGroupInfo` expressions, so
-   source order and global resolution remain discriminating. Do not reconstruct
-   common attributes or the transition in the parent.
-4. Preserve all accepted lint common-attribute, transition, rustfmt and clippy
-   proofs. Do not append `RustClippyTestInfo` or another clippy-tail declaration.
-
-No new oracle is needed: pinned Bazel source fixes the native global contract,
-and the exact rules_rust source extract discriminates the live boundary.
-
-## Serial validation and STOP
-
-Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
-`CARGO_BUILD_JOBS=1`:
-
-- focused `RunEnvironmentInfo` and exact lint-test helper-freeze proofs;
-- `cargo test -p slug_loading_v2 --lib --locked`;
-- `cargo test -p slug_loading_v2 --test bzl_invalidation --locked`;
-- `cargo test -p slug_loading_v2 --test build_file_loading --locked`;
-- `cargo check --locked -p slug_analysis_v2 -p slug_core_v2`;
-- `cargo build -p slug_cli_v2 --locked` before any rebuilt-binary smoke;
-- `cargo fmt --all -- --check`, `git diff --check`, and
-  `scripts/v2_archive_status.sh` with only its three known archive-only misses.
-
-Independent terminal review must verify the recursive source stop, fixed-global
-authority, native/user/OutputGroupInfo separation, constructor nonactivation,
-compatibility boundary, exact excluded clippy tail, Zabel guidance-only role,
-utility decision, validation and caps.
-
-STOP and `REPLAN` for a constructed provider value; observable provider
-equality/hash; a shared generic native-provider framework; configured
-provider/test/environment/aspect/transition/action work; helper execution;
-evaluation of the clippy tail; DICE or analysis changes; Java/JVM work; copied
-Zabel content; another file; dirty authority; or a cap violation.
+STOP and `REPLAN` for Rust/test edits; dirty authority; helper execution;
+constructed native provider values; configured provider/aspect/transition/test
+or action semantics; Java/JVM work; copied Zabel content; skipped source order;
+an unauthenticated imported module; invented parity; or an unbounded packet.
 
 ## Immediate predecessor
 
-`37aeab638` selected the source-order audit after `993ba5e4` accepted the fixed
-`OutputGroupInfo` declaration and `rust_clippy` closure.
+`45b479e56` accepted the distinct fixed `.bzl` `RunEnvironmentInfo` token and
+exact unabridged lint-test child freeze with full validation and terminal review.

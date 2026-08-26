@@ -5247,6 +5247,36 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### RunEnvironmentInfo declaration and exact lint-test child accepted; clippy-tail audit selected (2026-08-26)
+
+Commit `45b479e56` adds a dedicated zero-state `RunEnvironmentInfo` token only
+to complete `.bzl` globals. It renders exactly as
+`<function RunEnvironmentInfo>`, is distinct from the existing
+`OutputGroupInfo` token and user providers, remains absent from BUILD globals,
+freezes without evaluator state, and rejects every invocation before producing
+a value. Constructor values, fields, equality/hash and configured
+environment/test behavior remain deferred.
+
+An exact unabridged 159-line `rust/private/lint_test.bzl` child with SHA-256
+`4f4fade9218980db0296f99e5d199059c91ebebc7b9745bee18ad58c37b551c8`
+now compiles and freezes. A parent using exact `clippy.bzl:19-25` loads proves
+all four imports are pointer-identical to their child exports, while neither
+helper nor any native-provider constructor executes. All 222 loading units, 24
+invalidation tests, 31 BUILD-loading tests, locked dependent checks, rebuilt
+CLI and hygiene pass. Growth is 28 production and 217 proof additions, 245
+total, within caps; independent terminal review returned `ACCEPT`.
+
+Run only docs audit `WP-4-7A-post-run-environment-info-clippy-tail-audit`.
+Authenticate `clippy.bzl:463-596` and every imported provider/helper identity
+in source order, then select one bounded exact loading closure or `REPLAN`.
+Helper execution and configured provider/aspect/transition/test, build-setting
+and action behavior remain unsupported/deferred.
+
+Clean `../zabel` `0795445f…` guided only the distinct builtin-provider ID and
+declaration-owned loading-binding architecture. No Zig code, representation,
+provider value, constructor, configured lowering, diagnostic or behavior was
+copied. Bazel 9.2 remains sole behavior authority.
+
 ### Post-rust_clippy source audit selects RunEnvironmentInfo global (2026-08-26)
 
 The selected rules_rust 0.73.0 source replay reaches
