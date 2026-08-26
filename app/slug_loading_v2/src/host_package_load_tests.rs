@@ -759,19 +759,19 @@ fn selected_registry_root_package_epoch() -> (PathObservationEpoch, PathObservat
     epoch.materialized_file(
         instance,
         "/registry-dep/defs.bzl",
-        "load(':nested.bzl', 'NESTED_NAME', 'current_rust_analyzer_toolchain')\nprint('SELECTED_BZL')\nSELECTED_NAME=NESTED_NAME\nCURRENT_RULE=current_rust_analyzer_toolchain\n",
+        "load(':nested.bzl', 'NESTED_NAME', 'current_rust_analyzer_toolchain', 'rust_analyzer_detect_sysroot')\nprint('SELECTED_BZL')\nSELECTED_NAME=NESTED_NAME\nCURRENT_RULE=current_rust_analyzer_toolchain\nDETECT_RULE=rust_analyzer_detect_sysroot\n",
         901,
     );
     epoch.materialized_file(
         instance,
         "/registry-dep/nested.bzl",
-        "print('SELECTED_NESTED')\ndef _current_rust_analyzer_toolchain_impl(ctx): fail('implementation must stay lazy')\ncurrent_rust_analyzer_toolchain = rule(doc = 'current', implementation = _current_rust_analyzer_toolchain_impl, toolchains = [str(Label('@rules_rust//rust/rust_analyzer:toolchain_type'))])\nNESTED_NAME='selected_target'\n",
+        "print('SELECTED_NESTED')\ndef _current_rust_analyzer_toolchain_impl(ctx): fail('current implementation must stay lazy')\ncurrent_rust_analyzer_toolchain = rule(doc = 'current', implementation = _current_rust_analyzer_toolchain_impl, toolchains = [str(Label('@rules_rust//rust/rust_analyzer:toolchain_type'))])\ndef _rust_analyzer_detect_sysroot_impl(ctx): fail('detect implementation must stay lazy')\nrust_analyzer_detect_sysroot = rule(doc = 'detect', implementation = _rust_analyzer_detect_sysroot_impl, toolchains = ['@rules_rust//rust:toolchain_type', '@rules_rust//rust/rust_analyzer:toolchain_type'])\nNESTED_NAME='selected_target'\n",
         901,
     );
     (epoch.build(), instance)
 }
 
-async fn assert_selected_rust_analyzer_toolchain(
+async fn assert_selected_rust_analyzer_rules(
     transaction: &mut DiceTransaction,
     route: &RootRepositoryRoute,
 ) {
@@ -782,16 +782,17 @@ async fn assert_selected_rust_analyzer_toolchain(
             .any(|(apparent, canonical)| apparent.as_str() == "rules_rust"
                 && canonical.as_str() == "dep+")
     );
-    let current = transaction
+    let loaded = transaction
         .compute(&observed_external_bzl_key(route.clone(), "", "defs.bzl"))
         .await
         .unwrap();
-    let current = observed_external(&current)
+    let module = &observed_external(&loaded)
         .result()
         .as_ref()
         .as_ref()
         .unwrap()
-        .module
+        .module;
+    let current = module
         .get("CURRENT_RULE")
         .unwrap()
         .downcast::<FrozenRuleDefinition>()
@@ -799,6 +800,18 @@ async fn assert_selected_rust_analyzer_toolchain(
     assert_eq!(
         current.required_toolchains(),
         [CanonicalLabel::parse("@@dep+//rust/rust_analyzer:toolchain_type").unwrap()]
+    );
+    let detect = module
+        .get("DETECT_RULE")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    assert_eq!(
+        detect.required_toolchains(),
+        [
+            CanonicalLabel::parse("@@dep+//rust:toolchain_type").unwrap(),
+            CanonicalLabel::parse("@@dep+//rust/rust_analyzer:toolchain_type").unwrap(),
+        ]
     );
 }
 
@@ -881,7 +894,7 @@ async fn root_package_loads_selected_registry_bzl_through_admitted_route() {
         )])
         .unwrap();
     let mut transaction = updater.commit().await;
-    assert_selected_rust_analyzer_toolchain(&mut transaction, route).await;
+    assert_selected_rust_analyzer_rules(&mut transaction, route).await;
     let key = observed_package_key();
     let cold = transaction.compute(&key).await.unwrap();
     let loaded = observed_package(&cold)
@@ -2730,6 +2743,7 @@ fn bazel_label_rejects_unadmitted_inputs_and_missing_function_provenance() {
         "X = Label('@repo//pkg:target')",
         "X = Label('@@repo//pkg:target')",
         "X = Label(1)",
+        "def impl(ctx): return None\nR = rule(implementation = impl, toolchains = ['@repo//pkg:target'])",
     ] {
         assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
     }
@@ -2775,6 +2789,18 @@ fn bazel_label_rejects_unadmitted_inputs_and_missing_function_provenance() {
     let ast = AstModule::parse(
         "/workspace/owner/defs.bzl",
         "X = Label('@alias//:target')".to_owned(),
+        &Dialect::Bazel,
+    )
+    .unwrap();
+    let module = Module::new();
+    let mut evaluator = Evaluator::new(&module);
+    evaluator.extra = Some(&context);
+    let error = evaluator.eval_module(ast, &loading_globals()).unwrap_err();
+    assert!(error.to_string().contains("ambiguous"), "{error}");
+
+    let ast = AstModule::parse(
+        "/workspace/owner/defs.bzl",
+        "def impl(ctx): return None\nR = rule(implementation = impl, toolchains = ['@alias//:target'])".to_owned(),
         &Dialect::Bazel,
     )
     .unwrap();

@@ -87,6 +87,7 @@ use crate::provider::AnalysisBuiltinCallable;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::UserProviderCallable;
 use crate::starlark_label::label_globals;
+use crate::starlark_label::resolve_label;
 use crate::visibility::PackageGroupContents;
 use crate::visibility::RuleVisibility;
 use crate::visibility::VisibilitySource;
@@ -1760,6 +1761,8 @@ fn rule_toolchain_requirement(
             }
             if value.starts_with("@@") {
                 CanonicalLabel::parse(value).map_err(anyhow::Error::msg)
+            } else if value.starts_with('@') {
+                resolve_label(value, source)
             } else {
                 package_context_label(source.label.package().package().as_str(), value)
             }

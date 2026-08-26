@@ -105,7 +105,10 @@ fn starlark_label_methods(builder: &mut MethodsBuilder) {
     }
 }
 
-fn resolve_label(raw: &str, defining_source: &BzlModuleIdentity) -> anyhow::Result<CanonicalLabel> {
+pub(crate) fn resolve_label(
+    raw: &str,
+    defining_source: &BzlModuleIdentity,
+) -> anyhow::Result<CanonicalLabel> {
     if let Some(rest) = raw.strip_prefix('@') {
         if rest.starts_with('@') {
             anyhow::bail!("canonical Label input is not admitted in this loading slice");
