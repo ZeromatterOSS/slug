@@ -4341,10 +4341,14 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         attrs: Option<SmallMap<String, Value<'v>>>,
         build_setting: Option<Value<'v>>,
         toolchains: Option<UnpackList<&str>>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(default = false)] executable: bool,
         #[starlark(default = false)] test: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<RuleDefinition<'v>> {
+        if doc.is_some_and(|value| !value.is_none() && value.unpack_str().is_none()) {
+            anyhow::bail!("rule doc must be a string or None");
+        }
         let root_string_build_setting = build_setting
             .map(|value| RootStringBuildSetting::from_value(value).is_some())
             .unwrap_or(false);

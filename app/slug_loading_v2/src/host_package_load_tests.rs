@@ -2297,6 +2297,68 @@ async fn external_bzl_module_rejects_non_string_provider_doc() {
 }
 
 #[tokio::test]
+async fn external_bzl_module_accepts_bazel_rule_doc_and_freezes_exports() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "root.bzl",
+            b"load(\":support.bzl\", \"documented_rule\", \"none_rule\")\nDOCUMENTED = documented_rule\nNONE = none_rule\n",
+        ),
+        (
+            "support.bzl",
+            b"def _impl(ctx): return []\ndocumented_rule = rule(implementation = _impl, doc = \"A documented rule.\", build_setting = config.string(flag = True))\nnone_rule = rule(implementation = _impl, doc = None)\n",
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, 395).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+    let module = &external_terminal(&outcome).module;
+    for variable in ["DOCUMENTED", "NONE"] {
+        assert_eq!(module.get(variable).unwrap().value().get_type(), "rule");
+    }
+}
+
+#[tokio::test]
+async fn external_bzl_module_rejects_non_string_rule_doc() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(
+            &[(
+                "root.bzl",
+                b"def _impl(ctx): return []\nbad_rule = rule(implementation = _impl, doc = 1)\n",
+            )],
+            396,
+        )
+        .build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+    let ExternalBzlModuleError::Evaluation { message, .. } = external_error(&outcome) else {
+        panic!("expected evaluation failure");
+    };
+    assert!(
+        message.contains("rule doc must be a string or None"),
+        "{message}"
+    );
+}
+
+#[tokio::test]
 async fn external_bzl_module_retains_canonical_manifest_lifetime_and_local_events() {
     let files: &[(&str, &[u8])] = &[
         (
