@@ -18184,3 +18184,28 @@ root promotion, warm/A/B/A reuse and exact request equality. Split the mixed
 6,140-line `repository_io.rs` archive concern rather than adding generic
 transport/extraction breadth. Zabel guides lifecycle layering only; Bazel 9.2
 owns archive behavior.
+
+### Native archive async/session design accepted (2026-08-25)
+
+Use one service-owned raw Hyper client. Registry retains its current semantics;
+the archive owner alone implements redirects, fallback and streaming.
+Synchronous command progress calls the existing runtime only for HTTP futures,
+exits it before bounded gzip/tar/filesystem work, and then uses the existing
+lock-free materialization callback plus post-I/O token revalidation. Spawn no
+task and hold no lock across I/O or DICE.
+
+Split archive production/proof from the mixed 6,140-line materializer module.
+Transfer buffers/captures and partial roots are command scratch; only a complete
+root becomes provisional, and final accepted validation alone retains it.
+Warm/A/B/A remains request/result/observation driven. Implement only current;
+Zabel guides lifetime layering, while Bazel 9.2 owns behavior.
+
+### Native archive HTTP task-lifecycle correction (2026-08-25)
+
+The shared legacy-client draft is rejected because Hyper spawns connection
+drivers and default DNS can spawn blocking work. Current is docs-only: select
+an archive-private HTTP/1 connector with synchronous command-owned resolution
+and a directly driven, joined connection/body future. Preserve the existing
+lock-free materialization callback, post-I/O token revalidation and provisional
+root lifetime. Do not alter registry behavior or import Zabel scheduling;
+Zabel guides semantic/physical ownership only.

@@ -4001,3 +4001,26 @@ one lawful async transport boundary and one implementation packet. Do not
 erase fields, infer paths, introduce a second materializer or widen generic
 repository rules. Pinned Zabel supplies this semantic/physical ownership
 guidance only; Bazel 9.2 remains behavioral authority.
+
+### Selected-registry BCR archive design accepted (2026-08-25)
+
+The complete Bzlmod `RepoSpec` remains unchanged and structural. A private
+archive plan admits only the exact rules_rust shape: ordered HTTPS URLs,
+SHA-256 SRI, suffix-inferred gzip/tar, empty strip/patch/overlay fields, zero
+patch strip and one independently verified registry MODULE replacement. The
+existing local file/hex-SHA256/tar plan remains a separate exact branch.
+
+Implement only the bounded core packet in current. Nonempty patches/overlays,
+links/special entries, HTTP/auth/proxy and generic repository rules remain
+deferred. Zabel guides semantic-view/physical-realization separation only;
+Bazel 9.2 owns every admitted archive byte and ordering claim.
+
+### Selected-registry BCR HTTP lifecycle correction (2026-08-25)
+
+Independent review rejected the shared legacy-Hyper implementation contract:
+it spawned connection and possible blocking-DNS tasks while claiming none.
+Preserve the accepted complete `RepoSpec` and archive shape, but design an
+archive-only direct HTTP/1 connection. Resolve on the synchronous command
+owner; drive and join the connection/body future inside each runtime entry.
+Registry remains unchanged. Pinned Zabel continues to guide only the separation
+of the producer-owned semantic view from its physical root.
