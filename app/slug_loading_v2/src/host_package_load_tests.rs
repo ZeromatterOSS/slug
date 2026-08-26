@@ -97,6 +97,7 @@ use super::resolve_root_package_direct_load;
 use crate::LoadingPreparationOutcome;
 use crate::RootPackageLoadKey;
 use crate::cycle_detector::bzl_load_cycle_detector;
+use crate::provider::FrozenUserProviderCallable;
 
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
@@ -2230,6 +2231,68 @@ async fn external_bzl_module_evaluates_recursive_bazel_keyword_only_structs() {
             ("std".to_owned(), Some(true)),
             ("host_tools".to_owned(), Some(false))
         ]
+    );
+}
+
+#[tokio::test]
+async fn external_bzl_module_accepts_bazel_provider_doc_and_freezes_exports() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "root.bzl",
+            b"load(\":support.bzl\", \"DocumentedInfo\", \"NoneInfo\")\nDOCUMENTED = DocumentedInfo\nNONE = NoneInfo\n",
+        ),
+        (
+            "support.bzl",
+            b"DocumentedInfo = provider(\n    doc = \"A documented \" + \"provider.\",\n    fields = {\"value\": \"String value.\"},\n)\nNoneInfo = provider(doc = None, fields = {})\n",
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, 393).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+    let module = &external_terminal(&outcome).module;
+    for (variable, exported_name) in [("DOCUMENTED", "DocumentedInfo"), ("NONE", "NoneInfo")] {
+        let exported = module.get(variable).unwrap();
+        let callable = FrozenUserProviderCallable::from_value(exported.value()).unwrap();
+        assert_eq!(callable.id().source_label(), "@@dep+//:support.bzl");
+        assert_eq!(callable.id().exported_name(), exported_name);
+    }
+}
+
+#[tokio::test]
+async fn external_bzl_module_rejects_non_string_provider_doc() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(
+            &[("root.bzl", b"BadInfo = provider(doc = 1, fields = {})\n")],
+            394,
+        )
+        .build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+    let ExternalBzlModuleError::Evaluation { message, .. } = external_error(&outcome) else {
+        panic!("expected evaluation failure");
+    };
+    assert!(
+        message.contains("provider doc must be a string or None"),
+        "{message}"
     );
 }
 

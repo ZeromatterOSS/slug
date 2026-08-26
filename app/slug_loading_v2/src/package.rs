@@ -4402,9 +4402,13 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     }
 
     fn provider(
+        #[starlark(require = named)] doc: Option<Value<'_>>,
         #[starlark(require = named)] fields: SmallMap<String, String>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<UserProviderCallable> {
+        if doc.is_some_and(|value| !value.is_none() && value.unpack_str().is_none()) {
+            anyhow::bail!("provider doc must be a string or None");
+        }
         UserProviderCallable::from_evaluator(fields, eval)
     }
     fn transition<'v>(
