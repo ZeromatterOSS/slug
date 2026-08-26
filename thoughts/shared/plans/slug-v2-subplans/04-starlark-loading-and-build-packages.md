@@ -4342,6 +4342,42 @@ Slug-native; `Label`, the complete live expression, application plus
 Boolean/StringList targets and analysis/CLI, M8/M7B and exact output bytes
 remain deferred.
 
+### Second rustfmt aspect accepted; test-aspect provides audit selected (2026-08-26)
+
+Commit `275e0b24` reuses the frozen rule-attribute schema for exactly
+`_config` then `_process_wrapper` and freezes one complete required aspect
+value. The two defaults remain canonical in the rustfmt defining repository;
+single-file and exec/executable policy survive independently. The required
+object preserves
+`@@dep+//rust/private:rustfmt.bzl%rustfmt_srcs_aspect`, including the two
+`providers.bzl` IDs, without a derived class key, side registry or importer
+rebinding. Both implementations remain lazy and configured propagation stays
+absent.
+
+Focused proof and all 193 loading unit tests pass, as do the remaining 37
+integrations, locked core check, rebuilt CLI and hygiene. The sole full-suite
+failure remains the accepted baseline-stale `@external` assertion. Growth is
+120 production and 93 proof additions within caps. Independent review returned
+`ACCEPT` after the fail-closed matrix added explicit renamed and wider
+attribute dictionaries.
+
+This follows pinned Zabel `c7298478…` only as architectural guidance: one
+complete producer-owned `AspectDefinition`, a distinct first-export identity,
+and a freeze edge to the required value. Slug uses its own existing frozen
+schema/value representation; no Zig code, behavior, storage, cache or analysis
+algorithm is copied. Bazel 9.2 remains sole behavior authority.
+
+Source order accepts `RustfmtTestInfo`, an ordinary string-list constant and
+two lazy function bodies. The third aspect's implementation, ordered
+`attr_aspects`, one exported `requires` edge and documentation are already
+accepted. Its first unsupported argument is
+`provides = [RustfmtTestInfo]` at `rust/private/rustfmt.bzl:214`. Run only
+docs packet `WP-4-7A-rustfmt-test-aspect-provides-audit` to authenticate the
+flat advertised-provider identity, declaration retention and exact next stop.
+Provider production/matching, aspect application/propagation, configured
+dependencies/fragments, actions and the later `rustfmt_test` rule remain
+deferred.
+
 ### First rustfmt aspect requirements accepted; second aspect audit selected (2026-08-26)
 
 Commit `d4d4d6dc` retains exactly the first rustfmt aspect's two singleton
