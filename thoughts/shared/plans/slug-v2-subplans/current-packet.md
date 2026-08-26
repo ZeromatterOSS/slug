@@ -1,165 +1,97 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-bazel-config-common-toolchain-type-loading`
+Packet: `WP-4-7A-post-toolchain-source-order-audit`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: admit the final source-required typed toolchain requirement, preserve
-its optionality structurally, and complete top-level evaluation of
-`rust/private/toolchain.bzl` without invoking `rust_toolchain`.
+Result: authenticate the recursive return from the completed private toolchain
+child, the actual next child, and the first newly evaluated unsupported
+expression. Clippy is only a source-text candidate. This packet is docs-only
+and selects either one bounded implementation or `REPLAN`.
 
-## Accepted starting point and source-order stop
+## Accepted starting point
 
-Implementation base is `ef910068` (`Load scalar label provider predicates`).
-It freezes the complete `rust_toolchain` attribute map, including both
-singleton scalar provider predicates. The next unadmitted expression is:
+Base `4aed2438` (`Load config common toolchain requirements`) retains the sole
+optional C++ requirement on `rust_toolchain`, preserves mandatory identity,
+rejects optional invocation before publication, and completes top-level
+evaluation of `rust/private/toolchain.bzl`. Independent terminal review
+returned `ACCEPT`; all packet gates passed.
 
-```starlark
-toolchains = [
-    config_common.toolchain_type(
-        "@bazel_tools//tools/cpp:toolchain_type",
-        mandatory = False,
-    ),
-]
-```
+## Fixed source route
 
-Only a documentation string follows before the rule and the 1,002-line child
-end. This packet completes that child's top-level evaluation, then stops for a
-fresh caller/source audit. The implementation function remains lazy.
+Use the already-selected rules_rust 0.73.0 archive and record these fixed
+files before following their loads:
 
-## Fixed sources and compatibility authority
+- `rust/private/toolchain.bzl`, SHA-256 `c4b613cee96540a94fbdf4fbdca7b8dc4ef6d3082024c4d3636afc2e9c4d468e`;
+- `rust/rust_toolchain.bzl`, SHA-256 `0de5c3ba5c8a71176f881df065810a33eb2355a7007c16e47759653dbacdbd49`;
+- `rust/rustfmt_toolchain.bzl`, SHA-256 `e57f8129f8b2dfac8b820ed057ca65d8a5e6945d614d53923ac65b27aaefb6f5`;
+- `rust/toolchain.bzl`, SHA-256 `b94731396dc90e4ef8bbdc753252aac80208aba9cd857a7e7ca74d23f6aabbce`;
+- `rust/defs.bzl`, SHA-256 `5b71e4344a6c6ee04ade488c741784479f392b71d42f2102eedc5e4993654512`;
+- `rust/private/clippy.bzl`, SHA-256 `a778d2ddc77587ffbffc72efcdaa458a1ffae0763e500da1c876b9b567b2a686`.
 
-Selected rules_rust source:
-`/tmp/slug-rules-rust-registry.MZNsRA/source/rust/private/toolchain.bzl`,
-SHA-256
-`c4b613cee96540a94fbdf4fbdca7b8dc4ef6d3082024c4d3636afc2e9c4d468e`.
+The current hypothesis is that both public toolchain wrappers only re-export
+already-frozen declarations, after which `rust/defs.bzl` reaches clippy. Do not
+promote that hypothesis to accepted source order until the live recursive
+loader, manifest and cached-child behavior are checked.
+
+## Authorities and architectural guidance
 
 Behavior authority is clean Bazel 9.2 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a`. Fixed anchors are
-`ConfigStarlarkCommonApi.toolchain_type`,
-`ConfigStarlarkCommon.toolchainType`,
-`ToolchainTypeRequirement`, `StarlarkRuleClassFunctions.parseToolchainTypes`
-and `StarlarkRuleClassFunctionsTest.testRuleAddToolchain` plus its duplicate
-test. They establish String/Label input, defining-thread label conversion,
-default/explicit mandatory state, typed rule-list input, stable distinct order
-and strictest-wins duplicate normalization.
+`8220c6198837d5c13d53fea211cf3282aa12408a`. Authenticate any reached clippy
+provider, build-setting rule, aspect, attribute predicate or toolchain list
+against its concrete Bazel API, implementation and focused regression before
+classifying it.
 
 Architectural guidance is clean `../zabel` commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a`. Its
-`build_rule_declaration.zig` owns a typed label-plus-mandatory requirement on
-the rule declaration, while `build_invocation_capture.zig` detaches canonical
-label identity and mandatory state for later consumers. Slug follows that
-ownership boundary with its own Rust types. No Zig code, layout, evaluator
-value, diagnostic or configured algorithm is copied; Bazel alone defines
-behavior.
+`0795445f3ab60f4e49070bdd0b94425c5610f73a`. Its rule/aspect declaration
+owners and detached toolchain-requirement capture may guide a later bounded
+Rust design if that is the reached frontier. Zabel does not define recursive
+load order, accepted behavior or compatibility, and no Zig code, layout,
+diagnostic or evaluator algorithm may be copied.
 
-The Buck2 utility audit selects the existing `CanonicalLabel`, inline Boolean,
-`Arc<[T]>` and `Allocative` patterns. No collection, interner, hash, cache,
-memory ledger or imported utility is warranted.
+Read the Buck2 utility skill only if the selected follow-up changes retained
+data structures, compact collections, hashing, interning, clone cost or memory
+accounting. This audit itself changes none.
 
-## Compatibility classification
+## Audit obligations
 
-- **Exact:** `.bzl` `config_common.toolchain_type` accepts String or existing
-  Label input and named Boolean `mandatory` defaulting true; the returned typed
-  loading value exposes canonical label and mandatory state; `rule(toolchains)`
-  accepts existing String inputs as mandatory plus Label and typed requirement
-  inputs, retains distinct entries in order, and freezes the source singleton
-  optional C++ requirement.
-- **Slug-native:** evaluator-backed labels detach into Slug's valid-Unicode
-  canonical Rust identity and compact immutable storage.
-- **Unsupported/deferred:** duplicate toolchain labels reject instead of
-  strictest merging; typed aspect toolchains, other `config_common` members,
-  optional configured resolution, optional target invocation, full
-  `rust_toolchain` analysis/actions and the caller beyond the completed child.
-  Existing accepted unique mandatory string rule requirements stay exact.
-
-## Implementation boundary
-
-Add one small Starlark-visible requirement value and one evaluator-free public
-Rust requirement record containing `CanonicalLabel` and `mandatory`. Use the
-record through transient/frozen rule definitions and
-`StarlarkRuleImplementation`; it participates in equality and allocation
-accounting. Parse rule toolchain lists as values: existing strings and Labels
-become mandatory requirements, typed values retain their bit, and duplicate
-canonical labels fail closed.
-
-Expose only `config_common.toolchain_type` in `.bzl` loading globals. Resolve
-String input with the existing defining-call label owner; preserve an existing
-Label's identity. Do not alter aspect parsing. Reject any optional rule
-requirement in `FrozenRuleDefinition::invoke` before target publication; the
-configured analysis path therefore continues to receive mandatory
-requirements only and must read their label explicitly. Do not change DICE,
-source loading, repository mapping, toolchain selection or action behavior.
-
-## Discriminating proof
-
-- Prove String and Label inputs, relative/apparent mapping, default/explicit
-  true and false mandatory state, field visibility, wrong types and BUILD
-  non-callability for the selected declaration surface.
-- Prove rule lists retain distinct String, Label and typed entries in source
-  order, preserve mandatory identity through freeze, distinguish false from
-  true, and reject duplicate canonical labels and unrelated values.
-- Freeze the complete source-shaped `rust_toolchain` with the canonical
-  `@@bazel_tools//tools/cpp:toolchain_type` optional requirement and prove no
-  later top-level expression remains.
-- Prove optional rule invocation rejects before target recording while the
-  existing mandatory string rules and configured single-toolchain regression
-  remain green.
-- Keep scalar/list provider/aspect, file-allowance, allowed-values, docs,
-  stdlib, analyzer and rules_cc proofs green.
+- Reconstruct the exact caller return from `rust/private/toolchain.bzl` through
+  both alias-only wrappers and the remaining `rust/toolchain.bzl` exports.
+- Verify which children are already complete/memoized and which child
+  `rust/defs.bzl` evaluates next.
+- Traverse that child in source/evaluation order: complete imports first,
+  distinguish lazy function bodies and documentation examples from evaluated
+  top-level expressions, and stop at the first unsupported expression.
+- Compare the reached expression to the live Slug surface and fixed Bazel 9.2
+  contract. Classify the prospective change as exact, Slug-native, or
+  unsupported/deferred.
+- If bounded, write one implementation packet with explicit source stop,
+  allowlist, base hashes, line/addition caps, discriminating proofs, serial
+  validation and STOP/REPLAN triggers. Otherwise record `REPLAN`.
+- State exactly how Zabel informed ownership, or state that it supplied no
+  useful guidance for the reached surface.
 
 ## Allowlist and caps
 
-Only these files may change from base `ef910068`:
+Only these plan files may change from base `4aed2438`:
 
-| File | Base SHA-256 | Base lines | Final cap | Purpose |
-|---|---|---:|---:|---|
-| `app/slug_loading_v2/src/package.rs` | `59ea0ebeff912192aefe8207c6801f58053e4ae95326aa88398815a7018d14f2` | 6,004 | 6,185 | typed namespace, retained record, parsing and preflight |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `dbad32c210da6762a28bd1030d54058ffeec2b16771822eb1b9a832d449b77b4` | 6,485 | 6,675 | ABI, identity, rejection and complete-child proof |
-| `app/slug_analysis_v2/src/dice.rs` | `a62a6c3b6541641905fb4cdf4a8a708528c2d690e760873d8e5d23d6d0936c5e` | 2,959 | 2,990 | explicit label access on mandatory-only consumer |
-| `app/slug_loading_v2/tests/bzl_invalidation.rs` | `eff0715413b5f543d81d7a1692cb4c64fc21be744b5b283109f05de5ed83328f` | 2,296 | 2,320 | retained-requirement API adaptation |
-| `app/slug_loading_v2/tests/build_file_loading.rs` | `7ac52bf85dca12409209008d85b3713c7847e0fd23697789ce13947928bcc995` | 3,144 | 3,180 | retained-requirement API adaptation |
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`;
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
 
-Production additions are capped at 180, proof additions at 220 and total
-additions at 400. Deletions do not buy addition budget. No new function may
-exceed 120 lines. `FrozenRuleDefinition::invoke` may gain only the optional
-preflight; package publication order may not otherwise change. The large files
-keep the declaration and consumer beside their existing owners.
+No Rust, tests, lockfiles, sources, DICE keys, repository data, oracle fixtures
+or generated evidence may change. The audit addition cap is 260 lines across
+the canonical plan and Stage 4 subplan; the rewritten manifest is capped at
+220 lines. Use read-only checks only.
 
-Plan-only selection edits are limited to the canonical plan, Stage 4 subplan
-and this manifest and are excluded from implementation caps.
+## Review and STOP
 
-## Serial validation
+Independent selection review must verify the caller path, hashes, docs-only
+boundary, Bazel authority and Zabel's guidance-only role. The completed audit
+requires another independent review before its selected implementation packet
+is committed.
 
-Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
-`CARGO_BUILD_JOBS=1`:
-
-- focused config-common ABI/identity/rejection/complete-child proofs;
-- existing rule toolchain, provider/aspect, file-allowance, allowed-values,
-  docs, stdlib, analyzer and rules_cc proofs;
-- one configured mandatory-toolchain analysis regression;
-- `cargo test -p slug_loading_v2 --lib`;
-- `cargo test -p slug_loading_v2 --test bzl_invalidation`;
-- `cargo test -p slug_loading_v2 --test build_file_loading`;
-- `cargo check --locked -p slug_analysis_v2 -p slug_core_v2`;
-- `cargo build -p slug_cli_v2` after Rust changes;
-- `cargo fmt --all -- --check` and `git diff --check`;
-- `scripts/v2_archive_status.sh`.
-
-The broad daemon-sensitive integration remains 30/31 only for its known stale
-`@external` diagnostic-order row and need not rerun absent new integration
-risk. Recheck allowlist, caps, base/source hashes, both clean authority pins and
-stale `slugd` cleanup.
-
-Independent selection and terminal reviews must verify Bazel authority,
-Zabel's guidance-only role, retained mandatory identity, optional preflight,
-consumer adaptation, completed-child stop, classifications and every cap.
-
-## STOP / REPLAN
-
-STOP and REPLAN for a file outside the implementation allowlist; silent loss
-of mandatory state; duplicate approximation; typed aspect requirements; an
-additional `config_common` member; configured optional resolution; optional
-target publication; toolchain selection changes; DICE/repository/source/action
-changes; Java/JVM work; copied Zabel code or behavior; cap violation; or a
-claim beyond completing `rust/private/toolchain.bzl`. Audit its caller next.
+STOP and `REPLAN` for a dirty authority/source checkout; unresolved source
+identity; an unbounded or cyclic frontier; behavior requiring Java/JVM code;
+copied Zabel behavior; a Rust/test/source edit; a claim beyond the first
+unsupported expression; or cap violation.

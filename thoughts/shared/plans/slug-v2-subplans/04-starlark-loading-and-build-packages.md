@@ -5247,6 +5247,39 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Config-common toolchain requirement accepted; caller audit selected (2026-08-26)
+
+Commit `4aed2438` introduces one evaluator-free `RuleToolchainRequirement`
+owning canonical label and mandatory state through transient, frozen and
+package rule owners. The `.bzl` config-common value exposes both fields;
+existing String requirements remain mandatory; Label and typed requirements
+retain defining identities and source order; duplicates reject; and optional
+invocation stops before target publication. The configured consumer reads only
+the label of already-gated mandatory requirements.
+
+The complete 217 loading units, 24 invalidation tests, 31 BUILD-loading tests,
+configured mandatory-toolchain regression, locked checks, rebuilt CLI and
+hygiene pass at 172 production and 111 proof additions. Independent terminal
+review returned `ACCEPT`. The focused non-root proof also corrected relative
+rule toolchain strings to retain their defining repository.
+
+The source-text candidate returns from `rust/private/toolchain.bzl` through the
+alias-only `rust/rust_toolchain.bzl`; `rust/toolchain.bzl` then names the
+rustfmt wrapper and imported aliases, and `rust/defs.bzl` text names
+`rust/private/clippy.bzl` next. Recursive manifest/cache order has not yet
+promoted that textual route to accepted evaluation order.
+
+Run only docs packet `WP-4-7A-post-toolchain-source-order-audit`. Authenticate
+the wrapper hashes, actual next child and cached-child order, then inspect the
+reached call arguments in evaluation order and use pinned Bazel 9.2 to classify
+the first unsupported surface. Do not edit Rust or assume that clippy is
+reached or that later action bodies are evaluated.
+
+Clean `../zabel` `0795445f…` guides only the typed declaration/capture ownership
+available if the frontier is a rule/aspect toolchain requirement. It does not
+define recursive source order or behavior, and no Zig code, layout or
+diagnostic may be copied. Bazel 9.2 remains sole authority.
+
 ### Scalar-label provider predicate accepted; toolchain requirement selected (2026-08-26)
 
 Commit `ef910068` admits omitted/empty and one exported provider in a flat
