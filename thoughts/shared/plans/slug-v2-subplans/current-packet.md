@@ -1,158 +1,151 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-clippy-aspect-attribute-loading`
+Packet: `WP-4-7A-bazel-aspect-toolchain-requirements-loading-r2`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: retain the exact ordered 11 private label attributes declared by
-rules_rust 0.73.0's `rust_clippy_aspect`, then stop at its still-unadmitted
-mixed aspect toolchain list.
+Result: admit the source-required mixed aspect toolchain list, retain canonical
+label plus mandatory state structurally, freeze the complete
+`rust_clippy_aspect`, and stop before the following lazy rule helper.
 
-## Starting point and fixed sources
+## Accepted starting point and source stop
 
-Base is `9dea8ee7`. Its docs-only audit authenticates the attribute map as the
-next implementation dependency after the corrected clippy route. Both the Slug
-worktree and fixed source checkouts must remain clean.
+Base is `5f8dd852` (`Load clippy aspect attributes`). The exact ordered 11-row
+attribute map now freezes through the existing detached schema. Its unchanged
+source-shaped declaration terminates at the mixed toolchain argument:
 
-Selected rules_rust 0.73.0:
+```starlark
+toolchains = [
+    str(Label("//rust:toolchain_type")),
+    config_common.toolchain_type(
+        "@bazel_tools//tools/cpp:toolchain_type",
+        mandatory = False,
+    ),
+]
+```
 
-- `rust/private/clippy.bzl`, SHA-256
-  `a778d2ddc77587ffbffc72efcdaa458a1ffae0763e500da1c876b9b567b2a686`;
-- relevant source stop: `rust_clippy_aspect` attributes at lines 317-364;
-- later boundary: mixed toolchains at lines 370-373.
+Freeze the complete `rust_clippy_aspect` through line 404 of selected
+rules_rust 0.73.0 and stop before `_rust_clippy_rule_impl` at line 406 and
+`rust_clippy = rule(...)` at line 411. The clippy source SHA-256 is
+`a778d2ddc77587ffbffc72efcdaa458a1ffae0763e500da1c876b9b567b2a686`.
+
+## Fixed behavior and architecture authorities
 
 Behavior authority is clean Bazel 9.2 commit
 `8220c6198837d5c13d53fea211cf3282aa12408a`:
 
-- `StarlarkRuleFunctionsApi.java:835-856` documents aspect `attrs`;
-- `StarlarkRuleClassFunctions.java:1284-1297,1345-1446` validates names,
-  converts private names, preserves dictionary order, rejects explicit
-  configurability, requires implicit defaults and retains built attributes;
-- `StarlarkAttrModule.java:357-444,718-766` owns defining-module label
-  conversion, executable/cfg and file-allowance construction;
-- `StarlarkRuleClassFunctionsTest.testAspectExtraDeps`,
-  `testAspectNoDefaultValueAttribute`, `testAspectParameterBadType`,
-  `testAspectCannotSetConfigurableOnAttr`,
-  `testAttrAllowedSingleFileTypesWrongType` and
-  `testAttrSingleFileWithList` are the focused regressions.
+- `StarlarkRuleClassFunctions.aspect:1487-1491` consumes the shared parser;
+- `parseToolchainTypes:2212-2228` preserves first label order and applies
+  strictest-wins duplicate normalization;
+- `parseToolchainType:2230-2257` accepts typed requirements, Labels and
+  defining-thread Strings and makes Label/String entries mandatory;
+- `StarlarkRuleClassFunctionsTest.testAspectAddToolchain` proves default true,
+  explicit false and explicit true on a frozen aspect.
 
-## Exact source contract
-
-Retain these Starlark names and canonical defining-repository defaults in
-dictionary order:
-
-| Name | Default target | Additional retained state |
-|------|----------------|---------------------------|
-| `_capture_output` | `//rust/settings:capture_clippy_output` | none |
-| `_clippy_error_format` | `//rust/settings:clippy_error_format` | none |
-| `_clippy_flag` | `//rust/settings:clippy_flag` | none |
-| `_clippy_flags` | `//rust/settings:clippy_flags` | none |
-| `_clippy_output_diagnostics` | `//rust/settings:clippy_output_diagnostics` | none |
-| `_config` | `//rust/settings:clippy.toml` | `allow_single_file=True` |
-| `_error_format` | `//rust/settings:error_format` | none |
-| `_extra_rustc_flag` | `//rust/settings:extra_rustc_flag` | none |
-| `_incompatible_change_clippy_error_format` | `//rust/settings:incompatible_change_clippy_error_format` | none |
-| `_per_crate_rustc_flag` | `//rust/settings:per_crate_rustc_flag` | none |
-| `_process_wrapper` | `//util/process_wrapper` | `executable=True`, `cfg="exec"` |
-
-Every row is `attr.label`, nonmandatory, has omitted configurability, disallows
-ordinary files, has no provider predicate, attached aspect, allowed values or
-custom transition, and owns a concrete label default. All rows except
-`_config` have no single-file allowance. All rows except `_process_wrapper`
-are nonexecutable and do not use the exec configuration.
-
-## Decision and ownership
-
-Extend `aspect_attributes` with one exact source gate beside the existing
-rustfmt pair. Validate the complete ordered shape and every retained field,
-then call the existing `declared_attribute_schema` for each row. Do not add a
-parallel aspect schema, change ordinary rule lowering, or create a broad
-private-attribute compatibility claim.
-
-`AttributeDefinition` remains the evaluator-local producer;
-`declared_attribute_schema` remains the detachment boundary; and
-`AspectDefinitionGen.attributes` plus its frozen form remain the retained
-owner. The existing immutable `Arc<[RuleAttributeSchema]>` representation,
-equality, freezing and memory lifetime are unchanged. No DICE key, request
-overlay, analysis consumer, cache, fallback or asynchronous lifetime changes.
+The source map has two distinct labels, so this packet does not need duplicate
+normalization. Existing rule duplicate rejection remains the admitted
+unsupported boundary and may not change here.
 
 Clean `../zabel` commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only this shared
-`NamedAttribute`/`AttrDefinition` ownership and evaluator-detached retention.
-Copy no Zig code, layout, diagnostics or algorithm. Bazel 9.2 remains the sole
-behavior authority. Because retained representation, hashing, collections,
-clone cost and accounting do not change, no Buck2 utility or Stage 9 ledger
-work is selected.
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` is architecture guidance only.
+Its `ToolchainTypeRequirement` is declaration-owned label plus mandatory state,
+its rule and aspect definitions retain the same slice type, and
+`retainToolchainRequirements` detaches evaluator values. Slug adopts that
+ownership shape with its own Rust values. Copy no Zig code, layout, diagnostic,
+algorithm or behavior; Bazel 9.2 remains sole behavior authority.
 
-Compatibility classification:
+The Stage 9 generic compact-utility row and live Buck2 utility review select
+the existing `CanonicalLabel`, Boolean, immutable `Arc<[T]>` and
+`Allocative`. No map, interner, cache, deep-clone path, utility import or ledger
+update is warranted. The slice is retained semantic memory owned and released
+with the frozen module; parser `Vec`/`SmallSet` state remains evaluator scratch.
 
-- **Exact:** the listed Bazel private-label default, file, executable,
-  exec-configuration, configurability and order semantics.
-- **Slug-native:** retain Starlark `_name` spelling and existing Rust canonical
-  labels/immutable schema rather than Bazel's internal `$name` spelling.
-- **Unsupported/deferred:** every other aspect attribute map; public
-  parameters; label lists and other private kinds; absent/`None`, computed,
-  late-bound, materializing or dormant defaults; explicit configurability;
-  provider/aspect predicates; custom transitions; other file allowance shapes;
-  configured aspect execution; and the mixed toolchain list/complete clippy
-  aspect.
+## Decision and compatibility
+
+Rename the rule-specific retained record to `ToolchainTypeRequirement` and use
+its existing canonical-label/mandatory fields and accessors for both rules and
+aspects. Rule transient/frozen/package storage remains the same immutable Arc
+slice. Replace the aspect's `Option<CanonicalLabel>` with
+`Arc<[ToolchainTypeRequirement]>` in transient and frozen definitions.
+
+Rename the evaluator-aware rule parser into the shared declaration parser.
+Change the aspect binding from `UnpackList<&str>` to an evaluator value and
+reuse that parser. Distinct String, Label and typed entries preserve source
+order; String resolution uses the defining module; typed entries preserve
+mandatory state. Keep duplicate rejection and every configured rule consumer
+unchanged. No DICE key, analysis consumer, request overlay, cache, asynchronous
+owner or fallback changes.
+
+- **Exact:** distinct String, Label and typed requirements; defining-module
+  conversion; default mandatory true; retained explicit false; source order;
+  empty and existing singleton String aspects; complete source clippy aspect
+  loading.
+- **Slug-native:** Rust canonical labels and immutable evaluator-detached Arc
+  storage.
+- **Unsupported/deferred:** strictest-wins duplicate normalization; configured
+  aspect propagation/resolution, optional absence, invocation and actions; the
+  following clippy rule; other aspect/config-common breadth.
 
 ## Allowlist, proof and caps
 
 Only these files may change:
 
-- `app/slug_loading_v2/src/package.rs`, base 6,142 lines, SHA-256
-  `974990551b1d717106c24e37237ef2e1910cf5a64207e659cbec910ac478ee8f`;
-- `app/slug_loading_v2/src/host_package_load_tests.rs`, base 6,575 lines,
-  SHA-256
-  `9bc0a07c319b34e8f6b9089415978700d1831e86b3a996948e015e96f05c8ce0`.
+| File | Base SHA-256 | Base lines | Final ceiling |
+|---|---|---:|---:|
+| `app/slug_loading_v2/src/package.rs` | `bd44500ef347d7b215baca5ccbb141348514a5a7a5d705732dcfa15bf6ea7621` | 6,222 | 6,305 |
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `033876a8aacffe0a2741e2553c6a5a6a73b7bafd47b420026d7b0f741da0f665` | 6,735 | 6,875 |
 
-Caps are 110 production, 160 proof and 270 total additions; physical ceilings
-are 6,255 and 6,735 lines. `package.rs` exceeds the complexity trigger, but the
-change stays in its existing cohesive declaration-validation owner and may not
-add a second representation or cross-owner helper.
+Caps are 80 production, 140 proof and 220 total additions; deletions do not
+buy addition budget. No new function may exceed 120 lines. `package.rs`
+remains above the physical complexity trigger, but this change unifies its
+existing adjacent rule/aspect declaration owner and removes the singular
+parallel representation rather than adding another responsibility.
 
 Required proof:
 
-1. Freeze a source-shaped exact clippy map with the later toolchain list
-   omitted or reduced to the already-admitted singleton string. Assert all 11
-   names, canonical defaults and flags in order, and prove the implementation
-   stays lazy.
-2. Preserve the existing rustfmt aspect proof unchanged.
-3. Replace fixed-pair negative assertions that Bazel admits with mutation
-   cases discriminating missing/reordered/extra rows, wrong defaults, missing
-   defaults, public label parameters, explicit configurability, wrong kinds,
-   file/provider/aspect/transition additions and executable/exec mismatches.
-4. Prove the unchanged source-shaped mixed String/typed-requirement list still
-   terminates at the aspect toolchain boundary. Do not claim the complete
-   clippy aspect or run its implementation.
+1. Freeze an aspect in a non-root module with distinct String, Label and typed
+   requirements crossing an apparent mapping. Assert order and mandatory
+   true/false, including that true and false are structurally distinct.
+2. Preserve empty and singleton String analyzer/rustfmt aspects. Reject a
+   non-list, wrong entry type and duplicate canonical labels before export.
+3. Change the pinned clippy source-shaped proof to its real mixed list. Include
+   its accepted attributes, providers, fragments and doc; assert both canonical
+   requirements and mandatory states; prove implementation and following rule
+   helper stay lazy.
+4. Keep all rule/config-common requirement, attribute, provider and private-
+   toolchain proofs green. Do not weaken current duplicate or optional-rule
+   invocation rejections.
 
-The test source is a focused extract of the pinned rules_rust file, not a new
-oracle fixture. Existing Bazel tests cover the constructor contract; no copied
-workspace or fixture growth is authorized.
+No new oracle fixture is needed: pinned Bazel source/tests establish the
+declaration contract and the focused source extract discriminates the live
+rules_rust boundary.
 
-## Validation and STOP
+## Serial validation and STOP
 
-Run serially with
-`CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1`:
+Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
+`CARGO_BUILD_JOBS=1`:
 
-- focused new and rustfmt aspect tests;
+- focused mixed-aspect, clippy, rule/config-common and rustfmt tests;
 - `cargo test -p slug_loading_v2 --lib --locked`;
 - `cargo test -p slug_loading_v2 --test bzl_invalidation --locked`;
 - `cargo test -p slug_loading_v2 --test build_file_loading --locked`;
-- `cargo check -p slug_loading_v2 --locked`;
-- `cargo fmt --all -- --check` and `git diff --check`.
+- `cargo check --locked -p slug_analysis_v2 -p slug_core_v2`;
+- `cargo build -p slug_cli_v2 --locked` before any rebuilt-binary smoke;
+- `cargo fmt --all -- --check`, `git diff --check`, and
+  `scripts/v2_archive_status.sh` with only its three known archive-only misses.
 
-Independent terminal review is required because `package.rs` is above the
-complexity trigger and the source gate changes retained aspect declarations.
+Independent terminal review must verify the shared retained representation,
+rule-consumer nonchange, source stop, exact/Slug-native/deferred boundary,
+Zabel guidance-only role, utility choice, validation and caps.
 
-STOP and `REPLAN` for dirty authority; a changed retained representation or
-DICE/analysis owner; a need to widen `attr.label`; ordinary-rule regression;
-an unbounded aspect API; copied Zabel behavior; Java/JVM work; toolchain
-parsing; complete-clippy claims; an additional file; or a cap violation.
+STOP and `REPLAN` for any other file; dirty source/authority; changed rule
+semantics or configured consumers; duplicate approximation; DICE/analysis/
+repository/oracle/action work; the following clippy rule; Java/JVM work;
+copied Zabel behavior; a new utility/ledger need; or a cap violation.
 
 ## Immediate predecessor
 
-`WP-4-7A-clippy-aspect-attribute-audit` found the existing schema complete for
-this source subset and received independent bounded-implementation approval.
-The earlier toolchain candidate remains fully reverted.
+`5f8dd852` accepted the exact clippy private-label map with 219 loading, 24
+invalidation and 31 BUILD-loading tests plus independent terminal review. The
+earlier pre-attribute toolchain candidate was fully reverted and supplies no
+implementation state.

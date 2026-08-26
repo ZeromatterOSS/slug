@@ -5247,6 +5247,38 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Clippy aspect attributes accepted; typed aspect toolchains selected (2026-08-26)
+
+Commit `5f8dd852` admits the exact ordered clippy map beside the rustfmt pair.
+It validates concrete defining-repository defaults, omitted configurability,
+file allowance, executable/exec configuration, provider/aspect/transition and
+allowed-value fields before reusing `declared_attribute_schema`. The frozen
+source proof retains all 11 rows in order and the mutation proof fails closed
+on every named divergence. Existing rustfmt behavior is unchanged. All 219
+loading units, 24 invalidation tests, 31 BUILD-loading tests and locked checks
+pass; independent review returned `ACCEPT`.
+
+The unchanged mixed source list is now the exact terminal. Bazel 9.2
+`parseToolchainTypes` accepts String, Label and typed requirements for aspects,
+resolves strings in the defining thread, makes String/Label entries mandatory,
+retains typed false, preserves first-label order, and applies strictest-wins to
+duplicates. The source has distinct labels, so duplicate normalization remains
+deferred without weakening this exact source claim.
+
+Run only `WP-4-7A-bazel-aspect-toolchain-requirements-loading-r2`. Rename
+Slug's rule-named label/mandatory record into one shared declaration type,
+retain its immutable Arc slice on both rule and aspect definitions, and reuse
+the evaluator-aware parser for the aspect value list. Rule storage and
+configured consumers stay semantically unchanged. Freeze the complete source
+`rust_clippy_aspect` through line 404 and stop before its lazy helper and rule.
+
+Clean `../zabel` `0795445f…` supplies concept-only architectural guidance: its
+rule and aspect declarations share `ToolchainTypeRequirement` slices and one
+evaluator-detachment path. Slug uses its own canonical label and mandatory
+Boolean. The Buck2 utility review selects existing immutable `Arc<[T]>` and
+`Allocative`; no interner, map, cache, clone mechanism, import or ledger row is
+needed. No Zig behavior is copied, and Bazel 9.2 remains authoritative.
+
 ### Clippy aspect attribute audit; exact source loading selected (2026-08-26)
 
 Bazel 9.2 `StarlarkRuleClassFunctions.attrObjectToAttributesList` validates
