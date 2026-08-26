@@ -5247,6 +5247,37 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Imported frozen lint descriptors accepted; parent audit selected (2026-08-26)
+
+Commit `db51996b9` accepts the exact imported plain `LINT_TEST_COMMON_ATTRS`
+descriptors and imported frozen `platform_transition` without adding a second
+retained representation. Complete `clippy.bzl:463-596` now freezes with its
+lint/provider/common children. The proof discriminates ordered kinds/defaults,
+producer-context canonical labels, provider/aspect identities, transition
+implementation/output, test capability and Boolean settings. Rich imported
+descriptors remain fail-closed.
+
+All 223 loading units, both 24/31 integration suites, dependent core checks,
+rebuilt CLI and hygiene pass within 39 production and 259 proof additions.
+Independent terminal review returned `ACCEPT`.
+
+Run only docs packet `WP-4-7A-post-clippy-parent-frontier-audit`. Resume exact
+`rust/defs.bzl` direct-load order after clippy returns, account for cached
+children, authenticate the next newly evaluated child and classify its first
+unsupported loading expression. Edit no Rust and do not enter configured
+semantics.
+
+Exact compatibility covers imported plain descriptor validity/fields,
+imported transition implementation/output and complete clippy-tail freeze.
+Generic Rust wrapper reconstruction and rich-import rejection are Slug-native.
+Transition execution, identity bytes and configured provider/aspect/test/
+build-setting/action semantics remain unsupported/deferred.
+
+Clean `../zabel` `0795445f…` guided only declaration producer ownership across
+freeze. No Zig code, representation, pointer, capture, algorithm, diagnostic or
+behavior was copied. Bazel 9.2 remains authoritative, and the existing compact
+values require no new Buck2-derived utility or memory-ledger entry.
+
 ### Imported-transition correction exposes frozen common attributes (2026-08-26)
 
 The exact tail candidate first cleared imported `platform_transition`, then

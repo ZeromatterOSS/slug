@@ -30,17 +30,50 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; imported frozen attribute/transition loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; `5f8dd852`, `fc9473b1`, `993ba5e4`, and `45b479e56` accept clippy's complete aspect, fixed OutputGroupInfo and RunEnvironmentInfo declaration globals, exact lint-test child loading, lazy helper and `rust_clippy` rule | after frozen transition admission, exact clippy tail proof stops when `rule(attrs=...)` rejects the first plain frozen descriptor imported in `LINT_TEST_COMMON_ATTRS` | implement only `WP-4-7A-imported-frozen-attribute-transition-clippy-tail-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; post-clippy parent frontier audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; `5f8dd852`, `fc9473b1`, `993ba5e4`, `45b479e56`, and `db51996b9` accept clippy's complete aspect and rule tail, fixed OutputGroupInfo and RunEnvironmentInfo declaration globals, exact lint-test child loading, imported plain frozen attributes and imported frozen transitions | the next newly evaluated child after complete `rust/private/clippy.bzl` has not yet been authenticated | audit only `WP-4-7A-post-clippy-parent-frontier-audit`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-imported-frozen-attribute-transition-clippy-tail-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-post-clippy-parent-frontier-audit](./slug-v2-subplans/current-packet.md).
 
-Accept plain frozen `LINT_TEST_COMMON_ATTRS` values and the frozen
-`platform_transition` imported from the exact lint child, then prove complete
-`clippy.bzl:463-596` freezes.
+Authenticate the next newly evaluated child after exact `clippy.bzl` returns to
+`rust/defs.bzl`, then classify its first unsupported loading surface without
+editing Rust.
+
+### M7 imported frozen lint descriptors accepted; parent audit selected (2026-08-26)
+
+Commit `db51996b9` projects imported plain frozen attribute declarations and an
+imported frozen transition into Slug's existing loading wrappers. Exact
+`clippy.bzl:463-596` now freezes recursively with all lint/provider/common
+imports retaining their producer identities. The final rule preserves ordered
+common-attribute kinds and defaults, canonical allowlist/runner labels, attached
+aspect/provider alternatives, pointer-identical transition implementation and
+its exact output. Rich imported provider/aspect/transition descriptors still
+fail closed.
+
+All 223 loading units, 24 invalidation tests, 31 BUILD-loading tests, dependent
+core checks, rebuilt CLI and hygiene pass. Final growth is 39 production and
+259 proof additions; both files remain under their packet ceilings. Independent
+terminal review returned `ACCEPT`.
+
+Run only docs packet `WP-4-7A-post-clippy-parent-frontier-audit`. Return to the
+source-ordered direct loads in exact `rust/defs.bzl`; account for already cached
+children, authenticate the next newly evaluated child and classify its first
+unsupported loading expression. Do not edit Rust or infer configured behavior.
+
+Exact compatibility is imported plain descriptor validity/fields, imported
+transition implementation/output and complete clippy-tail freeze. Rust wrapper
+reconstruction and the rich-import fail-closed boundary are Slug-native.
+Transition execution, identity bytes and configured provider/aspect/test/
+build-setting/action behavior remain unsupported/deferred.
+
+Clean `../zabel` `0795445f…` supplied architecture guidance only: declarations
+remain producer-owned across freeze and are projected by consumers. No Zig
+code, representation, pointer identity, capture, algorithm, diagnostic or
+behavior was copied; Bazel 9.2 remains sole behavior authority. Existing
+Arc/CompactString/default storage was reused with no new utility or ledger.
 
 ### M7 imported-transition correction exposes frozen common attributes (2026-08-26)
 
