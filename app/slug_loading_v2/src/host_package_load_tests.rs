@@ -3209,6 +3209,90 @@ CUSTOM_TRUE = rule(implementation = _impl, attrs = {"x": attr.label(cfg = transi
     }
 }
 
+#[test]
+fn bazel_label_list_boolean_allow_files_freezes_rust_stdlib_filegroup() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_rust+//rust/private:toolchain.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_rust/rust/private/toolchain.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let source = r#"
+def _impl(ctx): fail("implementation must stay lazy")
+OMITTED = rule(implementation = _impl, attrs = {"srcs": attr.label_list()})
+EXPLICIT_NONE = rule(implementation = _impl, attrs = {"srcs": attr.label_list(allow_files = None)})
+EXPLICIT_FALSE = rule(implementation = _impl, attrs = {"srcs": attr.label_list(allow_files = False)})
+rust_stdlib_filegroup = rule(doc = "stdlib", implementation = _impl, attrs = {
+    "srcs": attr.label_list(allow_files = True, doc = "stdlib files", mandatory = True),
+})
+"#;
+    let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
+    for (name, allow_files) in [
+        ("OMITTED", false),
+        ("EXPLICIT_NONE", false),
+        ("EXPLICIT_FALSE", false),
+        ("rust_stdlib_filegroup", true),
+    ] {
+        let rule = module
+            .get(name)
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        let srcs = rule
+            .schema
+            .iter()
+            .find(|schema| schema.name == "srcs")
+            .unwrap();
+        assert_eq!(srcs.allow_files, allow_files, "{name}");
+        if allow_files {
+            assert!(srcs.mandatory, "{name}");
+        }
+    }
+    let rejects = |source| eval_bzl_with_identity(source, owner.clone()).is_err();
+    assert!(rejects("X = attr.label_list(allow_files = ['.rlib'])"));
+    assert!(rejects("X = attr.label_list(allow_files = 1)"));
+}
+
+#[tokio::test]
+async fn rust_stdlib_filegroup_projects_file_allowance_into_target_schema() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(':defs.bzl', 'rust_stdlib_filegroup')\nrust_stdlib_filegroup(name = 'stdlib', srcs = [], visibility = ['//visibility:public'])\n",
+        ),
+        (
+            "defs.bzl",
+            b"def _impl(ctx): fail('must stay lazy')\nrust_stdlib_filegroup=rule(implementation=_impl, attrs={'srcs':attr.label_list(allow_files=True, mandatory=True)})\n",
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, 407).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    let package = repository_package_terminal(&outcome);
+    let crate::package::PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+        panic!("stdlib did not retain its Starlark rule implementation")
+    };
+    let srcs = rule
+        .schema()
+        .iter()
+        .find(|schema| schema.declaration_name() == "srcs")
+        .unwrap();
+    assert!(srcs.mandatory() && srcs.allow_files());
+    assert!(srcs.allow_single_file().is_none());
+}
+
 fn eval_bzl_with_identity(
     source: &str,
     owner: BzlModuleIdentity,

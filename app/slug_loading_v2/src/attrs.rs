@@ -83,6 +83,7 @@ pub struct AttributeSchema {
     order_independent: bool,
     ordinary_dependency: bool,
     builtin: bool,
+    allow_files: bool,
     allow_single_file: Option<AllowSingleFile>,
     default: Option<Arc<CoercedAttributeValue>>,
     transition: Option<TransitionDefinition>,
@@ -112,6 +113,7 @@ impl AttributeSchema {
             order_independent: false,
             ordinary_dependency: kind.contributes_ordinary_dependencies(),
             builtin: false,
+            allow_files: false,
             allow_single_file: None,
             default: default.map(Arc::new),
             transition,
@@ -168,6 +170,9 @@ impl AttributeSchema {
     pub fn is_builtin(&self) -> bool {
         self.builtin
     }
+    pub fn allow_files(&self) -> bool {
+        self.allow_files
+    }
     pub(crate) fn order_independent(&self) -> bool {
         self.order_independent
     }
@@ -179,6 +184,10 @@ impl AttributeSchema {
         allow_single_file: Option<AllowSingleFile>,
     ) -> Self {
         self.allow_single_file = allow_single_file;
+        self
+    }
+    pub(crate) fn with_allow_files(mut self, allow_files: bool) -> Self {
+        self.allow_files = allow_files;
         self
     }
     pub fn default(&self) -> Option<&CoercedAttributeValue> {

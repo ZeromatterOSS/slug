@@ -2838,6 +2838,8 @@ pub(crate) struct RuleAttributeSchemaGen<V> {
     #[trace(unsafe_ignore)]
     configurable_set: bool,
     #[trace(unsafe_ignore)]
+    pub(crate) allow_files: bool,
+    #[trace(unsafe_ignore)]
     pub(crate) allow_single_file: Option<AllowSingleFile>,
     #[trace(unsafe_ignore)]
     pub(crate) executable: bool,
@@ -2863,6 +2865,7 @@ fn declared_attribute_schema<'v>(
         transition: definition.transition.clone(),
         builtin: false,
         configurable_set: false,
+        allow_files: definition.allow_files,
         allow_single_file: definition.allow_single_file.clone(),
         executable: definition.executable,
         exec_configuration: definition.exec_configuration,
@@ -2892,6 +2895,7 @@ fn starlark_builtin_schema<V>(
             transition: None,
             builtin: true,
             configurable_set: false,
+            allow_files: false,
             allow_single_file: None,
             executable: false,
             exec_configuration: false,
@@ -3271,6 +3275,8 @@ struct AttributeDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     configurable_set: bool,
     #[trace(unsafe_ignore)]
+    allow_files: bool,
+    #[trace(unsafe_ignore)]
     allow_single_file: Option<AllowSingleFile>,
     #[trace(unsafe_ignore)]
     default: Option<CoercedAttributeValue>,
@@ -3307,6 +3313,7 @@ impl<'v> Freeze for AttributeDefinition<'v> {
             mandatory: self.mandatory,
             configurable: self.configurable,
             configurable_set: self.configurable_set,
+            allow_files: self.allow_files,
             allow_single_file: self.allow_single_file,
             default: self.default,
             executable: self.executable,
@@ -3332,6 +3339,7 @@ impl<'v> Freeze for RuleAttributeSchema<'v> {
             mandatory: self.mandatory,
             configurable: self.configurable,
             configurable_set: self.configurable_set,
+            allow_files: self.allow_files,
             allow_single_file: self.allow_single_file,
             default: self.default,
             executable: self.executable,
@@ -3833,6 +3841,7 @@ fn attribute_definition<'v>(
             AttributeKind::Output | AttributeKind::OutputList
         )),
         configurable_set: configurable.is_some(),
+        allow_files: false,
         allow_single_file,
         default,
         executable,
@@ -3906,6 +3915,18 @@ fn unpack_allow_single_file(value: Option<Value>) -> anyhow::Result<Option<Allow
     Ok(Some(AllowSingleFile::Extensions(extensions.into())))
 }
 
+fn unpack_boolean_allow_files(value: Option<Value>) -> anyhow::Result<bool> {
+    let Some(value) = value else {
+        return Ok(false);
+    };
+    if value.is_none() {
+        return Ok(false);
+    }
+    value
+        .unpack_bool()
+        .ok_or_else(|| anyhow::anyhow!("allow_files must be a bool or None"))
+}
+
 #[starlark_module]
 fn attr_methods(builder: &mut MethodsBuilder) {
     fn label<'v>(
@@ -3937,6 +3958,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] aspects: Option<Value<'v>>,
@@ -3954,6 +3976,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             cfg,
             eval,
         )?;
+        definition.allow_files = unpack_boolean_allow_files(allow_files)?;
         definition.required_providers = required_providers;
         definition.attached_aspect = label_list_attached_aspect(aspects)?;
         Ok(definition)
@@ -4448,6 +4471,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                                 )
                             }),
                         )
+                        .with_allow_files(declaration.allow_files)
                         .with_allow_single_file(declaration.allow_single_file.clone())
                     };
                     // Keep the full declaration schema even for an omitted
@@ -4653,6 +4677,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 || definition.transition.is_some()
                 || definition.executable
                 || definition.exec_configuration
+                || definition.allow_files
                 || definition.allow_single_file.is_some()
                 || definition
                     .default
@@ -4698,6 +4723,9 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 anyhow::bail!(
                     "tag attribute `{name}` does not support explicit configurable policy"
                 );
+            }
+            if definition.allow_files {
+                anyhow::bail!("tag attribute `{name}` does not support allow_files");
             }
             let name = name
                 .strip_prefix('_')
