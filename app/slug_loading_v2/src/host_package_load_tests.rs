@@ -106,7 +106,9 @@ use super::merge_root_package_observations;
 use super::resolve_external_load_label;
 use super::resolve_host_load_label;
 use super::resolve_root_package_direct_load;
+use crate::AllowSingleFile;
 use crate::AttributeKind;
+use crate::CoercedAttributeValue;
 use crate::LoadingPreparationOutcome;
 use crate::RootPackageLoadKey;
 use crate::cycle_detector::bzl_load_cycle_detector;
@@ -2504,6 +2506,81 @@ async fn external_bzl_module_freezes_and_imports_fixed_aspect_definition() {
     let nested = FrozenListRef::from_value(module.get("NESTED").unwrap().value()).unwrap();
     let nested = nested[0].downcast_ref::<FrozenAspectDefinition>().unwrap();
     assert!(nested.exported_name.is_none());
+}
+
+#[tokio::test]
+async fn external_bzl_module_freezes_rust_analyzer_toolchain_rule_schema() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "root.bzl",
+            b"load(':support.bzl', 'rust_analyzer_toolchain', 'EXEC_ONLY', 'CUSTOM_TRUE')\nRULE=rust_analyzer_toolchain\n",
+        ),
+        (
+            "support.bzl",
+            br#"def _impl(ctx): fail("implementation must not run while loading")
+def _transition(settings, attr): return {}
+rust_analyzer_toolchain = rule(implementation = _impl, doc = "toolchain", attrs = {
+    "proc_macro_srv": attr.label(doc = "proc macro", cfg = "exec", executable = True, allow_single_file = True),
+    "rust_analyzer": attr.label(doc = "analyzer", cfg = "exec", executable = True, allow_single_file = True),
+    "rustc": attr.label(doc = "rustc", cfg = "exec", executable = True, allow_single_file = True, mandatory = True),
+    "rustc_srcs": attr.label(doc = "sources", mandatory = True),
+    "rustc_srcs_path": attr.string(doc = "path", default = "library"),
+    "version": attr.string(doc = None, default = ""),
+})
+EXEC_ONLY = rule(implementation = _impl, attrs = {"x": attr.label(cfg = "exec")})
+CUSTOM_TRUE = rule(implementation = _impl, attrs = {"x": attr.label(cfg = transition(implementation = _transition, inputs = [], outputs = ["//:setting"]), executable = True)})
+"#,
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let epoch = EpochBuilder::external_sources(files, 402).build();
+    let mut transaction = transaction(&dice, epoch, false, None).await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+    let module = &external_terminal(&outcome).module;
+    let rule = module
+        .get("RULE")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    let attr_index = |rule: &FrozenRuleDefinition, name: &str| {
+        rule.schema
+            .iter()
+            .position(|schema| schema.name == name)
+            .unwrap()
+    };
+    for name in ["proc_macro_srv", "rust_analyzer", "rustc"] {
+        let schema = &rule.schema[attr_index(&rule, name)];
+        assert!(schema.executable && schema.exec_configuration);
+        assert!(matches!(
+            schema.allow_single_file,
+            Some(AllowSingleFile::True)
+        ));
+    }
+    assert!(rule.schema[attr_index(&rule, "rustc")].mandatory);
+    assert!(rule.schema[attr_index(&rule, "rustc_srcs")].mandatory);
+    assert!(
+        matches!(rule.schema[attr_index(&rule, "rustc_srcs_path")].default.as_ref(), Some(CoercedAttributeValue::String(value)) if value == "library")
+    );
+    assert!(
+        matches!(rule.schema[attr_index(&rule, "version")].default.as_ref(), Some(CoercedAttributeValue::String(value)) if value.is_empty())
+    );
+    for name in ["EXEC_ONLY", "CUSTOM_TRUE"] {
+        let definition = module
+            .get(name)
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        let schema = &definition.schema[attr_index(&definition, "x")];
+        if name == "EXEC_ONLY" {
+            assert!(!schema.executable && schema.exec_configuration && schema.transition.is_none());
+        } else {
+            assert!(schema.executable && !schema.exec_configuration && schema.transition.is_some());
+        }
+    }
 }
 
 #[test]

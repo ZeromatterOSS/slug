@@ -2424,6 +2424,22 @@ impl fmt::Display for FrozenRuleDefinition {
     }
 }
 
+impl FrozenRuleDefinition {
+    fn reject_deferred_attribute_invocation(&self) -> anyhow::Result<()> {
+        if let Some(attribute) = self
+            .schema
+            .iter()
+            .find(|attribute| attribute.executable || attribute.exec_configuration)
+        {
+            anyhow::bail!(
+                "target invocation for executable or exec-configured attribute '{}' is not supported",
+                attribute.name
+            );
+        }
+        Ok(())
+    }
+}
+
 starlark::starlark_complex_values!(RuleDefinition);
 
 impl<'v> Freeze for RuleDefinition<'v> {
@@ -2582,18 +2598,22 @@ pub(crate) struct RuleAttributeSchemaGen<V> {
     #[trace(unsafe_ignore)]
     pub(crate) kind: AttributeKind,
     #[trace(unsafe_ignore)]
-    mandatory: bool,
+    pub(crate) mandatory: bool,
     #[trace(unsafe_ignore)]
     configurable: bool,
     #[trace(unsafe_ignore)]
-    default: Option<CoercedAttributeValue>,
-    transition: Option<TransitionDefinitionGen<V>>,
+    pub(crate) default: Option<CoercedAttributeValue>,
+    pub(crate) transition: Option<TransitionDefinitionGen<V>>,
     #[trace(unsafe_ignore)]
     builtin: bool,
     #[trace(unsafe_ignore)]
     configurable_set: bool,
     #[trace(unsafe_ignore)]
-    allow_single_file: Option<AllowSingleFile>,
+    pub(crate) allow_single_file: Option<AllowSingleFile>,
+    #[trace(unsafe_ignore)]
+    pub(crate) executable: bool,
+    #[trace(unsafe_ignore)]
+    pub(crate) exec_configuration: bool,
 }
 type RuleAttributeSchema<'v> = RuleAttributeSchemaGen<Value<'v>>;
 type FrozenRuleAttributeSchema = RuleAttributeSchemaGen<FrozenValue>;
@@ -2620,6 +2640,8 @@ fn starlark_builtin_schema<V>(
             builtin: true,
             configurable_set: false,
             allow_single_file: None,
+            executable: false,
+            exec_configuration: false,
         });
     };
     push("name", AttributeKind::String, true, false);
@@ -2955,7 +2977,7 @@ fn starlark_test_timeout(size: &str) -> &'static str {
     NoSerialize,
     Allocative
 )]
-struct TransitionDefinitionGen<V> {
+pub(crate) struct TransitionDefinitionGen<V> {
     implementation: V,
     #[trace(unsafe_ignore)]
     #[freeze(identity)]
@@ -2991,6 +3013,10 @@ struct AttributeDefinitionGen<V> {
     allow_single_file: Option<AllowSingleFile>,
     #[trace(unsafe_ignore)]
     default: Option<CoercedAttributeValue>,
+    #[trace(unsafe_ignore)]
+    executable: bool,
+    #[trace(unsafe_ignore)]
+    exec_configuration: bool,
     transition: Option<TransitionDefinitionGen<V>>,
 }
 type AttributeDefinition<'v> = AttributeDefinitionGen<Value<'v>>;
@@ -3019,6 +3045,8 @@ impl<'v> Freeze for AttributeDefinition<'v> {
             configurable_set: self.configurable_set,
             allow_single_file: self.allow_single_file,
             default: self.default,
+            executable: self.executable,
+            exec_configuration: self.exec_configuration,
             transition: self
                 .transition
                 .map(|value| value.freeze(freezer))
@@ -3037,6 +3065,8 @@ impl<'v> Freeze for RuleAttributeSchema<'v> {
             configurable_set: self.configurable_set,
             allow_single_file: self.allow_single_file,
             default: self.default,
+            executable: self.executable,
+            exec_configuration: self.exec_configuration,
             transition: self
                 .transition
                 .map(|value| value.freeze(freezer))
@@ -3480,10 +3510,14 @@ fn attribute_definition<'v>(
     mandatory: bool,
     configurable: Option<bool>,
     allow_single_file: Option<AllowSingleFile>,
+    executable: bool,
     default: Option<Value<'v>>,
     cfg: Option<Value<'v>>,
     eval: &Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<AttributeDefinition<'v>> {
+    if executable && !cfg.as_ref().is_some_and(|value| !value.is_none()) {
+        anyhow::bail!("cfg parameter is mandatory when executable=True is provided");
+    }
     let default = default
         .map(|value| {
             if value.is_none() && kind == AttributeKind::Label {
@@ -3491,11 +3525,28 @@ fn attribute_definition<'v>(
             }
             let raw = raw_attribute_value(value)?;
             let context = BzlEvaluationContext::from_evaluator(eval)?;
-            let source = CanonicalLabel::parse(&format!("@@{}", context.source_label()))
-                .map_err(anyhow::Error::msg)?;
+            let source = context.source_label_for_call(eval)?;
             coerce_raw_value(source.package().package().as_str(), kind, &raw)
         })
         .transpose()?;
+    let mut exec_configuration = false;
+    let transition = cfg
+        .map(|value| {
+            if value.unpack_str() == Some("exec") {
+                exec_configuration = true;
+                return Ok(None);
+            }
+            TransitionDefinition::from_value(value)
+                .into_iter()
+                .find_map(|value| match value {
+                    starlark::__macro_refs::Either::Left(value) => Some(value.clone()),
+                    starlark::__macro_refs::Either::Right(_) => None,
+                })
+                .map(Some)
+                .ok_or_else(|| anyhow::anyhow!("attr.label cfg must be 'exec' or a transition"))
+        })
+        .transpose()?
+        .flatten();
     Ok(AttributeDefinition {
         kind,
         mandatory,
@@ -3506,18 +3557,17 @@ fn attribute_definition<'v>(
         configurable_set: configurable.is_some(),
         allow_single_file,
         default,
-        transition: cfg
-            .map(|value| {
-                TransitionDefinition::from_value(value)
-                    .into_iter()
-                    .find_map(|value| match value {
-                        starlark::__macro_refs::Either::Left(value) => Some(value.clone()),
-                        starlark::__macro_refs::Either::Right(_) => None,
-                    })
-                    .ok_or_else(|| anyhow::anyhow!("attr.label cfg must be a transition"))
-            })
-            .transpose()?,
+        executable,
+        exec_configuration,
+        transition,
     })
+}
+
+fn discard_attribute_doc(doc: Option<Value>) -> anyhow::Result<()> {
+    if doc.is_some_and(|value| !value.is_none() && value.unpack_str().is_none()) {
+        anyhow::bail!("attribute doc must be a string or None");
+    }
+    Ok(())
 }
 
 fn unpack_allow_single_file(value: Option<Value>) -> anyhow::Result<Option<AllowSingleFile>> {
@@ -3562,13 +3612,17 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] allow_single_file: Option<Value<'v>>,
+        #[starlark(require = named)] executable: Option<bool>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
+        discard_attribute_doc(doc)?;
         attribute_definition(
             AttributeKind::Label,
             mandatory.unwrap_or(false),
             configurable,
             unpack_allow_single_file(allow_single_file)?,
+            executable.unwrap_or(false),
             default,
             cfg,
             eval,
@@ -3586,6 +3640,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             mandatory.unwrap_or(false),
             configurable,
             None,
+            false,
             default,
             None,
             eval,
@@ -3603,6 +3658,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             mandatory.unwrap_or(false),
             configurable,
             None,
+            false,
             default,
             None,
             eval,
@@ -3620,6 +3676,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             mandatory.unwrap_or(false),
             configurable,
             None,
+            false,
             default,
             None,
             eval,
@@ -3637,6 +3694,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             mandatory.unwrap_or(false),
             configurable,
             None,
+            false,
             default,
             None,
             eval,
@@ -3654,6 +3712,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             mandatory.unwrap_or(false),
             configurable,
             None,
+            false,
             default,
             None,
             eval,
@@ -3671,6 +3730,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             mandatory.unwrap_or(false),
             configurable,
             None,
+            false,
             default,
             None,
             eval,
@@ -3686,6 +3746,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             mandatory.unwrap_or(false),
             None,
             None,
+            false,
             None,
             None,
             eval,
@@ -3701,6 +3762,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             mandatory.unwrap_or(false),
             None,
             None,
+            false,
             None,
             None,
             eval,
@@ -3711,13 +3773,16 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] mandatory: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
+        discard_attribute_doc(doc)?;
         attribute_definition(
             AttributeKind::String,
             mandatory.unwrap_or(false),
             configurable,
             None,
+            false,
             default,
             None,
             eval,
@@ -3735,6 +3800,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             mandatory.unwrap_or(false),
             configurable,
             None,
+            false,
             default,
             None,
             eval,
@@ -3752,6 +3818,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             mandatory.unwrap_or(false),
             configurable,
             None,
+            false,
             default,
             None,
             eval,
@@ -3769,6 +3836,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             mandatory.unwrap_or(false),
             configurable,
             None,
+            false,
             default,
             None,
             eval,
@@ -3935,6 +4003,8 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 "a target declared by rule() requires a string `name`"
             ))
         })?;
+        self.reject_deferred_attribute_invocation()
+            .map_err(starlark::Error::new_other)?;
         if self.build_setting_kind == Some(BuildSettingKind::Boolean) {
             return Err(starlark::Error::new_other(anyhow::anyhow!(
                 "boolean build setting rule invocation is not supported"
@@ -4243,6 +4313,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                     | AttributeKind::Label
             ) || definition.configurable_set
                 || definition.transition.is_some()
+                || definition.executable
+                || definition.exec_configuration
                 || definition.allow_single_file.is_some()
                 || definition
                     .default
@@ -4278,7 +4350,10 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                     starlark::__macro_refs::Either::Right(_) => None,
                 })
                 .ok_or_else(|| anyhow::anyhow!("tag attribute `{name}` must use attr.*()"))?;
-            if definition.transition.is_some() {
+            if definition.transition.is_some()
+                || definition.executable
+                || definition.exec_configuration
+            {
                 anyhow::bail!("tag attribute `{name}` does not support cfg transitions");
             }
             if definition.configurable_set {
@@ -4618,6 +4693,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                     builtin: false,
                     configurable_set: false,
                     allow_single_file: definition.allow_single_file.clone(),
+                    executable: definition.executable,
+                    exec_configuration: definition.exec_configuration,
                 });
             }
         }

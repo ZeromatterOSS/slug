@@ -2178,6 +2178,63 @@ fn attr_and_transition_parameters_are_named_only_and_transition_inputs_are_requi
 }
 
 #[test]
+fn executable_and_exec_attribute_policies_fail_before_target_recording() {
+    let workspace = scratch("executable-exec-attribute-policy");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    let definitions = |attribute: &str| {
+        format!(
+            "def _impl(ctx): return [DefaultInfo()]\ndef _transition(settings, attr): return {{}}\nprobe = rule(implementation = _impl, attrs = {{\"x\": {attribute}}})\n"
+        )
+    };
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"subject\")\n",
+    )
+    .unwrap();
+
+    for attribute in [
+        "attr.label(cfg = \"exec\")",
+        "attr.label(cfg = \"exec\", executable = False)",
+        "attr.label(cfg = transition(implementation = _transition, inputs = [], outputs = [\"//pkg:setting\"]), executable = True)",
+    ] {
+        fs::write(package.join("defs.bzl"), definitions(attribute)).unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("target invocation for executable or exec-configured attribute 'x'"),
+            "error: {error}"
+        );
+    }
+
+    fs::write(
+        package.join("defs.bzl"),
+        definitions("attr.label(cfg = transition(implementation = _transition, inputs = [], outputs = [\"//pkg:setting\"]), executable = False)"),
+    )
+    .unwrap();
+    assert_eq!(
+        load_package(&workspace, &package).targets[0].name,
+        "subject"
+    );
+
+    for attribute in [
+        "attr.label(False)",
+        "attr.string(\"doc\")",
+        "attr.label(doc = 1)",
+        "attr.string(doc = 1)",
+        "attr.label(executable = True)",
+    ] {
+        fs::write(package.join("defs.bzl"), definitions(attribute)).unwrap();
+        assert!(
+            try_load_package(&workspace, &package).is_err(),
+            "{attribute}"
+        );
+    }
+}
+
+#[test]
 fn transition_rejects_recursive_package_patterns_but_allows_ellipsis_in_target_names() {
     let workspace = scratch("transition-recursive-package-pattern");
     let package = workspace.join("pkg");
