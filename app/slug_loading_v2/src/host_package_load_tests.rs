@@ -3786,6 +3786,18 @@ const UTILS_UNSUPPORTED_FEATURES_SOURCE: &str = r###"UNSUPPORTED_FEATURES = [
 ]
 "###;
 
+const UTILS_FIND_TOOLCHAIN_SOURCE: &str = r###"def find_toolchain(ctx):
+    """Finds the first rust toolchain that is configured.
+
+    Args:
+        ctx (ctx): The ctx object for the current target.
+
+    Returns:
+        rust_toolchain: A Rust toolchain context.
+    """
+    return ctx.toolchains[Label("//rust:toolchain_type")]
+"###;
+
 const UTILS_FORCE_DISABLE_SOURCE: &str = r###"_FORCE_DISABLE_CC_TOOLCHAIN = False
 "###;
 
@@ -4112,6 +4124,47 @@ fn exact_rules_rust_utils_eager_values_freeze_without_invocation() {
     let encode = encode_binding.value();
     assert_eq!(encode.get_type(), "function");
     assert!(encode.ptr_eq(proof_field("encode")));
+}
+
+#[test]
+fn exact_rules_rust_utils_find_toolchain_export_retains_parent_import_identity() {
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(UTILS_FIND_TOOLCHAIN_SOURCE.as_bytes())
+        ),
+        "75fe3e764290fcfcec78cc25d25b4d2486708dafabb112f5d1e44b8e21081be1"
+    );
+    let owner = |label: &str, path: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(label).unwrap(),
+        workspace_path: PathBuf::from(path),
+        repository_mapping: Arc::from([]),
+    };
+    let child_owner = owner(
+        "@@rules_rust+//rust/private:utils.bzl",
+        "/rules_rust/rust/private/utils.bzl",
+    );
+    let child = eval_bzl_with_identity(UTILS_FIND_TOOLCHAIN_SOURCE, child_owner.clone()).unwrap();
+    assert_eq!(
+        child.get("find_toolchain").unwrap().value().get_type(),
+        "function"
+    );
+    let parent = eval_bzl_with_loaded_children(
+        "load(\":utils.bzl\", \"find_toolchain\")\nIMPORTED = find_toolchain\n",
+        owner(
+            "@@rules_rust+//rust/private:rust.bzl",
+            "/rules_rust/rust/private/rust.bzl",
+        ),
+        &[(":utils.bzl", child_owner, child.dupe())],
+    )
+    .unwrap();
+    assert!(
+        parent
+            .get("IMPORTED")
+            .unwrap()
+            .value()
+            .ptr_eq(child.get("find_toolchain").unwrap().value())
+    );
 }
 
 #[test]
