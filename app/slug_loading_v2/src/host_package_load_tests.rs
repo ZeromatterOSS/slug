@@ -73,6 +73,11 @@ use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
+use starlark::environment::Globals;
+use starlark::environment::Module;
+use starlark::eval::Evaluator;
+use starlark::syntax::AstModule;
+use starlark::syntax::Dialect;
 use starlark::values::structs::StructRef;
 use starlark_map::small_map::SmallMap;
 
@@ -90,13 +95,18 @@ use super::RepositoryPackageLoadKey;
 use super::RepositoryPackageLoadObservationKey;
 use super::RootPackageDirectLoad;
 use super::RootPackageLoadObservationKey;
+use super::build_file_loading_globals;
+use super::loading_globals;
 use super::merge_root_package_observations;
 use super::resolve_external_load_label;
 use super::resolve_host_load_label;
 use super::resolve_root_package_direct_load;
+use crate::AttributeKind;
 use crate::LoadingPreparationOutcome;
 use crate::RootPackageLoadKey;
 use crate::cycle_detector::bzl_load_cycle_detector;
+use crate::package::BuildSettingKind;
+use crate::package::FrozenRuleDefinition;
 use crate::provider::FrozenUserProviderCallable;
 
 fn workspace() -> NormalizedAbsolutePath {
@@ -2355,6 +2365,106 @@ async fn external_bzl_module_rejects_non_string_rule_doc() {
     assert!(
         message.contains("rule doc must be a string or None"),
         "{message}"
+    );
+}
+
+#[tokio::test]
+async fn external_bzl_module_freezes_typed_bazel_config_bool_definition() {
+    let files: &[(&str, &[u8])] = &[
+        ("root.bzl", b"load(\":support.bzl\", \"bool_rule\")\nBOOL = bool_rule\n"),
+        (
+            "support.bzl",
+            b"def _impl(ctx): return []\nbool_rule = rule(implementation = _impl, build_setting = config.bool(flag = True))\n",
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, 397).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+    let rule = external_terminal(&outcome)
+        .module
+        .get("BOOL")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    assert_eq!(rule.build_setting_kind, Some(BuildSettingKind::Boolean));
+    assert_eq!(
+        rule.schema
+            .iter()
+            .find(|schema| schema.name == "build_setting_default")
+            .unwrap()
+            .kind,
+        AttributeKind::Boolean
+    );
+}
+fn evaluate_config_global(source: &str, globals: &Globals) -> Result<(), String> {
+    let ast = AstModule::parse("BUILD.bazel", source.to_owned(), &Dialect::Bazel).unwrap();
+    let module = Module::new();
+    Evaluator::new(&module)
+        .eval_module(ast, globals)
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
+#[test]
+fn bazel_config_bool_is_bzl_only_and_requires_flag_true() {
+    let bzl = loading_globals();
+    for source in [
+        "X=config.bool()",
+        "X=config.bool(flag=1==2)",
+        "X=config.bool(True)",
+    ] {
+        let error = evaluate_config_global(source, &bzl).unwrap_err();
+        assert!(error.contains("supported") || error.contains("positional"));
+    }
+    let error = evaluate_config_global(
+        "S=config.string(flag=True)\nB=config.bool(flag=True)",
+        &build_file_loading_globals(),
+    )
+    .unwrap_err();
+    assert!(error.contains("bool"));
+}
+
+#[tokio::test]
+async fn repository_package_rejects_config_bool_rule_before_target_recording() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(\":defs.bzl\", \"bool_rule\")\nbool_rule(name = \"blocked\", build_setting_default = True)\n",
+        ),
+        (
+            "defs.bzl",
+            b"def _impl(ctx): return []\nbool_rule = rule(implementation = _impl, build_setting = config.bool(flag = True))\n",
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, 398).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    assert!(
+        repository_package_error(&outcome)
+            .contains("boolean build setting rule invocation is not supported")
     );
 }
 

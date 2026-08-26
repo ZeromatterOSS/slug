@@ -449,6 +449,21 @@ impl NativeToolchainTarget {
 
 /// The frozen rule implementation retained for configured-target analysis.
 /// The containing package keeps its source `.bzl` module alive.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
+pub(crate) enum BuildSettingKind {
+    String,
+    Boolean,
+}
+
+impl BuildSettingKind {
+    fn attribute_kind(self) -> AttributeKind {
+        match self {
+            Self::String => AttributeKind::String,
+            Self::Boolean => AttributeKind::Boolean,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Allocative)]
 pub struct StarlarkRuleImplementation {
     #[allocative(skip)]
@@ -458,7 +473,7 @@ pub struct StarlarkRuleImplementation {
     schema: Arc<[AttributeSchema]>,
     values: Arc<[AttributeValue]>,
     capability: Arc<RuleCapability>,
-    root_string_build_setting: bool,
+    build_setting_kind: Option<BuildSettingKind>,
 }
 
 impl PartialEq for StarlarkRuleImplementation {
@@ -470,7 +485,7 @@ impl PartialEq for StarlarkRuleImplementation {
             && self.schema == other.schema
             && self.values == other.values
             && self.capability == other.capability
-            && self.root_string_build_setting == other.root_string_build_setting
+            && self.build_setting_kind == other.build_setting_kind
     }
 }
 
@@ -499,10 +514,10 @@ impl StarlarkRuleImplementation {
         &self.values
     }
     pub fn is_root_string_build_setting(&self) -> bool {
-        self.root_string_build_setting
+        self.build_setting_kind == Some(BuildSettingKind::String)
     }
     pub fn root_string_build_setting_default(&self) -> Option<&str> {
-        self.root_string_build_setting.then(|| {
+        self.is_root_string_build_setting().then(|| {
             self.value("build_setting_default")
                 .and_then(|value| match value.value.as_ref() {
                     CoercedAttributeValue::String(value) => Some(value.as_str()),
@@ -902,7 +917,7 @@ impl PackageRecorder {
         capability: Arc<RuleCapability>,
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
-        root_string_build_setting: bool,
+        build_setting_kind: Option<BuildSettingKind>,
         visibility: Option<Vec<String>>,
     ) -> anyhow::Result<()> {
         let mut dependencies = Vec::new();
@@ -932,7 +947,7 @@ impl PackageRecorder {
                 schema,
                 values,
                 capability,
-                root_string_build_setting,
+                build_setting_kind,
             }),
             self.visibility_source(visibility, VisibilitySource::PackageDefault)?,
         )
@@ -2339,7 +2354,7 @@ struct RuleDefinitionGen<V> {
     schema: Arc<[RuleAttributeSchemaGen<V>]>,
     executable: bool,
     test: bool,
-    root_string_build_setting: bool,
+    build_setting_kind: Option<BuildSettingKind>,
     #[trace(unsafe_ignore)]
     rule_class: OnceCell<CompactString>,
 }
@@ -2347,12 +2362,12 @@ struct RuleDefinitionGen<V> {
 /// The frozen definition contains no export-time interior mutability. Its
 /// shared capability is cloned into every package instance of this rule.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-struct FrozenRuleDefinition {
+pub(crate) struct FrozenRuleDefinition {
     implementation: FrozenValue,
     required_toolchains: Arc<[CanonicalLabel]>,
-    schema: Arc<[FrozenRuleAttributeSchema]>,
+    pub(crate) schema: Arc<[FrozenRuleAttributeSchema]>,
     capability: Arc<RuleCapability>,
-    root_string_build_setting: bool,
+    pub(crate) build_setting_kind: Option<BuildSettingKind>,
 }
 
 type RuleDefinition<'v> = RuleDefinitionGen<Value<'v>>;
@@ -2395,7 +2410,7 @@ impl<'v> Freeze for RuleDefinition<'v> {
                 executable: self.executable || self.test,
                 test_kind: self.test.then_some(TestRuleKind::Test),
             }),
-            root_string_build_setting: self.root_string_build_setting,
+            build_setting_kind: self.build_setting_kind,
         })
     }
 }
@@ -2442,11 +2457,11 @@ enum RawAttributeValue {
 }
 
 #[derive(Debug, Clone, Trace, Allocative)]
-struct RuleAttributeSchemaGen<V> {
+pub(crate) struct RuleAttributeSchemaGen<V> {
     #[trace(unsafe_ignore)]
-    name: CompactString,
+    pub(crate) name: CompactString,
     #[trace(unsafe_ignore)]
-    kind: AttributeKind,
+    pub(crate) kind: AttributeKind,
     #[trace(unsafe_ignore)]
     mandatory: bool,
     #[trace(unsafe_ignore)]
@@ -2471,7 +2486,7 @@ type FrozenRuleAttributeSchema = RuleAttributeSchemaGen<FrozenValue>;
 fn starlark_builtin_schema<V>(
     executable: bool,
     test: bool,
-    root_string_build_setting: bool,
+    build_setting_kind: Option<BuildSettingKind>,
     has_transition: bool,
 ) -> Vec<RuleAttributeSchemaGen<V>> {
     let mut result = Vec::new();
@@ -2558,8 +2573,8 @@ fn starlark_builtin_schema<V>(
         }
         push("$is_executable", AttributeKind::Boolean, false, false);
     }
-    if root_string_build_setting {
-        push("build_setting_default", AttributeKind::String, true, false);
+    if let Some(kind) = build_setting_kind {
+        push("build_setting_default", kind.attribute_kind(), true, false);
         push("help", AttributeKind::String, false, false);
     }
     if has_transition {
@@ -3658,6 +3673,14 @@ impl fmt::Display for ConfigModule {
         f.write_str("config")
     }
 }
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct BuildFileConfigModule;
+starlark::starlark_simple_value!(BuildFileConfigModule);
+impl fmt::Display for BuildFileConfigModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("config")
+    }
+}
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct RootStringBuildSetting;
 starlark::starlark_simple_value!(RootStringBuildSetting);
@@ -3668,16 +3691,50 @@ impl fmt::Display for RootStringBuildSetting {
 }
 #[starlark_value(type = "config_string")]
 impl<'v> StarlarkValue<'v> for RootStringBuildSetting {}
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct RootBoolBuildSetting;
+starlark::starlark_simple_value!(RootBoolBuildSetting);
+impl fmt::Display for RootBoolBuildSetting {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("config.bool")
+    }
+}
+#[starlark_value(type = "config_bool")]
+impl<'v> StarlarkValue<'v> for RootBoolBuildSetting {}
+
+fn root_string_build_setting(flag: bool) -> anyhow::Result<RootStringBuildSetting> {
+    if !flag {
+        anyhow::bail!("only config.string(flag = True) is supported")
+    }
+    Ok(RootStringBuildSetting)
+}
+
 #[starlark_module]
 fn config_methods(builder: &mut MethodsBuilder) {
     fn string(
         #[starlark(this)] _config: Value,
         #[starlark(default = false)] flag: bool,
     ) -> anyhow::Result<RootStringBuildSetting> {
+        root_string_build_setting(flag)
+    }
+
+    fn bool(
+        #[starlark(this)] _config: Value,
+        #[starlark(require = named, default = false)] flag: bool,
+    ) -> anyhow::Result<RootBoolBuildSetting> {
         if !flag {
-            anyhow::bail!("only config.string(flag = True) is supported")
+            anyhow::bail!("only config.bool(flag = True) is supported")
         }
-        Ok(RootStringBuildSetting)
+        Ok(RootBoolBuildSetting)
+    }
+}
+#[starlark_module]
+fn build_file_config_methods(builder: &mut MethodsBuilder) {
+    fn string(
+        #[starlark(this)] _config: Value,
+        #[starlark(default = false)] flag: bool,
+    ) -> anyhow::Result<RootStringBuildSetting> {
+        root_string_build_setting(flag)
     }
 }
 #[starlark_value(type = "config")]
@@ -3685,6 +3742,13 @@ impl<'v> StarlarkValue<'v> for ConfigModule {
     fn get_methods() -> Option<&'static Methods> {
         static METHODS: MethodsStatic = MethodsStatic::new();
         METHODS.methods(config_methods)
+    }
+}
+#[starlark_value(type = "config")]
+impl<'v> StarlarkValue<'v> for BuildFileConfigModule {
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(build_file_config_methods)
     }
 }
 
@@ -3729,6 +3793,11 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 "a target declared by rule() requires a string `name`"
             ))
         })?;
+        if self.build_setting_kind == Some(BuildSettingKind::Boolean) {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "boolean build setting rule invocation is not supported"
+            )));
+        }
         for attribute in names.keys() {
             if attribute.as_str() != "name"
                 && attribute.as_str() != "visibility"
@@ -3937,7 +4006,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     capability,
                     schema,
                     values,
-                    self.root_string_build_setting,
+                    self.build_setting_kind,
                     visibility,
                 )?;
                 for output in generated {
@@ -4349,14 +4418,22 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         if doc.is_some_and(|value| !value.is_none() && value.unpack_str().is_none()) {
             anyhow::bail!("rule doc must be a string or None");
         }
-        let root_string_build_setting = build_setting
-            .map(|value| RootStringBuildSetting::from_value(value).is_some())
-            .unwrap_or(false);
-        if build_setting.is_some() && !root_string_build_setting {
-            anyhow::bail!("only rule(build_setting = config.string(flag = True)) is supported")
+        let build_setting_kind = build_setting.and_then(|value| {
+            if RootStringBuildSetting::from_value(value).is_some() {
+                Some(BuildSettingKind::String)
+            } else if RootBoolBuildSetting::from_value(value).is_some() {
+                Some(BuildSettingKind::Boolean)
+            } else {
+                None
+            }
+        });
+        if build_setting.is_some() && build_setting_kind.is_none() {
+            anyhow::bail!(
+                "only rule(build_setting = config.string(flag = True) or config.bool(flag = True)) is supported"
+            )
         }
         let declared_builtin_names =
-            starlark_builtin_schema::<Value<'v>>(executable, test, root_string_build_setting, true);
+            starlark_builtin_schema::<Value<'v>>(executable, test, build_setting_kind, true);
         let mut user_schema = Vec::new();
         if let Some(attrs) = attrs {
             for (name, value) in attrs {
@@ -4392,7 +4469,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         }
         let has_transition = user_schema.iter().any(|schema| schema.transition.is_some());
         let mut schema =
-            starlark_builtin_schema(executable, test, root_string_build_setting, has_transition);
+            starlark_builtin_schema(executable, test, build_setting_kind, has_transition);
         schema.extend(user_schema);
         Ok(RuleDefinition {
             implementation,
@@ -4400,7 +4477,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             schema: schema.into(),
             executable,
             test,
-            root_string_build_setting,
+            build_setting_kind,
             rule_class: OnceCell::new(),
         })
     }
@@ -4708,13 +4785,17 @@ impl AllocFrozenValue for NativeModule {
     }
 }
 
-fn complete_loading_globals(extensions: &[LibraryExtension]) -> Globals {
+fn complete_loading_globals(extensions: &[LibraryExtension], bool_config: bool) -> Globals {
     let mut globals = GlobalsBuilder::extended_by(extensions)
         .with(package_globals)
         .with(select_globals);
     globals.set("native", NativeModule);
     globals.set("attr", AttrModule);
-    globals.set("config", ConfigModule);
+    if bool_config {
+        globals.set("config", ConfigModule);
+    } else {
+        globals.set("config", BuildFileConfigModule);
+    }
     globals.set("platform_common", PlatformCommonModule);
     globals.set("DefaultInfo", AnalysisBuiltinCallable::new("DefaultInfo"));
     globals.set("depset", AnalysisBuiltinCallable::new("depset"));
@@ -4722,11 +4803,14 @@ fn complete_loading_globals(extensions: &[LibraryExtension]) -> Globals {
 }
 
 pub(crate) fn loading_globals() -> Globals {
-    complete_loading_globals(&[LibraryExtension::Print, LibraryExtension::StructType])
+    complete_loading_globals(
+        &[LibraryExtension::Print, LibraryExtension::StructType],
+        true,
+    )
 }
 
 pub(crate) fn build_file_loading_globals() -> Globals {
-    complete_loading_globals(&[LibraryExtension::Print])
+    complete_loading_globals(&[LibraryExtension::Print], false)
 }
 
 #[cfg(test)]
