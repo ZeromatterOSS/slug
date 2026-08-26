@@ -1702,6 +1702,28 @@ type ObservedExternalBzlOutcome = <ExternalBzlModuleObservationKey as Key>::Valu
 type RepositoryPackageOutcome = <RepositoryPackageLoadKey as Key>::Value;
 type ObservedRepositoryPackageOutcome = <RepositoryPackageLoadObservationKey as Key>::Value;
 
+async fn load_repository_package_fixture(
+    files: &[(&str, &[u8])],
+    variant: i64,
+) -> RepositoryPackageOutcome {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, variant).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    transaction
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap()
+}
+
 fn observed_repository_package(
     outcome: &ObservedRepositoryPackageOutcome,
 ) -> &super::ObservedRepositoryPackageLoad {
@@ -3351,7 +3373,144 @@ SECOND = rule(implementation = _impl, attrs = _attrs("different documentation"))
             "{invalid}"
         );
     }
-    assert!(eval_bzl_with_identity("X = attr.int(values = [-1, 0, 1])", owner).is_err());
+    assert!(eval_bzl_with_identity("X = attr.string(values = ['cc', 'rust'])", owner).is_err());
+}
+
+#[test]
+fn bazel_integer_allowed_values_freeze_rust_toolchain_prefix() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_rust+//rust/private:toolchain.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_rust/rust/private/toolchain.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let source = r#"
+def _impl(ctx): fail("implementation must stay lazy")
+OMITTED = rule(implementation = _impl, attrs = {"x": attr.int()})
+EMPTY_LIST = rule(implementation = _impl, attrs = {"x": attr.int(values = [])})
+EMPTY_TUPLE = rule(implementation = _impl, attrs = {"x": attr.int(values = ())})
+NORMALIZED = rule(implementation = _impl, attrs = {"x": attr.int(values = [1, -1, 1, 0])})
+SAME = rule(implementation = _impl, attrs = {"x": attr.int(values = (-1, 0, 1))})
+DISTINCT = rule(implementation = _impl, attrs = {"x": attr.int(values = [-1, 1])})
+BAD_DEFAULT = rule(implementation = _impl, attrs = {"x": attr.int(default = 2, values = [0, 1])})
+rust_toolchain = rule(implementation = _impl, attrs = {
+    "experimental_use_allocator_libraries_with_mangled_symbols": attr.int(doc = "allocator", values = [-1, 0, 1], default = -1), "experimental_use_cc_common_link": attr.label(default = Label("//rust/settings:cc_common_link"), doc = "cc link"), "extra_exec_rustc_flags": attr.string_list(doc = "exec flags"), "extra_rustc_flags_for_crate_types": attr.string_list_dict(doc = "crate flags"), "global_allocator_library": attr.label(default = Label("//rust/private/cc:global_allocator_library"), doc = "allocator library"), "iso_date": attr.string(doc = "date", default = ""), "linker": attr.label(doc = "linker", cfg = "exec", allow_single_file = True),
+})
+"#;
+    let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
+    let snapshot = |rule_name: &str, attribute_name: &str| {
+        let rule = module
+            .get(rule_name)
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        let schema = rule
+            .schema
+            .iter()
+            .find(|schema| schema.name == attribute_name)
+            .unwrap();
+        (
+            schema.default.clone(),
+            schema.allowed_integer_values.clone(),
+        )
+    };
+    for name in ["OMITTED", "EMPTY_LIST", "EMPTY_TUPLE"] {
+        assert!(snapshot(name, "x").1.is_empty(), "{name}");
+    }
+    let normalized = snapshot("NORMALIZED", "x");
+    assert_eq!(normalized.1.as_ref(), [-1, 0, 1]);
+    assert_eq!(snapshot("SAME", "x"), normalized);
+    assert_eq!(snapshot("DISTINCT", "x").1.as_ref(), [-1, 1]);
+    let bad_default = snapshot("BAD_DEFAULT", "x");
+    assert!(matches!(
+        bad_default.0,
+        Some(CoercedAttributeValue::Integer(2))
+    ));
+    assert_eq!(bad_default.1.as_ref(), [0, 1]);
+    let allocator = snapshot(
+        "rust_toolchain",
+        "experimental_use_allocator_libraries_with_mangled_symbols",
+    );
+    assert_eq!(allocator.1.as_ref(), [-1, 0, 1]);
+    for invalid in ["None", "1", "['1']", "[True]", "{}", "[2147483648]"] {
+        let source = format!("X = attr.int(values = {invalid})");
+        assert!(
+            eval_bzl_with_identity(&source, owner.clone()).is_err(),
+            "{invalid}"
+        );
+    }
+    assert!(
+        eval_bzl_with_identity("X = attr.string(values = ['cc', 'rust'])", owner.clone()).is_err()
+    );
+    assert!(
+        eval_bzl_with_identity(
+            "def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.int(values = [1])})",
+            owner.clone()
+        )
+        .is_err()
+    );
+    assert!(
+        eval_bzl_with_identity(
+            "X = tag_class(attrs = {'x': attr.int(values = [1])})",
+            owner
+        )
+        .is_err()
+    );
+}
+
+#[tokio::test]
+async fn integer_allowed_values_enforce_explicit_and_select_candidates() {
+    let defs = b"def _impl(ctx): fail('must stay lazy')\nr=rule(implementation=_impl, attrs={'x':attr.int(default=2, values=[1,-1,0,1])})\n";
+    let good: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(':defs.bzl','r')\nr(name='default',visibility=['//visibility:public'])\n",
+        ),
+        ("defs.bzl", defs),
+    ];
+    let outcome = load_repository_package_fixture(good, 411).await;
+    let package = repository_package_terminal(&outcome);
+    let default = package
+        .targets
+        .iter()
+        .find(|target| target.name == "default")
+        .unwrap();
+    let crate::package::PackageTargetKind::StarlarkRule(rule) = &default.kind else {
+        panic!("default target did not retain its Starlark rule")
+    };
+    let x_schema = rule
+        .schema()
+        .iter()
+        .find(|schema| schema.declaration_name() == "x")
+        .unwrap();
+    let x_value = rule
+        .values()
+        .iter()
+        .find(|value| value.declaration_name == "x")
+        .unwrap();
+    assert_eq!(x_schema.allowed_integer_values(), [-1, 0, 1]);
+    assert!(matches!(
+        x_value.value.as_ref(),
+        CoercedAttributeValue::Integer(2)
+    ));
+
+    for (variant, build) in [
+        (415, b"load(':defs.bzl','r')\nr(name='allowed',x=-1,visibility=['//visibility:public'])\n".as_slice()),
+        (416, b"load(':defs.bzl','r')\nr(name='selected',x=select({'//conditions:default':0}),visibility=['//visibility:public'])\n".as_slice()),
+    ] {
+        let files = [("BUILD.bazel", build), ("defs.bzl", defs.as_slice())];
+        let outcome = load_repository_package_fixture(&files, variant).await;
+        let _ = repository_package_terminal(&outcome);
+    }
+
+    for (variant, build) in [
+        (412, b"load(':defs.bzl','r')\nr(name='bad',x=2,visibility=['//visibility:public'])\n".as_slice()),
+        (413, b"load(':defs.bzl','r')\nr(name='bad',x=select({'//conditions:default':2}),visibility=['//visibility:public'])\n".as_slice()),
+        (414, b"load(':defs.bzl','r')\nr(name='bad',x=select({'//:flag':2,'//conditions:default':0}),visibility=['//visibility:public'])\n".as_slice()),
+    ] {
+        let files = [("BUILD.bazel", build), ("defs.bzl", defs.as_slice())];
+        let outcome = load_repository_package_fixture(&files, variant).await;
+        assert!(repository_package_error(&outcome).contains("2 is not allowed"));
+    }
 }
 
 fn eval_bzl_with_identity(

@@ -2842,6 +2842,8 @@ pub(crate) struct RuleAttributeSchemaGen<V> {
     #[trace(unsafe_ignore)]
     pub(crate) allow_single_file: Option<AllowSingleFile>,
     #[trace(unsafe_ignore)]
+    pub(crate) allowed_integer_values: Arc<[i32]>,
+    #[trace(unsafe_ignore)]
     pub(crate) executable: bool,
     #[trace(unsafe_ignore)]
     pub(crate) exec_configuration: bool,
@@ -2867,6 +2869,7 @@ fn declared_attribute_schema<'v>(
         configurable_set: false,
         allow_files: definition.allow_files,
         allow_single_file: definition.allow_single_file.clone(),
+        allowed_integer_values: definition.allowed_integer_values.clone(),
         executable: definition.executable,
         exec_configuration: definition.exec_configuration,
         required_providers: definition.required_providers.clone(),
@@ -2897,6 +2900,7 @@ fn starlark_builtin_schema<V>(
             configurable_set: false,
             allow_files: false,
             allow_single_file: None,
+            allowed_integer_values: Arc::from([]),
             executable: false,
             exec_configuration: false,
             required_providers: Arc::from([]),
@@ -3202,6 +3206,35 @@ fn normalize_starlark_value(
     }
 }
 
+fn validate_allowed_integer_value(
+    attribute_name: &str,
+    value: &CoercedAttributeValue,
+    allowed: &[i32],
+) -> anyhow::Result<()> {
+    if allowed.is_empty() {
+        return Ok(());
+    }
+    match value {
+        CoercedAttributeValue::Integer(value) if allowed.binary_search(value).is_ok() => Ok(()),
+        CoercedAttributeValue::Integer(value) => {
+            anyhow::bail!("invalid value in `{attribute_name}` attribute: {value} is not allowed")
+        }
+        CoercedAttributeValue::Selector { branches, default } => {
+            for (_, value) in branches.iter() {
+                validate_allowed_integer_value(attribute_name, value, allowed)?;
+            }
+            if let Some(value) = default {
+                validate_allowed_integer_value(attribute_name, value, allowed)?;
+            }
+            Ok(())
+        }
+        CoercedAttributeValue::Concatenation(_, _) => anyhow::bail!(
+            "integer allowed values on concatenated select expressions are not supported"
+        ),
+        _ => anyhow::bail!("attribute `{attribute_name}` must be an integer"),
+    }
+}
+
 fn replace_starlark_builtin_value(
     values: &mut [AttributeValue],
     name: &str,
@@ -3279,6 +3312,8 @@ struct AttributeDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     allow_single_file: Option<AllowSingleFile>,
     #[trace(unsafe_ignore)]
+    allowed_integer_values: Arc<[i32]>,
+    #[trace(unsafe_ignore)]
     default: Option<CoercedAttributeValue>,
     #[trace(unsafe_ignore)]
     executable: bool,
@@ -3315,6 +3350,7 @@ impl<'v> Freeze for AttributeDefinition<'v> {
             configurable_set: self.configurable_set,
             allow_files: self.allow_files,
             allow_single_file: self.allow_single_file,
+            allowed_integer_values: self.allowed_integer_values,
             default: self.default,
             executable: self.executable,
             exec_configuration: self.exec_configuration,
@@ -3341,6 +3377,7 @@ impl<'v> Freeze for RuleAttributeSchema<'v> {
             configurable_set: self.configurable_set,
             allow_files: self.allow_files,
             allow_single_file: self.allow_single_file,
+            allowed_integer_values: self.allowed_integer_values,
             default: self.default,
             executable: self.executable,
             exec_configuration: self.exec_configuration,
@@ -3843,6 +3880,7 @@ fn attribute_definition<'v>(
         configurable_set: configurable.is_some(),
         allow_files: false,
         allow_single_file,
+        allowed_integer_values: Arc::from([]),
         default,
         executable,
         exec_configuration,
@@ -3925,6 +3963,13 @@ fn unpack_boolean_allow_files(value: Option<Value>) -> anyhow::Result<bool> {
     value
         .unpack_bool()
         .ok_or_else(|| anyhow::anyhow!("allow_files must be a bool or None"))
+}
+
+fn normalize_allowed_integer_values(values: Option<UnpackListOrTuple<i32>>) -> Arc<[i32]> {
+    let mut values = values.unwrap_or_default().items;
+    values.sort_unstable();
+    values.dedup();
+    values.into()
 }
 
 #[starlark_module]
@@ -4043,10 +4088,11 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] values: Option<UnpackListOrTuple<i32>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
-        attribute_definition(
+        let mut definition = attribute_definition(
             AttributeKind::Integer,
             mandatory.unwrap_or(false),
             configurable,
@@ -4055,7 +4101,9 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             default,
             None,
             eval,
-        )
+        )?;
+        definition.allowed_integer_values = normalize_allowed_integer_values(values);
+        Ok(definition)
     }
     fn label_list_dict<'v>(
         #[starlark(this)] _attr: Value<'v>,
@@ -4481,6 +4529,9 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                         )
                         .with_allow_files(declaration.allow_files)
                         .with_allow_single_file(declaration.allow_single_file.clone())
+                        .with_allowed_integer_values(
+                            declaration.allowed_integer_values.clone(),
+                        )
                     };
                     // Keep the full declaration schema even for an omitted
                     // optional value. Stage 8 must distinguish absent-looking
@@ -4540,6 +4591,13 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                         ),
                     };
                     let value = normalize_starlark_value(value, attribute_schema.order_independent());
+                    if provenance == AttributeProvenance::Explicit {
+                        validate_allowed_integer_value(
+                            &declaration.name,
+                            &value,
+                            attribute_schema.allowed_integer_values(),
+                        )?;
+                    }
                     if matches!(
                         attribute_schema.kind(),
                         AttributeKind::Output | AttributeKind::OutputList
@@ -4687,6 +4745,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 || definition.exec_configuration
                 || definition.allow_files
                 || definition.allow_single_file.is_some()
+                || !definition.allowed_integer_values.is_empty()
                 || definition
                     .default
                     .as_ref()
@@ -4734,6 +4793,9 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             }
             if definition.allow_files {
                 anyhow::bail!("tag attribute `{name}` does not support allow_files");
+            }
+            if !definition.allowed_integer_values.is_empty() {
+                anyhow::bail!("tag attribute `{name}` does not support allowed values");
             }
             let name = name
                 .strip_prefix('_')

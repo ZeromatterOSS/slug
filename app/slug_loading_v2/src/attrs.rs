@@ -85,6 +85,7 @@ pub struct AttributeSchema {
     builtin: bool,
     allow_files: bool,
     allow_single_file: Option<AllowSingleFile>,
+    allowed_integer_values: Arc<[i32]>,
     default: Option<Arc<CoercedAttributeValue>>,
     transition: Option<TransitionDefinition>,
 }
@@ -115,6 +116,7 @@ impl AttributeSchema {
             builtin: false,
             allow_files: false,
             allow_single_file: None,
+            allowed_integer_values: Arc::from([]),
             default: default.map(Arc::new),
             transition,
         }
@@ -179,6 +181,9 @@ impl AttributeSchema {
     pub fn allow_single_file(&self) -> Option<&AllowSingleFile> {
         self.allow_single_file.as_ref()
     }
+    pub(crate) fn allowed_integer_values(&self) -> &[i32] {
+        &self.allowed_integer_values
+    }
     pub(crate) fn with_allow_single_file(
         mut self,
         allow_single_file: Option<AllowSingleFile>,
@@ -188,6 +193,10 @@ impl AttributeSchema {
     }
     pub(crate) fn with_allow_files(mut self, allow_files: bool) -> Self {
         self.allow_files = allow_files;
+        self
+    }
+    pub(crate) fn with_allowed_integer_values(mut self, values: Arc<[i32]>) -> Self {
+        self.allowed_integer_values = values;
         self
     }
     pub fn default(&self) -> Option<&CoercedAttributeValue> {
