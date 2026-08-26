@@ -5247,6 +5247,33 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Exact utils eager values accepted; parent-import frontier audit selected (2026-08-26)
+
+Commit `adde01290` freezes five exact rules_rust 0.73.0 `utils.bzl` slices
+totaling 124 source lines under exact producer
+`@@rules_rust+//rust/private:utils.bzl`. It proves the ordered six unsupported
+features, false C++ kill switch, all 63 derived substitution pairs, the public
+list alias, and the public encode function alias without invoking a helper.
+Lines 692-740 close only `_encode_raw_string`'s compiler/freeze dependency on
+`_replace_all`; all utility results and diagnostics remain deferred.
+
+The +202 proof/0 production change ends at 8,362 lines. Focused proof, all 227
+loading units, 24 invalidation tests, 31 BUILD-loading tests, direct dependents,
+CLI build and hygiene pass; independent review returned `ACCEPT`.
+
+The exact parent `rust.bzl`, 1,821 lines at SHA-256
+`a645bd5db6344bd3c0997dcf73600475c0af53fb4dd025890be24b8e1e2dbfd8`,
+imports fifteen functions from utils at lines 40-57, slice SHA-256
+`1ad3406b7c58cc7d74e1e86991fdb6aeadbd836d32926fc54eee9583295ab500`.
+Those exports and their transitive compiler/freeze dependencies are not yet
+admitted. Run only the bounded docs audit
+`WP-4-7A-post-utils-eager-values-parent-import-frontier-audit`; do not return to
+parent source or invoke a utility until it selects an exact proof or `REPLAN`.
+
+Clean `../zabel` `0795445f…` remains architecture guidance only for recursively
+freezing reachable defining-module values. Bazel 9.2 remains sole behavior
+authority; no Zig implementation or behavior is copied.
+
 ### Post-find-toolchain audit selects bounded utils eager-values proof (2026-08-26)
 
 Exact `rust/private/utils.bzl` returns from the find-toolchain child through
