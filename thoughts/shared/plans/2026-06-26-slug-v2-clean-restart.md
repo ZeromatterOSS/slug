@@ -30,18 +30,47 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; rustfmt test target-attribute audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes the file's final lazy rule; `2cbdb148` completes lint-test common attributes; `d4d4d6dc` freezes the first rustfmt aspect's fixed requirements; `275e0b24` freezes the second aspect's attrs and required producer; `50205fb3` freezes the third aspect's advertised provider | authenticate the fixed `targets` label-list declaration and select one bounded loading packet or `REPLAN`; application, propagation and configured semantics remain deferred | run only `WP-4-7A-rustfmt-test-target-attribute-audit`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; rustfmt test target-attribute loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes the file's final lazy rule; `2cbdb148` completes lint-test common attributes; `d4d4d6dc` freezes the first rustfmt aspect's fixed requirements; `275e0b24` freezes the second aspect's attrs and required producer; `50205fb3` freezes the third aspect's advertised provider; `cb8df441` selects the authenticated target-attribute audit | freeze the fixed `targets` dependency declaration while failing target invocation closed; application, propagation and configured semantics remain deferred | run only `WP-4-7A-rustfmt-test-target-attribute-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-rustfmt-test-target-attribute-audit](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-rustfmt-test-target-attribute-loading](./slug-v2-subplans/current-packet.md).
 
-Audit accepted rules_rust `rust/private/rustfmt.bzl:218-243`, especially the
+Freeze accepted rules_rust `rust/private/rustfmt.bzl:218-243`, especially the
 fixed `targets = attr.label_list(...)` documentation, provider predicate,
-aspect and custom transition. Select one bounded declaration-only loading
-packet or `REPLAN`; make no Rust or behavior change.
+aspect and custom transition. Reject invocation before dropping provider or
+aspect metadata; do not apply either dependency policy.
+
+### M7 rustfmt test target-attribute audit accepted; loading selected (2026-08-26)
+
+Commit `cb8df441` selected the declaration audit. Pinned Bazel 9.2 proves
+`attr.label_list` builds one immutable factory containing trimmed docs,
+normalized required-provider alternatives, an exported aspect list and the
+custom transition factory. The enclosing rule only marks that it propagates
+aspects and has a Starlark transition; implementations, aspects, provider
+matching and transitions do not execute during declaration loading.
+
+The exact `dict(LINT_TEST_COMMON_ATTRS, **{"targets": ...})` overlay uses
+ordinary Starlark dictionary update semantics. Keyword entries replace an
+existing value without moving its key; this fixed base has no `targets`, so
+the descriptor is appended after the four already-frozen common attributes.
+No Slug code is needed for that merge.
+
+Slug can extend its existing transient/frozen `RuleAttributeSchemaGen` with
+the fixed two singleton provider alternatives and one complete frozen aspect
+object, while reusing its current frozen transition object. Documentation is
+validated and discarded consistently with earlier admitted attributes.
+Target invocation must fail before the loading `AttributeSchema` projection
+can drop provider/aspect facts.
+
+Pinned Zabel `c7298478…` guides only that owner and phase split: its single
+`AttrDefinition` retains optional providers/aspects/cfg, and later configured
+capture detaches their producer identities and transition provenance. Slug
+uses its own `ProviderId`, frozen values and Arc/Option storage; no Zig code,
+layout, behavior, evaluator, cache or analysis algorithm is copied. Bazel 9.2
+remains sole behavior authority.
 
 ### M7 rustfmt test aspect accepted; target-attribute audit selected (2026-08-26)
 

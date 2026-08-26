@@ -4993,3 +4993,34 @@ configured capture later detaches their identities and provenance without
 reconstructing them at a consumer. No Zig code, layout, behavior, evaluator,
 cache or analysis algorithm is adopted. Bazel 9.2 remains sole behavior
 authority.
+
+### Rustfmt test target-attribute audit accepts bounded loading (2026-08-26)
+
+Pinned Bazel 9.2 confirms the `targets` label-list call constructs one
+immutable attribute factory. Its doc is trimmed metadata; the two nested
+singleton provider lists are ordered OR alternatives of immutable producer-ID
+sets; the attached aspect must already be exported and is retained with its
+required-aspect closure; and `cfg = platform_transition` wraps the complete
+Starlark transition object without executing it. Rule construction records
+aspect propagation and custom-transition presence but remains lazy.
+
+The exact dictionary merge is already supported: `dict(base, **overlay)`
+updates a collision in place and appends a new key. `LINT_TEST_COMMON_ATTRS`
+does not contain `targets`, so its four accepted descriptors remain first and
+the fixed descriptor is fifth.
+
+Run only `WP-4-7A-rustfmt-test-target-attribute-loading`. Reuse the existing
+frozen rule schema, `ProviderId`, complete frozen aspect/transition values and
+Arc/Option owners. Accept only the fixed two distinct singleton provider
+alternatives and one exported aspect when those arguments are present;
+omission remains empty for earlier label lists. Validate/discard docs as in
+the accepted label path. Preserve every producer identity through recursive
+freeze and reject target invocation before provider/aspect metadata could be
+dropped. Do not apply aspects, evaluate transitions or match providers.
+
+Pinned Zabel `c7298478…` remains architectural guidance only. Its single
+declaration-owned `AttrDefinition` and later detached invocation capture
+support the same phase boundary; no Zig code, representation, behavior, cache
+or analysis algorithm is adopted. Bazel 9.2 remains sole authority. The
+Buck2-utility audit selects existing Arc slices, `ProviderId`, frozen values,
+compact strings and `Allocative`, with no new collection or interner.
