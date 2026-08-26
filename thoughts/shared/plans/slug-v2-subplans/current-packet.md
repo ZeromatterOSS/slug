@@ -52,10 +52,11 @@ behavior; Bazel remains provider authority.
 
 ## Decision and non-decisions
 
-In `package.rs`, add named `doc: Option<&str>` immediately before the existing
-named `fields` parameter of `package_globals::provider`. Consume `doc` in that
-adapter and continue delegating the unchanged field map/evaluator to
-`UserProviderCallable::from_evaluator`.
+In `package.rs`, add named `doc: Option<NoneOr<&str>>` immediately before the
+existing named `fields` parameter of `package_globals::provider`. The outer
+`Option` represents omission and `NoneOr` distinguishes explicit Starlark
+`None` from a string. Consume `doc` in that adapter and continue delegating the
+unchanged field map/evaluator to `UserProviderCallable::from_evaluator`.
 
 Do not retain documentation in `UserProviderCallable`, add an accessor or add a
 metadata registry. This packet admits build/query loading behavior, where doc
