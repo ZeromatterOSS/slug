@@ -4342,6 +4342,33 @@ Slug-native; `Label`, the complete live expression, application plus
 Boolean/StringList targets and analysis/CLI, M8/M7B and exact output bytes
 remain deferred.
 
+### Rustfmt test-aspect provides audit selects declaration loading (2026-08-26)
+
+Commit `df654bfb` selected the audit at
+`rust/private/rustfmt.bzl:194-216`. Pinned Bazel 9.2 establishes that
+`provides` converts every already-exported provider to its producer
+`Provider.Key` during aspect declaration, normalizes the sequence into an
+immutable set, and retains that set in `StarlarkDefinedAspect` equality/hash.
+Only later definition/application work advertises the provider and checks the
+implementation result.
+
+The fixed call is one same-module
+`@@dep+//rust/private:rustfmt.bzl%RustfmtTestInfo` identity. Slug can reuse the
+existing transient/frozen provider-ID projection and store one Arc slice in the
+frozen aspect owner. Omission preserves earlier empty state. Explicit empty,
+duplicate or wider lists, native providers and unexported/non-provider success
+remain outside the admitted slice; provider production/matching, application,
+propagation, configured dependencies/fragments/toolchains and actions stay
+deferred.
+
+Pinned Zabel `c7298478…` guides the architecture only: its complete
+producer-owned `AspectDefinition` retains `provides` and follows it during
+module freeze while aspect export identity remains distinct. Slug adds no
+registry, consumer rebinding or new lifetime owner and copies no Zig code,
+behavior, representation, cache or analysis algorithm. Bazel 9.2 remains sole
+behavior authority. Run only
+`WP-4-7A-rustfmt-test-aspect-provides-loading`.
+
 ### Second rustfmt aspect accepted; test-aspect provides audit selected (2026-08-26)
 
 Commit `275e0b24` reuses the frozen rule-attribute schema for exactly
