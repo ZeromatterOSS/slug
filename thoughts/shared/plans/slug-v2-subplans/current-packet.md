@@ -1,36 +1,37 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-7A-bazel-config-string-list-false-loading
+Packet: WP-4-7A-bazel-config-string-descriptor-loading
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: loading-owned typed build-setting declaration and frozen rule schema
-Base: 52d2c6f2
+Owners: loading-owned typed build-setting declaration, frozen rule schema, and
+the existing narrow root-string configured consumer
+Base: 297c2286
 
-Result: load and freeze selected bazel_skylib@1.8.2
-rules/common_settings.bzl:107-138. Complete the existing StringList
-build-setting descriptor by retaining flag beside repeatable, accept the
-non-flag declaration, preserve BUILD absence, and continue rejecting list
-target invocation before package recording. Do not parse CLI values, execute
-implementations or advance configured analysis.
+Result: finish selected bazel_skylib@1.8.2
+rules/common_settings.bzl:149-181. Complete the .bzl String build-setting
+descriptor with flag and allow_multiple identity, load string_setting at line
+172, preserve the existing BUILD-only true/single string constructor, and fail
+unsupported string rule variants before target recording. Do not add non-flag
+or multi-value configured semantics.
 
-## Accepted starting point and first absent fact
+## Accepted starting point and source frontier
 
-Commit 52d2c6f2 accepts both Boolean declarations through line 105, retaining
-true versus omitted/false flag identity. The following string_list_flag at
-lines 107-114 and repeatable_string_flag at lines 119-129 use already-admitted
-true-flag StringList descriptors. Their implementations remain lazy.
+Commit 297c2286 accepts every valid StringList flag/repeatable descriptor and
+the source-shaped non-flag list declaration at line 133. Lines 140-155 are a
+lazy implementation body. string_flag at lines 157-168 uses the already
+accepted config.string(flag=True), accepted StringList attributes, and lazy
+implementation. string_setting evaluates config.string() at line 172, the
+first absent expression.
 
-string_list_setting then evaluates config.string_list() at line 133. Slug
-currently rejects omitted or false flag, and BuildSettingKind::StringList
-cannot distinguish flag polarity. This is the first absent evaluated
-expression. After this declaration the helper body at lines 140-155 stays
-lazy, string_flag uses the accepted true form and accepted string-list
-attribute schema, and the next absent expression is config.string() at line
-172.
+Slug's .bzl Config method rejects false/omitted flag, accepts flag positionally,
+and exposes no allow_multiple argument. RootStringBuildSetting and
+BuildSettingKind::String are unit facts. This is insufficient for Bazel's
+descriptor identity. The selected child ends after string_setting; once it
+freezes, evaluation returns to rust/private/toolchain.bzl and must audit the
+next loaded child separately before reaching that file's body.
 
-## Selected source provenance
+## Source provenance
 
-The root's locked graph selects bazel_skylib@1.8.2. Reuse these accepted
-inputs:
+Reuse the selected bazel_skylib@1.8.2 route:
 
 - BCR source JSON SHA-256:
   34a3c8bcf233b835eb74be9d628899bb32999d3e0eadef1947a0a562a2b16ffb;
@@ -39,141 +40,159 @@ inputs:
 - rules/common_settings.bzl SHA-256:
   f3bcedef4b2b2cbe9750d61852917954499c4ba5e83d79fb975ec5814eb76d20.
 
-The child has no recursive loads. Reuse the accepted selected-source route and
-module fingerprint. Add no fixture, network oracle, source observer,
-repository mapping or materializer.
+Add no source route, mapping, observer, fixture, network oracle or
+materializer.
 
 ## Bazel authority and Zabel architectural guidance
 
 Pinned Bazel 9.2 commit
-8220c6198837d5c13d53fea211cf3282aa12408a is the sole behavior authority.
-StarlarkConfigApi.stringListSetting declares named-only Boolean flag and
-repeatable, both defaulting to False. StarlarkConfig.stringListSetting rejects
-repeatable=True unless flag=True, then calls
-BuildSetting.create(flag, STRING_LIST, false, repeatable). RuleClass.Builder
-derives mandatory nonconfigurable StringList build_setting_default, optional
-nonconfigurable string help, and the later toolchain-resolution opt-out.
-Pinned ConfigSettingTest.buildsettings_repeatableWithoutFlagErrors
-authenticates the exact invalid-combination diagnostic; its repeatable tests
-authenticate the distinct true/false repeatability facts.
+8220c6198837d5c13d53fea211cf3282aa12408a is sole behavior authority.
+StarlarkConfigApi.stringSetting declares named-only Boolean flag and
+allow_multiple, both defaulting to False. StarlarkConfig.stringSetting creates
+BuildSetting(flag, STRING, allow_multiple, repeatable=false) without forbidding
+any Boolean pair. RuleClass.Builder derives mandatory nonconfigurable String
+build_setting_default and optional nonconfigurable String help.
+StarlarkIntegrationTest testBuildSettingRule_flag,
+testBuildSettingRule_settingByDefault, and
+testBuildSettingRule_settingByFlagParameter authenticate flag polarity.
+ConfigSettingTest.buildsettings_allowMultipleWorks and
+StarlarkOptionsParsingTest.testAllowMultipleStringFlag authenticate the
+distinct allow_multiple fact; their configured/CLI behavior is not admitted.
 
-Admit the complete valid declaration matrix:
+The complete declaration matrix contains four pairwise-distinct values:
 
-- config.string_list(flag = True);
-- config.string_list(flag = True, repeatable = False);
-- config.string_list(flag = True, repeatable = True);
-- config.string_list(); and
-- config.string_list(flag = False) or explicit false/false.
+- flag=True, allow_multiple=False;
+- flag=False, allow_multiple=False, including both omitted and explicit false;
+- flag=True, allow_multiple=True; and
+- flag=False, allow_multiple=True.
 
-Omitted and explicit false/false descriptors are equal. True/false, true/true
-and false/false are pairwise distinct. Positional, nonboolean, None, unknown
-arguments and false-flag/true-repeatable reject. Configured values, CLI
-accumulation and implementation access are later consumers.
+Both arguments are named-only; positional, nonboolean, None and unknown forms
+reject through the typed ABI.
 
-Pinned Zabel commit c7298478e2e56262a2f438e9c065325744c9f0fc is
-architectural guidance only. Its build_rule_declaration.zig keeps StringList
-kind, flag and repeatable together in one evaluator-free
-BuildSettingDefinition. Slug follows only that producer-owned phase split. No
-Zig code, layout, diagnostic, evaluator behavior, configured capture, cache or
-analysis algorithm may be copied; Zabel supplies no behavior authority.
+Pinned Zabel commit c7298478e2e56262a2f438e9c065325744c9f0fc remains
+architectural guidance only. Its evaluator-free BuildSettingDefinition keeps
+String kind, flag and allow_multiple together before rule attachment. Slug
+follows that single producer-owned phase split. No Zig code, layout,
+diagnostic, configured behavior, cache or algorithm may be copied.
+
+## Existing configured boundary
+
+Slug already admits one narrow root string setting:
+flag=True, allow_multiple=False. Loading records its String default; analysis
+uses one structural RootStringSettingValue, supplies one scalar
+ctx.build_setting_value, and permits the existing explicit override/transition
+vertical. That behavior and Slug-native configuration identity remain
+unchanged.
+
+Definitions with flag=False must not enter the explicit CLI override path.
+Definitions with allow_multiple=True would require list-valued parsing,
+configuration identity, transition and ctx value changes. Reject both families
+before PackageRecorder records a target. This lets common_settings declarations
+freeze without widening configured behavior. The existing supported
+true/single target remains recordable and analyzable.
+
+BUILD currently exposes only the accepted Slug-native
+config.string(flag=True) constructor. Bazel's config module is .bzl-only, but
+removing this existing Slug surface is outside the packet. Preserve it exactly:
+omitted/false remains rejected, positional behavior remains unchanged, and
+allow_multiple remains unknown.
 
 ## Compatibility classification
 
-- **Exact:** .bzl config.string_list named-only ABI and defaults; the valid
-  flag/repeatable matrix; invalid false/true relation and diagnostic; retained
-  STRING_LIST kind, flag and repeatability identity; mandatory nonconfigurable
-  list default and optional nonconfigurable help; recursive freeze/export
-  identity; implementation laziness; BUILD absence.
-- **Slug-native:** RootStringListBuildSetting { flag, repeatable } and
-  BuildSettingKind::StringList { flag, repeatable }; Rust equality/copying;
-  existing source/module fingerprint over-invalidation; nonrequired
-  diagnostics; Allocative; fail-closed target invocation.
-- **Unsupported/deferred:** StringList target invocation/default coercion;
-  ctx.build_setting_value; CLI comma parsing/repeatable accumulation;
-  transitions, configured values, analysis, providers and actions; toolchain
-  effects; config.string() with false flag; later Skylib declarations;
-  attr.label_list(allow_files = True); M8/M7B and exact Bazel
-  configuration/output identity.
+- **Exact:** .bzl config.string named-only flag/allow_multiple ABI and false
+  defaults; all four descriptor identities; omitted/explicit false equality;
+  STRING kind; mandatory nonconfigurable String default and optional
+  nonconfigurable help; recursive freeze/export identity and implementation
+  laziness.
+- **Slug-native:** RootStringBuildSetting { flag, allow_multiple } and
+  BuildSettingKind::String { flag, allow_multiple }; Rust equality/copying;
+  existing source fingerprint invalidation; preserved BUILD true/single
+  constructor; fail-closed unsupported target variants; existing single-value
+  root string configuration and diagnostics.
+- **Unsupported/deferred:** non-flag string target invocation/analysis and CLI
+  override; allow_multiple target invocation, list parsing, repeated values,
+  transitions, ctx value, configured identity, providers and actions; Bazel
+  toolchain-resolution effects; later source children; exact Bazel
+  configuration/output bytes; M8/M7B.
 
 ## Natural owner, lifetime and utility reuse
 
-Add flag to the existing .bzl-only RootStringListBuildSetting and project both
-bits immediately at rule(build_setting = ...) into the existing compact Copy
-enum. That enum already flows through transient rule definition, recursive
-freeze, invocation and StarlarkRuleImplementation equality. Its schema
-projection remains AttributeKind::StringList.
+Put flag and allow_multiple on RootStringBuildSetting, then project both
+immediately into the existing compact Copy BuildSettingKind. The enum already
+flows through transient/frozen rule definition and semantic equality. Adjust
+is_root_string_build_setting to recognize only the already-supported
+true/single variant.
 
-No evaluator heap survives freeze: only two Boolean bits and the enum
-discriminant remain. Add no collection, string, Arc, interner, hash, cache or
-memory owner. Preserve Allocative. The Buck2-utility review selects the
-existing compact enum/frozen owner and no imported utility. No Stage 9 ledger
-change is required because no utility is imported and the accepted retained
-runtime/compact-owner decisions remain unchanged.
+No evaluator heap survives freeze. Retain only two Boolean bits and the enum
+discriminant; add no string, collection, Arc, interner, hash, cache or DICE
+key. Preserve Allocative. The Buck2-utility review selects the current compact
+owner and no import. No Stage 9 ledger update is needed.
 
-No request overlay, source observation, DICE key/equality, async transfer or
-command result changes. Existing source/module fingerprints continue to
-invalidate declaration bytes. There is no fallback.
+No request overlay, source observation, async transfer or command-result
+change applies. Existing module/source fingerprints own invalidation. There is
+no fallback.
 
 ## Implementation boundary
 
-1. Let .bzl config.string_list accept named-only false/omitted flag when
-   repeatable is false; keep it absent from BuildFileConfigModule.
-2. Retain both fields in RootStringListBuildSetting and
-   BuildSettingKind::StringList. Preserve both through rule projection, freeze
-   and equality; keep the schema projection unchanged.
-3. Reject false-flag/true-repeatable with Bazel's pinned diagnostic before
-   allocating the descriptor.
-4. Reuse the existing builtin schema and wildcard StringList pre-recording
-   rejection. Do not edit the oversized invoke body or coerce a default.
-5. Update the supported-build-setting diagnostic to name the admitted
-   StringList false form. Do not broaden string descriptors.
-6. Add no configured consumer, provider, transition behavior, source route,
-   registry, cache, DICE key, I/O or public API outside loading.
+1. Change only .bzl Config.string to named-only flag and allow_multiple,
+   defaulting both false, and return the complete descriptor.
+2. Preserve BuildFileConfigModule.string exactly as true/single-only through
+   the existing checked constructor; do not add allow_multiple there.
+3. Change BuildSettingKind::String to retain both bits and map every String
+   variant to AttributeKind::String.
+4. Keep is_root_string_build_setting true only for
+   flag=True/allow_multiple=False so the existing configured consumer cannot
+   reinterpret other variants.
+5. In reject_deferred_attribute_invocation, reject flag=False or
+   allow_multiple=True before recording. Do not edit the oversized invoke
+   body. Keep the supported true/single path unchanged.
+6. Reuse the existing schema builder and update the supported-descriptor
+   diagnostic. Add no configured, CLI, transition, provider, action, source,
+   DICE, cache, I/O or public API behavior.
 
 ## Discriminating proof
 
-- Accept every valid flag/repeatable combination; reject positional,
-  nonboolean, None, unknown and false/true forms, including the exact
-  invalid-combination diagnostic.
-- Prove omitted and explicit false/false equality and pairwise discrimination
-  from true/false and true/true.
-- Recursively freeze source-shaped string_list_flag,
-  repeatable_string_flag, string_list_setting and explicit false/false. Assert
-  kind/bits, mandatory nonconfigurable list default, optional nonconfigurable
-  help, export identity and implementation laziness.
-- Prove BUILD still cannot resolve config.string_list.
-- Invoke true and false list rules in separate repository-package cases;
-  require the existing fail-closed diagnostic before target recording.
-- Keep integer, Boolean, string, docs and recursive-freeze proofs green. Add no
-  fixture, oracle, network request or Bazel run.
+- Accept all four .bzl Boolean pairs plus omitted/explicit false equality;
+  reject positional, nonboolean, None and unknown arguments separately.
+- Recursively freeze true/single, omitted false/false, explicit false/false,
+  true/multiple and false/multiple definitions. Assert exact producer export,
+  descriptor bits, String default/help schema and implementation laziness.
+- Prove BUILD still accepts its existing true constructor but rejects omitted
+  false and allow_multiple.
+- Invoke false/single, true/multiple and false/multiple rules in separate
+  packages; require the new pre-recording diagnostic and no target. Preserve
+  the existing true/single package/default proof.
+- Run the existing root-string cquery structural configuration test to prove
+  the admitted configured path is unchanged.
+- Keep integer, Boolean and StringList proof green. Add no fixture, Bazel run
+  or network request.
 
-## Allowlist and growth caps
+## Allowlist and caps
 
-Only these files may change from base 52d2c6f2:
+Only these files may change from base 297c2286:
 
-| File | Base SHA-256 | Base lines | Final line cap | Purpose |
+| File | Base SHA-256 | Base lines | Final cap | Purpose |
 |---|---|---:|---:|---|
-| app/slug_loading_v2/src/package.rs | d0e7ec88ef755f2f645920a34e04124568ffe58b3838ac08b04847fcdf0e0f2c | 5,799 | 5,829 | StringList flag identity and invalid-pair validation |
-| app/slug_loading_v2/src/host_package_load_tests.rs | 04c30c1ca1ff4f2e9dd6be2965bfca2acf839f581f238782cad58202cc9417b4 | 5,173 | 5,273 | ABI, freeze/identity/schema and fail-closed proofs |
+| app/slug_loading_v2/src/package.rs | 9a27cb7a69ae69ff50774707269e858286598afe5cb28d25b9d0c34312f14962 | 5,801 | 5,851 | String descriptor identity, BUILD preservation, configured gate |
+| app/slug_loading_v2/src/host_package_load_tests.rs | 794b3ecd07166a8a1830b18db22e82f8ad28f3d731cfd33152ad714902045643 | 5,206 | 5,356 | ABI, freeze/schema/identity, BUILD and fail-closed proof |
 
-Additions are capped at 30 production lines, 100 proof lines and 130 total.
-Deletions do not buy addition budget. No new or touched function may exceed
-150 lines. package.rs exceeds the 2,000-line review trigger, but its Config
-methods, retained build-setting enum and projection are one cohesive
-declaration lifetime; splitting them would create a second owner. The existing
+Additions are capped at 50 production, 150 proof and 200 total. Deletions do
+not buy addition budget. No new or touched function may exceed 150 lines.
+package.rs exceeds 2,000 lines, but Config descriptors, retained kind,
+projection and the small pre-recording gate are one cohesive lifetime. The
 oversized invoke body is frozen.
 
-## Serial validation and review
+## Serial validation
 
-Run these commands serially with
-CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target and CARGO_BUILD_JOBS=1:
+Use CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target and CARGO_BUILD_JOBS=1:
 
-- cargo test -p slug_loading_v2 --lib config_string_list
-- cargo test -p slug_loading_v2 --lib typed_bazel_config_definitions
+- cargo test -p slug_loading_v2 --lib config_string
 - cargo test -p slug_loading_v2 --lib bazel_config_typed_descriptors
+- cargo test -p slug_loading_v2 --test build_file_loading rule_capabilities_use_exported_class_names_and_keep_native_rules_non_executable
+- cargo test -p slug_core_v2 --lib cquery_restores_structural_configuration_and_display_projection
 - cargo test -p slug_loading_v2 --lib
 - cargo test -p slug_loading_v2 --test build_file_loading
-- cargo check --locked -p slug_core_v2
+- cargo check --locked -p slug_analysis_v2 -p slug_core_v2
 - cargo build -p slug_cli_v2
 - cargo fmt --check
 - git diff --check
@@ -181,22 +200,24 @@ CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target and CARGO_BUILD_JOBS=1:
 
 The broad integration may retain only its recorded stale @external
 diagnostic-order failure. Archive hygiene may report only the known three
-retained thoughts paths plus active packet files. Recheck hashes, caps,
-allowlist and function sizes before review.
+thoughts paths plus active files. Recheck hashes, caps, allowlist and function
+sizes.
 
-This retained semantic-identity change requires independent terminal review.
-Verify source order/provenance, Bazel default/relation behavior, identity,
-frozen lifetime, schema, BUILD absence, pre-recording rejection, Zabel's
-guidance-only role, utility reuse, caps and deferred configured behavior.
+Retained semantic identity and the configured-consumer gate require
+independent terminal review. Verify all descriptor identities, .bzl versus
+BUILD ABI, exact schema, supported-path preservation, unsupported pre-recording
+rejection, Zabel's guidance-only role, utility reuse, caps and deferred
+multi-value/configured semantics.
 
 ## STOP / REPLAN
 
-STOP and REPLAN for a file outside the allowlist; BUILD config.string_list;
-accepting invalid false/true or positional/nonboolean forms; changing
-integer/Boolean/string breadth; target/default/CLI/configured/transition/
-analysis/action behavior; a new schema owner, raw evaluator value, collection,
-registry, interner, cache, DICE key, source route, observation, I/O or async
-path; any invoke edit; Java/JVM work; Zabel code or behavior adoption; unpinned
-source; a new fixture/oracle/network request; cap violation; or a public
-Skylib/rules_rust success claim. After the non-flag list declaration freezes,
-stop at common_settings.bzl:172 and audit config.string() separately.
+STOP and REPLAN for a file outside the allowlist; widening BUILD string;
+allowing unsupported string variants to record; changing the admitted
+true/single configured behavior; parsing flags or multiple values; changing
+configuration/transition/ctx/provider/action semantics; a raw evaluator value,
+new owner, collection, registry, cache, interner, DICE key, source route,
+observation, I/O or async path; any invoke edit; Java/JVM work; Zabel code or
+behavior adoption; unpinned source; a fixture/oracle/network request; cap
+violation; or a broad Skylib/rules_rust success claim. After common_settings
+finishes, stop and audit the next rust/private/toolchain.bzl loaded child
+separately.

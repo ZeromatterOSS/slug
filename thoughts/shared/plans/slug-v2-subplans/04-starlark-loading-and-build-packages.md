@@ -5199,3 +5199,50 @@ one producer value. No Zig code, layout, diagnostic, evaluator behavior or
 configured algorithm is copied. The Buck2 utility audit selects Slug's current
 Copy enum and `Allocative` value; no collection, interner, hash or cache is
 introduced. Bazel 9.2 remains sole behavior authority.
+
+### Config-string-list false accepted; Bazel config-string descriptor selected (2026-08-26)
+
+Commit `297c2286` retains StringList `flag` and `repeatable` together through
+rule projection, recursive freeze and equality. Every valid named pair loads;
+false-flag/true-repeatable rejects with Bazel's pinned diagnostic. The exact
+producer rule class, list default/help schema, omitted/explicit false equality
+and all valid identity discriminators are covered. BUILD stays unchanged and
+true and false list targets fail before recording.
+
+Focused StringList, typed-freeze and ABI proof, all 198 loading units, locked
+core check, rebuilt CLI, formatting and hygiene pass. The broad integration
+remains 30/31 with its sole recorded stale `@external` diagnostic-order row.
+Final growth is 7 production and 97 proof additions. Terminal review requested
+non-Boolean integer ABI cases and exact imported producer identities, then
+returned `ACCEPT` after correction.
+
+The remaining selected `common_settings.bzl` body is lines 149-181. Its helper
+implementation remains lazy, and `string_flag` at line 159 uses the accepted
+true/single descriptor and StringList attribute schema. `string_setting` calls
+`config.string()` at line 172, the first absent expression and the last
+declaration in this child.
+
+Pinned Bazel 9.2 declares named-only Boolean `flag` and `allow_multiple`, both
+defaulting false. `StarlarkConfig` retains both with STRING kind; no Boolean
+pair is invalid. Pinned integration tests distinguish true, omitted and
+explicit false flag identities, while config-setting/options tests establish
+the separate allow-multiple fact. Slug's descriptor and retained kind are unit
+values, and its `.bzl` method currently accepts `flag` positionally and has no
+allow-multiple argument.
+
+The existing configured consumer supports only a true, non-multiple scalar
+root string setting. Allowing other variants to record would incorrectly route
+non-flags through explicit overrides or require list-valued configuration,
+transition and `ctx.build_setting_value` semantics. Run only
+`WP-4-7A-bazel-config-string-descriptor-loading`: retain both declaration bits,
+but reject non-flag and allow-multiple target invocation before recording.
+Keep the true/single path and existing BUILD true-only constructor unchanged.
+Once common settings finishes, stop and audit the next loaded child of
+`rust/private/toolchain.bzl`; do not jump to its rule body.
+
+Pinned Zabel `c7298478…` remains guidance only. Its one evaluator-free
+build-setting descriptor co-locates String kind, flag and allow-multiple,
+supporting Slug's compact producer-owned value rather than a side registry. No
+Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
+selects the current Copy enum and `Allocative`; no utility or ledger change is
+needed. Bazel 9.2 remains sole behavior authority.
