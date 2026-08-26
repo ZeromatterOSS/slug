@@ -75,6 +75,7 @@ use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
+use starlark::environment::FrozenModule;
 use starlark::environment::Globals;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
@@ -759,13 +760,13 @@ fn selected_registry_root_package_epoch() -> (PathObservationEpoch, PathObservat
     epoch.materialized_file(
         instance,
         "/registry-dep/defs.bzl",
-        "load(':nested.bzl', 'NESTED_NAME', 'current_rust_analyzer_toolchain', 'rust_analyzer_detect_sysroot')\nprint('SELECTED_BZL')\nSELECTED_NAME=NESTED_NAME\nCURRENT_RULE=current_rust_analyzer_toolchain\nDETECT_RULE=rust_analyzer_detect_sysroot\n",
+        "load(':nested.bzl', 'NESTED_NAME', 'current_rust_analyzer_toolchain', 'lint_rule', 'rust_analyzer_detect_sysroot')\nprint('SELECTED_BZL')\nSELECTED_NAME=NESTED_NAME\nCURRENT_RULE=current_rust_analyzer_toolchain\nDETECT_RULE=rust_analyzer_detect_sysroot\nLINT_RULE=lint_rule\n",
         901,
     );
     epoch.materialized_file(
         instance,
         "/registry-dep/nested.bzl",
-        "print('SELECTED_NESTED')\ndef _current_rust_analyzer_toolchain_impl(ctx): fail('current implementation must stay lazy')\ncurrent_rust_analyzer_toolchain = rule(doc = 'current', implementation = _current_rust_analyzer_toolchain_impl, toolchains = [str(Label('@rules_rust//rust/rust_analyzer:toolchain_type'))])\ndef _rust_analyzer_detect_sysroot_impl(ctx): fail('detect implementation must stay lazy')\nrust_analyzer_detect_sysroot = rule(doc = 'detect', implementation = _rust_analyzer_detect_sysroot_impl, toolchains = ['@rules_rust//rust:toolchain_type', '@rules_rust//rust/rust_analyzer:toolchain_type'])\nNESTED_NAME='selected_target'\n",
+        "print('SELECTED_NESTED')\ndef _current_rust_analyzer_toolchain_impl(ctx): fail('current implementation must stay lazy')\ncurrent_rust_analyzer_toolchain = rule(doc = 'current', implementation = _current_rust_analyzer_toolchain_impl, toolchains = [str(Label('@rules_rust//rust/rust_analyzer:toolchain_type'))])\ndef _rust_analyzer_detect_sysroot_impl(ctx): fail('detect implementation must stay lazy')\nrust_analyzer_detect_sysroot = rule(doc = 'detect', implementation = _rust_analyzer_detect_sysroot_impl, toolchains = ['@rules_rust//rust:toolchain_type', '@rules_rust//rust/rust_analyzer:toolchain_type'])\ndef _lint_impl(ctx): fail('lint implementation must stay lazy')\nlint_rule = rule(implementation = _lint_impl, attrs = {'runner': attr.label(default = Label('//rust/private/lint_test_runner'), cfg = 'exec', executable = True)})\nNESTED_NAME='selected_target'\n",
         901,
     );
     (epoch.build(), instance)
@@ -813,6 +814,22 @@ async fn assert_selected_rust_analyzer_rules(
             CanonicalLabel::parse("@@dep+//rust/rust_analyzer:toolchain_type").unwrap(),
         ]
     );
+    let lint = module
+        .get("LINT_RULE")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    let runner = lint
+        .schema
+        .iter()
+        .find(|schema| schema.name == "runner")
+        .unwrap();
+    assert!(runner.executable && runner.exec_configuration);
+    assert!(matches!(
+        runner.default.as_ref(),
+        Some(CoercedAttributeValue::Label(label))
+            if label.to_string() == "@@dep+//rust/private/lint_test_runner:lint_test_runner"
+    ));
 }
 
 #[tokio::test]
@@ -2628,6 +2645,87 @@ CUSTOM_TRUE = rule(implementation = _impl, attrs = {"x": attr.label(cfg = transi
             assert!(schema.executable && !schema.exec_configuration && schema.transition.is_some());
         }
     }
+}
+
+fn eval_bzl_with_identity(
+    source: &str,
+    owner: BzlModuleIdentity,
+) -> starlark::Result<FrozenModule> {
+    let path = owner.workspace_path.to_str().unwrap();
+    let ast = AstModule::parse(path, source.to_owned(), &Dialect::Bazel)?;
+    let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
+        root: owner.clone(),
+        direct_children: Arc::from([]),
+        reachable: Arc::from([owner]),
+        fingerprint: [0; 32],
+    });
+    let module = Module::new();
+    let mut evaluator = Evaluator::new(&module);
+    evaluator.extra = Some(&context);
+    evaluator.eval_module(ast, &loading_globals())?;
+    drop(evaluator);
+    Ok(module.freeze()?)
+}
+#[test]
+fn label_attribute_defaults_keep_defining_module_identity() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@dep+//rust/private:lint_test.bzl").unwrap(),
+        workspace_path: PathBuf::from("/registry-dep/rust/private/lint_test.bzl"),
+        repository_mapping: Arc::from([(
+            ApparentRepoName::new("bazel_tools").unwrap(),
+            CanonicalRepoName::new("bazel_tools").unwrap(),
+        )]),
+    };
+    let source = "def _impl(ctx): fail('implementation must stay lazy')\ndef _platform_transition_impl(settings, attr): return {'//command_line_option:platforms': attr.platform}\nplatform_transition = transition(implementation = _platform_transition_impl, inputs = [], outputs = ['//command_line_option:platforms'])\nLINT_TEST_COMMON_ATTRS = {'platform': attr.label(doc = 'platform'), 'transitive': attr.bool(doc = 'transitive', default = False), '_allowlist_function_transition': attr.label(default = '@bazel_tools//tools/allowlists/function_transition_allowlist'), '_runner': attr.label(doc = 'runner', cfg = 'exec', executable = True, default = Label('//rust/private/lint_test_runner'))}\nLINT_TEST_RULE = rule(implementation = _impl, attrs = LINT_TEST_COMMON_ATTRS)\n";
+    let module = eval_bzl_with_identity(source, owner).unwrap();
+    let rule = module
+        .get("LINT_TEST_RULE")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    let attr = |name| {
+        rule.schema
+            .iter()
+            .find(|schema| schema.name == name)
+            .unwrap()
+    };
+    assert!(matches!(attr("platform").default, None));
+    assert!(matches!(
+        attr("transitive").default,
+        Some(CoercedAttributeValue::Boolean(false))
+    ));
+    assert!(
+        matches!(attr("_allowlist_function_transition").default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == "@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist")
+    );
+    let runner = attr("_runner");
+    assert!(runner.executable && runner.exec_configuration && runner.transition.is_none());
+    assert!(
+        matches!(runner.default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == "@@dep+//rust/private/lint_test_runner:lint_test_runner")
+    );
+}
+
+#[test]
+fn label_attribute_default_rejects_unadmitted_apparent_mapping() {
+    let evaluate = |mapping| {
+        let owner = BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@dep+//:defs.bzl").unwrap(),
+            workspace_path: PathBuf::from("/registry-dep/defs.bzl"),
+            repository_mapping: mapping,
+        };
+        eval_bzl_with_identity(
+            "def impl(ctx): return None\nR=rule(implementation=impl, attrs={'x': attr.label(default='@alias//:x')})",
+            owner,
+        )
+        .unwrap_err()
+        .to_string()
+    };
+    assert!(evaluate(Arc::from([])).contains("not visible"));
+    let alias = ApparentRepoName::new("alias").unwrap();
+    let conflict = Arc::from([
+        (alias.clone(), CanonicalRepoName::new("one+").unwrap()),
+        (alias, CanonicalRepoName::new("two+").unwrap()),
+    ]);
+    assert!(evaluate(conflict).contains("ambiguous"));
 }
 
 #[test]

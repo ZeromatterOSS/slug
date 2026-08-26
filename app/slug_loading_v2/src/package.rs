@@ -86,6 +86,7 @@ use crate::module_extension_repository_rule::RepositoryRuleDefinition;
 use crate::provider::AnalysisBuiltinCallable;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::UserProviderCallable;
+use crate::starlark_label::StarlarkLabel;
 use crate::starlark_label::label_globals;
 use crate::starlark_label::resolve_label;
 use crate::visibility::PackageGroupContents;
@@ -3534,8 +3535,12 @@ fn attribute_definition<'v>(
             if value.is_none() && kind == AttributeKind::Label {
                 return Ok(CoercedAttributeValue::None);
             }
-            let raw = raw_attribute_value(value)?;
             let context = BzlEvaluationContext::from_evaluator(eval)?;
+            if kind == AttributeKind::Label {
+                let source = context.source_identity_for_call(eval)?;
+                return coerce_label_default(value, source);
+            }
+            let raw = raw_attribute_value(value)?;
             let source = context.source_label_for_call(eval)?;
             coerce_raw_value(source.package().package().as_str(), kind, &raw)
         })
@@ -3572,6 +3577,29 @@ fn attribute_definition<'v>(
         exec_configuration,
         transition,
     })
+}
+
+fn coerce_label_default(
+    value: Value<'_>,
+    source: &BzlModuleIdentity,
+) -> anyhow::Result<CoercedAttributeValue> {
+    if let Some(label) = StarlarkLabel::from_value(value) {
+        return Ok(CoercedAttributeValue::Label(label.canonical().clone()));
+    }
+    let raw = raw_attribute_value(value)?;
+    let RawAttributeValue::String(raw) = &raw else {
+        return coerce_raw_value(
+            source.label.package().package().as_str(),
+            AttributeKind::Label,
+            &raw,
+        );
+    };
+    let label = if raw.starts_with('@') || raw.starts_with("//") || raw.starts_with(':') {
+        resolve_label(raw, source)?
+    } else {
+        resolve_label(&format!(":{raw}"), source)?
+    };
+    Ok(CoercedAttributeValue::Label(label))
 }
 
 fn discard_attribute_doc(doc: Option<Value>) -> anyhow::Result<()> {
@@ -3698,8 +3726,10 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] mandatory: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
+        discard_attribute_doc(doc)?;
         attribute_definition(
             AttributeKind::Boolean,
             mandatory.unwrap_or(false),
