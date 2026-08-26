@@ -5108,3 +5108,48 @@ keeping the producer fact together, but supplies no behavior or code. The
 Buck2-utility audit selects Slug's existing small Copy enum, frozen rule owner
 and `Allocative` Starlark value; no collection, interner or utility import is
 needed. Bazel 9.2 is the sole behavior authority.
+
+### Config-int accepted; Bazel config-bool false identity selected (2026-08-26)
+
+Commit `9685d9a7` adds the integer descriptor to the existing `.bzl` Config
+module and retained `BuildSettingKind`. Named true, omitted and explicit false
+forms preserve INTEGER kind and flag polarity through rule projection,
+recursive freeze and equality. The existing schema builder derives mandatory,
+nonconfigurable Integer `build_setting_default` and optional nonconfigurable
+string `help`; BUILD still has no integer constructor. Integer target
+invocation rejects in the small pre-recording gate, so implementations and
+configured behavior remain untouched.
+
+Focused config-int proof passes 2/2, adjacent typed-descriptor proofs and all
+198 loading unit tests pass, and locked core check, rebuilt CLI, formatting and
+hygiene are green. The broad loading integration remains 30/31 with only its
+recorded stale `@external` diagnostic-order expectation. Final growth is 32
+production and 108 proof additions within the 50/110/160 caps. Independent
+terminal review returned `ACCEPT`.
+
+Selected `bazel_skylib@1.8.2` source order then freezes `bool_flag` at lines
+89-96 through the already-admitted `config.bool(flag = True)` descriptor. The
+next declaration, `bool_setting`, evaluates `config.bool()` at line 100. This
+is the first absent expression: Slug's typed method currently rejects omitted
+or false flags and `BuildSettingKind::Boolean` cannot retain their polarity.
+The same authenticated source JSON, archive and `common_settings.bzl` hashes
+remain authoritative; no new mapping, source observer or I/O is required.
+
+Pinned Bazel 9.2 declares Boolean `flag` named-only with default `False`, passes
+it into `BuildSetting.create(flag, BOOLEAN)`, and derives mandatory,
+nonconfigurable Boolean `build_setting_default` plus optional string `help`.
+Run only `WP-4-7A-bazel-config-bool-false-loading`: turn the existing Boolean
+descriptor into `{ flag }`, accept named true, omitted and explicit false,
+preserve equality/discrimination through freeze, keep BUILD absence and reject
+all Boolean target invocation before recording. Do not interpret the flag,
+coerce defaults, parse CLI values, run implementations or add configured,
+transition, provider, analysis or action behavior. Stop next at
+`config.string_list()` on line 133.
+
+Pinned Zabel `c7298478…` supplies architectural guidance only. Its one
+evaluator-free `BuildSettingDefinition` keeps Boolean kind and flag together,
+supporting the existing declaration-owned frozen descriptor rather than a side
+registry. No Zig code, layout, diagnostics, evaluator behavior or configured
+algorithm is adopted; Bazel 9.2 remains the sole behavior authority. The Buck2
+utility audit selects the current Copy enum and `Allocative` Starlark value,
+with no new collection, hash, interner or cache.

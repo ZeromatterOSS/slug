@@ -30,18 +30,53 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; Bazel config-int loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes the file's final lazy rule; `2cbdb148` completes lint-test common attributes; `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` freeze the three rustfmt aspects and the rustfmt-test dependency declaration; `1e2759c2` selects the authenticated post-rustfmt audit | retain Skylib's integer build-setting kind and flag identity while failing integer target invocation closed | run only `WP-4-7A-bazel-config-int-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; Bazel config-bool false identity selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes the file's final lazy rule; `2cbdb148` completes lint-test common attributes; `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` freeze the three rustfmt aspects and dependency declaration; `9685d9a7` accepts integer build-setting identity | retain omitted/false Boolean flag identity while keeping target invocation closed | run only `WP-4-7A-bazel-config-bool-false-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-config-int-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-bazel-config-bool-false-loading](./slug-v2-subplans/current-packet.md).
 
-Load selected `bazel_skylib@1.8.2` integer build-setting declarations. Retain
-the exact INTEGER kind and named `flag` identity through rule freeze, derive
-the mandatory integer default schema, keep BUILD absence, and reject target
-invocation before recording.
+Complete selected `bazel_skylib@1.8.2` Boolean build-setting declarations.
+Retain omitted/false versus true `flag` identity through rule freeze, preserve
+the existing Boolean schema and BUILD absence, and reject target invocation
+before recording.
+
+### M7 config-int accepted; config-bool false identity selected (2026-08-26)
+
+Commit `9685d9a7` admits `.bzl` `config.int` with named-only `flag` defaulting
+to `False`. INTEGER kind and flag polarity now survive rule construction,
+recursive freeze and equality. Omitted and explicit false descriptors agree;
+true differs. The existing builtin-schema owner derives mandatory,
+nonconfigurable Integer `build_setting_default` and optional string `help`.
+BUILD retains no integer constructor and integer target invocation fails before
+package recording. Focused proof, all 198 loading unit tests, locked core check,
+rebuilt CLI, formatting and hygiene pass. The broad loading integration retains
+only its recorded stale `@external` diagnostic-order failure. Final growth was
+32 production and 108 proof additions within caps; independent terminal review
+returned `ACCEPT`.
+
+The accepted Skylib child then freezes `bool_flag` through the already-admitted
+`config.bool(flag = True)` descriptor. Its next declaration reaches
+`config.bool()` at line 100, which is the first absent evaluated expression:
+Slug currently rejects false/omitted Boolean flags and retains no Boolean flag
+bit. Pinned Bazel 9.2 declares the argument named-only with default `False`,
+passes that bit into a BOOLEAN `BuildSetting`, and derives the same mandatory
+Boolean default schema for both flag identities.
+
+Run only `WP-4-7A-bazel-config-bool-false-loading`. Complete the existing
+Boolean descriptor as `{ flag }`, accept named true, omitted and explicit
+false, retain equality/discrimination through recursive freeze, keep BUILD
+absence, and preserve the pre-recording invocation rejection. Do not add CLI,
+configured, transition, provider, analysis or action behavior. After this
+slice, source order stops at `config.string_list()` on line 133.
+
+Pinned Zabel `c7298478…` is architectural guidance only. Its evaluator-free
+`BuildSettingDefinition` owns Boolean kind and flag together, supporting the
+same declaration/freeze phase split. No Zig code, layout, behavior, configured
+capture or analysis algorithm is adopted; pinned Bazel 9.2 remains sole
+behavior authority.
 
 ### M7 post-rustfmt audit accepts config-int loading (2026-08-26)
 
