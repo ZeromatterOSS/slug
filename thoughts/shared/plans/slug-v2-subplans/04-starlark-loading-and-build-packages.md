@@ -4307,19 +4307,35 @@ Final growth is 14 production, 23 proof and 37 total; independent terminal
 review returns `ACCEPT`.
 
 Fresh disposable query/build still surface only the generic repository-session
-wrappers. Run docs-only
-`WP-4-7A-rules-rust-post-string-list-frontier-audit`: trace deterministic
-recursive archive loading beyond the complete descriptor inventory, separate
-the internal typed stop from public presentation, and select exactly one
-bounded producer/retained value/consumer slice or `REPLAN`. Do not edit Rust or
-infer Boolean/StringList target activation without the trace.
+wrappers. The deterministic audit at `a8e18278` instead follows Slug's
+recursive external-Bzl evaluator: `rust/defs.bzl` reaches
+`rust/toolchain.bzl`, then `rust/private/rust_analyzer.bzl`, whose accepted
+children finish before line 207 evaluates the first missing
+`rust_analyzer_aspect = aspect(...)`. That definition precedes the file's
+later rule calls and the later `rustfmt`, `clippy` and `unpretty` aspects.
 
-Pinned Zabel `c7298478…` continues direct architectural guidance: its rule
-projection structurally compares the complete typed build-setting declaration,
-and its list-setting proof keeps value type and repeatability distinct. Slug
-therefore keeps one complete retained declaration owner and thin projections;
-no Zabel code, representation or behavior is copied. Bazel 9.2 remains sole
-compatibility authority. Exact compatibility includes all live descriptor
-call/freeze/schema forms only; Rust representation and fail-closed errors are
-Slug-native; Boolean/StringList targets and analysis/CLI, later rules_rust
-semantics, M8/M7B and exact output bytes remain deferred.
+Pinned Bazel 9.2 `StarlarkRuleFunctionsApi.aspect`,
+`StarlarkRuleClassFunctions.aspect`, `StarlarkDefinedAspect.export`,
+`StarlarkDefinedAspectsTest` and `StarlarkRuleClassFunctionsTest` establish a
+`.bzl`-only declaration, callable implementation, fixed ordered propagation
+attributes, a defining-context toolchain requirement, string/`None`
+documentation and first producer export identity. No implementation runs
+while the declaration loads or freezes.
+
+Run only `WP-4-7A-bazel-aspect-definition-loading`: add the exact fixed subset
+needed by the first live declaration and retain implementation lifetime,
+ordered `attr_aspects`, the canonical toolchain requirement, defining module
+and optional first exported name in one frozen owner. BUILD absence and
+recursive imported identity are proof obligations. Aspect attachment,
+selection, propagation, analysis, actions and every later call shape remain
+deferred.
+
+Pinned Zabel `c7298478…` is direct architectural guidance: its complete
+`AspectDefinition` owner and distinct `AspectExportIdentity` keep declaration
+semantics with the producer while importing aliases use narrow projections.
+Slug follows that split with its existing frozen-Bzl lifetime and compact
+owners; no Zabel code, representation or behavior is copied. Bazel 9.2 remains
+sole compatibility authority. Exact compatibility adds only the admitted live
+definition/export/freeze subset; Rust representation and diagnostics are
+Slug-native; application plus Boolean/StringList targets and analysis/CLI,
+M8/M7B and exact output bytes remain deferred.

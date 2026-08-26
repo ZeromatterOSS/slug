@@ -1,124 +1,198 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-rust-post-string-list-frontier-audit`
+Packet: `WP-4-7A-bazel-aspect-definition-loading`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: Stage 4 recursive ruleset loading and the first missing typed semantic owner
-Base: `68e458b4`
+Owners: Stage 4 recursive `.bzl` loading and frozen aspect declarations
+Base: `a8e18278`
 
-Result: authenticate the first rules_rust source-order stop after complete
-String/Boolean/StringList descriptor-definition loading and select exactly one
-bounded implementation packet or `REPLAN`. This packet is read-only and
-changes no Rust.
+Result: load, bind, export, freeze and recursively import the first live
+rules_rust `aspect(...)` declaration while retaining its complete admitted
+semantic identity. The packet ends before an aspect is attached to an
+attribute, selected from the command line, propagated or analyzed.
 
-## Accepted basis
+## Learned facts and authority
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-is sole behavior authority. Commits `573c25c7`, `6811fa84`, and `68e458b4`
-accept the live named `.bzl` String, Boolean, nonrepeatable StringList and
-repeatable StringList descriptor definitions. Repeatability is structurally
-retained through recursive freeze/equality while both list forms select a
-list-typed `build_setting_default`. Boolean and every StringList target still
-fail before `PackageRecorder`; only the earlier String target/analysis slice is
-admitted.
+is sole behavior authority:
+
+- `StarlarkRuleFunctionsApi.aspect` defines a `.bzl` global whose
+  `implementation` is callable, whose fixed `attr_aspects` is an ordered
+  sequence, whose `toolchains` is a sequence of requirements, and whose `doc`
+  is string-or-`None`.
+- `StarlarkRuleClassFunctions.aspect` requires `.bzl` initialization,
+  resolves toolchain labels in the defining module context and constructs a
+  `StarlarkDefinedAspect` without running its implementation.
+- `StarlarkDefinedAspect.export` assigns the defining module plus the first
+  top-level exported name. Imported aliases observe that already-exported
+  identity rather than becoming a new aspect class.
+- `StarlarkDefinedAspectsTest.simpleAspect`,
+  `aspectCanBeDefinedUsingFactory` and
+  `aspectCannotBeDefinedInBuildFileThread` authenticate top-level export,
+  factory construction and BUILD absence. `StarlarkRuleClassFunctionsTest`
+  `aspectAttrs`, `aspectDefaultAttrs`, `starTheOnlyAspectArg` and
+  `invalidAttrAspectsType` authenticate ordered fixed propagation attributes
+  and their validation. Broader aspect application tests exercise a deferred
+  phase.
 
 The accepted rules_rust 0.73.0 archive SHA-256 is
 `2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`.
-The descriptor inventory includes every `config.string_list` form in
-`rust/private/rustc.bzl`, `clippy.bzl`, and `unpretty.bzl`; line 3120 was the
-first repeatable occurrence. Source inventory, not the generic public wrapper,
-must determine what recursive evaluation or BUILD loading reaches next.
+Slug evaluates external `.bzl` loads recursively and in source order.
+`rust/defs.bzl` first reaches `rust/toolchain.bzl`, which first reaches
+`rust/private/rust_analyzer.bzl`; after its already-admitted `rustc.bzl` and
+`utils.bzl` children freeze, line 207 is:
 
-Fresh disposable query/build after removing the separately parked wildcard
-registration still return the established public `query_error` exit 7 and
-`build_runtime_error` exit 2 with `repository session failed`. Unmodified query
-still stops earlier on the registration-label boundary. These are public
-wrappers, not evidence of the internal first semantic stop.
+```starlark
+rust_analyzer_aspect = aspect(
+    attr_aspects = ["srcs", "deps", "proc_macro_deps", "crate", "actual", "proto"],
+    implementation = _rust_analyzer_aspect_impl,
+    toolchains = [str(Label("//rust:toolchain_type"))],
+    doc = "Annotates rust rules with RustAnalyzerInfo later used to build a rust-project.json",
+)
+```
+
+Slug has no `aspect` global, so this is the first internal source-order stop
+after all accepted String/Boolean/StringList descriptor definitions. The
+later rules in that file and later `rustfmt`, `clippy` and `unpretty` aspect
+forms cannot be selected first. Public query/build still expose only their
+generic repository-session wrappers and are not terminal evidence.
 
 Pinned `../zabel` commit
-`c7298478e2e56262a2f438e9c065325744c9f0fc` is architecture guidance only.
-Its recursive module projection validates one complete typed rule declaration
-against invocation, and its configuration design keeps declaration, effective
-value, and consumer projections separate. Use those ownership lessons to
-reject evaluator-local markers, side registries, or command-side repairs.
-Copy no Zabel code, representation, runtime, scheduler or behavior; exact
-claims require pinned Bazel 9.2.
+`c7298478e2e56262a2f438e9c065325744c9f0fc` is direct architecture guidance
+only. Its `build_rule_declaration.AspectDefinition` keeps implementation,
+propagation inputs and toolchain requirements in one declaration owner, while
+`AspectExportIdentity` keeps producer-module identity distinct from an
+importing alias. Its evaluated-package publication then exposes narrow
+projections from the retained declaration. Slug follows those ownership
+lessons without copying Zabel code, representation, runtime, scheduler or
+behavior; exact claims remain grounded in pinned Bazel 9.2.
 
-## Audit and decision rule
+The Buck2 utility-reuse audit selects no import or Stage 9 ledger update. Use
+Slug's existing `Arc`, `CompactString`, `CanonicalLabel`, frozen Starlark
+value and module-lifetime owners. Add no collection, hash domain, interner,
+side registry or clone-sensitive cache.
 
-Trace the accepted archive in deterministic recursive load order beyond all
-StringList descriptor definitions. Separate:
+## Decision and non-decisions
 
-- `.bzl` parse/global/call-shape or freeze failures;
-- rule-definition schema failures;
-- BUILD invocation/default coercion and target-publication failures;
-- configured analysis/`ctx.build_setting_value` failures; and
-- command/repository-session presentation that masks a lower typed terminal.
+Add `aspect` only to complete `.bzl` loading globals. Accept the exact fixed
+subset needed by the first live declaration:
 
-Inventory every candidate occurrence before choosing one owner. If the first
-stop is Boolean/StringList target invocation, trace Bazel `RuleClass`, default
-coercion, `StarlarkRuleContext.getBuildSettingValue`, configuration lookup and
-the exact rules_rust defaults/consumers. Determine whether a definition-only,
-invocation-only, or invocation-plus-analysis slice is semantically complete;
-do not publish a target whose configured consumer cannot fail closed at the
-next boundary.
+- callable `implementation`, positional or named as Bazel permits;
+- omitted or fixed list-of-string `attr_aspects`;
+- omitted `toolchains` or the live one-element list-of-string requirement,
+  resolved canonically in the defining `.bzl` context; and
+- omitted, string or `None` `doc`, validated but not retained.
 
-If the first stop is another global, rule parameter, provider, attribute,
-transition, toolchain or repository surface, trace its pinned Bazel producer,
-retained identity, immediate consumers and discriminating tests instead. Select
-the smallest source-ordered semantic owner, not a convenient adjacent feature.
+All accepted non-implementation arguments remain named-only. The fixed
+signature rejects every unadmitted Bazel aspect parameter. BUILD must not
+resolve `aspect`, including through a function imported from `.bzl`.
 
-Inspect Slug's producer, frozen/retained value, equality/invalidation path,
-request/publication boundary and fail-closed behavior. Reuse accepted evidence
-before adding an oracle. If no bounded Rust-native slice preserves the declared
-compatibility class, record `REPLAN`.
+Create one evaluator-local aspect definition and one frozen aspect definition.
+Retain the implementation lifetime, ordered propagation attribute names, the
+single canonical toolchain requirement, defining module label and optional
+first top-level exported name. `export_as` binds the name once. An unexported
+definition may freeze without an export identity, but no later consumer may
+apply it. A recursive import must preserve the producer identity and semantic
+fields rather than rebinding them to the importer.
 
-## Ownership, memory and prior art
+Do not add aspect membership to `attr.label`/`attr.label_list`, rule aspect
+parameters, command-line aspect selection, propagation, required providers,
+required aspects, attributes, fragments, toolchain-aspect propagation,
+configured analysis, action ownership, query/aquery presentation or aspect
+implementation execution. Do not accept later rules_rust aspect call shapes.
+Do not change Boolean/StringList target rejection or string-setting analysis.
 
-No semantic owner changes during this audit. For the selected implementation,
-name the producer, retained value, schema/analysis projections, request-local
-facts, invalidation and publication boundary. Classify any memory as evaluator
-scratch, DICE-retained semantic state, command state or async transfer and name
-release/cancellation behavior.
+## Ownership, revision and lifetime
 
-Apply the Buck2 utility-reuse skill if the selected packet changes retained
-data, hashing, compact collections/strings, interning, clone cost or memory
-accounting. Record a Stage 9 decision only when reuse/import changes; do not add
-a collection, hash domain, interner or allocation without evidence. Classify
-Zabel as concept/test only unless a separately reviewed leaf exists.
+The `aspect` call in the defining `.bzl` evaluation is the producer. Its
+evaluation value owns the first export cell; the frozen definition in the
+existing `BzlLoadValue` module is the sole retained semantic owner. Imported
+modules borrow the frozen value through existing `FrozenBzlLifetimeEntry`
+ownership. There is no command-side repair, path inference or side registry.
 
-## Files, proof and validation
+Existing observed source dependencies and recursive Bzl DICE keys invalidate
+definition edits before freeze. No new DICE key, projection, request overlay,
+revision certificate, filesystem observation or overlapping-request behavior
+is added. Because application is deferred, there is no configured-aspect
+equality key yet; future consumers must project every admitted retained field
+from this owner and fail closed on unmodeled inputs.
 
-This audit may edit only:
+The transient definition and export cell are evaluator scratch. The frozen
+implementation and compact arrays are DICE-retained semantic state owned and
+released with the frozen Bzl module. No command-retained state, service cache,
+async transfer, cancellation hook, task, eviction or shutdown duty is added.
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`;
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
+## Files and caps
 
-Any selected implementation must record exact base hashes, final line
-ceilings, addition caps, file allowlist, observable result, exclusions,
-compatibility classes, proof and `REPLAN` stops. Existing large-file ownership
-must be justified or split under the authoring guide.
+Allowed files, with base SHA-256 and final line ceiling:
 
-Run `git diff --check`, plan/current alignment and
-`scripts/v2_archive_status.sh`, preserving only its known three-path thoughts
-classification if unchanged. Read-only source tracing and fresh disposable
-smokes are allowed; no Cargo, Bazel oracle, fixture, network mutation or daemon
-change is required unless a demonstrated evidence gap demands it.
+| File | Base SHA-256 | Cap |
+|---|---|---:|
+| `app/slug_loading_v2/src/package.rs` | `3e28fa6634c2958720a1750bcaaf858681285ed7214cd60d49019c7550980447` | 5,401 |
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `6fbbd2b8876f2c57056e115f7901eec2e5cc02dfaa345186f4de785578eae1d8` | 4,248 |
+
+Production additions are <=160, proof additions <=120 and total additions
+<=280. Both files exceed the authoring-guide size trigger. `package.rs`
+nevertheless remains cohesive as the sole owner of loading globals and their
+evaluation/frozen callable values; extracting one aspect type would split its
+context, global registration and freeze contract without a second consumer.
+The test file already owns the recursive external-Bzl DICE harness needed to
+prove producer identity and import lifetime. No touched function may grow
+past 150 lines. `REPLAN` before adding a third file or breaching a cap.
+
+## Proof and validation
+
+Extend focused proof that:
+
+- an exact `rust_analyzer_aspect`-shaped declaration loads, exports and freezes
+  with its six ordered attribute names, canonical toolchain label, defining
+  module and exported name;
+- a recursive importing module observes the same producer identity and fields;
+- positional and named callable implementation plus omitted defaults work,
+  while a noncallable implementation, malformed fixed lists, non-string doc
+  and every unsupported parameter fail closed; an unexported nested result
+  freezes without falsely acquiring producer export identity;
+- `aspect` is absent from BUILD, including an imported factory call; and
+- accepted String/Boolean/StringList descriptor definitions and their target
+  rejection boundaries remain unchanged.
+
+Run serially:
+
+- `cargo fmt --check` and `git diff --check`;
+- focused aspect-definition loading tests;
+- full `cargo test -p slug_loading_v2`;
+- `cargo check -p slug_core_v2 --locked`;
+- `cargo build -p slug_cli_v2 --locked` before any `SLUG_V2_BIN` smoke;
+- `scripts/v2_archive_status.sh`, preserving only its known three-path
+  thoughts classification if unchanged; and
+- with clean `slugd` lifecycle and fresh output roots, the existing disposable
+  rules_rust query/build, recording the next internal source-order stop
+  separately from unchanged public wrappers.
+
+Pinned source/tests and the archive source shape already discriminate this
+definition contract. No new oracle fixture, copied source, network mutation
+or Bazel execution is authorized. Upstream application, propagation,
+configured-analysis and action tests are skipped because those phases remain
+unsupported; their definition/export portions are adapted into focused local
+proof.
 
 ## Compatibility and STOP
 
-- **Exact:** accepted `.bzl` String/Boolean/StringList descriptor definitions,
-  including structural repeatability and list schema; the audit may
-  authenticate but not implement the next Bazel surface.
-- **Slug-native:** retained Rust representations, valid-Unicode handling,
-  fail-closed nonadmitted boundaries and nonrequired diagnostics.
-- **Unsupported/deferred:** Boolean/StringList targets and configured values,
-  CLI parsing/accumulation, transitions/config matching unless selected after
-  audit; later rules_rust/toolchain/action surfaces, M8/M7B and exact output
+- **Exact:** `.bzl` placement, callable implementation ABI, fixed ordered
+  string `attr_aspects`, the live single string toolchain requirement, string/`None`
+  doc validation, first top-level export identity and recursive frozen import
+  for the admitted live call subset.
+- **Slug-native:** Rust frozen representation, compact storage,
+  valid-Unicode strings, canonical-label representation and nonrequired
+  diagnostics.
+- **Unsupported/deferred:** every other `aspect` parameter or dynamic
+  propagation function, dependency-attribute aspect attachment, aspect
+  application/selection/propagation/analysis/actions, later rules_rust call
+  shapes, Boolean/StringList targets and analysis/CLI, M8/M7B and exact output
   bytes.
 
-STOP on Rust changes, an inferred terminal based only on the public wrapper,
-target publication without its complete fail-closed consumer boundary,
-behavior sourced from Zabel, BUILD/global widening without Bazel authority,
-new oracle work without a gap, dirty overlap, or inability to state one
-bounded implementation/`REPLAN` with exact evidence and caps.
+STOP on dirty overlap, edits outside the two-file allowlist, BUILD visibility,
+an evaluator-local marker without frozen producer identity, rebinding an
+imported alias, dropping or reordering semantic fields, aspect application or
+execution, a side registry, behavior sourced from Zabel, source vendoring,
+Java/JVM, dependency drift, fixture growth, public-success claims or any cap
+breach. `REPLAN` before crossing a boundary.
