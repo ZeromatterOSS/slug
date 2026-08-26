@@ -18131,3 +18131,23 @@ only its architectural rule that package-source ownership resolves direct
 loads before the runtime consumes immutable modules; it supplies no Slug
 representation or compatibility bytes. M7 remains partial and M7A -> M8 ->
 M7B remains.
+
+### Root external-load design accepted; ordinary consumers stay closed (2026-08-25)
+
+The selected route is admitted by an explicit root-BUILD key mode, not by
+widening the ordinary projection. Existing query and core source consumers keep
+the ordinary constructor and `ObservedPathFrontierError` outer; bounded adapters
+must invariant-assert selected/infrastructure variants unreachable. This is a
+nonactivation proof, not new Stage 6 semantics.
+
+Root package loading may now consume an apparent selected-registry route and
+the existing external-Bzl child. The disposable rules_rust replay with only the
+parked M8 wildcard registration removed must advance to the already known
+`repository_rule(doc=...)` terminal, not succeed. Wildcard registration,
+repository-rule schemas/effects and all toolchain/provider/action/input-tree
+breadth remain deferred.
+
+Independent review accepts the eight-file implementation with exhaustive path
+retry versus infrastructure-terminal observation projection. Pinned Zabel
+remains concept-only architectural guidance; Bazel 9.2 remains behavioral
+authority. M7 stays partial and M7A -> M8 -> M7B remains.

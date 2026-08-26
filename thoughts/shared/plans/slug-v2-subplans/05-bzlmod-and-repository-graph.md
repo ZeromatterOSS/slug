@@ -3940,3 +3940,33 @@ Independent scheduling review accepts this producer step inside one cross-
 stage design; a RootPackageLoad-only implementation would be `REPLAN`. Pinned
 Zabel's package-source/resolved-view architecture is concept-only guidance.
 Bazel 9.2 remains behavioral authority.
+
+### Admission-scoped selected root route design accepted (2026-08-25)
+
+Keep the existing `RootRepositoryRouteKey`; add no second key, selected cache,
+registry or path inference. An equality/hash-discriminated admission mode is
+available only to root BUILD direct-load demand. The ordinary constructor,
+display and builtin/direct-local/root/unknown/error results remain exact and
+must not compute the selected graph.
+
+Only an original exact Unsupported may enter selected admission. Demand the
+accepted root mapping, map the apparent name to a canonical selected definition,
+and project the existing structural route only for `SelectedRegistry`. Missing
+mapping/definition and successful root/selected-nonregistry definitions restore
+the original Unsupported. Semantic/compute failures remain typed terminals and
+Need remains Need. The route continues retaining canonical identity, definition,
+`RepoSpec`, source policy and ordered producer mapping structurally.
+
+Observed route demand preserves root -> mapping -> definition epoch order. Add
+doc-hidden exhaustive projections in the existing selected owners:
+`Path(ObservedPathFrontierError)` is a retry outer, while every nested non-path
+effective/policy/ignore/marker compute failure is `Infrastructure(Arc<str>)`
+and becomes a typed upper computation terminal. Typed Mapping/Definition route
+variants remain discriminable. Ordinary query/core/source adapters accept only
+Path and invariant-assert admission-only variants unreachable; their public
+outer remains path-only.
+
+Pinned Zabel guides only structural producer-owned mapping and immutable
+resolved-view consumption. Bazel 9.2 alone defines repository mapping behavior.
+Implement only the eight authorized files and do not activate selected routes
+for repository packages, query, core source preparation or generated owners.

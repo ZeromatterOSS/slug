@@ -3865,3 +3865,31 @@ must not reconstruct mappings, selected definitions, RepoSpecs or paths.
 Preserve root/self behavior, left-first epochs, child event ownership, Need/
 outer/semantic stops and complete-only lifecycle identity. Pinned Zabel guides
 the immutable already-resolved-module layering only; Bazel 9.2 owns behavior.
+
+### Root package external-Bzl consumer design accepted (2026-08-25)
+
+`RootPackageLoadKey` remains the package/source-order owner. Preserve the
+existing root-only resolver for recursive root `.bzl` loads. A new direct BUILD
+load resolver keeps root/self children byte-equivalent and sends only
+`@apparent//...` through a root-BUILD-admitted `RootRepositoryRouteKey` followed
+by the existing external-Bzl eval/observation child. Canonical nonroot direct
+loads remain deferred.
+
+The exact order is root anchor, BUILD source, then each route and Bzl child in
+declaration order, then package evaluation. Merge observations left-first and
+stop on Need, path retry outer, typed route/Bzl terminal or semantic terminal.
+The Bzl child retains its source, recursive closure, manifest and event batch;
+the package owner stores only the package-attempt events. Scratch evaluation
+state remains compute-local.
+
+Selected observation carriers must preserve two distinct lifecycles: genuine
+path-frontier failures return through the existing observed outer, while any
+nested non-path DICE compute failure becomes a typed route-computation terminal.
+No infrastructure failure is fabricated as a path retry. A selected-registry
+integration uses existing public registry/materialization seams; no test-only
+visibility or fixture is needed.
+
+This implements pinned Zabel's package-source/resolved-direct-load layering as
+architectural guidance only. Bazel 9.2 defines source-order and mapping behavior.
+Run only `WP-4-5-6-7A-root-package-external-bzl-load-owner-implementation`;
+do not reconstruct mappings/definitions in loading or activate broader loading.
