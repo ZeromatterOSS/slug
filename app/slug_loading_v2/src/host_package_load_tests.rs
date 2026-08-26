@@ -2373,11 +2373,11 @@ async fn external_bzl_module_freezes_typed_bazel_config_definitions() {
     let files: &[(&str, &[u8])] = &[
         (
             "root.bzl",
-            b"load(\":support.bzl\", \"bool_rule\", \"list_rule\")\nBOOL = bool_rule\nLIST = list_rule\n",
+            b"load(\":support.bzl\", \"bool_rule\", \"list_rule\", \"repeatable_rule\")\nBOOL = bool_rule\nLIST = list_rule\nREPEATABLE = repeatable_rule\n",
         ),
         (
             "support.bzl",
-            b"def _impl(ctx): return []\nbool_rule = rule(implementation = _impl, build_setting = config.bool(flag = True))\nlist_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True))\n",
+            b"def _impl(ctx): return []\nbool_rule = rule(implementation = _impl, build_setting = config.bool(flag = True))\nlist_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True))\nrepeatable_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True, repeatable = True))\n",
         ),
     ];
     let dice = Dice::builder().build(DetectCycles::Enabled);
@@ -2419,10 +2419,28 @@ async fn external_bzl_module_freezes_typed_bazel_config_definitions() {
         .unwrap();
     assert_eq!(
         list_rule.build_setting_kind,
-        Some(BuildSettingKind::StringList)
+        Some(BuildSettingKind::StringList { repeatable: false })
     );
     assert_eq!(
         list_rule
+            .schema
+            .iter()
+            .find(|schema| schema.name == "build_setting_default")
+            .unwrap()
+            .kind,
+        AttributeKind::StringList
+    );
+    let repeatable_rule = module
+        .get("REPEATABLE")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    assert_eq!(
+        repeatable_rule.build_setting_kind,
+        Some(BuildSettingKind::StringList { repeatable: true })
+    );
+    assert_eq!(
+        repeatable_rule
             .schema
             .iter()
             .find(|schema| schema.name == "build_setting_default")
@@ -2450,13 +2468,12 @@ fn bazel_config_typed_descriptors_are_bzl_only_and_require_supported_flags() {
         "X=config.string_list()",
         "X=config.string_list(flag=False)",
         "X=config.string_list(True)",
-        "X=config.string_list(flag=True, repeatable=True)",
     ] {
         let error = evaluate_config_global(source, &bzl).unwrap_err();
         assert!(error.contains("supported") || error.contains("positional"));
     }
     evaluate_config_global(
-        "L=config.string_list(flag=True)\nE=config.string_list(flag=True, repeatable=False)",
+        "L=config.string_list(flag=True)\nE=config.string_list(flag=True, repeatable=False)\nR=config.string_list(flag=True, repeatable=True)",
         &bzl,
     )
     .unwrap();
@@ -2519,7 +2536,7 @@ async fn repository_package_rejects_config_string_list_rule_before_target_record
         ),
         (
             "defs.bzl",
-            b"def _impl(ctx): return []\nlist_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True))\n",
+            b"def _impl(ctx): return []\nlist_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True, repeatable = True))\n",
         ),
     ];
     let dice = Dice::builder().build(DetectCycles::Enabled);

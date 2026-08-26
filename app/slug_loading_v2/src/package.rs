@@ -453,7 +453,7 @@ impl NativeToolchainTarget {
 pub(crate) enum BuildSettingKind {
     String,
     Boolean,
-    StringList,
+    StringList { repeatable: bool },
 }
 
 impl BuildSettingKind {
@@ -461,7 +461,7 @@ impl BuildSettingKind {
         match self {
             Self::String => AttributeKind::String,
             Self::Boolean => AttributeKind::Boolean,
-            Self::StringList => AttributeKind::StringList,
+            Self::StringList { .. } => AttributeKind::StringList,
         }
     }
 }
@@ -3704,7 +3704,9 @@ impl fmt::Display for RootBoolBuildSetting {
 #[starlark_value(type = "config_bool")]
 impl<'v> StarlarkValue<'v> for RootBoolBuildSetting {}
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct RootStringListBuildSetting;
+struct RootStringListBuildSetting {
+    repeatable: bool,
+}
 starlark::starlark_simple_value!(RootStringListBuildSetting);
 impl fmt::Display for RootStringListBuildSetting {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -3748,10 +3750,7 @@ fn config_methods(builder: &mut MethodsBuilder) {
         if !flag {
             anyhow::bail!("only config.string_list(flag = True) is supported")
         }
-        if repeatable {
-            anyhow::bail!("repeatable config.string_list is not supported")
-        }
-        Ok(RootStringListBuildSetting)
+        Ok(RootStringListBuildSetting { repeatable })
     }
 }
 #[starlark_module]
@@ -3824,7 +3823,10 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 "boolean build setting rule invocation is not supported"
             )));
         }
-        if self.build_setting_kind == Some(BuildSettingKind::StringList) {
+        if matches!(
+            self.build_setting_kind,
+            Some(BuildSettingKind::StringList { .. })
+        ) {
             return Err(starlark::Error::new_other(anyhow::anyhow!(
                 "string-list build setting rule invocation is not supported"
             )));
@@ -4454,8 +4456,10 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 Some(BuildSettingKind::String)
             } else if RootBoolBuildSetting::from_value(value).is_some() {
                 Some(BuildSettingKind::Boolean)
-            } else if RootStringListBuildSetting::from_value(value).is_some() {
-                Some(BuildSettingKind::StringList)
+            } else if let Some(setting) = RootStringListBuildSetting::from_value(value) {
+                Some(BuildSettingKind::StringList {
+                    repeatable: setting.repeatable,
+                })
             } else {
                 None
             }
