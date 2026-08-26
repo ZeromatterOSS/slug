@@ -1,112 +1,92 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-bazel-keyword-only-arguments`
+Packet: `WP-4-7A-bazel-struct-builtin-audit`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: retained Starlark dialect and Stage 4 BUILD/`.bzl` parse boundaries
-Base: `2f373248`
+Owners: Stage 4 Bazel loading globals and retained Starlark `struct` value
+Base: `54d28477`
 
-Result: Bazel 9.2 keyword-only definition and lambda parameter forms are
-accepted through one retained Bazel dialect. Every Stage 4 production
-BUILD/`.bzl` parse and the live preliminary root-BUILD evaluator consume that
-same value; MODULE evaluation and every unrelated dialect field are unchanged.
+Result: docs-only. Audit the Bazel `.bzl` `struct` builtin now exposed by the
+accepted keyword-only dialect, determine whether retained starlark-rust already
+implements the exact required value/call surface, and select one bounded shared
+globals owner or `REPLAN`. Do not edit Rust in this packet.
 
-## Authority and accepted design
+## Authority and live terminal
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-is sole behavior authority. Its `Resolver`, `Parameter`, `StarlarkFunction`,
-`FunctionTest.testKeywordOnly`/`testStarArgsAndKeywordOnly`,
-`ResolverTest.testParameterOrdering`, and `ParserTest.testLambda` authenticate
-the exact syntax, ordering and call-binding slice. No new oracle is needed;
-these pinned source regressions discriminate every admitted row.
+is sole behavior authority. Start with `StarlarkGlobalsImpl`,
+`StructProvider`, `StarlarkRuleClassFunctionsTest` struct rows and the Starlark
+evaluator tests they depend on. Run a fresh disposable oracle only if pinned
+source and existing regressions do not discriminate a required edge.
 
-The accepted rules_rust 0.73.0 route reaches
-`rust/platform/triple_mappings.bzl:5` and fails in
-`compute_external_bzl_module` at:
+Fresh query and build against the accepted rules_rust 0.73.0 root both pass
+the former `_support(*, ...)` boundary and converge at
+`rust/platform/triple.bzl:28`:
 
 ```starlark
-def _support(*, std = False, host_tools = False):
+return struct(
 ```
 
-Retained starlark-rust already owns `ParameterP::NoArgs`, `DefParams`
-validation, compiled named-only parameters, default evaluation and call
-binding. Only `Dialect::Standard.enable_keyword_only_arguments == false`
-prevents this path. Add `Dialect::Bazel`, identical to `Standard` except that
-this field is true. Do not use `Extended` and do not alter parser/evaluator
-logic.
+Slug reports `Variable struct not found` from recursive external-Bzl
+evaluation. Preserve the accepted repository source, materialization, route,
+parse and call slices; do not revisit them in this audit.
 
 Pinned `../zabel` commit
 `c7298478e2e56262a2f438e9c065325744c9f0fc` is architectural guidance only.
-Its injected/session Starlark-semantics design projects one complete typed
-value to all relevant evaluators. The retained Bazel dialect follows that
-single-owner pattern; copy no Zabel code, representation, fingerprint,
-scheduler or behavior. Bazel remains syntax/call authority.
+Inspect it with `git show`, especially
+`session_analysis_starlark_semantics.zig` and
+`injected_repository_starlark_semantics.zig`: they retain one complete typed
+semantics value and project it to all relevant consumers. Use that guidance
+when choosing Slug's globals owner, but copy no Zabel code, representation,
+fingerprint, scheduler or behavior. Bazel remains builtin/value authority.
 
-## Exact implementation boundary
+## Required read-only audit
 
-In `starlark_syntax::Dialect`, add the documented `Bazel` constant and a test
-that freezes every field: def/lambda/load and load reexport enabled,
-keyword-only enabled, positional-only/types/top-level/f-strings disabled, and
-Unicode string encoding still chosen separately by callers.
+1. Trace the exact rules_rust `struct(...)` call and every subsequent struct
+   operation needed before the next honest command terminal. Distinguish the
+   minimal immediate slice from broader provider/toolchain use.
+2. Authenticate Bazel's environment placement. Inventory fixed `.bzl`, BUILD,
+   MODULE, REPO, cquery and other relevant environments in pinned
+   `StarlarkGlobalsImpl`; do not infer that a builtin belongs everywhere.
+3. Audit `StructProvider` and pinned tests for named-only construction, field
+   access and absence, immutability, equality, hashing, representation,
+   addition, JSON and error behavior. Classify only rows required by the live
+   route or needed to prevent an incorrect parity claim.
+4. Audit retained starlark-rust `Struct`, `FrozenStruct`, `register_struct`,
+   `LibraryExtension::StructType`, argument handling, freeze/equality/hash and
+   tests. Determine whether reuse is exact for the admitted slice or needs a
+   bounded Rust-native wrapper; do not expose a private engine registration
+   ad hoc at multiple call sites.
+5. Inventory every `loading_globals()` consumer and any preliminary or legacy
+   environment on the live command path. Decide the smallest owner that gives
+   all Bazel `.bzl` evaluators the same complete globals while preserving
+   BUILD/MODULE/repository distinctions and existing `Print` policy.
+6. Define the implementation/test file set, base hashes, line caps and
+   validation. Prefer focused retained-value tests plus the existing recursive
+   external-Bzl route and fresh rules_rust query/build. Do not vendor rules_rust
+   or the downloaded archive.
 
-Replace only the nine `Dialect::Standard` arguments in `bzl_module.rs` with
-`Dialect::Bazel`: Host package attempt, observed Host Bzl, external Bzl, root
-package, repository package, legacy Bzl parse/eval and both legacy package
-parse/eval calls. Preserve every `StringEncoding::BazelInternal`, source name,
-load traversal, event, DICE key and error wrapper byte-for-byte.
+## Compatibility candidates
 
-The preliminary root-BUILD evaluator in core is live before ordinary loading.
-Use `Dialect::Bazel` only when `is_module == false`; retain Standard for its
-dormant MODULE branch. Do not change Stage 5 `module_eval`, `repo_file`, test-
-only parser helpers or other crates.
+- **Exact candidate:** Bazel 9.2 `.bzl` availability plus the required
+  named-only construction, frozen field access and value behavior exercised by
+  the live rules_rust closure.
+- **Slug-native:** Rust storage/layout, valid-Unicode strings, internal error
+  representation and nonrequired diagnostic wording.
+- **Unsupported/deferred:** blanket BUILD/MODULE/REPO exposure, unrelated
+  starlark-rust library extensions, unexercised struct breadth, later
+  rules_rust providers/toolchains/actions, M8/M7B and exact output bytes.
 
-## Files and caps
+## Documentation authority and STOP
 
-Allowed files, with base SHA-256 and final line ceiling:
+This packet may change only the canonical plan, this manifest and Stage 4.
+Caps are <=45 canonical, <=190 current and <=230 Stage additions, <=465
+aggregate. Record inspected source symbols, live operations, environment
+matrix, exact/Slug-native/deferred classification, implementation file hashes
+and caps, tests and exactly one successor; obtain independent review before
+activating Rust.
 
-| File | Base SHA-256 | Cap |
-|---|---|---:|
-| `starlark-rust/starlark_syntax/src/dialect.rs` | `35bfaeb5f01ebfea98d20aeec8170858ce0f015a61a9786a5ff2e4d5f016df2f` | 175 |
-| `starlark-rust/starlark_syntax/src/syntax/def.rs` | `5f3e9eb9b8bfa872af27807ca64fccea5d5c8c5164469c5b350c1f4234ff20d7` | 510 |
-| `app/slug_loading_v2/src/bzl_module.rs` | `c24e225d055f4dee9caf41435e55eba49cbfebb0d907f0a347cc9f1f17e09327` | 9,675 |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `0bf30933cb0173ff14f3d97867f386ea62ee1da87db54a3dd50a679cfcf519e0` | 3,850 |
-| `app/slug_core_v2/src/runtime/starlark.rs` | `dace8e6ec43a6ea097798a92ea3e3d96285fafd18592a2e7eb7545400da75e71` | 105 |
-
-Production additions are <=35, proof additions <=120 and total additions
-<=155. Apart from the retained `Dialect::Bazel` constant, no public API,
-dependency, lockfile, DICE key or new source file is authorized.
-
-## Proof and validation
-
-Prove the Bazel dialect accepts bare `*` with required/defaulted named-only
-parameters, `*args` followed by named-only parameters and the admitted lambda
-form; prove positional delivery/missing names fail and bare/multiple-star,
-duplicate/order errors remain rejected. Evaluate the real `_support` shape.
-
-Add one full external-Bzl route proof through source observation, recursive
-parse/evaluation and frozen module result. Add a focused core preliminary
-root-BUILD test and prove its MODULE branch is not widened. Do not copy the
-rules_rust file or archive into the repository.
-
-Run `cargo fmt --check`; focused starlark-syntax, loading-route and core tests;
-full `cargo test -p slug_loading_v2`; `cargo check -p slug_core_v2 --locked`;
-and `cargo build -p slug_cli_v2 --locked`. With clean `slugd` lifecycle and
-fresh roots, rerun the existing disposable rules_rust query and build, prove
-both pass this parse/evaluation boundary, and record the next honest internal
-and public terminal. Finish with `git diff --check` and independent review.
-
-## Compatibility and STOP
-
-- **Exact:** Bazel 9.2 bare-`*` and `*args` keyword-only definition/lambda
-  parsing, ordering, defaults and call binding on BUILD/`.bzl` routes;
-  rules_rust `_support`; unchanged load/source/event ordering.
-- **Slug-native:** Rust AST/evaluator storage, valid-Unicode source ingestion,
-  typed loading errors and nonrequired diagnostic wording.
-- **Unsupported/deferred:** positional-only `/`, types, f-strings, new top-
-  level forms, MODULE widening, generic Python syntax, later rules_rust
-  providers/toolchains/actions, M8/M7B and exact output bytes.
-
-STOP on dirty overlap, any parser/evaluator repair beyond the existing field,
-use of `Extended`, a second/scattered dialect value, changed MODULE behavior,
-unrelated syntax activation, source vendoring, Java/JVM, dependency drift,
-public diagnostic widening or scope above the caps. `REPLAN` before crossing
-a boundary.
+STOP on dirty overlap, a need to invent a new struct representation, exposure
+outside Bazel's authenticated environments, switching to all starlark-rust
+extensions, per-evaluator symbol reconstruction, parser/dialect changes,
+source vendoring, Java/JVM, dependency drift or scope above the caps. `REPLAN`
+instead of widening.

@@ -30,18 +30,40 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; bounded Bazel keyword-only syntax selected** | selected-registry source/root-load, verified transport and exact rules_rust root realization are accepted through `2f373248`; the Stage 4 audit proves starlark-rust already owns Bazel's parameter resolution/call behavior and isolates the missing syntax to one dialect field across the live root/external/recursive loading routes | add one retained Bazel dialect constant and route only Stage 4 BUILD/`.bzl` plus the preliminary root-BUILD evaluator through it; keep MODULE and unrelated syntax unchanged | run only `WP-4-7A-bazel-keyword-only-arguments`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; Bazel keyword-only syntax accepted, `struct` audit active** | selected-registry source/root-load, verified transport and exact rules_rust root realization are accepted through `2f373248`; commit `54d28477` accepts the bounded Bazel BUILD/`.bzl` dialect and keyword-only parse/binding slice across every live Stage 4 route | rules_rust now evaluates through the prior `_support` stop and first fails because Bazel's `.bzl` `struct` global is absent from Slug's loading environment | run only `WP-4-7A-bazel-struct-builtin-audit`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-keyword-only-arguments](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-bazel-struct-builtin-audit](./slug-v2-subplans/current-packet.md).
 
-Implement only the audited Bazel dialect constant, all Stage 4 production
-BUILD/`.bzl` parser uses, the live preliminary root-BUILD parser and focused
-syntax/call/route proof. Do not change MODULE evaluation or other dialect
-fields.
+Audit only Bazel 9.2's `.bzl` `struct` global, the retained starlark-rust
+implementation and Slug's loading-global ownership. Select one bounded shared
+globals owner or `REPLAN`; do not edit Rust in this packet.
+
+### M7 Bazel keyword-only Starlark support accepted (2026-08-25)
+
+Commit `54d28477` adds one retained Bazel dialect equal to Standard except for
+keyword-only arguments and routes exactly the audited BUILD/`.bzl` parsers
+through it. MODULE parsing and every unrelated syntax field remain unchanged.
+Focused syntax, core and recursive external-Bzl tests pass, as do all 239
+loading tests, locked core check, rebuilt V2 CLI, formatting and hygiene.
+
+Fresh query and build both pass rules_rust's `_support(*, ...)` definition and
+calls. They converge on the same next internal terminal at
+`rust/platform/triple.bzl:28`: `Variable struct not found`; their public
+terminals remain the existing typed query/build wrappers. Independent review
+accepted the implementation and proof.
+
+Exact compatibility covers the admitted Bazel 9.2 definition/lambda syntax,
+parameter ordering, defaults and call binding. Rust storage, valid-Unicode
+source ingestion and nonrequired diagnostic wording remain Slug-native;
+positional-only parameters and unrelated syntax remain unsupported/deferred.
+
+Pinned Zabel `c7298478…` guided the single complete dialect owner consumed by
+all relevant evaluators. No Zabel code or behavior is copied; Bazel 9.2
+remains sole compatibility authority.
 
 ### M7 Bazel keyword-only Starlark implementation selected (2026-08-25)
 

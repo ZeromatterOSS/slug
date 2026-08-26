@@ -3973,3 +3973,31 @@ Pinned Zabel `c7298478…` guides one complete typed semantics/dialect value
 consumed by the relevant evaluators, not scattered reconstructed toggles.
 Bazel 9.2 remains behavioral authority. M7 stays partial and
 M7A -> M8 -> M7B remains.
+
+### Bazel keyword-only syntax accepted; `struct` frontier active (2026-08-25)
+
+Commit `54d28477` implements the audited retained Bazel dialect and routes all
+nine Stage 4 BUILD/`.bzl` parse sites plus the preliminary root-BUILD evaluator
+through it while leaving MODULE parsing unchanged. Focused parameter, root and
+recursive external-Bzl proofs pass, the full loading suite is 239/239, locked
+core check and CLI build pass, and independent review accepts the result.
+
+Fresh rules_rust query and build now evaluate past `_support(*, ...)` and stop
+at `rust/platform/triple.bzl:28` with `Variable struct not found`. The retained
+starlark-rust engine already has an immutable `struct` value and a separately
+selectable `LibraryExtension::StructType`, while `loading_globals()` currently
+selects only `Print` before adding Bazel package globals. That observation is
+an audit input, not implementation authority.
+
+Run only docs packet `WP-4-7A-bazel-struct-builtin-audit`. Authenticate Bazel
+9.2's fixed `.bzl` binding and required struct behavior, inventory every
+loading-global consumer, and decide whether one complete shared Bazel-loading
+globals owner can admit the exact slice without enabling unrelated extensions
+or widening BUILD/MODULE/repository environments. Do not edit Rust in the
+audit.
+
+Pinned Zabel `c7298478…` guides the architectural requirement that relevant
+evaluators consume one complete typed semantics/global environment rather than
+reconstructing symbols per call. It does not define `struct` behavior and no
+Zig code or representation may be copied; pinned Bazel 9.2 remains sole
+behavior authority. M7 stays partial and M7A -> M8 -> M7B remains.
