@@ -3293,6 +3293,67 @@ async fn rust_stdlib_filegroup_projects_file_allowance_into_target_schema() {
     assert!(srcs.allow_single_file().is_none());
 }
 
+#[test]
+fn bazel_data_attribute_docs_advance_rust_toolchain_to_values_constraint() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_rust+//rust/private:toolchain.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_rust/rust/private/toolchain.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let source = r#"
+def _impl(ctx): fail("implementation must stay lazy")
+def _attrs(doc):
+    return {
+        "count": attr.int(doc = doc, default = -1),
+        "flags": attr.string_list(doc = doc, default = ["--cfg", "probe"]),
+        "debug_info": attr.string_dict(doc = doc, default = {"dbg": "2", "opt": "0"}),
+        "crate_flags": attr.string_list_dict(doc = doc, default = {"bin": ["--emit=link"]}),
+    }
+OMITTED = rule(implementation = _impl, attrs = {
+    "count": attr.int(default = -1),
+    "flags": attr.string_list(default = ["--cfg", "probe"]),
+    "debug_info": attr.string_dict(default = {"dbg": "2", "opt": "0"}),
+    "crate_flags": attr.string_list_dict(default = {"bin": ["--emit=link"]}),
+})
+EXPLICIT_NONE = rule(implementation = _impl, attrs = _attrs(None))
+FIRST = rule(implementation = _impl, attrs = _attrs("first documentation"))
+SECOND = rule(implementation = _impl, attrs = _attrs("different documentation"))
+"#;
+    let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
+    let snapshot = |name| {
+        let rule = module
+            .get(name)
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        ["count", "flags", "debug_info", "crate_flags"].map(|name| {
+            let schema = rule
+                .schema
+                .iter()
+                .find(|schema| schema.name == name)
+                .unwrap();
+            (
+                schema.kind,
+                schema.mandatory,
+                schema.configurable,
+                schema.default.clone(),
+            )
+        })
+    };
+    let omitted = snapshot("OMITTED");
+    for name in ["EXPLICIT_NONE", "FIRST", "SECOND"] {
+        assert_eq!(snapshot(name), omitted, "{name}");
+    }
+    for invalid in ["1", "[]", "{}", "provider(fields = {})"] {
+        let source = format!("X = attr.string_dict(doc = {invalid})");
+        assert!(
+            eval_bzl_with_identity(&source, owner.clone()).is_err(),
+            "{invalid}"
+        );
+    }
+    assert!(eval_bzl_with_identity("X = attr.int(values = [-1, 0, 1])", owner).is_err());
+}
+
 fn eval_bzl_with_identity(
     source: &str,
     owner: BzlModuleIdentity,

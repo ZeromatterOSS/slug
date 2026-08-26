@@ -4042,8 +4042,10 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] mandatory: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
+        discard_attribute_doc(doc)?;
         attribute_definition(
             AttributeKind::Integer,
             mandatory.unwrap_or(false),
@@ -4130,8 +4132,10 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] mandatory: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
+        discard_attribute_doc(doc)?;
         attribute_definition(
             AttributeKind::StringList,
             mandatory.unwrap_or(false),
@@ -4148,8 +4152,10 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] mandatory: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
+        discard_attribute_doc(doc)?;
         attribute_definition(
             AttributeKind::StringDict,
             mandatory.unwrap_or(false),
@@ -4166,8 +4172,10 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] mandatory: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
+        discard_attribute_doc(doc)?;
         attribute_definition(
             AttributeKind::StringListDict,
             mandatory.unwrap_or(false),
