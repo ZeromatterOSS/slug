@@ -4342,6 +4342,45 @@ Slug-native; `Label`, the complete live expression, application plus
 Boolean/StringList targets and analysis/CLI, M8/M7B and exact output bytes
 remain deferred.
 
+### Rust-analyzer toolchain-rule audit selects fail-closed declaration loading (2026-08-26)
+
+The accepted rules_rust archive reaches
+`rust/private/rust_analyzer.bzl:359-402`, whose first post-aspect rule has four
+documented label descriptors and two documented string descriptors. Pinned
+Bazel 9.2 establishes that docs are trimmed metadata; executable labels require
+a non-`None` configuration; `cfg = "exec"`, executable, single-artifact and
+mandatory policy are retained independently; and string defaults remain typed
+schema values. Rule freeze/export keeps the implementation and defining-module
+class identity without invoking it.
+
+Slug's first failure is the unknown label `doc` argument. It already owns the
+mandatory, `allow_single_file`, default, custom-transition, implementation and
+export fields, but its label `cfg` accepts only a custom transition and it has
+no attribute-executable field. Run only
+`WP-4-7A-rust-analyzer-toolchain-rule-loading`: accept string/`None` attribute
+docs without retaining a documentation side store, add executable policy and
+an exec-transition marker to the existing descriptor/frozen rule-schema owner,
+and load the exact fixed declaration. Omitted and explicit `False` executable
+values are identical false policy with either admitted cfg; `True` requires
+exec or the existing custom transition. A rule with executable true or an exec
+marker must reject target invocation before recording until configured exec
+dependencies are implemented; non-executable custom-transition invocation
+remains unchanged.
+
+Exact compatibility covers the fixed named call shapes, invalid doc type and
+executable-without-cfg rejection, structural retention, string defaults,
+recursive freeze and producer export identity. Rust fields, diagnostics and
+the fail-closed target boundary are Slug-native. Wider cfg forms, documentation
+extraction, target invocation, executable prerequisite validation, configured
+dependency/analysis/action semantics and later declarations remain deferred.
+
+Pinned Zabel `c7298478…` supplies architectural guidance only: keep executable,
+single-file and transition policy in one declaration-owned ordinary-dependency
+schema, separate from target-local values and executable-module identity. No
+Zig layout, code, DICE relation or behavior is adopted. Bazel 9.2 remains sole
+behavior authority, and the utility-reuse audit adds no new collection,
+interner, cache or hash domain.
+
 ### Bounded Bazel `Label` loading accepted; rust-analyzer toolchain-rule audit selected (2026-08-26)
 
 Commit `84ddb6a3` installs a bounded `.bzl` `Label` constructor over one shared
