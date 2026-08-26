@@ -4131,3 +4131,25 @@ Run only `WP-5-7A-selected-registry-bcr-archive-realization`. Generic
 overlay and broader ruleset work remain deferred. Pinned Zabel commit
 `c7298478…` guides the producer-owned selected-view/completed-immutable-root
 separation only; Bazel 9.2 owns archive and MODULE compatibility behavior.
+
+### Selected-registry BCR archive realization accepted (2026-08-25)
+
+Commit `2f373248` consumes the accepted complete selected-registry plan without
+erasure, streams its verified rules_rust gzip/GNU-tar into one fresh owned
+root, overlays the independently verified registry MODULE, and publishes only
+the completed immutable root through the existing materializer. The archive
+and MODULE content digests form a domain-separated Slug-native association;
+no scratch path participates in semantic identity or retained request state.
+
+All focused lifecycle, extraction and session proofs pass. Disposable pinned
+Bazel and Slug manifests agree on all 4,493 paths/types and every admitted
+regular-file byte, mode and archive mtime. Fresh query/build requests pass the
+repository boundary and expose Stage 4's keyword-only definition parse stop.
+Generic archives, links/PAX/specials, strip/patch/overlay breadth and later
+ruleset/toolchain/action work remain unsupported/deferred.
+
+Pinned Zabel `c7298478…` guided private verified inputs, fresh complete-root
+ownership, separation of semantic association from physical path and existing-
+owner publication. Bazel 9.2 remains sole behavior authority. Route next to
+the docs-only Stage 4 keyword-only-arguments audit; M7 remains partial and
+M7A -> M8 -> M7B remains.

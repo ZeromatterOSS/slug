@@ -3922,3 +3922,25 @@ repository-rule declaration.
 Loading is closed for this slice. It must not erase `RepoSpec` fields, inject a
 physical root or participate in archive transport/extraction. Pinned Zabel
 guides the producer-owned resolved-view handoff only; Bazel 9.2 owns behavior.
+
+### Rules-rust keyword-only definition frontier active (2026-08-25)
+
+Accepted selected-BCR realization now makes both fresh query and build reach
+`@rules_rust//rust/platform:triple_mappings.bzl`. The first recursive parse
+stops at `def _support(*, std = False, host_tools = False)`: pinned Bazel 9.2
+accepts this bare-`*` keyword-only definition, while every live Stage 4
+BUILD/`.bzl` parser currently passes starlark-rust `Dialect::Standard`, whose
+only relevant disabled field rejects it before evaluation.
+
+Run only docs packet `WP-4-7A-rules-rust-keyword-only-arguments-audit`.
+Inventory every production BUILD/`.bzl` parse boundary, authenticate Bazel's
+parameter ordering/call behavior and starlark-rust's retained parser, resolver
+and evaluator support, then select the smallest centralized Bazel-loading
+dialect owner or `REPLAN`. Do not enable unrelated extended syntax, change
+MODULE dialects, or edit Rust during the audit.
+
+Pinned Zabel `c7298478…` guides the architectural preference for one complete
+typed semantics projection consumed by all relevant evaluators, rather than
+scattered local toggles. It is not syntax authority and no representation is
+copied; Bazel 9.2 alone defines admitted behavior. M7 stays partial and
+M7A -> M8 -> M7B remains.
