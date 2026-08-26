@@ -5153,3 +5153,49 @@ registry. No Zig code, layout, diagnostics, evaluator behavior or configured
 algorithm is adopted; Bazel 9.2 remains the sole behavior authority. The Buck2
 utility audit selects the current Copy enum and `Allocative` Starlark value,
 with no new collection, hash, interner or cache.
+
+### Config-bool false accepted; Bazel config-string-list false selected (2026-08-26)
+
+Commit `52d2c6f2` turns the existing Boolean build-setting descriptor into a
+complete `{ flag }` semantic fact. Named true, omitted and explicit false forms
+retain polarity through rule projection, recursive freeze and equality while
+sharing the Boolean default/help schema. BUILD still exposes no Boolean
+constructor. The unchanged Boolean invocation rejection was extracted from the
+oversized invoke body into the small deferred-attribute helper, and no other
+invoke line changed.
+
+Focused config-bool, typed-freeze and ABI tests pass, as do all 198 loading
+unit tests, locked core check, rebuilt CLI, formatting and hygiene. The broad
+loading integration remains 30/31 with only the recorded stale `@external`
+diagnostic-order expectation. Final growth is 15 production and 76 proof
+additions within packet caps; independent terminal review returned `ACCEPT`.
+
+Selected Skylib source order next evaluates the already-admitted
+`string_list_flag` and `repeatable_string_flag` at lines 107-129. The first
+absent expression is `config.string_list()` at line 133: Slug rejects an
+omitted/false flag and its retained StringList kind owns only repeatability.
+After this declaration, `_string_impl` remains lazy and `string_flag` uses
+accepted descriptors; `config.string()` at line 172 is the next missing
+expression. The same authenticated source JSON, archive and child hashes apply.
+
+Pinned Bazel 9.2 declares `flag` and `repeatable` named-only and false by
+default. It retains both on the STRING_LIST `BuildSetting`, rejects
+`repeatable=True` without `flag=True`, and derives mandatory nonconfigurable
+list `build_setting_default` plus optional nonconfigurable string `help`.
+Pinned `ConfigSettingTest` supplies the invalid-pair diagnostic and
+repeatability discrimination evidence.
+
+Run only `WP-4-7A-bazel-config-string-list-false-loading`. Add `flag` to the
+existing evaluation descriptor and compact retained StringList variant; accept
+the complete valid flag/repeatable matrix and preserve the invalid-pair
+diagnostic. Keep BUILD absence and the existing wildcard pre-recording
+invocation rejection. Do not parse CLI values, accumulate repeats, run an
+implementation or add configured, transition, provider, analysis or action
+behavior. Stop next at `config.string()` on line 172.
+
+Pinned Zabel `c7298478…` supplies architecture guidance only: its evaluator-
+free `BuildSettingDefinition` owns StringList kind, flag and repeatability in
+one producer value. No Zig code, layout, diagnostic, evaluator behavior or
+configured algorithm is copied. The Buck2 utility audit selects Slug's current
+Copy enum and `Allocative` value; no collection, interner, hash or cache is
+introduced. Bazel 9.2 remains sole behavior authority.
