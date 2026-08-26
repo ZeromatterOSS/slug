@@ -4041,3 +4041,11 @@ transport adds five core dependency edges plus the bounded `flate2`/`tar`
 closure. Current is docs-only until the exact 77-line lock addition is frozen
 without existing-version drift. Zabel continues to guide only semantic-view/
 physical-root ownership.
+
+### Selected-registry BCR dependency closure accepted (2026-08-25)
+
+The exact lock addition is bounded to five core names and eight new packages;
+no existing version changes. Implement the complete structural `RepoSpec` and
+physical archive root only through current's sole materializer. Bazel owns
+archive behavior; pinned Zabel continues to guide semantic/physical ownership
+only.

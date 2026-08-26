@@ -18226,3 +18226,11 @@ eight-package compression/archive closure require a `Cargo.lock` update while
 the contract marked it read-only. No Rust candidate remains. Current freezes
 the exact 77-line addition, existing `wasip2` and Ring-only graph; runtime/
 session/root lifetime and Zabel guidance are unchanged.
+
+### Native archive dependency closure accepted (2026-08-25)
+
+Current admits the exact 77-line lock addition, preserves all existing package
+versions and proves Ring-only provider selection. Implement the accepted direct
+connection and provisional-root lifetime without registry/global-provider
+changes. Runtime/session semantics and Zabel's ownership-only guidance remain
+unchanged.
