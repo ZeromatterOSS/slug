@@ -5247,6 +5247,54 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Clippy aspect attribute audit; exact source loading selected (2026-08-26)
+
+Bazel 9.2 `StarlarkRuleClassFunctions.attrObjectToAttributesList` validates
+identifier spelling, converts private direct-value names from `_x` to `$x`
+internally and retains dictionary insertion order. `aspect()` builds those
+descriptors before later semantic owners, rejects either explicit value of
+`configurable`, requires defaults for implicit attributes and rejects computed
+defaults. `StarlarkAttrModule` supplies the ordinary defining-module label,
+file, executable and `cfg="exec"` semantics. Focused upstream tests
+`testAspectExtraDeps`, `testAspectNoDefaultValueAttribute`,
+`testAspectParameterBadType`, `testAspectCannotSetConfigurableOnAttr`,
+`testAttrAllowedSingleFileTypesWrongType` and `testAttrSingleFileWithList`
+discriminate the selected subset. API prose is not widened into a complete
+private-kind claim where the pinned implementation is broader.
+
+Rules_rust clippy lines 317-364 declare these exact ordered private label
+names: `_capture_output`, `_clippy_error_format`, `_clippy_flag`,
+`_clippy_flags`, `_clippy_output_diagnostics`, `_config`, `_error_format`,
+`_extra_rustc_flag`, `_incompatible_change_clippy_error_format`,
+`_per_crate_rustc_flag`, `_process_wrapper`. Their concrete defaults resolve
+in the defining rules_rust repository. All are nonmandatory and omit
+configurability; only `_config` allows one file, and only `_process_wrapper` is
+executable with the exec configuration. All ordinary file, provider, attached-
+aspect, allowed-value and custom-transition fields are empty.
+
+Slug's existing `AttributeDefinition` already captures every constructor
+field. `declared_attribute_schema` detaches it into the same immutable schema
+used by rules, and `AspectDefinitionGen.attributes` retains/freezes that slice.
+No new representation, DICE key, analysis consumer, mapping owner or fallback
+is needed. The exact source gate is validation only; it does not become a
+parallel semantic owner.
+
+Run only `WP-4-7A-clippy-aspect-attribute-loading`. Admit the exact map beside
+the existing rustfmt pair, validate all names/defaults/fields, and reuse
+`declared_attribute_schema`. Freeze a source-shaped declaration with its later
+toolchain list omitted or reduced to the already-admitted singleton string,
+preserve rustfmt coverage, mutate every significant field, and prove the
+unchanged mixed toolchain list remains terminal. Stop before toolchain parsing,
+complete aspect loading or configured aspect execution.
+
+Clean `../zabel` `0795445f…` contributes concept-only guidance: its rule and
+aspect declarations share `NamedAttribute` plus `AttrDefinition` retention.
+That supports the existing Slug owner, not copied Zig layout, code, diagnostics
+or behavior. Bazel 9.2 remains sole authority. Since immutable Arc storage,
+hashing, collection choice, clone cost and accounting are unchanged, no Buck2
+utility or Stage 9 ledger work applies. Independent audit returned bounded
+implementation approval.
+
 ### Post-toolchain source-order correction; aspect attribute audit selected (2026-08-26)
 
 Slug's external Bzl driver first parses and resolves every direct load, then
