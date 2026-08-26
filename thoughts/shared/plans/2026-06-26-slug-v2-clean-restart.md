@@ -30,17 +30,48 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; bounded Bazel `.bzl` `struct` support selected** | selected-registry source/root-load, verified transport and exact rules_rust root realization are accepted through `2f373248`; commit `54d28477` accepts the bounded Bazel BUILD/`.bzl` dialect and keyword-only parse/binding slice; the `struct` audit authenticates the live rules_rust operations and the retained engine implementation | add `StructType` only to the complete `.bzl` loading environment while preserving BUILD/MODULE/REPO environments, then prove named construction, field access and frozen recursive export | run only `WP-4-7A-bazel-bzl-struct-builtin`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; Bazel `provider(doc=...)` audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commit `54d28477` accepts bounded Bazel keyword-only syntax/binding; commit `1a527089` accepts exact `.bzl` `struct` placement plus the live named construction, field-read and frozen-export slice | fresh query/build now converge at rules_rust `CrateInfo = provider(doc = ..., fields = {...})`; authenticate Bazel's provider declaration contract and separate loading-time callable export from later provider instances/analysis | run only docs packet `WP-4-7A-bazel-provider-doc-audit`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-bzl-struct-builtin](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-bazel-provider-doc-audit](./slug-v2-subplans/current-packet.md).
 
-Implement only the audited split between complete `.bzl` and BUILD loading
-globals, activate retained `StructType` for `.bzl` evaluation, and prove the
-live rules_rust construction/field/freeze slice. Do not widen MODULE or REPO.
+Read-only: authenticate Bazel 9.2's `provider(doc=..., fields=...)` declaration
+surface, trace the immediate rules_rust declarations and uses, and decide the
+smallest complete loading-global owner or `REPLAN`. Do not edit Rust.
+
+### M7 Bazel `.bzl` `struct` support accepted; provider frontier active (2026-08-25)
+
+Commit `1a527089` gives every audited `.bzl` evaluator one complete globals
+value containing `Print` and retained `StructType`, while both direct BUILD
+evaluation routes use the sibling Print-only value. Focused recursive export
+and BUILD-exclusion tests pass, all 240 `slug_loading_v2` tests pass, locked
+core check and rebuilt V2 CLI pass, and independent review returned `ACCEPT`.
+
+Fresh rules_rust query and build both pass named struct construction, field
+reads and recursive freeze/export. They now converge at
+`rust/private/providers.bzl:17`, where `CrateInfo = provider(doc = ...,
+fields = {...})` reaches Slug's retained provider builtin and rejects `doc` as
+an extra named parameter. Public query/build errors retain their existing
+typed wrappers.
+
+Run only docs packet `WP-4-7A-bazel-provider-doc-audit`. Authenticate the
+pinned Bazel declaration contract for `doc` and `fields`, inspect Slug's
+current provider callable ownership, and trace the live rules_rust declarations
+through export and first required use. Keep declaration-time callable creation
+distinct from later provider instances and configured-analysis semantics.
+
+Exact compatibility remains limited to the accepted `.bzl` environment and
+live struct operations. Rust value storage and nonrequired diagnostics are
+Slug-native. Broader struct behavior, unauthenticated provider parameters,
+provider-instance/analysis breadth, toolchains/actions, M8/M7B and exact output
+bytes remain unsupported/deferred.
+
+Pinned Zabel `c7298478…` continues to guide one complete typed globals owner
+projected to the correct consumers. It supplies no provider behavior or
+representation; pinned Bazel 9.2 remains sole compatibility authority.
 
 ### M7 Bazel `.bzl` `struct` implementation selected (2026-08-25)
 

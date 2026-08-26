@@ -4059,3 +4059,49 @@ Pinned Zabel `c7298478…` guides one complete typed environment owner projected
 to each correct evaluator class. It supplies no behavior or representation;
 Bazel 9.2 remains sole compatibility authority. M7 stays partial and
 M7A -> M8 -> M7B remains.
+
+### Bazel `.bzl` `struct` accepted; provider declaration frontier active (2026-08-25)
+
+Commit `1a527089` implements the audited environment split. `package.rs`
+remains the sole complete loading-globals owner: `.bzl` evaluation receives
+exactly `Print` plus retained `StructType`, while the sibling BUILD value stays
+Print-only. The Host and legacy BUILD routes select the latter; all Host,
+external and legacy recursive `.bzl` routes continue to share the former.
+MODULE, REPO, cquery and preliminary core environments are unchanged.
+
+The recursive proof constructs the real rules_rust `_support` struct, reads
+both bool fields and inspects the frozen value exported through its parent. A
+Host BUILD proof keeps `struct` absent. Both focused tests, all 240 loading
+tests, locked core check, rebuilt V2 CLI, formatting and hygiene pass;
+independent implementation review returned `ACCEPT`.
+
+Fresh rules_rust query and build both clear the struct boundary and converge at
+`rust/private/providers.bzl:17`:
+
+```starlark
+CrateInfo = provider(doc = ..., fields = {...})
+```
+
+Slug's retained `provider` builtin currently accepts the required named
+`fields` map but rejects `doc` as an extra named parameter. This live terminal
+selects a read-only audit; it does not yet authenticate the complete Bazel
+provider surface or authorize a signature change.
+
+Run only docs packet `WP-4-7A-bazel-provider-doc-audit`. Inspect pinned Bazel
+9.2 provider source/tests for `doc` and `fields`, trace every immediate
+rules_rust provider declaration and operation to the next honest terminal, and
+inventory Slug's callable-definition/export owner. Separate loading-time
+provider callable construction from provider instances and configured-analysis
+semantics; select one bounded implementation or `REPLAN`, with no Rust changes
+in the audit.
+
+Exact compatibility covers only the accepted `.bzl` struct placement and live
+construction/field/freeze slice. Rust storage and nonrequired diagnostics are
+Slug-native. Broader struct semantics, unauthenticated provider parameters,
+provider-instance/analysis breadth, toolchains/actions, M8/M7B and exact output
+bytes remain unsupported/deferred.
+
+Pinned Zabel `c7298478…` guides a complete typed globals/semantic owner
+projected to all relevant consumers; it supplies no provider behavior,
+representation or identity. Pinned Bazel 9.2 remains sole compatibility
+authority. M7 stays partial and M7A -> M8 -> M7B remains.

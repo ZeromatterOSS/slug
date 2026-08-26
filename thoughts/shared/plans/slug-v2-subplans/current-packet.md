@@ -1,141 +1,104 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-bazel-bzl-struct-builtin`
+Packet: `WP-4-7A-bazel-provider-doc-audit`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: Stage 4 complete BUILD/`.bzl` loading globals
-Base: `54d28477`
+Owners: Stage 4 `.bzl` loading globals and retained user-provider callable
+Base: `1a527089`
 
-Result: expose retained starlark-rust `StructType` in every Bazel `.bzl`
-evaluation and nowhere else. The real rules_rust `_support` shape constructs,
-reads and freezes across a recursive external load; BUILD, MODULE and REPO
-environments remain unchanged.
+Result: docs-only. Audit Bazel 9.2's `provider(doc=..., fields=...)`
+declaration surface exposed by the accepted rules_rust load, distinguish
+loading-time callable construction/export from provider instances and analysis,
+and select one bounded implementation or `REPLAN`. Do not edit Rust.
 
-## Learned facts and authority
+## Authority and live terminal
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-is sole behavior authority:
+is sole behavior authority. Inspect the provider builtin implementation,
+callable/provider value types and focused source tests for the `doc` and
+`fields` contract. Use a fresh disposable oracle only if pinned source and
+existing regressions do not discriminate an edge required by the live route.
 
-- `StarlarkGlobalsImpl.getFixedBzlToplevels` installs
-  `StructProvider.STRUCT`; fixed BUILD, MODULE and REPO methods do not.
-  cquery and SCL also contain it but are outside this packet.
-- `BazelStarlarkEnvironmentTest.buildAndModuleBzlEnvsDeclareSameNames` proves
-  BUILD-loaded and MODULE-loaded `.bzl` files expose the same names.
-- `StructProvider.createStruct` and `StarlarkRuleClassFunctionsTest` rows
-  `testStructCreation`, `testStructFields`, `testStructEquality`,
-  `testStructIncomparability`, `testStructPosArgs`, `testStructStr` and the
-  export row authenticate the wider Bazel value surface.
+Commit `1a527089` is accepted through exact `.bzl` `struct` placement plus the
+live named construction, field-read and frozen recursive-export slice. Fresh
+query and build against rules_rust 0.73.0 now converge at
+`rust/private/providers.bzl:17`:
 
-The live rules_rust 0.73.0 load needs only a smaller slice. During evaluation
-of `rust/platform/triple_mappings.bzl`, `_support` constructs two named bool
-fields, the comprehension reads `support.std`, the structs remain dictionary
-values, and the completed module freezes/exports those values. Loaded
-`triple.bzl` defines more named-field constructors but does not invoke them at
-this terminal. Comparison, concatenation, provider identity, formatting, JSON
-and struct-key hashing are not required here.
+```starlark
+CrateInfo = provider(doc = ..., fields = {...})
+```
 
-Retained starlark-rust already implements named-only construction and no
-positional arguments in `register_struct`, immutable field access and
-order-insensitive equality/hash in `StructGen`, and frozen storage through its
-derived `Freeze`. Do not claim the whole implementation exact: its `compare`
-orders structs although Bazel rejects ordering, it lacks Bazel struct
-concatenation/provider identity, and its display spacing differs.
+Slug reaches its retained `provider` builtin and reports `doc` as an extra
+named parameter. Preserve the accepted source, routing, parsing, globals and
+struct slices; this audit must not revisit them.
 
 Pinned `../zabel` commit
 `c7298478e2e56262a2f438e9c065325744c9f0fc` is architecture guidance only.
-`session_analysis_starlark_semantics.zig` projects one typed semantics value to
-the relevant consumers, while `injected_repository_starlark_semantics.zig`
-retains and authenticates a complete request value. Follow the corresponding
-single complete globals-owner pattern; copy no Zabel code, representation,
-fingerprint, scheduler or behavior. Bazel remains builtin/value authority.
+Inspect it with `git show`, especially
+`session_analysis_starlark_semantics.zig` and
+`injected_repository_starlark_semantics.zig`: they retain one complete typed
+semantic/global value and project it to the relevant consumers. Use that
+guidance when selecting the Slug owner, but copy no Zabel code, representation,
+fingerprint, scheduler or behavior. Bazel remains provider authority.
 
-## Decision, owner and non-decisions
+## Required read-only audit
 
-`package.rs` remains the sole complete loading-global owner. Add one private
-common builder, keep `loading_globals()` as the `.bzl` environment and include
-exactly `LibraryExtension::{Print, StructType}` there. Add a distinctly named
-`build_file_loading_globals()` that preserves the current Print-only extension
-set. Both receive the same existing package/select/native/attr/config/platform
-and bounded provider symbols.
+1. Trace Bazel 9.2's provider declaration builtin and focused tests for the
+   exact signature, defaults, validation, return shape, export/naming lifecycle
+   and diagnostic behavior of `doc` and `fields`. Record other parameters but
+   do not admit them without a live requirement.
+2. Trace the immediate rules_rust provider declarations from
+   `rust/private/providers.bzl`, their recursive export/load path and every
+   callable/instance operation required before the next honest query/build
+   terminal. Separate declaration-only work from configured analysis.
+3. Audit Slug's `provider` in `package.rs`, `UserProviderCallable`, freeze and
+   module-export behavior, descriptor/schema ownership, provider construction
+   and existing tests. Determine whether accepting `doc` can be exact and
+   observationally inert for the live declaration slice or whether semantics
+   must be retained.
+4. Inventory every globals consumer only as needed to confirm the accepted
+   `.bzl` owner remains complete. Do not reconstruct provider symbols or
+   metadata at evaluation call sites and do not widen BUILD/MODULE/REPO.
+5. Classify declaration callable identity, exported naming, documentation,
+   field schemas, instance construction/access, equality/hash, formatting and
+   analysis integration separately. Unexercised or unowned behavior fails
+   closed.
+6. Define the smallest implementation/test file set, base hashes, line caps
+   and validation. Prefer focused provider declaration/freeze proofs, the
+   recursive external-Bzl route and fresh rules_rust query/build. Do not vendor
+   rules_rust or a downloaded archive.
 
-In `bzl_module.rs`, switch only the Host package-attempt and legacy
-`PackageLoadKey` BUILD evaluations to `build_file_loading_globals()`. The Host,
-external and legacy recursive `.bzl` evaluations keep `loading_globals()` and
-therefore share one complete value. Repository-package and root-package BUILD
-evaluation already flow through the Host package-attempt owner.
+## Compatibility candidates
 
-Do not touch the preliminary core BUILD evaluator, Stage 5 MODULE/REPO globals,
-cquery, parser/dialect logic, source/load traversal, DICE keys, events or error
-translation. Do not enable all `LibraryExtension`s and do not implement a new
-struct value or Bazel's deferred broader struct semantics.
-
-## Ownership and lifecycle
-
-The environment selection is a constant semantic fact owned at the Stage 4
-evaluation boundary; it has no request input or filesystem observation and
-adds no DICE identity/invalidation field. Each `Globals` value remains
-evaluation-local. Successful struct instances freeze with the module into the
-existing DICE-retained `FrozenBzlModule`; they borrow neither command scratch
-nor an evaluator heap. Cancellation, overlapping requests, equality cutoff,
-events, source observations and shutdown behavior are unchanged.
-
-No fallback, new cache, global registry, task, async transfer, dependency,
-lockfile entry or public API is authorized. No performance measurement is
-needed because this is a fixed environment member and the admitted real route
-already performs its construction.
-
-## Files and caps
-
-Allowed files, with base SHA-256 and final line ceiling:
-
-| File | Base SHA-256 | Cap |
-|---|---|---:|
-| `app/slug_loading_v2/src/package.rs` | `650a5784681ac1ba5f8a20e3eb08cb4831d27fa7cb36ef439f5b425b10be08ef` | 5,140 |
-| `app/slug_loading_v2/src/bzl_module.rs` | `05de7358109c2a7a017522fdc7b685e9bbf518fb5b93c8ada0526f6cb8289034` | 9,650 |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `ac91348377a41bb9ddc901890dbb3e2442eafc8b702d3bb9a7b1f0fbaf345a00` | 3,845 |
-| `app/slug_loading_v2/src/host_package_attempt_tests.rs` | `41365b2b59e145b447053ac1b42d68fc3cc7baf1071a486d9cb32142c76b4687` | 550 |
-
-Production additions are <=30, proof additions <=80 and total additions <=110.
-The two production files exceed the authoring-guide size trigger, but the
-change is cohesive with the existing sole globals owner and changes only two
-evaluation selections in the orchestration file. A broader physical split
-would cross packet scope.
-
-## Proof and validation
-
-Extend the recursive external-Bzl proof with the real `_support` form:
-construct named `std`/`host_tools` bool fields, read both fields, export the
-result through its parent and inspect the frozen value. Add one Host package
-attempt proving `struct` remains absent in BUILD evaluation. Do not assert
-diagnostic text beyond the stable missing-variable discriminator.
-
-Run:
-
-- `cargo fmt --check` and `git diff --check`;
-- focused external-Bzl and Host package-attempt tests;
-- full `cargo test -p slug_loading_v2`;
-- `cargo check -p slug_core_v2 --locked`;
-- `cargo build -p slug_cli_v2 --locked`;
-- with clean `slugd` lifecycle and fresh output roots, the existing disposable
-  rules_rust query and build, recording the next common internal/public
-  terminal after `struct`.
-
-Pinned source/tests already discriminate environment placement and the value
-surface, so no new Bazel fixture or copied archive is authorized.
-
-## Compatibility and STOP
-
-- **Exact:** Bazel 9.2 `.bzl` availability, named-only bool construction,
-  immutable field access and frozen recursive export exercised by the live
-  rules_rust load; absence from BUILD/MODULE/REPO.
-- **Slug-native:** Rust storage/layout, valid-Unicode strings, evaluator/error
+- **Exact candidate:** Bazel 9.2 acceptance and validation of the live
+  `provider(doc=..., fields=...)` declaration, callable freeze/export/naming,
+  and only the provider instance operations proven necessary before the next
+  terminal.
+- **Slug-native:** Rust storage/layout, valid-Unicode strings, internal error
   representation and nonrequired diagnostic wording.
-- **Unsupported/deferred:** cquery/SCL activation, struct ordering,
-  concatenation, provider identity, exact display/JSON/hash bytes and other
-  unexercised value breadth; later rules_rust providers/toolchains/actions,
-  M8/M7B and exact output bytes.
+- **Unsupported/deferred:** unauthenticated provider parameters, documentation
+  introspection not exercised by the live route, broader provider-instance and
+  configured-analysis semantics, struct breadth, toolchains/actions, M8/M7B
+  and exact output bytes.
 
-STOP on dirty overlap, any new struct representation, exposure outside the
-authenticated `.bzl` environment, all-extension activation, per-evaluator
-symbol reconstruction, parser/dialect changes, DICE/source/event changes,
-source vendoring, Java/JVM, dependency drift, public diagnostic widening or
-scope above the caps. `REPLAN` before crossing a boundary.
+## Documentation authority and STOP
+
+This packet may change only the canonical plan, this manifest and Stage 4.
+Base SHA-256 values are:
+
+| File | Base SHA-256 |
+|---|---|
+| `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md` | `af020bae98cd2a68821960da5c28b6276428309183fde254147be43299ecb037` |
+| `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md` | `f8f936392c07ad956f15076d830a37a6ffc3a46fcac5ab3f279961ab4a90c202` |
+| `thoughts/shared/plans/slug-v2-subplans/current-packet.md` | `bc844be9267d73753703476019ab13011517b18932056bbfec78312250d4e4a5` |
+
+Caps are <=45 canonical, <=190 current and <=230 Stage additions, <=465
+aggregate. Record inspected symbols, live operations, owner/lifecycle analysis,
+exact/Slug-native/deferred classification, implementation file hashes/caps,
+tests and exactly one successor; obtain independent review before activating
+Rust.
+
+STOP on dirty overlap, accepting `doc` without authenticating its semantics,
+discarding observable provider metadata, mixing declaration and analysis
+ownership, exposure outside authenticated environments, per-evaluator symbol
+reconstruction, source vendoring, Java/JVM, dependency drift or scope above
+the caps. `REPLAN` instead of widening.
