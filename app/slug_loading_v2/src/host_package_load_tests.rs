@@ -3798,6 +3798,146 @@ const UTILS_FIND_TOOLCHAIN_SOURCE: &str = r###"def find_toolchain(ctx):
     return ctx.toolchains[Label("//rust:toolchain_type")]
 "###;
 
+const UTILS_DETERMINE_OUTPUT_HASH_SOURCE: &str = r###"def determine_output_hash(crate_root, label):
+    """Generates a hash of the crate root file's path.
+
+    Args:
+        crate_root (File): The crate's root file (typically `lib.rs`).
+        label (Label): The label of the target.
+
+    Returns:
+        str: A string representation of the hash.
+    """
+
+    # Take the absolute value of hash() since it could be negative.
+    h = abs(hash(crate_root.path) + hash(repr(label)))
+    return repr(h)
+"###;
+
+const UTILS_DEDUPLICATE_SOURCE: &str = r###"def deduplicate(xs):
+    return {x: True for x in xs}.keys()
+
+"###;
+
+const UTILS_DEDENT_SOURCE: &str = r###"def dedent(doc_string):
+    """Remove any common leading whitespace from every line in text.
+
+    This functionality is similar to python's `textwrap.dedent` functionality
+    https://docs.python.org/3/library/textwrap.html#textwrap.dedent
+
+    Args:
+        doc_string (str): A docstring style string
+
+    Returns:
+        str: A string optimized for stardoc rendering
+    """
+    lines = doc_string.splitlines()
+    if not lines:
+        return doc_string
+
+    # If the first line is empty, use the second line
+    first_line = lines[0]
+    if not first_line:
+        first_line = lines[1]
+
+    # Detect how much space prepends the first line and subtract that from all lines
+    space_count = len(first_line) - len(first_line.lstrip())
+
+    # If there are no leading spaces, do not alter the docstring
+    if space_count == 0:
+        return doc_string
+    else:
+        # Remove the leading block of spaces from the current line
+        block = " " * space_count
+        return "\n".join([line.replace(block, "", 1).rstrip() for line in lines])
+"###;
+
+const UTILS_CAN_USE_METADATA_SOURCE: &str = r###"def can_use_metadata_for_pipelining(toolchain, crate_type):
+    """Can we use metadata from this rust_library for pipelined compilation?
+
+    This does not include whether or not metadata itself can be generated, which
+    is covered instead by can_build_metadata.
+
+    Args:
+        toolchain (toolchain): The rust toolchain
+        crate_type (String): one of lib|rlib|dylib|staticlib|cdylib|proc-macro
+
+    Returns:
+        bool: whether we can use the metadata for pipelined compilation.
+    """
+
+    # In order to enable pipelined compilation we require that:
+    # 1) The _pipelined_compilation flag is enabled,
+    # 2) the crate_type is rlib or lib.
+    # This is *in addition* to the checks in can_build_metadata (i.e. that
+    # process_wrapper is enabled).
+    return toolchain._pipelined_compilation and \
+           crate_type in ("rlib", "lib")
+"###;
+
+const UTILS_DETERMINE_LIB_NAME_SOURCE: &str = r###"def determine_lib_name(name, crate_type, toolchain, lib_hash = None):
+    """See https://github.com/bazelbuild/rules_rust/issues/405
+
+    Args:
+        name (str): The name of the current target
+        crate_type (str): The `crate_type`
+        toolchain (rust_toolchain): The current `rust_toolchain`
+        lib_hash (str, optional): The hashed crate root path
+
+    Returns:
+        str: A unique library name
+    """
+    extension = None
+    prefix = ""
+    if crate_type in ("dylib", "cdylib", "proc-macro"):
+        extension = toolchain.dylib_ext
+    elif crate_type == "staticlib":
+        extension = toolchain.staticlib_ext
+    elif crate_type in ("lib", "rlib"):
+        # All platforms produce 'rlib' here
+        extension = ".rlib"
+        prefix = "lib"
+    elif crate_type == "bin":
+        fail("crate_type of 'bin' was detected in a rust_library. Please compile " +
+             "this crate as a rust_binary instead.")
+
+    if not extension:
+        fail(("Unknown crate_type: `{}`. If this is a cargo-supported crate type, " +
+              "please file an issue!").format(crate_type))
+
+    prefix = "lib"
+    if toolchain.target_triple and toolchain.target_os == "windows" and crate_type not in ("lib", "rlib"):
+        prefix = ""
+    if toolchain.target_arch in ("wasm32", "wasm64") and crate_type == "cdylib":
+        prefix = ""
+
+    return "{prefix}{name}{lib_hash}{extension}".format(
+        prefix = prefix,
+        name = name,
+        lib_hash = "-" + lib_hash if lib_hash else "",
+        extension = extension,
+    )
+"###;
+
+const UTILS_GET_EDITION_SOURCE: &str = r###"def get_edition(attr, toolchain, label):
+    """Returns the Rust edition from either the current rule's attributes or the current `rust_toolchain`
+
+    Args:
+        attr (struct): The current rule's attributes
+        toolchain (rust_toolchain): The `rust_toolchain` for the current target
+        label (Label): The label of the target being built
+
+    Returns:
+        str: The target Rust edition
+    """
+    if getattr(attr, "edition"):
+        return attr.edition
+    elif not toolchain.default_edition:
+        fail("Attribute `edition` is required for {}.".format(label))
+    else:
+        return toolchain.default_edition
+"###;
+
 const UTILS_FORCE_DISABLE_SOURCE: &str = r###"_FORCE_DISABLE_CC_TOOLCHAIN = False
 "###;
 
@@ -4165,6 +4305,57 @@ fn exact_rules_rust_utils_find_toolchain_export_retains_parent_import_identity()
             .value()
             .ptr_eq(child.get("find_toolchain").unwrap().value())
     );
+}
+
+#[test]
+#[rustfmt::skip]
+fn exact_rules_rust_utils_leaf_exports_retain_parent_import_order_and_identity() {
+    let slices = [
+        (UTILS_DETERMINE_OUTPUT_HASH_SOURCE, "determine_output_hash", "0e4c8febdc878e77987b4a525f8737723a6e7c4c00d409f58df46581edc54d77"),
+        (UTILS_DEDUPLICATE_SOURCE, "deduplicate", "1647d85c5e861c2a388e9700c9b9182ca3f1ea9cb388d350fb063b8124674e6f"),
+        (UTILS_DEDENT_SOURCE, "dedent", "2b851cbad7d7131e011da7f85b50b12ff3fb9e9c698654bb219eb1edb07dc839"),
+        (UTILS_CAN_USE_METADATA_SOURCE, "can_use_metadata_for_pipelining", "00078da9862fec4e91d5e0e4453a5395dca29f12e4bc6dd44f280a58643b0b5a"),
+        (UTILS_DETERMINE_LIB_NAME_SOURCE, "determine_lib_name", "e42edb4f6802acc91363c06db74ff2322f11dcdba3d2d2d8adbd9091faa660b0"),
+        (UTILS_GET_EDITION_SOURCE, "get_edition", "51f501c5b091031305732a81b909a2abcc3be419bbbfb8577cf8e23ff45c7db8"),
+    ];
+    for (source, _, expected) in slices {
+        assert_eq!(format!("{:x}", Sha256::digest(source.as_bytes())), expected);
+    }
+    let owner = |label: &str, path: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(label).unwrap(),
+        workspace_path: PathBuf::from(path),
+        repository_mapping: Arc::from([]),
+    };
+    let child_owner = owner("@@rules_rust+//rust/private:utils.bzl", "/rules_rust/rust/private/utils.bzl");
+    let child_source = slices.iter().map(|(source, _, _)| *source).collect::<Vec<_>>().join("\n");
+    let child = eval_bzl_with_identity(&child_source, child_owner.clone()).unwrap();
+    for (_, name, _) in slices {
+        assert_eq!(child.get(name).unwrap().value().get_type(), "function");
+    }
+    let names = [
+        "can_use_metadata_for_pipelining", "dedent", "deduplicate",
+        "determine_lib_name", "determine_output_hash", "get_edition",
+    ];
+    let parent = eval_bzl_with_loaded_children(
+        r#"load(
+    ":utils.bzl",
+    "can_use_metadata_for_pipelining",
+    "dedent",
+    "deduplicate",
+    "determine_lib_name",
+    "determine_output_hash",
+    "get_edition",
+)
+IMPORTED_LEAVES = [can_use_metadata_for_pipelining, dedent, deduplicate, determine_lib_name, determine_output_hash, get_edition]
+"#,
+        owner("@@rules_rust+//rust/private:rust.bzl", "/rules_rust/rust/private/rust.bzl"),
+        &[(":utils.bzl", child_owner, child.dupe())],
+    ).unwrap();
+    let imported = FrozenListRef::from_value(parent.get("IMPORTED_LEAVES").unwrap().value()).unwrap();
+    assert_eq!(imported.len(), names.len());
+    for (value, name) in imported.iter().zip(names) {
+        assert!(value.to_value().ptr_eq(child.get(name).unwrap().value()));
+    }
 }
 
 #[test]
