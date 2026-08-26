@@ -121,6 +121,8 @@ use crate::package::FrozenAspectDefinition;
 use crate::package::FrozenRuleDefinition;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::FrozenUserProviderCallable;
+use crate::provider::StarlarkUserProvider;
+use crate::provider::initialized_provider_id;
 
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
@@ -3288,6 +3290,101 @@ fn bazel_cc_common_private_bridge_is_bzl_only_owner_checked_and_opaque() {
             .unwrap_err()
             .contains("cc_common")
     );
+}
+
+#[test]
+fn bazel_initialized_provider_loads_rules_cc_artifact_categories_and_stays_separate() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_cc+//cc/common:cc_helper_internal.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_cc/cc/common/cc_helper_internal.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let source = r#"
+events = []
+def _artifact_category_info_init(name, default_prefix, *extensions):
+    events.append(name)
+    return {
+        "allowed_extensions": extensions,
+        "default_extension": extensions[0],
+        "default_prefix": default_prefix,
+        "name": name,
+    }
+ArtifactCategoryInfo, _new_aci = provider(
+    """A category of artifacts that are candidate input/output to an action.""",
+    fields = ["name", "default_prefix", "default_extension", "allowed_extensions"],
+    init = _artifact_category_info_init,
+)
+STATIC = ArtifactCategoryInfo("STATIC_LIBRARY", "lib", ".a", ".lib")
+OMITTED = _new_aci(name = "OMITTED")
+CATEGORIES = [STATIC, OMITTED]
+NAMES = struct(**{category.name: category.name for category in CATEGORIES})
+STATIC_NAME = STATIC.name
+STATIC_DEFAULT = STATIC.default_extension
+STATIC_SECOND = STATIC.allowed_extensions[1]
+HAS_OMITTED_PREFIX = hasattr(OMITTED, "default_prefix")
+def _failing_init(name):
+    fail("initializer must be bypassed")
+FailingInfo, _new_failing = provider("Failing", fields = ["name"], init = _failing_init)
+BYPASSED = _new_failing(name = "raw")
+"#;
+    let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
+    assert_eq!(
+        module.get("STATIC_NAME").unwrap().unpack_str(),
+        Some("STATIC_LIBRARY")
+    );
+    assert_eq!(
+        module.get("STATIC_DEFAULT").unwrap().unpack_str(),
+        Some(".a")
+    );
+    assert_eq!(
+        module.get("STATIC_SECOND").unwrap().unpack_str(),
+        Some(".lib")
+    );
+    assert_eq!(
+        module.get("HAS_OMITTED_PREFIX").unwrap().unpack_bool(),
+        Some(false)
+    );
+    let names_value = module.get("NAMES").unwrap();
+    let names = StructRef::from_value(names_value.value()).unwrap();
+    let names = names
+        .iter()
+        .map(|(name, value)| (name.as_str(), value.unpack_str().unwrap()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        names,
+        [("STATIC_LIBRARY", "STATIC_LIBRARY"), ("OMITTED", "OMITTED")]
+    );
+    let events = FrozenListRef::from_value(module.get("events").unwrap().value()).unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].to_value().unpack_str(), Some("STATIC_LIBRARY"));
+
+    let normal = module.get("STATIC").unwrap();
+    let raw = module.get("OMITTED").unwrap();
+    let normal = normal.value();
+    let raw = raw.value();
+    assert_eq!(
+        initialized_provider_id(normal),
+        initialized_provider_id(raw)
+    );
+    assert!(StarlarkUserProvider::from_value(normal).is_none());
+    assert!(StarlarkUserProvider::from_value(raw).is_none());
+
+    let failures = [
+        "X = provider('doc', fields = ['x'])",
+        "def init(): return {}\nX = provider('doc', fields = {'x': 'doc'}, init = init)",
+        "def init(): return {}\nX = provider('doc', fields = None, init = init)",
+        "X = provider('doc', fields = ['x'], init = 1)",
+        "def init(): return 'bad'\nInfo, raw = provider('doc', fields = ['x'], init = init)\nX = Info()",
+        "def init(): return {1: 'bad'}\nInfo, raw = provider('doc', fields = ['x'], init = init)\nX = Info()",
+        "def init(): return {'other': 'bad'}\nInfo, raw = provider('doc', fields = ['x'], init = init)\nX = Info()",
+        "def init(): return {'x': 'ok'}\nInfo, raw = provider('doc', fields = ['x'], init = init)\nX = raw('bad')",
+    ];
+    for failure in failures {
+        assert!(
+            eval_bzl_with_identity(failure, owner.clone()).is_err(),
+            "{failure}"
+        );
+    }
 }
 
 #[test]

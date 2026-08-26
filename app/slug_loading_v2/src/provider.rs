@@ -32,9 +32,13 @@ use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
+use starlark::values::UnpackValue;
 use starlark::values::Value;
+use starlark::values::ValueLike;
+use starlark::values::dict::DictRef;
 use starlark::values::list::ListRef;
 use starlark::values::starlark_value;
+use starlark::values::typing::StarlarkCallable;
 use starlark_map::small_map::SmallMap;
 
 use crate::bzl_module::BzlLoadManifest;
@@ -144,6 +148,54 @@ pub struct UserProviderCallable {
     id: OnceCell<ProviderId>,
 }
 
+pub(crate) fn user_provider_from_arguments<'v>(
+    doc: Option<Value<'v>>,
+    fields: Value<'v>,
+    init: Option<Value<'v>>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> anyhow::Result<Value<'v>> {
+    if doc.is_some_and(|value| !value.is_none() && value.unpack_str().is_none()) {
+        anyhow::bail!("provider doc must be a string or None");
+    }
+    if let Some(init) = init.filter(|value| !value.is_none()) {
+        if doc.and_then(Value::unpack_str).is_none() {
+            anyhow::bail!("initialized provider requires a string doc");
+        }
+        let callable: Option<StarlarkCallable<'v>> = StarlarkCallable::unpack_value_opt(init);
+        if callable.is_none() {
+            anyhow::bail!("provider init must be callable");
+        }
+        let fields = ListRef::from_value(fields)
+            .ok_or_else(|| anyhow::anyhow!("initialized provider fields must be a list"))?;
+        let fields = fields
+            .iter()
+            .map(|value| {
+                value
+                    .unpack_str()
+                    .map(CompactString::new)
+                    .ok_or_else(|| anyhow::anyhow!("provider fields must be strings"))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        return InitializedUserProviderCallable::allocate_pair(fields.into(), init, eval);
+    }
+    let fields = DictRef::from_value(fields)
+        .ok_or_else(|| anyhow::anyhow!("provider fields must be a dictionary"))?;
+    let fields = fields
+        .iter()
+        .map(|(name, documentation)| {
+            let name = name
+                .unpack_str()
+                .ok_or_else(|| anyhow::anyhow!("provider field names must be strings"))?;
+            let documentation = documentation
+                .unpack_str()
+                .ok_or_else(|| anyhow::anyhow!("provider field docs must be strings"))?;
+            Ok((name.to_owned(), documentation.to_owned()))
+        })
+        .collect::<anyhow::Result<SmallMap<_, _>>>()?;
+    Ok(eval
+        .heap()
+        .alloc(UserProviderCallable::from_evaluator(fields, eval)?))
+}
 impl UserProviderCallable {
     pub(crate) fn from_evaluator(
         fields: SmallMap<String, String>,
@@ -223,11 +275,7 @@ impl<'v> StarlarkValue<'v> for UserProviderCallable {
         args: &Arguments<'v, '_>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        let id = self.id.get().ok_or_else(|| {
-            starlark::Error::new_other(anyhow::anyhow!(
-                "the result of provider() must be assigned before it can be called"
-            ))
-        })?;
+        let id = self.id.get().ok_or_else(unbound_provider_error)?;
         invoke_provider(id, &self.fields, args, eval)
     }
 }
@@ -266,6 +314,245 @@ impl<'v> StarlarkValue<'v> for FrozenUserProviderCallable {
     }
 }
 
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
+pub(crate) struct InitializedUserProviderCallable<'v> {
+    source_label: CompactString,
+    fields: Arc<[CompactString]>,
+    init: Value<'v>,
+    #[allocative(skip)]
+    id: OnceCell<ProviderId>,
+}
+impl<'v> InitializedUserProviderCallable<'v> {
+    pub(crate) fn allocate_pair(
+        fields: Arc<[CompactString]>,
+        init: Value<'v>,
+        eval: &Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        let context = BzlEvaluationContext::from_evaluator(eval)
+            .map_err(|_| anyhow::anyhow!("provider() may only be called in a .bzl module"))?;
+        let provider = eval.heap().alloc_complex(Self {
+            source_label: context.source_label.clone(),
+            fields,
+            init,
+            id: OnceCell::new(),
+        });
+        let raw = eval
+            .heap()
+            .alloc_complex(InitializedProviderRawGen { provider });
+        Ok(eval.heap().alloc((provider, raw)))
+    }
+}
+impl fmt::Display for InitializedUserProviderCallable<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.id.get() {
+            Some(id) => write!(f, "provider[{id}]"),
+            None => f.write_str("provider[unbound]"),
+        }
+    }
+}
+impl Freeze for InitializedUserProviderCallable<'_> {
+    type Frozen = FrozenInitializedUserProviderCallable;
+    fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
+        let Some(id) = self.id.into_inner() else {
+            return Err(FreezeError::new(
+                "the result of provider() must be assigned to a top-level variable".to_owned(),
+            ));
+        };
+        Ok(FrozenInitializedUserProviderCallable {
+            id,
+            fields: self.fields,
+            init: self.init.freeze(freezer)?,
+        })
+    }
+}
+#[starlark_value(type = "provider_callable")]
+impl<'v> StarlarkValue<'v> for InitializedUserProviderCallable<'v> {
+    type Canonical = FrozenInitializedUserProviderCallable;
+    fn export_as(
+        &self,
+        variable_name: &str,
+        _eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<()> {
+        if self.id.get().is_none() {
+            let id = ProviderId::new(self.source_label.clone(), variable_name)
+                .map_err(|error| starlark::Error::new_other(anyhow::anyhow!(error.to_string())))?;
+            let _ = self.id.set(id);
+        }
+        Ok(())
+    }
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let id = self.id.get().ok_or_else(unbound_provider_error)?;
+        invoke_initialized_provider(id, &self.fields, self.init, args, eval)
+    }
+}
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub(crate) struct FrozenInitializedUserProviderCallable {
+    id: ProviderId,
+    fields: Arc<[CompactString]>,
+    init: FrozenValue,
+}
+starlark::starlark_simple_value!(FrozenInitializedUserProviderCallable);
+impl fmt::Display for FrozenInitializedUserProviderCallable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "provider[{}]", self.id)
+    }
+}
+#[starlark_value(type = "provider_callable")]
+impl<'v> StarlarkValue<'v> for FrozenInitializedUserProviderCallable {
+    type Canonical = Self;
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        invoke_initialized_provider(&self.id, &self.fields, self.init.to_value(), args, eval)
+    }
+}
+fn unbound_provider_error() -> starlark::Error {
+    let message = "the result of provider() must be assigned before it can be called";
+    starlark::Error::new_other(anyhow::anyhow!(message))
+}
+#[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
+struct InitializedProviderRawGen<V> {
+    provider: V,
+}
+type InitializedProviderRaw<'v> = InitializedProviderRawGen<Value<'v>>;
+type FrozenInitializedProviderRaw = InitializedProviderRawGen<FrozenValue>;
+starlark::starlark_complex_values!(InitializedProviderRaw);
+impl<V> fmt::Display for InitializedProviderRawGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<raw constructor>")
+    }
+}
+#[starlark_value(type = "function")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for InitializedProviderRawGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    type Canonical = FrozenInitializedProviderRaw;
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let provider = self.provider.to_value();
+        if let Some(provider) = provider.downcast_ref::<InitializedUserProviderCallable>() {
+            let id = provider.id.get().ok_or_else(unbound_provider_error)?;
+            invoke_initialized_raw(id, &provider.fields, args, eval)
+        } else {
+            let provider = provider
+                .downcast_ref::<FrozenInitializedUserProviderCallable>()
+                .expect("raw constructor retains its provider callable");
+            invoke_initialized_raw(&provider.id, &provider.fields, args, eval)
+        }
+    }
+}
+#[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
+pub(crate) struct InitializedStarlarkUserProviderGen<V> {
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    id: ProviderId,
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    schema: Arc<[CompactString]>,
+    fields: SmallMap<u32, V>,
+}
+pub(crate) type InitializedStarlarkUserProvider<'v> = InitializedStarlarkUserProviderGen<Value<'v>>;
+type FrozenInitializedStarlarkUserProvider = InitializedStarlarkUserProviderGen<FrozenValue>;
+starlark::starlark_complex_values!(InitializedStarlarkUserProvider);
+#[cfg(test)]
+pub(crate) fn initialized_provider_id(value: Value<'_>) -> Option<ProviderId> {
+    match InitializedStarlarkUserProvider::from_value(value)? {
+        starlark::__macro_refs::Either::Left(provider) => Some(provider.id.dupe()),
+        starlark::__macro_refs::Either::Right(provider) => Some(provider.id.dupe()),
+    }
+}
+impl<V> fmt::Display for InitializedStarlarkUserProviderGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}(...)", self.id.exported_name())
+    }
+}
+#[starlark_value(type = "provider")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for InitializedStarlarkUserProviderGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    type Canonical = FrozenInitializedStarlarkUserProvider;
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        let index = self
+            .schema
+            .iter()
+            .position(|field| field.as_str() == attribute)? as u32;
+        self.fields.get(&index).map(|value| value.to_value())
+    }
+}
+fn invoke_initialized_provider<'v>(
+    id: &ProviderId,
+    fields: &Arc<[CompactString]>,
+    init: Value<'v>,
+    args: &Arguments<'v, '_>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> starlark::Result<Value<'v>> {
+    let positions = args.positions(eval.heap())?.collect::<Vec<_>>();
+    let kwargs = eval.heap().alloc(args.names_map()?);
+    let initialized = init.invoke_pos_kwargs(&positions, Some(kwargs), eval)?;
+    let values = DictRef::from_value(initialized).ok_or_else(|| {
+        starlark::Error::new_other(anyhow::anyhow!(
+            "provider init must return a dictionary, got {}",
+            initialized.get_type()
+        ))
+    })?;
+    allocate_initialized_provider(id, fields, values.iter(), eval)
+}
+fn invoke_initialized_raw<'v>(
+    id: &ProviderId,
+    fields: &Arc<[CompactString]>,
+    args: &Arguments<'v, '_>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> starlark::Result<Value<'v>> {
+    args.no_positional_args(eval.heap())?;
+    let values = args.names_map()?;
+    allocate_initialized_provider(
+        id,
+        fields,
+        values.iter().map(|(name, value)| (name.to_value(), *value)),
+        eval,
+    )
+}
+fn allocate_initialized_provider<'v>(
+    id: &ProviderId,
+    fields: &Arc<[CompactString]>,
+    values: impl IntoIterator<Item = (Value<'v>, Value<'v>)>,
+    eval: &Evaluator<'v, '_, '_>,
+) -> starlark::Result<Value<'v>> {
+    let mut retained = SmallMap::new();
+    for (name, value) in values {
+        let name = name.unpack_str().ok_or_else(|| {
+            starlark::Error::new_other(anyhow::anyhow!("provider field keys must be strings"))
+        })?;
+        let Some(index) = fields.iter().position(|field| field.as_str() == name) else {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "provider {} received unknown field `{name}`",
+                id
+            )));
+        };
+        retained.insert(index as u32, value);
+    }
+    Ok(eval
+        .heap()
+        .alloc_complex(InitializedStarlarkUserProviderGen {
+            id: id.dupe(),
+            schema: fields.dupe(),
+            fields: retained,
+        }))
+}
 fn invoke_provider<'v>(
     id: &ProviderId,
     fields: &[CompactString],

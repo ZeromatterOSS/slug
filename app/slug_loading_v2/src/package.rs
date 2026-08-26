@@ -89,6 +89,7 @@ use crate::provider::AnalysisBuiltinCallable;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::FrozenUserProviderCallable;
 use crate::provider::UserProviderCallable;
+use crate::provider::user_provider_from_arguments;
 use crate::starlark_label::StarlarkLabel;
 use crate::starlark_label::label_globals;
 use crate::starlark_label::resolve_label;
@@ -5044,15 +5045,13 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         })
     }
 
-    fn provider(
-        #[starlark(require = named)] doc: Option<Value<'_>>,
-        #[starlark(require = named)] fields: SmallMap<String, String>,
-        eval: &mut Evaluator,
-    ) -> anyhow::Result<UserProviderCallable> {
-        if doc.is_some_and(|value| !value.is_none() && value.unpack_str().is_none()) {
-            anyhow::bail!("provider doc must be a string or None");
-        }
-        UserProviderCallable::from_evaluator(fields, eval)
+    fn provider<'v>(
+        doc: Option<Value<'v>>,
+        #[starlark(require = named)] fields: Value<'v>,
+        #[starlark(require = named)] init: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        user_provider_from_arguments(doc, fields, init, eval)
     }
     fn transition<'v>(
         #[starlark(require = named)] implementation: Value<'v>,
