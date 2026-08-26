@@ -5247,6 +5247,34 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Clippy-tail proof exposes imported frozen-transition prerequisite (2026-08-26)
+
+The exact recursive proof selected by `f4cfaacb3` stopped at
+`clippy.bzl:502`: the label-list `cfg` receives the valid frozen
+`platform_transition` exported by exact `lint_test.bzl:37-41`, but Slug's
+attribute converter accepts only the transient half of the Starlark transition
+value union. The rejected 246-line test candidate was removed and the file's
+accepted SHA restored.
+
+Run only `WP-4-7A-imported-frozen-transition-clippy-tail-loading`. Project the
+frozen implementation/output into the existing transient generic wrapper, then
+rerun the complete exact-tail producer proof. Prove the final package-schema
+transition implementation is pointer-identical to the lint child's exported
+implementation and retains the exact output. Change only `package.rs` and the
+loading test under 20/260/280 caps. Do not add identity, registry, DICE,
+transition execution or configured semantics.
+
+Exact compatibility covers valid imported transition acceptance and retained
+implementation/output. The Rust wrapper reconstruction is Slug-native.
+Observable identity bytes, evaluation/configuration hashing and all configured
+provider/aspect/test/build-setting/action behavior remain unsupported/deferred.
+
+Clean `../zabel` `0795445f…` guides only producer-owned transition publication
+and definition-module identity before detached capture. No Zig representation,
+identity, ordinal, capture, algorithm or behavior is copied. Bazel 9.2 remains
+sole authority; existing CompactString/value storage requires no utility or
+memory-ledger change.
+
 ### Post-RunEnvironmentInfo clippy-tail audit accepts proof-only closure (2026-08-26)
 
 The source-order audit authenticates complete rules_rust 0.73.0
