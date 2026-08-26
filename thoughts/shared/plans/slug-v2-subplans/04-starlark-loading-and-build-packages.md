@@ -5247,6 +5247,45 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Clippy aspect toolchains accepted; rule source closure selected (2026-08-26)
+
+Commit `fc9473b1` replaces the aspect's singular label with the same immutable
+typed requirement slice used by rules. One shared evaluator-aware parser
+retains distinct String, Label and typed entries in source order, resolves
+defining-module labels and makes mandatory state structural. The real clippy
+aspect now freezes its mandatory Rust and optional C++ rows. Existing rule
+semantics and duplicate rejection remain unchanged; Bazel duplicate
+strictest-wins normalization is still explicitly deferred.
+
+Focused aspect, clippy, rustfmt and rule/config-common proofs pass beside all
+220 loading units, 24 invalidation tests and 31 BUILD-loading tests. Locked
+analysis/core checks, rebuilt CLI, formatting and diff hygiene pass;
+archive-status reports only its three known archive-only paths. The packet
+adds 31 production and 90 proof lines, and independent terminal review returned
+`ACCEPT`.
+
+The next source expression is `_rust_clippy_rule_impl`, whose function body is
+lazy. `rust_clippy = rule(...)` then declares one `deps` label-list with two
+ordered singleton provider alternatives and the exported
+`rust_clippy_aspect`. This is a strict subset of the already-accepted
+`rustfmt_test.targets` schema: it omits the custom transition, while ordinary
+rule documentation and non-test capability are already admitted.
+
+Run only `WP-4-7A-clippy-rule-loading`. Extend the pinned source-shaped proof
+through rules_rust `clippy.bzl` line 461, assert the frozen rule identity,
+single dependency descriptor, provider order and complete attached aspect,
+and keep the helper lazy. Change no production code and stop before
+`RustClippyTestInfo` at line 463. Target invocation remains rejected before
+provider/aspect metadata could be dropped; no configured aspect application,
+provider matching or implementation execution is admitted.
+
+Clean `../zabel` `0795445f…` supplies architecture guidance only. Its
+declaration-owned `RuleDefinition`, `NamedAttribute` and `AttrDefinition`
+support reusing one frozen schema with retained producer identities. Slug
+copies no Zig code, behavior, configured capture or analysis algorithm, and
+Bazel 9.2 remains sole behavior authority. Retained representations are
+unchanged, so no Buck2 utility or Stage 9 ledger update applies.
+
 ### Clippy aspect attributes accepted; typed aspect toolchains selected (2026-08-26)
 
 Commit `5f8dd852` admits the exact ordered clippy map beside the rustfmt pair.
