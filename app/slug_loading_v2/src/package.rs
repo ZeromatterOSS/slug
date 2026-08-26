@@ -5047,7 +5047,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
 
     fn provider<'v>(
         doc: Option<Value<'v>>,
-        #[starlark(require = named)] fields: Value<'v>,
+        #[starlark(require = named)] fields: Option<Value<'v>>,
         #[starlark(require = named)] init: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Value<'v>> {

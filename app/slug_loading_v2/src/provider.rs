@@ -143,14 +143,34 @@ impl BzlEvaluationContext {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 pub struct UserProviderCallable {
     source_label: CompactString,
-    fields: Arc<[CompactString]>,
+    schema: UserProviderSchema,
     #[allocative(skip)]
     id: OnceCell<ProviderId>,
 }
 
+#[derive(Debug, Allocative, Trace)]
+enum UserProviderSchema {
+    Schemaless,
+    List(Arc<[CompactString]>),
+    Documented(Arc<[CompactString]>),
+}
+
+impl UserProviderSchema {
+    fn fields(&self) -> Option<&Arc<[CompactString]>> {
+        match self {
+            Self::Schemaless => None,
+            Self::List(fields) | Self::Documented(fields) => Some(fields),
+        }
+    }
+
+    fn supports_configured_strings(&self) -> bool {
+        matches!(self, Self::Documented(_))
+    }
+}
+
 pub(crate) fn user_provider_from_arguments<'v>(
     doc: Option<Value<'v>>,
-    fields: Value<'v>,
+    fields: Option<Value<'v>>,
     init: Option<Value<'v>>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<Value<'v>> {
@@ -165,53 +185,70 @@ pub(crate) fn user_provider_from_arguments<'v>(
         if callable.is_none() {
             anyhow::bail!("provider init must be callable");
         }
-        let fields = ListRef::from_value(fields)
-            .ok_or_else(|| anyhow::anyhow!("initialized provider fields must be a list"))?;
         let fields = fields
-            .iter()
-            .map(|value| {
-                value
-                    .unpack_str()
-                    .map(CompactString::new)
-                    .ok_or_else(|| anyhow::anyhow!("provider fields must be strings"))
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?;
-        return InitializedUserProviderCallable::allocate_pair(fields.into(), init, eval);
+            .and_then(ListRef::from_value)
+            .ok_or_else(|| anyhow::anyhow!("initialized provider fields must be a list"))?;
+        return InitializedUserProviderCallable::allocate_pair(
+            provider_list_fields(fields)?,
+            init,
+            eval,
+        );
     }
-    let fields = DictRef::from_value(fields)
-        .ok_or_else(|| anyhow::anyhow!("provider fields must be a dictionary"))?;
-    let fields = fields
-        .iter()
-        .map(|(name, documentation)| {
-            let name = name
-                .unpack_str()
-                .ok_or_else(|| anyhow::anyhow!("provider field names must be strings"))?;
-            let documentation = documentation
-                .unpack_str()
-                .ok_or_else(|| anyhow::anyhow!("provider field docs must be strings"))?;
-            Ok((name.to_owned(), documentation.to_owned()))
-        })
-        .collect::<anyhow::Result<SmallMap<_, _>>>()?;
+    let schema = match fields.filter(|value| !value.is_none()) {
+        None => UserProviderSchema::Schemaless,
+        Some(fields) if ListRef::from_value(fields).is_some() => {
+            UserProviderSchema::List(provider_list_fields(ListRef::from_value(fields).unwrap())?)
+        }
+        Some(fields) => {
+            let fields = DictRef::from_value(fields).ok_or_else(|| {
+                anyhow::anyhow!("provider fields must be a list, dictionary or None")
+            })?;
+            let mut names = Vec::with_capacity(fields.len());
+            for (name, documentation) in fields.iter() {
+                let name = name
+                    .unpack_str()
+                    .ok_or_else(|| anyhow::anyhow!("provider field names must be strings"))?;
+                if documentation.unpack_str().is_none() {
+                    anyhow::bail!("provider field docs must be strings");
+                }
+                names.push(CompactString::new(name));
+            }
+            names.sort_unstable();
+            UserProviderSchema::Documented(names.into())
+        }
+    };
     Ok(eval
         .heap()
-        .alloc(UserProviderCallable::from_evaluator(fields, eval)?))
+        .alloc(UserProviderCallable::from_evaluator(schema, eval)?))
 }
+
+fn provider_list_fields(fields: &ListRef<'_>) -> anyhow::Result<Arc<[CompactString]>> {
+    let mut names = fields
+        .iter()
+        .map(|value| {
+            value
+                .unpack_str()
+                .map(CompactString::new)
+                .ok_or_else(|| anyhow::anyhow!("provider fields must be strings"))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    names.sort_unstable();
+    if names.windows(2).any(|pair| pair[0] == pair[1]) {
+        anyhow::bail!("provider fields must not contain duplicates");
+    }
+    Ok(names.into())
+}
+
 impl UserProviderCallable {
-    pub(crate) fn from_evaluator(
-        fields: SmallMap<String, String>,
+    fn from_evaluator(
+        schema: UserProviderSchema,
         eval: &Evaluator<'_, '_, '_>,
     ) -> anyhow::Result<Self> {
         let context = BzlEvaluationContext::from_evaluator(eval)
             .map_err(|_| anyhow::anyhow!("provider() may only be called in a .bzl module"))?;
-        let mut names = fields
-            .into_iter()
-            .map(|(name, _documentation)| CompactString::new(name))
-            .collect::<Vec<_>>();
-        names.sort_unstable();
-        names.dedup();
         Ok(Self {
             source_label: context.source_label.clone(),
-            fields: names.into(),
+            schema,
             id: OnceCell::new(),
         })
     }
@@ -241,7 +278,7 @@ impl Freeze for UserProviderCallable {
         };
         Ok(FrozenUserProviderCallable {
             id,
-            fields: self.fields,
+            schema: self.schema,
         })
     }
 }
@@ -276,14 +313,14 @@ impl<'v> StarlarkValue<'v> for UserProviderCallable {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let id = self.id.get().ok_or_else(unbound_provider_error)?;
-        invoke_provider(id, &self.fields, args, eval)
+        invoke_provider(id, &self.schema, args, eval)
     }
 }
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct FrozenUserProviderCallable {
     id: ProviderId,
-    fields: Arc<[CompactString]>,
+    schema: UserProviderSchema,
 }
 
 starlark::starlark_simple_value!(FrozenUserProviderCallable);
@@ -310,7 +347,7 @@ impl<'v> StarlarkValue<'v> for FrozenUserProviderCallable {
         args: &Arguments<'v, '_>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        invoke_provider(&self.id, &self.fields, args, eval)
+        invoke_provider(&self.id, &self.schema, args, eval)
     }
 }
 
@@ -454,43 +491,68 @@ where
         }
     }
 }
+#[derive(Debug, Trace, Freeze, Allocative)]
+enum LoadingProviderFieldsGen<V> {
+    Schemaful {
+        #[trace(unsafe_ignore)]
+        #[freeze(identity)]
+        schema: Arc<[CompactString]>,
+        values: SmallMap<u32, V>,
+    },
+    Schemaless(SchemalessLoadingFieldsGen<V>),
+}
+#[derive(Debug, Trace, Freeze, Allocative)]
+struct SchemalessLoadingFieldsGen<V> {
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    names: Arc<[CompactString]>,
+    values: Vec<V>,
+}
 #[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
-pub(crate) struct InitializedStarlarkUserProviderGen<V> {
+pub(crate) struct LoadingStarlarkUserProviderGen<V> {
     #[trace(unsafe_ignore)]
     #[freeze(identity)]
     id: ProviderId,
-    #[trace(unsafe_ignore)]
-    #[freeze(identity)]
-    schema: Arc<[CompactString]>,
-    fields: SmallMap<u32, V>,
+    fields: LoadingProviderFieldsGen<V>,
 }
-pub(crate) type InitializedStarlarkUserProvider<'v> = InitializedStarlarkUserProviderGen<Value<'v>>;
-type FrozenInitializedStarlarkUserProvider = InitializedStarlarkUserProviderGen<FrozenValue>;
-starlark::starlark_complex_values!(InitializedStarlarkUserProvider);
+pub(crate) type LoadingStarlarkUserProvider<'v> = LoadingStarlarkUserProviderGen<Value<'v>>;
+type FrozenLoadingStarlarkUserProvider = LoadingStarlarkUserProviderGen<FrozenValue>;
+starlark::starlark_complex_values!(LoadingStarlarkUserProvider);
 #[cfg(test)]
-pub(crate) fn initialized_provider_id(value: Value<'_>) -> Option<ProviderId> {
-    match InitializedStarlarkUserProvider::from_value(value)? {
+pub(crate) fn loading_provider_id(value: Value<'_>) -> Option<ProviderId> {
+    match LoadingStarlarkUserProvider::from_value(value)? {
         starlark::__macro_refs::Either::Left(provider) => Some(provider.id.dupe()),
         starlark::__macro_refs::Either::Right(provider) => Some(provider.id.dupe()),
     }
 }
-impl<V> fmt::Display for InitializedStarlarkUserProviderGen<V> {
+impl<V> fmt::Display for LoadingStarlarkUserProviderGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}(...)", self.id.exported_name())
     }
 }
 #[starlark_value(type = "provider")]
-impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for InitializedStarlarkUserProviderGen<V>
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for LoadingStarlarkUserProviderGen<V>
 where
     Self: ProvidesStaticType<'v>,
 {
-    type Canonical = FrozenInitializedStarlarkUserProvider;
+    type Canonical = FrozenLoadingStarlarkUserProvider;
     fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
-        let index = self
-            .schema
-            .iter()
-            .position(|field| field.as_str() == attribute)? as u32;
-        self.fields.get(&index).map(|value| value.to_value())
+        match &self.fields {
+            LoadingProviderFieldsGen::Schemaful { schema, values } => {
+                let index = schema
+                    .iter()
+                    .position(|field| field.as_str() == attribute)?
+                    as u32;
+                values.get(&index).map(|value| value.to_value())
+            }
+            LoadingProviderFieldsGen::Schemaless(values) => {
+                let index = values
+                    .names
+                    .iter()
+                    .position(|name| name.as_str() == attribute)?;
+                Some(values.values[index].to_value())
+            }
+        }
     }
 }
 fn invoke_initialized_provider<'v>(
@@ -509,7 +571,7 @@ fn invoke_initialized_provider<'v>(
             initialized.get_type()
         ))
     })?;
-    allocate_initialized_provider(id, fields, values.iter(), eval)
+    allocate_schemaful_loading_provider(id, fields, values.iter(), eval)
 }
 fn invoke_initialized_raw<'v>(
     id: &ProviderId,
@@ -519,14 +581,14 @@ fn invoke_initialized_raw<'v>(
 ) -> starlark::Result<Value<'v>> {
     args.no_positional_args(eval.heap())?;
     let values = args.names_map()?;
-    allocate_initialized_provider(
+    allocate_schemaful_loading_provider(
         id,
         fields,
         values.iter().map(|(name, value)| (name.to_value(), *value)),
         eval,
     )
 }
-fn allocate_initialized_provider<'v>(
+fn allocate_schemaful_loading_provider<'v>(
     id: &ProviderId,
     fields: &Arc<[CompactString]>,
     values: impl IntoIterator<Item = (Value<'v>, Value<'v>)>,
@@ -545,52 +607,67 @@ fn allocate_initialized_provider<'v>(
         };
         retained.insert(index as u32, value);
     }
-    Ok(eval
-        .heap()
-        .alloc_complex(InitializedStarlarkUserProviderGen {
-            id: id.dupe(),
+    Ok(eval.heap().alloc_complex(LoadingStarlarkUserProviderGen {
+        id: id.dupe(),
+        fields: LoadingProviderFieldsGen::Schemaful {
             schema: fields.dupe(),
-            fields: retained,
-        }))
+            values: retained,
+        },
+    }))
 }
 fn invoke_provider<'v>(
     id: &ProviderId,
-    fields: &[CompactString],
+    schema: &UserProviderSchema,
     args: &Arguments<'v, '_>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> starlark::Result<Value<'v>> {
     args.no_positional_args(eval.heap())?;
     let names = args.names_map()?;
-    for name in names.keys() {
-        if !fields.iter().any(|field| field.as_str() == name.as_str()) {
-            return Err(starlark::Error::new_other(anyhow::anyhow!(
-                "provider {} received unknown field `{}`",
-                id,
-                name
-            )));
+    if let Some(fields) = schema.fields() {
+        for name in names.keys() {
+            if !fields.iter().any(|field| field.as_str() == name.as_str()) {
+                return Err(starlark::Error::new_other(anyhow::anyhow!(
+                    "provider {} received unknown field `{}`",
+                    id,
+                    name
+                )));
+            }
         }
+        if schema.supports_configured_strings() {
+            let configured: Option<SmallMap<CompactString, CompactString>> = fields
+                .iter()
+                .map(|field| {
+                    Some((
+                        field.clone(),
+                        CompactString::new(names.get(field.as_str())?.unpack_str()?),
+                    ))
+                })
+                .collect();
+            if let Some(fields) = configured {
+                return Ok(eval.heap().alloc_simple(StarlarkUserProvider {
+                    id: id.dupe(),
+                    fields,
+                }));
+            }
+        }
+        return allocate_schemaful_loading_provider(
+            id,
+            fields,
+            names.iter().map(|(name, value)| (name.to_value(), *value)),
+            eval,
+        );
     }
-    let mut values = SmallMap::with_capacity(fields.len());
-    for field in fields {
-        let value = names.get(field.as_str()).ok_or_else(|| {
-            starlark::Error::new_other(anyhow::anyhow!(
-                "provider {} is missing required field `{}`",
-                id,
-                field
-            ))
-        })?;
-        let value = value.unpack_str().ok_or_else(|| {
-            starlark::Error::new_other(anyhow::anyhow!(
-                "provider {} field `{}` must be a string",
-                id,
-                field
-            ))
-        })?;
-        values.insert(field.clone(), CompactString::new(value));
-    }
-    Ok(eval.heap().alloc_simple(StarlarkUserProvider {
+    let field_names = names
+        .keys()
+        .map(|name| CompactString::new(name.as_str()))
+        .collect::<Vec<_>>();
+    let values = names.values().copied().collect();
+    Ok(eval.heap().alloc_complex(LoadingStarlarkUserProviderGen {
         id: id.dupe(),
-        fields: values,
+        fields: LoadingProviderFieldsGen::Schemaless(SchemalessLoadingFieldsGen {
+            names: field_names.into(),
+            values,
+        }),
     }))
 }
 

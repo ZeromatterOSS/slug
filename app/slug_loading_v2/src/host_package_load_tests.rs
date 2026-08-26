@@ -122,7 +122,7 @@ use crate::package::FrozenRuleDefinition;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::FrozenUserProviderCallable;
 use crate::provider::StarlarkUserProvider;
-use crate::provider::initialized_provider_id;
+use crate::provider::loading_provider_id;
 
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
@@ -3362,15 +3362,11 @@ BYPASSED = _new_failing(name = "raw")
     let raw = module.get("OMITTED").unwrap();
     let normal = normal.value();
     let raw = raw.value();
-    assert_eq!(
-        initialized_provider_id(normal),
-        initialized_provider_id(raw)
-    );
+    assert_eq!(loading_provider_id(normal), loading_provider_id(raw));
     assert!(StarlarkUserProvider::from_value(normal).is_none());
     assert!(StarlarkUserProvider::from_value(raw).is_none());
 
     let failures = [
-        "X = provider('doc', fields = ['x'])",
         "def init(): return {}\nX = provider('doc', fields = {'x': 'doc'}, init = init)",
         "def init(): return {}\nX = provider('doc', fields = None, init = init)",
         "X = provider('doc', fields = ['x'], init = 1)",
@@ -3378,6 +3374,106 @@ BYPASSED = _new_failing(name = "raw")
         "def init(): return {1: 'bad'}\nInfo, raw = provider('doc', fields = ['x'], init = init)\nX = Info()",
         "def init(): return {'other': 'bad'}\nInfo, raw = provider('doc', fields = ['x'], init = init)\nX = Info()",
         "def init(): return {'x': 'ok'}\nInfo, raw = provider('doc', fields = ['x'], init = init)\nX = raw('bad')",
+    ];
+    for failure in failures {
+        assert!(
+            eval_bzl_with_identity(failure, owner.clone()).is_err(),
+            "{failure}"
+        );
+    }
+}
+
+#[test]
+fn bazel_provider_schemas_freeze_rules_cc_extra_library_child_and_stay_loading_only() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse(
+            "@@rules_cc+//cc/private/link:create_extra_link_time_library.bzl",
+        )
+        .unwrap(),
+        workspace_path: PathBuf::from(
+            "/rules_cc/cc/private/link/create_extra_link_time_library.bzl",
+        ),
+        repository_mapping: Arc::from([]),
+    };
+    let source = r#"
+ExtraLinkTimeLibraryInfo = provider("ExtraLinkTimeLibraryInfo")
+ExtraLibraryInfo = provider("The result of building extra link-time libraries.")
+_KeyInfo = provider(
+    "_KeyInfo",
+    fields = ["build_library_func", "constant_fields", "depset_fields"],
+)
+ExtraLinkTimeLibrariesInfo = provider(
+    "ExtraLinkTimeLibrariesInfo",
+    fields = {"libraries": "A list of extra libraries."},
+)
+_EMPTY = ExtraLinkTimeLibrariesInfo(libraries = [])
+EMPTY_LIBRARIES = _EMPTY.libraries
+FREE = ExtraLinkTimeLibraryInfo(payload = struct(marker = "free"))
+FREE_MARKER = FREE.payload.marker
+ExplicitNoneInfo = provider(fields = None)
+EXPLICIT_NONE = ExplicitNoneInfo(other = ["none"])
+NONE_FIRST = EXPLICIT_NONE.other[0]
+KEY = _KeyInfo(build_library_func = struct(name = "key"))
+KEY_NAME = KEY.build_library_func.name
+KEY_OMITS_CONSTANTS = not hasattr(KEY, "constant_fields")
+EmptyInfo = provider(fields = [])
+EMPTY_OK = EmptyInfo()
+StringInfo = provider(fields = {"value": "A string."})
+CONFIGURED = StringInfo(value = "configured")
+LOADING = StringInfo(value = ["loading"])
+LOADING_FIRST = LOADING.value[0]
+OPTIONAL = ExtraLinkTimeLibrariesInfo()
+OPTIONAL_OMITS_LIBRARIES = not hasattr(OPTIONAL, "libraries")
+"#;
+    let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
+    assert_eq!(
+        module.get("FREE_MARKER").unwrap().unpack_str(),
+        Some("free")
+    );
+    assert_eq!(module.get("NONE_FIRST").unwrap().unpack_str(), Some("none"));
+    assert_eq!(module.get("KEY_NAME").unwrap().unpack_str(), Some("key"));
+    assert_eq!(
+        module.get("KEY_OMITS_CONSTANTS").unwrap().unpack_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        module.get("LOADING_FIRST").unwrap().unpack_str(),
+        Some("loading")
+    );
+    assert_eq!(
+        module
+            .get("OPTIONAL_OMITS_LIBRARIES")
+            .unwrap()
+            .unpack_bool(),
+        Some(true)
+    );
+    let libraries = module.get("EMPTY_LIBRARIES").unwrap();
+    let libraries = libraries.value();
+    assert_eq!(FrozenListRef::from_value(libraries).unwrap().len(), 0);
+    assert!(
+        FrozenUserProviderCallable::from_value(
+            module.get("ExtraLinkTimeLibraryInfo").unwrap().value()
+        )
+        .is_some()
+    );
+
+    let configured = module.get("CONFIGURED").unwrap();
+    let configured = configured.value();
+    let configured = StarlarkUserProvider::from_value(configured).unwrap();
+    let loading = module.get("LOADING").unwrap();
+    let loading = loading.value();
+    assert_eq!(loading_provider_id(loading), Some(configured.id().dupe()));
+    assert!(StarlarkUserProvider::from_value(loading).is_none());
+    assert!(StarlarkUserProvider::from_value(module.get("KEY").unwrap().value()).is_none());
+
+    let failures = [
+        "Info = provider(fields = ['same', 'same'])",
+        "Info = provider(fields = ['name', 1])",
+        "Info = provider(fields = ('name',))",
+        "Info = provider(fields = [])\nX = Info(name = 1)",
+        "Info = provider(fields = ['name'])\nX = Info(other = 1)",
+        "Info = provider(fields = ['name'])\nX = Info(1)",
+        "Info = provider()\nX = Info(1)",
     ];
     for failure in failures {
         assert!(
