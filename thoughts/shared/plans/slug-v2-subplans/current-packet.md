@@ -1,18 +1,20 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-lint-test-label-default-loading-r2`
+Packet: `WP-4-7A-lint-test-label-default-loading-r3`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owners: loading-owned attribute definition, defining external-Bzl identity and frozen rule schema
-Base: `2936c570`
+Base: `14776a88`
 
 Result: complete declaration-time loading and freezing of the fixed
 `LINT_TEST_COMMON_ATTRS` dictionary at accepted rules_rust 0.73.0
 `rust/private/lint_test.bzl:45-62`. Resolve its raw `@bazel_tools` scalar label
 default through the innermost defining module's immutable repository mapping,
 preserve its already-constructed relative `Label` default as canonical typed
-identity, and prove both values by composing accepted selected-route mapping
-evidence with caller-aware external-module freeze. Do not invoke a target,
-apply the transition, or broaden the later rustfmt aspect.
+identity, and first admit the adjacent fixed bool documentation argument
+through the existing validation-only path. Prove the complete dictionary by
+composing accepted selected-route mapping evidence with caller-aware
+external-module freeze. Do not retain documentation, invoke a target, apply
+the transition, or broaden the later rustfmt aspect.
 
 ## Accepted starting point and first absent fact
 
@@ -29,10 +31,16 @@ authenticated return path is:
 3. `common.bzl` is already complete from the accepted rust-analyzer closure;
    the first new child is therefore `rust/private/lint_test.bzl`.
 4. The function bodies at lines 15-35 remain lazy. The fixed transition at
-   lines 37-41, `platform` descriptor at lines 46-48 and boolean default at
-   lines 49-52 already construct.
-5. The first unsupported expression is the raw string default at lines 53-55:
+   lines 37-41 and `platform` descriptor at lines 46-48 already construct.
+5. The first unsupported expression is the `doc` argument on `attr.bool` at
+   lines 49-52. Once its shared validation-only documentation path is admitted,
+   the next unsupported expression is the raw string default at lines 53-55:
    `@bazel_tools//tools/allowlists/function_transition_allowlist`.
+
+`attr.label` already routes `doc` through `discard_attribute_doc`, but
+`attr.bool` does not expose that named parameter. Pinned Bazel admits the same
+string-or-None documentation shape for bool. Documentation retention and
+extraction remain outside this slice.
 
 `attribute_definition` currently converts every non-`None` default through
 `raw_attribute_value`, then calls `coerce_raw_value` with only the defining
@@ -40,9 +48,10 @@ package path. The label branch consequently rejects every `@...` string and
 cannot consult the already-retained defining-module mapping. The immediately
 adjacent `_runner` at lines 56-60 supplies
 `Label("//rust/private/lint_test_runner")`; the same raw adapter rejects this
-typed value. A raw-string-only fix would stop one expression later and would
-not complete the newly selected module, so this packet admits exactly both
-scalar label-default forms through one existing owner.
+typed value. A bool-doc-only or raw-string-only fix would stop at the next
+adjacent expression and would not complete the newly selected module, so this
+packet admits the fixed bool documentation call plus exactly both scalar
+label-default forms through existing owners.
 
 The exact frozen results for the admitted defining identity are:
 
@@ -116,6 +125,23 @@ reviewed owner, proof composition, implementation allowlist and caps while
 correcting every expected runner identity. No Rust from either stopped attempt
 is retained.
 
+## Third implementation stop and bool-documentation correction
+
+The exact fixed-dictionary test for `-r2` stopped before either label default:
+Slug reports `doc` as an extra named parameter to `attr.bool`. The accepted
+rules_rust source passes a fixed string at lines 49-50. At pinned Bazel 9.2,
+`StarlarkAttrModuleApi.boolAttribute` declares `doc` as string or None, and
+`StarlarkAttrModule.boolAttribute` validates/converts it before passing it to
+the common attribute factory. Slug already owns the matching bounded
+`discard_attribute_doc` validation path for other admitted descriptors.
+
+This material source-order and contract correction stops `-r2` with `REPLAN`.
+No Rust from that attempt is retained. This `-r3` packet adds only the missing
+bool `doc` parameter and existing validation call before applying the
+already-reviewed label-default design. It does not retain or expose
+documentation and adds no owner, representation or broader compatibility
+claim.
+
 ## Authorities and compatibility classification
 
 Pinned Bazel 9.2 commit
@@ -127,6 +153,9 @@ HEADs.
 
 The minimum authenticated Bazel chain is:
 
+- `StarlarkAttrModuleApi.boolAttribute` declares a named string-or-None `doc`,
+  and `StarlarkAttrModule.boolAttribute` passes it to the common attribute
+  factory after conversion;
 - `StarlarkAttrModule.createAttribute` passes the default and
   `LabelConverter.forBzlEvaluatingThread(thread)` to the attribute builder;
 - `Attribute.Builder.defaultValue` delegates typed conversion to the
@@ -143,7 +172,9 @@ The minimum authenticated Bazel chain is:
 
 Compatibility is classified as follows:
 
-- **Exact:** scalar `attr.label(default = <string>)` resolution through the
+- **Exact:** validation/acceptance of the fixed `attr.bool(doc = <string>)`
+  call without claiming documentation extraction; scalar
+  `attr.label(default = <string>)` resolution through the
   innermost defining `.bzl` identity; scalar `attr.label(default = <Label>)`
   retention without re-resolution; the two fixed canonical defaults, their
   schema fields, recursive freeze/export and lazy implementations in
@@ -151,8 +182,9 @@ Compatibility is classified as follows:
 - **Slug-native:** existing `CanonicalLabel`, `CoercedAttributeValue`, Arc and
   frozen Rust representation; complete repository-mapping
   over-invalidation/fingerprint framing; and nonrequired diagnostic text.
-- **Unsupported/deferred:** label-list/dict defaults, computed or late-bound
-  defaults, `configuration_field`, raw canonical-string breadth, target
+- **Unsupported/deferred:** documentation retention/extraction, label-list/dict
+  defaults, computed or late-bound defaults, `configuration_field`, raw
+  canonical-string breadth, target
   lookup/invocation, executable prerequisite validation, transition
   allowlisting/application, configured dependencies, providers, toolchains,
   rustfmt aspect `required_providers`/`fragments`, analysis/actions, M8/M7B and
@@ -169,18 +201,20 @@ relation may be copied. Pinned Bazel 9.2 remains sole behavior authority.
 
 ## Implementation boundary
 
-Change only the loading-owned attribute-default path:
+Change only the loading-owned bool descriptor and attribute-default path:
 
-1. Reuse `BzlEvaluationContext::source_identity_for_call(eval)` to retain the
+1. Add the named optional `doc` value to `attr.bool` and pass it through the
+   existing `discard_attribute_doc`; do not store or expose it.
+2. Reuse `BzlEvaluationContext::source_identity_for_call(eval)` to retain the
    complete innermost `BzlModuleIdentity`, rather than reducing it to a source
    label/package before coercion.
-2. For `AttributeKind::Label` only, preserve the accepted `None` behavior,
+3. For `AttributeKind::Label` only, preserve the accepted `None` behavior,
    resolve a scalar string with the shared pure `resolve_label(raw, source)`,
    or clone the canonical identity from an actual `StarlarkLabel` value.
-3. Store either result in the existing owned
+4. Store either result in the existing owned
    `CoercedAttributeValue::Label`. Every other attribute kind and raw default
    follows its existing `raw_attribute_value`/`coerce_raw_value` path.
-4. Do not teach `raw_attribute_value` about Starlark values generally, do not
+5. Do not teach `raw_attribute_value` about Starlark values generally, do not
    add external-label behavior to package-local coercion, and do not
    reconstruct or re-resolve a `StarlarkLabel` from its display string.
 
@@ -207,7 +241,8 @@ test:
   the admitted `bazel_tools -> bazel_tools` mapping, evaluate the fixed
   transition/four-entry `LINT_TEST_COMMON_ATTRS`, project the dictionary into
   one test-only frozen rule, and inspect both exact canonical defaults,
-  `_runner` executable/exec markers, the boolean default and lazy bodies;
+  `_runner` executable/exec markers, the accepted bool documentation call,
+  boolean default and lazy bodies;
 - add a focused absent/conflicting apparent-mapping rejection through the raw
   scalar attribute-default converter before module freeze.
 
@@ -221,12 +256,12 @@ request or Bazel run.
 
 ## Allowlist and growth caps
 
-Only these files may change from base `2936c570`:
+Only these files may change from base `14776a88`:
 
 | File | Base SHA-256 | Base lines | Final line cap | Purpose |
 |---|---|---:|---:|---|
-| `app/slug_loading_v2/src/package.rs` | `cc669d2158c036d20bd92bcff61ee929d65b317e3a85883fbcbe14238b53d9b0` | 5,492 | 5,532 | bounded scalar label-default coercion in the existing owner |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `b83d263c05f1933d8a82e3d3b38b22f5d58d343acea4fb0aedb77522983faf13` | 4,546 | 4,646 | selected-route frozen-schema and fail-closed proofs |
+| `app/slug_loading_v2/src/package.rs` | `cc669d2158c036d20bd92bcff61ee929d65b317e3a85883fbcbe14238b53d9b0` | 5,492 | 5,532 | fixed bool-doc validation and bounded scalar label-default coercion |
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `b83d263c05f1933d8a82e3d3b38b22f5d58d343acea4fb0aedb77522983faf13` | 4,546 | 4,646 | exact dictionary, selected-route and fail-closed proofs |
 
 Additions are capped at 40 production lines, 100 proof lines and 140 total
 lines. Deletions do not buy addition budget. No touched function may exceed
@@ -260,7 +295,8 @@ Independent terminal review is mandatory before commit. The reviewer must
 inspect the full base-to-worktree diff and explicitly verify source-order
 selection, the Bazel string-versus-Label distinction, defining-module mapping,
 the synthetic-root proof boundary, accepted Bzlmod built-in-route composition,
-exact canonical values, no Label re-resolution, missing/conflicting failure,
+the pinned bool-doc ABI and validation-only handling, exact canonical values,
+no Label re-resolution, missing/conflicting failure,
 lazy implementation boundary, file/function/addition caps, serial validation
 and absence of a new semantic owner. A plain `ACCEPT` or actionable `REJECT` is
 required; correct every rejection and re-review.
@@ -269,7 +305,8 @@ required; correct every rejection and re-review.
 
 STOP and `REPLAN` if completion requires any file outside the allowlist; a
 label-list/dict, computed/late-bound or canonical raw-string default; changing
-global raw-value semantics; target lookup/invocation; transition application
+global raw-value semantics; documentation retention/extraction or any doc
+breadth beyond the fixed bool call; target lookup/invocation; transition application
 or allowlist enforcement; rustfmt aspect/provider/fragment breadth; a new
 mapping, DICE dependency, cache, I/O path, interner, hash or lifetime owner;
 Java/JVM work; Zabel behavior/code adoption; an unpinned source; a new

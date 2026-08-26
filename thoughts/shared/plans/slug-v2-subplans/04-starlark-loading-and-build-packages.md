@@ -4351,15 +4351,18 @@ serially in source order and stops at the first failed child. Once
 child `common.bzl` is already complete because rust-analyzer loaded it; the
 first new child is therefore `rust/private/lint_test.bzl`.
 
-The fixed `transition(...)` at `lint_test.bzl:37-41`, documented label at
-lines 46-48 and boolean default at lines 49-52 already evaluate. The first
-unsupported expression is `_allowlist_function_transition` at lines 53-55:
+The fixed `transition(...)` at `lint_test.bzl:37-41` and documented label at
+lines 46-48 already evaluate. The first unsupported expression is the `doc`
+argument on `attr.bool` at lines 49-52 because Slug's bool descriptor does not
+yet expose the shared validation-only documentation parameter. Once admitted,
+the next unsupported expression is `_allowlist_function_transition` at lines 53-55:
 its raw external string default is sent to Slug's package-only label coercer,
 which rejects `@` after the defining repository mapping has been discarded.
 The immediately adjacent `_runner` default at lines 56-60 is a constructed
 `Label("//rust/private/lint_test_runner")`; Slug's raw-value adapter cannot
 retain that typed Label either. One coherent declaration-time packet must
-admit both scalar forms or it will not complete the newly selected child.
+admit the fixed bool doc and both scalar label forms or it will not complete
+the newly selected child.
 
 Pinned Bazel 9.2 `StarlarkAttrModule.createAttribute`,
 `Attribute.Builder.defaultValue`, `BuildType.LabelType.convert` and
@@ -4369,7 +4372,9 @@ repository mapping; an already-constructed Label is returned unchanged.
 Focused rule-class, remote-label-default and Bzlmod load tests authenticate
 conversion at declaration time, before target lookup or rule invocation.
 
-Run only `WP-4-7A-lint-test-label-default-loading-r2`. In the existing
+Run only `WP-4-7A-lint-test-label-default-loading-r3`. Add the named `doc` to
+the existing bool descriptor and pass it through `discard_attribute_doc`; do
+not retain or expose documentation. In the existing
 `attribute_definition` owner, retain the full caller-aware
 `BzlModuleIdentity`; route only scalar label strings through the shared pure
 resolver and clone only an actual `StarlarkLabel`'s canonical identity into
@@ -4382,10 +4387,11 @@ recursive freeze/export and missing/conflicting mapping failure. Add no map,
 DICE compute, I/O, cache,
 interner, hash domain or lifetime owner.
 
-Exact compatibility covers only these two scalar label-default input forms,
-their defining-module context, fixed lint-test dictionary and canonical frozen
-values. Existing Rust enum/Arc storage, complete-map over-invalidation and
-nonrequired diagnostics are Slug-native. Label-list/dict defaults, canonical
+Exact compatibility covers validation/acceptance of this fixed bool doc, the
+two scalar label-default input forms, their defining-module context, fixed
+lint-test dictionary and canonical frozen values. Existing Rust enum/Arc
+storage, complete-map over-invalidation and nonrequired diagnostics are
+Slug-native. Documentation retention/extraction, label-list/dict defaults, canonical
 raw-string breadth, computed/late-bound defaults, target invocation,
 transition application/allowlisting, configured dependencies, providers,
 rustfmt aspect arguments/analysis, actions and exact output bytes remain
@@ -4426,8 +4432,19 @@ rule. The exact canonical value is therefore
 package-path and target-name projection is architectural guidance for keeping
 those identity parts producer-owned, never behavior authority. This is the
 second material correction, so the prior packet is stopped and only
-`WP-4-7A-lint-test-label-default-loading-r2` may proceed under the unchanged
-two-file boundary and caps.
+the `-r2` packet retained the unchanged two-file boundary and caps.
+
+Third implementation stop: the exact fixed dictionary then failed before
+either label default because Slug rejects `attr.bool(doc = ...)`. Pinned Bazel
+9.2 `StarlarkAttrModuleApi.boolAttribute` declares string-or-None `doc`, and
+`StarlarkAttrModule.boolAttribute` passes it to the common attribute factory;
+the accepted rules_rust source supplies that fixed string at lines 49-50.
+No Rust from the stopped attempt is retained. `REPLAN` to
+`WP-4-7A-lint-test-label-default-loading-r3`: reuse the existing
+validation-only `discard_attribute_doc` path, then perform the unchanged two
+label conversions under the same files and caps. Documentation retention and
+extraction remain deferred. Pinned Zabel continues to guide only the separate
+producer-owned label identity architecture.
 
 ### Detect-sysroot rule accepted; post-rust-analyzer frontier audit selected (2026-08-26)
 
