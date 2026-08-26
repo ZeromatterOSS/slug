@@ -5247,7 +5247,7 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
-### Post-toolchain source-order audit accepted; aspect requirements selected (2026-08-26)
+### Post-toolchain source-order correction; aspect attribute audit selected (2026-08-26)
 
 Slug's external Bzl driver first parses and resolves every direct load, then
 awaits each child serially in `AstModule::loads()` source order. It returns at
@@ -5271,31 +5271,27 @@ its one function body is lazy and its sole top-level `struct` uses the accepted
 surface. The other six imports are completed dependencies of the toolchain,
 rust-analyzer or rustfmt branches. Lines 48-74 use accepted provider and
 string-list build-setting surfaces. Lines 76-309 are lazy function bodies,
-and lines 311-314 are comments. Every argument of `rust_clippy_aspect` before
-its toolchain list uses an accepted attribute/provider/fragment surface. The
-first newly unsupported operation is therefore lines 370-373: the list
-evaluates a canonical String and a typed optional `config_common` requirement,
-but Slug's `Option<UnpackList<&str>>` aspect binder cannot accept the latter or
-retain both requirements.
+and lines 311-314 are comments.
 
-Pinned Bazel 9.2 `StarlarkRuleFunctionsApi`,
-`StarlarkRuleClassFunctions.parseToolchainTypes`, and
-`StarlarkRuleClassFunctionsTest.testAspectAddToolchain` establish mixed
-String/Label/typed input, defining-thread label conversion, stable distinct
-order, mandatory default/retention and strictest-wins duplicates. Run only
-`WP-4-7A-bazel-aspect-toolchain-requirements-loading`: share the existing
-typed requirement representation and parser with aspects, retain the two
-requirements through freeze, prove the exact source aspect, and stop at its
-line 404 close. Duplicates, configured aspect propagation/resolution and the
-following `rust_clippy` rule remain deferred.
+The implementation attempt selected in `7bba3a4e` added mixed aspect
+toolchain retention, but its required source-shaped proof failed before that
+parser ran: after evaluating every keyword value, `aspect()` calls
+`aspect_attributes` first. The live owner accepts only the fixed rustfmt
+`_config`/`_process_wrapper` pair and rejects clippy's 11 private label
+attributes at lines 317-364. The attempted Rust/test diff was fully reverted.
+This is a source-order `REPLAN`, not an accepted toolchain change.
 
-Clean `../zabel` `0795445f…` usefully confirms one
-`ToolchainTypeRequirement` slice on both rule and aspect declarations and
-detached defining-module label ownership. That informs Slug's shared Rust
-owner only. No Zig code, evaluator layout, diagnostic or behavior is copied;
-Bazel 9.2 remains authoritative. The Buck2 utility audit keeps the existing
-`CanonicalLabel`, Boolean, `Arc<[T]>` and `Allocative` pattern, so no utility
-import or Stage 9 ledger update is warranted.
+Run only docs packet `WP-4-7A-clippy-aspect-attribute-audit`. Pin Bazel 9.2's
+aspect attribute API, validation and tests; classify clippy's defaults,
+`allow_single_file`, executable and exec-configuration rows; compare them to
+the existing retained rule/aspect schema; and select one bounded implementation
+or `REPLAN`. Stop before toolchain parsing.
+
+Clean `../zabel` `0795445f…` confirms that rule and aspect declarations share
+one named-attribute definition shape with defining-module ownership. That is
+architectural guidance only. No Zig code, layout, diagnostic or behavior is
+copied; Bazel 9.2 remains authoritative. No retained representation changes in
+this docs audit, so the Buck2 utility skill selects no further action.
 
 ### Config-common toolchain requirement accepted; caller audit selected (2026-08-26)
 
