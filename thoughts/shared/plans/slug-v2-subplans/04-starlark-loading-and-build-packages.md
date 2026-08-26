@@ -4258,7 +4258,7 @@ the enum replaces one bool, preserves existing `Allocative`/Arc/compact-string
 ownership and adds no allocation, collection, hash or interner. Bazel 9.2
 remains sole behavior authority.
 
-### Bazel config-bool definition loading accepted; string-list audit selected (2026-08-26)
+### String-list audit selects nonrepeatable definition loading (2026-08-26)
 
 Commit `573c25c7` accepts only named `config.bool(flag = True)` in `.bzl`,
 keeps bool absent from BUILD, and retains String versus Boolean as one compact
@@ -4290,19 +4290,27 @@ first `repeatable = True` use, followed by both forms elsewhere. Slug already
 owns exact string-list attribute coercion, but its retained build-setting kind
 does not yet own StringList or repeatability.
 
-Run only docs packet `WP-4-7A-bazel-config-string-list-audit`. Trace pinned
-Bazel construction, identity, default coercion and immediate consumers;
-inventory every live rules_rust form and Slug's complete config/kind/schema
-owner; select one bounded definition-loading implementation or `REPLAN`.
-Make no Rust changes. Do not collapse repeatable and nonrepeatable identity,
-widen BUILD globals, publish list-setting targets, or enter analysis, CLI,
-transition, toolchain or action work.
+The audit selects only the first two source-ordered nonrepeatable rules_rust
+definitions. Add `BuildSettingKind::StringList` to the existing sole retained
+definition/freeze/equality owner, derive `AttributeKind::StringList` for the
+default schema, and accept named `.bzl`
+`config.string_list(flag=True[, repeatable=False])`. Omission and explicit
+false normalize to the same definition identity. Reject false/omitted `flag`,
+positional calls, `repeatable=True`, and every list-setting target before
+`PackageRecorder`; keep BUILD string-only and String/Boolean behavior intact.
 
-Pinned Zabel `c7298478…` guides only the architecture choice: every admitted
-type/repeatability fact belongs to one complete retained owner, with thin
-environment/schema/analysis projections. Copy no Zabel code or behavior;
-pinned Bazel 9.2 remains sole compatibility authority. Exact compatibility is
-limited to the accepted string/bool descriptor slices until a reviewed
-StringList implementation lands; prospective Rust representation and
-nonrequired diagnostics are Slug-native, and all list behavior remains
-unsupported/deferred during this audit.
+Run only `WP-4-7A-bazel-config-string-list-nonrepeatable-loading` in
+`package.rs` and its existing Host loading proof under 90 production, 90 proof
+and 180 total added lines. No analysis, CLI, transition, configuration,
+toolchain, action, DICE, event, dependency or fixture change is authorized.
+The first later repeatable definition is the next source-order terminal.
+
+Pinned Zabel `c7298478…` supplies direct architectural guidance: its rule
+projection structurally compares the complete typed build-setting declaration,
+and its list-setting proof keeps value type and repeatability distinct. Slug
+therefore keeps one complete retained declaration owner and thin projections;
+no Zabel code, representation or behavior is copied. Bazel 9.2 remains sole
+compatibility authority. Exact compatibility is the admitted nonrepeatable
+definition call/freeze/schema slice; Rust representation and fail-closed
+errors are Slug-native; repeatable descriptors, all list targets/analysis/CLI,
+later rules_rust semantics, M8/M7B and exact output bytes remain deferred.
