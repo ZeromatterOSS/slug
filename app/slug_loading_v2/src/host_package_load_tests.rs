@@ -2573,6 +2573,102 @@ async fn external_bzl_module_freezes_and_imports_fixed_aspect_definition() {
 }
 
 #[tokio::test]
+async fn external_bzl_module_freezes_rustfmt_first_aspect_requirements() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "rust/private/root.bzl",
+            b"load(':rustfmt.bzl', 'rustfmt_srcs_aspect')\nIMPORTED = rustfmt_srcs_aspect\n",
+        ),
+        ("rust/private/BUILD.bazel", b""),
+        (
+            "rust/private/providers.bzl",
+            b"CrateInfo = provider(doc = 'crate', fields = {})\nTestCrateInfo = provider(doc = 'test crate', fields = {})\n",
+        ),
+        (
+            "rust/private/common.bzl",
+            b"load(':providers.bzl', 'CrateInfo', 'TestCrateInfo')\nrust_common = struct(crate_info = CrateInfo, test_crate_info = TestCrateInfo)\n",
+        ),
+        (
+            "rust/private/rustfmt.bzl",
+            br#"load(":common.bzl", "rust_common")
+RustfmtTargetInfo = provider(
+    doc = "A provider containing rustfmt formattable sources for a target.",
+    fields = {"edition": "str", "srcs": "list[File]"},
+)
+def _rustfmt_srcs_aspect_impl(target, ctx):
+    fail("aspect implementation must stay lazy")
+rustfmt_srcs_aspect = aspect(
+    implementation = _rustfmt_srcs_aspect_impl,
+    doc = "This aspect collects formattable sources from a Rust target.",
+    required_providers = [
+        [rust_common.crate_info],
+        [rust_common.test_crate_info],
+    ],
+    fragments = ["cpp"],
+)
+"#,
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut epoch = EpochBuilder::external_sources(files, 404);
+    epoch.directory("/workspace/dep/rust", 404);
+    epoch.directory("/workspace/dep/rust/private", 404);
+    epoch.missing("/workspace/dep/rust/BUILD.bazel");
+    epoch.missing("/workspace/dep/rust/BUILD");
+    let mut transaction = transaction(&dice, epoch.build(), false, None).await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&external_bzl_key(route, "rust/private", "root.bzl"))
+        .await
+        .unwrap();
+    let module = &external_terminal(&outcome).module;
+    let aspect = module
+        .get("IMPORTED")
+        .unwrap()
+        .downcast::<FrozenAspectDefinition>()
+        .unwrap();
+    assert_eq!(aspect.required_providers.len(), 2);
+    assert_eq!(aspect.required_providers[0].len(), 1);
+    assert_eq!(aspect.required_providers[1].len(), 1);
+    assert_eq!(
+        aspect.required_providers[0][0].to_string(),
+        "@@dep+//rust/private:providers.bzl%CrateInfo"
+    );
+    assert_eq!(
+        aspect.required_providers[1][0].to_string(),
+        "@@dep+//rust/private:providers.bzl%TestCrateInfo"
+    );
+    assert_eq!(aspect.required_fragments.as_ref(), ["cpp"]);
+    assert_eq!(
+        aspect.defining_label,
+        CanonicalLabel::parse("@@dep+//rust/private:rustfmt.bzl").unwrap()
+    );
+    assert_eq!(aspect.exported_name.as_deref(), Some("rustfmt_srcs_aspect"));
+}
+
+#[test]
+fn rustfmt_first_aspect_rejects_unadmitted_requirement_shapes() {
+    eval_global(
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl)",
+        &loading_globals(),
+    )
+    .unwrap();
+    for source in [
+        "P=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[P])",
+        "P=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[P], P])",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[]])",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[1]])",
+        "P=provider()\nQ=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[P, Q], [P]])",
+        "P=provider()\nQ=provider()\nR=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[P], [Q], [R]])",
+        "def make_provider(): return provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[make_provider()]])",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, fragments=[])",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, fragments=['java'])",
+    ] {
+        assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
+    }
+}
+
+#[tokio::test]
 async fn external_bzl_module_freezes_rust_analyzer_toolchain_rule_schema() {
     let files: &[(&str, &[u8])] = &[
         (

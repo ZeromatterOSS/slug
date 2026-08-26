@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use slug_build_api_v2::ProviderId;
 use slug_bzlmod_v2::NonrootAttributeValue;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
@@ -85,6 +86,7 @@ use crate::module_extension_repository_rule::RepositoryRuleAttribute;
 use crate::module_extension_repository_rule::RepositoryRuleDefinition;
 use crate::provider::AnalysisBuiltinCallable;
 use crate::provider::BzlEvaluationContext;
+use crate::provider::FrozenUserProviderCallable;
 use crate::provider::UserProviderCallable;
 use crate::starlark_label::StarlarkLabel;
 use crate::starlark_label::label_globals;
@@ -2526,6 +2528,10 @@ struct AspectDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     required_toolchain: Option<CanonicalLabel>,
     #[trace(unsafe_ignore)]
+    required_providers: Arc<[Arc<[ProviderId]>]>,
+    #[trace(unsafe_ignore)]
+    required_fragments: Arc<[CompactString]>,
+    #[trace(unsafe_ignore)]
     defining_label: CanonicalLabel,
     #[trace(unsafe_ignore)]
     exported_name: OnceCell<CompactString>,
@@ -2539,6 +2545,8 @@ pub(crate) struct FrozenAspectDefinition {
     implementation: FrozenValue,
     pub(crate) attr_aspects: Arc<[CompactString]>,
     pub(crate) required_toolchain: Option<CanonicalLabel>,
+    pub(crate) required_providers: Arc<[Arc<[ProviderId]>]>,
+    pub(crate) required_fragments: Arc<[CompactString]>,
     pub(crate) defining_label: CanonicalLabel,
     pub(crate) exported_name: Option<CompactString>,
 }
@@ -2567,10 +2575,49 @@ impl<'v> Freeze for AspectDefinition<'v> {
             implementation: self.implementation.freeze(freezer)?,
             attr_aspects: self.attr_aspects,
             required_toolchain: self.required_toolchain,
+            required_providers: self.required_providers,
+            required_fragments: self.required_fragments,
             defining_label: self.defining_label,
             exported_name: self.exported_name.into_inner(),
         })
     }
+}
+
+fn aspect_required_provider_id(value: Value) -> anyhow::Result<ProviderId> {
+    if let Some(provider) = value.downcast_ref::<UserProviderCallable>() {
+        return provider
+            .id()
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("aspect required providers must be exported"));
+    }
+    if let Some(provider) = value.downcast_ref::<FrozenUserProviderCallable>() {
+        return Ok(provider.id().clone());
+    }
+    anyhow::bail!("aspect required providers must be user provider constructors")
+}
+
+fn aspect_required_providers(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[ProviderId]>]>> {
+    let Some(value) = value else {
+        return Ok(Arc::from([]));
+    };
+    let alternatives = ListRef::from_value(value)
+        .ok_or_else(|| anyhow::anyhow!("aspect required_providers must be a nested list"))?;
+    if alternatives.len() != 2 {
+        anyhow::bail!("only two singleton aspect provider alternatives are supported");
+    }
+    alternatives
+        .iter()
+        .map(|alternative| {
+            let providers = ListRef::from_value(alternative).ok_or_else(|| {
+                anyhow::anyhow!("aspect required_providers must be a nested list")
+            })?;
+            if providers.len() != 1 {
+                anyhow::bail!("aspect required_providers alternatives must be singletons");
+            }
+            Ok(Arc::from([aspect_required_provider_id(providers[0])?]))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()
+        .map(Arc::from)
 }
 
 #[starlark_value(type = "aspect")]
@@ -4801,6 +4848,8 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
         implementation: Value<'v>,
         #[starlark(require = named)] attr_aspects: Option<UnpackList<&str>>,
         #[starlark(require = named)] toolchains: Option<UnpackList<&str>>,
+        #[starlark(require = named)] required_providers: Option<Value<'v>>,
+        #[starlark(require = named)] fragments: Option<UnpackList<&str>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AspectDefinition<'v>> {
@@ -4830,10 +4879,20 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
         let defining_label =
             CanonicalLabel::parse(&canonical_source).map_err(anyhow::Error::msg)?;
         let required_toolchain = aspect_toolchain_requirement(toolchains, &defining_label)?;
+        let required_providers = aspect_required_providers(required_providers)?;
+        let required_fragments: Arc<[CompactString]> = match fragments {
+            None => Arc::from([]),
+            Some(fragments) if fragments.items.as_slice() == ["cpp"] => {
+                Arc::from([CompactString::new("cpp")])
+            }
+            Some(_) => anyhow::bail!("only aspect(fragments = ['cpp']) is supported"),
+        };
         Ok(AspectDefinitionGen {
             implementation,
             attr_aspects,
             required_toolchain,
+            required_providers,
+            required_fragments,
             defining_label,
             exported_name: OnceCell::new(),
         })

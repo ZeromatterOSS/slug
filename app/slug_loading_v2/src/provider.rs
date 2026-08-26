@@ -163,6 +163,10 @@ impl UserProviderCallable {
             id: OnceCell::new(),
         })
     }
+
+    pub(crate) fn id(&self) -> Option<&ProviderId> {
+        self.id.get()
+    }
 }
 
 impl fmt::Display for UserProviderCallable {
