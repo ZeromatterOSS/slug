@@ -4342,6 +4342,37 @@ Slug-native; `Label`, the complete live expression, application plus
 Boolean/StringList targets and analysis/CLI, M8/M7B and exact output bytes
 remain deferred.
 
+### Bounded Bazel `Label` loading accepted; rust-analyzer toolchain-rule audit selected (2026-08-26)
+
+Commit `84ddb6a3` installs a bounded `.bzl` `Label` constructor over one shared
+`CanonicalLabel`-owned Starlark value. It admits only `//...`, `:...` and Label
+idempotence, completes the fixed aspect toolchain expression, and keeps loaded
+aliases unusable in BUILD. General repository mapping, explicit repositories,
+wider value APIs and aspect application remain deferred.
+
+`BzlLoadManifest` now supplies one byte-preserving source-name projection used
+by the parser and evaluator context. Typed call-expression source wins over an
+outer `DefInfo`, preserving the defining module when an imported function is
+compiler-inlined inside a non-inlined caller; `DefInfo` remains the fallback
+for non-inlined definitions. Missing and ambiguous mappings fail closed. A
+cross-package recursive frozen-module proof discriminates direct alias caller
+ownership from imported-function owner identity.
+
+All loading tests, the focused vendored runtime proof, locked core check,
+rebuilt CLI, formatting and diff gates pass; archive status retains only its
+known thoughts classification. Growth is 295 production, 134 proof and 429
+total. Independent terminal review returns `ACCEPT`.
+
+Source order now reaches `rust/private/rust_analyzer.bzl:359-402`, the first
+`rust_analyzer_toolchain = rule(...)` after the accepted aspect. Its schema
+uses documented `attr.label` declarations with `cfg = "exec"`, executable,
+single-file and mandatory policy, followed by documented string defaults.
+Run only docs packet `WP-4-7A-rust-analyzer-toolchain-rule-audit` to establish
+the Bazel 9.2 call/retention boundary and select a bounded implementation or
+`REPLAN`. Pinned Zabel `c7298478…` guides the single retained attribute-schema,
+declaration-owner and executable-module split only; no Zabel code or behavior
+is copied.
+
 ### Fixed aspect definition accepted; Bazel `Label` audit selected (2026-08-26)
 
 Commit `840d28e7` exposes `aspect` only during complete `.bzl` evaluation and

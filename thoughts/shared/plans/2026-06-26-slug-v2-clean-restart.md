@@ -30,19 +30,60 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; bounded `Label` implementation selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `650075d8` selects the function-provenance audit | add the bounded `.bzl` Label constructor/stringification vertical with typed defining-function provenance, advancing the complete fixed aspect expression; aspect application and bool/list targets/analysis remain deferred | run only `WP-4-7A-bazel-label-global-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; rust-analyzer toolchain-rule audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction with optimizer-safe defining-source provenance | audit the first `rust_analyzer_toolchain = rule(...)` declaration and its exact label/string attribute schemas; aspect application and bool/list targets/analysis remain deferred | run only `WP-4-7A-rust-analyzer-toolchain-rule-audit`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-label-global-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-rust-analyzer-toolchain-rule-audit](./slug-v2-subplans/current-packet.md).
 
-Add the bounded `.bzl` Label constructor over the existing canonical Label
-value, resolving `//...` and `:...` against typed innermost Starlark-function
-provenance or top-level module context. Accept the complete fixed
-`rust_analyzer_aspect` expression, but stop before later declarations, general
-repository mapping, wider Label inputs/APIs or aspect application.
+Audit the first post-aspect source-order declaration at
+`rust/private/rust_analyzer.bzl:359-402`. Authenticate the exact `rule` and
+label/string attribute subset, retained schema identity and execution boundary
+needed by `rust_analyzer_toolchain`, then select one bounded implementation or
+`REPLAN`. Do not implement in the audit.
+
+### M7 bounded Bazel `Label` loading accepted; toolchain-rule audit selected (2026-08-26)
+
+Commit `84ddb6a3` adds `Label` only to complete `.bzl` globals and shares one
+`CanonicalLabel`-owned Starlark value with module-extension evaluation. The
+admitted constructor accepts `//...`, `:...` and Label idempotence, preserves
+the existing narrow value surface, completes the fixed aspect toolchain
+expression and keeps BUILD aliases rejected. Bare and explicit-repository
+spellings, mapping and wider APIs remain deferred.
+
+Recursive provenance uses the exact byte-preserving parser source-name
+projection retained by `BzlLoadManifest`. The typed native call-expression
+source takes precedence over a surviving outer `DefInfo`, so an imported
+function inlined inside a non-inlined caller still resolves to its defining
+module; non-inlined definitions retain the typed `DefInfo` fallback. Missing
+or ambiguous mappings fail closed. The same source-name helper now owns Host,
+external and legacy local parser naming.
+
+Focused Label/aspect/runtime proof, all 254 loading tests, locked core check,
+rebuilt CLI, formatting and diff gates pass. The archive checker retains only
+its known three-path thoughts classification. Final growth is 295 production,
+134 proof and 429 total, within every file/function/packet cap. Independent
+review returned `ACCEPT` after requiring byte-preserving provenance and the
+nested cross-package inlining discriminator.
+
+Pinned Zabel `c7298478…` guided the single retained Label owner and thin
+definition-context projection; no parser, mapping, runtime or behavior was
+copied. Bazel 9.2 remains sole authority. Exact compatibility is limited to
+the admitted constructor/value/fixed-aspect slice; Rust representation and
+diagnostics are Slug-native; wider Label/aspect behavior is unsupported or
+deferred.
+
+The accepted source-order closure now reaches
+`rust/private/rust_analyzer.bzl:359`, where
+`rust_analyzer_toolchain = rule(...)` contains four label attributes using
+`doc`, `cfg = "exec"`, `executable`, `allow_single_file` and `mandatory`, plus
+two documented string attributes with defaults. Run only the docs audit
+`WP-4-7A-rust-analyzer-toolchain-rule-audit`. Pinned Zabel's retained ordinary
+dependency schema and executable-module/declaration-owner split are
+architecture guidance only; the audit must authenticate behavior against
+Bazel 9.2 and stop before implementation, target invocation or analysis.
 
 ### M7 `Label` audit accepted; bounded loading packet selected (2026-08-26)
 
