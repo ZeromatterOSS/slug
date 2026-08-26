@@ -5247,6 +5247,34 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Scalar-label file allowance accepted; provider predicate selected (2026-08-26)
+
+Commit `b1edbe0e` admits Boolean/`None` scalar-label file allowance, checks the
+simultaneous non-None `allow_single_file` conflict before normalization, and
+reuses the existing schema Boolean. True is any-file but not single-artifact;
+repository and tag projections fail closed. Both selected rules_rust LLVM rows
+freeze. All 214 loading tests and downstream gates pass at 10 production, 91
+proof and 101 total additions; independent terminal review returned `ACCEPT`.
+
+Source order now reaches `lto` with `providers=[RustLtoInfo]`; the hidden
+allocator setting later repeats that scalar-label shape with
+`BuildSettingInfo`. All other remaining attribute-map rows use admitted
+constructors. Pinned Bazel 9.2 maps a flat provider list to one conjunction of
+exported provider identities. The next distinct stop after both predicates is
+the rule-level `config_common.toolchain_type(...)` call.
+
+Run only `WP-4-7A-bazel-label-provider-predicate-loading`: accept omitted,
+empty and the source-required single exported provider in a flat list, reuse
+the existing immutable nested-`Arc` provider schema, and keep target invocation
+plus repository/tag projections fail-closed. Broader predicate shapes,
+configured validation and `config_common` remain deferred.
+
+Clean `../zabel` `0795445f…` guides sharing one provider-predicate declaration
+fact across scalar/list dependency attributes and detaching it before package
+lowering. No Zig evaluator value, code, layout or behavior is copied. The
+Buck2 audit selects the existing `Arc<[Arc<[ProviderId]>]>` and `Allocative`
+owners with no utility or ledger change. Bazel 9.2 remains sole authority.
+
 ### String allowed values accepted; scalar-label file allowance selected (2026-08-26)
 
 Commit `80425ce9` unifies integer and string allowed-value sets in one typed,

@@ -1,44 +1,48 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-bazel-label-allow-files-loading`
+Packet: `WP-4-7A-bazel-label-provider-predicate-loading`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owners: existing loading attribute declaration and package-schema owners
-Base: `80425ce9`
+Base: `b1edbe0e`
 
-Result: admit the Boolean/`None` subset of Bazel scalar-label
-`allow_files`, reuse the existing file-allowance schema fact, and advance
-rules_rust's `rust_toolchain` declaration through `llvm_lib` and `llvm_tools`
-to its first scalar-label provider predicate. Keep the implementation lazy.
+Result: admit the source-required singleton scalar-label provider predicate,
+reuse the existing normalized provider-identity schema, and advance
+rules_rust's complete `rust_toolchain` attribute map to its first
+`config_common.toolchain_type` call. Keep the implementation lazy.
 
 ## Accepted starting point and source-order stop
 
-Commit `80425ce9` unifies integer and string allowed values in one immutable,
-evaluator-free schema enum. String sets normalize at declaration capture and
-explicit direct, selectable and concatenated final candidates are checked
-before target recording; ordinary defaults remain unchecked. All 213 loading
-tests and downstream gates pass, with independent terminal `ACCEPT` at 77
-production, 165 proof and 242 total additions.
+Commit `b1edbe0e` admits Boolean/`None` scalar-label `allow_files`, checks the
+non-`None` conflict with `allow_single_file` before normalization, and projects
+the existing Boolean without single-artifact identity. Both rules_rust LLVM
+file rows freeze. All 214 loading tests and downstream gates pass, with
+independent terminal `ACCEPT` at 10 production, 91 proof and 101 total
+additions.
 
-Source order now reaches these absent rows in rules_rust 0.73
-`rust/private/toolchain.bzl`:
+Source order now reaches:
 
 ```starlark
-"llvm_lib": attr.label(
-    doc = "The location of the `libLLVM` shared object files. ...",
-    allow_files = True,
-    cfg = "exec",
-),
-...
-"llvm_tools": attr.label(
-    doc = "LLVM tools that are shipped with the Rust toolchain.",
-    allow_files = True,
+"lto": attr.label(
+    providers = [RustLtoInfo],
+    default = Label("//rust/settings:lto"),
+    doc = "...",
 ),
 ```
 
-Between them, `llvm_profdata` uses accepted scalar-label
-`allow_single_file=True`. The next distinct stop is `lto`, whose
-`attr.label(providers = [RustLtoInfo], ...)` predicate is unadmitted. Do not
-admit scalar-label providers or claim the full `rust_toolchain` rule freezes.
+The same scalar-label shape occurs later for
+`_experimental_use_allocator_libraries_with_mangled_symbols_setting` with
+`providers=[BuildSettingInfo]`. Every intervening and remaining attribute-map
+row uses admitted constructors. The next absent evaluated expression is the
+rule-level toolchain entry:
+
+```starlark
+config_common.toolchain_type(
+    "@bazel_tools//tools/cpp:toolchain_type",
+    mandatory = False,
+)
+```
+
+Do not admit this `config_common` method or claim the full rule freezes.
 
 ## Fixed sources and compatibility authority
 
@@ -49,94 +53,99 @@ SHA-256
 Pinned Bazel 9.2 commit
 `8220c6198837d5c13d53fea211cf3282aa12408a` is sole behavior authority.
 
-`StarlarkAttrModuleApi.labelAttribute` types `allow_files` as Boolean,
-string sequence or `None`, with `None` as its default. The shared
-`buildAttribute` path uses non-`None` presence, rejects simultaneous non-None
-`allow_files` and `allow_single_file`, and maps Boolean true to
-`FileTypeSet.ANY_FILE` and false to `NO_FILE`. With neither argument, a
-dependency label also receives `NO_FILE`. Only `allow_single_file` sets
-`SINGLE_ARTIFACT`. `StarlarkRuleClassFunctionsTest.testAttrWithList` and
-`testAttrSingleFileWithList` pin the distinction between the allowed-file
-predicate and single-artifact identity.
+`StarlarkAttrModuleApi.labelAttribute` exposes named `providers` with an empty
+sequence default. `StarlarkAttrModule.buildProviderPredicate` treats a flat
+provider list as one conjunctive set and a nested list as alternatives,
+requires exported provider constructors, and installs a nonempty predicate in
+the shared label/label-list builder. `StarlarkRuleClassFunctionsTest` proves a
+scalar label retains `[ParentInfo]`; `testAttrWithProviders` pins conjunction
+and `testAttrWithProvidersList` pins alternatives.
 
-This packet reproduces only the Boolean/`None` constructor subset and its
-retained schema projection. Extension-sequence predicates and actual file
-target resolution remain deferred.
+This packet reproduces only omitted/empty and one exported provider in a flat
+list. Multiple conjunction members, alternative lists, empty alternatives,
+built-in providers and configured provider checking remain deferred.
 
 ## Zabel and Buck2 architectural guidance
 
 Clean `../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a`
-is architectural/test guidance only. Its declaration owner keeps
-`allows_files` separate from `allows_single_file`, checks simultaneous
-non-`None` arguments before normalization, and projects the same fact into
-the captured schema. Slug follows that ownership and presence-check boundary
-using its existing Rust Boolean; it copies no Zig code, layout, diagnostics or
-behavior. Bazel remains compatibility authority.
+is architectural/test guidance only. Its one dependency-attribute declaration
+owner retains the same optional provider-predicate fact for scalar and list
+labels, beside other schema metadata, before later package lowering. Slug
+follows that shared ownership boundary but immediately detaches the selected
+exported identity into its existing Rust provider schema. It copies no Zig
+evaluator value, code, layout, diagnostics or behavior. Bazel remains
+compatibility authority.
 
-The Buck2 utility audit selects the existing inline `allow_files: bool` in
-already `Allocative` schemas. There is no new collection, allocation, hash,
-interner, cache, utility import or Stage 9 ledger row.
+The Buck2 utility audit selects the existing
+`Arc<[Arc<[ProviderId]>]>` normalized provider-predicate representation and
+`Allocative` owners already used by label-list attributes. The singleton adds
+one immutable outer alternative and one immutable inner conjunction; clones
+remain reference bumps. No new collection, hash, interner, utility import or
+Stage 9 ledger row is needed.
 
 ## Compatibility classification
 
-- **Exact:** the admitted scalar-label subset accepts omitted, `None`, false
-  and true; normalizes omitted/`None`/false to no allowed files; maps true to
-  any-file allowance without single-artifact identity; rejects simultaneous
-  non-`None` `allow_files` and `allow_single_file`; retains the Boolean through
-  freeze and package schema; and crosses both rules_rust rows without invoking
-  the rule implementation.
-- **Slug-native:** one inline Rust Boolean as the retained semantic projection,
-  plus Rust diagnostic wording/order.
-- **Unsupported/deferred:** string-sequence extension predicates for
-  `allow_files`; exact diagnostics; actual source/filegroup validation and
-  configured file resolution; scalar-label `providers`, `allow_rules`,
-  aspects and materializers; repository/tag use of file-allowing attrs;
-  completion/invocation of `rust_toolchain`; M8, M7B and exact output bytes.
+- **Exact:** the admitted scalar-label subset accepts omitted and empty
+  provider sequences as unconstrained; accepts one exported user-provider
+  constructor in a flat list; retains its canonical defining-module/export
+  identity as one conjunctive predicate; rejects unexported/non-provider and
+  unsupported shapes; carries the predicate through freeze; and crosses both
+  rules_rust rows without invoking the implementation.
+- **Slug-native:** the existing compact nested-`Arc` schema representation and
+  Rust diagnostic wording/order.
+- **Unsupported/deferred:** multiple-provider conjunctions, nested alternatives,
+  empty alternatives, built-in provider identifiers, exact diagnostics,
+  configured prerequisite/provider validation, invocation of any constrained
+  rule, `config_common.toolchain_type`, completion of `rust_toolchain`, M8,
+  M7B and exact output bytes.
 
 ## Ownership and implementation boundary
 
-Add named `allow_files` only to the existing scalar `attr.label` adapter.
-Before normalization, reject when it and `allow_single_file` are both
-explicitly non-`None`. Parse the Boolean/`None` subset with the existing
-`unpack_boolean_allow_files`, then store it in the existing
-`AttributeDefinitionGen::allow_files` field. Existing freeze, target-schema,
-repository-rule and tag-class owners already retain or reject that fact and
-must not be duplicated.
+Add a small scalar-label provider parser beside the existing label-list
+normalizer. It accepts no argument or `[]` as empty, otherwise requires exactly
+one exported user-provider constructor and returns one existing nested-`Arc`
+alternative. Add named `providers` only to scalar `attr.label` and assign the
+normalized predicate to existing `AttributeDefinitionGen::required_providers`.
+
+Existing freeze and rule schemas already retain the field; the target-call
+preflight already rejects all nonempty provider-constrained attrs. Extend the
+repository-rule and tag-class projection guards so the new scalar form cannot
+be silently dropped. Do not change invocation, provider identity or analysis.
 
 There is no new representation and no DICE, request, command, analysis,
 async, mapping, repository, publication, cancellation or shutdown change.
 
 ## Discriminating proof
 
-- Accept omitted, explicit `None`, false and true scalar-label `allow_files`;
-  reject scalar and mapping wrong types and retain extension sequences as an
-  explicit unsupported boundary.
-- Prove omitted/`None`/false normalize equally, true is structurally distinct,
-  true remains separate from `allow_single_file=True`, and every simultaneous
-  non-`None` pair rejects even when either Boolean is false.
-- Freeze the source-shaped `llvm_lib`, `llvm_profdata` and `llvm_tools` rows;
-  prove both selected rows retain file allowance and the following
-  `providers=[RustLtoInfo]` row remains rejected.
-- Project true into a loaded package target schema without single-artifact
-  identity and prove repository-rule/tag-class projections fail closed.
-- Keep the prior label-list file allowance, string/integer values, docs,
+- Accept omitted and empty scalar-label provider sequences plus one imported,
+  exported provider; reject `None`, scalars, unexported constructors,
+  non-providers, multiple flat members and nested alternatives.
+- Prove constrained and unconstrained frozen schemas differ, the retained
+  predicate contains the imported provider's canonical defining-module/export
+  identity, and order-independent empty forms remain equal.
+- Freeze the source-shaped `lto` and hidden build-setting rows with distinct
+  imported providers; prove the following `config_common.toolchain_type` call
+  remains rejected.
+- Prove package invocation of a scalar provider-constrained rule rejects before
+  target recording and repository-rule/tag-class projections fail closed.
+- Keep the label-list provider/aspect, file allowance, allowed-values, docs,
   stdlib, Rust analyzer and rules_cc proofs plus one configured-analysis
   regression green.
 
 ## Allowlist and caps
 
-Only these files may change from base `80425ce9`:
+Only these files may change from base `b1edbe0e`:
 
 | File | Base SHA-256 | Base lines | Final cap | Purpose |
 |---|---|---:|---:|---|
-| `app/slug_loading_v2/src/package.rs` | `76a67c738567596ac4e673793a02a56d487fd4bf4eb2b9c0b3db6513f61bfc9f` | 5,975 | 5,995 | scalar-label ABI, conflict check and existing Boolean projection |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `e84b03b4c43b27785d96fa7155760e368aefae2d7665ee6708a39b480c28c2c8` | 6,314 | 6,435 | ABI, identity, fail-closed and source-prefix proof |
+| `app/slug_loading_v2/src/package.rs` | `a0dc5f05069f3d75b30dda310e0df355bf0ee42cb358cd4183117a78e4452e7c` | 5,983 | 6,030 | scalar provider normalization, adapter and fail-closed guards |
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `952c6b10453fd00364dbb59f790aa71a6740d1688ad5ccab2189ae3c4a093411` | 6,402 | 6,540 | ABI, identity, rejection and source-prefix proof |
 
-Production additions are capped at 20, proof additions at 120 and total
-additions at 140. Deletions do not buy addition budget. No new function may
+Production additions are capped at 45, proof additions at 135 and total
+additions at 180. Deletions do not buy addition budget. No new function may
 exceed 120 lines. `FrozenRuleDefinition::invoke` may not change. The files
-exceed the 2,000-line trigger, but the adapter belongs with adjacent `attr.*`
-constructors and the recursive proof belongs beside adjacent rules_rust tests;
+exceed the 2,000-line trigger, but normalization belongs beside the existing
+provider predicate owner and recursive proof beside adjacent rules_rust tests;
 splitting would duplicate owners and widen the packet.
 
 Plan-only selection edits are limited to the canonical plan, Stage 4 subplan
@@ -147,9 +156,9 @@ and this manifest and are excluded from implementation caps.
 Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
 `CARGO_BUILD_JOBS=1`:
 
-- focused scalar-label file-allowance ABI/identity/source-prefix proof;
-- existing label-list, allowed-values, docs, stdlib, analyzer and rules_cc
-  proofs;
+- focused scalar-label provider ABI/identity/rejection/source-prefix proof;
+- existing label-list provider/aspect, file-allowance, allowed-values, docs,
+  stdlib, analyzer and rules_cc proofs;
 - one configured rule/provider analysis regression;
 - `cargo test -p slug_loading_v2 --lib`;
 - `cargo check --locked -p slug_analysis_v2 -p slug_core_v2`;
@@ -163,16 +172,17 @@ known stale `@external` diagnostic-order row and need not rerun absent
 integration risk. Recheck caps, hashes, source stop and clean Zabel pin.
 
 Independent selection and terminal reviews must verify Bazel authority,
-Zabel's guidance-only role, the existing Boolean representation, presence
-conflict, file/single-file distinction, fail-closed projections, the provider
-stop, compatibility classes and every cap.
+Zabel's guidance-only role, reuse of normalized provider identity, singleton
+scope, invocation/projection failure, the `config_common` stop, compatibility
+classes and every cap.
 
 ## STOP / REPLAN
 
-STOP and REPLAN for a file outside the implementation allowlist; extension
-predicates; another scalar-label argument; a new retained representation;
-silent file-allowance loss; configured file enforcement; actual file target
-resolution; completion of `rust_toolchain`; DICE/analysis/repository/source
-changes; Java/JVM work; copied Zabel code or behavior; cap violation; or a
-claim beyond reaching the first scalar-label provider predicate. Audit
-`providers=[RustLtoInfo]` separately after this prefix loads.
+STOP and REPLAN for a file outside the implementation allowlist; a broader
+provider-predicate shape; a new retained representation; silent provider loss;
+configured provider enforcement; invocation of a constrained rule;
+`config_common.toolchain_type`; completion of `rust_toolchain`;
+DICE/analysis/repository/source changes; Java/JVM work; copied Zabel code or
+behavior; cap violation; or a claim beyond reaching the first rule-level
+toolchain-type expression. Audit that `config_common` method separately after
+the complete attribute map loads.
