@@ -4024,3 +4024,12 @@ archive-only direct HTTP/1 connection. Resolve on the synchronous command
 owner; drive and join the connection/body future inside each runtime entry.
 Registry remains unchanged. Pinned Zabel continues to guide only the separation
 of the producer-owned semantic view from its physical root.
+
+### Selected-registry BCR HTTP lifecycle accepted (2026-08-25)
+
+Implement the complete accepted `RepoSpec` without erasure. The archive-only
+transport resolves synchronously on the command owner and drives one direct
+HTTP/1 connection without a legacy client, pool or task. Physical captures and
+roots remain scratch below the producer-owned selected view; only a verified
+root reaches the existing token-revalidated publication seam. Bazel 9.2 owns
+archive behavior; pinned Zabel supplies this ownership guidance only.

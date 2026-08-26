@@ -18209,3 +18209,12 @@ and a directly driven, joined connection/body future. Preserve the existing
 lock-free materialization callback, post-I/O token revalidation and provisional
 root lifetime. Do not alter registry behavior or import Zabel scheduling;
 Zabel guides semantic/physical ownership only.
+
+### Native archive HTTP lifecycle accepted (2026-08-25)
+
+Bounded runtime entries drive a pinned direct HTTP/1 connection and yield body
+frames; synchronous command code owns DNS, hash/capture writes and extraction.
+Final sender/connection shutdown completes before return, and brief active-token
+checks between steps hold no lock across work. Implement only current through
+the existing provisional-root/final-validation lifetime. Registry, DICE
+identity and Zabel scheduling remain unchanged.
