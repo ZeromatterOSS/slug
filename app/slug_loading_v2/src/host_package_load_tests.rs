@@ -3079,6 +3079,142 @@ rust_clippy(
 )
 "#;
 
+const CLIPPY_TEST_TAIL_SOURCE: &str = r###"RustClippyTestInfo = provider(
+    doc = "Clippy check outputs collected by `rust_clippy_test` from the underlying `rust_clippy_aspect`.",
+    fields = {
+        "checks": "depset[File]: Clippy markers for the visited target plus every crate reached via `deps`, `proc_macro_deps`, and `crate`.",
+        "direct": "depset[File]: Clippy markers for the visited target only.",
+    },
+)
+
+# clippy contributes to two output groups: `clippy_checks` (`.clippy.ok`
+# marker in the default config, `.clippy.out` when `capture_clippy_output`
+# is on) and `clippy_output` (`.clippy.diagnostics` JSON when
+# `clippy_output_diagnostics` is on). Capture modes make clippy exit 0 even
+# on real issues, so the runner inspects file contents to decide pass/fail.
+_CLIPPY_OUTPUT_GROUPS = ["clippy_checks", "clippy_output"]
+
+def _rust_clippy_test_aspect_impl(target, ctx):
+    return lint_test_aspect_impl(target, ctx, RustClippyTestInfo, _CLIPPY_OUTPUT_GROUPS)
+
+def _rust_clippy_test_impl(ctx):
+    return lint_test_rule_impl(ctx, RustClippyTestInfo, _CLIPPY_OUTPUT_GROUPS)
+
+_rust_clippy_test_aspect = aspect(
+    implementation = _rust_clippy_test_aspect_impl,
+    attr_aspects = ["deps", "proc_macro_deps", "crate"],
+    requires = [rust_clippy_aspect],
+    provides = [RustClippyTestInfo],
+    doc = "Walks `deps`/`proc_macro_deps`/`crate` and rolls up the markers produced by `rust_clippy_aspect` into a transitive `RustClippyTestInfo`.",
+)
+
+rust_clippy_test = rule(
+    implementation = _rust_clippy_test_impl,
+    attrs = dict(LINT_TEST_COMMON_ATTRS, **{
+        "targets": attr.label_list(
+            doc = "Rust targets to run clippy on.",
+            providers = [
+                [rust_common.crate_info],
+                [rust_common.test_crate_info],
+            ],
+            aspects = [_rust_clippy_test_aspect],
+            cfg = platform_transition,
+        ),
+    }),
+    test = True,
+    doc = """\
+A test rule that runs `clippy` over a set of Rust targets.
+
+By default (`transitive = False`), only the exact targets listed are checked. Set
+`transitive = True` to walk `deps`, `proc_macro_deps`, and `crate` so that listing a
+top-level target checks its whole crate graph.
+
+The clippy actions run during the build phase, so a clippy failure fails `bazel test` before
+the test executable is invoked. The rule also exposes the collected markers under the
+`clippy_checks` output group, so `bazel build //x:my_clippy_test --output_groups=clippy_checks`
+drives the clippy actions without running the test.
+
+When `capture_clippy_output` or `clippy_output_diagnostics` is set globally clippy exits 0
+even on real issues; in that case the runner inspects the captured stderr / JSON diagnostics
+and reports the verdict.
+
+An optional `platform` attribute transitions `targets` to the given platform before running
+clippy.
+
+Example:
+
+```python
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_clippy_test", "rust_library")
+
+rust_library(
+    name = "lib",
+    srcs = ["src/lib.rs"],
+    edition = "2021",
+)
+
+rust_binary(
+    name = "app",
+    srcs = ["src/main.rs"],
+    edition = "2021",
+    deps = [":lib"],
+)
+
+rust_clippy_test(
+    name = "clippy_app_only_test",
+    targets = [":app"],
+)
+
+rust_clippy_test(
+    name = "clippy_tree_test",
+    targets = [":app"],
+    transitive = True,
+)
+```
+
+Targets tagged `no_clippy`, `no_lint`, `nolint`, or `noclippy` are skipped.
+""",
+)
+
+def _capture_clippy_output_impl(ctx):
+    """Implementation of the `capture_clippy_output` rule
+
+    Args:
+        ctx (ctx): The rule's context object
+
+    Returns:
+        list: A list containing the CaptureClippyOutputInfo provider
+    """
+    return [CaptureClippyOutputInfo(capture_output = ctx.build_setting_value)]
+
+capture_clippy_output = rule(
+    doc = "Control whether to print clippy output or store it to a file, using the configured error_format.",
+    implementation = _capture_clippy_output_impl,
+    build_setting = config.bool(flag = True),
+)
+
+def _clippy_output_diagnostics_impl(ctx):
+    """Implementation of the `clippy_output_diagnostics` rule
+
+    Args:
+        ctx (ctx): The rule's context object
+
+    Returns:
+        list: A list containing the CaptureClippyOutputInfo provider
+    """
+    return [ClippyOutputDiagnosticsInfo(output_diagnostics = ctx.build_setting_value)]
+
+clippy_output_diagnostics = rule(
+    doc = (
+        "Setting this flag from the command line with `--@rules_rust//rust/settings:clippy_output_diagnostics` " +
+        "makes rules_rust save lippy json output (suitable for consumption by rust-analyzer) in a file, " +
+        "available from the `clippy_output` output group. This is the clippy equivalent of " +
+        "`@rules_rust//settings:rustc_output_diagnostics`."
+    ),
+    implementation = _clippy_output_diagnostics_impl,
+    build_setting = config.bool(flag = True),
+)
+"###;
+
 const CLIPPY_TOOLCHAINS: &str = "[str(Label('//rust:toolchain_type')), config_common.toolchain_type('@bazel_tools//tools/cpp:toolchain_type', mandatory = False)]";
 
 fn clippy_owner() -> BzlModuleIdentity {
@@ -3089,6 +3225,129 @@ fn clippy_owner() -> BzlModuleIdentity {
             ApparentRepoName::new("bazel_tools").unwrap(),
             CanonicalRepoName::new("bazel_tools+").unwrap(),
         )]),
+    }
+}
+
+fn eval_bzl_with_loaded_children(
+    source: &str,
+    owner: BzlModuleIdentity,
+    children: &[(&str, BzlModuleIdentity, FrozenModule)],
+) -> anyhow::Result<FrozenModule> {
+    let child_identities = children
+        .iter()
+        .map(|(_, identity, _)| identity.clone())
+        .collect::<Vec<_>>();
+    let mut reachable = vec![owner.clone()];
+    reachable.extend(child_identities.iter().cloned());
+    let filename = owner.workspace_path.to_string_lossy().into_owned();
+    let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
+        root: owner,
+        direct_children: child_identities.into(),
+        reachable: reachable.into(),
+        fingerprint: [0; 32],
+    });
+    let ast = AstModule::parse(&filename, source.to_owned(), &Dialect::Bazel)
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    let module = Module::new();
+    let loader = LocalBzlLoader {
+        modules: children
+            .iter()
+            .map(|(load, _, module)| (*load, module.dupe()))
+            .collect(),
+    };
+    let mut evaluator = Evaluator::new(&module);
+    evaluator.extra = Some(&context);
+    evaluator.set_loader(&loader);
+    evaluator
+        .eval_module(ast, &loading_globals())
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    drop(evaluator);
+    Ok(module.freeze()?)
+}
+
+#[test]
+#[rustfmt::skip]
+fn clippy_test_tail_freezes_with_recursive_producer_identities() {
+    let child_owner = |name: &str| {
+        let mut owner = clippy_owner();
+        owner.label = CanonicalLabel::parse(&format!("@@rules_rust+//rust/private:{name}.bzl")).unwrap();
+        owner.workspace_path = PathBuf::from(format!("/rules_rust/rust/private/{name}.bzl"));
+        owner
+    };
+    let providers_owner = child_owner("providers");
+    let providers = eval_bzl_with_identity(
+        r#"CrateInfo = provider(doc = "crate", fields = {})
+TestCrateInfo = provider(doc = "test crate", fields = {})
+CaptureClippyOutputInfo = provider(doc = "Value of capture", fields = {"capture_output": "value"})
+ClippyInfo = provider(doc = "Provides information on a clippy run.", fields = {"output": "File with the clippy output."})
+ClippyOutputDiagnosticsInfo = provider(doc = "Value of diagnostics", fields = {"output_diagnostics": "value"})
+"#,
+        providers_owner.clone(),
+    ).unwrap();
+    let common_owner = child_owner("common");
+    let common = eval_bzl_with_loaded_children(
+        "load(':providers.bzl', 'CrateInfo', 'TestCrateInfo')\nrust_common = struct(crate_info = CrateInfo, test_crate_info = TestCrateInfo)\n",
+        common_owner.clone(),
+        &[(":providers.bzl", providers_owner.clone(), providers.dupe())],
+    ).unwrap();
+    let lint_owner = child_owner("lint_test");
+    let lint = eval_bzl_with_identity(&format!("{LINT_TEST_SOURCE}\nTRANSITION_IMPL=_platform_transition_impl\n"), lint_owner.clone()).unwrap();
+    let prefix = CLIPPY_ASPECT_SOURCE.replace("TOOLCHAINS", CLIPPY_TOOLCHAINS);
+    let prefix = &prefix[prefix.find("def _clippy_aspect_impl").unwrap()..];
+    let mut source = r#"load("//rust/private:common.bzl", "rust_common")
+load("//rust/private:lint_test.bzl", "LINT_TEST_COMMON_ATTRS", "lint_test_aspect_impl", "lint_test_rule_impl", "platform_transition")
+load("//rust/private:providers.bzl", "CaptureClippyOutputInfo", "ClippyInfo", "ClippyOutputDiagnosticsInfo")
+"#.to_owned();
+    source.push_str(prefix);
+    source.push_str(CLIPPY_TEST_TAIL_SOURCE);
+    source.push_str("\nIMPORTED_LINT=[LINT_TEST_COMMON_ATTRS, lint_test_aspect_impl, lint_test_rule_impl, platform_transition]\nIMPORTED_PROVIDERS=[CaptureClippyOutputInfo, ClippyInfo, ClippyOutputDiagnosticsInfo]\nIMPORTED_COMMON=rust_common\nOUTPUT_GROUPS=_CLIPPY_OUTPUT_GROUPS\nTEST_ASPECT=_rust_clippy_test_aspect\n");
+    let module = eval_bzl_with_loaded_children(
+        &source, clippy_owner(), &[
+            ("//rust/private:common.bzl", common_owner, common.dupe()),
+            ("//rust/private:lint_test.bzl", lint_owner, lint.dupe()),
+            ("//rust/private:providers.bzl", providers_owner, providers.dupe()),
+        ],
+    ).unwrap();
+    let imported = |name| FrozenListRef::from_value(module.get(name).unwrap().value()).unwrap();
+    for (value, name) in imported("IMPORTED_LINT").iter().zip(["LINT_TEST_COMMON_ATTRS", "lint_test_aspect_impl", "lint_test_rule_impl", "platform_transition"]) {
+        assert!(value.to_value().ptr_eq(lint.get(name).unwrap().value()));
+    }
+    for (value, name) in imported("IMPORTED_PROVIDERS").iter().zip(["CaptureClippyOutputInfo", "ClippyInfo", "ClippyOutputDiagnosticsInfo"]) {
+        assert!(value.to_value().ptr_eq(providers.get(name).unwrap().value()));
+    }
+    assert!(module.get("IMPORTED_COMMON").unwrap().value().ptr_eq(common.get("rust_common").unwrap().value()));
+    let groups = imported("OUTPUT_GROUPS");
+    assert_eq!(groups.iter().map(|v| v.to_value().unpack_str().unwrap()).collect::<Vec<_>>(), ["clippy_checks", "clippy_output"]);
+    let aspect_value = module.get("TEST_ASPECT").unwrap();
+    let aspect = aspect_value.clone().downcast::<FrozenAspectDefinition>().unwrap();
+    assert_eq!(aspect.attr_aspects.as_ref(), ["deps", "proc_macro_deps", "crate"]);
+    assert!(aspect.required_aspect.unwrap().to_value().ptr_eq(module.get("rust_clippy_aspect").unwrap().value()));
+    assert_eq!(aspect.advertised_providers[0].to_string(), "@@rules_rust+//rust/private:clippy.bzl%RustClippyTestInfo");
+    let rule = module.get("rust_clippy_test").unwrap().downcast::<FrozenRuleDefinition>().unwrap();
+    assert_eq!(rule.capability().test_kind, Some(TestRuleKind::Test));
+    let declared = &rule.schema[rule.schema.len() - 5..];
+    assert_eq!(declared.iter().map(|attribute| attribute.name.as_str()).collect::<Vec<_>>(), ["platform", "transitive", "_allowlist_function_transition", "_runner", "targets"]);
+    assert_eq!(declared[..4].iter().map(|attribute| attribute.kind).collect::<Vec<_>>(), [AttributeKind::Label, AttributeKind::Boolean, AttributeKind::Label, AttributeKind::Label]);
+    assert!(declared[0].default.is_none() && matches!(declared[1].default, Some(CoercedAttributeValue::Boolean(false))) && matches!(declared[2].default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == "@@bazel_tools+//tools/allowlists/function_transition_allowlist:function_transition_allowlist") && declared[3].executable && declared[3].exec_configuration && matches!(declared[3].default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == "@@rules_rust+//rust/private/lint_test_runner:lint_test_runner"));
+    let targets = &declared[4];
+    assert_eq!(targets.required_providers[0][0].to_string(), "@@rules_rust+//rust/private:providers.bzl%CrateInfo");
+    assert_eq!(targets.required_providers[1][0].to_string(), "@@rules_rust+//rust/private:providers.bzl%TestCrateInfo");
+    assert!(targets.attached_aspect.unwrap().to_value().ptr_eq(aspect_value.value()));
+    let transition = targets.transition.as_ref().unwrap();
+    assert!(transition.implementation().to_value().ptr_eq(lint.get("TRANSITION_IMPL").unwrap().value()));
+    assert_eq!(transition.output(), "//command_line_option:platforms");
+    for name in ["capture_clippy_output", "clippy_output_diagnostics"] {
+        let setting = module.get(name).unwrap().downcast::<FrozenRuleDefinition>().unwrap();
+        assert_eq!(setting.build_setting_kind, Some(BuildSettingKind::Boolean { flag: true }));
+    }
+    for rich in [
+        "P=provider()\nX=attr.label(providers=[P])",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl)\nX=attr.label_list(aspects=[A])",
+        "def impl(settings, attr): return {}\nT=transition(implementation=impl, inputs=[], outputs=['//:setting'])\nX=attr.label(cfg=T)",
+    ] {
+        let rich_owner = child_owner("rich");
+        let rich = eval_bzl_with_identity(rich, rich_owner.clone()).unwrap();
+        assert!(eval_bzl_with_loaded_children("load(':rich.bzl','X')\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'x':X})", clippy_owner(), &[(":rich.bzl", rich_owner, rich)]).is_err());
     }
 }
 

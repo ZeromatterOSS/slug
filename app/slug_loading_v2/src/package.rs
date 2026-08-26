@@ -3455,6 +3455,11 @@ type FrozenTransitionDefinition = TransitionDefinitionGen<FrozenValue>;
 starlark::starlark_complex_values!(TransitionDefinition);
 impl FrozenTransitionDefinition {
     #[cfg(test)]
+    pub(crate) fn implementation(&self) -> FrozenValue {
+        self.implementation
+    }
+
+    #[cfg(test)]
     pub(crate) fn output(&self) -> &str {
         &self.output
     }
@@ -3502,6 +3507,34 @@ struct AttributeDefinitionGen<V> {
 type AttributeDefinition<'v> = AttributeDefinitionGen<Value<'v>>;
 type FrozenAttributeDefinition = AttributeDefinitionGen<FrozenValue>;
 starlark::starlark_complex_values!(AttributeDefinition);
+
+fn rule_attribute_definition_from_value<'v>(value: Value<'v>) -> Option<AttributeDefinition<'v>> {
+    match AttributeDefinition::from_value(value)? {
+        starlark::__macro_refs::Either::Left(value) => Some(value.clone()),
+        starlark::__macro_refs::Either::Right(value)
+            if value.required_providers.is_empty()
+                && value.attached_aspect.is_none()
+                && value.transition.is_none() =>
+        {
+            Some(AttributeDefinitionGen {
+                kind: value.kind,
+                mandatory: value.mandatory,
+                configurable: value.configurable,
+                configurable_set: value.configurable_set,
+                allow_files: value.allow_files,
+                allow_single_file: value.allow_single_file.clone(),
+                allowed_values: value.allowed_values.clone(),
+                default: value.default.clone(),
+                executable: value.executable,
+                exec_configuration: value.exec_configuration,
+                required_providers: value.required_providers.clone(),
+                attached_aspect: None,
+                transition: None,
+            })
+        }
+        starlark::__macro_refs::Either::Right(_) => None,
+    }
+}
 impl<V> fmt::Display for AttributeDefinitionGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "attr.{:?}()", self.kind)
@@ -4038,7 +4071,10 @@ fn attribute_definition<'v>(
                 .into_iter()
                 .find_map(|value| match value {
                     starlark::__macro_refs::Either::Left(value) => Some(value.clone()),
-                    starlark::__macro_refs::Either::Right(_) => None,
+                    starlark::__macro_refs::Either::Right(value) => Some(TransitionDefinitionGen {
+                        implementation: value.implementation.to_value(),
+                        output: value.output.clone(),
+                    }),
                 })
                 .map(Some)
                 .ok_or_else(|| anyhow::anyhow!("attr.label cfg must be 'exec' or a transition"))
@@ -5367,18 +5403,14 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 {
                     anyhow::bail!("rule attribute `{name}` is built in and cannot be redeclared");
                 }
-                let definition = AttributeDefinition::from_value(value)
-                    .and_then(|value| match value {
-                        starlark::__macro_refs::Either::Left(value) => Some(value),
-                        starlark::__macro_refs::Either::Right(_) => None,
-                    })
+                let definition = rule_attribute_definition_from_value(value)
                     .ok_or_else(|| anyhow::anyhow!("rule attribute `{name}` must use attr.*()"))?;
                 if definition.configurable_set {
                     anyhow::bail!(
                         "attribute '{name}' has the 'configurable' argument set, which is not allowed in rule definitions"
                     );
                 }
-                user_schema.push(declared_attribute_schema(name, definition));
+                user_schema.push(declared_attribute_schema(name, &definition));
             }
         }
         let has_transition = user_schema.iter().any(|schema| schema.transition.is_some());
