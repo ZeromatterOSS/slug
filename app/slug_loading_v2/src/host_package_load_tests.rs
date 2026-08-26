@@ -82,6 +82,7 @@ use starlark::eval::Evaluator;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
 use starlark::values::ValueLike;
+use starlark::values::dict::DictRef;
 use starlark::values::list::FrozenListRef;
 use starlark::values::structs::StructRef;
 use starlark_map::small_map::SmallMap;
@@ -126,6 +127,7 @@ use crate::provider::OutputGroupInfo;
 use crate::provider::RunEnvironmentInfo;
 use crate::provider::StarlarkUserProvider;
 use crate::provider::loading_provider_id;
+use crate::starlark_label::StarlarkLabel;
 
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
@@ -3315,6 +3317,139 @@ rust_lint_config(
 )
 "###;
 
+const FIND_CC_TOOLCHAIN_SOURCE: &str = r###"# pylint: disable=g-bad-file-header
+# Copyright 2016 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+Helpers for CC Toolchains.
+
+Rules that require a CC toolchain should call `use_cc_toolchain` and `find_cc_toolchain`
+to depend on and find a cc toolchain.
+
+* When https://github.com/bazelbuild/bazel/issues/7260 is **not** flipped, current
+  C++ toolchain is selected using the legacy mechanism (`--crosstool_top`,
+  `--cpu`, `--compiler`). For that to work the rule needs to declare an
+  `_cc_toolchain` attribute, e.g.
+
+    foo = rule(
+        implementation = _foo_impl,
+        attrs = {
+            "_cc_toolchain": attr.label(
+                default = Label(
+                    "@rules_cc//cc:current_cc_toolchain",
+                ),
+            ),
+        },
+    )
+
+* When https://github.com/bazelbuild/bazel/issues/7260 **is** flipped, current
+  C++ toolchain is selected using the toolchain resolution mechanism
+  (`--platforms`). For that to work the rule needs to declare a dependency on
+  C++ toolchain type:
+
+    load(":find_cc_toolchain/bzl", "use_cc_toolchain")
+
+    foo = rule(
+        implementation = _foo_impl,
+        toolchains = use_cc_toolchain(),
+    )
+
+We advise to depend on both `_cc_toolchain` attr and on the toolchain type for
+the duration of the migration. After
+https://github.com/bazelbuild/bazel/issues/7260 is flipped (and support for old
+Bazel version is not needed), it's enough to only keep the toolchain type.
+"""
+
+load("//cc/common:cc_common.bzl", "cc_common")
+
+CC_TOOLCHAIN_TYPE = Label("@bazel_tools//tools/cpp:toolchain_type")
+
+CC_TOOLCHAIN_ATTRS = {
+    # Needed for Bazel 6.x and 7.x compatibility.
+    "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
+}
+
+def find_cc_toolchain(ctx, *, mandatory = True):
+    """
+    Returns the current `CcToolchainInfo`.
+
+    Args:
+      ctx: The rule context for which to find a toolchain.
+      mandatory: (bool) If this is set to False, this function will return None
+        rather than fail if no toolchain is found.
+
+    Returns:
+      A CcToolchainInfo or None if the c++ toolchain is declared as
+      optional, mandatory is False and no toolchain has been found.
+    """
+
+    # Check the incompatible flag for toolchain resolution.
+    if hasattr(cc_common, "is_cc_toolchain_resolution_enabled_do_not_use") and cc_common.is_cc_toolchain_resolution_enabled_do_not_use(ctx = ctx):
+        if not CC_TOOLCHAIN_TYPE in ctx.toolchains:
+            fail("In order to use find_cc_toolchain, your rule has to depend on C++ toolchain. See find_cc_toolchain.bzl docs for details.")
+        toolchain_info = ctx.toolchains[CC_TOOLCHAIN_TYPE]
+        if toolchain_info == None:
+            if not mandatory:
+                return None
+
+            # No cpp toolchain was found, so report an error.
+            fail("Unable to find a CC toolchain using toolchain resolution. Target: %s, Platform: %s, Exec platform: %s" %
+                 (ctx.label, ctx.fragments.platform.platform, ctx.fragments.platform.host_platform))
+        if hasattr(toolchain_info, "cc_provider_in_toolchain") and hasattr(toolchain_info, "cc"):
+            return toolchain_info.cc
+        return toolchain_info
+
+    # Fall back to the legacy implicit attribute lookup.
+    if hasattr(ctx.attr, "_cc_toolchain"):
+        return ctx.attr._cc_toolchain[cc_common.CcToolchainInfo]
+
+    # We didn't find anything.
+    if not mandatory:
+        return None
+    fail("In order to use find_cc_toolchain, your rule has to depend on C++ toolchain. See find_cc_toolchain.bzl docs for details.")
+
+def find_cpp_toolchain(ctx):
+    """Deprecated, use `find_cc_toolchain` instead.
+
+    Args:
+      ctx: See `find_cc_toolchain`.
+
+    Returns:
+      A CcToolchainInfo.
+    """
+    return find_cc_toolchain(ctx)
+
+def use_cc_toolchain(mandatory = True):
+    """
+    Helper to depend on the cc toolchain.
+
+    Usage:
+    ```
+    my_rule = rule(
+        toolchains = [other toolchain types] + use_cc_toolchain(),
+    )
+    ```
+
+    Args:
+      mandatory: Whether or not it should be an error if the toolchain cannot be resolved.
+
+    Returns:
+      A list that can be used as the value for `rule.toolchains`.
+    """
+    return [config_common.toolchain_type(CC_TOOLCHAIN_TYPE, mandatory = mandatory)]
+"###;
+
 const PATHS_SOURCE: &str = r###"# Copyright 2017 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -3685,6 +3820,96 @@ fn eval_bzl_with_loaded_children(
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;
     drop(evaluator);
     Ok(module.freeze()?)
+}
+
+#[test]
+fn exact_rules_cc_find_toolchain_child_freezes_eager_constants_and_functions() {
+    assert_eq!(
+        format!("{:x}", Sha256::digest(FIND_CC_TOOLCHAIN_SOURCE.as_bytes())),
+        "3f62d3ea99f59674f71dbc669c80dd0dc5ef14637933d727b74f0bd556334655"
+    );
+    let identity = |label: &str, path: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(label).unwrap(),
+        workspace_path: PathBuf::from(path),
+        repository_mapping: Arc::from([
+            (
+                ApparentRepoName::new("bazel_tools").unwrap(),
+                CanonicalRepoName::new("bazel_tools+").unwrap(),
+            ),
+            (
+                ApparentRepoName::new("rules_cc").unwrap(),
+                CanonicalRepoName::new("rules_cc+").unwrap(),
+            ),
+        ]),
+    };
+    let cc_common_owner = identity(
+        "@@rules_cc+//cc/common:cc_common.bzl",
+        "/rules_cc/cc/common/cc_common.bzl",
+    );
+    let cc_common =
+        eval_bzl_with_identity("cc_common = struct()\n", cc_common_owner.clone()).unwrap();
+    let owner = identity(
+        "@@rules_cc+//cc:find_cc_toolchain.bzl",
+        "/rules_cc/cc/find_cc_toolchain.bzl",
+    );
+    let module = eval_bzl_with_loaded_children(
+        FIND_CC_TOOLCHAIN_SOURCE,
+        owner.clone(),
+        &[("//cc/common:cc_common.bzl", cc_common_owner, cc_common)],
+    )
+    .unwrap();
+
+    for (name, expected_type) in [
+        ("CC_TOOLCHAIN_ATTRS", "dict"),
+        ("CC_TOOLCHAIN_TYPE", "Label"),
+        ("find_cc_toolchain", "function"),
+        ("find_cpp_toolchain", "function"),
+        ("use_cc_toolchain", "function"),
+    ] {
+        assert_eq!(module.get(name).unwrap().value().get_type(), expected_type);
+    }
+    let toolchain_type = module
+        .get("CC_TOOLCHAIN_TYPE")
+        .unwrap()
+        .downcast::<StarlarkLabel>()
+        .unwrap();
+    assert_eq!(
+        toolchain_type.canonical().to_string(),
+        "@@bazel_tools+//tools/cpp:toolchain_type"
+    );
+    let attrs_value = module.get("CC_TOOLCHAIN_ATTRS").unwrap();
+    let attrs = DictRef::from_value(attrs_value.value()).unwrap();
+    let entries = attrs.iter().collect::<Vec<_>>();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].0.unpack_str(), Some("_cc_toolchain"));
+    assert_eq!(entries[0].1.get_type(), "attribute");
+
+    let consumer_owner = identity(
+        "@@rules_cc+//cc:find_cc_toolchain_proof.bzl",
+        "/rules_cc/cc/find_cc_toolchain_proof.bzl",
+    );
+    let consumer = eval_bzl_with_loaded_children(
+        "load(\"//cc:find_cc_toolchain.bzl\", \"CC_TOOLCHAIN_ATTRS\")\ndef _impl(ctx): fail(\"implementation must stay lazy\")\nproof_rule = rule(implementation = _impl, attrs = CC_TOOLCHAIN_ATTRS)\n",
+        consumer_owner,
+        &[("//cc:find_cc_toolchain.bzl", owner, module.dupe())],
+    )
+    .unwrap();
+    let rule = consumer
+        .get("proof_rule")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    let attribute = rule
+        .schema
+        .iter()
+        .find(|attribute| attribute.name == "_cc_toolchain")
+        .unwrap();
+    assert_eq!(attribute.kind, AttributeKind::Label);
+    assert!(matches!(
+        attribute.default.as_ref(),
+        Some(CoercedAttributeValue::Label(label))
+            if label.to_string() == "@@rules_cc+//cc:current_cc_toolchain"
+    ));
 }
 
 #[test]
