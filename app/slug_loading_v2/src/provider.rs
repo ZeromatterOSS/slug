@@ -10,6 +10,8 @@
 
 use std::cell::OnceCell;
 use std::fmt;
+#[cfg(test)]
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -36,13 +38,14 @@ use starlark::values::starlark_value;
 use starlark_map::small_map::SmallMap;
 
 use crate::bzl_module::BzlLoadManifest;
+use crate::bzl_module::BzlModuleIdentity;
 use crate::bzl_module::manifest_starlark_sources;
 
 #[derive(Debug, ProvidesStaticType)]
 pub(crate) struct BzlEvaluationContext {
     source_label: CompactString,
-    source_canonical: CanonicalLabel,
-    source_labels_by_filename: Arc<[(CompactString, CanonicalLabel)]>,
+    source_identity: BzlModuleIdentity,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
 }
 
 impl BzlEvaluationContext {
@@ -54,11 +57,16 @@ impl BzlEvaluationContext {
         } else {
             format!("@@{source_label}")
         };
+        let label = CanonicalLabel::parse(&canonical)
+            .expect("Bzl evaluation context requires a valid source label");
         Self {
-            source_canonical: CanonicalLabel::parse(&canonical)
-                .expect("Bzl evaluation context requires a valid source label"),
+            source_identity: BzlModuleIdentity {
+                label,
+                workspace_path: PathBuf::new(),
+                repository_mapping: Arc::from([]),
+            },
             source_label,
-            source_labels_by_filename: Arc::from([]),
+            source_identities_by_filename: Arc::from([]),
         }
     }
 
@@ -74,8 +82,8 @@ impl BzlEvaluationContext {
         };
         Self {
             source_label,
-            source_canonical: manifest.root.label.clone(),
-            source_labels_by_filename: manifest_starlark_sources(manifest),
+            source_identity: manifest.root.clone(),
+            source_identities_by_filename: manifest_starlark_sources(manifest),
         }
     }
 
@@ -89,33 +97,40 @@ impl BzlEvaluationContext {
         &self.source_label
     }
 
-    pub(crate) fn source_label_for_call(
-        &self,
+    pub(crate) fn source_identity_for_call<'a>(
+        &'a self,
         eval: &Evaluator<'_, '_, '_>,
-    ) -> anyhow::Result<CanonicalLabel> {
+    ) -> anyhow::Result<&'a BzlModuleIdentity> {
         let caller = eval.native_caller_function_filename();
         let Some(filename) = eval
             .native_call_source_filename()
             .or_else(|| caller.clone())
         else {
-            return Ok(self.source_canonical.clone());
+            return Ok(&self.source_identity);
         };
-        if caller.is_none() && self.source_labels_by_filename.is_empty() {
-            return Ok(self.source_canonical.clone());
+        if caller.is_none() && self.source_identities_by_filename.is_empty() {
+            return Ok(&self.source_identity);
         }
-        let mut labels = self
-            .source_labels_by_filename
+        let mut identities = self
+            .source_identities_by_filename
             .iter()
-            .filter_map(|(source, label)| (source.as_str() == filename).then_some(label));
-        let label = labels.next().ok_or_else(|| {
+            .filter_map(|(source, identity)| (source.as_str() == filename).then_some(identity));
+        let identity = identities.next().ok_or_else(|| {
             anyhow::anyhow!(
                 "Starlark caller source is not present in the recursive Bzl manifest: {filename}"
             )
         })?;
-        if labels.next().is_some() {
+        if identities.next().is_some() {
             anyhow::bail!("ambiguous Starlark caller in the Bzl manifest: {filename}");
         }
-        Ok(label.clone())
+        Ok(identity)
+    }
+
+    pub(crate) fn source_label_for_call(
+        &self,
+        eval: &Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<CanonicalLabel> {
+        Ok(self.source_identity_for_call(eval)?.label.clone())
     }
 }
 

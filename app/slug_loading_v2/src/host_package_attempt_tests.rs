@@ -212,6 +212,7 @@ fn frozen_macro(source: &str) -> FrozenBzlModule {
     let identity = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@//pkg:defs.bzl").unwrap(),
         workspace_path: PathBuf::from("/workspace/pkg/defs.bzl"),
+        repository_mapping: Arc::from([]),
     };
     FrozenBzlModule {
         module,

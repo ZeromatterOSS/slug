@@ -18,6 +18,8 @@ use dice::Key;
 use dice::RichActivation;
 use dice::UserComputationData;
 use dupe::Dupe;
+use sha2::Digest;
+use sha2::Sha256;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::HostRepositoryMaterializationDisposition;
@@ -132,7 +134,7 @@ impl RegistryIo for SelectedRegistryIo {
     ) -> Result<RegistryIoOutcome, RegistryTransportError> {
         let bytes: Option<&'static [u8]> = match url.as_str() {
             "https://registry.invalid/modules/dep/1/MODULE.bazel" => {
-                Some(b"module(name='dep', version='1')\n")
+                Some(b"module(name='dep', version='1', repo_name='rules_rust')\n")
             }
             "https://registry.invalid/modules/dep/1/source.json" => {
                 Some(br#"{"url":"https://origin.invalid/dep.tgz","integrity":"sha256-test"}"#)
@@ -749,7 +751,7 @@ fn selected_registry_root_package_epoch() -> (PathObservationEpoch, PathObservat
     epoch.materialized_file(
         instance,
         "/registry-dep/MODULE.bazel",
-        "module(name='dep', version='1')\n",
+        "module(name='dep', version='1', repo_name='rules_rust')\n",
         901,
     );
     epoch.materialized_missing(instance, "/registry-dep/REPO.bazel");
@@ -757,16 +759,47 @@ fn selected_registry_root_package_epoch() -> (PathObservationEpoch, PathObservat
     epoch.materialized_file(
         instance,
         "/registry-dep/defs.bzl",
-        "load(':nested.bzl', 'NESTED_NAME')\nprint('SELECTED_BZL')\nSELECTED_NAME=NESTED_NAME\n",
+        "load(':nested.bzl', 'NESTED_NAME', 'current_rust_analyzer_toolchain')\nprint('SELECTED_BZL')\nSELECTED_NAME=NESTED_NAME\nCURRENT_RULE=current_rust_analyzer_toolchain\n",
         901,
     );
     epoch.materialized_file(
         instance,
         "/registry-dep/nested.bzl",
-        "print('SELECTED_NESTED')\nNESTED_NAME='selected_target'\n",
+        "print('SELECTED_NESTED')\ndef _current_rust_analyzer_toolchain_impl(ctx): fail('implementation must stay lazy')\ncurrent_rust_analyzer_toolchain = rule(doc = 'current', implementation = _current_rust_analyzer_toolchain_impl, toolchains = [str(Label('@rules_rust//rust/rust_analyzer:toolchain_type'))])\nNESTED_NAME='selected_target'\n",
         901,
     );
     (epoch.build(), instance)
+}
+
+async fn assert_selected_rust_analyzer_toolchain(
+    transaction: &mut DiceTransaction,
+    route: &RootRepositoryRoute,
+) {
+    assert!(
+        route
+            .bzl_repository_mapping()
+            .iter()
+            .any(|(apparent, canonical)| apparent.as_str() == "rules_rust"
+                && canonical.as_str() == "dep+")
+    );
+    let current = transaction
+        .compute(&observed_external_bzl_key(route.clone(), "", "defs.bzl"))
+        .await
+        .unwrap();
+    let current = observed_external(&current)
+        .result()
+        .as_ref()
+        .as_ref()
+        .unwrap()
+        .module
+        .get("CURRENT_RULE")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    assert_eq!(
+        current.required_toolchains(),
+        [CanonicalLabel::parse("@@dep+//rust/rust_analyzer:toolchain_type").unwrap()]
+    );
 }
 
 #[tokio::test]
@@ -848,6 +881,7 @@ async fn root_package_loads_selected_registry_bzl_through_admitted_route() {
         )])
         .unwrap();
     let mut transaction = updater.commit().await;
+    assert_selected_rust_analyzer_toolchain(&mut transaction, route).await;
     let key = observed_package_key();
     let cold = transaction.compute(&key).await.unwrap();
     let loaded = observed_package(&cold)
@@ -2617,6 +2651,7 @@ fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@dep+//owner:support.bzl").unwrap(),
         workspace_path: PathBuf::from("/workspace/dep/owner/support.bzl"),
+        repository_mapping: Arc::from([]),
     };
     let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
         root: owner.clone(),
@@ -2640,6 +2675,7 @@ fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
     let root = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@dep+//caller:root.bzl").unwrap(),
         workspace_path: PathBuf::from("/workspace/dep/caller/root.bzl"),
+        repository_mapping: Arc::from([]),
     };
     let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
         root: root.clone(),
@@ -2703,6 +2739,50 @@ fn bazel_label_rejects_unadmitted_inputs_and_missing_function_provenance() {
     )
     .unwrap_err();
     assert!(error.contains("recursive Bzl manifest"), "{error}");
+
+    let conflicting = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@owner+//:defs.bzl").unwrap(),
+        workspace_path: PathBuf::from("/workspace/owner/defs.bzl"),
+        repository_mapping: Arc::from([
+            (
+                ApparentRepoName::new("alias").unwrap(),
+                CanonicalRepoName::new("first+").unwrap(),
+            ),
+            (
+                ApparentRepoName::new("alias").unwrap(),
+                CanonicalRepoName::new("second+").unwrap(),
+            ),
+        ]),
+    };
+    let mut changed = conflicting.clone();
+    changed.repository_mapping = Arc::from([(
+        ApparentRepoName::new("alias").unwrap(),
+        CanonicalRepoName::new("first+").unwrap(),
+    )]);
+    let hash = |identity: &BzlModuleIdentity| {
+        let mut hasher = Sha256::new();
+        super::fingerprint_identity(&mut hasher, identity);
+        hasher.finalize()
+    };
+    assert_ne!(conflicting, changed);
+    assert_ne!(hash(&conflicting), hash(&changed));
+    let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
+        root: conflicting.clone(),
+        direct_children: Arc::from([]),
+        reachable: Arc::from([conflicting]),
+        fingerprint: [0; 32],
+    });
+    let ast = AstModule::parse(
+        "/workspace/owner/defs.bzl",
+        "X = Label('@alias//:target')".to_owned(),
+        &Dialect::Bazel,
+    )
+    .unwrap();
+    let module = Module::new();
+    let mut evaluator = Evaluator::new(&module);
+    evaluator.extra = Some(&context);
+    let error = evaluator.eval_module(ast, &loading_globals()).unwrap_err();
+    assert!(error.to_string().contains("ambiguous"), "{error}");
 }
 
 #[tokio::test]

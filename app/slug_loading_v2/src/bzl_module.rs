@@ -74,7 +74,9 @@ use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
 use slug_identity_v2::ApparentLabel;
+use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
 use slug_workspace_v2::NormalizedAbsolutePath;
@@ -176,12 +178,15 @@ impl PrintHandler for LoadingPrintCapture {
 /// Stable identity for one `.bzl` module evaluated through a logical source path.
 ///
 /// `label` is the canonical repository label and `workspace_path` is the
-/// normalized absolute path DICE evaluated.  The value intentionally carries
-/// no evaluator handle, so it can be used at semantic equality boundaries.
+/// normalized absolute path DICE evaluated. `repository_mapping` is the
+/// defining module's already-selected apparent-to-canonical mapping. The value
+/// intentionally carries no evaluator handle, so it can be used at semantic
+/// equality boundaries.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct BzlModuleIdentity {
     pub label: CanonicalLabel,
     pub workspace_path: PathBuf,
+    pub repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
 }
 
 /// Flat, immutable loading provenance for one evaluated `.bzl` root.
@@ -1265,14 +1270,14 @@ pub(crate) fn starlark_source_name(path: &Path) -> Option<String> {
 
 pub(crate) fn manifest_starlark_sources(
     manifest: &BzlLoadManifest,
-) -> Arc<[(CompactString, CanonicalLabel)]> {
+) -> Arc<[(CompactString, BzlModuleIdentity)]> {
     manifest
         .reachable
         .iter()
         .map(|identity| {
             let source = starlark_source_name(&identity.workspace_path)
                 .expect("manifest paths were accepted as Starlark source names");
-            (source.into(), identity.label.clone())
+            (source.into(), identity.clone())
         })
         .collect::<Vec<_>>()
         .into()
@@ -2371,6 +2376,7 @@ async fn compute_host_bzl_module(
         BzlModuleIdentity {
             label: label.canonical_label(),
             workspace_path: source.logical_path().as_path().to_path_buf(),
+            repository_mapping: Arc::from([]),
         },
         digest(source_text.as_str()),
         loaded_modules.iter().map(|(_, module)| module),
@@ -4109,6 +4115,7 @@ async fn compute_external_bzl_module(
         BzlModuleIdentity {
             label: canonical_label.clone(),
             workspace_path: logical_path.as_path().to_path_buf(),
+            repository_mapping: key.route.bzl_repository_mapping(),
         },
         digest(source_text.as_str()),
         loaded_modules.iter().map(|(_, module)| module),
@@ -6085,6 +6092,7 @@ fn bzl_module_identity(workspace: &Path, path: &Path) -> Result<BzlModuleIdentit
     Ok(BzlModuleIdentity {
         label: canonical_root_label(&bzl_source_label(workspace, path)?)?,
         workspace_path: path.to_path_buf(),
+        repository_mapping: Arc::from([]),
     })
 }
 
@@ -6185,6 +6193,15 @@ fn fingerprint_identity(hasher: &mut Sha256, identity: &BzlModuleIdentity) {
     hasher.update(label);
     hasher.update((path.len() as u64).to_be_bytes());
     hasher.update(path);
+    hasher.update((identity.repository_mapping.len() as u64).to_be_bytes());
+    for (apparent, canonical) in identity.repository_mapping.iter() {
+        let apparent = apparent.as_str().as_bytes();
+        let canonical = canonical.as_str().as_bytes();
+        hasher.update((apparent.len() as u64).to_be_bytes());
+        hasher.update(apparent);
+        hasher.update((canonical.len() as u64).to_be_bytes());
+        hasher.update(canonical);
+    }
 }
 
 fn first_seen_direct_roots(loaded_modules: &[(String, FrozenBzlModule)]) -> Vec<BzlModuleIdentity> {

@@ -27,6 +27,7 @@ use starlark::values::Value;
 use starlark::values::starlark_value;
 use starlark_map::StarlarkHasher;
 
+use crate::bzl_module::BzlModuleIdentity;
 use crate::provider::BzlEvaluationContext;
 
 /// One canonical Bazel Label value shared by loading and module-extension
@@ -104,16 +105,49 @@ fn starlark_label_methods(builder: &mut MethodsBuilder) {
     }
 }
 
-fn resolve_label(raw: &str, defining_source: &CanonicalLabel) -> anyhow::Result<CanonicalLabel> {
+fn resolve_label(raw: &str, defining_source: &BzlModuleIdentity) -> anyhow::Result<CanonicalLabel> {
+    if let Some(rest) = raw.strip_prefix('@') {
+        if rest.starts_with('@') {
+            anyhow::bail!("canonical Label input is not admitted in this loading slice");
+        }
+        let (requested, label) = rest
+            .split_once("//")
+            .ok_or_else(|| anyhow::anyhow!("apparent repository Label has no package separator"))?;
+        if requested.is_empty() {
+            anyhow::bail!("empty apparent repository Label is not admitted in this loading slice");
+        }
+        let mut matches = defining_source
+            .repository_mapping
+            .iter()
+            .filter(|(apparent, _)| apparent.as_str() == requested);
+        let canonical = matches.next().ok_or_else(|| {
+            anyhow::anyhow!(
+                "repository '@{requested}' is not visible from {}",
+                defining_source.label
+            )
+        })?;
+        if matches.next().is_some() {
+            anyhow::bail!(
+                "repository mapping for '@{requested}' is ambiguous from {}",
+                defining_source.label
+            );
+        }
+        let spelling = if canonical.1.is_root() {
+            format!("@@//{label}")
+        } else {
+            format!("@@{}//{label}", canonical.1.as_str())
+        };
+        return CanonicalLabel::parse(&spelling).map_err(anyhow::Error::msg);
+    }
     if raw.starts_with(':') {
-        return CanonicalLabel::parse(&format!("{}{}", defining_source.package(), raw))
+        return CanonicalLabel::parse(&format!("{}{}", defining_source.label.package(), raw))
             .map_err(anyhow::Error::msg);
     }
     if !raw.starts_with("//") {
         anyhow::bail!("Label input must begin with '//' or ':' in the admitted loading slice");
     }
     let provisional = CanonicalLabel::parse(&format!("@@{raw}")).map_err(anyhow::Error::msg)?;
-    let repo = defining_source.package().repo();
+    let repo = defining_source.label.package().repo();
     if repo.is_root() {
         Ok(provisional)
     } else {
@@ -135,9 +169,9 @@ pub(crate) fn label_globals(builder: &mut GlobalsBuilder) {
             .ok_or_else(|| anyhow::anyhow!("Label input must be a string or Label"))?;
         let source = BzlEvaluationContext::from_evaluator(eval)
             .map_err(|_| anyhow::anyhow!("Label() may only be called in a .bzl module"))?
-            .source_label_for_call(eval)?;
+            .source_identity_for_call(eval)?;
         Ok(eval
             .heap()
-            .alloc_simple(StarlarkLabel::new(resolve_label(raw, &source)?)))
+            .alloc_simple(StarlarkLabel::new(resolve_label(raw, source)?)))
     }
 }

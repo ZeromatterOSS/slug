@@ -1350,6 +1350,16 @@ impl RootRepositoryRoute {
         &self.source
     }
 
+    /// Immutable selected mapping used while evaluating this route's `.bzl`
+    /// modules. Other route families remain fail-closed until admitted.
+    #[doc(hidden)]
+    pub fn bzl_repository_mapping(&self) -> Arc<[(ApparentRepoName, CanonicalRepoName)]> {
+        match &self.source {
+            RootRepositorySource::SelectedRegistry(route) => route.mapping.clone(),
+            _ => Arc::from([]),
+        }
+    }
+
     pub fn is_builtin_bazel_tools(&self) -> bool {
         matches!(self.source, RootRepositorySource::BuiltinBazelTools(_))
     }

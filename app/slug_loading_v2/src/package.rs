@@ -1749,8 +1749,7 @@ fn rule_toolchain_requirement(
         return Ok(Arc::from([]));
     }
     let context = BzlEvaluationContext::from_evaluator(eval)?;
-    let source = CanonicalLabel::parse(&format!("@@{}", context.source_label()))
-        .map_err(anyhow::Error::msg)?;
+    let source = context.source_identity_for_call(eval)?;
     values
         .iter()
         .map(|value| {
@@ -1759,7 +1758,11 @@ fn rule_toolchain_requirement(
             if recursive || matches!(target, Some("all" | "all-targets" | "*")) {
                 anyhow::bail!("rule(toolchains = ...) requires a direct target label: {value}");
             }
-            package_context_label(source.package().package().as_str(), value)
+            if value.starts_with("@@") {
+                CanonicalLabel::parse(value).map_err(anyhow::Error::msg)
+            } else {
+                package_context_label(source.label.package().package().as_str(), value)
+            }
         })
         .collect::<anyhow::Result<Vec<_>>>()
         .map(Into::into)
@@ -2425,6 +2428,11 @@ impl fmt::Display for FrozenRuleDefinition {
 }
 
 impl FrozenRuleDefinition {
+    #[cfg(test)]
+    pub(crate) fn required_toolchains(&self) -> &[CanonicalLabel] {
+        &self.required_toolchains
+    }
+
     fn reject_deferred_attribute_invocation(&self) -> anyhow::Result<()> {
         if let Some(attribute) = self
             .schema
