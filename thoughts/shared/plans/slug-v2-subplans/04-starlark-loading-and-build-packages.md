@@ -4204,3 +4204,56 @@ broader provider/rule analysis, toolchains/actions, M8/M7B and exact output
 bytes remain unsupported/deferred. Pinned Zabel `c7298478…` guides the one
 complete adapter/narrow semantic projection only; Bazel 9.2 remains sole
 behavior authority.
+
+### Bazel rule `doc` accepted; typed config-bool definition selected (2026-08-26)
+
+Commit `6ab6f35d` accepts omitted, string and explicit `None` docs at the sole
+`rule` call-shape adapter, rejects every other value and retains no prose.
+`RuleDefinitionGen`, `FrozenRuleDefinition`, `RuleCapability`, invocation and
+configured analysis remain unchanged. Recursive export/freeze and rejection
+proof pass, as do all 244 loading tests, locked core check, rebuilt CLI,
+formatting and hygiene. Independent terminal review returns `ACCEPT` within
+the two-file 4/62/66 addition caps.
+
+Fresh disposable rules_rust query and build pass `rust_lto_flag` and the next
+documented `config.string(flag=True)` declaration. Source order reaches
+`rust/private/rustc.bzl:3047-3055`, where the documented
+`always_enable_metadata_output_groups` rule supplies
+`config.bool(flag=True)`. A second bool descriptor follows before the first
+`config.string_list` descriptor. The public query/build terminals remain the
+accepted repository-session wrappers.
+
+Pinned Bazel 9.2 `StarlarkConfigApi.bool` declares named-only boolean `flag`
+with `False` default. `StarlarkConfig.boolSetting` creates a BOOLEAN
+`BuildSetting`; `RuleClass.Builder` derives mandatory nonconfigurable
+`build_setting_default` from the descriptor type; and
+`ConfigSettingTest.buildsettings_convertedType` proves a boolean default is
+typed rather than stringified. `ConfigRules` installs `ConfigBootstrap` through
+the `.bzl`-only `addStarlarkBootstrap` path; fixed BUILD globals do not receive
+the module.
+
+Slug's complete `ConfigModule` currently exposes only
+`RootStringBuildSetting`, while rule definitions retain a string-specific bit
+through freeze, equality and target recording. Loading already owns exact bool
+attribute coercion. Run only `WP-4-7A-bazel-config-bool-loading`: add the live
+`flag=True` descriptor, replace the bit with one compact String/Boolean kind,
+derive the corresponding default schema and preserve existing string
+projections. The complete `.bzl` config projection gains bool; BUILD retains
+its current string-only projection and must prove bool absent. Reject boolean
+build-setting invocation before target recording; do not enter analysis, CLI
+flags, transitions or config matching.
+
+Exact compatibility is the `.bzl`-only live bool descriptor definition, BUILD
+absence, distinct retained kind/schema and recursive export/freeze. Rust
+representation, the fail-closed invocation boundary and nonrequired
+diagnostics are Slug-native.
+Omitted/False bool descriptors, boolean target invocation/analysis, other
+config methods, toolchains/actions, M8/M7B and exact output bytes remain
+unsupported/deferred.
+
+Pinned `../zabel` `c7298478…` supplies architecture guidance only: keep one
+complete typed config/rule owner and expose narrow schema/string projections,
+never a second metadata registry. The Buck2 utility audit selects no import:
+the enum replaces one bool, preserves existing `Allocative`/Arc/compact-string
+ownership and adds no allocation, collection, hash or interner. Bazel 9.2
+remains sole behavior authority.
