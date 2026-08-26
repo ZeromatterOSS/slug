@@ -2730,6 +2730,21 @@ fn label_list_required_providers(value: Option<Value>) -> anyhow::Result<Arc<[Ar
     Ok(providers)
 }
 
+fn label_required_provider(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[ProviderId]>]>> {
+    let Some(value) = value else {
+        return Ok(Arc::from([]));
+    };
+    let providers = ListRef::from_value(value)
+        .ok_or_else(|| anyhow::anyhow!("label providers must be a list"))?;
+    if providers.is_empty() {
+        return Ok(Arc::from([]));
+    }
+    let [provider] = providers.content() else {
+        anyhow::bail!("label providers supports exactly one exported provider");
+    };
+    Ok(Arc::from([Arc::from([aspect_provider_id(*provider)?])]))
+}
+
 fn label_list_attached_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>> {
     aspect_required_aspect(value)
 }
@@ -4020,6 +4035,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] allow_single_file: Option<Value<'v>>,
+        #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] executable: Option<bool>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -4041,6 +4057,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             eval,
         )?;
         definition.allow_files = unpack_boolean_allow_files(allow_files)?;
+        definition.required_providers = label_required_provider(providers)?;
         Ok(definition)
     }
     fn label_list<'v>(
@@ -4797,6 +4814,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 || definition.exec_configuration
                 || definition.allow_files
                 || definition.allow_single_file.is_some()
+                || !definition.required_providers.is_empty()
                 || !matches!(definition.allowed_values, AllowedAttributeValues::None)
                 || definition
                     .default
@@ -4845,6 +4863,9 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             }
             if definition.allow_files {
                 anyhow::bail!("tag attribute `{name}` does not support allow_files");
+            }
+            if !definition.required_providers.is_empty() {
+                anyhow::bail!("tag attribute `{name}` does not support providers");
             }
             if !matches!(definition.allowed_values, AllowedAttributeValues::None) {
                 anyhow::bail!("tag attribute `{name}` does not support allowed values");
@@ -5954,7 +5975,7 @@ ext = module_extension(
             "ext = module_extension(implementation = 1)",
             "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.string(configurable = False)})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
             "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.string(values = ['x'])})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
-            "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.label(providers = [])})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
+            "P = provider()\ndef _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.label(providers = [P])})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
             "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.label(executable = True)})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
             "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.string(allow_empty = False)})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
             "def _impl(ctx):\n    pass\next = module_extension(implementation = _impl, facts_version = -1)",

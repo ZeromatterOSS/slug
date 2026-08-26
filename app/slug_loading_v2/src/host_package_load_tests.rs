@@ -2861,7 +2861,7 @@ fn assert_frozen_rustfmt_test_rule(rule: &FrozenRuleDefinition) {
     assert_eq!(rule.capability().rule_class, "rustfmt_test");
     assert!(rule.capability().executable);
     assert_eq!(rule.capability().test_kind, Some(TestRuleKind::Test));
-    let declared = &rule.schema[rule.schema.len() - 5..];
+    let declared = &rule.schema[rule.schema.len() - 6..];
     assert_eq!(
         declared
             .iter()
@@ -2872,13 +2872,18 @@ fn assert_frozen_rustfmt_test_rule(rule: &FrozenRuleDefinition) {
             "transitive",
             "_allowlist_function_transition",
             "_runner",
+            "provider_tool",
             "targets"
         ]
     );
     assert!(declared[..4].iter().all(|attribute| {
         attribute.required_providers.is_empty() && attribute.attached_aspect.is_none()
     }));
-    let targets = &declared[4];
+    assert_eq!(
+        declared[4].required_providers[0][0].to_string(),
+        "@@dep+//rust/private:providers.bzl%CrateInfo"
+    );
+    let targets = &declared[5];
     assert_eq!(targets.kind, AttributeKind::LabelList);
     assert!(!targets.mandatory && !targets.executable && !targets.exec_configuration);
     assert!(targets.default.is_none() && targets.allow_single_file.is_none());
@@ -2990,6 +2995,7 @@ LINT_TEST_COMMON_ATTRS = {
     "transitive": attr.bool(doc = "transitive", default = False),
     "_allowlist_function_transition": attr.label(default = Label("//tools/allowlists/function_transition_allowlist")),
     "_runner": attr.label(doc = "runner", cfg = "exec", executable = True, default = Label("//rust/private/lint_test_runner")),
+    "provider_tool": attr.label(providers = [rust_common.crate_info]),
 }
 def _rustfmt_test_impl(ctx):
     fail("rule implementation must stay lazy")
@@ -3155,6 +3161,23 @@ async fn repository_package_rejects_provider_or_aspect_dependency_before_recordi
         ),
         "{error}"
     );
+}
+
+#[tokio::test]
+async fn repository_package_rejects_scalar_provider_constraint_before_recording() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(':defs.bzl','probe')\nprobe(name='blocked')\n",
+        ),
+        (
+            "defs.bzl",
+            b"P=provider()\ndef impl(ctx): return []\nprobe=rule(implementation=impl, attrs={'tool':attr.label(providers=[P])})\n",
+        ),
+    ];
+    let outcome = load_repository_package_fixture(files, 426).await;
+    let error = repository_package_error(&outcome);
+    assert!(error.contains("provider-constrained or aspect-bearing attribute 'tool'"));
 }
 
 #[tokio::test]
@@ -3401,7 +3424,11 @@ SECOND = rule(implementation = _impl, attrs = _attrs("different documentation"))
         );
     }
     assert!(
-        eval_bzl_with_identity("P = provider()\nX = attr.label(providers = [P])", owner).is_err()
+        eval_bzl_with_identity(
+            "X = config_common.toolchain_type('//tools:toolchain_type', mandatory = False)",
+            owner
+        )
+        .is_err()
     );
 }
 
@@ -3414,6 +3441,8 @@ fn bazel_integer_allowed_values_freeze_rust_toolchain_prefix() {
     };
     let source = r#"
 def _impl(ctx): fail("implementation must stay lazy")
+RustLtoInfo = provider()
+BuildSettingInfo = provider()
 OMITTED = rule(implementation = _impl, attrs = {"x": attr.int()})
 EMPTY_LIST = rule(implementation = _impl, attrs = {"x": attr.int(values = [])})
 EMPTY_TUPLE = rule(implementation = _impl, attrs = {"x": attr.int(values = ())})
@@ -3432,8 +3461,10 @@ LABEL_NONE = rule(implementation = _impl, attrs = {"x": attr.label(allow_files =
 LABEL_FALSE = rule(implementation = _impl, attrs = {"x": attr.label(allow_files = False)})
 LABEL_TRUE = rule(implementation = _impl, attrs = {"x": attr.label(allow_files = True)})
 LABEL_SINGLE = rule(implementation = _impl, attrs = {"x": attr.label(allow_files = None, allow_single_file = True)})
+LABEL_PROVIDERS_EMPTY = rule(implementation = _impl, attrs = {"x": attr.label(providers = [])})
+LABEL_PROVIDERS_ONE = rule(implementation = _impl, attrs = {"x": attr.label(providers = [RustLtoInfo])})
 rust_toolchain = rule(implementation = _impl, attrs = {
-    "experimental_use_allocator_libraries_with_mangled_symbols": attr.int(doc = "allocator", values = [-1, 0, 1], default = -1), "experimental_use_cc_common_link": attr.label(default = Label("//rust/settings:cc_common_link"), doc = "cc link"), "extra_exec_rustc_flags": attr.string_list(doc = "exec flags"), "extra_rustc_flags_for_crate_types": attr.string_list_dict(doc = "crate flags"), "global_allocator_library": attr.label(default = Label("//rust/private/cc:global_allocator_library"), doc = "allocator library"), "iso_date": attr.string(doc = "date", default = ""), "linker": attr.label(doc = "linker", cfg = "exec", allow_single_file = True), "linker_preference": attr.string(doc = "preferred", values = ["cc", "rust"]), "linker_type": attr.string(doc = "type", values = ["direct", "indirect"]), "llvm_cov": attr.label(doc = "llvm-cov", cfg = "exec", allow_single_file = True), "llvm_lib": attr.label(doc = "libLLVM", allow_files = True, cfg = "exec"), "llvm_profdata": attr.label(doc = "profdata", allow_single_file = True, cfg = "exec"), "llvm_tools": attr.label(doc = "tools", allow_files = True),
+    "experimental_use_allocator_libraries_with_mangled_symbols": attr.int(doc = "allocator", values = [-1, 0, 1], default = -1), "experimental_use_cc_common_link": attr.label(default = Label("//rust/settings:cc_common_link"), doc = "cc link"), "extra_exec_rustc_flags": attr.string_list(doc = "exec flags"), "extra_rustc_flags_for_crate_types": attr.string_list_dict(doc = "crate flags"), "global_allocator_library": attr.label(default = Label("//rust/private/cc:global_allocator_library"), doc = "allocator library"), "iso_date": attr.string(doc = "date", default = ""), "linker": attr.label(doc = "linker", cfg = "exec", allow_single_file = True), "linker_preference": attr.string(doc = "preferred", values = ["cc", "rust"]), "linker_type": attr.string(doc = "type", values = ["direct", "indirect"]), "llvm_cov": attr.label(doc = "llvm-cov", cfg = "exec", allow_single_file = True), "llvm_lib": attr.label(doc = "libLLVM", allow_files = True, cfg = "exec"), "llvm_profdata": attr.label(doc = "profdata", allow_single_file = True, cfg = "exec"), "llvm_tools": attr.label(doc = "tools", allow_files = True), "lto": attr.label(providers = [RustLtoInfo], default = Label("//rust/settings:lto"), doc = "lto"), "opt_level": attr.string_dict(doc = "levels", default = {"dbg":"0","fastbuild":"0","opt":"3"}), "per_crate_rustc_flags": attr.string_list(doc = "flags"), "require_explicit_unstable_features": attr.label(default = Label("//rust/settings:require_explicit_unstable_features"), doc = "unstable"), "rust_doc": attr.label(doc = "rustdoc", allow_single_file = True, cfg = "exec", mandatory = True), "rust_objcopy": attr.label(doc = "objcopy", allow_single_file = True, cfg = "exec"), "rust_std": attr.label(doc = "std", mandatory = True), "rustc": attr.label(doc = "rustc", allow_single_file = True, cfg = "exec", mandatory = True), "rustc_lib": attr.label(doc = "rustc libs", cfg = "exec"), "rustfmt": attr.label(doc = "rustfmt", allow_single_file = True, cfg = "exec"), "staticlib_ext": attr.string(doc = "static", mandatory = True), "stdlib_linkflags": attr.string_list(doc = "linkflags", mandatory = True), "strip_level": attr.string_dict(doc = "strip", default = {"dbg":"none","fastbuild":"none","opt":"debuginfo"}), "target_json": attr.string(doc = "json"), "target_triple": attr.string(doc = "triple"), "version": attr.string(doc = "version", default = ""), "_codegen_units": attr.label(default = Label("//rust/settings:codegen_units")), "_experimental_compile_rustdoc_tests": attr.label(default = Label("//rust/settings:experimental_compile_rustdoc_tests")), "_experimental_use_allocator_libraries_with_mangled_symbols_setting": attr.label(default = Label("//rust/settings:experimental_use_allocator_libraries_with_mangled_symbols"), providers = [BuildSettingInfo], doc = "allocator setting"), "_experimental_use_coverage_metadata_files": attr.label(default = Label("//rust/settings:experimental_use_coverage_metadata_files")), "_experimental_use_global_allocator": attr.label(default = Label("//rust/settings:experimental_use_global_allocator"), doc = "allocator"), "_incompatible_do_not_include_data_in_compile_data": attr.label(default = Label("//rust/settings:incompatible_do_not_include_data_in_compile_data"), doc = "data"), "_incompatible_do_not_include_transitive_data_in_compile_inputs": attr.label(default = Label("//rust/settings:incompatible_do_not_include_transitive_data_in_compile_inputs"), doc = "transitive"), "_linker_preference": attr.label(default = Label("//rust/settings:toolchain_linker_preference")), "_no_std": attr.label(default = Label("//rust/settings:no_std")), "_pipelined_compilation": attr.label(default = Label("//rust/settings:pipelined_compilation")), "_rename_first_party_crates": attr.label(default = Label("//rust/settings:rename_first_party_crates")), "_third_party_dir": attr.label(default = Label("//rust/settings:third_party_dir")), "_toolchain_generated_sysroot": attr.label(default = Label("//rust/settings:toolchain_generated_sysroot"), doc = "sysroot"),
 })
 "#;
     let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
@@ -3531,6 +3562,36 @@ rust_toolchain = rule(implementation = _impl, attrs = {
         label_snapshot("rust_toolchain", "llvm_profdata"),
         (false, Some(AllowSingleFile::True))
     );
+    let provider_snapshot = |rule_name: &str, attribute_name: &str| {
+        let rule = module
+            .get(rule_name)
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        rule.schema
+            .iter()
+            .find(|schema| schema.name == attribute_name)
+            .unwrap()
+            .required_providers
+            .clone()
+    };
+    assert!(provider_snapshot("LABEL_OMITTED", "x").is_empty());
+    assert!(provider_snapshot("LABEL_PROVIDERS_EMPTY", "x").is_empty());
+    let lto = provider_snapshot("LABEL_PROVIDERS_ONE", "x");
+    assert_eq!(lto.len(), 1);
+    assert_eq!(
+        lto[0][0].to_string(),
+        "@@rules_rust+//rust/private:toolchain.bzl%RustLtoInfo"
+    );
+    assert_eq!(provider_snapshot("rust_toolchain", "lto"), lto);
+    assert_eq!(
+        provider_snapshot(
+            "rust_toolchain",
+            "_experimental_use_allocator_libraries_with_mangled_symbols_setting"
+        )[0][0]
+            .to_string(),
+        "@@rules_rust+//rust/private:toolchain.bzl%BuildSettingInfo"
+    );
     for invalid in ["None", "1", "['1']", "[True]", "{}", "[2147483648]"] {
         let source = format!("X = attr.int(values = {invalid})");
         assert!(
@@ -3558,9 +3619,23 @@ rust_toolchain = rule(implementation = _impl, attrs = {
     ] {
         assert!(eval_bzl_with_identity(conflict, owner.clone()).is_err());
     }
+    for invalid in [
+        "None",
+        "1",
+        "['provider']",
+        "[P, Q]",
+        "[[P]]",
+        "[provider()]",
+    ] {
+        let source = format!("P=provider()\nQ=provider()\nX=attr.label(providers={invalid})");
+        assert!(
+            eval_bzl_with_identity(&source, owner.clone()).is_err(),
+            "{invalid}"
+        );
+    }
     assert!(
         eval_bzl_with_identity(
-            "P = provider()\nX = attr.label(providers = [P])",
+            "X = config_common.toolchain_type('//tools:toolchain_type', mandatory = False)",
             owner.clone()
         )
         .is_err()
@@ -3591,6 +3666,14 @@ rust_toolchain = rule(implementation = _impl, attrs = {
     assert!(
         eval_bzl_with_identity(
             "X = tag_class(attrs = {'x': attr.label(allow_files = True)})",
+            owner.clone()
+        )
+        .is_err()
+    );
+    assert!(eval_bzl_with_identity("P=provider()\ndef impl(ctx): pass\nX=repository_rule(impl, attrs={'x':attr.label(providers=[P])})", owner.clone()).is_err());
+    assert!(
+        eval_bzl_with_identity(
+            "P=provider()\nX=tag_class(attrs={'x':attr.label(providers=[P])})",
             owner
         )
         .is_err()
