@@ -5,10 +5,11 @@ Milestone: M7A bootstrap-critical command/ruleset breadth
 Owners: Stage 4 recursive `.bzl` loading and frozen aspect declarations
 Base: `a8e18278`
 
-Result: load, bind, export, freeze and recursively import the first live
-rules_rust `aspect(...)` declaration while retaining its complete admitted
-semantic identity. The packet ends before an aspect is attached to an
-attribute, selected from the command line, propagated or analyzed.
+Result: expose the first missing `.bzl` `aspect(...)` constructor, then load,
+bind, export, freeze and recursively import its fixed definition subset while
+retaining complete admitted semantic identity. On the live rules_rust route,
+evaluation advances within `rust_analyzer_aspect` to the separately missing
+`Label(...)` argument; this packet does not claim that full declaration loads.
 
 ## Learned facts and authority
 
@@ -50,11 +51,14 @@ rust_analyzer_aspect = aspect(
 )
 ```
 
-Slug has no `aspect` global, so this is the first internal source-order stop
-after all accepted String/Boolean/StringList descriptor definitions. The
-later rules in that file and later `rustfmt`, `clippy` and `unpretty` aspect
-forms cannot be selected first. Public query/build still expose only their
-generic repository-session wrappers and are not terminal evidence.
+Slug has no `aspect` global, so resolving the call target is the first internal
+source-order stop after all accepted String/Boolean/StringList descriptor
+definitions. Slug also deliberately lacks Bazel's `Label` global; after this
+packet the same expression must stop while evaluating
+`str(Label("//rust:toolchain_type"))`. The later rules in that file and later
+`rustfmt`, `clippy` and `unpretty` aspect forms cannot be selected first.
+Public query/build still expose only their generic repository-session wrappers
+and are not terminal evidence.
 
 Pinned `../zabel` commit
 `c7298478e2e56262a2f438e9c065325744c9f0fc` is direct architecture guidance
@@ -74,12 +78,12 @@ side registry or clone-sensitive cache.
 ## Decision and non-decisions
 
 Add `aspect` only to complete `.bzl` loading globals. Accept the exact fixed
-subset needed by the first live declaration:
+constructor subset adjacent to the first live declaration:
 
 - callable `implementation`, positional or named as Bazel permits;
 - omitted or fixed list-of-string `attr_aspects`;
-- omitted `toolchains` or the live one-element list-of-string requirement,
-  resolved canonically in the defining `.bzl` context; and
+- omitted `toolchains` or one direct list-of-string requirement, resolved
+  canonically in the defining `.bzl` context; and
 - omitted, string or `None` `doc`, validated but not retained.
 
 All accepted non-implementation arguments remain named-only. The fixed
@@ -94,7 +98,7 @@ definition may freeze without an export identity, but no later consumer may
 apply it. A recursive import must preserve the producer identity and semantic
 fields rather than rebinding them to the importer.
 
-Do not add aspect membership to `attr.label`/`attr.label_list`, rule aspect
+Do not add `Label`, aspect membership to `attr.label`/`attr.label_list`, rule aspect
 parameters, command-line aspect selection, propagation, required providers,
 required aspects, attributes, fragments, toolchain-aspect propagation,
 configured analysis, action ownership, query/aquery presentation or aspect
@@ -143,9 +147,9 @@ past 150 lines. `REPLAN` before adding a third file or breaching a cap.
 
 Extend focused proof that:
 
-- an exact `rust_analyzer_aspect`-shaped declaration loads, exports and freezes
-  with its six ordered attribute names, canonical toolchain label, defining
-  module and exported name;
+- a direct-string analogue of the `rust_analyzer_aspect` declaration loads,
+  exports and freezes with its six ordered attribute names, canonical
+  toolchain label, defining module and exported name;
 - a recursive importing module observes the same producer identity and fields;
 - positional and named callable implementation plus omitted defaults work,
   while a noncallable implementation, malformed fixed lists, non-string doc
@@ -165,8 +169,8 @@ Run serially:
 - `scripts/v2_archive_status.sh`, preserving only its known three-path
   thoughts classification if unchanged; and
 - with clean `slugd` lifecycle and fresh output roots, the existing disposable
-  rules_rust query/build, recording the next internal source-order stop
-  separately from unchanged public wrappers.
+  rules_rust query/build, recording missing `Label` as the next internal
+  source-order stop separately from unchanged public wrappers.
 
 Pinned source/tests and the archive source shape already discriminate this
 definition contract. No new oracle fixture, copied source, network mutation
@@ -178,14 +182,15 @@ proof.
 ## Compatibility and STOP
 
 - **Exact:** `.bzl` placement, callable implementation ABI, fixed ordered
-  string `attr_aspects`, the live single string toolchain requirement, string/`None`
-  doc validation, first top-level export identity and recursive frozen import
-  for the admitted live call subset.
+  string `attr_aspects`, one direct string toolchain requirement,
+  string/`None` doc validation, first top-level export identity and recursive
+  frozen import for the admitted constructor subset.
 - **Slug-native:** Rust frozen representation, compact storage,
   valid-Unicode strings, canonical-label representation and nonrequired
   diagnostics.
 - **Unsupported/deferred:** every other `aspect` parameter or dynamic
-  propagation function, dependency-attribute aspect attachment, aspect
+  propagation function, `Label`, the complete live `rust_analyzer_aspect`
+  expression, dependency-attribute aspect attachment, aspect
   application/selection/propagation/analysis/actions, later rules_rust call
   shapes, Boolean/StringList targets and analysis/CLI, M8/M7B and exact output
   bytes.

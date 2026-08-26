@@ -4322,20 +4322,22 @@ attributes, a defining-context toolchain requirement, string/`None`
 documentation and first producer export identity. No implementation runs
 while the declaration loads or freezes.
 
-Run only `WP-4-7A-bazel-aspect-definition-loading`: add the exact fixed subset
-needed by the first live declaration and retain implementation lifetime,
-ordered `attr_aspects`, the canonical toolchain requirement, defining module
-and optional first exported name in one frozen owner. BUILD absence and
-recursive imported identity are proof obligations. Aspect attachment,
-selection, propagation, analysis, actions and every later call shape remain
-deferred.
+Run only `WP-4-7A-bazel-aspect-definition-loading`: add the exact fixed
+constructor subset adjacent to the first live declaration and retain
+implementation lifetime, ordered `attr_aspects`, one canonical direct-string
+toolchain requirement, defining module and optional first exported name in one
+frozen owner. BUILD absence and recursive imported identity are proof
+obligations. The live expression advances to missing `Label`; that global,
+aspect attachment, selection, propagation, analysis, actions and every later
+call shape remain deferred.
 
 Pinned Zabel `c7298478…` is direct architectural guidance: its complete
 `AspectDefinition` owner and distinct `AspectExportIdentity` keep declaration
 semantics with the producer while importing aliases use narrow projections.
 Slug follows that split with its existing frozen-Bzl lifetime and compact
 owners; no Zabel code, representation or behavior is copied. Bazel 9.2 remains
-sole compatibility authority. Exact compatibility adds only the admitted live
-definition/export/freeze subset; Rust representation and diagnostics are
-Slug-native; application plus Boolean/StringList targets and analysis/CLI,
-M8/M7B and exact output bytes remain deferred.
+sole compatibility authority. Exact compatibility adds only the admitted
+constructor/export/freeze subset; Rust representation and diagnostics are
+Slug-native; `Label`, the complete live expression, application plus
+Boolean/StringList targets and analysis/CLI, M8/M7B and exact output bytes
+remain deferred.
