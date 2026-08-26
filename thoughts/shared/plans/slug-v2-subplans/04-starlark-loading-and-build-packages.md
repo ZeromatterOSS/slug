@@ -4341,3 +4341,37 @@ constructor/export/freeze subset; Rust representation and diagnostics are
 Slug-native; `Label`, the complete live expression, application plus
 Boolean/StringList targets and analysis/CLI, M8/M7B and exact output bytes
 remain deferred.
+
+### Fixed aspect definition accepted; Bazel `Label` audit selected (2026-08-26)
+
+Commit `840d28e7` exposes `aspect` only during complete `.bzl` evaluation and
+freezes one bounded definition owner with the implementation, ordered fixed
+`attr_aspects`, one direct canonical toolchain requirement, defining source
+and optional first export name. Recursive imports preserve producer identity;
+an unexported nested definition remains unnamed. BUILD absence, imported
+factory rejection, native-function rejection and fixed-ABI failures are
+covered. Focused proof passes 3/3 and all 251 loading tests pass with locked
+core check, rebuilt CLI, hygiene and the unchanged archive baseline. Growth is
+153 production, 120 proof and 273 total; independent review returns `ACCEPT`.
+
+Source order now stops inside that same accepted rules_rust declaration at
+`str(Label("//rust:toolchain_type"))`. Run only docs packet
+`WP-4-7A-bazel-label-global-audit`. Inspect pinned Bazel 9.2
+`StarlarkRuleFunctionsApi.Label`, `StarlarkRuleClassFunctions.label`, the
+Starlark `Label` value and their focused tests; determine the exact smallest
+constructor/stringification slice and its BUILD boundary. Audit Slug's
+`BzlEvaluationContext`, `CanonicalLabel`, existing module-extension Label
+wrapper and repository-route ownership before selecting reuse or a bounded
+split. Slug currently installs one outer-module evaluator context; the audit
+must find typed innermost Starlark-function frame provenance or fail closed,
+because an imported function containing `Label` resolves in its defining
+`.bzl`, not the outer module. General apparent-repository mapping, wider
+fields/methods, attribute conversion and all aspect application remain
+deferred unless separately authenticated.
+
+Pinned Zabel `c7298478…` is direct architecture guidance only: its generic
+Label host keeps canonical identity on the value while the shared builtin
+consults the executing function's defining module context rather than the
+outer evaluator or builtin exporter. Its mapping observer/side effects and
+runtime are not candidates for import. Bazel 9.2 remains sole compatibility
+authority.

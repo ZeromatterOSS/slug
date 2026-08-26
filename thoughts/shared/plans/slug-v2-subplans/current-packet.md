@@ -1,206 +1,128 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-bazel-aspect-definition-loading`
+Packet: `WP-4-7A-bazel-label-global-audit`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: Stage 4 recursive `.bzl` loading and frozen aspect declarations
-Base: `a8e18278`
+Owners: Stage 4 recursive `.bzl` loading and evaluator-visible label values
+Base: `840d28e7`
 
-Result: expose the first missing `.bzl` `aspect(...)` constructor, then load,
-bind, export, freeze and recursively import its fixed definition subset while
-retaining complete admitted semantic identity. On the live rules_rust route,
-evaluation advances within `rust_analyzer_aspect` to the separately missing
-`Label(...)` argument; this packet does not claim that full declaration loads.
+Result: produce a docs-only, source-authenticated implementation decision for
+the smallest exact Bazel `Label(...)` slice needed by the accepted rules_rust
+`rust_analyzer_aspect` declaration. Do not edit Rust or claim that the live
+declaration loads during this packet.
 
-## Learned facts and authority
+## Learned facts to authenticate
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-is sole behavior authority:
+is sole behavior authority. Inspect:
 
-- `StarlarkRuleFunctionsApi.aspect` defines a `.bzl` global whose
-  `implementation` is a Starlark function, whose fixed `attr_aspects` is an
-  ordered sequence, whose `toolchains` is a sequence of requirements, and
-  whose `doc` is string-or-`None`.
-- `StarlarkRuleClassFunctions.aspect` requires `.bzl` initialization,
-  resolves toolchain labels in the defining module context and constructs a
-  `StarlarkDefinedAspect` without running its implementation.
-- `StarlarkDefinedAspect.export` assigns the defining module plus the first
-  top-level exported name. Imported aliases observe that already-exported
-  identity rather than becoming a new aspect class.
-- `StarlarkDefinedAspectsTest.simpleAspect`,
-  `aspectCanBeDefinedUsingFactory` and
-  `aspectCannotBeDefinedInBuildFileThread` authenticate top-level export,
-  factory construction and BUILD absence. `StarlarkRuleClassFunctionsTest`
-  `aspectAttrs`, `aspectDefaultAttrs`, `starTheOnlyAspectArg` and
-  `invalidAttrAspectsType` authenticate ordered fixed propagation attributes
-  and their validation. Broader aspect application tests exercise a deferred
-  phase.
+- `StarlarkRuleFunctionsApi.Label` for `.bzl` placement, the one positional
+  string-or-Label input and constructor contract;
+- `BazelModuleContext.ofInnermostBzlOrFail` and
+  `StarlarkRuleClassFunctions.label` for the innermost executing Starlark
+  function's defining-module context, package-relative parsing and
+  repository-mapping use;
+- `cmdline.Label` for canonical identity, `str`, `repr`, equality/hash and the
+  exposed property/method boundary; and
+- `StarlarkRuleClassFunctionsTest.testLabel`, `testLabelIdempotence`,
+  `testLabelSameInstance`, `testLabelNameAndPackage` plus
+  `StarlarkIntegrationTest.testLabelConstructorFailsInBuildFile` for focused
+  observable discrimination.
 
 The accepted rules_rust 0.73.0 archive SHA-256 is
 `2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`.
-Slug evaluates external `.bzl` loads recursively and in source order.
-`rust/defs.bzl` first reaches `rust/toolchain.bzl`, which first reaches
-`rust/private/rust_analyzer.bzl`; after its already-admitted `rustc.bzl` and
-`utils.bzl` children freeze, line 207 is:
+Its first source-order use is exactly
+`str(Label("//rust:toolchain_type"))` inside
+`rust/private/rust_analyzer.bzl:210`; record which Label behaviors that
+expression needs and stop before later aspect declarations or rule calls.
 
-```starlark
-rust_analyzer_aspect = aspect(
-    attr_aspects = ["srcs", "deps", "proc_macro_deps", "crate", "actual", "proto"],
-    implementation = _rust_analyzer_aspect_impl,
-    toolchains = [str(Label("//rust:toolchain_type"))],
-    doc = "Annotates rust rules with RustAnalyzerInfo later used to build a rust-project.json",
-)
-```
+Inspect the live Slug checkout rather than inventing a second identity domain:
 
-Slug has no `aspect` global, so resolving the call target is the first internal
-source-order stop after all accepted String/Boolean/StringList descriptor
-definitions. Slug also deliberately lacks Bazel's `Label` global; after this
-packet the same expression must stop while evaluating
-`str(Label("//rust:toolchain_type"))`. The later rules in that file and later
-`rustfmt`, `clippy` and `unpretty` aspect forms cannot be selected first.
-Public query/build still expose only their generic repository-session wrappers
-and are not terminal evidence.
+- `slug_identity_v2::CanonicalLabel` and its repository/package/target
+  ownership;
+- `BzlEvaluationContext`, including whether its source label is enough for the
+  admitted top-level same-repository form, why its current outer-module
+  installation is insufficient for imported functions, and where typed frame
+  provenance plus a future complete repository mapping would belong;
+- the existing module-extension `InvocationLabel` Starlark wrapper and all of
+  its consumers, deciding whether reuse, rename/move or avoidance preserves a
+  natural shared owner; and
+- recursive external-Bzl evaluation/freeze plus BUILD calls through a loaded
+  alias, so the builtin reads the current evaluator rather than its exporter.
 
 Pinned `../zabel` commit
-`c7298478e2e56262a2f438e9c065325744c9f0fc` is direct architecture guidance
-only. Its `build_rule_declaration.AspectDefinition` keeps implementation,
-propagation inputs and toolchain requirements in one declaration owner, while
-`AspectExportIdentity` keeps producer-module identity distinct from an
-importing alias. Its evaluated-package publication then exposes narrow
-projections from the retained declaration. Slug follows those ownership
-lessons without copying Zabel code, representation, runtime, scheduler or
-behavior; exact claims remain grounded in pinned Bazel 9.2.
+`c7298478e2e56262a2f438e9c065325744c9f0fc` is concept/test guidance only.
+Inspect `generic_label.zig` and `generic_label_value.zig`: their useful
+architectural lessons are canonical identity retained by the Label value and
+a shared builtin resolved against the executing function's defining module
+context rather than the outer evaluator or builtin exporter. Do not copy
+Zabel code, mapping observers, runtime,
+scheduler, side stores or behavior. Bazel 9.2 remains authoritative.
 
-The Buck2 utility-reuse audit selects no import or Stage 9 ledger update. Use
-Slug's existing `Arc`, `CompactString`, `CanonicalLabel`, frozen Starlark
-value and module-lifetime owners. Add no collection, hash domain, interner,
-side registry or clone-sensitive cache.
+The Buck2 utility-reuse audit is mandatory because a Starlark Label is retained
+identity and the repository already has a label wrapper. Prefer the existing
+`CanonicalLabel`, compact strings and Starlark frozen/value owners. Record a
+concrete reuse/split decision and whether any new interning or cache is
+necessary; default to none.
 
-## Decision and non-decisions
+## Questions and decision output
 
-Add `aspect` only to complete `.bzl` loading globals. Accept the exact fixed
-constructor subset adjacent to the first live declaration:
+The audit must answer:
 
-- user-defined Starlark-function `implementation`, positional or named as
-  Bazel permits;
-- omitted or fixed list-of-string `attr_aspects`;
-- omitted `toolchains` or one direct list-of-string requirement, resolved
-  canonically in the defining `.bzl` context; and
-- omitted, string or `None` `doc`, validated but not retained.
+1. Can exact compatibility be bounded to `.bzl` construction from the live
+   repository-less absolute string, canonical `str`, and BUILD rejection while
+   every apparent/canonical external spelling, relative spelling, Label input,
+   property/method and attribute conversion remains fail-closed?
+2. Does `CanonicalLabel` already supply the required immutable equality/hash
+   identity, and which display projection makes `str(Label(...))` acceptable
+   to the fixed aspect toolchain adapter?
+3. How will a shared/re-exported builtin consult the currently executing
+   Starlark function's typed defining-module provenance, and why can no outer
+   evaluator, direct alias, importer or BUILD call supply the wrong context?
+4. Should the existing `InvocationLabel` move to a small shared loading-owned
+   module, be generalized in place, or be avoided? Name every consumer and
+   avoid duplicate wrappers over the same canonical identity.
+5. Which exact Rust/test files, line and addition caps, validation commands,
+   STOP conditions and residual unsupported surface make the successor
+   implementation packet independently executable?
 
-All accepted non-implementation arguments remain named-only. The fixed
-signature rejects every unadmitted Bazel aspect parameter. BUILD must not
-resolve `aspect`, including through a function imported from `.bzl`.
+If a bounded exact implementation exists, replace this manifest with that
+implementation packet and align the canonical and Stage 4 plans. Otherwise
+record `REPLAN` or an unsupported boundary. Classify every result as exact,
+Slug-native or unsupported/deferred.
 
-Create one evaluator-local aspect definition and one frozen aspect definition.
-Retain the implementation lifetime, ordered propagation attribute names, the
-single canonical toolchain requirement, defining module label and optional
-first top-level exported name. `export_as` binds the name once. An unexported
-definition may freeze without an export identity, but no later consumer may
-apply it. A recursive import must preserve the producer identity and semantic
-fields rather than rebinding them to the importer.
+The proof matrix must distinguish (a) the live top-level call, (b) a directly
+re-exported `Label` alias, including BUILD rejection, and (c) an imported
+function whose body calls `Label`, which Bazel resolves in that function's
+defining `.bzl` module. Identify an existing typed function-frame source or
+`REPLAN`; the outer `Evaluator.extra` module label is not sufficient evidence.
 
-Do not add `Label`, aspect membership to `attr.label`/`attr.label_list`, rule aspect
-parameters, command-line aspect selection, propagation, required providers,
-required aspects, attributes, fragments, toolchain-aspect propagation,
-configured analysis, action ownership, query/aquery presentation or aspect
-implementation execution. Do not accept later rules_rust aspect call shapes.
-Do not change Boolean/StringList target rejection or string-setting analysis.
+## Ownership, revision and lifetime audit
 
-## Ownership, revision and lifetime
+Name the call-time producer, evaluator context and retained Label value. Any
+admitted canonical repository/package/target bytes must be owned by the value
+and participate in Starlark equality/hash; display is a projection, not
+identity. Repository mappings remain tracked semantic inputs and may not be
+guessed from paths or repaired command-side.
 
-The `aspect` call in the defining `.bzl` evaluation is the producer. Its
-evaluation value owns the first export cell; the frozen definition in the
-existing `BzlLoadValue` module is the sole retained semantic owner. Imported
-modules borrow the frozen value through existing `FrozenBzlLifetimeEntry`
-ownership. There is no command-side repair, path inference or side registry.
+State evaluator-scratch versus frozen-module lifetime, DICE invalidation,
+overlapping-request behavior and release. The audit may add no key, cache,
+registry, task, I/O, observation or async ownership.
 
-Existing observed source dependencies and recursive Bzl DICE keys invalidate
-definition edits before freeze. No new DICE key, projection, request overlay,
-revision certificate, filesystem observation or overlapping-request behavior
-is added. Because application is deferred, there is no configured-aspect
-equality key yet; future consumers must project every admitted retained field
-from this owner and fail closed on unmodeled inputs.
+## Files, proof and STOP
 
-The transient definition and export cell are evaluator scratch. The frozen
-implementation and compact arrays are DICE-retained semantic state owned and
-released with the frozen Bzl module. No command-retained state, service cache,
-async transfer, cancellation hook, task, eviction or shutdown duty is added.
+Only these docs may change:
 
-## Files and caps
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`;
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
 
-Allowed files, with base SHA-256 and final line ceiling:
+The final audit selection may add at most 100 lines to the canonical plan and
+120 lines to Stage 4; keep this manifest at or below 180 lines. Run
+`git diff --check`, plan-alignment search and `scripts/v2_archive_status.sh`.
+Require independent terminal review before commit.
 
-| File | Base SHA-256 | Cap |
-|---|---|---:|
-| `app/slug_loading_v2/src/package.rs` | `3e28fa6634c2958720a1750bcaaf858681285ed7214cd60d49019c7550980447` | 5,401 |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `6fbbd2b8876f2c57056e115f7901eec2e5cc02dfaa345186f4de785578eae1d8` | 4,248 |
-
-Production additions are <=160, proof additions <=120 and total additions
-<=280. Both files exceed the authoring-guide size trigger. `package.rs`
-nevertheless remains cohesive as the sole owner of loading globals and their
-evaluation/frozen callable values; extracting one aspect type would split its
-context, global registration and freeze contract without a second consumer.
-The test file already owns the recursive external-Bzl DICE harness needed to
-prove producer identity and import lifetime. No touched function may grow
-past 150 lines. `REPLAN` before adding a third file or breaching a cap.
-
-## Proof and validation
-
-Extend focused proof that:
-
-- a direct-string analogue of the `rust_analyzer_aspect` declaration loads,
-  exports and freezes with its six ordered attribute names, canonical
-  toolchain label, defining module and exported name;
-- a recursive importing module observes the same producer identity and fields;
-- positional and named Starlark-function implementation plus omitted defaults
-  work, while a native/other non-Starlark-function implementation, malformed
-  fixed lists, non-string doc and every unsupported parameter fail closed; an
-  unexported nested result freezes without falsely acquiring producer export
-  identity;
-- `aspect` is absent from BUILD, including an imported factory call; and
-- accepted String/Boolean/StringList descriptor definitions and their target
-  rejection boundaries remain unchanged.
-
-Run serially:
-
-- `cargo fmt --check` and `git diff --check`;
-- focused aspect-definition loading tests;
-- full `cargo test -p slug_loading_v2`;
-- `cargo check -p slug_core_v2 --locked`;
-- `cargo build -p slug_cli_v2 --locked` before any `SLUG_V2_BIN` smoke;
-- `scripts/v2_archive_status.sh`, preserving only its known three-path
-  thoughts classification if unchanged; and
-- with clean `slugd` lifecycle and fresh output roots, the existing disposable
-  rules_rust query/build, recording missing `Label` as the next internal
-  source-order stop separately from unchanged public wrappers.
-
-Pinned source/tests and the archive source shape already discriminate this
-definition contract. No new oracle fixture, copied source, network mutation
-or Bazel execution is authorized. Upstream application, propagation,
-configured-analysis and action tests are skipped because those phases remain
-unsupported; their definition/export portions are adapted into focused local
-proof.
-
-## Compatibility and STOP
-
-- **Exact:** `.bzl` placement, user-defined Starlark-function implementation
-  ABI, fixed ordered
-  string `attr_aspects`, one direct string toolchain requirement,
-  string/`None` doc validation, first top-level export identity and recursive
-  frozen import for the admitted constructor subset.
-- **Slug-native:** Rust frozen representation, compact storage,
-  valid-Unicode strings, canonical-label representation and nonrequired
-  diagnostics.
-- **Unsupported/deferred:** every other `aspect` parameter or dynamic
-  propagation function, `Label`, the complete live `rust_analyzer_aspect`
-  expression, dependency-attribute aspect attachment, aspect
-  application/selection/propagation/analysis/actions, later rules_rust call
-  shapes, Boolean/StringList targets and analysis/CLI, M8/M7B and exact output
-  bytes.
-
-STOP on dirty overlap, edits outside the two-file allowlist, BUILD visibility,
-an evaluator-local marker without frozen producer identity, rebinding an
-imported alias, dropping or reordering semantic fields, aspect application or
-execution, a side registry, behavior sourced from Zabel, source vendoring,
-Java/JVM, dependency drift, fixture growth, public-success claims or any cap
-breach. `REPLAN` before crossing a boundary.
+STOP on Rust or fixture edits, behavior sourced from Zabel, Java/JVM, network
+mutation, a duplicate semantic Label owner, guessed repository mapping,
+captured exporter context, BUILD visibility, aspect application, a public
+success claim, outer-evaluator context substituted for function provenance or
+any cap breach. `REPLAN` rather than widening the audit.
