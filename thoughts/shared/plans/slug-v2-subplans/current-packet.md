@@ -1,183 +1,125 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-bazel-config-bool-loading`
+Packet: `WP-4-7A-bazel-config-string-list-audit`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owners: Stage 4 complete `config` global and retained rule-definition semantics
-Base: `6ab6f35d`
+Base: `573c25c7`
 
-Result: accept the live Bazel `config.bool(flag = True)` build-setting
-descriptor, retain its type distinctly from the accepted string descriptor,
-and prove documented boolean rule definitions freeze through recursive `.bzl`
-loading. Boolean build-setting target invocation and configured analysis remain
-unsupported and must fail before a target is recorded.
+Result: authenticate the next live rules_rust build-setting descriptor,
+`config.string_list`, including its `repeatable` dimension, and select one
+bounded definition-loading implementation or `REPLAN`. This packet is
+read-only and changes no Rust.
 
 ## Learned facts and authority
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
 is sole behavior authority:
 
-- `StarlarkConfigApi.bool` is a method on the fixed `config` module. Its
-  `flag` parameter is named-only, boolean and defaults to `False`.
-- `StarlarkConfig.boolSetting` returns `BuildSetting.create(flag, BOOLEAN)`.
-  `BuildSetting` owns both the value type and command-line-flag bit.
-- `StarlarkRuleClassFunctions.createRule` stores the descriptor on the
-  `RuleClass.Builder`. `RuleClass.Builder.build` derives mandatory,
-  nonconfigurable `build_setting_default` from that exact descriptor type and
-  adds string `help`.
-- `ConfigSettingTest.buildsettings_convertedType` authenticates
-  `config.bool(flag = True)`, a boolean default and typed matching. The broader
-  `StarlarkRuleContextTest` build-setting rows establish that analysis reads a
-  typed default or typed configuration value; that later behavior is not
-  admitted here.
-- `ConfigRules` registers `ConfigBootstrap` through
-  `ConfiguredRuleClassProvider.Builder.addStarlarkBootstrap`, whose contract is
-  explicitly `.bzl`-only. `StarlarkGlobalsImpl` builds fixed BUILD globals
-  separately and does not add `config` there.
+- `StarlarkConfigApi.string_list` declares named-only boolean `flag` and
+  `repeatable` parameters, both defaulting to `False`.
+- `StarlarkConfig.stringListSetting` rejects `repeatable = True` unless
+  `flag = True`, then creates a `STRING_LIST` descriptor retaining
+  repeatability.
+- `RuleClass.Builder` derives mandatory, nonconfigurable
+  `build_setting_default` from the descriptor type. Existing config tests
+  authenticate list defaults, repeatable command-line accumulation and the
+  repeatable-without-flag error; target/CLI semantics are not admitted here.
+- The fixed `config` bootstrap remains `.bzl`-only. BUILD must retain Slug's
+  accepted string-only compatibility projection and must not gain
+  `string_list`.
 
 The accepted rules_rust 0.73.0 archive SHA-256 is
 `2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`.
-After accepted `rule(doc=...)` and `config.string(flag=True)` declarations,
-`rust/private/rustc.bzl:3047-3055` defines
-`always_enable_metadata_output_groups` with
-`build_setting = config.bool(flag = True)`. A second boolean descriptor follows
-at lines 3058-3080; the next distinct descriptor family is
-`config.string_list(flag = True)` at line 3093. Fresh query and build reach the
-first boolean descriptor; their public wrappers remain `query_error` exit 7
-and `build_runtime_error` exit 2 at the repository-session boundary.
+After two `config.bool(flag = True)` definitions, source order reaches
+`rust/private/rustc.bzl:3093` and `:3108`, both using
+`config.string_list(flag = True)` with nonrepeatable default behavior. Line
+3120 is the first `repeatable = True` occurrence, followed by both forms in
+the same module and other rules_rust files. The audit must not silently treat
+repeatable and nonrepeatable descriptors as identical.
 
-Slug's `ConfigModule` is already the one complete `.bzl` config-global owner,
-but currently exposes only a zero-sized `RootStringBuildSetting`. The rule
-definition, frozen definition and recorded `StarlarkRuleImplementation` retain
-that semantic fact as `root_string_build_setting: bool`; this bit participates
-in equality and selects a string `build_setting_default` schema. Loading
-already has exact boolean attribute coercion. Analysis deliberately recognizes
-only the accepted root string setting. Unlike Bazel, Slug's shared
-`complete_loading_globals` currently places the same string-only config module
-in `.bzl` and BUILD environments; the accepted BUILD projection must not gain
-the new boolean method.
+Commit `573c25c7` accepted the preceding boolean definition slice. Slug now
+retains `Option<BuildSettingKind>` with String/Boolean variants through rule
+definition, freeze, equality and typed default schema; boolean invocation
+still fails before target recording. Loading already owns exact string-list
+attribute coercion, but the build-setting kind and descriptor do not yet own a
+StringList or repeatability fact.
 
 Pinned `../zabel` commit
 `c7298478e2e56262a2f438e9c065325744c9f0fc` is architecture guidance only.
-Its complete typed semantics owner and narrow projections support replacing the
-string-only bit with one compact typed fact owned by the rule definition, then
-letting schema construction and the existing string accessor project from it.
-Copy no Zabel code, representation, scheduler, runtime or behavior; Bazel
-remains build-setting authority.
+Its complete typed semantics owner and narrow projections require the audit to
+choose one retained owner for every admitted repeatability-affecting fact,
+rather than adding evaluator-local or analysis-side markers. Copy no Zabel
+code, representation, scheduler, runtime or behavior; Bazel remains the sole
+compatibility authority.
 
-The Buck2 utility-reuse audit found no matching import. A two-variant enum is
-smaller and clearer than a second flag, map or interner; existing
-`CompactString`, immutable `Arc` slices and `Allocative` coverage remain
-unchanged. No Stage 9 extraction-ledger update is required.
+The Buck2 utility-reuse skill remains applicable if the selected packet
+changes retained descriptor data. The audit must decide whether the existing
+small enum plus a compact repeatability fact is sufficient or whether a
+reviewed Buck2-derived utility is warranted; it may not introduce a map,
+interner, hash domain or allocation without evidence.
 
-## Decision and non-decisions
+## Audit questions and decision rule
 
-In `package.rs`, add an evaluation-local zero-sized boolean descriptor returned
-only by `.bzl` `config.bool(flag = True)`. Give `loading_globals` the complete
-string-plus-bool config projection while `build_file_loading_globals` retains
-its current string-only sibling projection. Share the string constructor logic;
-do not reconstruct descriptor semantics per evaluator.
+Trace pinned Bazel source/tests from `string_list` construction through
+`BuildSetting`, `RuleClass.Builder`, default coercion, equality and the first
+analysis/transition consumers. Inventory every rules_rust occurrence in
+source order and separate the first nonrepeatable declaration from the later
+repeatable family.
 
-Replace the retained string-only boolean with `Option<BuildSettingKind>`
-(string or boolean) through `RuleDefinitionGen`, `FrozenRuleDefinition` and
-`StarlarkRuleImplementation`. Include that kind in structural equality. Derive
-the mandatory `build_setting_default` schema as string or boolean from the kind
-and keep the existing string-setting accessors as narrow projections.
+Inspect Slug's complete config-global owner, `BuildSettingKind`, builtin
+schema, raw/coerced list attribute representation, freeze/equality path,
+string-only analysis accessor and boolean fail-closed invocation boundary.
+Determine the smallest packet that can:
 
-Reject omitted/`False` `config.bool` because the admitted command route uses
-only `flag = True`; those forms remain unsupported rather than being claimed
-by exposing the method. Reject invocation of a boolean build-setting rule at
-the callable boundary before `PackageRecorder::starlark_rule`, so no target,
-dependency, analysis value or configuration fact is published.
+- expose only the authenticated `.bzl` call shape;
+- retain all admitted type/repeatability facts structurally;
+- select a list-typed `build_setting_default` schema;
+- keep BUILD and existing string/bool behavior unchanged; and
+- fail before target recording for every unimplemented list-setting target.
 
-Do not change string build-setting invocation/analysis, configuration
-identity, CLI option parsing, transitions, `config_setting(flag_values=...)`,
-`ctx.build_setting_value`, provider/action semantics, other `config` methods,
-other `rule` parameters, every non-config global placement, DICE keys, events
-or public error translation. Do not remove or broaden the current BUILD
-string-only projection, and do not retain a second boolean marker or metadata
-registry.
+Prefer a definition-only slice for the first nonrepeatable rules_rust use if
+it remains honest and does not collapse a later repeatable identity. Otherwise
+select one bounded descriptor-identity prerequisite or write `REPLAN`.
 
-## Ownership, identity and lifetime
+Do not implement list-setting target invocation, analysis, CLI parsing,
+transitions, `config_setting`, `ctx.build_setting_value`, later config
+families, toolchains or actions. Do not infer repeatability from a default
+value and do not reuse String identity for StringList.
 
-The `.bzl` config module remains the complete call-shape owner; the BUILD
-module is a string-only environment projection and never owns bool semantics.
-The frozen rule definition is the sole retained owner of the descriptor kind;
-builtin schema and the existing string-only analysis accessor borrow
-projections from it.
-String and boolean definitions must compare unequal even when implementation,
-attributes and capability match. The kind is copied through freeze and target
-definition equality; it is never inferred from a default value.
+## Files, proof and validation
 
-Existing source observation invalidates definition edits before evaluation.
-No request input, revision certificate, overlapping-request behavior,
-publication or DICE dependency changes. The enum replaces one retained bool,
-adds no allocation and remains DICE-owned with the loaded definition. The
-boolean Starlark descriptor is evaluator-local. No cache, task, fallback,
-interner or async memory is added.
+This audit may edit only:
 
-## Files and caps
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`;
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
 
-Allowed files, with base SHA-256 and final line ceiling:
+Record exact base hashes, final line ceilings, addition caps and a bounded
+allowlist for any selected implementation. Reuse pinned Bazel tests and the
+accepted rules_rust archive; add oracle evidence only for a demonstrated gap.
+Record the existing real-smoke public repository-session boundary separately
+from the source-order terminal and do not overclaim it as a successful public
+load.
 
-| File | Base SHA-256 | Cap |
-|---|---|---:|
-| `app/slug_loading_v2/src/package.rs` | `59b191dbdcd4f56c11cbd07bcd1bddab6d52c558e065ce8943964b4db8425676` | 5,240 |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `a6079c3a7c414a0e421fea1d79392d59bf70cb4e442b46fe3ce79b2447aed937` | 4,035 |
-
-Production additions are <=120, proof additions <=110 and total additions
-<=230. Both files exceed the authoring-guide size trigger, but `package.rs`
-already owns the complete config global, rule-definition freeze, builtin
-schema and invocation boundary. The proof belongs in the existing recursive
-external-Bzl/package harness. Splitting any one of those responsibilities in
-this packet would create a second semantics owner.
-
-## Proof and validation
-
-Add focused proof that:
-
-- `config.bool(flag = True)` creates a documented rule definition that binds,
-  recursively exports and freezes alongside a string build-setting definition;
-- the frozen kinds are structurally distinct and select boolean versus string
-  `build_setting_default` schema;
-- BUILD evaluation cannot resolve `config.bool`, while its current
-  `config.string` projection remains unchanged;
-- omitted/`False` boolean descriptors fail closed; and
-- invoking the boolean rule with a boolean default fails before a package
-  target is recorded, while the accepted string-setting route remains green.
-
-Run:
-
-- `cargo fmt --check` and `git diff --check`;
-- focused config-bool loading tests;
-- full `cargo test -p slug_loading_v2`;
-- `cargo check -p slug_core_v2 --locked`;
-- `cargo build -p slug_cli_v2 --locked`;
-- `scripts/v2_archive_status.sh`, preserving only its current stale
-  thoughts-path classification if unchanged; and
-- with clean `slugd` lifecycle and fresh output roots, the existing disposable
-  rules_rust query and build, recording the next common internal/public
-  terminal.
-
-Pinned source/tests and the accepted real archive already discriminate this
-declaration contract, so no new Bazel fixture or copied source is authorized.
+Run `git diff --check`, plan/current alignment checks and
+`scripts/v2_archive_status.sh`, preserving only its known three-path thoughts
+classification if unchanged. No Cargo, Bazel, daemon or network command is
+required by this docs-only audit.
 
 ## Compatibility and STOP
 
-- **Exact:** `.bzl`-only named `config.bool(flag = True)` descriptor
-  construction, BUILD absence, distinct boolean rule-definition identity,
-  boolean default schema and recursive bind/export/freeze behavior on the live
-  rules_rust loading route.
-- **Slug-native:** the compact Rust enum, fail-closed nonadmitted invocation
-  error, evaluator representation, valid-Unicode source handling and
+- **Exact:** only the already accepted `.bzl` string/bool descriptor slices;
+  the audit may authenticate exact Bazel `string_list` call shape, identity and
+  list-default rules but cannot claim them implemented.
+- **Slug-native:** prospective Rust representation, valid-Unicode handling and
   nonrequired diagnostics.
-- **Unsupported/deferred:** omitted/`False` bool descriptors, boolean target
-  invocation and analysis, CLI bool flags, transitions/config matching,
-  `ctx.build_setting_value`, `config.string_list` and every other config method,
-  later rules_rust toolchains/actions, M8/M7B and exact output bytes.
+- **Unsupported/deferred:** all `config.string_list` behavior until a reviewed
+  implementation lands, including repeatable descriptors, targets, analysis,
+  CLI values and transitions; every later rules_rust/toolchain/action surface,
+  M8/M7B and exact output bytes.
 
-STOP on dirty overlap, edits outside the two-file allowlist, recording a
-boolean build-setting target, analysis/configuration/CLI changes, a second
-retained marker or side registry, string-setting regression, globals widening,
-BUILD visibility of `config.bool`, source vendoring, Java/JVM, dependency
-drift, archive fixture growth, public success claims or scope above the caps.
-`REPLAN` before crossing a boundary.
+STOP on Rust changes, an implementation packet that omits repeatability from
+semantic identity, BUILD-global widening, list-target publication, behavior
+claims sourced from Zabel, new oracle work without a demonstrated gap, dirty
+overlap, or inability to state one bounded implementation/`REPLAN` with exact
+authority and caps.

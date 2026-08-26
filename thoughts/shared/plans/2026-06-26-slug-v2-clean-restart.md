@@ -30,18 +30,49 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; bounded Bazel `config.bool(flag=True)` definition loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits `54d28477`, `1a527089`, `a81b5823` and `6ab6f35d` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider-doc and rule-doc call acceptance with unchanged nonprose identity; the config-bool audit authenticates the next typed descriptor and its definition-only projection | expose bool only in `.bzl`, retain boolean versus string definition identity and recursive freeze, and fail before boolean target recording; boolean invocation/analysis and later config families remain deferred | run only `WP-4-7A-bazel-config-bool-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; Bazel `config.bool(flag=True)` definitions accepted and `config.string_list` audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits `54d28477`, `1a527089`, `a81b5823`, `6ab6f35d` and `573c25c7` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed bool definition loading | authenticate StringList plus repeatability identity and select one bounded definition-loading slice or `REPLAN`; bool/list invocation and analysis remain deferred | run only `WP-4-7A-bazel-config-string-list-audit`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-config-bool-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-bazel-config-string-list-audit](./slug-v2-subplans/current-packet.md).
 
-Accept the live Bazel `config.bool(flag = True)` descriptor at the complete
-`.bzl` config global, keep it absent from BUILD, retain its type distinctly
-from string through rule-definition freeze, and reject boolean rule invocation
-before recording a target.
+Authenticate the next live rules_rust descriptor,
+`config.string_list(flag = True)`, including its later `repeatable = True`
+dimension. Select one bounded definition-loading implementation or `REPLAN`;
+make no Rust changes in the audit.
+
+### M7 Bazel `config.bool(flag=True)` definition loading accepted; string-list audit active (2026-08-26)
+
+Commit `573c25c7` exposes named-only `config.bool(flag = True)` only through
+the complete `.bzl` config projection, keeps it absent from BUILD, and replaces
+the prior string-only marker with a compact String/Boolean kind retained
+through rule definition, freeze, equality and typed default-schema selection.
+Boolean rule invocation fails before target recording. Both BUILD and `.bzl`
+string projections share one private constructor, following the single-owner,
+thin-projection architecture selected from pinned Zabel guidance.
+
+Focused proof passes 3/3 and all 247 loading tests pass; core check, rebuilt
+CLI, formatting and diff checks pass. The packet lands within its 120/110/230
+caps at 116/110/226. Independent terminal review returned `ACCEPT` after
+requiring the shared string constructor and exact named-only boolean ABI. The
+archive audit preserves only its known three-path thoughts classification.
+
+Pinned Bazel 9.2 defines `config.string_list` with named-only `flag` and
+`repeatable`, both defaulting to `False`, creates a `STRING_LIST` descriptor,
+and rejects repeatability without `flag = True`. The accepted rules_rust
+archive reaches nonrepeatable uses at `rust/private/rustc.bzl:3093` and `:3108`
+before the first `repeatable = True` use at `:3120`. Repeatability therefore
+cannot be omitted from any widened semantic-identity claim.
+
+Run only docs packet `WP-4-7A-bazel-config-string-list-audit`. Trace the pinned
+Bazel type/repeatability/default path and every immediate rules_rust use;
+inventory Slug's config owner, retained kind/schema/equality and list coercion;
+then select one definition-only implementation or `REPLAN`. Exact compatibility
+remains limited to already landed string/bool slices until that implementation
+is accepted. Zabel `c7298478…` remains architecture guidance only for one
+complete typed owner and narrow projections; it supplies no behavior or code.
 
 ### M7 Bazel `rule(doc=...)` support accepted; config-bool frontier active (2026-08-26)
 

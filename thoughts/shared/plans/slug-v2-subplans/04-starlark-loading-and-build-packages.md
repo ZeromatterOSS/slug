@@ -4257,3 +4257,52 @@ never a second metadata registry. The Buck2 utility audit selects no import:
 the enum replaces one bool, preserves existing `Allocative`/Arc/compact-string
 ownership and adds no allocation, collection, hash or interner. Bazel 9.2
 remains sole behavior authority.
+
+### Bazel config-bool definition loading accepted; string-list audit selected (2026-08-26)
+
+Commit `573c25c7` accepts only named `config.bool(flag = True)` in `.bzl`,
+keeps bool absent from BUILD, and retains String versus Boolean as one compact
+kind through rule-definition construction, recursive export/freeze, equality
+and typed `build_setting_default` schema. Boolean invocation rejects before
+`PackageRecorder` records a target. The existing string analysis accessor
+remains a narrow projection, while BUILD and `.bzl` string construction now
+share one private constructor.
+
+Focused config-bool proof passes 3/3 and all 247 loading tests pass. Core
+check, rebuilt CLI, formatting and diff checks pass; the archive audit retains
+only its known three-path thoughts classification. Final additions are
+116 production, 110 proof and 226 total, within the 120/110/230 contract.
+Independent terminal review returned `ACCEPT` after correcting shared string
+construction and the named-only bool ABI.
+
+Pinned Bazel 9.2 `StarlarkConfigApi.string_list` declares named-only boolean
+`flag` and `repeatable`, both defaulting to `False`.
+`StarlarkConfig.stringListSetting` rejects `repeatable = True` without
+`flag = True`, then retains `STRING_LIST` plus repeatability in the
+`BuildSetting`. `RuleClass.Builder` derives a list-typed mandatory default,
+and config tests authenticate repeatable accumulation and the invalid
+repeatable-without-flag form.
+
+The accepted rules_rust 0.73.0 archive reaches
+`rust/private/rustc.bzl:3093` and `:3108`, where nonrepeatable
+`config.string_list(flag = True)` descriptors are defined. Line 3120 is the
+first `repeatable = True` use, followed by both forms elsewhere. Slug already
+owns exact string-list attribute coercion, but its retained build-setting kind
+does not yet own StringList or repeatability.
+
+Run only docs packet `WP-4-7A-bazel-config-string-list-audit`. Trace pinned
+Bazel construction, identity, default coercion and immediate consumers;
+inventory every live rules_rust form and Slug's complete config/kind/schema
+owner; select one bounded definition-loading implementation or `REPLAN`.
+Make no Rust changes. Do not collapse repeatable and nonrepeatable identity,
+widen BUILD globals, publish list-setting targets, or enter analysis, CLI,
+transition, toolchain or action work.
+
+Pinned Zabel `c7298478…` guides only the architecture choice: every admitted
+type/repeatability fact belongs to one complete retained owner, with thin
+environment/schema/analysis projections. Copy no Zabel code or behavior;
+pinned Bazel 9.2 remains sole compatibility authority. Exact compatibility is
+limited to the accepted string/bool descriptor slices until a reviewed
+StringList implementation lands; prospective Rust representation and
+nonrequired diagnostics are Slug-native, and all list behavior remains
+unsupported/deferred during this audit.
