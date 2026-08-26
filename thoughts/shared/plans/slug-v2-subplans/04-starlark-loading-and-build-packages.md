@@ -5246,3 +5246,58 @@ supporting Slug's compact producer-owned value rather than a side registry. No
 Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
+
+### Config-string descriptor accepted; rules_cc private bridge selected (2026-08-26)
+
+Commit `919ecfa5` retains `.bzl` String `flag` and `allow_multiple` as one
+compact declaration fact. All four Boolean pairs load and freeze; BUILD keeps
+its true/single-only constructor; and only true/single targets may record and
+reach the unchanged scalar configured consumer. Non-flag and multi-value
+targets fail in the small pre-recording gate. Focused proof, all 200 loading
+units, locked core check, rebuilt CLI and hygiene pass. Broad integration is
+30/31 only because of the declared stale `@external` diagnostic-order row.
+Independent review returned `ACCEPT` within the 41/134/175 addition caps.
+
+The authenticated rules_rust 0.73.0 source now returns to
+`rust/private/toolchain.bzl` (SHA-256 `c4b613ce…`). Its next load is rules_cc
+0.2.17 `cc/common/cc_common.bzl` (SHA-256 `65e91cf0…`). The lockfile fixes the
+rules_cc source JSON SHA-256 at `3832f45d…`; that source selects archive
+SHA-256 `283fa1cd…`. Bazel 9.2's generated compatibility proxy
+`symbols.bzl` hashes to `2adedeea…` and loads
+`cc/private/cc_common.bzl` (SHA-256 `5e6ab737…`). Its first child reaches
+`cc/common/cc_helper_internal.bzl` (SHA-256 `793ab429…`), which first freezes
+Skylib `lib/paths.bzl` (SHA-256 `96cce438…`) and then loads
+`cc/private/cc_internal.bzl` (SHA-256 `8241ced5…`).
+
+That last file's sole evaluated expression is
+`cc_common.internal_DO_NOT_USE()` guarded by `hasattr`. Slug has no
+`cc_common` `.bzl` global, so name resolution is the first absent surface.
+Pinned Bazel 9.2 `bazel/exports.bzl`, `cc_common_bazel.bzl`,
+`BazelStarlarkEnvironment` and `CcStarlarkInternal.checkPrivateApi` establish
+the contract: builtins injection exports the public wrapper; its zero-argument
+internal bridge checks the innermost calling module against rules_cc; any
+canonical repository whose name begins `rules_cc+` satisfies that module-name
+allowlist; and a foreign caller fails with `file '<label>' cannot use private
+API`. BUILD receives injected rules only, not this exported `.bzl` toplevel.
+
+Run only `WP-4-7A-bazel-cc-common-private-bridge-loading`. Put a stateless
+public wrapper and stateless opaque internal token in a small loading-owned
+module, install the wrapper only in the complete `.bzl` globals environment,
+and make the bridge use existing defining-call provenance to admit the pinned
+`rules_cc+` owner and fail every other owner. The token must freeze but expose
+no fields or methods. Prove exact placement, zero-argument binding, allowed
+canonical-owner call/freeze and foreign-owner diagnostic. Do not load or
+implement bundled Bazel builtins, add a generic private-API framework, expose
+BUILD `cc_common`, or admit any `cc_internal`/public C++ method, provider,
+toolchain, action or analysis behavior. Re-audit source order after this one
+child.
+
+Pinned Zabel `c7298478…` supplies architectural guidance only. Its
+`builtins_cc_primitives.zig` deliberately keeps the private native token behind
+a mandatory owner capability and leaves public wrapper construction to the
+builtins layer. Slug adopts that public/private separation and fail-closed
+ownership rule, while its narrow public projection is explicitly Slug-native
+until full builtins injection is selected. No Zig code, layout, method table,
+analysis object or behavior is copied. The values are zero-sized and
+`Allocative`; the Buck2 utility audit selects no collection, interner, cache or
+utility import. Bazel 9.2 remains sole behavior authority.

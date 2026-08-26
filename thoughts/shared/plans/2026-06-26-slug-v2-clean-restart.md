@@ -30,18 +30,61 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; Bazel config-string descriptor selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes the file's final lazy rule; `2cbdb148` completes lint-test common attributes; `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` freeze the three rustfmt aspects and dependency declaration; `9685d9a7`, `52d2c6f2`, and `297c2286` retain integer, Boolean and StringList flag identity | complete String flag/allow-multiple declaration identity while fencing unsupported configured variants | run only `WP-4-7A-bazel-config-string-descriptor-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; rules_cc private bridge selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes the file's final lazy rule; `2cbdb148` completes lint-test common attributes; `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` freeze the three rustfmt aspects and dependency declaration; `9685d9a7`, `52d2c6f2`, `297c2286`, and `919ecfa5` retain complete integer, Boolean, StringList, and String descriptor identity | admit only the owner-checked `cc_common.internal_DO_NOT_USE` load bridge; all C++ semantics remain deferred | run only `WP-4-7A-bazel-cc-common-private-bridge-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-config-string-descriptor-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-bazel-cc-common-private-bridge-loading](./slug-v2-subplans/current-packet.md).
 
-Finish selected `bazel_skylib@1.8.2` common-settings declarations. Retain
-String `flag` and `allow_multiple` identity, preserve the existing BUILD and
-true/single configured slice, and reject unsupported string target variants
-before recording.
+Admit only the first rules_cc private C++ bridge needed after the completed
+Skylib child. Expose `.bzl` `cc_common.internal_DO_NOT_USE()` with mandatory
+rules_cc owner checking and an opaque returned token; do not add any C++
+analysis method or advance into the rules_cc body.
+
+### M7 config-string descriptor accepted; cc_common private bridge selected (2026-08-26)
+
+Commit `919ecfa5` completes the selected bazel_skylib common-settings child.
+`.bzl` `config.string` now has Bazel's named-only `flag` and `allow_multiple`
+booleans with false defaults and retains all four identities through rule
+projection, recursive freeze and equality. BUILD keeps its existing
+true/single-only constructor. Only true/single definitions may record and use
+the admitted scalar configured consumer; non-flag and multi-value variants
+fail before target recording.
+
+Focused descriptor/ABI, supported-package and configured-cquery proof passes;
+all 200 loading units pass. The broad integration remains 30/31 with only its
+declared stale `@external` diagnostic-order row. Locked core check, rebuilt
+CLI, formatting, hygiene and the known archive baseline pass. Growth is 41
+production and 134 proof additions within caps. Independent terminal review
+returned `ACCEPT`.
+
+Source order returns to rules_rust 0.73.0
+`rust/private/toolchain.bzl`, whose second child is rules_cc 0.2.17
+`cc/common/cc_common.bzl`. That child enters the generated Bazel-9
+compatibility proxy, then `cc/private/cc_common.bzl`, then
+`cc/common/cc_helper_internal.bzl`. The first missing evaluated expression is
+`cc_common.internal_DO_NOT_USE()` in `cc/private/cc_internal.bzl`; the prior
+Skylib `paths` child contains only lazy functions, constants and the accepted
+keyword-only `struct` construction.
+
+Pinned Bazel 9.2 constructs public `cc_common` through builtins injection.
+Its `internal_DO_NOT_USE` wrapper calls the private `cc_internal` checker with
+the rules_cc allowlist; canonical repositories beginning `rules_cc+` are
+accepted and other owners receive the private-API diagnostic. Run only
+`WP-4-7A-bazel-cc-common-private-bridge-loading`: add a `.bzl`-only,
+owner-checked bridge and return one frozen opaque internal token. BUILD must
+remain without `cc_common`, and every internal member, provider, toolchain,
+action and analysis operation remains deferred. Stop and re-audit before the
+next rules_cc expression.
+
+Pinned Zabel `c7298478…` is architectural guidance only. Its C++ builtins leaf
+does not install a public global itself, exposes the internal token through a
+private capability, and makes owner enforcement mandatory. Slug follows the
+public/private phase split and fail-closed owner rule with its current complete
+`.bzl` globals owner, but does not copy Zig code, methods, builtins execution
+or C++ semantics. Pinned Bazel 9.2 remains sole behavior authority.
 
 ### M7 config-string-list false accepted; config-string descriptor selected (2026-08-26)
 
