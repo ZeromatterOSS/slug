@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -1169,6 +1170,29 @@ fn selected_bcr_spec() -> RepoSpec {
     RepoSpec { rule_id: RepoRuleId { bzl_file: CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:http.bzl").unwrap(), rule_name: "http_archive".into() }, attributes: Arc::new(SmallMap::from_iter(attributes)) }
 }
 
+fn selected_bcr_request(
+    workspace: &NormalizedAbsolutePath,
+    repo: &str,
+    mirror: &str,
+) -> Arc<RepositoryMaterializationRequest> {
+    let mut spec = selected_bcr_spec();
+    Arc::make_mut(&mut spec.attributes).insert(
+        "urls".into(),
+        OverrideAttributeValue::Iterable(Arc::new([
+            OverrideAttributeValue::String(format!("https://{mirror}.test/archive.tar.gz").into()),
+            OverrideAttributeValue::String("https://origin.test/archive.tar.gz".into()),
+        ])),
+    );
+    Arc::new(RepositoryMaterializationRequest {
+        id: RepositoryMaterializationRequestId {
+            workspace: workspace.clone(),
+            canonical_repo: CanonicalRepoName::new(repo).unwrap(),
+        },
+        repo_spec: spec,
+        kind: RepositoryMaterializationKind::Immutable,
+    })
+}
+
 fn reject_bcr(key: &str, value: OverrideAttributeValue) {
     let mut spec = selected_bcr_spec();
     Arc::make_mut(&mut spec.attributes).insert(key.into(), value);
@@ -1288,22 +1312,12 @@ fn native_selected_bcr_is_generation_scoped_transport_without_success() {
     let workspace_root = tempfile::tempdir().unwrap();
     let workspace = NormalizedAbsolutePath::new(workspace_root.path().to_path_buf()).unwrap();
     let materializer = RepositoryMaterializer::new(workspace.clone());
-    let request = |repo: &str, spec| {
-        Arc::new(RepositoryMaterializationRequest {
-            id: RepositoryMaterializationRequestId {
-                workspace: workspace.clone(),
-                canonical_repo: CanonicalRepoName::new(repo).unwrap(),
-            },
-            repo_spec: spec,
-            kind: RepositoryMaterializationKind::Immutable,
-        })
-    };
     let token = materializer.begin().unwrap();
     materializer.preflight_native(token, []).unwrap();
     materializer
         .materialize_native(
             token,
-            request("valid", selected_bcr_spec()),
+            selected_bcr_request(&workspace, "valid", "mirror"),
             RepositoryMaterializationGeneration(9),
         )
         .unwrap();
@@ -1321,7 +1335,14 @@ fn native_selected_bcr_is_generation_scoped_transport_without_success() {
     materializer
         .materialize_native(
             token,
-            request("malformed", malformed),
+            Arc::new(RepositoryMaterializationRequest {
+                id: RepositoryMaterializationRequestId {
+                    workspace: workspace.clone(),
+                    canonical_repo: CanonicalRepoName::new("malformed").unwrap(),
+                },
+                repo_spec: malformed,
+                kind: RepositoryMaterializationKind::Immutable,
+            }),
             RepositoryMaterializationGeneration(10),
         )
         .unwrap();
@@ -1330,4 +1351,79 @@ fn native_selected_bcr_is_generation_scoped_transport_without_success() {
         RepositoryMaterializationResult::SpecError(_)
     ));
     materializer.discard(token).unwrap();
+}
+
+#[test]
+fn selected_bcr_capture_has_session_scoped_stage_reuse_recapture_and_stale_ownership() {
+    let workspace_root = tempfile::tempdir().unwrap();
+    let workspace = NormalizedAbsolutePath::new(workspace_root.path().to_path_buf()).unwrap();
+    let materializer = RepositoryMaterializer::new(workspace.clone());
+    let captures = Cell::new(0);
+
+    for (mirror, generation) in [("a", 9), ("b", 10), ("a", 11)] {
+        let token = materializer.begin().unwrap();
+        materializer.preflight_native(token, []).unwrap();
+        let request = selected_bcr_request(&workspace, "cycling", mirror);
+        materializer
+            .materialize_selected_bcr_capture_for_test(
+                token,
+                request.clone(),
+                RepositoryMaterializationGeneration(generation),
+                |active| {
+                    assert!(active());
+                    captures.set(captures.get() + 1);
+                    Ok(())
+                },
+            )
+            .unwrap();
+        assert!(matches!(
+            materializer.active_result_for_test(token, "cycling"),
+            RepositoryMaterializationResult::MaterializationError {
+                generation: actual,
+                ref message,
+            } if actual == RepositoryMaterializationGeneration(generation)
+                && message.as_str() == SELECTED_BCR_EXTRACTION_DEFERRED
+        ));
+        if generation == 9 {
+            materializer
+                .materialize_selected_bcr_capture_for_test(
+                    token,
+                    request,
+                    RepositoryMaterializationGeneration(99),
+                    |_| panic!("same-session duplicate must reuse the terminal"),
+                )
+                .unwrap();
+        }
+        if generation != 11 {
+            materializer.discard(token).unwrap();
+            continue;
+        }
+
+        let replacement = Cell::new(None);
+        let stale = selected_bcr_request(&workspace, "stale", "stale");
+        let error = materializer
+            .materialize_selected_bcr_capture_for_test(
+                token,
+                stale,
+                RepositoryMaterializationGeneration(12),
+                |active| {
+                    materializer.discard(token).unwrap();
+                    let next = materializer.begin().unwrap();
+                    materializer.preflight_native(next, []).unwrap();
+                    replacement.set(Some(next));
+                    assert!(!active());
+                    Ok(())
+                },
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            super::super::repository_io::RepositorySessionError::StaleToken {
+                active: Some(_),
+                supplied,
+            } if supplied == token
+        ));
+        materializer.discard(replacement.get().unwrap()).unwrap();
+    }
+    assert_eq!(captures.get(), 3, "changed A/B/A commands must recapture");
 }

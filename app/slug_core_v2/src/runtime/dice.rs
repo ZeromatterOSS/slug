@@ -6656,10 +6656,11 @@ impl NativeDemandCommand<'_> {
                 self.repository_results = self
                     .runtime
                     .repository_materializer
-                    .materialize_native(
+                    .materialize_native_with_runtime(
                         self.repository_session,
                         request.clone(),
                         self.inputs.generations.repository,
+                        &self.runtime.runtime,
                     )
                     .map_err(NativeDemandSessionError::Repository)?;
                 self.reusable_requests.shift_remove(&request.id);

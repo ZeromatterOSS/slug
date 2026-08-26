@@ -661,6 +661,20 @@ impl RepositoryMaterializer {
         request: Arc<RepositoryMaterializationRequest>,
         generation: RepositoryMaterializationGeneration,
     ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
+        let workspace = self.workspace.as_path();
+        let request_for_io = request.clone();
+        self.materialize_native_with(token, request, generation, || {
+            materialize_native_attempt(workspace, &request_for_io)
+        })
+    }
+
+    fn materialize_native_with(
+        &self,
+        token: RepositorySessionToken,
+        request: Arc<RepositoryMaterializationRequest>,
+        generation: RepositoryMaterializationGeneration,
+        materialize: impl FnOnce() -> RepositoryMaterializationAttempt,
+    ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
         {
             let state = self
                 .state
@@ -669,11 +683,51 @@ impl RepositoryMaterializer {
             matching_validated_active(&state, token)?;
         }
         validate_native_request(&self.workspace, &request)?;
+        self.materialize_with(token, request, generation, materialize)
+    }
+
+    pub(super) fn materialize_native_with_runtime(
+        &self,
+        token: RepositorySessionToken,
+        request: Arc<RepositoryMaterializationRequest>,
+        generation: RepositoryMaterializationGeneration,
+        runtime: &tokio::runtime::Runtime,
+    ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
         let workspace = self.workspace.as_path();
         let request_for_io = request.clone();
-        self.materialize_with(token, request, generation, || {
-            materialize_native_attempt(workspace, &request_for_io)
+        self.materialize_native_with(token, request, generation, || {
+            materialize_native_attempt_with_runtime(workspace, &request_for_io, runtime, &|| {
+                self.session_is_active(token)
+            })
         })
+    }
+
+    #[cfg(test)]
+    pub(super) fn materialize_selected_bcr_capture_for_test(
+        &self,
+        token: RepositorySessionToken,
+        request: Arc<RepositoryMaterializationRequest>,
+        generation: RepositoryMaterializationGeneration,
+        capture: impl FnOnce(&dyn Fn() -> bool) -> Result<(), ArchiveMaterializationError>,
+    ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
+        self.materialize_native_with(token, request, generation, || {
+            materialized_attempt(capture(&|| self.session_is_active(token)).and_then(|()| {
+                Err(ArchiveMaterializationError::materialization(
+                    super::repository_archive::SELECTED_BCR_EXTRACTION_DEFERRED,
+                ))
+            }))
+        })
+    }
+
+    pub(super) fn session_is_active(&self, token: RepositorySessionToken) -> bool {
+        self.state
+            .lock()
+            .expect("repository materializer mutex poisoned")
+            .active
+            .as_ref()
+            .is_some_and(|active| {
+                active.token == token && active.validation == RepositorySessionValidation::Complete
+            })
     }
 
     fn epoch(
@@ -1421,6 +1475,25 @@ fn materialize_native_attempt(
     }
 }
 
+fn materialize_native_attempt_with_runtime(
+    workspace: &Path,
+    request: &RepositoryMaterializationRequest,
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+) -> RepositoryMaterializationAttempt {
+    if request.repo_spec.rule_id.bzl_file.to_string()
+        == "@@bazel_tools//tools/build_defs/repo:http.bzl"
+        && request.repo_spec.rule_id.rule_name.as_str() == "http_archive"
+    {
+        return materialized_attempt(materialize_archive_plan_with_capture(
+            &request.repo_spec,
+            runtime,
+            active,
+        ));
+    }
+    materialize_native_attempt(workspace, request)
+}
+
 fn validate_native_request(
     workspace: &NormalizedAbsolutePath,
     request: &RepositoryMaterializationRequest,
@@ -1565,6 +1638,22 @@ fn materialize_archive_plan(
             Err(ArchiveMaterializationError::transport(
                 "selected-registry BCR archive transport is deferred",
             ))
+        }
+        Err(error) => Err(ArchiveMaterializationError::spec(error)),
+    }
+}
+
+fn materialize_archive_plan_with_capture(
+    repo_spec: &RepoSpec,
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+) -> Result<Materialized, ArchiveMaterializationError> {
+    match super::repository_archive::parse_archive_plan(repo_spec) {
+        Ok(super::repository_archive::ArchivePlan::LocalTar) => {
+            super::repository_archive::materialize_local_tar(repo_spec)
+        }
+        Ok(super::repository_archive::ArchivePlan::SelectedBcrTarGz(plan)) => {
+            super::repository_archive::materialize_selected_bcr_capture(&plan, runtime, active)
         }
         Err(error) => Err(ArchiveMaterializationError::spec(error)),
     }

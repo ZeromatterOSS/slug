@@ -57,6 +57,9 @@ pub(super) struct SelectedBcrTarGz {
     pub(super) module_integrity: [u8; 32],
 }
 
+pub(super) const SELECTED_BCR_EXTRACTION_DEFERRED: &str =
+    "selected-registry BCR archive extraction is deferred";
+
 pub(super) fn parse_archive_plan(spec: &RepoSpec) -> Result<ArchivePlan, String> {
     let keys = spec
         .attributes
@@ -117,6 +120,17 @@ pub(super) fn parse_archive_plan(spec: &RepoSpec) -> Result<ArchivePlan, String>
         module_url: module_url.clone(),
         module_integrity: sri(spec, "remote_module_file_integrity")?,
     }))
+}
+
+pub(super) fn materialize_selected_bcr_capture(
+    plan: &SelectedBcrTarGz,
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+) -> Result<Materialized, ArchiveMaterializationError> {
+    super::repository_archive_http::capture_selected_bcr(plan, runtime, active)?;
+    Err(ArchiveMaterializationError::materialization(
+        SELECTED_BCR_EXTRACTION_DEFERRED,
+    ))
 }
 
 fn string<'a>(spec: &'a RepoSpec, key: &str) -> Result<&'a str, String> {
