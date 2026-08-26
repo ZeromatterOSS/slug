@@ -3367,6 +3367,75 @@ NESTED_HEADERS = EMPTY_COMPILATION_CONTEXT._header_info.modular_public_headers
 }
 
 #[test]
+fn bazel_empty_list_freeze_loads_empty_cc_compilation_outputs() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_cc+//cc/private/compile:cc_compilation_outputs.bzl")
+            .unwrap(),
+        workspace_path: PathBuf::from("/rules_cc/cc/private/compile/cc_compilation_outputs.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let source = r#"
+cc_internal = cc_common.internal_DO_NOT_USE()
+LtoCompilationContextInfo = provider(fields = {"lto_bitcode_inputs": "bitcode map"})
+EMPTY_LTO_COMPILATION_CONTEXT = LtoCompilationContextInfo(lto_bitcode_inputs = {})
+CcCompilationOutputsInfo = provider(fields = {
+    "objects": "objects", "pic_objects": "pic objects", "temps": "temps",
+    "_header_tokens": "tokens", "_module_files": "modules",
+    "_lto_compilation_context": "lto", "_gcno_files": "gcno",
+    "_pic_gcno_files": "pic gcno", "_dwo_files": "dwo",
+    "_pic_dwo_files": "pic dwo", "cpp_module_files": "cpp modules",
+    "pic_cpp_module_files": "pic cpp modules",
+    "cpp_modules_info_file": "cpp info", "pic_cpp_modules_info_file": "pic cpp info",
+})
+def wrap_with_check_private_api(symbol):
+    def callback():
+        return symbol
+    return callback
+def create_compilation_outputs_internal(objects = [], pic_objects = [], temps = [], header_tokens = [], module_files = [], gcno_files = [], pic_gcno_files = [], dwo_files = [], pic_dwo_files = [], cpp_module_files = [], pic_cpp_module_files = []):
+    return CcCompilationOutputsInfo(
+        objects = cc_internal.freeze(objects), pic_objects = cc_internal.freeze(pic_objects),
+        temps = wrap_with_check_private_api(depset(temps)),
+        _header_tokens = cc_internal.freeze(header_tokens), _module_files = cc_internal.freeze(module_files),
+        _lto_compilation_context = EMPTY_LTO_COMPILATION_CONTEXT,
+        _gcno_files = cc_internal.freeze(gcno_files), _pic_gcno_files = cc_internal.freeze(pic_gcno_files),
+        _dwo_files = cc_internal.freeze(dwo_files), _pic_dwo_files = cc_internal.freeze(pic_dwo_files),
+        cpp_module_files = cc_internal.freeze(cpp_module_files), pic_cpp_module_files = cc_internal.freeze(pic_cpp_module_files),
+        cpp_modules_info_file = None, pic_cpp_modules_info_file = None,
+    )
+EMPTY = create_compilation_outputs_internal()
+LISTS_EMPTY = EMPTY.objects == [] and EMPTY.pic_objects == [] and EMPTY._header_tokens == [] and EMPTY._module_files == [] and EMPTY._gcno_files == [] and EMPTY._pic_gcno_files == [] and EMPTY._dwo_files == [] and EMPTY._pic_dwo_files == [] and EMPTY.cpp_module_files == [] and EMPTY.pic_cpp_module_files == []
+SHAPE_OK = type(EMPTY.objects) == "list" and type(EMPTY.temps) == "function" and EMPTY._lto_compilation_context.lto_bitcode_inputs == {} and EMPTY.cpp_modules_info_file == None and EMPTY.pic_cpp_modules_info_file == None
+POSITIONAL = cc_internal.freeze([])
+NAMED = cc_internal.freeze(value = [])
+FROM_FROZEN = cc_internal.freeze(cc_internal.create_header_info().modular_public_headers)
+EXTRA_EMPTY = POSITIONAL == [] and NAMED == [] and FROM_FROZEN == []
+"#;
+    let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
+    for name in ["LISTS_EMPTY", "SHAPE_OK", "EXTRA_EMPTY"] {
+        assert_eq!(
+            module.get(name).unwrap().unpack_bool(),
+            Some(true),
+            "{name}"
+        );
+    }
+
+    for failure in [
+        "X = cc_common.internal_DO_NOT_USE().freeze([1])",
+        "X = cc_common.internal_DO_NOT_USE().freeze(())",
+        "X = cc_common.internal_DO_NOT_USE().freeze({})",
+        "X = cc_common.internal_DO_NOT_USE().freeze(1)",
+        "X = cc_common.internal_DO_NOT_USE().freeze()",
+        "X = cc_common.internal_DO_NOT_USE().freeze([], [])",
+        "cc_common.internal_DO_NOT_USE().freeze([]).append(1)",
+    ] {
+        assert!(
+            eval_bzl_with_identity(failure, owner.clone()).is_err(),
+            "{failure}"
+        );
+    }
+}
+
+#[test]
 fn bazel_initialized_provider_loads_rules_cc_artifact_categories_and_stays_separate() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/common:cc_helper_internal.bzl").unwrap(),

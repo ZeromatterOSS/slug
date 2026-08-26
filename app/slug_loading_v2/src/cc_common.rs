@@ -27,6 +27,7 @@ use starlark::values::Trace;
 use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::list::AllocList;
+use starlark::values::list::ListRef;
 use starlark::values::starlark_value;
 
 use crate::provider::BzlEvaluationContext;
@@ -121,6 +122,20 @@ where
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn freeze<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        value: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        let Some(list) = ListRef::from_value(value) else {
+            anyhow::bail!("cc_internal.freeze currently supports only empty lists");
+        };
+        if !list.is_empty() {
+            anyhow::bail!("cc_internal.freeze currently supports only empty lists");
+        }
+        Ok(eval.frozen_heap().alloc(AllocList::EMPTY).to_value())
+    }
+
     fn create_header_info<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
