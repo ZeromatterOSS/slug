@@ -47,6 +47,13 @@ pub enum AllowSingleFile {
     Extensions(Arc<[CompactString]>),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum AllowedAttributeValues {
+    None,
+    Integer(Arc<[i32]>),
+    String(Arc<[CompactString]>),
+}
+
 impl AttributeKind {
     pub(crate) fn reaches_labels(self) -> bool {
         !matches!(
@@ -85,7 +92,7 @@ pub struct AttributeSchema {
     builtin: bool,
     allow_files: bool,
     allow_single_file: Option<AllowSingleFile>,
-    allowed_integer_values: Arc<[i32]>,
+    allowed_values: AllowedAttributeValues,
     default: Option<Arc<CoercedAttributeValue>>,
     transition: Option<TransitionDefinition>,
 }
@@ -116,7 +123,7 @@ impl AttributeSchema {
             builtin: false,
             allow_files: false,
             allow_single_file: None,
-            allowed_integer_values: Arc::from([]),
+            allowed_values: AllowedAttributeValues::None,
             default: default.map(Arc::new),
             transition,
         }
@@ -181,8 +188,8 @@ impl AttributeSchema {
     pub fn allow_single_file(&self) -> Option<&AllowSingleFile> {
         self.allow_single_file.as_ref()
     }
-    pub(crate) fn allowed_integer_values(&self) -> &[i32] {
-        &self.allowed_integer_values
+    pub(crate) fn allowed_values(&self) -> &AllowedAttributeValues {
+        &self.allowed_values
     }
     pub(crate) fn with_allow_single_file(
         mut self,
@@ -195,8 +202,8 @@ impl AttributeSchema {
         self.allow_files = allow_files;
         self
     }
-    pub(crate) fn with_allowed_integer_values(mut self, values: Arc<[i32]>) -> Self {
-        self.allowed_integer_values = values;
+    pub(crate) fn with_allowed_values(mut self, values: AllowedAttributeValues) -> Self {
+        self.allowed_values = values;
         self
     }
     pub fn default(&self) -> Option<&CoercedAttributeValue> {
