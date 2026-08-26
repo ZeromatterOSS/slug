@@ -30,18 +30,34 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; documented provider initializer selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; `9685d9a7`, `52d2c6f2`, `297c2286`, `919ecfa5`, `4d7a9bbb`, `9c51999f`, `f65c9ce0`, and `2ebc6fe1` retain complete typed descriptors, the private rules_cc bridge, provider loading, and the empty HeaderInfo row | admit documented-dictionary schemas on the existing initialized-provider owner needed by `CcInfo` and `CcLauncherInfo`; configured C++ semantics remain deferred | run only `WP-4-7A-bazel-documented-provider-initializer-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; empty-list freeze selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; `9685d9a7`, `52d2c6f2`, `297c2286`, `919ecfa5`, `4d7a9bbb`, `9c51999f`, `f65c9ce0`, `2ebc6fe1`, and `152caa6f` retain complete typed descriptors, the private rules_cc bridge, provider loading, empty HeaderInfo, and documented initialized C++ providers | admit exact empty-list `cc_internal.freeze` needed by top-level `EMPTY_COMPILATION_OUTPUTS`; general container copies and configured C++ semantics remain deferred | run only `WP-4-7A-bazel-empty-list-freeze-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-documented-provider-initializer-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-bazel-empty-list-freeze-loading](./slug-v2-subplans/current-packet.md).
 
-Admit documented-dictionary schemas on the existing loading-only initialized
-provider family, completing the `CcInfo` and `CcLauncherInfo` declarations.
-Stop before `_cc_internal.freeze(objects)` in
-`cc_compilation_outputs.bzl`.
+Admit exact empty-list `cc_internal.freeze` on the existing frozen-list
+representation, completing the top-level `EMPTY_COMPILATION_OUTPUTS` row.
+Stop and audit `compile.bzl` separately before general container copying or
+configured C++ semantics.
+
+### M7 documented provider initializer accepted; empty-list freeze selected (2026-08-26)
+
+Commit `152caa6f` generalizes the existing initialized provider schema parser
+to documented string dictionaries and completes the source-shaped `CcInfo` and
+`CcLauncherInfo` declarations without a second owner or representation. All
+205 loading units, configured analysis, locked checks, rebuilt CLI and hygiene
+pass; independent terminal review returned `ACCEPT`.
+
+Source order next reaches top-level `EMPTY_COMPILATION_OUTPUTS` and its ten
+`_cc_internal.freeze` calls, all with default empty lists. Pinned Bazel 9.2
+returns an immutable list copy. Run only
+`WP-4-7A-bazel-empty-list-freeze-loading`: reuse starlark-rust's existing
+frozen empty-list singleton and fail closed for non-empty/general container
+shapes. Clean `../zabel` `0795445f…` guides the evaluator-owned immutable-copy
+boundary and mutation proof only; no Zig code or behavior is copied.
 
 ### M7 empty HeaderInfo accepted; documented provider initializer selected (2026-08-26)
 

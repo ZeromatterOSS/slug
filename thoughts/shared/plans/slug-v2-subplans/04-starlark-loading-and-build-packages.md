@@ -5247,6 +5247,32 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Documented provider initializer accepted; empty-list freeze selected (2026-08-26)
+
+Commit `152caa6f` accepts documented string-dictionary schemas through the
+existing initialized-provider owner, completing the source-shaped `CcInfo` and
+`CcLauncherInfo` declarations. The shared-library hint and LTO provider
+declarations then freeze. All 205 loading units, configured analysis, locked
+checks, rebuilt CLI and hygiene pass; independent terminal review returned
+`ACCEPT`.
+
+Source order next enters `cc/private/compile/cc_compilation_outputs.bzl`.
+Top-level `EMPTY_COMPILATION_OUTPUTS = create_compilation_outputs_internal()`
+first reaches `_cc_internal.freeze(objects)` at line 86; all ten freeze
+arguments on this invocation are default empty lists. Pinned Bazel 9.2 returns
+an immutable list copy. The bounded exact row can reuse the existing
+starlark-rust frozen empty-list singleton while rejecting non-empty lists,
+dictionaries and every other unselected shape.
+
+Run only `WP-4-7A-bazel-empty-list-freeze-loading`. Complete and freeze the
+top-level empty compilation-output provider, but do not claim general
+`cc_internal.freeze`, configured C++ semantics or later source. Clean
+`../zabel` `0795445f…` is architectural/test guidance for one evaluator-owned
+immutable-copy boundary and source/result mutation separation only; no Zig
+code, representation or behavior is copied. The Buck2 reuse audit selects the
+existing `AllocList::EMPTY` and frozen heap, so no new utility or ledger row is
+needed. Bazel 9.2 remains sole behavior authority.
+
 ### Empty HeaderInfo accepted; documented provider initializer selected (2026-08-26)
 
 Commit `2ebc6fe1` accepts only no-argument empty HeaderInfo loading. The private
