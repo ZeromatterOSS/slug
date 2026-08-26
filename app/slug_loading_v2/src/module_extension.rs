@@ -36,6 +36,7 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
+#[cfg(test)]
 use slug_identity_v2::CanonicalLabel;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
@@ -54,7 +55,6 @@ use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
 use starlark::values::starlark_value;
-use starlark_map::StarlarkHasher;
 
 use crate::attrs::CoercedAttributeValue;
 use crate::bzl_module::ExternalBzlModuleEvalKey;
@@ -78,6 +78,7 @@ use crate::package::FrozenModuleExtensionDefinition;
 use crate::package::ModuleExtensionDefinitionProjection;
 use crate::package::prepare_module_extension_tag_attributes;
 use crate::package::validate_module_extension_tag_schema;
+use crate::starlark_label::StarlarkLabel;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct HostPureModuleExtensionInvocations {
@@ -978,7 +979,7 @@ fn allocate_attribute<'v>(value: &CoercedAttributeValue, heap: Heap<'v>) -> Valu
         CoercedAttributeValue::String(value) => heap.alloc_str(value).to_value(),
         CoercedAttributeValue::Boolean(value) => Value::new_bool(*value),
         CoercedAttributeValue::Integer(value) => heap.alloc(*value),
-        CoercedAttributeValue::Label(value) => heap.alloc_simple(InvocationLabel(value.clone())),
+        CoercedAttributeValue::Label(value) => heap.alloc_simple(StarlarkLabel::new(value.clone())),
         CoercedAttributeValue::None => Value::new_none(),
         _ => unreachable!("preparation rejects non-scalar module-extension attributes"),
     }
@@ -1076,71 +1077,6 @@ impl<'v> StarlarkValue<'v> for InvocationTagSortKey {
             starlark::Error::new_other(anyhow::anyhow!("sort keys can only compare with sort keys"))
         })?;
         Ok((self.0, self.1).cmp(&(other.0, other.1)))
-    }
-}
-
-#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-pub(crate) struct InvocationLabel(CanonicalLabel);
-impl InvocationLabel {
-    #[cfg(test)]
-    pub(crate) fn new(label: CanonicalLabel) -> Self {
-        Self(label)
-    }
-
-    pub(crate) fn canonical(&self) -> &CanonicalLabel {
-        &self.0
-    }
-}
-impl fmt::Display for InvocationLabel {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-starlark::starlark_simple_value!(InvocationLabel);
-#[starlark_value(type = "Label")]
-impl<'v> StarlarkValue<'v> for InvocationLabel {
-    fn collect_str(&self, collector: &mut String) {
-        collector.push_str(&self.0.to_string());
-    }
-    fn collect_repr(&self, collector: &mut String) {
-        collector.push_str("Label(\"");
-        collector.push_str(&self.0.to_string());
-        collector.push_str("\")");
-    }
-    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
-        self.0.hash(hasher);
-        Ok(())
-    }
-    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
-        Ok(Self::from_value(other).is_some_and(|other| self.0 == other.0))
-    }
-    fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match name {
-            "name" => Some(heap.alloc_str(self.0.target().as_str()).to_value()),
-            "package" => Some(
-                heap.alloc_str(self.0.package().package().as_str())
-                    .to_value(),
-            ),
-            "repo_name" | "workspace_name" => {
-                Some(heap.alloc_str(self.0.package().repo().as_str()).to_value())
-            }
-            _ => None,
-        }
-    }
-    fn get_methods() -> Option<&'static Methods> {
-        static METHODS: MethodsStatic = MethodsStatic::new();
-        METHODS.methods(invocation_label_methods)
-    }
-}
-
-#[starlark_module]
-fn invocation_label_methods(builder: &mut MethodsBuilder) {
-    fn same_package_label(this: Value, target_name: &str) -> anyhow::Result<InvocationLabel> {
-        let this = InvocationLabel::from_value(this)
-            .ok_or_else(|| anyhow::anyhow!("invalid Label receiver"))?;
-        let label = CanonicalLabel::parse(&format!("{}:{}", this.0.package(), target_name))
-            .map_err(anyhow::Error::msg)?;
-        Ok(InvocationLabel(label))
     }
 }
 
@@ -1600,7 +1536,7 @@ mod tests {
             .unwrap_err();
             assert!(error.contains("another module_ctx"), "{error}");
         }
-        let label = InvocationLabel(CanonicalLabel::parse("@@//pkg:item").unwrap());
+        let label = StarlarkLabel::new(CanonicalLabel::parse("@@//pkg:item").unwrap());
         for name in ["workspace_root", "relative"] {
             let source = format!("def f(label):\n  return label.{name}\n");
             assert!(

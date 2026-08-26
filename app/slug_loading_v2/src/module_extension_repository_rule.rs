@@ -31,7 +31,7 @@ use starlark::values::starlark_value;
 
 use crate::attrs::AttributeKind;
 use crate::attrs::CoercedAttributeValue;
-use crate::module_extension::InvocationLabel;
+use crate::starlark_label::StarlarkLabel;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct RepositoryRuleAttribute {
@@ -338,7 +338,7 @@ fn project_call_value(value: Value<'_>) -> anyhow::Result<RepositoryRuleCallValu
     if let Some(value) = value.unpack_str() {
         return Ok(RepositoryRuleCallValue::String(value.into()));
     }
-    if let Some(label) = InvocationLabel::from_value(value) {
+    if let Some(label) = StarlarkLabel::from_value(value) {
         return Ok(RepositoryRuleCallValue::Label(label.canonical().clone()));
     }
     anyhow::bail!(
@@ -426,7 +426,7 @@ _repo = repository_rule(
         ))
         .unwrap();
         let (result, records) = invoke(&loaded, "run", |module| {
-            vec![module.heap().alloc_simple(InvocationLabel::new(
+            vec![module.heap().alloc_simple(StarlarkLabel::new(
                 CanonicalLabel::parse("@@dep+//pkg:item").unwrap(),
             ))]
         });

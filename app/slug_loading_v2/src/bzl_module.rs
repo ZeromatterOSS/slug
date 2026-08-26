@@ -1233,27 +1233,49 @@ fn host_source_text(source: &RootPackageSource) -> Result<Arc<String>, HostSourc
 fn host_source_name(source: &RootPackageSource) -> Result<String, HostSourceInputError> {
     #[cfg(unix)]
     {
-        Ok(source
-            .logical_path()
-            .as_path()
-            .as_os_str()
-            .as_bytes()
-            .iter()
-            .copied()
-            .map(char::from)
-            .collect())
+        Ok(starlark_source_name(source.logical_path().as_path()).expect("Unix paths are accepted"))
     }
     #[cfg(not(unix))]
     {
-        source
-            .logical_path()
-            .as_path()
-            .to_str()
-            .map(str::to_owned)
-            .ok_or_else(|| HostSourceInputError::UnsupportedPathEncoding {
+        starlark_source_name(source.logical_path().as_path()).ok_or_else(|| {
+            HostSourceInputError::UnsupportedPathEncoding {
                 logical_path: source.logical_path().dupe(),
-            })
+            }
+        })
     }
+}
+
+pub(crate) fn starlark_source_name(path: &Path) -> Option<String> {
+    #[cfg(unix)]
+    {
+        Some(
+            path.as_os_str()
+                .as_bytes()
+                .iter()
+                .copied()
+                .map(char::from)
+                .collect(),
+        )
+    }
+    #[cfg(not(unix))]
+    {
+        path.to_str().map(str::to_owned)
+    }
+}
+
+pub(crate) fn manifest_starlark_sources(
+    manifest: &BzlLoadManifest,
+) -> Arc<[(CompactString, CanonicalLabel)]> {
+    manifest
+        .reachable
+        .iter()
+        .map(|identity| {
+            let source = starlark_source_name(&identity.workspace_path)
+                .expect("manifest paths were accepted as Starlark source names");
+            (source.into(), identity.label.clone())
+        })
+        .collect::<Vec<_>>()
+        .into()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -2359,7 +2381,7 @@ async fn compute_host_bzl_module(
             .map(|(load, module)| (load.as_str(), module.module.dupe()))
             .collect(),
     };
-    let evaluation_context = BzlEvaluationContext::new(label.to_string());
+    let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
     let print_capture = capture_events.then(LoadingPrintCapture::default);
     let globals = loading_globals();
     {
@@ -3891,21 +3913,7 @@ async fn compute_external_bzl_child(
 }
 
 fn external_source_name(logical_path: &NormalizedAbsolutePath) -> Result<String, ()> {
-    #[cfg(unix)]
-    {
-        Ok(logical_path
-            .as_path()
-            .as_os_str()
-            .as_bytes()
-            .iter()
-            .copied()
-            .map(char::from)
-            .collect())
-    }
-    #[cfg(not(unix))]
-    {
-        logical_path.as_path().to_str().map(str::to_owned).ok_or(())
-    }
+    starlark_source_name(logical_path.as_path()).ok_or(())
 }
 
 async fn compute_external_bzl_children(
@@ -4111,7 +4119,7 @@ async fn compute_external_bzl_module(
             .map(|(load, module)| (load.as_str(), module.module.dupe()))
             .collect(),
     };
-    let evaluation_context = BzlEvaluationContext::new(canonical_label.to_string());
+    let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
     let print_capture = capture_events.then(LoadingPrintCapture::default);
     let globals = loading_globals();
     {
@@ -5613,7 +5621,8 @@ impl Key for BzlParseKey {
         };
         Arc::new((|| {
             let ast = AstModule::parse(
-                &self.path.display().to_string(),
+                &starlark_source_name(&self.path)
+                    .ok_or_else(|| LoadingError::new("invalid .bzl source path"))?,
                 source.as_ref().clone(),
                 &Dialect::Bazel,
             )
@@ -5756,7 +5765,8 @@ impl Key for BzlModuleEvalKey {
 
             Arc::new((|| {
                 let ast = AstModule::parse(
-                    &self.path.display().to_string(),
+                    &starlark_source_name(&self.path)
+                        .ok_or_else(|| LoadingError::new("invalid .bzl source path"))?,
                     parsed.source.clone(),
                     &Dialect::Bazel,
                 )
@@ -5773,10 +5783,7 @@ impl Key for BzlModuleEvalKey {
                         .map(|(load, module)| (load.as_str(), module.module.dupe()))
                         .collect(),
                 };
-                let evaluation_context = BzlEvaluationContext::new(
-                    bzl_source_label(&self.workspace, &self.path)
-                        .map_err(|error| LoadingError::new(error.to_string()))?,
-                );
+                let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
                 let print_capture = capture_events.then(LoadingPrintCapture::default);
                 let globals = loading_globals();
                 {

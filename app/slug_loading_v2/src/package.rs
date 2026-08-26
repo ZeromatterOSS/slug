@@ -86,6 +86,7 @@ use crate::module_extension_repository_rule::RepositoryRuleDefinition;
 use crate::provider::AnalysisBuiltinCallable;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::UserProviderCallable;
+use crate::starlark_label::label_globals;
 use crate::visibility::PackageGroupContents;
 use crate::visibility::RuleVisibility;
 use crate::visibility::VisibilitySource;
@@ -1776,6 +1777,15 @@ fn aspect_toolchain_requirement(
             "the admitted aspect(toolchains = ...) slice requires at most one target label"
         ),
     };
+    if raw.starts_with("@@") {
+        let canonical = CanonicalLabel::parse(raw).map_err(anyhow::Error::msg)?;
+        if canonical.package().repo() != defining_label.package().repo() {
+            anyhow::bail!(
+                "the admitted aspect toolchain label must name the defining repository: {raw}"
+            );
+        }
+        return Ok(Some(canonical));
+    }
     let provisional = package_context_label(defining_label.package().package().as_str(), raw)
         .map_err(|_| {
             anyhow::anyhow!(
@@ -4983,6 +4993,7 @@ fn complete_loading_globals(extensions: &[LibraryExtension], bool_config: bool) 
     if bool_config {
         globals.set("config", ConfigModule);
         aspect_globals(&mut globals);
+        label_globals(&mut globals);
     } else {
         globals.set("config", BuildFileConfigModule);
     }
@@ -5037,7 +5048,7 @@ mod module_extension_definition_tests {
     }
 
     #[test]
-    fn module_extension_globals_admit_repository_rule_and_exclude_label() {
+    fn module_extension_globals_admit_repository_rule_and_label() {
         let module =
             evaluate("def impl(ctx):\n  pass\ncaptured = repository_rule(implementation=impl)\n")
                 .unwrap();
@@ -5048,8 +5059,7 @@ mod module_extension_definition_tests {
                 .downcast::<crate::module_extension_repository_rule::FrozenRepositoryRuleDefinition>()
                 .is_ok()
         );
-        let error = evaluate("captured = Label\n").unwrap_err();
-        assert!(error.to_string().contains("not found"), "{error:#}");
+        evaluate("captured = Label\n").unwrap();
     }
 
     fn tag_attribute(

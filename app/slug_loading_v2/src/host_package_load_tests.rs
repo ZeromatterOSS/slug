@@ -83,12 +83,15 @@ use starlark::values::list::FrozenListRef;
 use starlark::values::structs::StructRef;
 use starlark_map::small_map::SmallMap;
 
+use super::BzlLoadManifest;
+use super::BzlModuleIdentity;
 use super::ExternalBzlCycleIdentity;
 use super::ExternalBzlModuleError;
 use super::ExternalBzlModuleEvalKey;
 use super::ExternalBzlModuleObservationKey;
 use super::ForceRootPackageObservationOuter;
 use super::HostPackageLoadMode;
+use super::LocalBzlLoader;
 use super::ObservedRootPackageLoad;
 use super::RepositoryBzlLabel;
 use super::RepositoryPackageLoadError;
@@ -2525,15 +2528,132 @@ fn bazel_aspect_definition_validates_admitted_fixed_abi_and_build_absence() {
     )
     .unwrap_err();
     assert!(error.contains("aspect"), "{error}");
-    let error = eval_global(
+    eval_global(
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, toolchains=[str(Label('//rust:toolchain_type'))])",
         &loading_globals(),
     )
-    .unwrap_err();
-    assert!(
-        error.contains("Label") && error.contains("not found"),
-        "{error}"
+    .unwrap();
+}
+
+#[test]
+fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@dep+//owner:support.bzl").unwrap(),
+        workspace_path: PathBuf::from("/workspace/dep/owner/support.bzl"),
+    };
+    let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
+        root: owner.clone(),
+        direct_children: Arc::from([]),
+        reachable: Arc::from([owner.clone()]),
+        fingerprint: [0; 32],
+    });
+    let ast = AstModule::parse(
+        "/workspace/dep/owner/support.bzl",
+        "LABEL_ALIAS = Label\ndef owned_label(): return str(Label(':owned'))\n".to_owned(),
+        &Dialect::Bazel,
+    )
+    .unwrap();
+    let support = Module::new();
+    let mut evaluator = Evaluator::new(&support);
+    evaluator.extra = Some(&context);
+    evaluator.eval_module(ast, &loading_globals()).unwrap();
+    drop(evaluator);
+    let support = support.freeze().unwrap();
+
+    let root = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@dep+//caller:root.bzl").unwrap(),
+        workspace_path: PathBuf::from("/workspace/dep/caller/root.bzl"),
+    };
+    let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
+        root: root.clone(),
+        direct_children: Arc::from([owner.clone()]),
+        reachable: Arc::from([root, owner]),
+        fingerprint: [0; 32],
+    });
+    let ast = AstModule::parse(
+        "/workspace/dep/caller/root.bzl",
+        "load('//owner:support.bzl', 'LABEL_ALIAS', 'owned_label')\ndef _impl(target, ctx): return []\ndef wrapped():\n  result = owned_label()\n  return result\nTOP = str(Label(':top'))\nALIASED = str(LABEL_ALIAS(':alias'))\nIMPORTED = wrapped()\nIDEMPOTENT = Label(Label(':same')) == Label(':same')\nRUST_ANALYZER = aspect(implementation = _impl, attr_aspects = ['srcs', 'deps', 'proc_macro_deps', 'crate', 'actual', 'proto'], toolchains = [str(Label('//rust:toolchain_type'))], doc = 'Rust analyzer')\n".to_owned(),
+        &Dialect::Bazel,
+    )
+    .unwrap();
+    let module = Module::new();
+    let loader = LocalBzlLoader {
+        modules: vec![("//owner:support.bzl", support)],
+    };
+    let mut evaluator = Evaluator::new(&module);
+    evaluator.extra = Some(&context);
+    evaluator.set_loader(&loader);
+    evaluator.eval_module(ast, &loading_globals()).unwrap();
+    drop(evaluator);
+    let module = module.freeze().unwrap();
+    assert_eq!(
+        module.get("TOP").unwrap().unpack_str(),
+        Some("@@dep+//caller:top")
     );
+    assert_eq!(
+        module.get("ALIASED").unwrap().unpack_str(),
+        Some("@@dep+//caller:alias")
+    );
+    assert_eq!(
+        module.get("IMPORTED").unwrap().unpack_str(),
+        Some("@@dep+//owner:owned")
+    );
+    assert_eq!(module.get("IDEMPOTENT").unwrap().unpack_bool(), Some(true));
+    let aspect = module
+        .get("RUST_ANALYZER")
+        .unwrap()
+        .downcast::<FrozenAspectDefinition>()
+        .unwrap();
+    assert_eq!(
+        aspect.required_toolchain.as_ref(),
+        Some(&CanonicalLabel::parse("@@dep+//rust:toolchain_type").unwrap())
+    );
+}
+
+#[test]
+fn bazel_label_rejects_unadmitted_inputs_and_missing_function_provenance() {
+    for source in [
+        "X = Label('bare')",
+        "X = Label('@repo//pkg:target')",
+        "X = Label('@@repo//pkg:target')",
+        "X = Label(1)",
+    ] {
+        assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
+    }
+    let error = eval_global(
+        "def make_label():\n  x = Label(':owned')\n  return x\nX = make_label()",
+        &loading_globals(),
+    )
+    .unwrap_err();
+    assert!(error.contains("recursive Bzl manifest"), "{error}");
+}
+
+#[tokio::test]
+async fn repository_package_rejects_reexported_label_builtin() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(\":defs.bzl\", \"LABEL_ALIAS\")\nBLOCKED = LABEL_ALIAS(\":target\")\n",
+        ),
+        ("defs.bzl", b"LABEL_ALIAS = Label\n"),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, 403).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    assert!(repository_package_error(&outcome).contains("Label() may only be called in a .bzl"));
 }
 
 #[tokio::test]

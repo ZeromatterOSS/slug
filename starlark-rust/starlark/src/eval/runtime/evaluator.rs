@@ -542,6 +542,30 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
         })
     }
 
+    /// Return the source filename of the innermost executing Starlark `def`.
+    /// A direct module-scope native call has no such frame.
+    pub fn native_caller_function_filename(&self) -> Option<String> {
+        (1..self.call_stack.count()).find_map(|n| {
+            let caller = self.call_stack.top_nth_function_opt(n)?;
+            let def_info = if let Some(caller) = caller.downcast_ref::<Def>() {
+                caller.def_info
+            } else if let Some(caller) = caller.downcast_ref::<FrozenDef>() {
+                caller.def_info
+            } else {
+                return None;
+            };
+            Some(def_info.codemap.filename().to_owned())
+        })
+    }
+
+    /// Return the typed source filename containing the current native call.
+    /// This remains available when a Starlark function was compiler-inlined.
+    pub fn native_call_source_filename(&self) -> Option<String> {
+        self.call_stack
+            .nth_location(0)
+            .map(|location| location.file.filename().to_owned())
+    }
+
     pub(crate) fn before_stmt_fn(
         &mut self,
         f: &'a dyn for<'v1, 'a2> Fn(FileSpanRef, bool, &mut Evaluator<'v1, 'a2, 'e>),
@@ -1146,9 +1170,12 @@ mod tests {
         fn capture_native_context(eval: &mut Evaluator) -> anyhow::Result<String> {
             Ok(match eval.native_call_context("name") {
                 Some(context) => format!(
-                    "{}|{}|{}",
+                    "{}|{}|{}@{}",
                     context.function_name,
                     context.local_value.as_deref().unwrap_or("<none>"),
+                    eval.native_caller_function_filename()
+                        .as_deref()
+                        .unwrap_or("<none>"),
                     context.call_location
                 ),
                 None => "<none>".to_owned(),
@@ -1182,7 +1209,9 @@ mod tests {
         let inside = module.get("inside").unwrap();
         let inside = inside.unpack_str().unwrap();
         assert!(
-            inside.starts_with("legacy_macro|target|native_call_context.star:5:"),
+            inside.starts_with(
+                "legacy_macro|target|native_call_context.star@native_call_context.star:5:"
+            ),
             "{inside}"
         );
         assert_eq!(module.get("direct").unwrap().unpack_str(), Some("<none>"));

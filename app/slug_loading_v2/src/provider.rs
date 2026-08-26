@@ -16,6 +16,7 @@ use allocative::Allocative;
 use compact_str::CompactString;
 use dupe::Dupe;
 use slug_build_api_v2::ProviderId;
+use slug_identity_v2::CanonicalLabel;
 use starlark::any::ProvidesStaticType;
 use starlark::eval::Arguments;
 use starlark::eval::Evaluator;
@@ -34,15 +35,47 @@ use starlark::values::list::ListRef;
 use starlark::values::starlark_value;
 use starlark_map::small_map::SmallMap;
 
+use crate::bzl_module::BzlLoadManifest;
+use crate::bzl_module::manifest_starlark_sources;
+
 #[derive(Debug, ProvidesStaticType)]
 pub(crate) struct BzlEvaluationContext {
     source_label: CompactString,
+    source_canonical: CanonicalLabel,
+    source_labels_by_filename: Arc<[(CompactString, CanonicalLabel)]>,
 }
 
 impl BzlEvaluationContext {
+    #[cfg(test)]
     pub(crate) fn new(source_label: impl Into<CompactString>) -> Self {
+        let source_label = source_label.into();
+        let canonical = if source_label.starts_with("@@") {
+            source_label.to_string()
+        } else {
+            format!("@@{source_label}")
+        };
         Self {
-            source_label: source_label.into(),
+            source_canonical: CanonicalLabel::parse(&canonical)
+                .expect("Bzl evaluation context requires a valid source label"),
+            source_label,
+            source_labels_by_filename: Arc::from([]),
+        }
+    }
+
+    pub(crate) fn from_manifest(manifest: &BzlLoadManifest) -> Self {
+        let canonical_source = manifest.root.label.to_string();
+        let source_label = if manifest.root.label.package().repo().is_root() {
+            canonical_source
+                .strip_prefix("@@")
+                .expect("canonical root labels begin with @@")
+                .into()
+        } else {
+            canonical_source.into()
+        };
+        Self {
+            source_label,
+            source_canonical: manifest.root.label.clone(),
+            source_labels_by_filename: manifest_starlark_sources(manifest),
         }
     }
 
@@ -54,6 +87,35 @@ impl BzlEvaluationContext {
 
     pub(crate) fn source_label(&self) -> &str {
         &self.source_label
+    }
+
+    pub(crate) fn source_label_for_call(
+        &self,
+        eval: &Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<CanonicalLabel> {
+        let caller = eval.native_caller_function_filename();
+        let Some(filename) = eval
+            .native_call_source_filename()
+            .or_else(|| caller.clone())
+        else {
+            return Ok(self.source_canonical.clone());
+        };
+        if caller.is_none() && self.source_labels_by_filename.is_empty() {
+            return Ok(self.source_canonical.clone());
+        }
+        let mut labels = self
+            .source_labels_by_filename
+            .iter()
+            .filter_map(|(source, label)| (source.as_str() == filename).then_some(label));
+        let label = labels.next().ok_or_else(|| {
+            anyhow::anyhow!(
+                "Starlark caller source is not present in the recursive Bzl manifest: {filename}"
+            )
+        })?;
+        if labels.next().is_some() {
+            anyhow::bail!("ambiguous Starlark caller in the Bzl manifest: {filename}");
+        }
+        Ok(label.clone())
     }
 }
 
