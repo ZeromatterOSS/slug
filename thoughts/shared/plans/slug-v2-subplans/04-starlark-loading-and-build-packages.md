@@ -5024,3 +5024,44 @@ support the same phase boundary; no Zig code, representation, behavior, cache
 or analysis algorithm is adopted. Bazel 9.2 remains sole authority. The
 Buck2-utility audit selects existing Arc slices, `ProviderId`, frozen values,
 compact strings and `Allocative`, with no new collection or interner.
+
+### Rustfmt test target attribute accepted; post-rustfmt source-order audit selected (2026-08-26)
+
+Commit `88304c2f` retains the fixed `rustfmt_test.targets` dependency schema in
+the existing transient/frozen rule owner. Its two ordered singleton provider
+alternatives, complete attached aspect and custom transition remain distinct
+declaration facts. Recursive proof preserves every provider/aspect defining
+label and first export. Target invocation rejects before configured loading
+could drop provider or aspect metadata; no dependency policy is applied.
+
+Focused proof, all 196 loading unit tests and unaffected integrations pass.
+Locked core check, rebuilt CLI, formatting and diff checks pass; the one broad
+integration failure is the already-recorded stale `@external` diagnostic
+expectation. Growth is 66 production and 175 proof additions within packet
+caps. Independent review returned `ACCEPT` after a direct duplicate-aspect
+rejection row closed its only requested proof gap.
+
+Recursive source order does not jump directly to another public ruleset. The
+tail of `rust/private/rustfmt.bzl` contains lazy implementation bodies and two
+toolchain rule declarations that appear to use accepted label schemas and
+canonical toolchain strings. Evaluation then returns to `rust/toolchain.bzl`,
+passes the alias-only rust-analyzer wrapper, and enters
+`rust/rust_stdlib_filegroup.bzl`, which loads `rust/private/toolchain.bzl`.
+That module's first mapped child is
+`@bazel_skylib//rules:common_settings.bzl`; provider and string-attribute
+declarations precede the first candidate absent expression,
+`config.int(flag = True)` at line 71, followed by `config.int()` at line 81.
+
+Run only docs packet `WP-4-7A-post-rustfmt-source-order-audit`. Authenticate
+the complete recursive manifest/cached-child order, prove that mapped external
+loading is already admitted, verify the remaining rustfmt declarations against
+the live Slug surface, and establish the exact Bazel integer build-setting
+descriptor contract before selecting one implementation or `REPLAN`. Do not
+add Rust or advance to `attr.label_list(allow_files = True)` during the audit.
+
+Pinned Zabel `c7298478…` supplies architectural guidance only: its evaluator-
+free `BuildSettingDefinition` owns `BuildSettingKind.int` beside bool, string
+and list kinds. This supports a single declaration-owned typed descriptor, not
+any compatibility conclusion. No Zig code, representation, evaluator,
+configured capture or analysis behavior is adopted; pinned Bazel 9.2 remains
+sole behavior authority.

@@ -30,18 +30,49 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; rustfmt test target-attribute loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes the file's final lazy rule; `2cbdb148` completes lint-test common attributes; `d4d4d6dc` freezes the first rustfmt aspect's fixed requirements; `275e0b24` freezes the second aspect's attrs and required producer; `50205fb3` freezes the third aspect's advertised provider; `cb8df441` selects the authenticated target-attribute audit | freeze the fixed `targets` dependency declaration while failing target invocation closed; application, propagation and configured semantics remain deferred | run only `WP-4-7A-rustfmt-test-target-attribute-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; post-rustfmt source-order audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes the file's final lazy rule; `2cbdb148` completes lint-test common attributes; `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` freeze the three rustfmt aspects and the rustfmt-test dependency declaration | replay the selected recursive manifest beyond rustfmt, authenticate the first new unsupported expression, and select one bounded packet or `REPLAN` | run only `WP-4-7A-post-rustfmt-source-order-audit`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-rustfmt-test-target-attribute-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-post-rustfmt-source-order-audit](./slug-v2-subplans/current-packet.md).
 
-Freeze accepted rules_rust `rust/private/rustfmt.bzl:218-243`, especially the
-fixed `targets = attr.label_list(...)` documentation, provider predicate,
-aspect and custom transition. Reject invocation before dropping provider or
-aspect metadata; do not apply either dependency policy.
+Replay the selected rules_rust recursive manifest after the accepted
+`rustfmt_test` dependency declaration. Prove which remaining rustfmt/toolchain
+declarations are already supported and authenticate the first newly evaluated
+unsupported expression before selecting implementation or `REPLAN`.
+
+### M7 rustfmt test target attribute accepted; post-rustfmt audit selected (2026-08-26)
+
+Commit `88304c2f` freezes the fixed `targets` label-list declaration with its
+ordered `CrateInfo`/`TestCrateInfo` alternatives, complete exported
+`_rustfmt_test_aspect`, and existing `platform_transition`. All producer
+identities survive recursive module freeze. Target invocation fails before
+configured loading could discard provider/aspect facts; application,
+transition execution and provider matching remain deferred.
+
+Focused proof, all 196 loading unit tests, unaffected loading integrations,
+locked core check, rebuilt CLI, formatting and diff gates pass. The sole broad
+integration failure remains the recorded stale `@external` diagnostic
+expectation. Final growth is 66 production and 175 proof additions within all
+caps. Independent review requested one duplicate-aspect rejection row and
+returned `ACCEPT` after that bounded correction.
+
+Source order continues through `rust/private/rustfmt.bzl:281-356`, then returns
+to `rust/toolchain.bzl`. The remaining rustfmt toolchain declarations appear to
+use accepted label schemas and toolchain-label conversion, but that must be
+proved against the live loader. The next uncached wrapper reaches
+`rust/private/toolchain.bzl`, whose first mapped child is
+`@bazel_skylib//rules:common_settings.bzl`; its first candidate missing surface
+is `config.int(flag = True)` at line 71. Run only the docs audit before adding
+integer settings or assuming every preceding child is already supported.
+
+Pinned Zabel `c7298478…` guides only the declaration owner: its typed
+`BuildSettingKind.int` lives beside the other evaluator-free build-setting
+kinds. Slug may reuse that phase split, but no Zig code, layout, behavior,
+cache or configured semantics may be adopted. Pinned Bazel 9.2 remains the
+sole behavior authority.
 
 ### M7 rustfmt test target-attribute audit accepted; loading selected (2026-08-26)
 
