@@ -7,11 +7,9 @@
  * source tree. You may select the license that applies to you.
  */
 
-use std::ffi::OsString;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::ops::Range;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
@@ -264,6 +262,29 @@ impl RepositoryMaterializer {
     #[cfg(test)]
     pub(super) fn workspace(&self) -> &NormalizedAbsolutePath {
         &self.workspace
+    }
+
+    #[cfg(test)]
+    pub(super) fn active_result_for_test(
+        &self,
+        token: RepositorySessionToken,
+        canonical_repo: &str,
+    ) -> RepositoryMaterializationResult {
+        self.state
+            .lock()
+            .expect("repository materializer mutex poisoned")
+            .active
+            .as_ref()
+            .filter(|active| active.token == token)
+            .and_then(|active| {
+                active
+                    .entries
+                    .iter()
+                    .find(|entry| entry.request.id.canonical_repo.as_str() == canonical_repo)
+            })
+            .expect("active repository materialization result")
+            .result
+            .clone()
     }
 
     pub(super) fn begin(&self) -> Result<RepositorySessionToken, RepositorySessionError> {
@@ -1196,7 +1217,7 @@ impl RepositoryIo for LocalRepositoryIo {
     }
 }
 
-enum Materialized {
+pub(super) enum Materialized {
     Local {
         source_root: PathBuf,
     },
@@ -1388,9 +1409,9 @@ fn materialize_native_attempt(
                 Err(error) => RepositoryMaterializationAttempt::SpecError(error.message.into()),
             }
         }
-        ("@@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive") => materialized_attempt(
-            materialize_archive_with(&request.repo_spec, &mut NativeArchiveIo),
-        ),
+        ("@@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive") => {
+            materialized_attempt(materialize_archive_plan(&request.repo_spec))
+        }
         ("@@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository") => {
             materialized_attempt(materialize_git_staged(&request.repo_spec))
         }
@@ -1524,40 +1545,61 @@ fn materialize_local(
 }
 
 fn materialize_archive(repo_spec: &RepoSpec) -> Result<Materialized, RepositoryTransportError> {
-    materialize_archive_with(repo_spec, &mut NativeArchiveIo)
-        .map_err(ArchiveMaterializationError::into_repository)
+    materialize_archive_plan(repo_spec).map_err(ArchiveMaterializationError::into_repository)
+}
+
+fn materialize_archive_plan(
+    repo_spec: &RepoSpec,
+) -> Result<Materialized, ArchiveMaterializationError> {
+    match super::repository_archive::parse_archive_plan(repo_spec) {
+        Ok(super::repository_archive::ArchivePlan::LocalTar) => {
+            super::repository_archive::materialize_local_tar(repo_spec)
+        }
+        Ok(super::repository_archive::ArchivePlan::SelectedBcrTarGz(plan)) => {
+            let _complete_plan = (
+                plan.urls,
+                plan.integrity,
+                plan.module_url,
+                plan.module_integrity,
+            );
+            Err(ArchiveMaterializationError::transport(
+                "selected-registry BCR archive transport is deferred",
+            ))
+        }
+        Err(error) => Err(ArchiveMaterializationError::spec(error)),
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ArchiveFailureStage {
+pub(super) enum ArchiveFailureStage {
     Spec,
     Transport,
     Materialization,
 }
 
 #[derive(Debug)]
-struct ArchiveMaterializationError {
-    stage: ArchiveFailureStage,
-    message: String,
+pub(super) struct ArchiveMaterializationError {
+    pub(super) stage: ArchiveFailureStage,
+    pub(super) message: String,
 }
 
 impl ArchiveMaterializationError {
-    fn new(stage: ArchiveFailureStage, message: impl Into<String>) -> Self {
+    pub(super) fn new(stage: ArchiveFailureStage, message: impl Into<String>) -> Self {
         Self {
             stage,
             message: message.into(),
         }
     }
 
-    fn spec(message: impl Into<String>) -> Self {
+    pub(super) fn spec(message: impl Into<String>) -> Self {
         Self::new(ArchiveFailureStage::Spec, message)
     }
 
-    fn transport(message: impl Into<String>) -> Self {
+    pub(super) fn transport(message: impl Into<String>) -> Self {
         Self::new(ArchiveFailureStage::Transport, message)
     }
 
-    fn materialization(message: impl Into<String>) -> Self {
+    pub(super) fn materialization(message: impl Into<String>) -> Self {
         Self::new(ArchiveFailureStage::Materialization, message)
     }
 
@@ -1567,561 +1609,6 @@ impl ArchiveMaterializationError {
             message: self.message.into(),
         }
     }
-}
-
-enum SavedChecksum {
-    Valid(String),
-    Malformed,
-}
-
-struct CapturedArchive {
-    bytes: Vec<u8>,
-    _artifact: tempfile::NamedTempFile,
-}
-
-trait ArchiveIo: ArchiveDestination {
-    fn create_root(&mut self) -> std::io::Result<tempfile::TempDir>;
-    fn create_capture(&mut self) -> std::io::Result<tempfile::NamedTempFile>;
-    fn read_source(&mut self, source: &Path) -> std::io::Result<Vec<u8>>;
-    fn write_capture(
-        &mut self,
-        capture: &mut tempfile::NamedTempFile,
-        bytes: &[u8],
-    ) -> std::io::Result<()>;
-    fn flush_capture(&mut self, capture: &mut tempfile::NamedTempFile) -> std::io::Result<()>;
-}
-
-struct NativeArchiveIo;
-
-impl ArchiveIo for NativeArchiveIo {
-    fn create_root(&mut self) -> std::io::Result<tempfile::TempDir> {
-        tempfile::tempdir()
-    }
-
-    fn create_capture(&mut self) -> std::io::Result<tempfile::NamedTempFile> {
-        tempfile::NamedTempFile::new()
-    }
-
-    fn read_source(&mut self, source: &Path) -> std::io::Result<Vec<u8>> {
-        std::fs::read(source)
-    }
-
-    fn write_capture(
-        &mut self,
-        capture: &mut tempfile::NamedTempFile,
-        bytes: &[u8],
-    ) -> std::io::Result<()> {
-        capture.write_all(bytes)
-    }
-
-    fn flush_capture(&mut self, capture: &mut tempfile::NamedTempFile) -> std::io::Result<()> {
-        capture.flush()
-    }
-}
-
-impl ArchiveDestination for NativeArchiveIo {
-    fn create_parent(&mut self, path: &Path) -> std::io::Result<()> {
-        std::fs::create_dir_all(path)
-    }
-
-    fn create_directory(&mut self, path: &Path) -> std::io::Result<()> {
-        std::fs::create_dir_all(path)
-    }
-
-    fn write_regular(&mut self, path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-        let mut output = File::create(path)?;
-        output.write_all(bytes)
-    }
-}
-
-fn materialize_archive_with(
-    repo_spec: &RepoSpec,
-    io: &mut impl ArchiveIo,
-) -> Result<Materialized, ArchiveMaterializationError> {
-    reject_extra_attributes(repo_spec, &["urls", "sha256", "type", "strip_prefix"])
-        .map_err(|error| ArchiveMaterializationError::spec(error.message))?;
-    let urls = repo_spec.attributes.get("urls").ok_or_else(|| {
-        ArchiveMaterializationError::spec("http_archive requires exactly one file URL")
-    })?;
-    let OverrideAttributeValue::Iterable(urls) = urls else {
-        return Err(ArchiveMaterializationError::spec(
-            "http_archive urls must contain exactly one file URL",
-        ));
-    };
-    let [OverrideAttributeValue::String(url)] = urls.as_ref() else {
-        return Err(ArchiveMaterializationError::spec(
-            "http_archive urls must contain exactly one file URL",
-        ));
-    };
-    let archive =
-        local_file_uri(url).map_err(|error| ArchiveMaterializationError::spec(error.message))?;
-    if optional_string(repo_spec, "type")
-        .map_err(|error| ArchiveMaterializationError::spec(error.message))?
-        != Some("tar")
-    {
-        return Err(ArchiveMaterializationError::spec(
-            "http_archive type must be exactly tar",
-        ));
-    }
-    let strip_prefix = optional_string(repo_spec, "strip_prefix")
-        .map_err(|error| ArchiveMaterializationError::spec(error.message))?
-        .map(latin1_bytes);
-    if strip_prefix
-        .as_ref()
-        .is_some_and(|prefix| prefix.contains(&0))
-    {
-        return Err(ArchiveMaterializationError::spec(
-            "http_archive strip_prefix contains a NUL byte",
-        ));
-    }
-    let prefix = strip_prefix
-        .as_deref()
-        .map(|value| normalize_raw_tar_path(value, native_path_flavor()))
-        .transpose()?;
-    if let Some(prefix) = prefix.as_deref() {
-        validate_strip_prefix(prefix, native_path_flavor())?;
-    }
-    let expected_sha256 = required_string(repo_spec, "sha256")
-        .map_err(|error| ArchiveMaterializationError::spec(error.message))?;
-    let saved_checksum = if expected_sha256.len() == 64
-        && expected_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
-    {
-        SavedChecksum::Valid(expected_sha256.to_owned())
-    } else {
-        SavedChecksum::Malformed
-    };
-
-    let root = io.create_root().map_err(|error| {
-        ArchiveMaterializationError::materialization(format!(
-            "creating archive materialization root: {error}"
-        ))
-    })?;
-    let mut artifact = io.create_capture().map_err(|error| {
-        ArchiveMaterializationError::materialization(format!(
-            "creating temporary http_archive capture: {error}"
-        ))
-    })?;
-    let bytes = io.read_source(&archive).map_err(|error| {
-        ArchiveMaterializationError::transport(format!(
-            "reading http_archive {}: {error}",
-            archive.display()
-        ))
-    })?;
-    io.write_capture(&mut artifact, &bytes).map_err(|error| {
-        ArchiveMaterializationError::transport(format!(
-            "writing temporary http_archive capture: {error}"
-        ))
-    })?;
-    io.flush_capture(&mut artifact).map_err(|error| {
-        ArchiveMaterializationError::transport(format!(
-            "flushing temporary http_archive capture: {error}"
-        ))
-    })?;
-    let captured = CapturedArchive {
-        bytes,
-        _artifact: artifact,
-    };
-
-    let SavedChecksum::Valid(expected_sha256) = saved_checksum else {
-        return Err(ArchiveMaterializationError::spec(
-            "http_archive sha256 must be an exact 64-character hexadecimal digest",
-        ));
-    };
-    let actual_sha256 = format!("{:x}", Sha256::digest(&captured.bytes));
-    if !actual_sha256.eq_ignore_ascii_case(&expected_sha256) {
-        return Err(ArchiveMaterializationError::transport(
-            "http_archive sha256 does not match the local tar",
-        ));
-    }
-
-    let plan = inspect_and_plan_ustar(&captured.bytes, prefix.as_deref(), root.path())?;
-    extract_ustar_plan(&captured.bytes, &plan, io)?;
-    Ok(Materialized::Immutable {
-        bytes: captured.bytes,
-        root,
-    })
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[allow(dead_code)] // Both flavors are exercised by host-pure tests.
-enum PathFlavor {
-    Unix,
-    Windows,
-}
-
-#[cfg(windows)]
-fn native_path_flavor() -> PathFlavor {
-    PathFlavor::Windows
-}
-
-#[cfg(not(windows))]
-fn native_path_flavor() -> PathFlavor {
-    PathFlavor::Unix
-}
-
-fn latin1_bytes(value: &str) -> Vec<u8> {
-    value
-        .chars()
-        .map(|character| u8::try_from(u32::from(character)).unwrap_or(b'?'))
-        .collect()
-}
-
-fn validate_strip_prefix(
-    prefix: &[Vec<u8>],
-    flavor: PathFlavor,
-) -> Result<(), ArchiveMaterializationError> {
-    if prefix.is_empty() || join_raw_components(Path::new(""), prefix, flavor).is_err() {
-        return Err(ArchiveMaterializationError::spec(
-            "http_archive strip_prefix must normalize to a safe relative path",
-        ));
-    }
-    Ok(())
-}
-
-fn normalize_raw_tar_path(
-    value: &[u8],
-    flavor: PathFlavor,
-) -> Result<Vec<Vec<u8>>, ArchiveMaterializationError> {
-    let is_separator = |byte| byte == b'/' || (flavor == PathFlavor::Windows && byte == b'\\');
-    let drive_absolute = flavor == PathFlavor::Windows
-        && value.len() >= 3
-        && value[0].is_ascii_alphabetic()
-        && value[1] == b':'
-        && is_separator(value[2]);
-    let absolute = value.first().is_some_and(|byte| is_separator(*byte)) || drive_absolute;
-    let mut start = if drive_absolute { 3 } else { 0 };
-    while start < value.len() && is_separator(value[start]) {
-        start += 1;
-    }
-    let mut components: Vec<Vec<u8>> = Vec::new();
-    for component in value[start..].split(|byte| is_separator(*byte)) {
-        if component.is_empty() || component == b"." {
-            continue;
-        }
-        if component == b".." {
-            if components
-                .last()
-                .is_some_and(|last| last.as_slice() != b"..")
-            {
-                components.pop();
-            } else if !absolute {
-                components.push(component.to_vec());
-            }
-        } else {
-            components.push(component.to_vec());
-        }
-    }
-    Ok(components)
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum PlannedUstarKind {
-    Regular,
-    Directory,
-}
-
-#[derive(Debug)]
-struct PlannedUstarEntry {
-    components: Vec<Vec<u8>>,
-    path: PathBuf,
-    payload: Range<usize>,
-    kind: PlannedUstarKind,
-}
-
-#[derive(Debug, Default)]
-struct UstarExtractionPlan {
-    entries: Vec<PlannedUstarEntry>,
-}
-
-fn inspect_and_plan_ustar(
-    bytes: &[u8],
-    prefix: Option<&[Vec<u8>]>,
-    root: &Path,
-) -> Result<UstarExtractionPlan, ArchiveMaterializationError> {
-    let flavor = native_path_flavor();
-    inspect_and_plan_ustar_for_flavor(bytes, prefix, flavor, root)
-}
-
-fn inspect_and_plan_ustar_for_flavor(
-    bytes: &[u8],
-    prefix: Option<&[Vec<u8>]>,
-    flavor: PathFlavor,
-    root: &Path,
-) -> Result<UstarExtractionPlan, ArchiveMaterializationError> {
-    let mut plan = UstarExtractionPlan::default();
-    let mut offset = 0usize;
-    let mut found_prefix = false;
-    while offset < bytes.len() {
-        if bytes.len() - offset < 512 {
-            break;
-        }
-        let header = &bytes[offset..offset + 512];
-        if header.iter().all(|byte| *byte == 0) {
-            break;
-        }
-        let size = parse_ustar_octal(&header[124..136])?;
-        parse_ustar_octal(&header[148..156]).map_err(|_| {
-            ArchiveMaterializationError::materialization(
-                "http_archive tar entry has a malformed checksum field",
-            )
-        })?;
-        reject_non_ustar_layout(header)?;
-        let payload_start = offset + 512;
-        let payload_end = payload_start.checked_add(size).ok_or_else(|| {
-            ArchiveMaterializationError::materialization(
-                "http_archive tar entry payload length overflows",
-            )
-        })?;
-        if payload_end > bytes.len() {
-            return Err(ArchiveMaterializationError::materialization(
-                "http_archive tar entry payload is truncated",
-            ));
-        }
-        let padding = (512 - size % 512) % 512;
-        let next_offset = payload_end.checked_add(padding).ok_or_else(|| {
-            ArchiveMaterializationError::materialization(
-                "http_archive tar entry padding length overflows",
-            )
-        })?;
-        if next_offset > bytes.len() {
-            return Err(ArchiveMaterializationError::materialization(
-                "http_archive tar entry padding is truncated",
-            ));
-        }
-
-        let name = nul_terminated(&header[..100]);
-        let raw_prefix = nul_terminated(&header[345..500]);
-        let mut raw_path =
-            Vec::with_capacity(raw_prefix.len() + usize::from(!raw_prefix.is_empty()) + name.len());
-        if !raw_prefix.is_empty() {
-            raw_path.extend_from_slice(raw_prefix);
-            raw_path.push(b'/');
-        }
-        raw_path.extend_from_slice(name);
-        let normalized = normalize_raw_tar_path(&raw_path, flavor)?;
-        let selected = match prefix {
-            None => Some(normalized.as_slice()),
-            Some(prefix) if normalized.starts_with(prefix) => {
-                found_prefix = true;
-                Some(&normalized[prefix.len()..])
-            }
-            Some(_) => None,
-        };
-        if let Some(selected) = selected {
-            let kind = match header[156] {
-                b'5' => PlannedUstarKind::Directory,
-                0 | b'0' if raw_path.ends_with(b"/") => PlannedUstarKind::Directory,
-                0 | b'0' => PlannedUstarKind::Regular,
-                _ => {
-                    return Err(ArchiveMaterializationError::materialization(
-                        "http_archive contains an unsupported tar entry type",
-                    ));
-                }
-            };
-            if !selected.is_empty() {
-                let path = join_raw_components(root, selected, flavor)?;
-                reject_namespace_collision(&plan.entries, selected, kind)?;
-                plan.entries.push(PlannedUstarEntry {
-                    components: selected.to_vec(),
-                    path,
-                    payload: payload_start..payload_end,
-                    kind,
-                });
-            }
-        }
-        offset = next_offset;
-    }
-    if prefix.is_some() && !found_prefix {
-        return Err(ArchiveMaterializationError::materialization(
-            "http_archive strip_prefix was not found",
-        ));
-    }
-    Ok(plan)
-}
-
-fn reject_non_ustar_layout(header: &[u8]) -> Result<(), ArchiveMaterializationError> {
-    if &header[257..263] == b"ustar " || (&header[257..263] == b"ustar\0" && is_xstar(header)) {
-        return Err(ArchiveMaterializationError::materialization(
-            "http_archive contains an unsupported tar header layout",
-        ));
-    }
-    Ok(())
-}
-
-fn is_xstar(header: &[u8]) -> bool {
-    if &header[508..512] == b"tar\0" {
-        return true;
-    }
-    if header[475] != 0
-        && (header[156] != b'M' || ((header[464] & 0x80) == 0 && header[475] != b' '))
-    {
-        return false;
-    }
-    xstar_time_is_valid(&header[476..488]) && xstar_time_is_valid(&header[488..500])
-}
-
-fn xstar_time_is_valid(field: &[u8]) -> bool {
-    field[0] & 0x80 != 0
-        || (field[..field.len() - 1]
-            .iter()
-            .all(|byte| matches!(byte, b'0'..=b'7'))
-            && matches!(field[field.len() - 1], 0 | b' '))
-}
-
-fn parse_ustar_octal(field: &[u8]) -> Result<usize, ArchiveMaterializationError> {
-    if field.first() == Some(&0) {
-        return Ok(0);
-    }
-    if field.first().is_some_and(|byte| byte & 0x80 != 0) {
-        return Err(ArchiveMaterializationError::materialization(
-            "http_archive tar entry uses an unsupported base-256 size",
-        ));
-    }
-    let mut start = 0;
-    while field.get(start) == Some(&b' ') {
-        start += 1;
-    }
-    let mut end = field.len();
-    while end > start && matches!(field[end - 1], 0 | b' ') {
-        end -= 1;
-    }
-    let mut value = 0usize;
-    for byte in &field[start..end] {
-        if !matches!(byte, b'0'..=b'7') {
-            return Err(ArchiveMaterializationError::materialization(
-                "http_archive tar entry has a malformed size",
-            ));
-        }
-        value = value
-            .checked_mul(8)
-            .and_then(|value| value.checked_add(usize::from(*byte - b'0')))
-            .ok_or_else(|| {
-                ArchiveMaterializationError::materialization(
-                    "http_archive tar entry size overflows",
-                )
-            })?;
-    }
-    Ok(value)
-}
-
-fn nul_terminated(field: &[u8]) -> &[u8] {
-    &field[..field
-        .iter()
-        .position(|byte| *byte == 0)
-        .unwrap_or(field.len())]
-}
-
-fn reject_namespace_collision(
-    entries: &[PlannedUstarEntry],
-    components: &[Vec<u8>],
-    kind: PlannedUstarKind,
-) -> Result<(), ArchiveMaterializationError> {
-    for entry in entries {
-        if entry.components == components {
-            if entry.kind != kind {
-                return Err(ArchiveMaterializationError::materialization(
-                    "http_archive tar entries collide as file and directory",
-                ));
-            }
-        } else if entry.kind == PlannedUstarKind::Regular
-            && components.starts_with(&entry.components)
-            || kind == PlannedUstarKind::Regular && entry.components.starts_with(components)
-        {
-            return Err(ArchiveMaterializationError::materialization(
-                "http_archive tar entry collides with a regular-file ancestor",
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn join_raw_components(
-    root: &Path,
-    components: &[Vec<u8>],
-    flavor: PathFlavor,
-) -> Result<PathBuf, ArchiveMaterializationError> {
-    let mut result = root.to_path_buf();
-    for component in components {
-        if component.is_empty()
-            || matches!(component.as_slice(), b"." | b"..")
-            || component.contains(&0)
-            || (flavor == PathFlavor::Windows
-                && component
-                    .iter()
-                    .any(|byte| matches!(byte, b'/' | b'\\' | b':')))
-        {
-            return Err(ArchiveMaterializationError::materialization(
-                "http_archive tar entry contains a non-normal path component",
-            ));
-        }
-        let component = raw_os_string(component);
-        let mut parsed = Path::new(&component).components();
-        if !matches!(parsed.next(), Some(Component::Normal(value)) if value == component)
-            || parsed.next().is_some()
-        {
-            return Err(ArchiveMaterializationError::materialization(
-                "http_archive tar entry contains a non-normal OS component",
-            ));
-        }
-        result.push(component);
-    }
-    if !result.starts_with(root) {
-        return Err(ArchiveMaterializationError::materialization(
-            "http_archive tar entry escapes the destination directory",
-        ));
-    }
-    Ok(result)
-}
-
-#[cfg(unix)]
-fn raw_os_string(bytes: &[u8]) -> OsString {
-    use std::os::unix::ffi::OsStringExt;
-
-    OsString::from_vec(bytes.to_vec())
-}
-
-#[cfg(windows)]
-fn raw_os_string(bytes: &[u8]) -> OsString {
-    OsString::from(
-        bytes
-            .iter()
-            .map(|byte| char::from(*byte))
-            .collect::<String>(),
-    )
-}
-
-trait ArchiveDestination {
-    fn create_parent(&mut self, path: &Path) -> std::io::Result<()>;
-    fn create_directory(&mut self, path: &Path) -> std::io::Result<()>;
-    fn write_regular(&mut self, path: &Path, bytes: &[u8]) -> std::io::Result<()>;
-}
-
-fn extract_ustar_plan(
-    bytes: &[u8],
-    plan: &UstarExtractionPlan,
-    destination: &mut impl ArchiveDestination,
-) -> Result<(), ArchiveMaterializationError> {
-    for entry in &plan.entries {
-        if let Some(parent) = entry.path.parent() {
-            destination.create_parent(parent).map_err(|error| {
-                ArchiveMaterializationError::materialization(format!(
-                    "creating http_archive tar entry parent: {error}"
-                ))
-            })?;
-        }
-        let result = match entry.kind {
-            PlannedUstarKind::Directory => destination.create_directory(&entry.path),
-            PlannedUstarKind::Regular => {
-                destination.write_regular(&entry.path, &bytes[entry.payload.clone()])
-            }
-        };
-        result.map_err(|error| {
-            ArchiveMaterializationError::materialization(format!(
-                "extracting http_archive tar entry: {error}"
-            ))
-        })?;
-    }
-    Ok(())
 }
 
 fn materialize_git(repo_spec: &RepoSpec) -> Result<Materialized, RepositoryTransportError> {
@@ -2267,7 +1754,7 @@ fn extract_tar(
     Ok(())
 }
 
-fn local_file_uri(value: &str) -> Result<PathBuf, RepositoryTransportError> {
+pub(super) fn local_file_uri(value: &str) -> Result<PathBuf, RepositoryTransportError> {
     let url = url::Url::parse(value)
         .map_err(|_| unsupported("repository source must use an absolute file:// URI"))?;
     if url.scheme() != "file"
@@ -2283,7 +1770,7 @@ fn local_file_uri(value: &str) -> Result<PathBuf, RepositoryTransportError> {
         .map_err(|_| unsupported("repository source must use an absolute file:// URI"))
 }
 
-fn required_string<'a>(
+pub(super) fn required_string<'a>(
     repo_spec: &'a RepoSpec,
     name: &str,
 ) -> Result<&'a str, RepositoryTransportError> {
@@ -2295,7 +1782,7 @@ fn required_string<'a>(
     }
 }
 
-fn optional_string<'a>(
+pub(super) fn optional_string<'a>(
     repo_spec: &'a RepoSpec,
     name: &str,
 ) -> Result<Option<&'a str>, RepositoryTransportError> {
@@ -2308,7 +1795,7 @@ fn optional_string<'a>(
     }
 }
 
-fn reject_extra_attributes(
+pub(super) fn reject_extra_attributes(
     repo_spec: &RepoSpec,
     allowed: &[&str],
 ) -> Result<(), RepositoryTransportError> {
@@ -2783,15 +2270,6 @@ mod tests {
         }
     }
 
-    fn archive_spec_with_prefix(url: String, sha256: String, prefix: &str) -> RepoSpec {
-        let mut spec = archive_spec(url, sha256);
-        Arc::make_mut(&mut spec.attributes).insert(
-            "strip_prefix".into(),
-            OverrideAttributeValue::String(prefix.into()),
-        );
-        spec
-    }
-
     #[derive(Clone, Copy)]
     struct TarEntry<'a> {
         name: &'a [u8],
@@ -2837,153 +2315,29 @@ mod tests {
         field[..digits.len()].copy_from_slice(digits.as_bytes());
     }
 
-    #[derive(Default)]
-    struct RecordingDestination {
-        calls: Vec<(PlannedUstarKind, PathBuf, Vec<u8>)>,
-        fail: bool,
-    }
-
-    impl ArchiveDestination for RecordingDestination {
-        fn create_parent(&mut self, _path: &Path) -> std::io::Result<()> {
-            if self.fail {
-                return Err(std::io::Error::other("scripted parent failure"));
-            }
-            Ok(())
-        }
-
-        fn create_directory(&mut self, path: &Path) -> std::io::Result<()> {
-            if self.fail {
-                return Err(std::io::Error::other("scripted extraction failure"));
-            }
-            self.calls
-                .push((PlannedUstarKind::Directory, path.to_owned(), Vec::new()));
-            Ok(())
-        }
-
-        fn write_regular(&mut self, path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-            if self.fail {
-                return Err(std::io::Error::other("scripted extraction failure"));
-            }
-            self.calls
-                .push((PlannedUstarKind::Regular, path.to_owned(), bytes.to_vec()));
-            Ok(())
-        }
-    }
-
-    #[derive(Clone, Copy)]
-    enum ScriptedFailure {
-        None,
-        Root,
-        Capture,
-        Read,
-        Write,
-        Flush,
-    }
-
-    struct ScriptedArchiveIo {
-        source: Vec<u8>,
-        failure: ScriptedFailure,
-        reads: usize,
-        root_path: Option<PathBuf>,
-        capture_path: Option<PathBuf>,
-        replace_source: Option<Vec<u8>>,
-        delete_source: bool,
-        destination_calls: usize,
-        destination_failure: Option<&'static str>,
-    }
-
-    impl ScriptedArchiveIo {
-        fn new(source: Vec<u8>, failure: ScriptedFailure) -> Self {
-            Self {
-                source,
-                failure,
-                reads: 0,
-                root_path: None,
-                capture_path: None,
-                replace_source: None,
-                delete_source: false,
-                destination_calls: 0,
-                destination_failure: None,
-            }
-        }
-    }
-
-    impl ArchiveIo for ScriptedArchiveIo {
-        fn create_root(&mut self) -> std::io::Result<tempfile::TempDir> {
-            if matches!(self.failure, ScriptedFailure::Root) {
-                return Err(std::io::Error::other("scripted root failure"));
-            }
-            let root = tempfile::tempdir()?;
-            self.root_path = Some(root.path().to_owned());
-            Ok(root)
-        }
-
-        fn create_capture(&mut self) -> std::io::Result<tempfile::NamedTempFile> {
-            if matches!(self.failure, ScriptedFailure::Capture) {
-                return Err(std::io::Error::other("scripted capture failure"));
-            }
-            let capture = tempfile::NamedTempFile::new()?;
-            self.capture_path = Some(capture.path().to_owned());
-            Ok(capture)
-        }
-
-        fn read_source(&mut self, source: &Path) -> std::io::Result<Vec<u8>> {
-            self.reads += 1;
-            if matches!(self.failure, ScriptedFailure::Read) {
-                return Err(std::io::Error::other("scripted read failure"));
-            }
-            if let Some(replacement) = self.replace_source.take() {
-                std::fs::write(source, replacement)?;
-            } else if self.delete_source {
-                std::fs::remove_file(source)?;
-            }
-            Ok(self.source.clone())
-        }
-
-        fn write_capture(
-            &mut self,
-            capture: &mut tempfile::NamedTempFile,
-            bytes: &[u8],
-        ) -> std::io::Result<()> {
-            if matches!(self.failure, ScriptedFailure::Write) {
-                return Err(std::io::Error::other("scripted write failure"));
-            }
-            capture.write_all(bytes)
-        }
-
-        fn flush_capture(&mut self, capture: &mut tempfile::NamedTempFile) -> std::io::Result<()> {
-            if matches!(self.failure, ScriptedFailure::Flush) {
-                return Err(std::io::Error::other("scripted flush failure"));
-            }
-            capture.flush()
-        }
-    }
-
-    impl ArchiveDestination for ScriptedArchiveIo {
-        fn create_parent(&mut self, _path: &Path) -> std::io::Result<()> {
-            self.destination_calls += 1;
-            if self.destination_failure == Some("parent") {
-                return Err(std::io::Error::other("scripted parent failure"));
-            }
-            Ok(())
-        }
-
-        fn create_directory(&mut self, path: &Path) -> std::io::Result<()> {
-            self.destination_calls += 1;
-            if self.destination_failure == Some("directory") {
-                return Err(std::io::Error::other("scripted directory failure"));
-            }
-            std::fs::create_dir_all(path)
-        }
-
-        fn write_regular(&mut self, path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-            self.destination_calls += 1;
-            if self.destination_failure == Some("write") {
-                return Err(std::io::Error::other("scripted file failure"));
-            }
-            let mut output = File::create(path)?;
-            output.write_all(bytes)
-        }
+    fn immutable_archive_fixture() -> (tempfile::TempDir, RepoSpec) {
+        let source = tempfile::tempdir().unwrap();
+        let content = source.path().join("content");
+        std::fs::create_dir(&content).unwrap();
+        std::fs::write(content.join("MODULE.bazel"), b"module(name = 'archive')").unwrap();
+        let archive = source.path().join("source.tar");
+        assert!(
+            Command::new("tar")
+                .args(["--format=ustar", "-cf"])
+                .arg(&archive)
+                .args(["-C"])
+                .arg(source.path())
+                .arg("content")
+                .status()
+                .unwrap()
+                .success()
+        );
+        let bytes = std::fs::read(&archive).unwrap();
+        let spec = archive_spec(
+            url::Url::from_file_path(&archive).unwrap().to_string(),
+            format!("{:x}", Sha256::digest(&bytes)),
+        );
+        (source, spec)
     }
 
     fn git_spec(remote: String, commit: String) -> RepoSpec {
@@ -3034,929 +2388,6 @@ mod tests {
             repo_spec,
             kind,
         })
-    }
-
-    fn immutable_archive_fixture() -> (tempfile::TempDir, RepoSpec) {
-        let source = tempfile::tempdir().unwrap();
-        let content = source.path().join("content");
-        std::fs::create_dir(&content).unwrap();
-        std::fs::write(content.join("MODULE.bazel"), b"module(name = 'archive')").unwrap();
-        let archive = source.path().join("source.tar");
-        assert!(
-            Command::new("tar")
-                .args(["--format=ustar", "-cf"])
-                .arg(&archive)
-                .args(["-C"])
-                .arg(source.path())
-                .arg("content")
-                .status()
-                .unwrap()
-                .success()
-        );
-        let bytes = std::fs::read(&archive).unwrap();
-        let spec = archive_spec(
-            url::Url::from_file_path(&archive).unwrap().to_string(),
-            format!("{:x}", Sha256::digest(&bytes)),
-        );
-        (source, spec)
-    }
-
-    #[test]
-    fn archive_path_flavors_and_latin1_prefix_are_exact() {
-        assert_eq!(latin1_bytes("\u{ff}root"), b"\xffroot");
-        assert_eq!(latin1_bytes("\u{100}root"), b"?root");
-        assert_eq!(
-            normalize_raw_tar_path(br"root\f", PathFlavor::Unix).unwrap(),
-            vec![br"root\f".to_vec()]
-        );
-        for (input, expected) in [
-            (&b"C:/root/f"[..], vec![b"root".to_vec(), b"f".to_vec()]),
-            (&br"C:\root\f"[..], vec![b"root".to_vec(), b"f".to_vec()]),
-            (
-                &br"\\server\share\f"[..],
-                vec![b"server".to_vec(), b"share".to_vec(), b"f".to_vec()],
-            ),
-            (&br"root\f"[..], vec![b"root".to_vec(), b"f".to_vec()]),
-            (&b"C:foo"[..], vec![b"C:foo".to_vec()]),
-            (&br"a\..\b"[..], vec![b"b".to_vec()]),
-        ] {
-            assert_eq!(
-                normalize_raw_tar_path(input, PathFlavor::Windows).unwrap(),
-                expected
-            );
-        }
-        assert!(
-            join_raw_components(Path::new("root"), &[b"C:foo".to_vec()], PathFlavor::Windows)
-                .is_err()
-        );
-        assert!(
-            join_raw_components(
-                Path::new("root"),
-                &[b"..".to_vec(), b"escape".to_vec()],
-                PathFlavor::Unix
-            )
-            .is_err()
-        );
-        for (prefix, flavor) in [
-            (Vec::<Vec<u8>>::new(), PathFlavor::Unix),
-            (vec![b"..".to_vec()], PathFlavor::Unix),
-            (vec![b"C:foo".to_vec()], PathFlavor::Windows),
-        ] {
-            let error = validate_strip_prefix(&prefix, flavor).err().unwrap();
-            assert_eq!(error.stage, ArchiveFailureStage::Spec);
-        }
-        assert!(validate_strip_prefix(&[b"safe".to_vec()], PathFlavor::Unix).is_ok());
-    }
-
-    #[test]
-    fn archive_short_headers_and_declared_bounds_match_commons() {
-        for length in [0, 1, 511] {
-            let short = vec![b'x'; length];
-            assert!(
-                inspect_and_plan_ustar_for_flavor(&short, None, PathFlavor::Unix, Path::new(""))
-                    .unwrap()
-                    .entries
-                    .is_empty()
-            );
-            assert!(
-                inspect_and_plan_ustar_for_flavor(
-                    &short,
-                    Some(&[b"missing".to_vec()]),
-                    PathFlavor::Unix,
-                    Path::new("")
-                )
-                .is_err()
-            );
-        }
-        let entry = TarEntry {
-            name: b"file",
-            prefix: b"",
-            typeflag: b'0',
-            data: b"x",
-        };
-        let complete = ustar(&[entry], false);
-        assert_eq!(
-            inspect_and_plan_ustar_for_flavor(&complete, None, PathFlavor::Unix, Path::new(""))
-                .unwrap()
-                .entries
-                .len(),
-            1
-        );
-        for length in [1, 511] {
-            let mut trailing = complete.clone();
-            trailing.extend(std::iter::repeat_n(b'x', length));
-            assert_eq!(
-                inspect_and_plan_ustar_for_flavor(&trailing, None, PathFlavor::Unix, Path::new(""))
-                    .unwrap()
-                    .entries
-                    .len(),
-                1
-            );
-        }
-        let mut truncated_payload = ustar(
-            &[TarEntry {
-                name: b"file",
-                prefix: b"",
-                typeflag: b'0',
-                data: &[1; 513],
-            }],
-            false,
-        );
-        truncated_payload.truncate(512 + 512);
-        assert!(
-            inspect_and_plan_ustar_for_flavor(
-                &truncated_payload,
-                None,
-                PathFlavor::Unix,
-                Path::new("")
-            )
-            .is_err()
-        );
-        let mut truncated_padding = complete.clone();
-        truncated_padding.truncate(513);
-        assert!(
-            inspect_and_plan_ustar_for_flavor(
-                &truncated_padding,
-                None,
-                PathFlavor::Unix,
-                Path::new("")
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn archive_numeric_and_header_format_boundaries_are_explicit() {
-        assert_eq!(parse_ustar_octal(b"\x001          ").unwrap(), 0);
-        assert_eq!(parse_ustar_octal(b"       17\0 ").unwrap(), 15);
-        assert!(parse_ustar_octal(b"000000008\0  ").is_err());
-        assert!(parse_ustar_octal(&[b'7'; 30]).is_err());
-        let mut binary = [0u8; 12];
-        binary[0] = 0x80;
-        assert!(parse_ustar_octal(&binary).is_err());
-
-        let mut leading_nul = ustar(
-            &[TarEntry {
-                name: b"empty",
-                prefix: b"",
-                typeflag: b'0',
-                data: b"",
-            }],
-            false,
-        );
-        leading_nul[124..136].copy_from_slice(b"\x001          ");
-        let plan =
-            inspect_and_plan_ustar_for_flavor(&leading_nul, None, PathFlavor::Unix, Path::new(""))
-                .unwrap();
-        assert!(plan.entries[0].payload.is_empty());
-
-        for selected in [true, false] {
-            let mut binary_archive = ustar(
-                &[TarEntry {
-                    name: b"file",
-                    prefix: if selected {
-                        b"wanted".as_slice()
-                    } else {
-                        b"other".as_slice()
-                    },
-                    typeflag: b'0',
-                    data: b"",
-                }],
-                false,
-            );
-            binary_archive[124] = 0x80;
-            assert!(
-                inspect_and_plan_ustar_for_flavor(
-                    &binary_archive,
-                    Some(&[b"wanted".to_vec()]),
-                    PathFlavor::Unix,
-                    Path::new("")
-                )
-                .is_err()
-            );
-        }
-
-        let entry = TarEntry {
-            name: b"file",
-            prefix: b"prefix",
-            typeflag: b'0',
-            data: b"x",
-        };
-        let mut legacy = ustar(&[entry], false);
-        legacy[257..265].fill(0);
-        let plan = inspect_and_plan_ustar_for_flavor(
-            &legacy,
-            Some(&[b"prefix".to_vec()]),
-            PathFlavor::Unix,
-            Path::new(""),
-        )
-        .unwrap();
-        assert_eq!(plan.entries[0].components, vec![b"file".to_vec()]);
-
-        let mut odd_version = ustar(&[entry], false);
-        odd_version[263..265].copy_from_slice(b"!?");
-        assert!(
-            inspect_and_plan_ustar_for_flavor(&odd_version, None, PathFlavor::Unix, Path::new(""))
-                .is_ok()
-        );
-        let mut gnu = ustar(&[entry], false);
-        gnu[257..263].copy_from_slice(b"ustar ");
-        assert!(
-            inspect_and_plan_ustar_for_flavor(&gnu, None, PathFlavor::Unix, Path::new("")).is_err()
-        );
-        let mut xstar = ustar(&[entry], false);
-        xstar[508..512].copy_from_slice(b"tar\0");
-        assert!(
-            inspect_and_plan_ustar_for_flavor(&xstar, None, PathFlavor::Unix, Path::new(""))
-                .is_err()
-        );
-        let long_prefix = [b'p'; 140];
-        let mut discriminating_xstar = ustar(
-            &[TarEntry {
-                name: b"file",
-                prefix: &long_prefix,
-                typeflag: b'0',
-                data: b"x",
-            }],
-            false,
-        );
-        discriminating_xstar[508..512].copy_from_slice(b"tar\0");
-        assert!(
-            inspect_and_plan_ustar_for_flavor(
-                &discriminating_xstar,
-                Some(&[long_prefix.to_vec()]),
-                PathFlavor::Unix,
-                Path::new("")
-            )
-            .is_err()
-        );
-        let mut xustar = ustar(&[entry], false);
-        xustar[476..488].copy_from_slice(b"00000000000 ");
-        xustar[488..500].copy_from_slice(b"00000000000 ");
-        assert!(
-            inspect_and_plan_ustar_for_flavor(&xustar, None, PathFlavor::Unix, Path::new(""))
-                .is_err()
-        );
-        let mut checksum_corrupt = ustar(&[entry], false);
-        checksum_corrupt[148..156].fill(b'7');
-        assert!(
-            inspect_and_plan_ustar_for_flavor(
-                &checksum_corrupt,
-                None,
-                PathFlavor::Unix,
-                Path::new("")
-            )
-            .is_ok()
-        );
-        let mut checksum_leading_nul = ustar(&[entry], false);
-        checksum_leading_nul[148..156].copy_from_slice(b"\0xxxxxxx");
-        assert!(
-            inspect_and_plan_ustar_for_flavor(
-                &checksum_leading_nul,
-                None,
-                PathFlavor::Unix,
-                Path::new("")
-            )
-            .is_ok()
-        );
-        let mut checksum_invalid = ustar(&[entry], false);
-        checksum_invalid[148..156].copy_from_slice(b"000x000\0");
-        assert!(
-            inspect_and_plan_ustar_for_flavor(
-                &checksum_invalid,
-                None,
-                PathFlavor::Unix,
-                Path::new("")
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn archive_raw_prefix_normalization_and_type_rows_are_discriminating() {
-        let archive = ustar(
-            &[
-                TarEntry {
-                    name: b"raw-\xff",
-                    prefix: b"\xffroot",
-                    typeflag: b'0',
-                    data: b"raw",
-                },
-                TarEntry {
-                    name: b"./dir/",
-                    prefix: b"\xffroot",
-                    typeflag: b'0',
-                    data: b"",
-                },
-                TarEntry {
-                    name: b"typed",
-                    prefix: b"\xffroot",
-                    typeflag: b'5',
-                    data: b"",
-                },
-                TarEntry {
-                    name: b"/absolute/../normalized",
-                    prefix: b"\xffroot",
-                    typeflag: 0,
-                    data: b"normalized",
-                },
-            ],
-            false,
-        );
-        let plan = inspect_and_plan_ustar_for_flavor(
-            &archive,
-            Some(&[b"\xffroot".to_vec()]),
-            PathFlavor::Unix,
-            Path::new(""),
-        )
-        .unwrap();
-        assert_eq!(plan.entries.len(), 4);
-        assert_eq!(plan.entries[0].components[0], b"raw-\xff");
-        assert_eq!(plan.entries[1].kind, PlannedUstarKind::Directory);
-        assert_eq!(plan.entries[2].kind, PlannedUstarKind::Directory);
-        assert_eq!(plan.entries[3].components, vec![b"normalized".to_vec()]);
-
-        let source = tempfile::NamedTempFile::new().unwrap();
-        std::fs::write(source.path(), &archive).unwrap();
-        let url = url::Url::from_file_path(source.path()).unwrap().to_string();
-        let digest = format!("{:x}", Sha256::digest(&archive));
-        let mut io = ScriptedArchiveIo::new(archive, ScriptedFailure::None);
-        let Materialized::Immutable { root, .. } = materialize_archive_with(
-            &archive_spec_with_prefix(url, digest, "\u{ff}root"),
-            &mut io,
-        )
-        .unwrap() else {
-            panic!("archive must be immutable");
-        };
-        assert_eq!(
-            std::fs::read(root.path().join("normalized")).unwrap(),
-            b"normalized"
-        );
-
-        let question_archive = ustar(
-            &[TarEntry {
-                name: b"file",
-                prefix: b"?root",
-                typeflag: b'0',
-                data: b"question",
-            }],
-            false,
-        );
-        let question_source = tempfile::NamedTempFile::new().unwrap();
-        let question_url = url::Url::from_file_path(question_source.path())
-            .unwrap()
-            .to_string();
-        let question_digest = format!("{:x}", Sha256::digest(&question_archive));
-        let mut io = ScriptedArchiveIo::new(question_archive, ScriptedFailure::None);
-        assert!(
-            materialize_archive_with(
-                &archive_spec_with_prefix(question_url, question_digest, "\u{100}root"),
-                &mut io
-            )
-            .is_ok()
-        );
-    }
-
-    #[test]
-    fn archive_selection_types_and_planning_are_atomic() {
-        let entries = [
-            TarEntry {
-                name: b"root/",
-                prefix: b"",
-                typeflag: b'0',
-                data: b"",
-            },
-            TarEntry {
-                name: b"file",
-                prefix: b"root",
-                typeflag: 0,
-                data: b"first",
-            },
-            TarEntry {
-                name: b"file",
-                prefix: b"root",
-                typeflag: b'0',
-                data: b"last",
-            },
-            TarEntry {
-                name: b"directory",
-                prefix: b"root",
-                typeflag: b'5',
-                data: b"",
-            },
-            TarEntry {
-                name: b"ignored",
-                prefix: b"other",
-                typeflag: b'3',
-                data: b"",
-            },
-        ];
-        let archive = ustar(&entries, true);
-        let plan = inspect_and_plan_ustar_for_flavor(
-            &archive,
-            Some(&[b"root".to_vec()]),
-            PathFlavor::Unix,
-            Path::new(""),
-        )
-        .unwrap();
-        assert_eq!(plan.entries.len(), 3);
-        let mut destination = RecordingDestination::default();
-        extract_ustar_plan(&archive, &plan, &mut destination).unwrap();
-        assert_eq!(destination.calls[0].2, b"first");
-        assert_eq!(destination.calls[1].2, b"last");
-
-        let mut late_failure = ustar(&entries[..2], false);
-        late_failure.extend(ustar(
-            &[TarEntry {
-                name: b"bad",
-                prefix: b"root",
-                typeflag: b'3',
-                data: b"",
-            }],
-            false,
-        ));
-        let destination = RecordingDestination::default();
-        assert!(
-            inspect_and_plan_ustar_for_flavor(
-                &late_failure,
-                Some(&[b"root".to_vec()]),
-                PathFlavor::Unix,
-                Path::new("")
-            )
-            .is_err()
-        );
-        assert!(destination.calls.is_empty());
-
-        let collision = ustar(
-            &[
-                TarEntry {
-                    name: b"same",
-                    prefix: b"",
-                    typeflag: b'5',
-                    data: b"",
-                },
-                TarEntry {
-                    name: b"same",
-                    prefix: b"",
-                    typeflag: b'0',
-                    data: b"x",
-                },
-            ],
-            false,
-        );
-        assert!(
-            inspect_and_plan_ustar_for_flavor(&collision, None, PathFlavor::Unix, Path::new(""))
-                .is_err()
-        );
-        let reverse_collision = ustar(
-            &[
-                TarEntry {
-                    name: b"same",
-                    prefix: b"",
-                    typeflag: b'0',
-                    data: b"x",
-                },
-                TarEntry {
-                    name: b"same",
-                    prefix: b"",
-                    typeflag: b'5',
-                    data: b"",
-                },
-            ],
-            false,
-        );
-        assert!(
-            inspect_and_plan_ustar_for_flavor(
-                &reverse_collision,
-                None,
-                PathFlavor::Unix,
-                Path::new("")
-            )
-            .is_err()
-        );
-        for entries in [
-            [
-                TarEntry {
-                    name: b"a",
-                    prefix: b"",
-                    typeflag: b'0',
-                    data: b"x",
-                },
-                TarEntry {
-                    name: b"a/b",
-                    prefix: b"",
-                    typeflag: b'0',
-                    data: b"y",
-                },
-            ],
-            [
-                TarEntry {
-                    name: b"a/b",
-                    prefix: b"",
-                    typeflag: b'0',
-                    data: b"y",
-                },
-                TarEntry {
-                    name: b"a",
-                    prefix: b"",
-                    typeflag: b'0',
-                    data: b"x",
-                },
-            ],
-        ] {
-            let ancestor_collision = ustar(&entries, false);
-            assert!(
-                inspect_and_plan_ustar_for_flavor(
-                    &ancestor_collision,
-                    None,
-                    PathFlavor::Unix,
-                    Path::new("")
-                )
-                .is_err()
-            );
-        }
-        for entries in [
-            [
-                TarEntry {
-                    name: b"a",
-                    prefix: b"",
-                    typeflag: b'5',
-                    data: b"",
-                },
-                TarEntry {
-                    name: b"a",
-                    prefix: b"",
-                    typeflag: b'5',
-                    data: b"",
-                },
-            ],
-            [
-                TarEntry {
-                    name: b"a",
-                    prefix: b"",
-                    typeflag: b'5',
-                    data: b"",
-                },
-                TarEntry {
-                    name: b"a/b",
-                    prefix: b"",
-                    typeflag: b'0',
-                    data: b"x",
-                },
-            ],
-            [
-                TarEntry {
-                    name: b"a/b",
-                    prefix: b"",
-                    typeflag: b'0',
-                    data: b"x",
-                },
-                TarEntry {
-                    name: b"a",
-                    prefix: b"",
-                    typeflag: b'5',
-                    data: b"",
-                },
-            ],
-        ] {
-            let compatible = ustar(&entries, false);
-            assert!(
-                inspect_and_plan_ustar_for_flavor(
-                    &compatible,
-                    None,
-                    PathFlavor::Unix,
-                    Path::new("")
-                )
-                .is_ok()
-            );
-        }
-
-        for (typeflag, name, expected) in [
-            (0, b"nul".as_slice(), PlannedUstarKind::Regular),
-            (b'0', b"zero".as_slice(), PlannedUstarKind::Regular),
-            (b'5', b"typed".as_slice(), PlannedUstarKind::Directory),
-            (b'5', b"typed/".as_slice(), PlannedUstarKind::Directory),
-            (b'0', b"implicit/".as_slice(), PlannedUstarKind::Directory),
-        ] {
-            let typed = ustar(
-                &[TarEntry {
-                    name,
-                    prefix: b"",
-                    typeflag,
-                    data: b"",
-                }],
-                false,
-            );
-            let typed =
-                inspect_and_plan_ustar_for_flavor(&typed, None, PathFlavor::Unix, Path::new(""))
-                    .unwrap();
-            assert_eq!(typed.entries[0].kind, expected);
-        }
-        for typeflag in [b'x', b'g', b'L', b'K', b'1', b'2', b'3', b'4', b'6'] {
-            for name in [b"bad".as_slice(), b"bad/".as_slice()] {
-                let selected = ustar(
-                    &[TarEntry {
-                        name,
-                        prefix: b"root",
-                        typeflag,
-                        data: b"",
-                    }],
-                    false,
-                );
-                let error = inspect_and_plan_ustar_for_flavor(
-                    &selected,
-                    Some(&[b"root".to_vec()]),
-                    PathFlavor::Unix,
-                    Path::new(""),
-                )
-                .err()
-                .unwrap();
-                assert!(error.message.contains("unsupported tar entry type"));
-                let outside = ustar(
-                    &[TarEntry {
-                        name,
-                        prefix: b"rooted",
-                        typeflag,
-                        data: b"",
-                    }],
-                    false,
-                );
-                let error = inspect_and_plan_ustar_for_flavor(
-                    &outside,
-                    Some(&[b"wanted".to_vec()]),
-                    PathFlavor::Unix,
-                    Path::new(""),
-                )
-                .err()
-                .unwrap();
-                assert!(error.message.contains("strip_prefix"));
-            }
-            let prefix_root = ustar(
-                &[TarEntry {
-                    name: b"root",
-                    prefix: b"",
-                    typeflag,
-                    data: b"",
-                }],
-                false,
-            );
-            let error = inspect_and_plan_ustar_for_flavor(
-                &prefix_root,
-                Some(&[b"root".to_vec()]),
-                PathFlavor::Unix,
-                Path::new(""),
-            )
-            .err()
-            .unwrap();
-            assert!(error.message.contains("unsupported tar entry type"));
-        }
-
-        let escaping = TarEntry {
-            name: b"../escape",
-            prefix: b"",
-            typeflag: b'0',
-            data: b"x",
-        };
-        let outside_escape = ustar(
-            &[
-                escaping,
-                TarEntry {
-                    name: b"good",
-                    prefix: b"wanted",
-                    typeflag: b'0',
-                    data: b"good",
-                },
-            ],
-            false,
-        );
-        assert_eq!(
-            inspect_and_plan_ustar_for_flavor(
-                &outside_escape,
-                Some(&[b"wanted".to_vec()]),
-                PathFlavor::Unix,
-                Path::new("")
-            )
-            .unwrap()
-            .entries
-            .len(),
-            1
-        );
-        let selected_escape = ustar(&[escaping], false);
-        assert!(
-            inspect_and_plan_ustar_for_flavor(
-                &selected_escape,
-                None,
-                PathFlavor::Unix,
-                Path::new("")
-            )
-            .is_err()
-        );
-
-        let mut failed_destination = RecordingDestination {
-            fail: true,
-            ..RecordingDestination::default()
-        };
-        let error = extract_ustar_plan(&archive, &plan, &mut failed_destination)
-            .err()
-            .unwrap();
-        assert_eq!(error.stage, ArchiveFailureStage::Materialization);
-    }
-
-    #[test]
-    fn archive_capture_stage_precedence_and_mutation_barrier_are_exact() {
-        let archive = ustar(
-            &[TarEntry {
-                name: b"file",
-                prefix: b"",
-                typeflag: b'0',
-                data: b"captured",
-            }],
-            false,
-        );
-        let source = tempfile::NamedTempFile::new().unwrap();
-        std::fs::write(source.path(), b"caller").unwrap();
-        let url = url::Url::from_file_path(source.path()).unwrap().to_string();
-        for (failure, stage, reads) in [
-            (
-                ScriptedFailure::Root,
-                ArchiveFailureStage::Materialization,
-                0,
-            ),
-            (
-                ScriptedFailure::Capture,
-                ArchiveFailureStage::Materialization,
-                0,
-            ),
-            (ScriptedFailure::Read, ArchiveFailureStage::Transport, 1),
-            (ScriptedFailure::Write, ArchiveFailureStage::Transport, 1),
-            (ScriptedFailure::Flush, ArchiveFailureStage::Transport, 1),
-        ] {
-            let mut io = ScriptedArchiveIo::new(archive.clone(), failure);
-            let error = materialize_archive_with(&archive_spec(url.clone(), "bad".into()), &mut io)
-                .err()
-                .unwrap();
-            assert_eq!(error.stage, stage);
-            assert_eq!(io.reads, reads);
-            if let Some(path) = io.root_path {
-                assert!(!path.exists());
-            }
-            if let Some(path) = io.capture_path {
-                assert!(!path.exists());
-            }
-        }
-        let mut io = ScriptedArchiveIo::new(archive.clone(), ScriptedFailure::None);
-        let error = materialize_archive_with(&archive_spec(url.clone(), "bad".into()), &mut io)
-            .err()
-            .unwrap();
-        assert_eq!(error.stage, ArchiveFailureStage::Spec);
-        assert_eq!(io.reads, 1);
-        assert!(!io.root_path.unwrap().exists());
-        assert!(!io.capture_path.unwrap().exists());
-
-        let mut io = ScriptedArchiveIo::new(archive.clone(), ScriptedFailure::Root);
-        let error =
-            materialize_archive_with(&archive_spec("not a URL".into(), "bad".into()), &mut io)
-                .err()
-                .unwrap();
-        assert_eq!(error.stage, ArchiveFailureStage::Spec);
-        assert!(io.root_path.is_none());
-        assert_eq!(io.reads, 0);
-        for prefix in ["", ".."] {
-            let mut io = ScriptedArchiveIo::new(archive.clone(), ScriptedFailure::Root);
-            let error = materialize_archive_with(
-                &archive_spec_with_prefix(url.clone(), "bad".into(), prefix),
-                &mut io,
-            )
-            .err()
-            .unwrap();
-            assert_eq!(error.stage, ArchiveFailureStage::Spec);
-            assert!(io.root_path.is_none());
-            assert_eq!(io.reads, 0);
-        }
-
-        let mut io = ScriptedArchiveIo::new(archive.clone(), ScriptedFailure::None);
-        let error = materialize_archive_with(&archive_spec(url.clone(), "0".repeat(64)), &mut io)
-            .err()
-            .unwrap();
-        assert_eq!(error.stage, ArchiveFailureStage::Transport);
-
-        let malformed = vec![b'x'; 512];
-        let malformed_digest = format!("{:x}", Sha256::digest(&malformed));
-        let mut io = ScriptedArchiveIo::new(malformed, ScriptedFailure::None);
-        let error = materialize_archive_with(&archive_spec(url.clone(), malformed_digest), &mut io)
-            .err()
-            .unwrap();
-        assert_eq!(error.stage, ArchiveFailureStage::Materialization);
-        assert!(!io.root_path.unwrap().exists());
-        assert!(!io.capture_path.unwrap().exists());
-
-        let mut io = ScriptedArchiveIo::new(vec![b'x'; 512], ScriptedFailure::None);
-        let error = materialize_archive_with(&archive_spec(url.clone(), "0".repeat(64)), &mut io)
-            .err()
-            .unwrap();
-        assert_eq!(error.stage, ArchiveFailureStage::Transport);
-        assert_eq!(io.destination_calls, 0);
-
-        let late_failure = ustar(
-            &[
-                TarEntry {
-                    name: b"early",
-                    prefix: b"",
-                    typeflag: b'0',
-                    data: b"early",
-                },
-                TarEntry {
-                    name: b"bad",
-                    prefix: b"",
-                    typeflag: b'3',
-                    data: b"",
-                },
-            ],
-            false,
-        );
-        let late_digest = format!("{:x}", Sha256::digest(&late_failure));
-        let mut io = ScriptedArchiveIo::new(late_failure, ScriptedFailure::None);
-        let error = materialize_archive_with(&archive_spec(url.clone(), late_digest), &mut io)
-            .err()
-            .unwrap();
-        assert_eq!(error.stage, ArchiveFailureStage::Materialization);
-        assert_eq!(io.destination_calls, 0);
-        assert!(!io.root_path.unwrap().exists());
-        assert!(!io.capture_path.unwrap().exists());
-
-        let extraction_archive = ustar(
-            &[
-                TarEntry {
-                    name: b"file",
-                    prefix: b"",
-                    typeflag: b'0',
-                    data: b"file",
-                },
-                TarEntry {
-                    name: b"directory",
-                    prefix: b"",
-                    typeflag: b'5',
-                    data: b"",
-                },
-            ],
-            false,
-        );
-        let extraction_digest = format!("{:x}", Sha256::digest(&extraction_archive));
-        for failure in ["parent", "write", "directory"] {
-            let mut io = ScriptedArchiveIo::new(extraction_archive.clone(), ScriptedFailure::None);
-            io.destination_failure = Some(failure);
-            let error = materialize_archive_with(
-                &archive_spec(url.clone(), extraction_digest.clone()),
-                &mut io,
-            )
-            .err()
-            .unwrap();
-            assert_eq!(error.stage, ArchiveFailureStage::Materialization);
-            assert!(io.destination_calls > 0);
-            assert!(!io.root_path.unwrap().exists());
-            assert!(!io.capture_path.unwrap().exists());
-        }
-
-        let digest = format!("{:x}", Sha256::digest(&archive));
-        let mut io = ScriptedArchiveIo::new(archive, ScriptedFailure::None);
-        io.replace_source = Some(b"changed after capture".to_vec());
-        let Materialized::Immutable { bytes, root } =
-            materialize_archive_with(&archive_spec(url, digest), &mut io).unwrap()
-        else {
-            panic!("archive must be immutable");
-        };
-        assert_eq!(io.reads, 1);
-        assert_eq!(bytes.len(), 1024);
-        assert_eq!(
-            std::fs::read(root.path().join("file")).unwrap(),
-            b"captured"
-        );
-
-        let source = tempfile::NamedTempFile::new().unwrap();
-        std::fs::write(source.path(), b"caller").unwrap();
-        let url = url::Url::from_file_path(source.path()).unwrap().to_string();
-        let archive = ustar(
-            &[TarEntry {
-                name: b"file",
-                prefix: b"",
-                typeflag: b'0',
-                data: b"deleted source",
-            }],
-            false,
-        );
-        let digest = format!("{:x}", Sha256::digest(&archive));
-        let mut io = ScriptedArchiveIo::new(archive, ScriptedFailure::None);
-        io.delete_source = true;
-        let Materialized::Immutable { root, .. } =
-            materialize_archive_with(&archive_spec(url, digest), &mut io).unwrap()
-        else {
-            panic!("archive must be immutable");
-        };
-        assert!(!source.path().exists());
-        assert_eq!(
-            std::fs::read(root.path().join("file")).unwrap(),
-            b"deleted source"
-        );
     }
 
     fn materialization_request(
@@ -5860,38 +4291,6 @@ mod tests {
             assert_eq!(retained.next_instance, invalid);
             assert!(retained.roots.is_empty());
         }
-    }
-
-    #[test]
-    fn archive_requires_the_fixed_tar_shape_and_decodes_file_uris() {
-        let source = tempfile::tempdir().unwrap();
-        let content = source.path().join("space name");
-        std::fs::create_dir(&content).unwrap();
-        std::fs::write(content.join("MODULE.bazel"), b"module(name = 'archive')").unwrap();
-        let archive = source.path().join("source archive.tar");
-        assert!(
-            Command::new("tar")
-                .args(["--format=ustar", "-cf"])
-                .arg(&archive)
-                .args(["-C"])
-                .arg(source.path())
-                .arg("space name")
-                .status()
-                .unwrap()
-                .success()
-        );
-        let bytes = std::fs::read(&archive).unwrap();
-        let digest = format!("{:x}", Sha256::digest(&bytes));
-        let url = url::Url::from_file_path(&archive).unwrap().to_string();
-        let Materialized::Immutable { root, .. } =
-            materialize_archive(&archive_spec(url, digest)).unwrap()
-        else {
-            panic!("archive source must materialize immutably");
-        };
-        assert_eq!(
-            std::fs::read(root.path().join("space name/MODULE.bazel")).unwrap(),
-            b"module(name = 'archive')"
-        );
     }
 
     #[tokio::test]
