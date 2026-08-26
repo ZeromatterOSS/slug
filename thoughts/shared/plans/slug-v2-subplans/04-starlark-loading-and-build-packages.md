@@ -4342,6 +4342,53 @@ Slug-native; `Label`, the complete live expression, application plus
 Boolean/StringList targets and analysis/CLI, M8/M7B and exact output bytes
 remain deferred.
 
+### Detect-sysroot rule accepted; post-rust-analyzer frontier audit selected (2026-08-26)
+
+Commit `129ff448` makes the accepted pure `.bzl` Label resolver crate-visible
+and routes only raw single-`@` rule-toolchain strings through it with the
+innermost defining `BzlModuleIdentity`. Canonical `@@...` and relative-string
+branches retain their accepted behavior. No second mapping, DICE compute,
+lookup, I/O, cache, hash domain or lifetime owner is introduced.
+
+The selected-registry proof retains root apparent `dep_alias`, module self-name
+`rules_rust` and canonical `dep+` as distinct spellings. It recursively imports
+and freezes `rust_analyzer_detect_sysroot` with ordered mandatory requirements
+`@@dep+//rust:toolchain_type` and
+`@@dep+//rust/rust_analyzer:toolchain_type`; both the detect implementation and
+the prior current-toolchain implementation remain lazy. Missing and conflicting
+mapping cases reject through the raw rule-string converter itself.
+
+Focused proofs and all 256 loading tests pass with locked core check, rebuilt
+CLI, formatting and diff checks. Archive status has only the known three
+retained thoughts paths. Final additions are 7 production and 33 proof, 40
+total, within every cap; independent terminal review returned `ACCEPT`.
+
+Exact compatibility covers the fixed two raw string conversions, defining
+module mapping, mandatory policy, source order, recursive freeze, doc value and
+export. Existing Arc storage and nonrequired diagnostics are Slug-native.
+Label objects, optional/duplicate requirements, invocation, `ctx.toolchains`,
+selection, configured dependencies, provider/path semantics, JSON FileWrite,
+`DefaultInfo`, aspect application and analysis remain unsupported/deferred.
+
+Pinned Zabel `c7298478…` guided only reuse of the immutable defining-module
+mapping and pure canonical projection. Its native BUILD `toolchain(...)`
+resolver was explicitly not treated as the behavior analogue, and no Zig code,
+mapping behavior, representation or DICE relation was copied. Bazel 9.2
+remained sole behavior authority.
+
+The accepted `rust/private/rust_analyzer.bzl` ends at line 484. Evaluation now
+returns through the recursive load stack to `rust/toolchain.bzl`, whose next
+source load names `//rust/private:rustfmt.bzl`. That module itself loads
+`common.bzl` and `lint_test.bzl` before reaching its own provider/aspect/rule
+declarations; already-completed modules may be memoized from the accepted
+closure. Run only docs packet
+`WP-4-7A-post-rust-analyzer-source-order-audit`: replay Slug's selected-route
+recursive manifest against the accepted rules_rust archive, identify the first
+newly evaluated unsupported expression, authenticate its behavior with pinned
+Bazel 9.2, consult pinned Zabel only for bounded Rust ownership guidance, and
+select one implementation or `REPLAN`. Do not edit Rust or assume that a later
+rustfmt declaration is the immediate frontier.
+
 ### Current-toolchain rule accepted; detect-sysroot rule loading selected (2026-08-26)
 
 Commit `61cb0ad0` projects the selected route's existing ordered repository
