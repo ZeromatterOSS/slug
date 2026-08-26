@@ -5247,6 +5247,52 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Provider schemas accepted; empty HeaderInfo selected (2026-08-26)
+
+Commit `f65c9ce0` accepts non-initialized schemaless, unique string-list and
+documented-map provider schemas plus optional arbitrary loading values. One
+assignment-bound `ProviderId` survives freeze; schemaful rows use compact
+ordinals, schemaless rows retain dynamic compact names, and only the pre-
+existing complete documented-string shape enters configured analysis. Focused
+proof, all 203 loading units, configured analysis, locked checks, rebuilt CLI
+and hygiene pass at 173 production, 102 proof and 275 total additions.
+Independent review returned `ACCEPT`.
+
+Recursive source order now completes
+`cc/private/link/create_extra_link_time_library.bzl` and resumes
+`cc/private/cc_info.bzl`. Its top-level `EMPTY_COMPILATION_CONTEXT` constructs
+the admitted documented provider with depsets, lists and `None`, then first
+fails at line 134:
+
+```starlark
+_header_info = _cc_internal.create_header_info()
+```
+
+Pinned Bazel 9.2 `CcStarlarkInternal.createHeaderInfo` supplies eight named-
+only parameters with empty defaults. The selected zero-argument row creates a
+fresh immutable `HeaderInfo`: `header_module`, `pic_header_module`,
+`separate_module`, and `separate_pic_module` are `None`; the four direct header
+fields are immutable empty lists; dependencies are empty. Evaluation then
+passes lazy functions until lines 260–269, where `CcInfo, _ = provider(...)`
+uses a documented dictionary schema with an initializer. That shape is not
+admitted by the accepted list-schema initializer and is the next source stop.
+
+Run only `WP-4-7A-bazel-empty-header-info-loading`. Extend the existing opaque
+`cc_internal` capability with the no-argument constructor and add one frozen,
+loading-only HeaderInfo value. Preserve fresh occurrence identity and exact
+empty field observations. Reject all arguments; keep non-empty HeaderInfo,
+hashing, dependency DAGs, `create_header_info_with_deps`, configured provider
+lowering and every other C++ method unsupported/deferred.
+
+Clean `../zabel` `0795445f…` is architectural guidance only. Its C++ primitive
+owner keeps evaluator-local HeaderInfo fields together and explicitly hands
+retained ownership to later provider lowering. Slug follows that phase split
+with one immutable empty-list value shared by the unobservable-equal list
+fields, but copies no Zig code, layout, allocator, analysis behavior or API.
+Bazel 9.2 is the sole compatibility authority. Existing starlark-rust frozen
+values and `Allocative` satisfy the Buck2 utility audit without a new utility,
+collection, counter, interner or Stage 9 ledger row.
+
 ### Provider initializer accepted; provider schemas selected (2026-08-26)
 
 Commit `9c51999f` accepts the rules_cc initialized artifact-category provider.
