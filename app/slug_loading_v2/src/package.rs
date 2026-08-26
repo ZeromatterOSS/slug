@@ -459,7 +459,7 @@ pub(crate) enum BuildSettingKind {
     Integer { flag: bool },
     String,
     Boolean { flag: bool },
-    StringList { repeatable: bool },
+    StringList { flag: bool, repeatable: bool },
 }
 
 impl BuildSettingKind {
@@ -4198,6 +4198,7 @@ impl fmt::Display for RootBoolBuildSetting {
 impl<'v> StarlarkValue<'v> for RootBoolBuildSetting {}
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct RootStringListBuildSetting {
+    flag: bool,
     repeatable: bool,
 }
 starlark::starlark_simple_value!(RootStringListBuildSetting);
@@ -4244,10 +4245,10 @@ fn config_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] flag: bool,
         #[starlark(require = named, default = false)] repeatable: bool,
     ) -> anyhow::Result<RootStringListBuildSetting> {
-        if !flag {
-            anyhow::bail!("only config.string_list(flag = True) is supported")
+        if repeatable && !flag {
+            anyhow::bail!("'repeatable' can only be set for a setting with 'flag = True'")
         }
-        Ok(RootStringListBuildSetting { repeatable })
+        Ok(RootStringListBuildSetting { flag, repeatable })
     }
 }
 #[starlark_module]
@@ -4959,6 +4960,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 Some(BuildSettingKind::Boolean { flag: setting.flag })
             } else if let Some(setting) = RootStringListBuildSetting::from_value(value) {
                 Some(BuildSettingKind::StringList {
+                    flag: setting.flag,
                     repeatable: setting.repeatable,
                 })
             } else {
@@ -4967,7 +4969,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         });
         if build_setting.is_some() && build_setting_kind.is_none() {
             anyhow::bail!(
-                "only rule(build_setting = config.int(), config.string(flag = True), config.bool(), or config.string_list(flag = True)) is supported"
+                "only rule(build_setting = config.int(), config.string(flag = True), config.bool(), or config.string_list()) is supported"
             )
         }
         let declared_builtin_names =

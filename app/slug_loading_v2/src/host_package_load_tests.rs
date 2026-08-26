@@ -2447,11 +2447,11 @@ async fn external_bzl_module_freezes_typed_bazel_config_definitions() {
     let files: &[(&str, &[u8])] = &[
         (
             "root.bzl",
-            b"load(\":support.bzl\", \"bool_flag\", \"bool_setting\", \"bool_false\", \"list_rule\", \"repeatable_rule\")\nBOOL_FLAG = bool_flag\nBOOL_SETTING = bool_setting\nBOOL_FALSE = bool_false\nLIST = list_rule\nREPEATABLE = repeatable_rule\n",
+            b"load(\":support.bzl\", \"bool_flag\", \"bool_setting\", \"bool_false\", \"list_rule\", \"repeatable_rule\", \"list_setting\", \"list_false\")\nBOOL_FLAG = bool_flag\nBOOL_SETTING = bool_setting\nBOOL_FALSE = bool_false\n",
         ),
         (
             "support.bzl",
-            b"def _impl(ctx): fail('build setting implementations must stay lazy')\nbool_flag = rule(implementation = _impl, build_setting = config.bool(flag = True))\nbool_setting = rule(implementation = _impl, build_setting = config.bool())\nbool_false = rule(implementation = _impl, build_setting = config.bool(flag = False))\nlist_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True))\nrepeatable_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True, repeatable = True))\n",
+            b"def _impl(ctx): fail('build setting implementations must stay lazy')\nbool_flag = rule(implementation = _impl, build_setting = config.bool(flag = True))\nbool_setting = rule(implementation = _impl, build_setting = config.bool())\nbool_false = rule(implementation = _impl, build_setting = config.bool(flag = False))\nlist_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True))\nrepeatable_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True, repeatable = True))\nlist_setting = rule(implementation = _impl, build_setting = config.string_list())\nlist_false = rule(implementation = _impl, build_setting = config.string_list(flag = False, repeatable = False))\n",
         ),
     ];
     let dice = Dice::builder().build(DetectCycles::Enabled);
@@ -2508,42 +2508,58 @@ async fn external_bzl_module_freezes_typed_bazel_config_definitions() {
         assert!(!help.mandatory);
         assert!(!help.configurable);
     }
-    let list_rule = module
-        .get("LIST")
-        .unwrap()
-        .downcast::<FrozenRuleDefinition>()
-        .unwrap();
+    let list_kind = |name| {
+        module
+            .get(name)
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap()
+            .build_setting_kind
+    };
     assert_eq!(
-        list_rule.build_setting_kind,
-        Some(BuildSettingKind::StringList { repeatable: false })
+        list_kind("list_rule"),
+        Some(BuildSettingKind::StringList {
+            flag: true,
+            repeatable: false,
+        })
     );
     assert_eq!(
-        list_rule
+        list_kind("repeatable_rule"),
+        Some(BuildSettingKind::StringList {
+            flag: true,
+            repeatable: true,
+        })
+    );
+    assert_eq!(
+        list_kind("list_setting"),
+        Some(BuildSettingKind::StringList {
+            flag: false,
+            repeatable: false,
+        })
+    );
+    assert_eq!(list_kind("list_setting"), list_kind("list_false"));
+    for export in ["list_rule", "repeatable_rule", "list_setting", "list_false"] {
+        let list_rule = module
+            .get(export)
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        assert_eq!(list_rule.capability().rule_class, export);
+        let default = list_rule
             .schema
             .iter()
             .find(|schema| schema.name == "build_setting_default")
-            .unwrap()
-            .kind,
-        AttributeKind::StringList
-    );
-    let repeatable_rule = module
-        .get("REPEATABLE")
-        .unwrap()
-        .downcast::<FrozenRuleDefinition>()
-        .unwrap();
-    assert_eq!(
-        repeatable_rule.build_setting_kind,
-        Some(BuildSettingKind::StringList { repeatable: true })
-    );
-    assert_eq!(
-        repeatable_rule
+            .unwrap();
+        assert!(
+            default.kind == AttributeKind::StringList && default.mandatory && !default.configurable
+        );
+        let help = list_rule
             .schema
             .iter()
-            .find(|schema| schema.name == "build_setting_default")
-            .unwrap()
-            .kind,
-        AttributeKind::StringList
-    );
+            .find(|schema| schema.name == "help")
+            .unwrap();
+        assert!(!help.mandatory && !help.configurable);
+    }
 }
 
 #[tokio::test]
@@ -3471,18 +3487,30 @@ fn bazel_config_typed_descriptors_are_bzl_only_and_require_supported_flags() {
         assert!(eval_global(source, &bzl).is_err(), "{source}");
     }
     for source in [
-        "X=config.string_list()",
-        "X=config.string_list(flag=False)",
         "X=config.string_list(True)",
+        "X=config.string_list(flag=None)",
+        "X=config.string_list(flag=1)",
+        "X=config.string_list(repeatable=None)",
+        "X=config.string_list(repeatable=1)",
+        "X=config.string_list(unknown=True)",
     ] {
-        let error = eval_global(source, &bzl).unwrap_err();
-        assert!(error.contains("supported") || error.contains("positional"));
+        assert!(eval_global(source, &bzl).is_err(), "{source}");
     }
     eval_global(
-        "L=config.string_list(flag=True)\nE=config.string_list(flag=True, repeatable=False)\nR=config.string_list(flag=True, repeatable=True)",
+        "L=config.string_list(flag=True)\nE=config.string_list(flag=True, repeatable=False)\nR=config.string_list(flag=True, repeatable=True)\nO=config.string_list()\nF=config.string_list(flag=False)\nFF=config.string_list(flag=False, repeatable=False)",
         &bzl,
     )
     .unwrap();
+    for source in [
+        "X=config.string_list(repeatable=True)",
+        "X=config.string_list(flag=False, repeatable=True)",
+    ] {
+        let error = eval_global(source, &bzl).unwrap_err();
+        assert!(
+            error.contains("'repeatable' can only be set for a setting with 'flag = True'"),
+            "{error}"
+        );
+    }
     let build = build_file_loading_globals();
     for (source, missing) in [
         ("S=config.string(flag=True)\nI=config.int()", "int"),
@@ -3574,36 +3602,41 @@ async fn repository_package_rejects_config_bool_rule_before_target_recording() {
 
 #[tokio::test]
 async fn repository_package_rejects_config_string_list_rule_before_target_recording() {
-    let files: &[(&str, &[u8])] = &[
-        (
-            "BUILD.bazel",
-            b"load(\":defs.bzl\", \"list_rule\")\nlist_rule(name = \"blocked\", build_setting_default = [\"value\"])\n",
-        ),
-        (
-            "defs.bzl",
-            b"def _impl(ctx): return []\nlist_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True, repeatable = True))\n",
-        ),
-    ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
-    let mut transaction = transaction(
-        &dice,
-        EpochBuilder::external_sources(files, 399).build(),
-        false,
-        None,
-    )
-    .await;
-    let route = external_route(&mut transaction).await;
-    let outcome = transaction
-        .compute(&RepositoryPackageLoadKey::new(
-            route,
-            PackagePath::parse("").unwrap(),
-        ))
-        .await
-        .unwrap();
-    assert!(
-        repository_package_error(&outcome)
-            .contains("string-list build setting rule invocation is not supported")
-    );
+    for (facts, descriptor) in [
+        (400, "config.string_list(flag=True, repeatable=True)"),
+        (401, "config.string_list()"),
+    ] {
+        let defs = format!(
+            "def _impl(ctx): fail('list implementation must stay lazy')\nlist_rule=rule(implementation=_impl, build_setting={descriptor})\n"
+        );
+        let files: &[(&str, &[u8])] = &[
+            (
+                "BUILD.bazel",
+                b"load(':defs.bzl', 'list_rule')\nlist_rule(name='blocked', build_setting_default=['value'])\n",
+            ),
+            ("defs.bzl", defs.as_bytes()),
+        ];
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut transaction = transaction(
+            &dice,
+            EpochBuilder::external_sources(files, facts).build(),
+            false,
+            None,
+        )
+        .await;
+        let route = external_route(&mut transaction).await;
+        let outcome = transaction
+            .compute(&RepositoryPackageLoadKey::new(
+                route,
+                PackagePath::parse("").unwrap(),
+            ))
+            .await
+            .unwrap();
+        assert!(
+            repository_package_error(&outcome)
+                .contains("string-list build setting rule invocation is not supported")
+        );
+    }
 }
 
 #[tokio::test]
