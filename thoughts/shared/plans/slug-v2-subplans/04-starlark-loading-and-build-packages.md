@@ -4342,6 +4342,61 @@ Slug-native; `Label`, the complete live expression, application plus
 Boolean/StringList targets and analysis/CLI, M8/M7B and exact output bytes
 remain deferred.
 
+### Post-rust-analyzer audit selects defining-module scalar label defaults (2026-08-26)
+
+The accepted recursive external-Bzl evaluator computes `resolved_loads`
+serially in source order and stops at the first failed child. Once
+`rust/private/rust_analyzer.bzl:484` returns, its caller
+`rust/toolchain.bzl:11-14` reaches `rust/private/rustfmt.bzl`. Rustfmt's first
+child `common.bzl` is already complete because rust-analyzer loaded it; the
+first new child is therefore `rust/private/lint_test.bzl`.
+
+The fixed `transition(...)` at `lint_test.bzl:37-41`, documented label at
+lines 46-48 and boolean default at lines 49-52 already evaluate. The first
+unsupported expression is `_allowlist_function_transition` at lines 53-55:
+its raw external string default is sent to Slug's package-only label coercer,
+which rejects `@` after the defining repository mapping has been discarded.
+The immediately adjacent `_runner` default at lines 56-60 is a constructed
+`Label("//rust/private/lint_test_runner")`; Slug's raw-value adapter cannot
+retain that typed Label either. One coherent declaration-time packet must
+admit both scalar forms or it will not complete the newly selected child.
+
+Pinned Bazel 9.2 `StarlarkAttrModule.createAttribute`,
+`Attribute.Builder.defaultValue`, `BuildType.LabelType.convert` and
+`LabelConverter.forBzlEvaluatingThread` establish exact behavior. Strings are
+resolved through the innermost defining `.bzl` module's package context and
+repository mapping; an already-constructed Label is returned unchanged.
+Focused rule-class, remote-label-default and Bzlmod load tests authenticate
+conversion at declaration time, before target lookup or rule invocation.
+
+Run only `WP-4-7A-lint-test-label-default-loading`. In the existing
+`attribute_definition` owner, retain the full caller-aware
+`BzlModuleIdentity`; route only scalar label strings through the shared pure
+resolver and clone only an actual `StarlarkLabel`'s canonical identity into
+the existing `CoercedAttributeValue::Label`. Preserve every non-label default
+path and the accepted label-`None` case. Prove the selected registry's distinct
+root alias, module self-name and canonical repo, the exact `@@bazel_tools`
+allowlist default, the `@@dep+` runner default, recursive freeze/export and
+missing/conflicting mapping failure. Add no map, DICE compute, I/O, cache,
+interner, hash domain or lifetime owner.
+
+Exact compatibility covers only these two scalar label-default input forms,
+their defining-module context, fixed lint-test dictionary and canonical frozen
+values. Existing Rust enum/Arc storage, complete-map over-invalidation and
+nonrequired diagnostics are Slug-native. Label-list/dict defaults, canonical
+raw-string breadth, computed/late-bound defaults, target invocation,
+transition application/allowlisting, configured dependencies, providers,
+rustfmt aspect arguments/analysis, actions and exact output bytes remain
+unsupported/deferred.
+
+Pinned Zabel `c7298478…` is architectural guidance only. Its producer-owned
+declared-default spelling and retained canonical Label paths support resolving
+strings at the defining module, preserving typed Label identity, and keeping a
+later BUILD consumer out of repair ownership. No Zig code, representation,
+mapping behavior, evaluator rule or DICE relation is copied; pinned Bazel 9.2
+remains sole behavior authority. The utility audit selects Slug's existing
+identity, mapping, enum and frozen owners without a new retained data structure.
+
 ### Detect-sysroot rule accepted; post-rust-analyzer frontier audit selected (2026-08-26)
 
 Commit `129ff448` makes the accepted pure `.bzl` Label resolver crate-visible
