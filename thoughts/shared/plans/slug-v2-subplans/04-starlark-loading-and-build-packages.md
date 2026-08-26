@@ -5247,7 +5247,7 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
-### Clippy aspect toolchains accepted; rule source closure selected (2026-08-26)
+### Clippy rule proof replanned; OutputGroupInfo global audit selected (2026-08-26)
 
 Commit `fc9473b1` replaces the aspect's singular label with the same immutable
 typed requirement slice used by rules. One shared evaluator-aware parser
@@ -5264,27 +5264,36 @@ archive-status reports only its three known archive-only paths. The packet
 adds 31 production and 90 proof lines, and independent terminal review returned
 `ACCEPT`.
 
-The next source expression is `_rust_clippy_rule_impl`, whose function body is
-lazy. `rust_clippy = rule(...)` then declares one `deps` label-list with two
-ordered singleton provider alternatives and the exported
-`rust_clippy_aspect`. This is a strict subset of the already-accepted
-`rustfmt_test.targets` schema: it omits the custom transition, while ordinary
-rule documentation and non-test capability are already admitted.
+The next source expression is `_rust_clippy_rule_impl`. Although its body is
+lazy at loading time, Starlark compilation resolves its global names. The
+independently accepted proof-only `WP-4-7A-clippy-rule-loading` candidate
+therefore exposed `OutputGroupInfo` as the first missing name before the
+following rule declaration could freeze. Its partial test change was fully
+reverted and no production code was changed.
 
-Run only `WP-4-7A-clippy-rule-loading`. Extend the pinned source-shaped proof
-through rules_rust `clippy.bzl` line 461, assert the frozen rule identity,
-single dependency descriptor, provider order and complete attached aspect,
-and keep the helper lazy. Change no production code and stop before
-`RustClippyTestInfo` at line 463. Target invocation remains rejected before
-provider/aspect metadata could be dropped; no configured aspect application,
-provider matching or implementation execution is admitted.
+Bazel 9.2 `StarlarkGlobalsImpl.getFixedBzlToplevels` installs
+`OutputGroupInfo.STARLARK_CONSTRUCTOR` in `.bzl` globals, not fixed BUILD
+globals. `OutputGroupInfoProvider` is a named native `BuiltinProvider`; its
+constructor accepts named groups and converts their values to artifact nested
+sets. The clippy helper only captures the provider global as a later indexing
+key: no constructor, group, artifact or configured target is evaluated while
+the module freezes.
 
-Clean `../zabel` `0795445f…` supplies architecture guidance only. Its
-declaration-owned `RuleDefinition`, `NamedAttribute` and `AttrDefinition`
-support reusing one frozen schema with retained producer identities. Slug
-copies no Zig code, behavior, configured capture or analysis algorithm, and
-Bazel 9.2 remains sole behavior authority. Retained representations are
-unchanged, so no Buck2 utility or Stage 9 ledger update applies.
+Run only docs packet `WP-4-7A-output-group-info-global-audit`. Authenticate
+the provider's fixed identity, `.bzl`-only placement, callable/type surface and
+fail-closed loading boundary. Decide whether the existing analysis-builtin
+callable owner can represent this fixed provider without lying about identity,
+or select one bounded native-provider declaration token. Do not edit Rust,
+resume the clippy rule proof, construct output-group values, or admit configured
+lookup/merge/selection during the audit.
+
+Clean `../zabel` `0795445f…` supplies guidance only. Its process-stable
+`BuiltinProviderId.output_group_info` distinguishes native provider identity
+from module/export-owned user providers and later configured values. Slug may
+adopt that phase/identity separation in Rust, but copies no Zig code,
+discriminant, layout, constructor, configured capture or behavior. Bazel 9.2
+remains sole authority. Any retained identity change must trigger the Buck2
+utility review before implementation.
 
 ### Clippy aspect attributes accepted; typed aspect toolchains selected (2026-08-26)
 

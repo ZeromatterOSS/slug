@@ -1,119 +1,102 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-clippy-rule-loading`
+Packet: `WP-4-7A-output-group-info-global-audit`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: prove that the already-admitted loading model freezes the exact
-`rust_clippy` rule declaration, with no production change, and stop before the
-following provider declaration.
+Result: authenticate the first missing fixed native-provider global reached by
+the exact clippy helper, then select one bounded loading implementation or
+`REPLAN`. This is a docs-only audit.
 
-## Accepted starting point and source stop
+## Accepted starting point and disproven candidate
 
 Base is `fc9473b1` (`Load clippy aspect toolchain requirements`). The complete
-`rust_clippy_aspect` freezes through rules_rust 0.73.0 `clippy.bzl` line 404,
-including its ordered private attributes, provider requirements, fragments,
-documentation and mixed mandatory/optional toolchain requirements.
-
-Continue through the lazy `_rust_clippy_rule_impl` at lines 406-409 and
-`rust_clippy = rule(...)` at lines 411-461. Stop before `RustClippyTestInfo =
-provider(...)` at line 463. The pinned source SHA-256 is
+`rust_clippy_aspect` freezes through rules_rust 0.73.0 `clippy.bzl` line 404.
+The next helper begins at line 406; the source SHA-256 is
 `a778d2ddc77587ffbffc72efcdaa458a1ffae0763e500da1c876b9b567b2a686`.
 
-## Authority and admitted reuse
+The independently accepted proof-only `WP-4-7A-clippy-rule-loading` candidate
+was attempted and disproved before acceptance. The exact helper body fails at
+compile time with `Variable OutputGroupInfo not found`. Function laziness
+prevents invocation but not global name resolution. Its partial test edit was
+fully reverted; there is no Rust or proof delta to carry forward.
+
+## Audit authorities and questions
 
 Bazel 9.2 clean commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` remains sole behavior authority.
-The accepted rustfmt target-attribute packet already pinned rule attribute
-construction, nested provider alternatives, exported attached-aspect identity,
-documentation validation and lazy implementation ownership. The clippy
-declaration uses the same contract with less breadth:
+`8220c6198837d5c13d53fea211cf3282aa12408a` is sole behavior authority. Audit:
 
-- one ordinary non-test, non-executable rule;
-- one `deps` `attr.label_list` with documentation;
-- two ordered singleton provider alternatives, `CrateInfo` then
-  `TestCrateInfo`;
-- one exported attached `rust_clippy_aspect`;
-- no transition, default, file policy, toolchain requirement or build setting.
+- `StarlarkGlobalsImpl.getFixedBzlToplevels`, which installs
+  `OutputGroupInfo.STARLARK_CONSTRUCTOR` directly in the fixed `.bzl`
+  environment and omits it from fixed BUILD-file globals;
+- `OutputGroupInfoApi` and `OutputGroupInfo.OutputGroupInfoProvider`, which
+  define one callable native `BuiltinProvider` named `OutputGroupInfo`;
+- `BuiltinProvider` identity/key semantics needed to distinguish this fixed
+  provider from module/export-owned user providers and other native providers;
+- constructor validation and focused tests only far enough to place a strict
+  unsupported boundary around named output groups, depsets/artifacts and
+  configured values.
 
-The helper body is parsed and retained but never invoked. Its `ctx`, depset,
-provider indexing and `DefaultInfo` expressions therefore add no evaluated
-surface.
+Answer whether Slug's existing `AnalysisBuiltinCallable` can truthfully expose
+the fixed declaration identity while construction remains unsupported, or
+whether a small dedicated native-provider declaration token is required. Do
+not collapse native provider identity into `ProviderId`, whose source-label
+plus export-name domain is explicitly for user providers.
 
 Clean `../zabel` commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` is architectural guidance only.
-Its declaration-owned `RuleDefinition`/`NamedAttribute`/`AttrDefinition`
-boundary supports reusing Slug's existing frozen rule schema and retained
-producer identities. Copy no Zig code, layout, diagnostic, parser, configured
-capture or analysis behavior. No representation changes, hot-path utility,
-interner, cache or memory-accounting decision occurs, so the Buck2 utility
-skill and Stage 9 ledger require no update.
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` is architecture guidance only.
+Inspect its process-stable `BuiltinProviderId.output_group_info`, provider
+binding and separation between declaration identity and configured value. Copy
+no Zig code, numeric discriminant, enum layout, parser, constructor, configured
+capture, diagnostic or behavior. Bazel 9.2 decides compatibility.
 
-## Compatibility decision
+## Compatibility target for a selected implementation
 
-- **Exact:** loading and freezing this source rule declaration; ordinary rule
-  identity; `deps` label-list kind; ordered provider alternatives; attached
-  exported aspect identity; omitted descriptor fields; lazy helper ownership.
-- **Slug-native:** Rust frozen-value and Arc-backed schema ownership already
-  accepted by predecessor packets.
-- **Unsupported/deferred:** invoking this provider/aspect-bearing rule;
-  configured provider matching; aspect propagation/application; executing the
-  helper; the following clippy-test provider/rule/runner and action semantics.
+- **Exact candidate:** `.bzl` name availability, omission from BUILD globals,
+  callable native-provider declaration identity, distinctness from user
+  providers and other fixed providers, and lazy capture by the clippy helper.
+- **Slug-native candidate:** an evaluator-free Rust representation for the
+  fixed declaration token, with explicit memory accounting if retained.
+- **Unsupported/deferred:** constructing nonempty or empty OutputGroupInfo
+  values unless separately proved necessary; named-group validation;
+  depset/artifact conversion; fields, indexing, iteration and membership;
+  returning the provider from a rule/aspect; configured target/aspect lookup,
+  attachment, merge and output selection.
 
-This is a proof-only closure packet. It may not widen a constructor, retained
-type, configured consumer or diagnostic.
+The audit must narrow these candidates rather than assume them. In particular,
+callability in Bazel does not authorize configured construction in Slug.
 
-## Allowlist, proof and caps
+## Allowlist and deliverable
 
-Only this file may change:
+Only these documentation files may change:
 
-| File | Base SHA-256 | Base lines | Final ceiling |
-|---|---|---:|---:|
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `4215f59e3d3cbc51f06f19b82c610630541fa79c62a958c8851d5c9838ee9e73` | 6,798 | 6,908 |
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md`
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
+- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
 
-Cap is 110 proof additions; deletions do not buy addition budget. No new
-function may exceed 120 lines.
+The deliverable must record:
 
-Required proof:
+1. exact Bazel source/test anchors for placement, native identity and callable
+   behavior;
+2. the current Slug global/provider owners and why the chosen owner does not
+   conflate user and native provider identity;
+3. the precise Zabel guidance used and excluded;
+4. Buck2 utility/retained-memory review if a new representation is selected;
+5. one bounded implementation packet with file allowlist, base hashes, line
+   caps, exact/Slug-native/deferred classifications, discriminating proof,
+   serial validation and independent review, or `REPLAN`.
 
-1. Extend the existing source-shaped clippy declaration with the exact lazy
-   helper and rule through line 461; do not replace it with a reduced rule.
-2. Assert exported class name `rust_clippy`, ordinary non-test/non-executable
-   capability, no rule toolchains and exactly one declared `deps` label-list.
-3. Assert the dependency descriptor's omitted default/file/executable/exec/
-   transition state, its two provider identities in source order and its
-   attached aspect's complete already-accepted identity.
-4. Preserve the complete aspect and mutation proofs, prove the helper remains
-   lazy, and keep the existing invocation rejection for provider/aspect-bearing
-   attributes green.
+No Cargo, Bazel oracle, daemon or smoke command is required for this docs-only
+audit. Run `git diff --check` and `scripts/v2_archive_status.sh`; only its three
+known archive-only misses may remain.
 
-No new oracle is needed: the exact pinned source plus the already-accepted
-Bazel 9.2 rule/attribute evidence discriminate this declaration.
-
-## Serial validation and STOP
-
-Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
-`CARGO_BUILD_JOBS=1`:
-
-- focused clippy and provider/aspect-bearing rule tests;
-- `cargo test -p slug_loading_v2 --lib --locked`;
-- `cargo test -p slug_loading_v2 --test bzl_invalidation --locked`;
-- `cargo test -p slug_loading_v2 --test build_file_loading --locked`;
-- `cargo check --locked -p slug_analysis_v2 -p slug_core_v2`;
-- `cargo build -p slug_cli_v2 --locked` before any rebuilt-binary smoke;
-- `cargo fmt --all -- --check`, `git diff --check`, and
-  `scripts/v2_archive_status.sh` with only its three known archive-only misses.
-
-Independent terminal review must verify exact source shape and stop, complete
-attached-aspect identity, no production delta, compatibility boundaries,
-Zabel guidance-only use, validation and caps.
-
-STOP and `REPLAN` for any production file; source or authority drift; helper
-execution; configured invocation/analysis/aspect work; the following provider
-or rule; Java/JVM work; copied Zabel behavior; a retained-representation or
-utility need; another file; or a cap violation.
+STOP and `REPLAN` for any Rust/test edit; dirty authority; Java/JVM work;
+configured provider/target/aspect work; output-group construction or artifact
+semantics; copied Zabel content; invented Bazel behavior; an unbounded native
+provider framework; another source expression; or a non-bounded implementation.
 
 ## Immediate predecessor
 
-`fc9473b1` accepted the complete clippy aspect using one shared typed rule/
-aspect requirement slice. All local gates and independent review passed.
+`fc9473b1` accepted the complete clippy aspect using one shared typed
+rule/aspect requirement slice. All local gates and independent review passed.
