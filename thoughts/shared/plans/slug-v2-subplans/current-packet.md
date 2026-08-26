@@ -1,162 +1,213 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-post-rustfmt-source-order-audit`
+Packet: `WP-4-7A-bazel-config-int-loading`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: docs-only recursive selected-source and declaration-surface audit
-Base: `88304c2f`
+Owners: loading-owned typed build-setting declaration and frozen rule schema
+Base: `1e2759c2`
 
-Result: replay the accepted selected rules_rust root's recursive manifest after
-`rustfmt_test`, identify the first newly evaluated unsupported expression, and
-select one bounded implementation packet or `REPLAN`. Make no Rust, fixture,
-oracle, command behavior or source-materialization change.
+Result: load and freeze selected `bazel_skylib@1.8.2`
+`rules/common_settings.bzl:69-87`. Add the exact integer build-setting kind and
+named flag identity to the existing `.bzl` Config/rule declaration owner,
+derive the mandatory integer default schema, keep BUILD absence, and reject
+integer target invocation before package recording. Do not evaluate a build
+setting, parse its CLI value, execute an implementation or advance analysis.
 
-## Accepted starting point
+## Accepted starting point and first absent fact
 
-Commit `88304c2f` freezes the exact fixed `rustfmt_test.targets` label-list
-dependency declaration. Its ordered `CrateInfo` and `TestCrateInfo` provider
-alternatives, complete `_rustfmt_test_aspect`, and existing
-`platform_transition` remain distinct facts in the declaration-owned frozen
-rule schema. Every producer retains its defining module and first export.
+Commit `88304c2f` completes the fixed rustfmt-test dependency declaration.
+Commit `1e2759c2` selects the post-rustfmt source-order audit. The audit proves
+that `rust/private/rustfmt.bzl:281-356` finishes with already-admitted label
+schemas and canonical toolchain strings while both implementations remain
+lazy. The alias-only rust-analyzer wrapper also completes.
 
-Target invocation fails before the ordinary configured loading projection can
-discard provider or aspect metadata. Aspect application/propagation,
-transition evaluation, provider matching, configured dependency analysis and
-actions remain unsupported. The implementation and all aspect bodies stay
-lazy during module loading.
+Recursive source order then enters `rust/private/toolchain.bzl` through
+`rust/rust_stdlib_filegroup.bzl`. Its first child maps through the accepted
+selected producer view to `bazel_skylib@1.8.2`; no new mapping or source owner
+is required. The child has no recursive loads. Provider and attribute
+declarations through line 69 are already supported or lazy. Slug's `.bzl`
+Config module has string, bool and string-list methods but no `int`, so
+`config.int(flag = True)` at line 71 is the first absent evaluated expression.
+The adjacent `int_setting` uses `config.int()` at line 81.
 
-Focused proof, all 196 loading unit tests, unaffected loading integrations,
-locked core check, rebuilt CLI, formatting and diff gates pass. The sole broad
-integration failure is the already-recorded stale `@external` diagnostic
-expectation. Final additions are 66 production and 175 proof lines, within the
-packet caps. Independent correction review returned `ACCEPT`.
+## Selected source provenance
 
-## Recursive source-order candidate
+The root's locked module graph selects `bazel_skylib@1.8.2`. Preserve these
+exact inputs:
 
-Use the accepted rules_rust 0.73.0 archive, not a guessed public declaration.
-The preliminary replay is:
+- BCR source JSON SHA-256:
+  `34a3c8bcf233b835eb74be9d628899bb32999d3e0eadef1947a0a562a2b16ffb`;
+- archive SHA-256:
+  `6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446`;
+- `rules/common_settings.bzl` SHA-256:
+  `f3bcedef4b2b2cbe9750d61852917954499c4ba5e83d79fb975ec5814eb76d20`.
 
-1. `rust/private/rustfmt.bzl:244-279` is the already-parsed documentation tail
-   of the accepted `rustfmt_test` rule.
-2. Lines 281-309 and 336-348 are lazy implementation bodies. Lines 311-334 and
-   350-356 declare `rustfmt_toolchain` and `current_rustfmt_toolchain` using
-   label schemas, docs and canonical toolchain strings that appear already
-   admitted. The audit must prove that against current Slug.
-3. Evaluation returns to `rust/toolchain.bzl`. Its rust-analyzer wrapper at
-   lines 15-18 is alias-only. Lines 19-22 enter
-   `rust/rust_stdlib_filegroup.bzl`, which loads
-   `rust/private/toolchain.bzl`.
-4. That private module first loads mapped
-   `@bazel_skylib//rules:common_settings.bzl`. The selected external route is
-   expected to own this child; the audit must prove the exact selected module,
-   repository mapping, source identity and prior-child completion.
-5. In the candidate selected `common_settings.bzl`, provider and string
-   attribute declarations through the first rule call are already supported or
-   lazy. The first apparent absent expression is `config.int(flag = True)` at
-   line 71, followed by `config.int()` at line 81.
+The source JSON names the Bazel Skylib 1.8.2 release archive with no strip
+prefix. Reuse these locked bytes and the accepted selected-source route. Add no
+network oracle, fixture, source observer, repository mapping or materializer.
 
-Do not assume this candidate is authoritative until the actual selected graph,
-source bytes and live loading surface agree. Generic top-level repository
-session wrappers are not discriminating source-order evidence.
-
-## Required authorities
+## Bazel authority and Zabel architectural guidance
 
 Pinned Bazel 9.2 commit
 `8220c6198837d5c13d53fea211cf3282aa12408a` is the sole behavior authority.
-The accepted rules_rust archive SHA-256 is
-`2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`.
-Use only pinned source objects and selected-source provenance already admitted
-by the repository graph. Do not add a network oracle or fixture.
+Its `StarlarkConfigApi.intSetting` declares one named-only boolean `flag`
+defaulting to `False`. `StarlarkConfig.intSetting` passes that bit to
+`BuildSetting.create(flag, INTEGER)`. `RuleClass.Builder` reads the descriptor
+type and adds mandatory, nonconfigurable integer `build_setting_default` plus
+optional nonconfigurable string `help`; it also disables later toolchain
+resolution for build-setting rules.
 
-For the integer candidate, inspect at minimum:
+The selected Skylib child requires both flag identities. Admit all three
+equivalent ABI spellings in one packet:
 
-- pinned `StarlarkConfigApi.intSetting`, including named-only `flag` with
-  default `False`;
-- pinned `StarlarkConfig.intSetting`, `BuildSetting.create` and rule-class
-  build-setting schema construction for the INTEGER type and flag bit;
-- pinned tests covering integer descriptor construction, equality, default
-  coercion and invalid rule defaults; and
-- current Slug `ConfigModule`, `BuildSettingKind`, rule definition/freeze,
-  declared attribute schema and target-invocation rejection.
+- `config.int(flag = True)`;
+- `config.int()`; and
+- `config.int(flag = False)`.
+
+Omitted and explicit `False` have the same structural descriptor identity;
+`True` differs. Positional, nonboolean, `None` and unknown arguments reject
+through the typed Starlark method ABI. Bazel
+`StarlarkAttrTransitionProviderTest` covers both integer setting forms and
+integer defaults; `StarlarkOptionsParsingTest` distinguishes flag from
+non-flag behavior. Reuse their declaration facts only. Transition execution,
+configured values and command-line parsing are later phases and are skipped.
 
 Pinned Zabel commit
 `c7298478e2e56262a2f438e9c065325744c9f0fc` is architectural guidance only.
-Read its `src/starlark_host/engine/build_rule_declaration.zig` at that commit,
-not the live checkout head. Its evaluator-free `BuildSettingDefinition` owns
-`BuildSettingKind.int` beside boolean, string and list kinds. Use this only to
-evaluate whether Slug should extend its existing declaration owner. Do not
-copy Zig code, representation, diagnostics, evaluator behavior, configured
-capture, cache or analysis algorithms; Zabel supplies no behavior authority.
+Its `build_rule_declaration.zig` keeps `BuildSettingKind.int` and `flag` in one
+evaluator-free `BuildSettingDefinition`, then attaches that definition to the
+declared rule. Slug follows only this producer-owned phase split. No Zig code,
+layout, diagnostics, evaluator behavior, configured capture, cache or analysis
+algorithm may be copied; Zabel supplies no behavior authority.
 
-## Audit questions
+## Compatibility classification
 
-Answer all before selecting implementation:
+- **Exact:** `.bzl` `config.int` named-only ABI; named `True`, omitted and
+  explicit `False`; INTEGER kind and flag polarity; omitted/false equality and
+  true discrimination; mandatory nonconfigurable Integer
+  `build_setting_default`; optional string `help`; recursive rule freeze,
+  first-export identity and implementation laziness; BUILD absence.
+- **Slug-native:** `RootIntBuildSetting` and
+  `BuildSettingKind::Integer { flag }` representation; Rust equality/copying;
+  existing source/module fingerprint over-invalidation; diagnostics;
+  `Allocative`; fail-closed target invocation.
+- **Unsupported/deferred:** integer target invocation and default coercion;
+  `ctx.build_setting_value`; implementation/provider execution; flag CLI
+  parsing; transitions over integer settings; configured values, analysis and
+  actions; Bazel toolchain-resolution effects; `config.bool()` without a true
+  flag; later Skylib declarations; `attr.label_list(allow_files = True)`;
+  M8/M7B and exact Bazel configuration/output identity.
 
-1. Does the selected recursive manifest actually complete both remaining
-   rustfmt rules and the alias wrapper before entering the mapped skylib child?
-2. Which exact selected skylib module/version/source contains the reached
-   `common_settings.bzl`, and does the existing producer mapping select it
-   without a new route, key or source owner?
-3. Is `config.int(flag = True)` the first evaluated missing capability after
-   all preceding declarations, rather than an earlier load, export, provider,
-   attribute, rule or freeze failure?
-4. What exact API shapes are required by the adjacent `int_flag` and
-   `int_setting` declarations: named `True`, omitted/default `False`, explicit
-   `False`, positional rejection, or a smaller source-order subset?
-5. What immutable Bazel descriptor identity includes the INTEGER kind and flag
-   bit, and how does the enclosing rule derive its mandatory default schema?
-6. Can Slug reuse its current build-setting definition/freeze owner and reject
-   target invocation before recording, with no integer configured consumer?
-7. What invalid inputs discriminate integer defaults from bool/string/list,
-   and what later expression becomes the next frontier after the selected
-   bounded implementation?
+## Natural owner, lifetime and utility reuse
 
-## Compatibility and ownership gates
+Add a small `.bzl`-only `RootIntBuildSetting { flag }` beside the current
+string/bool/list Starlark descriptor values. Project it immediately at
+`rule(build_setting = ...)` into
+`BuildSettingKind::Integer { flag }`. That compact Copy enum already flows
+through transient `RuleDefinitionGen`, `FrozenRuleDefinition`, package
+invocation and `StarlarkRuleImplementation` equality. Its `attribute_kind`
+projection already has `AttributeKind::Integer` and the existing coercion
+surface already owns signed 32-bit integers.
 
-Classify every selected behavior as **exact**, **Slug-native**, or
-**unsupported/deferred**. A likely bounded slice may include exact `.bzl`-only
-integer descriptor construction, the source-required flag forms, retained
-INTEGER kind/flag identity, recursive freeze and integer default schema.
-Rust enum/layout choices, diagnostics and fail-closed invocation remain
-Slug-native.
+No evaluator heap survives freeze: only the boolean flag and enum discriminant
+are retained. No new collection, string, Arc, interner, hash, cache or memory
+owner is needed. Preserve existing `Allocative` derivations. The Buck2-utility
+audit selects this current compact enum/frozen owner and rejects any side
+registry or imported utility.
 
-At minimum, BUILD exposure, integer command-line parsing, transition values,
-configured build-setting evaluation, analysis/provider returns, later
-`attr.label_list(allow_files = True)`, toolchain implementations/actions,
-M8/M7B and exact configuration/output identity remain unsupported unless this
-audit proves a smaller prerequisite requires otherwise.
+No request overlay, source observation, DICE equality, async transfer or
+command result changes. The accepted selected-source and module fingerprint
+owners continue to invalidate declaration bytes. No fallback is introduced.
 
-Prefer the existing `Root*BuildSetting`, `BuildSettingKind`, frozen rule
-definition, compact strings and schema projection. No side registry, raw
-evaluator-value retention, identity reconstruction, new interner, collection,
-hash family, DICE key, repository mapping, source observer, I/O, lock, async
-task or command result is admitted. If an integer descriptor cannot remain in
-that existing owner, return `REPLAN`.
+## Implementation boundary
 
-## Docs-only allowlist and validation
+1. Add `.bzl` `config.int` with a named-only `flag: bool = False`; do not add it
+   to `BuildFileConfigModule`.
+2. Add `BuildSettingKind::Integer { flag }` and map it to
+   `AttributeKind::Integer`. Preserve the flag through the existing rule
+   projection, freeze and semantic equality paths.
+3. Let the existing builtin-schema builder add mandatory nonconfigurable
+   integer `build_setting_default` and string `help`; add no parallel schema.
+4. Reject any frozen integer build-setting rule in the small existing deferred
+   invocation helper before `PackageRecorder` can record a target. Do not touch
+   the oversized invocation function or coerce a default.
+5. Update the unsupported build-setting diagnostic to name the newly admitted
+   integer descriptor. Do not broaden bool/string/list forms.
+6. Add no configured consumer, provider, transition behavior, source route,
+   registry, cache, DICE key, I/O or public API outside loading.
 
-Only these files may change from base `88304c2f`:
+## Discriminating proof
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
-- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
+- Accept named `True`, omitted and explicit `False`; reject positional,
+  nonboolean, `None` and unknown arguments.
+- Prove omitted and explicit false project to equal integer descriptor facts,
+  while true differs.
+- Recursively freeze and import source-shaped `int_flag`, `int_setting`, and an
+  explicit-false setting. Assert each first-export rule identity, Integer kind,
+  flag polarity, mandatory/nonconfigurable integer default schema and `help`.
+  Every implementation must fail if called and remain lazy.
+- Prove BUILD globals cannot resolve `config.int` while the accepted BUILD
+  string surface remains unchanged.
+- Invoke true and false integer rules in separate repository-package cases;
+  require the exact fail-closed integer diagnostic and absence of target
+  recording.
+- Keep existing string, bool, string-list, rule-doc and recursive-freeze proofs
+  green. Add no fixture, oracle, network request or Bazel run.
 
-Validate the pinned Bazel and Zabel commit objects, accepted rules_rust archive
-digest, exact selected skylib source identity, recursive source order, current
-Slug signatures, packet-ID agreement, document structure, `git diff --check`
-and exact file allowlist. This audit requires independent review before commit.
+## Allowlist and growth caps
 
-Any selected implementation packet must state exact file hashes, physical and
-addition caps, touched-function limits, focused/full serial validation,
-discriminating freeze/equality/default/invocation proofs, archive hygiene and a
-terminal independent implementation review.
+Only these files may change from base `1e2759c2`:
+
+| File | Base SHA-256 | Base lines | Final line cap | Purpose |
+|---|---|---:|---:|---|
+| `app/slug_loading_v2/src/package.rs` | `ddd5943b4ba0c3f19ffff75e1c6933747087e617eef5ac3acfa32e6f8830f583` | 5,770 | 5,825 | integer descriptor, retained kind/schema and invocation gate |
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `fb90513e375394d1684c79e1696c8b12861ad0f98147b1210da442f16e2551eb` | 5,036 | 5,150 | ABI, recursive freeze/identity and fail-closed proofs |
+
+Additions are capped at 50 production lines, 110 proof lines and 160 total.
+Deletions do not buy addition budget. No newly added or touched function may
+exceed 150 lines. `package.rs` exceeds the 2,000-line review trigger, but the
+Config methods, retained build-setting enum and rule projection are one
+cohesive declaration lifetime; a new module would split that owner. Avoid the
+existing oversized frozen-rule invocation body by changing only its small
+deferred-check helper.
+
+## Serial validation and review
+
+Use one Cargo target directory and run commands serially:
+
+```text
+CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 --lib config_int
+CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 --lib typed_bazel_config_definitions
+CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 --lib bazel_config_typed_descriptors
+CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 --lib
+CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 --test build_file_loading
+CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo check --locked -p slug_core_v2
+CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo build -p slug_cli_v2
+cargo fmt --check
+git diff --check
+scripts/v2_archive_status.sh
+```
+
+The `build_file_loading` suite may retain only its already-recorded stale
+`@external` diagnostic-order failure; every other row must pass. Archive
+hygiene may report only the known three retained thoughts paths plus active
+packet files. Recheck hashes, physical/addition caps, file allowlist and
+touched-function lengths before review.
+
+Because this changes retained semantic identity, terminal independent review
+is mandatory before commit. It must verify pinned source order/provenance,
+Bazel named/default flag behavior, flag equality/discrimination, frozen
+lifetime, Integer schema, BUILD absence, pre-recording rejection, Zabel
+guidance-only use, utility reuse, caps and deferred configured behavior.
 
 ## STOP / `REPLAN`
 
-STOP and `REPLAN` if the candidate source is not the selected graph input; an
-earlier recursive child fails; success requires a new repository route/source
-owner; integer semantics cannot remain declaration-owned; the packet would
-need BUILD exposure, configured evaluation, transition/CLI behavior, analysis
-or actions; a new DICE key, mapping, I/O path, cache, registry, interner or hash
-domain is required; Java/JVM work would enter Slug; Zabel code or behavior
-would be adopted; source or authority is unpinned; or a bounded proof/line-cap
-contract cannot be written. Do not edit Rust during this audit.
+STOP and `REPLAN` if implementation requires a file outside the allowlist;
+BUILD `config.int`; accepting positional or nonboolean flag shapes; changing
+existing bool/string/list descriptor breadth; integer invocation/default
+coercion, CLI parsing, transition/configured/analysis/action behavior; a new
+schema owner, raw evaluator value, collection, registry, interner, cache, DICE
+key, mapping, source observer, I/O or async path; editing the oversized invoke
+body; Java/JVM work; Zabel code or behavior adoption; unpinned source; a new
+fixture/oracle/network request; a cap violation; or a public Skylib/rules_rust
+success claim. After integer declarations freeze, stop at
+`common_settings.bzl:100` and audit `config.bool()` separately.

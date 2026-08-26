@@ -5065,3 +5065,46 @@ and list kinds. This supports a single declaration-owned typed descriptor, not
 any compatibility conclusion. No Zig code, representation, evaluator,
 configured capture or analysis behavior is adopted; pinned Bazel 9.2 remains
 sole behavior authority.
+
+### Post-rustfmt audit accepts Bazel config-int loading (2026-08-26)
+
+Commit `1e2759c2` selected the recursive source-order audit. The accepted
+rules_rust archive completes both remaining `rustfmt.bzl` toolchain rules with
+already-admitted docs, label attributes and canonical toolchain strings. Their
+implementations remain lazy. Evaluation returns through the alias-only
+rust-analyzer wrapper, enters `rust/rust_stdlib_filegroup.bzl`, and recursively
+loads `rust/private/toolchain.bzl`.
+
+That module's first child maps through the already-selected producer view to
+`bazel_skylib@1.8.2`. `MODULE.bazel.lock` fixes its source JSON SHA-256 at
+`34a3c8bcf233b835eb74be9d628899bb32999d3e0eadef1947a0a562a2b16ffb`.
+The JSON names archive SHA-256
+`6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446`;
+the reached `rules/common_settings.bzl` hashes to
+`f3bcedef4b2b2cbe9750d61852917954499c4ba5e83d79fb975ec5814eb76d20`.
+No new route, mapping, source owner, I/O or DICE key is required.
+
+The selected child has no recursive loads. Provider/string-attribute
+declarations through line 69 are already admitted or lazy. Its first absent
+evaluated expression is `config.int(flag = True)` at line 71; the adjacent
+`int_setting` uses `config.int()` at line 81. Pinned Bazel 9.2 declares `flag`
+named-only with default `False`, creates one INTEGER build-setting descriptor
+carrying that bit, and makes the enclosing rule add mandatory,
+nonconfigurable integer `build_setting_default` plus string `help`.
+
+Run only `WP-4-7A-bazel-config-int-loading`. Add the integer descriptor to the
+existing `.bzl` Config module and retained build-setting kind. Accept named
+`True`, omitted and explicit `False`; retain the bit through recursive freeze
+and semantic equality; derive the Integer schema; keep BUILD absence; reject
+integer target invocation before package recording. Positional, nonboolean,
+`None` and unknown arguments reject through the typed Starlark ABI. Do not
+admit CLI parsing, configured values, transitions, provider returns, analysis
+or actions. After acceptance, source order stops at `config.bool()` on line
+100; `attr.label_list(allow_files = True)` remains later.
+
+Pinned Zabel `c7298478…` remains architectural guidance only. Its
+declaration-owned `BuildSettingDefinition { kind, flag, ... }` corroborates
+keeping the producer fact together, but supplies no behavior or code. The
+Buck2-utility audit selects Slug's existing small Copy enum, frozen rule owner
+and `Allocative` Starlark value; no collection, interner or utility import is
+needed. Bazel 9.2 is the sole behavior authority.
