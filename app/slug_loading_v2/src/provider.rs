@@ -71,6 +71,32 @@ impl<'v> StarlarkValue<'v> for OutputGroupInfo {
     }
 }
 
+/// Fixed `.bzl` declaration token; configured environment values are deferred.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub(crate) struct RunEnvironmentInfo;
+
+impl fmt::Display for RunEnvironmentInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<function RunEnvironmentInfo>")
+    }
+}
+
+starlark::starlark_simple_value!(RunEnvironmentInfo);
+
+#[starlark_value(type = "RunEnvironmentInfo")]
+impl<'v> StarlarkValue<'v> for RunEnvironmentInfo {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        _args: &Arguments<'v, '_>,
+        _eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Err(starlark::Error::new_other(anyhow::anyhow!(
+            "RunEnvironmentInfo construction is unsupported during loading"
+        )))
+    }
+}
+
 #[derive(Debug, ProvidesStaticType)]
 pub(crate) struct BzlEvaluationContext {
     source_label: CompactString,

@@ -123,6 +123,7 @@ use crate::package::FrozenRuleDefinition;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::FrozenUserProviderCallable;
 use crate::provider::OutputGroupInfo;
+use crate::provider::RunEnvironmentInfo;
 use crate::provider::StarlarkUserProvider;
 use crate::provider::loading_provider_id;
 
@@ -2833,6 +2834,167 @@ fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
     );
 }
 
+const LINT_TEST_SOURCE: &str = r###""""Shared helpers for `rust_clippy_test` and `rustfmt_test`.
+
+Both rules follow the same shape: a thin wrapper aspect that walks
+`deps`/`proc_macro_deps`/`crate` and collects the output-group markers
+produced by the underlying real aspect (`rust_clippy_aspect` /
+`rustfmt_aspect`), plus a rule impl that symlinks a shared runner binary
+and hands it the collected marker rlocationpaths via `RUST_LINT_TEST_MARKERS`.
+
+The pieces exposed here — `rlocationpath`, `platform_transition`,
+`LINT_TEST_COMMON_ATTRS`, `lint_test_aspect_impl`, `lint_test_rule_impl` —
+let each rule file supply only what actually differs (the provider type
+and the output-group names it collects).
+"""
+
+def rlocationpath(file, workspace_name):
+    """Compute the runfile rlocationpath for a `File`.
+
+    Args:
+        file (File): The file to compute the rlocationpath for.
+        workspace_name (str): The name of the current workspace.
+
+    Returns:
+        str: The rlocationpath the runner should look up for `file`.
+    """
+    if file.short_path.startswith("../"):
+        return file.short_path[len("../"):]
+    return "{}/{}".format(workspace_name, file.short_path)
+
+def _platform_transition_impl(_settings, attr):
+    if not attr.platform:
+        return {}
+    platform = str(attr.platform)
+    if not platform.startswith("@"):
+        platform = "@" + platform
+    return {"//command_line_option:platforms": platform}
+
+platform_transition = transition(
+    implementation = _platform_transition_impl,
+    inputs = [],
+    outputs = ["//command_line_option:platforms"],
+)
+
+# Attrs every lint-test rule needs alongside its own `targets`. Callers
+# merge this dict into their `attrs = {...}`.
+LINT_TEST_COMMON_ATTRS = {
+    "platform": attr.label(
+        doc = "Optional platform to transition `targets` to before running the aspect. When set, `--platforms` is switched to this label for the duration of this rule's aspect actions.",
+    ),
+    "transitive": attr.bool(
+        doc = "If True, lint `targets` and every crate reachable via `deps`, `proc_macro_deps`, and `crate`. If False, lint only the exact targets listed.",
+        default = False,
+    ),
+    "_allowlist_function_transition": attr.label(
+        default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
+    ),
+    "_runner": attr.label(
+        doc = "The shared runner (prints/inspects collected marker paths).",
+        cfg = "exec",
+        executable = True,
+        default = Label("//rust/private/lint_test_runner"),
+    ),
+}
+
+def lint_test_aspect_impl(target, ctx, info_provider, output_group_names):
+    """Thin collector: walk deps and roll up the markers the underlying aspect produced.
+
+    Args:
+        target (Target): The target the aspect is running on.
+        ctx (ctx): The aspect's context object.
+        info_provider (provider): The provider type to read from deps and return
+            (e.g. `RustClippyTestInfo` or `RustfmtTestInfo`).
+        output_group_names (list): A `list` of `str` naming the `OutputGroupInfo`
+            fields to collect from the current target (e.g.
+            `["clippy_checks", "clippy_output"]` or `["rustfmt_checks"]`).
+
+    Returns:
+        list: A single-element list containing an `info_provider` with `direct`
+            (`depset[File]`) for `target` and `checks` (`depset[File]`) that
+            folds in every dep's `checks`.
+    """
+    direct_depsets = []
+    if OutputGroupInfo in target:
+        og = target[OutputGroupInfo]
+        for name in output_group_names:
+            if hasattr(og, name):
+                direct_depsets.append(getattr(og, name))
+    direct = depset(transitive = direct_depsets)
+
+    transitive = [direct]
+    for attr_name in ("deps", "proc_macro_deps"):
+        for dep in getattr(ctx.rule.attr, attr_name, []):
+            if info_provider in dep:
+                transitive.append(dep[info_provider].checks)
+    crate_dep = getattr(ctx.rule.attr, "crate", None)
+    if crate_dep and info_provider in crate_dep:
+        transitive.append(crate_dep[info_provider].checks)
+
+    return [info_provider(
+        direct = direct,
+        checks = depset(transitive = transitive),
+    )]
+
+def lint_test_rule_impl(ctx, info_provider, output_group_names):
+    """Symlink the shared runner and hand it the collected marker rlocationpaths.
+
+    Args:
+        ctx (ctx): The rule's context object.
+        info_provider (provider): The provider type produced by the rule's
+            aspect, carrying `direct` and `checks` depsets.
+        output_group_names (list): A `list` of `str` naming the
+            `OutputGroupInfo` fields to expose the collected markers under
+            (e.g. `["clippy_checks", "clippy_output"]` or
+            `["rustfmt_checks"]`). Each name maps to the same `checks` depset.
+
+    Returns:
+        list: `[DefaultInfo, RunEnvironmentInfo, OutputGroupInfo]` for the
+            test target.
+    """
+    is_windows = ctx.executable._runner.extension == ".exe"
+    runner = ctx.actions.declare_file("{}{}".format(
+        ctx.label.name,
+        ".exe" if is_windows else "",
+    ))
+    ctx.actions.symlink(
+        output = runner,
+        target_file = ctx.executable._runner,
+        is_executable = True,
+    )
+
+    check_depsets = []
+    for target in ctx.attr.targets:
+        if info_provider not in target:
+            continue
+        info = target[info_provider]
+        check_depsets.append(info.checks if ctx.attr.transitive else info.direct)
+    checks = depset(transitive = check_depsets)
+
+    runfiles = ctx.runfiles(transitive_files = checks).merge(
+        ctx.attr._runner[DefaultInfo].default_runfiles,
+    )
+
+    workspace_name = ctx.workspace_name
+    markers_env = ctx.configuration.host_path_separator.join([
+        rlocationpath(f, workspace_name)
+        for f in checks.to_list()
+    ])
+
+    return [
+        DefaultInfo(
+            files = depset([runner]),
+            runfiles = runfiles,
+            executable = runner,
+        ),
+        RunEnvironmentInfo(environment = {
+            "RUST_BACKTRACE": "1",
+            "RUST_LINT_TEST_MARKERS": markers_env,
+        }),
+        OutputGroupInfo(**{name: checks for name in output_group_names}),
+    ]
+"###;
+
 const CLIPPY_ASPECT_SOURCE: &str = r#"
 ClippyInfo = provider(doc = "clippy", fields = {"output": "output"})
 CrateInfo = provider()
@@ -2928,6 +3090,61 @@ fn clippy_owner() -> BzlModuleIdentity {
             CanonicalRepoName::new("bazel_tools+").unwrap(),
         )]),
     }
+}
+
+#[test]
+fn external_bzl_module_freezes_exact_lint_test_child_without_invocation() {
+    let mut child_owner = clippy_owner();
+    child_owner.label = CanonicalLabel::parse("@@rules_rust+//rust/private:lint_test.bzl").unwrap();
+    child_owner.workspace_path = PathBuf::from("/rules_rust/rust/private/lint_test.bzl");
+    let child = eval_bzl_with_identity(LINT_TEST_SOURCE, child_owner.clone()).unwrap();
+    let parent_owner = clippy_owner();
+    let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
+        root: parent_owner.clone(),
+        direct_children: Arc::from([child_owner.clone()]),
+        reachable: Arc::from([parent_owner.clone(), child_owner]),
+        fingerprint: [0; 32],
+    });
+    let source = r#"load(
+    "//rust/private:lint_test.bzl",
+    "LINT_TEST_COMMON_ATTRS",
+    "lint_test_aspect_impl",
+    "lint_test_rule_impl",
+    "platform_transition",
+)
+IMPORTED = [LINT_TEST_COMMON_ATTRS, lint_test_aspect_impl, lint_test_rule_impl, platform_transition]
+RUN = RunEnvironmentInfo
+"#;
+    let ast = AstModule::parse("clippy.bzl", source.to_owned(), &Dialect::Bazel).unwrap();
+    let module = Module::new();
+    let loader = LocalBzlLoader {
+        modules: vec![("//rust/private:lint_test.bzl", child.dupe())],
+    };
+    let mut evaluator = Evaluator::new(&module);
+    evaluator.extra = Some(&context);
+    evaluator.set_loader(&loader);
+    evaluator.eval_module(ast, &loading_globals()).unwrap();
+    drop(evaluator);
+    let module = module.freeze().unwrap();
+    let imported = FrozenListRef::from_value(module.get("IMPORTED").unwrap().value()).unwrap();
+    for (imported, name) in imported.iter().zip([
+        "LINT_TEST_COMMON_ATTRS",
+        "lint_test_aspect_impl",
+        "lint_test_rule_impl",
+        "platform_transition",
+    ]) {
+        assert!(imported.to_value().ptr_eq(child.get(name).unwrap().value()));
+    }
+    let run = module.get("RUN").unwrap();
+    assert_eq!(run.to_string(), "<function RunEnvironmentInfo>");
+    assert!(run.clone().downcast::<RunEnvironmentInfo>().is_ok());
+    assert!(run.clone().downcast::<OutputGroupInfo>().is_err());
+    assert!(run.downcast::<FrozenUserProviderCallable>().is_err());
+    assert!(eval_global("X = RunEnvironmentInfo", &build_file_loading_globals()).is_err());
+    let error = eval_bzl_with_identity("X = RunEnvironmentInfo(environment = {})", clippy_owner())
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("RunEnvironmentInfo construction is unsupported during loading"));
 }
 
 #[test]
