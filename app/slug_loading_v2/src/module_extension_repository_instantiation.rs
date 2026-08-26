@@ -116,6 +116,10 @@ impl HostInstantiatedModuleExtensionRepository {
     pub(crate) fn spec_parts(&self) -> (&CanonicalRepoName, &RepoSpec) {
         (&self.canonical_name, &self.repo_spec)
     }
+
+    pub(crate) fn call(&self) -> &RepositoryRuleCallRecord {
+        &self.call
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -137,6 +141,13 @@ pub(crate) enum HostInstantiatedModuleExtensionRepositoryError {
     Join(CompactString),
     Namespace(CompactString),
     Attribute(CompactString),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct HostInstantiateModuleExtensionRequestError {
+    pub(crate) current: Arc<[HostInstantiatedModuleExtensionRepository]>,
+    pub(crate) call: Option<RepositoryRuleCallRecord>,
+    pub(crate) error: HostInstantiatedModuleExtensionRepositoryError,
 }
 
 impl fmt::Display for HostInstantiatedModuleExtensionRepositoriesError {
@@ -400,52 +411,73 @@ fn instantiate_repositories(
                 ),
             ));
         }
-        let mapping = namespace_mapping(receipt).map_err(|message| {
-            after(
-                &completed,
-                Some(&receipt.request),
-                &[],
-                None,
-                HostInstantiatedModuleExtensionRepositoryError::Namespace(message),
-            )
-        })?;
-        let (unique_name, _, _, _) = receipt.request.namespace_parts();
-        let mut current = Vec::new();
-        for call in receipt.repository_rule_calls.iter() {
-            let canonical_name = generated_repo(unique_name, &call.name).map_err(|message| {
-                after(
+        match instantiate_request(receipt) {
+            Ok(value) => completed.push(value),
+            Err(error) => {
+                return Err(after(
                     &completed,
                     Some(&receipt.request),
-                    &current,
-                    Some(call),
-                    HostInstantiatedModuleExtensionRepositoryError::Namespace(message),
-                )
-            })?;
-            let repo_spec = instantiate_call(call, &mapping).map_err(|message| {
-                after(
-                    &completed,
-                    Some(&receipt.request),
-                    &current,
-                    Some(call),
-                    HostInstantiatedModuleExtensionRepositoryError::Attribute(message),
-                )
-            })?;
-            current.push(HostInstantiatedModuleExtensionRepository {
-                generated_name: call.name.clone(),
-                canonical_name,
-                call: call.clone(),
-                repo_spec,
-            });
+                    &error.current,
+                    error.call.as_ref(),
+                    error.error,
+                ));
+            }
         }
-        completed.push(HostInstantiatedModuleExtensionRepositoriesForRequest {
-            request: receipt.request.clone(),
-            mapping_entries: mapping.1.clone(),
-            repositories: current.into(),
-        });
     }
     Ok(HostInstantiatedModuleExtensionRepositories {
         predecessor,
         extensions: completed.into(),
+    })
+}
+
+pub(crate) fn instantiate_request(
+    receipt: &HostPureModuleExtensionInvocationReceipt,
+) -> Result<
+    HostInstantiatedModuleExtensionRepositoriesForRequest,
+    HostInstantiateModuleExtensionRequestError,
+> {
+    let fail = |current: &[HostInstantiatedModuleExtensionRepository],
+                call: Option<&RepositoryRuleCallRecord>,
+                error| HostInstantiateModuleExtensionRequestError {
+        current: current.into(),
+        call: call.cloned(),
+        error,
+    };
+    let mapping = namespace_mapping(receipt).map_err(|message| {
+        fail(
+            &[],
+            None,
+            HostInstantiatedModuleExtensionRepositoryError::Namespace(message),
+        )
+    })?;
+    let (unique_name, _, _, _) = receipt.request.namespace_parts();
+    let mut current = Vec::new();
+    for call in receipt.repository_rule_calls.iter() {
+        let canonical_name = generated_repo(unique_name, &call.name).map_err(|message| {
+            fail(
+                &current,
+                Some(call),
+                HostInstantiatedModuleExtensionRepositoryError::Namespace(message),
+            )
+        })?;
+        let repo_spec = instantiate_call(call, &mapping).map_err(|message| {
+            fail(
+                &current,
+                Some(call),
+                HostInstantiatedModuleExtensionRepositoryError::Attribute(message),
+            )
+        })?;
+        current.push(HostInstantiatedModuleExtensionRepository {
+            generated_name: call.name.clone(),
+            canonical_name,
+            call: call.clone(),
+            repo_spec,
+        });
+    }
+    Ok(HostInstantiatedModuleExtensionRepositoriesForRequest {
+        request: receipt.request.clone(),
+        mapping_entries: mapping.1.clone(),
+        repositories: current.into(),
     })
 }
 

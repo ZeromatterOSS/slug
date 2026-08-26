@@ -10,6 +10,7 @@
 
 mod builtin_repository;
 pub mod dice;
+mod generated_repository_file_effect;
 mod host_file;
 mod host_include;
 mod host_lockfile;
@@ -70,6 +71,14 @@ pub use dice::digest_registry_source_specs;
 pub use dice::digest_repo_mapping_entries;
 pub use dice::digest_repo_mappings;
 #[doc(hidden)]
+pub use generated_repository_file_effect::GeneratedRepositoryFileEffect;
+#[doc(hidden)]
+pub use generated_repository_file_effect::GeneratedRepositoryFileEffectPlan;
+#[doc(hidden)]
+pub use generated_repository_file_effect::GeneratedRepositoryFileEffectPlanBuilder;
+#[doc(hidden)]
+pub use generated_repository_file_effect::GeneratedRepositoryFileEffectPlanError;
+#[doc(hidden)]
 pub use host_module::HostRepositorySourceCapability;
 #[doc(hidden)]
 pub use host_module::HostRepositorySourceCapabilitySource;
@@ -85,6 +94,8 @@ pub use host_module::RootModuleLoadingAnchorObservationKey;
 pub use host_module::RootRepositoryRoute;
 pub use host_module::RootRepositoryRouteError;
 pub use host_module::RootRepositoryRouteKey;
+#[doc(hidden)]
+pub use host_module::RootRepositoryRouteObservationError;
 #[doc(hidden)]
 pub use host_module::RootRepositoryRouteObservationKey;
 pub use host_module::RootRepositorySource;
@@ -338,6 +349,20 @@ pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequestsObservati
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionOverride;
 #[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDefinitionSource;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDemand;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDemandError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDemandErrorDisposition;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDemandKey;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDemandObservationError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDemandObservationKey;
+#[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionEvaluationInput;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionEvaluationInputError;
@@ -352,11 +377,29 @@ pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequestsObservat
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequestsObservationKey;
 #[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionOwner;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionOwnerInputs;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionOwnerInputsError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionOwnerInputsKey;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionOwnerInputsObservationError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionOwnerInputsObservationKey;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionOwnerModuleInput;
+#[doc(hidden)]
 pub use selected_repo_spec::ObservedHostCanonicalSelectedModuleDefinition;
 #[doc(hidden)]
 pub use selected_repo_spec::ObservedHostSelectedExtensionDefinitionLoadRequests;
 #[doc(hidden)]
+pub use selected_repo_spec::ObservedHostSelectedExtensionDemand;
+#[doc(hidden)]
 pub use selected_repo_spec::ObservedHostSelectedExtensionEvaluationInputRequests;
+#[doc(hidden)]
+pub use selected_repo_spec::ObservedHostSelectedExtensionOwnerInputs;
 #[doc(hidden)]
 pub use source_preparation::HostRepositoryLocalPathPolicy;
 #[doc(hidden)]
@@ -390,6 +433,8 @@ pub use source_preparation::HostRepositorySourceObservationOutcome;
 pub use source_preparation::HostRepositorySourceObservationResult;
 #[doc(hidden)]
 pub use source_preparation::HostRepositorySourceObservationView;
+#[doc(hidden)]
+pub use source_preparation::HostSelectedObservationFrontier;
 pub use source_preparation::ModuleSourcePreparation;
 pub use source_preparation::ModuleSourcePreparationError;
 pub use source_preparation::ModuleSourcePreparationKey;

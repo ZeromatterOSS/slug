@@ -3893,3 +3893,32 @@ This implements pinned Zabel's package-source/resolved-direct-load layering as
 architectural guidance only. Bazel 9.2 defines source-order and mapping behavior.
 Run only `WP-4-5-6-7A-root-package-external-bzl-load-owner-implementation`;
 do not reconstruct mappings/definitions in loading or activate broader loading.
+
+### Root external-Bzl candidate retained; command proof REPLAN (2026-08-25)
+
+The eight-file candidate keeps `RootPackageLoadKey` as source-order/package
+owner and consumes the structural selected route through the existing external-
+Bzl child. Focused identity/order/lifecycle proof and the full serial loading
+suite pass; ordinary root recursion and child event ownership remain unchanged.
+
+The mandatory real rules_rust replay does advance beyond the former Host-loader
+rejection, but then stops before loading `rust/defs.bzl`: native materialization
+rejects the standard BCR archive request. Loading cannot repair transport,
+discard `RepoSpec` fields, infer a physical source or disguise the selected
+source as local. Freeze the candidate and run only the docs-only native archive
+frontier audit. Pinned Zabel still guides producer-owned resolved views only;
+Bazel 9.2 owns behavior.
+
+### Root selected external-Bzl loading accepted (2026-08-25)
+
+The corrected frontier audit accepts the frozen route/load candidate for root
+BUILD loading from an already materialized selected-registry source. Its direct
+transaction proves route-before-child order, selected self/mapped recursion,
+package-last evaluation, child-owned events and lifecycle; broad Rust proof is
+green. Real rules_rust now reaches the exact materialization request, which is
+the honest next command boundary rather than the previously claimed downstream
+repository-rule declaration.
+
+Loading is closed for this slice. It must not erase `RepoSpec` fields, inject a
+physical root or participate in archive transport/extraction. Pinned Zabel
+guides the producer-owned resolved-view handoff only; Bazel 9.2 owns behavior.

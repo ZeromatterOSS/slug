@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use dice::ActivationData;
 use dice::ActivationKind;
 use dice::ActivationTracker;
@@ -19,9 +20,16 @@ use dice::UserComputationData;
 use dupe::Dupe;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::HostRepositoryMaterializationDisposition;
 use slug_bzlmod_v2::HostRepositorySourceFileObservationKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::OverrideAttributeValue;
+use slug_bzlmod_v2::RegistryFileUrl;
+use slug_bzlmod_v2::RegistryIo;
+use slug_bzlmod_v2::RegistryIoOutcome;
+use slug_bzlmod_v2::RegistryRequestGeneration;
+use slug_bzlmod_v2::RegistryTransportError;
+use slug_bzlmod_v2::RegistryUrls;
 use slug_bzlmod_v2::RepoRuleId;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
@@ -36,8 +44,12 @@ use slug_bzlmod_v2::RepositoryPackageSourceObservationKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::RootRepositoryRoute;
 use slug_bzlmod_v2::RootRepositoryRouteKey;
+use slug_bzlmod_v2::RootRepositoryRouteObservationKey;
+use slug_bzlmod_v2::host_repository_materialization_request;
+use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
+use slug_bzlmod_v2::install_registry_io;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
@@ -56,6 +68,7 @@ use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathObservationEpochKey;
+use slug_workspace_v2::PathObservationInstanceId;
 use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
@@ -74,16 +87,42 @@ use super::RepositoryPackageLoadError;
 use super::RepositoryPackageLoadErrorInner;
 use super::RepositoryPackageLoadKey;
 use super::RepositoryPackageLoadObservationKey;
+use super::RootPackageDirectLoad;
 use super::RootPackageLoadObservationKey;
 use super::merge_root_package_observations;
 use super::resolve_external_load_label;
 use super::resolve_host_load_label;
+use super::resolve_root_package_direct_load;
 use crate::LoadingPreparationOutcome;
 use crate::RootPackageLoadKey;
 use crate::cycle_detector::bzl_load_cycle_detector;
 
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
+}
+
+struct SelectedRegistryIo;
+
+#[async_trait]
+impl RegistryIo for SelectedRegistryIo {
+    async fn read_exact(
+        &self,
+        url: &RegistryFileUrl,
+    ) -> Result<RegistryIoOutcome, RegistryTransportError> {
+        let bytes: Option<&'static [u8]> = match url.as_str() {
+            "https://registry.invalid/modules/dep/1/MODULE.bazel" => {
+                Some(b"module(name='dep', version='1')\n")
+            }
+            "https://registry.invalid/modules/dep/1/source.json" => {
+                Some(br#"{"url":"https://origin.invalid/dep.tgz","integrity":"sha256-test"}"#)
+            }
+            "https://registry.invalid/bazel_registry.json" => None,
+            _ => None,
+        };
+        Ok(bytes.map_or(RegistryIoOutcome::NotFound, |bytes| {
+            RegistryIoOutcome::Found(Arc::from(bytes))
+        }))
+    }
 }
 
 #[derive(Default)]
@@ -116,6 +155,72 @@ impl EpochBuilder {
     fn missing(&mut self, path: &str) {
         self.entries.insert(
             Self::demand(path, PathObservationOperation::Lstat),
+            PathObservationResult::Lstat(PathOperationResult::Missing),
+        );
+    }
+
+    fn materialized_file(
+        &mut self,
+        instance: PathObservationInstanceId,
+        path: &str,
+        source: impl AsRef<[u8]>,
+        variant: i64,
+    ) {
+        let namespace = PathObservationNamespace::Materialization(instance);
+        let path = NormalizedAbsolutePath::new(path).unwrap();
+        self.entries.insert(
+            PathObservationDemand::new(
+                namespace.clone(),
+                path.dupe(),
+                PathObservationOperation::Lstat,
+            ),
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::RegularFile,
+                variant,
+                variant,
+                variant,
+                variant,
+                0o755,
+            ))),
+        );
+        self.entries.insert(
+            PathObservationDemand::new(namespace, path, PathObservationOperation::FileBytes),
+            PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                source.as_ref(),
+            ))),
+        );
+    }
+
+    fn materialized_directory(
+        &mut self,
+        instance: PathObservationInstanceId,
+        path: &str,
+        variant: i64,
+    ) {
+        self.entries.insert(
+            PathObservationDemand::new(
+                PathObservationNamespace::Materialization(instance),
+                NormalizedAbsolutePath::new(path).unwrap(),
+                PathObservationOperation::Lstat,
+            ),
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::Directory,
+                variant,
+                variant,
+                variant,
+                variant,
+                0o755,
+            ))),
+        );
+    }
+
+    fn materialized_missing(&mut self, instance: PathObservationInstanceId, path: &str) {
+        self.entries.insert(
+            PathObservationDemand::new(
+                PathObservationNamespace::Materialization(instance),
+                NormalizedAbsolutePath::new(path).unwrap(),
+                PathObservationOperation::Lstat,
+            ),
             PathObservationResult::Lstat(PathOperationResult::Missing),
         );
     }
@@ -214,6 +319,7 @@ struct TrackedBatch {
 struct EventTracker {
     batches: Mutex<Vec<TrackedBatch>>,
     package_dependencies: Mutex<Vec<Vec<String>>>,
+    route_dependencies: Mutex<Vec<Vec<String>>>,
 }
 
 impl EventTracker {
@@ -223,6 +329,10 @@ impl EventTracker {
 
     fn take_package_dependencies(&self) -> Vec<Vec<String>> {
         std::mem::take(&mut *self.package_dependencies.lock().unwrap())
+    }
+
+    fn take_route_dependencies(&self) -> Vec<Vec<String>> {
+        std::mem::take(&mut *self.route_dependencies.lock().unwrap())
     }
 }
 
@@ -243,6 +353,14 @@ impl ActivationTracker for EventTracker {
                 .is_some()
         {
             self.package_dependencies
+                .lock()
+                .unwrap()
+                .push(deps.map(ToString::to_string).collect());
+        } else if key
+            .downcast_ref::<RootRepositoryRouteObservationKey>()
+            .is_some()
+        {
+            self.route_dependencies
                 .lock()
                 .unwrap()
                 .push(deps.map(ToString::to_string).collect());
@@ -572,6 +690,205 @@ fn root_load_resolution_is_mapping_free_and_rejects_path_escape() {
         error.to_string(),
         "parsing //:a.bzl: broken\ncompilation of module 'a.bzl' failed"
     );
+}
+
+#[test]
+fn root_package_direct_load_keeps_root_and_apparent_external_dispatch_distinct() {
+    let package = PackagePath::parse("pkg").unwrap();
+    assert!(matches!(
+        resolve_root_package_direct_load(&package, ":defs.bzl"),
+        Ok(RootPackageDirectLoad::Root(_))
+    ));
+    assert!(matches!(
+        resolve_root_package_direct_load(&package, "@dep//tools:defs.bzl"),
+        Ok(RootPackageDirectLoad::External { apparent_repo, .. }) if apparent_repo.as_str() == "dep"
+    ));
+    assert!(resolve_root_package_direct_load(&package, "@@dep+//tools:defs.bzl").is_err());
+}
+
+fn selected_registry_root_package_epoch() -> (PathObservationEpoch, PathObservationInstanceId) {
+    let root =
+        "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\n";
+    let build = concat!(
+        "load(':root_defs.bzl', 'ROOT_VALUE')\n",
+        "load('@dep_alias//:defs.bzl', 'SELECTED_NAME')\n",
+        "print('SELECTED_BUILD')\n",
+        "filegroup(name=SELECTED_NAME)\n",
+    );
+    let mut epoch = EpochBuilder::workspace_sources(
+        root,
+        build,
+        &[("root_defs.bzl", "print('ROOT_BZL')\nROOT_VALUE='root'\n")],
+        901,
+    );
+    epoch.missing("/workspace/MODULE.bazel.lock");
+    let instance = PathObservationInstanceId::new(77);
+    epoch.materialized_directory(instance, "/", 901);
+    epoch.materialized_directory(instance, "/registry-dep", 901);
+    epoch.materialized_file(
+        instance,
+        "/registry-dep/MODULE.bazel",
+        "module(name='dep', version='1')\n",
+        901,
+    );
+    epoch.materialized_missing(instance, "/registry-dep/REPO.bazel");
+    epoch.materialized_missing(instance, "/registry-dep/.bazelignore");
+    epoch.materialized_file(
+        instance,
+        "/registry-dep/defs.bzl",
+        "load(':nested.bzl', 'NESTED_NAME')\nprint('SELECTED_BZL')\nSELECTED_NAME=NESTED_NAME\n",
+        901,
+    );
+    epoch.materialized_file(
+        instance,
+        "/registry-dep/nested.bzl",
+        "print('SELECTED_NESTED')\nNESTED_NAME='selected_target'\n",
+        901,
+    );
+    (epoch.build(), instance)
+}
+
+#[tokio::test]
+async fn root_package_loads_selected_registry_bzl_through_admitted_route() {
+    let (epoch, instance) = selected_registry_root_package_epoch();
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, Arc::new(SelectedRegistryIo));
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(EventTracker::default());
+    let transaction = transaction(&dice, epoch, true, Some(tracker.dupe())).await;
+    let mut updater = transaction.into_updater();
+    inject_registry_request_inputs(
+        &mut updater,
+        workspace().as_path(),
+        RegistryUrls::new(["https://registry.invalid"]),
+        RegistryRequestGeneration(1),
+    )
+    .unwrap();
+    let mut transaction = updater.commit().await;
+    let route = transaction
+        .compute(
+            &RootRepositoryRouteObservationKey::for_root_build(
+                workspace(),
+                ApparentRepoName::new("dep_alias").unwrap(),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(route)) = route else {
+        panic!("selected route returned Need")
+    };
+    let route = route.result().as_ref().as_ref().unwrap();
+    assert_eq!(route.apparent_repo().as_str(), "dep_alias");
+    assert_eq!(route.canonical_repo().as_str(), "dep+");
+    let HostRepositoryMaterializationDisposition::Request(request) =
+        host_repository_materialization_request(&route.source_capability()).unwrap()
+    else {
+        panic!("selected registry route must request materialization")
+    };
+    assert_eq!(request.kind, RepositoryMaterializationKind::Immutable);
+    tracker.take();
+    tracker.take_package_dependencies();
+    let route_dependencies = tracker.take_route_dependencies();
+    let route_dependencies = route_dependencies.last().unwrap();
+    let root = route_dependencies
+        .iter()
+        .position(|dep| dep.starts_with("bzlmod-observed-host-root-module-file:"))
+        .unwrap();
+    let mapping = route_dependencies
+        .iter()
+        .position(|dep| dep.starts_with("observed-host-root-repository-mapping:"))
+        .unwrap();
+    let definition = route_dependencies
+        .iter()
+        .position(|dep| dep.starts_with("observed-host-canonical-selected-module-definition:"))
+        .unwrap();
+    assert!(root < mapping && mapping < definition);
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(
+            RepositoryMaterializationResultEpochKey {
+                workspace: workspace(),
+            },
+            RepositoryMaterializationResultEpoch::new(
+                workspace(),
+                [RepositoryMaterializationEpochEntry {
+                    request,
+                    result: RepositoryMaterializationResult::Success(
+                        RepositoryMaterializationSuccess::Immutable {
+                            source_identity: Arc::from("sha256-test"),
+                            generation_root: PathBuf::from("/registry-dep"),
+                            observation_instance: instance,
+                        },
+                    ),
+                }],
+            )
+            .unwrap(),
+        )])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    let key = observed_package_key();
+    let cold = transaction.compute(&key).await.unwrap();
+    let loaded = observed_package(&cold)
+        .result()
+        .as_ref()
+        .as_ref()
+        .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(
+        loaded
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        ["selected_target"]
+    );
+    let rows = tracker.take_package_dependencies();
+    let row = rows
+        .iter()
+        .find(|row| {
+            row.iter()
+                .any(|dep| dep.starts_with("observed-root-build-repository-route:"))
+        })
+        .expect("root package must depend on the admitted route");
+    let route = row
+        .iter()
+        .position(|dep| dep.starts_with("observed-root-build-repository-route:"))
+        .unwrap();
+    let root_bzl = row
+        .iter()
+        .position(|dep| dep.starts_with("observed-host-bzl-module:"))
+        .unwrap();
+    let bzl = row
+        .iter()
+        .position(|dep| dep.starts_with("observed-external-bzl-module:"))
+        .unwrap();
+    assert!(root_bzl < route && route < bzl);
+    let events = tracker.take();
+    assert!(events.iter().any(|entry| {
+        entry.key.starts_with("observed-host-bzl-module:")
+            && entry
+                .batch
+                .as_ref()
+                .is_some_and(|batch| event_texts(batch) == ["ROOT_BZL"])
+    }));
+    assert!(events.iter().any(|entry| {
+        entry.key.starts_with("observed-external-bzl-module:")
+            && entry
+                .batch
+                .as_ref()
+                .is_some_and(|batch| event_texts(batch) == ["SELECTED_BZL"])
+    }));
+    assert!(events.iter().any(|entry| {
+        entry.key.starts_with("observed-host-package-load:")
+            && entry
+                .batch
+                .as_ref()
+                .is_some_and(|batch| event_texts(batch) == ["SELECTED_BUILD"])
+    }));
+
+    let warm = transaction.compute(&key).await.unwrap();
+    assert!(RootPackageLoadObservationKey::equality(&cold, &warm));
+    assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
 }
 
 #[tokio::test]

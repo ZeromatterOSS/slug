@@ -22,7 +22,15 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequest;
+use slug_bzlmod_v2::HostSelectedExtensionDefinitionSource;
+use slug_bzlmod_v2::HostSelectedExtensionOwner;
+use slug_bzlmod_v2::HostSelectedExtensionOwnerInputs;
+use slug_bzlmod_v2::HostSelectedExtensionOwnerInputsError;
+use slug_bzlmod_v2::HostSelectedExtensionOwnerInputsKey;
+use slug_bzlmod_v2::HostSelectedExtensionOwnerInputsObservationError;
+use slug_bzlmod_v2::HostSelectedExtensionOwnerInputsObservationKey;
 use slug_bzlmod_v2::RootPackageBzlTarget;
+use slug_bzlmod_v2::RootRepositoryRoute;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
@@ -49,6 +57,8 @@ use starlark::values::starlark_value;
 use starlark_map::StarlarkHasher;
 
 use crate::attrs::CoercedAttributeValue;
+use crate::bzl_module::ExternalBzlModuleEvalKey;
+use crate::bzl_module::ExternalBzlModuleObservationKey;
 use crate::bzl_module::FrozenBzlModule;
 use crate::bzl_module::HostBzlModuleError;
 use crate::bzl_module::HostBzlModuleEvalKey;
@@ -61,9 +71,13 @@ use crate::bzl_module::HostPreparedModuleExtensionInputsObservationKey;
 use crate::bzl_module::HostRootBzlLabel;
 use crate::bzl_module::PreparedModuleExtensionInput;
 use crate::bzl_module::PreparedModuleExtensionTag;
+use crate::bzl_module::RepositoryBzlLabel;
 use crate::module_extension_repository_rule::RepositoryRuleCallRecord;
 use crate::module_extension_repository_rule::RepositoryRuleInvocationState;
 use crate::package::FrozenModuleExtensionDefinition;
+use crate::package::ModuleExtensionDefinitionProjection;
+use crate::package::prepare_module_extension_tag_attributes;
+use crate::package::validate_module_extension_tag_schema;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct HostPureModuleExtensionInvocations {
@@ -95,6 +109,7 @@ pub(crate) enum HostPureModuleExtensionInvocationError {
     UnsupportedFactors,
     Label(CompactString),
     Bzl(HostBzlModuleError),
+    SelectedBzl(crate::bzl_module::ExternalBzlModuleError),
     Drift(CompactString),
     Invocation(CompactString),
     Result(CompactString),
@@ -282,14 +297,13 @@ struct PurePreflight {
 }
 
 type PureHostBzlChild = SourcePreparationOutcome<
-    Result<
-        (
-            Arc<Result<FrozenBzlModule, HostBzlModuleError>>,
-            PathObservationEpoch,
-        ),
-        ObservedPathFrontierError,
-    >,
+    Result<(PureBzlCarrier, PathObservationEpoch), ObservedPathFrontierError>,
 >;
+
+enum PureBzlCarrier {
+    Root(Arc<Result<FrozenBzlModule, HostBzlModuleError>>),
+    Selected(Arc<Result<FrozenBzlModule, crate::bzl_module::ExternalBzlModuleError>>),
+}
 
 #[rustfmt::skip]
 async fn pure_host_bzl(ctx: &mut DiceComputations<'_>, workspace: &NormalizedAbsolutePath, prepared: &Arc<HostPreparedModuleExtensionInputs>, index: usize, request: &HostSelectedExtensionDefinitionLoadRequest, label: HostRootBzlLabel, observations: PathObservationEpoch, mode: PureInvocationsMode) -> Result<(FrozenBzlModule, PathObservationEpoch), PureInvocationsDriverOutcome> {
@@ -300,16 +314,34 @@ async fn pure_host_bzl(ctx: &mut DiceComputations<'_>, workspace: &NormalizedAbs
         current_calls: Arc::from([]),
         error,
     };
-    let child: PureHostBzlChild = match mode {
-        PureInvocationsMode::Legacy => match ctx.compute(&HostBzlModuleEvalKey::new(workspace.dupe(), label)).await {
+    let target = RootPackageBzlTarget::parse(request.parts().0.target().as_str()).map_err(|error| {
+        pure_complete(Err(after(HostPureModuleExtensionInvocationError::Label(error.to_string().into()))), observations.dupe())
+    })?;
+    let selected = match request.source() {
+        HostSelectedExtensionDefinitionSource::Root => None,
+        source => RootRepositoryRoute::for_selected_extension_definition(workspace.dupe(), source),
+    };
+    let child: PureHostBzlChild = match (mode, selected) {
+        (PureInvocationsMode::Legacy, None) => match ctx.compute(&HostBzlModuleEvalKey::new(workspace.dupe(), label)).await {
             Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(result)) => SourcePreparationOutcome::Complete(Ok((result, PathObservationEpoch::empty()))),
+            Ok(SourcePreparationOutcome::Complete(result)) => SourcePreparationOutcome::Complete(Ok((PureBzlCarrier::Root(result), PathObservationEpoch::empty()))),
             Err(error) => return Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()))), observations)),
         },
-        PureInvocationsMode::Observed => match ctx.compute(&HostBzlModuleObservationKey::new(workspace.dupe(), label)).await {
+        (PureInvocationsMode::Observed, None) => match ctx.compute(&HostBzlModuleObservationKey::new(workspace.dupe(), label)).await {
             Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(Err(error))) => return Err(SourcePreparationOutcome::Complete(Err(PureModuleExtensionInvocationsObservationError::HostBzl { prepared: prepared.dupe(), index, error }))),
-            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => SourcePreparationOutcome::Complete(Ok((Arc::new(observed.result().clone()), observed.observations().dupe()))),
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => SourcePreparationOutcome::Complete(Ok((PureBzlCarrier::Root(Arc::new(observed.result().clone())), observed.observations().dupe()))),
+            Err(error) => return Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()))), observations)),
+        },
+        (PureInvocationsMode::Legacy, Some(route)) => match ctx.compute(&ExternalBzlModuleEvalKey::new(route, RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target.dupe()).expect("selected target was parsed"))).await {
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(result)) => SourcePreparationOutcome::Complete(Ok((PureBzlCarrier::Selected(result), PathObservationEpoch::empty()))),
+            Err(error) => return Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()))), observations)),
+        },
+        (PureInvocationsMode::Observed, Some(route)) => match ctx.compute(&ExternalBzlModuleObservationKey::new(route, RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target).expect("selected target was parsed"))).await {
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return Err(SourcePreparationOutcome::Complete(Err(PureModuleExtensionInvocationsObservationError::HostBzl { prepared: prepared.dupe(), index, error }))),
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => SourcePreparationOutcome::Complete(Ok((PureBzlCarrier::Selected(observed.result().dupe()), observed.observations().dupe()))),
             Err(error) => return Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()))), observations)),
         },
     };
@@ -321,9 +353,15 @@ async fn pure_host_bzl(ctx: &mut DiceComputations<'_>, workspace: &NormalizedAbs
     let observations = union_pure_observations(&observations, &incoming).map_err(|error| {
         SourcePreparationOutcome::Complete(Err(PureModuleExtensionInvocationsObservationError::Merge { prepared: prepared.dupe(), index, error }))
     })?;
-    match result.as_ref() {
-        Ok(module) => Ok((module.clone(), observations)),
-        Err(error) => Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::Bzl(error.clone()))), observations)),
+    match result {
+        PureBzlCarrier::Root(result) => match result.as_ref() {
+            Ok(module) => Ok((module.clone(), observations)),
+            Err(error) => Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::Bzl(error.clone()))), observations)),
+        },
+        PureBzlCarrier::Selected(result) => match result.as_ref() {
+            Ok(module) => Ok((module.clone(), observations)),
+            Err(error) => Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::SelectedBzl(error.clone()))), observations)),
+        },
     }
 }
 
@@ -555,9 +593,202 @@ impl Key for HostPureModuleExtensionInvocationsObservationKey {
     }
 }
 
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct HostSelectedExtensionOwnerPureResult { pub(crate) inputs: Arc<HostSelectedExtensionOwnerInputs>, pub(crate) receipt: HostPureModuleExtensionInvocationReceipt }
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostSelectedExtensionOwnerPureError { Inputs(HostSelectedExtensionOwnerInputsError), Compute(CompactString), AfterInputs { inputs: Arc<HostSelectedExtensionOwnerInputs>, request: HostSelectedExtensionDefinitionLoadRequest, current_calls: Arc<[RepositoryRuleCallRecord]>, message: CompactString } }
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostSelectedExtensionOwnerPureKey { workspace: NormalizedAbsolutePath, owner: Arc<HostSelectedExtensionOwner> }
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostSelectedExtensionOwnerPureObservationKey(HostSelectedExtensionOwnerPureKey);
+#[rustfmt::skip]
+impl HostSelectedExtensionOwnerPureKey { pub(crate) fn new(workspace: NormalizedAbsolutePath, owner: Arc<HostSelectedExtensionOwner>) -> Self { Self { workspace, owner } } }
+#[rustfmt::skip]
+impl HostSelectedExtensionOwnerPureObservationKey { pub(crate) fn new(workspace: NormalizedAbsolutePath, owner: Arc<HostSelectedExtensionOwner>) -> Self { Self(HostSelectedExtensionOwnerPureKey::new(workspace, owner)) } }
+#[rustfmt::skip]
+impl fmt::Display for HostSelectedExtensionOwnerPureKey { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "host-selected-extension-owner-pure:{}:{:?}", self.workspace, self.owner) } }
+#[rustfmt::skip]
+impl fmt::Display for HostSelectedExtensionOwnerPureObservationKey { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "observed-{}", self.0) } }
+type OwnerPureResult =
+    Arc<Result<HostSelectedExtensionOwnerPureResult, HostSelectedExtensionOwnerPureError>>;
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedHostSelectedExtensionOwnerPure { result: OwnerPureResult, observations: PathObservationEpoch }
+#[rustfmt::skip]
+impl ObservedHostSelectedExtensionOwnerPure { pub(crate) fn result(&self) -> &OwnerPureResult { &self.result } pub(crate) fn observations(&self) -> &PathObservationEpoch { &self.observations } }
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct OwnerProjection { manifest: crate::bzl_module::BzlLoadManifest, definition: ModuleExtensionDefinitionProjection }
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) enum HostSelectedExtensionOwnerPureObservationError { Inputs(HostSelectedExtensionOwnerInputsObservationError), HostBzl { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Option<Arc<OwnerProjection>>, error: ObservedPathFrontierError }, Merge { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Option<Arc<OwnerProjection>>, error: ObservedPathFrontierError } }
+type OwnerPureDriver = SourcePreparationOutcome<
+    Result<(OwnerPureResult, PathObservationEpoch), HostSelectedExtensionOwnerPureObservationError>,
+>;
+#[rustfmt::skip]
+fn owner_complete(value: Result<HostSelectedExtensionOwnerPureResult, HostSelectedExtensionOwnerPureError>, observations: PathObservationEpoch) -> OwnerPureDriver { SourcePreparationOutcome::Complete(Ok((Arc::new(value), observations))) }
+#[rustfmt::skip]
+fn owner_after(inputs: &Arc<HostSelectedExtensionOwnerInputs>, calls: Arc<[RepositoryRuleCallRecord]>, message: impl Into<CompactString>) -> HostSelectedExtensionOwnerPureError { HostSelectedExtensionOwnerPureError::AfterInputs { inputs: inputs.clone(), request: inputs.request().clone(), current_calls: calls, message: message.into() } }
+
+#[rustfmt::skip]
+fn owner_projection(module: &FrozenBzlModule, request: &HostSelectedExtensionDefinitionLoadRequest) -> Result<OwnerProjection, CompactString> {
+    let export = module.module.get(request.parts().1).map_err(|error| CompactString::from(error.to_string()))?;
+    let definition = export.downcast::<FrozenModuleExtensionDefinition>().map_err(|_| CompactString::from("selected export is not module_extension"))?;
+    let projection = definition.projection();
+    if !projection.environment.is_empty() || projection.os_dependent || projection.arch_dependent || projection.facts_version != 0 {
+        return Err("selected module extension has unsupported factors".into());
+    }
+    Ok(OwnerProjection { manifest: module.manifest.clone(), definition: projection })
+}
+
+#[rustfmt::skip]
+fn owner_invocation_modules(inputs: &HostSelectedExtensionOwnerInputs, projection: &OwnerProjection, owner: &Arc<()>) -> Result<Arc<[InvocationModule]>, CompactString> {
+    for (_, schema) in projection.definition.tag_classes.iter() {
+        validate_module_extension_tag_schema(schema).map_err(|error| CompactString::from(error.to_string()))?;
+    }
+    let classes: Arc<[CompactString]> = projection.definition.tag_classes.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>().into();
+    inputs.modules().iter().enumerate().map(|(module_index, input)| {
+        let (context_repo, name, version, is_root, mapping, tags) = input.parts();
+        let tags = tags.iter().enumerate().map(|(tag_index, tag)| {
+            let schema = projection.definition.tag_classes.iter().find_map(|(name, schema)| (name == &tag.tag_class).then_some(schema.as_ref())).ok_or_else(|| CompactString::from(format!("unknown tag class '{}'", tag.tag_class)))?;
+            let attributes = prepare_module_extension_tag_attributes(schema, &tag.attributes, context_repo, mapping).map_err(|error| CompactString::from(error.to_string()))?;
+            Ok(PreparedModuleExtensionTag { tag_class: tag.tag_class.clone(), attributes, dev_dependency: tag.dev_dependency, location: tag.location.clone(), module_index, tag_index })
+        }).collect::<Result<Vec<_>, CompactString>>()?;
+        Ok(InvocationModule { name: name.into(), version: version.into(), is_root, tag_classes: classes.clone(), tags: tags.into(), owner: owner.clone() })
+    }).collect::<Result<Vec<_>, CompactString>>().map(Into::into)
+}
+
+#[rustfmt::skip]
+async fn owner_bzl(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOwnerPureKey, inputs: &Arc<HostSelectedExtensionOwnerInputs>, first: Option<&Arc<OwnerProjection>>, observations: PathObservationEpoch, mode: PureInvocationsMode) -> Result<(FrozenBzlModule, PathObservationEpoch), OwnerPureDriver> {
+    let request = inputs.request();
+    let target = RootPackageBzlTarget::parse(request.parts().0.target().as_str()).map_err(|error| owner_complete(Err(owner_after(inputs, Arc::from([]), error.to_string())), observations.dupe()))?;
+    let label = HostRootBzlLabel::new(request.parts().0.package().package().clone(), target.dupe());
+    let selected = match request.source() {
+        HostSelectedExtensionDefinitionSource::Root => None,
+        source => RootRepositoryRoute::for_selected_extension_definition(key.workspace.dupe(), source),
+    };
+    let child = match (mode, selected) {
+        (PureInvocationsMode::Legacy, None) => match ctx.compute(&HostBzlModuleEvalKey::new(key.workspace.dupe(), label.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return Err(SourcePreparationOutcome::Need(need)),
+            Ok(SourcePreparationOutcome::Complete(result)) => (result.as_ref().clone().map_err(|error| error.to_string()), PathObservationEpoch::empty()),
+            Err(error) => return Err(owner_complete(Err(owner_after(inputs, Arc::from([]), error.to_string())), observations)),
+        },
+        (PureInvocationsMode::Observed, None) => match ctx.compute(&HostBzlModuleObservationKey::new(key.workspace.dupe(), label.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return Err(SourcePreparationOutcome::Need(need)),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return Err(SourcePreparationOutcome::Complete(Err(HostSelectedExtensionOwnerPureObservationError::HostBzl { inputs: inputs.clone(), first: first.cloned(), error }))),
+            Ok(SourcePreparationOutcome::Complete(Ok(value))) => (value.result().clone().map_err(|error| error.to_string()), value.observations().dupe()),
+            Err(error) => return Err(owner_complete(Err(owner_after(inputs, Arc::from([]), error.to_string())), observations)),
+        },
+        (PureInvocationsMode::Legacy, Some(route)) => match ctx.compute(&ExternalBzlModuleEvalKey::new(route, RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target.dupe()).expect("selected target was parsed"))).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return Err(SourcePreparationOutcome::Need(need)),
+            Ok(SourcePreparationOutcome::Complete(result)) => (result.as_ref().clone().map_err(|error| error.to_string()), PathObservationEpoch::empty()),
+            Err(error) => return Err(owner_complete(Err(owner_after(inputs, Arc::from([]), error.to_string())), observations)),
+        },
+        (PureInvocationsMode::Observed, Some(route)) => match ctx.compute(&ExternalBzlModuleObservationKey::new(route, RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target).expect("selected target was parsed"))).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return Err(SourcePreparationOutcome::Need(need)),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return Err(SourcePreparationOutcome::Complete(Err(HostSelectedExtensionOwnerPureObservationError::HostBzl { inputs: inputs.clone(), first: first.cloned(), error }))),
+            Ok(SourcePreparationOutcome::Complete(Ok(value))) => (value.result().as_ref().clone().map_err(|error| error.to_string()), value.observations().dupe()),
+            Err(error) => return Err(owner_complete(Err(owner_after(inputs, Arc::from([]), error.to_string())), observations)),
+        },
+    };
+    let observations = union_pure_observations(&observations, &child.1).map_err(|error| SourcePreparationOutcome::Complete(Err(HostSelectedExtensionOwnerPureObservationError::Merge { inputs: inputs.clone(), first: first.cloned(), error })))?;
+    match child.0 {
+        Ok(module) => Ok((module, observations)),
+        Err(error) => Err(owner_complete(Err(owner_after(inputs, Arc::from([]), error.to_string())), observations)),
+    }
+}
+
+#[rustfmt::skip]
+async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOwnerPureKey, mode: PureInvocationsMode) -> OwnerPureDriver {
+    let (inputs, observations) = match mode {
+        PureInvocationsMode::Legacy => match ctx.compute(&HostSelectedExtensionOwnerInputsKey::new(key.workspace.dupe(), key.owner.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(value)) => (value, PathObservationEpoch::empty()),
+            Err(error) => return owner_complete(Err(HostSelectedExtensionOwnerPureError::Compute(error.to_string().into())), PathObservationEpoch::empty()),
+        },
+        PureInvocationsMode::Observed => match ctx.compute(&HostSelectedExtensionOwnerInputsObservationKey::new(key.workspace.dupe(), key.owner.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostSelectedExtensionOwnerPureObservationError::Inputs(error))),
+            Ok(SourcePreparationOutcome::Complete(Ok(value))) => (value.result().dupe(), value.observations().dupe()),
+            Err(error) => return owner_complete(Err(HostSelectedExtensionOwnerPureError::Compute(error.to_string().into())), PathObservationEpoch::empty()),
+        },
+    };
+    let inputs = match inputs.as_ref() {
+        Ok(value) => Arc::new(value.clone()),
+        Err(error) => return owner_complete(Err(HostSelectedExtensionOwnerPureError::Inputs(error.clone())), observations),
+    };
+    let first_module = match owner_bzl(ctx, key, &inputs, None, observations, mode).await { Ok(value) => value, Err(outcome) => return outcome };
+    let first = match owner_projection(&first_module.0, inputs.request()) {
+        Ok(value) => Arc::new(value),
+        Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1),
+    };
+    drop(first_module.0);
+    let owner = Arc::new(());
+    let modules = match owner_invocation_modules(&inputs, &first, &owner) {
+        Ok(value) => value,
+        Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1),
+    };
+    let (module, observations) = match owner_bzl(ctx, key, &inputs, Some(&first), first_module.1, mode).await { Ok(value) => value, Err(outcome) => return outcome };
+    let second = match owner_projection(&module, inputs.request()) {
+        Ok(value) => value,
+        Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
+    };
+    if second != *first {
+        return owner_complete(Err(owner_after(&inputs, Arc::from([]), "reacquired selected module extension differs")), observations);
+    }
+    let definition = module.module.get(inputs.request().parts().1).expect("projection authenticated export").downcast::<FrozenModuleExtensionDefinition>().expect("projection authenticated kind");
+    let invocation_module = Module::new();
+    let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner));
+    let capture = ctx.per_transaction_data().data.get::<CaptureEvaluationEvents>().is_ok().then(InvocationPrintCapture::default);
+    let repository_rules = RepositoryRuleInvocationState::new();
+    let returned = {
+        let mut evaluator = Evaluator::new(&invocation_module);
+        evaluator.extra = Some(&repository_rules);
+        if let Some(capture) = capture.as_ref() {
+            evaluator.set_print_handler(capture);
+        }
+        evaluator.eval_function(definition.implementation.to_value(), &[context], &[])
+    };
+    let calls = repository_rules.records();
+    let request = inputs.request().clone();
+    let result = match returned {
+        Err(error) => Err(owner_after(&inputs, calls, error.to_string())),
+        Ok(value) if !value.is_none() => Err(owner_after(&inputs, calls, format!("module extension must return None, got {}", value.get_type()))),
+        Ok(_) => Ok(HostSelectedExtensionOwnerPureResult {
+            inputs,
+            receipt: HostPureModuleExtensionInvocationReceipt { request, repository_rule_calls: calls },
+        }),
+    };
+    if let Some(capture) = capture {
+        ctx.store_evaluation_data(capture.into_batch()).expect("selected owner invocation stores one local Complete event batch");
+    }
+    owner_complete(result, observations)
+}
+
+#[async_trait]
+#[rustfmt::skip]
+impl Key for HostSelectedExtensionOwnerPureKey {
+    type Value = SourcePreparationOutcome<OwnerPureResult>;
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value { match compute_owner_pure(ctx, self, PureInvocationsMode::Legacy).await { SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need), SourcePreparationOutcome::Complete(Ok((result, _))) => SourcePreparationOutcome::Complete(result), SourcePreparationOutcome::Complete(Err(_)) => unreachable!() } }
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool { x.complete_eq(y) }
+    fn validity(value: &Self::Value) -> bool { value.is_complete() }
+}
+
+#[async_trait]
+#[rustfmt::skip]
+impl Key for HostSelectedExtensionOwnerPureObservationKey {
+    type Value = SourcePreparationOutcome<Result<ObservedHostSelectedExtensionOwnerPure, HostSelectedExtensionOwnerPureObservationError>>;
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value { match compute_owner_pure(ctx, &self.0, PureInvocationsMode::Observed).await { SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need), SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(Err(error)), SourcePreparationOutcome::Complete(Ok((result, observations))) => SourcePreparationOutcome::Complete(Ok(ObservedHostSelectedExtensionOwnerPure { result, observations })) } }
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool { x.complete_eq(y) }
+    fn validity(value: &Self::Value) -> bool { value.is_complete() }
+}
+
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct InvocationContext {
-    module: InvocationModule,
+    modules: Arc<[InvocationModule]>,
     #[allocative(skip)]
     owner: Arc<()>,
 }
@@ -569,15 +800,22 @@ impl InvocationContext {
         owner: &Arc<()>,
     ) -> Self {
         let (_, _, name, version, is_root, _) = input.input.parts();
-        Self {
-            module: InvocationModule {
+        Self::new_modules(
+            Arc::from([InvocationModule {
                 name: name.into(),
                 version: version.into(),
                 is_root,
                 tag_classes,
                 tags: input.tags.clone(),
                 owner: owner.clone(),
-            },
+            }]),
+            owner,
+        )
+    }
+
+    fn new_modules(modules: Arc<[InvocationModule]>, owner: &Arc<()>) -> Self {
+        Self {
+            modules,
             owner: owner.clone(),
         }
     }
@@ -593,8 +831,7 @@ starlark::starlark_simple_value!(InvocationContext);
 #[starlark_value(type = "module_ctx")]
 impl<'v> StarlarkValue<'v> for InvocationContext {
     fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        (name == "modules")
-            .then(|| heap.alloc_simple(InvocationModuleList(Arc::from([self.module.clone()]))))
+        (name == "modules").then(|| heap.alloc_simple(InvocationModuleList(self.modules.clone())))
     }
     fn get_methods() -> Option<&'static Methods> {
         static METHODS: MethodsStatic = MethodsStatic::new();
@@ -1182,7 +1419,7 @@ mod tests {
     fn immutable_lists_and_foreign_tags_fail_closed() {
         let owner = Arc::new(());
         let context = InvocationContext {
-            module: empty_module(&owner),
+            modules: Arc::from([empty_module(&owner)]),
             owner: owner.clone(),
         };
         let modules = call("def f(ctx):\n  ctx.modules.append(1)\n", |module| {
@@ -1226,10 +1463,10 @@ mod tests {
         let owner = Arc::new(());
         let tags: Arc<[PreparedModuleExtensionTag]> = Arc::from([]);
         let context = InvocationContext {
-            module: InvocationModule {
+            modules: Arc::from([InvocationModule {
                 tags,
                 ..empty_module(&owner)
-            },
+            }]),
             owner: owner.clone(),
         };
         let foreign = tag(&Arc::new(()), 0, false);
@@ -1276,10 +1513,10 @@ mod tests {
             assert!(error.contains("list index out of range"), "{error}");
         }
         let context = InvocationContext {
-            module: InvocationModule {
+            modules: Arc::from([InvocationModule {
                 tags: Arc::from([prepared_tag(0, false), prepared_tag(1, true)]),
                 ..empty_module(&owner)
-            },
+            }]),
             owner: owner.clone(),
         };
         let value = call(
@@ -1294,10 +1531,10 @@ mod tests {
     fn forbidden_abi_and_cross_context_captured_tags_fail_closed() {
         let owner = Arc::new(());
         let context = InvocationContext {
-            module: InvocationModule {
+            modules: Arc::from([InvocationModule {
                 tags: Arc::from([prepared_tag(0, false)]),
                 ..empty_module(&owner)
-            },
+            }]),
             owner,
         };
         for name in [
@@ -1344,10 +1581,10 @@ mod tests {
         }
         let other_owner = Arc::new(());
         let other = InvocationContext {
-            module: InvocationModule {
+            modules: Arc::from([InvocationModule {
                 tags: Arc::from([prepared_tag(0, true)]),
                 ..empty_module(&other_owner)
-            },
+            }]),
             owner: other_owner,
         };
         for method in ["is_dev_dependency", "tag_sort_key"] {
@@ -1400,14 +1637,14 @@ mod tests {
             owner: owner.clone(),
         };
         let context = InvocationContext {
-            module: InvocationModule {
+            modules: Arc::from([InvocationModule {
                 name: "root".into(),
                 version: "".into(),
                 is_root: true,
                 tag_classes: Arc::from([CompactString::from("tag")]),
                 tags: Arc::from([]),
                 owner: owner.clone(),
-            },
+            }]),
             owner,
         };
         let value = call("def f(ctx, tag):\n  label=tag.target\n  return [len(ctx.modules), ctx.modules[0].name, ctx.modules[0].version, ctx.modules[0].is_root, ctx.is_dev_dependency(tag), label.name, label.package, label.repo_name, label.workspace_name, str(label), repr(label), '%s' % label, '%r' % label, '{}'.format(label), '{!s}'.format(label), '{!r}'.format(label), label.same_package_label('other').name, {label: 1}[label], label == label]\n", |module| vec![module.heap().alloc_simple(context), module.heap().alloc_simple(tag)]).unwrap();
@@ -2233,5 +2470,17 @@ mod tests {
         };
         assert_eq!(completed[0].repository_rule_calls[0].name, "first");
         assert_eq!(current_calls[0].name, "second");
+    }
+
+    #[test]
+    fn selected_owner_pure_uses_external_bzl_for_both_reacquisitions() {
+        let source = include_str!("module_extension.rs");
+        let production = &source[..source.find("mod tests {").unwrap()];
+        let owner = &production[production.find("async fn owner_bzl").unwrap()..];
+        assert!(owner.contains("RootRepositoryRoute::for_selected_extension_definition"));
+        assert!(owner.contains("ExternalBzlModuleEvalKey::new"));
+        assert!(owner.contains("ExternalBzlModuleObservationKey::new"));
+        assert!(owner.contains("owner_bzl(ctx, key, &inputs, None"));
+        assert!(owner.contains("owner_bzl(ctx, key, &inputs, Some(&first)"));
     }
 }

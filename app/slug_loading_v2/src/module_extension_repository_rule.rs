@@ -179,6 +179,22 @@ impl fmt::Display for FrozenRepositoryRuleDefinition {
     }
 }
 
+impl FrozenRepositoryRuleDefinition {
+    pub(crate) fn projection(&self) -> Option<RepositoryRuleDefinitionProjection> {
+        self.exported_name
+            .as_ref()
+            .map(|exported_name| RepositoryRuleDefinitionProjection {
+                defining_label: self.defining_label.clone(),
+                exported_name: exported_name.clone(),
+                attributes: self.attributes.clone(),
+            })
+    }
+
+    pub(crate) fn implementation(&self) -> FrozenValue {
+        self.implementation
+    }
+}
+
 impl<'v> Freeze for RepositoryRuleDefinition<'v> {
     type Frozen = FrozenRepositoryRuleDefinition;
 

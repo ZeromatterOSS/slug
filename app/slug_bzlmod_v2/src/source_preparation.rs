@@ -67,6 +67,7 @@ use crate::BuiltinBazelToolsSourceFileError;
 use crate::BuiltinBazelToolsSourceFileKey;
 use crate::BuiltinBazelToolsSourceFileValue;
 use crate::EvaluatedNonrootModule;
+use crate::GeneratedRepositoryFileEffectPlan;
 use crate::HostRepositorySourceCapability;
 use crate::HostRepositorySourceCapabilitySource;
 use crate::ModuleKey;
@@ -271,6 +272,7 @@ pub enum RepositoryMaterializationKind {
         logical_root: NormalizedAbsolutePath,
     },
     Immutable,
+    GeneratedFileEffects(GeneratedRepositoryFileEffectPlan),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -399,6 +401,12 @@ fn result_kind_matches(
             )
             | (
                 RepositoryMaterializationKind::Immutable,
+                RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Immutable { .. }
+                )
+            )
+            | (
+                RepositoryMaterializationKind::GeneratedFileEffects(_),
                 RepositoryMaterializationResult::Success(
                     RepositoryMaterializationSuccess::Immutable { .. }
                 )
@@ -771,6 +779,65 @@ pub(crate) enum HostDiscoveredModuleObservationError {
     ClosureFrontier(HostDiscoveredModuleClosureFrontier),
     PreparationFrontier(ObservedPathFrontierError),
     MergeFrontier(ObservedPathFrontierError),
+}
+
+/// Classifies an observed selected-graph failure without collapsing a DICE
+/// computation failure into the retryable path frontier.
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub enum HostSelectedObservationFrontier {
+    Path(ObservedPathFrontierError),
+    Infrastructure(Arc<str>),
+}
+
+fn preflight_observation_frontier(
+    error: &HostNonregistryPackagePreflightObservationError,
+) -> HostSelectedObservationFrontier {
+    match error {
+        HostNonregistryPackagePreflightObservationError::EffectiveFrontier(error)
+        | HostNonregistryPackagePreflightObservationError::IgnoreFrontier(error)
+        | HostNonregistryPackagePreflightObservationError::MarkerFrontier { error, .. } => {
+            HostSelectedObservationFrontier::Path(error.clone())
+        }
+        HostNonregistryPackagePreflightObservationError::EffectiveCompute(message)
+        | HostNonregistryPackagePreflightObservationError::PolicyCompute(message)
+        | HostNonregistryPackagePreflightObservationError::IgnoreCompute(message)
+        | HostNonregistryPackagePreflightObservationError::MarkerCompute { message, .. } => {
+            HostSelectedObservationFrontier::Infrastructure(message.dupe())
+        }
+    }
+}
+
+impl HostDiscoveredModuleObservationError {
+    #[doc(hidden)]
+    pub(crate) fn selected_frontier(&self) -> HostSelectedObservationFrontier {
+        match self {
+            Self::EffectiveFrontier(error) | Self::PreparationFrontier(error) => {
+                HostSelectedObservationFrontier::Path(error.clone())
+            }
+            Self::MergeFrontier(error) => HostSelectedObservationFrontier::Path(error.clone()),
+            Self::ClosureFrontier(HostDiscoveredModuleClosureFrontier(error)) => match error {
+                HostNonregistryModuleClosureObservationError::EffectiveFrontier(error)
+                | HostNonregistryModuleClosureObservationError::MaterializationFrontier(error)
+                | HostNonregistryModuleClosureObservationError::RootSourceFrontier(error) => {
+                    HostSelectedObservationFrontier::Path(error.clone())
+                }
+                HostNonregistryModuleClosureObservationError::EffectiveCompute(message) => {
+                    HostSelectedObservationFrontier::Infrastructure(message.dupe())
+                }
+                HostNonregistryModuleClosureObservationError::PreparationFrontier(error) => {
+                    match error {
+                        NonregistryPreparationFrontierError::Path(error) => {
+                            HostSelectedObservationFrontier::Path(error.clone())
+                        }
+                        NonregistryPreparationFrontierError::Package(error) => {
+                            preflight_observation_frontier(error)
+                        }
+                    }
+                }
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1584,7 +1651,9 @@ async fn drive_direct_local_module_file(
                         PathObservationEpoch::empty(),
                     );
                 }
-                Ok(outcome) => match direct_local_observed_child(outcome) {
+                Ok(outcome) => match direct_local_observed_child(
+                    outcome.map(|value| value.map_err(|error| error.ordinary_path())),
+                ) {
                     ControlFlow::Break(outcome) => return outcome,
                     ControlFlow::Continue(observed) => observed,
                 },
@@ -4835,7 +4904,10 @@ pub fn host_repository_materialization_request(
                     canonical_repo: capability.canonical_repo().clone(),
                 },
                 repo_spec: repo_spec.as_ref().clone(),
-                kind: request_kind(capability.workspace(), repo_spec, *local_path_policy)?,
+                kind: match capability.generated_file_effect_plan() {
+                    Some(plan) => RepositoryMaterializationKind::GeneratedFileEffects(plan.clone()),
+                    None => request_kind(capability.workspace(), repo_spec, *local_path_policy)?,
+                },
             },
         ))),
     }
@@ -8275,6 +8347,8 @@ impl Key for HostNonregistryModuleClosureObservationKey {
 #[cfg(test)]
 mod tests {
     use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hash;
+    use std::hash::Hasher;
     use std::sync::Mutex;
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
@@ -8916,6 +8990,136 @@ mod tests {
             root_repository_materialization_request(&local_route()).unwrap(),
             relative_request
         );
+
+        let mut custom = relative.clone();
+        custom.rule_id.rule_name = "user_repository_rule".into();
+        let plan = crate::GeneratedRepositoryFileEffectPlan::build([(
+            CompactString::new("BUILD.bazel"),
+            Arc::<[u8]>::from(&b"exports_files([])\n"[..]),
+            true,
+        )])
+        .unwrap();
+        let generated = RootRepositoryRoute::for_generated_repo_spec(
+            workspace.dupe(),
+            ApparentRepoName::new("generated").unwrap(),
+            CanonicalRepoName::new("ext+generated").unwrap(),
+            custom,
+            LocalUnsupported,
+            plan.clone(),
+        )
+        .unwrap();
+        let crate::HostRepositoryMaterializationDisposition::Request(generated_request) =
+            crate::host_repository_materialization_request(&generated.source_capability()).unwrap()
+        else {
+            unreachable!()
+        };
+        assert_eq!(
+            generated_request.kind,
+            RepositoryMaterializationKind::GeneratedFileEffects(plan)
+        );
+    }
+
+    #[test]
+    fn generated_plan_is_structural_for_routes_and_requests_but_not_result_key_identity() {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let spec = RepoSpec {
+            rule_id: crate::RepoRuleId {
+                bzl_file: CanonicalLabel::parse("@@extension+repo//:defs.bzl").unwrap(),
+                rule_name: "generated_repository".into(),
+            },
+            attributes: Arc::default(),
+        };
+        let plan = |effects: [(&str, &[u8], bool); 2]| {
+            crate::GeneratedRepositoryFileEffectPlan::build(effects.into_iter().map(
+                |(path, content, executable)| {
+                    (
+                        CompactString::new(path),
+                        Arc::<[u8]>::from(content),
+                        executable,
+                    )
+                },
+            ))
+            .unwrap()
+        };
+        let route = |plan| {
+            RootRepositoryRoute::for_generated_repo_spec(
+                workspace.dupe(),
+                ApparentRepoName::new("generated").unwrap(),
+                CanonicalRepoName::new("extension+generated").unwrap(),
+                spec.clone(),
+                HostRepositoryLocalPathPolicy::LocalUnsupported,
+                plan,
+            )
+            .unwrap()
+        };
+        let a = route(plan([
+            ("BUILD.bazel", b"a", true),
+            ("generated.txt", b"x", false),
+        ]));
+        let content = route(plan([
+            ("BUILD.bazel", b"b", true),
+            ("generated.txt", b"x", false),
+        ]));
+        let order = route(plan([
+            ("generated.txt", b"x", false),
+            ("BUILD.bazel", b"a", true),
+        ]));
+        let executable = route(plan([
+            ("BUILD.bazel", b"a", false),
+            ("generated.txt", b"x", false),
+        ]));
+        let restored = route(plan([
+            ("BUILD.bazel", b"a", true),
+            ("generated.txt", b"x", false),
+        ]));
+        fn hash<T: Hash>(value: &T) -> u64 {
+            let mut state = DefaultHasher::new();
+            value.hash(&mut state);
+            state.finish()
+        }
+        let a_capability = a.source_capability();
+        let restored_capability = restored.source_capability();
+        for variant in [&content, &order, &executable] {
+            assert_ne!(a, *variant);
+            assert_ne!(hash(&a), hash(variant));
+            let capability = variant.source_capability();
+            assert_ne!(a_capability, capability);
+            assert_ne!(hash(&a_capability), hash(&capability));
+        }
+        assert_eq!(a, restored);
+        assert_eq!(hash(&a), hash(&restored));
+        assert_eq!(a_capability, restored_capability);
+        assert_eq!(hash(&a_capability), hash(&restored_capability));
+        let request_a = root_repository_materialization_request(&a).unwrap();
+        let request_content = root_repository_materialization_request(&content).unwrap();
+        let request_order = root_repository_materialization_request(&order).unwrap();
+        let request_executable = root_repository_materialization_request(&executable).unwrap();
+        let request_restored = root_repository_materialization_request(&restored).unwrap();
+        for variant in [&request_content, &request_order, &request_executable] {
+            assert_ne!(request_a, *variant);
+        }
+        assert_eq!(request_a, request_restored);
+        let key_a = RepositoryMaterializationResultKey { request: request_a };
+        let key_content = RepositoryMaterializationResultKey {
+            request: request_content,
+        };
+        let key_order = RepositoryMaterializationResultKey {
+            request: request_order,
+        };
+        let key_executable = RepositoryMaterializationResultKey {
+            request: request_executable,
+        };
+        let key_restored = RepositoryMaterializationResultKey {
+            request: request_restored,
+        };
+        let hash_key = |value: &RepositoryMaterializationResultKey| {
+            let mut state = DefaultHasher::new();
+            value.hash(&mut state);
+            state.finish()
+        };
+        for variant in [&key_content, &key_order, &key_executable, &key_restored] {
+            assert_eq!(hash_key(&key_a), hash_key(variant));
+        }
     }
 
     #[test]
@@ -16802,6 +17006,48 @@ mod tests {
         let mut state = DefaultHasher::new();
         value.hash(&mut state);
         state.finish()
+    }
+
+    #[test]
+    fn selected_frontier_preserves_path_and_nested_compute_polarity() {
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/workspace/MODULE.bazel").unwrap(),
+            PathObservationOperation::Lstat,
+        );
+        let path = ObservedPathFrontierError::from(
+            slug_workspace_v2::PathObservationEpochError::DuplicateDemand(demand),
+        );
+        assert!(matches!(
+            preflight_observation_frontier(
+                &HostNonregistryPackagePreflightObservationError::EffectiveFrontier(path)
+            ),
+            HostSelectedObservationFrontier::Path(_)
+        ));
+
+        let compute_errors = [
+            HostNonregistryPackagePreflightObservationError::EffectiveCompute("effective".into()),
+            HostNonregistryPackagePreflightObservationError::PolicyCompute("policy".into()),
+            HostNonregistryPackagePreflightObservationError::IgnoreCompute("ignore".into()),
+            HostNonregistryPackagePreflightObservationError::MarkerCompute {
+                marker: HostBuildFileName::Build,
+                message: "marker".into(),
+            },
+        ];
+        for error in compute_errors {
+            let selected = HostDiscoveredModuleObservationError::ClosureFrontier(
+                HostDiscoveredModuleClosureFrontier(
+                    HostNonregistryModuleClosureObservationError::PreparationFrontier(
+                        NonregistryPreparationFrontierError::Package(error),
+                    ),
+                ),
+            )
+            .selected_frontier();
+            assert!(matches!(
+                selected,
+                HostSelectedObservationFrontier::Infrastructure(_)
+            ));
+        }
     }
 
     mod observation_tests {

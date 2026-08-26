@@ -275,7 +275,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             {
                 LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
                 LoadingPreparationOutcome::Complete(Err(error)) => {
-                    Err(self.observation_restart(error))
+                    Err(self.observation_restart(error.ordinary_path()))
                 }
                 LoadingPreparationOutcome::Complete(Ok(value)) => {
                     self.merge_observations(value.observations())?;

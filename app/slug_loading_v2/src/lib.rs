@@ -18,6 +18,7 @@ mod host_glob;
 pub mod keys;
 pub mod load_label;
 mod module_extension;
+mod module_extension_repository_file_effect;
 mod module_extension_repository_instantiation;
 mod module_extension_repository_rule;
 mod module_extension_repository_validation;
@@ -61,7 +62,31 @@ pub use cycle_detector::bzl_load_cycle_detector;
 pub use glob::GlobSpec;
 pub use glob::PackageListing;
 #[doc(hidden)]
+pub use module_extension_repository_file_effect::HostSelectedRepositoryFileEffect;
+#[doc(hidden)]
+pub use module_extension_repository_file_effect::HostSelectedRepositoryFileEffectError;
+#[doc(hidden)]
+pub use module_extension_repository_file_effect::HostSelectedRepositoryFileEffectHostBzlError;
+#[doc(hidden)]
+pub use module_extension_repository_file_effect::HostSelectedRepositoryFileEffectKey;
+#[doc(hidden)]
+pub use module_extension_repository_file_effect::HostSelectedRepositoryFileEffectObservationError;
+#[doc(hidden)]
+pub use module_extension_repository_file_effect::HostSelectedRepositoryFileEffectObservationKey;
+#[doc(hidden)]
+pub use module_extension_repository_file_effect::ObservedHostSelectedRepositoryFileEffect;
+#[doc(hidden)]
 pub use module_extension_repository_validation::HostGeneratedRepositoryMapping;
+#[doc(hidden)]
+pub use module_extension_repository_validation::HostSelectedExtensionOwnerCertificate;
+#[doc(hidden)]
+pub use module_extension_repository_validation::HostSelectedExtensionOwnerCertificateError;
+#[doc(hidden)]
+pub use module_extension_repository_validation::HostSelectedExtensionOwnerCertificateKey;
+#[doc(hidden)]
+pub use module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationError;
+#[doc(hidden)]
+pub use module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationKey;
 #[doc(hidden)]
 pub use module_extension_repository_validation::HostValidatedGeneratedRepositorySpecs;
 #[doc(hidden)]
@@ -74,6 +99,8 @@ pub use module_extension_repository_validation::HostValidatedModuleExtensionRepo
 pub use module_extension_repository_validation::HostValidatedModuleExtensionRepositoriesObservationError;
 #[doc(hidden)]
 pub use module_extension_repository_validation::HostValidatedModuleExtensionRepositoriesObservationKey;
+#[doc(hidden)]
+pub use module_extension_repository_validation::ObservedHostSelectedExtensionOwnerCertificate;
 #[doc(hidden)]
 pub use module_extension_repository_validation::ObservedHostValidatedGeneratedRepositorySpecs;
 pub use package::LoadedPackage;

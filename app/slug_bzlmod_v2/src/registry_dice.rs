@@ -34,6 +34,12 @@ use crate::RegistryFileExpectation;
 use crate::SourcePreparationOutcome;
 use crate::VisibleLockfileRead;
 use crate::host_registry::RegistryKnownFileHashesMode;
+use crate::host_registry_inputs::HostModuleMirrorOccurrence;
+use crate::host_registry_inputs::HostModuleMirrorsInputKey;
+use crate::host_registry_inputs::HostRegistryRefreshToken;
+use crate::host_registry_inputs::HostRegistryRefreshTokenKey;
+use crate::host_registry_inputs::HostRegistryUrlsInputKey;
+use crate::host_registry_inputs::normalize_host_registry_inputs;
 use crate::module_eval::RootModuleFilesKey;
 use crate::module_eval::RootModuleFilesObservationKey;
 use crate::module_eval::RootModuleLockfileMode;
@@ -1129,17 +1135,40 @@ pub fn inject_registry_request_inputs(
     urls: RegistryUrls,
     generation: RegistryRequestGeneration,
 ) -> anyhow::Result<()> {
+    let urls = if urls.as_slice().is_empty() {
+        RegistryUrls::default_bazel_registry()
+    } else {
+        urls
+    };
+    let workspace = NormalizedAbsolutePath::new(workspace.to_path_buf())?;
+    let (host_urls, host_mirrors) = normalize_host_registry_inputs(
+        urls.as_slice().iter().map(|url| url.as_str()),
+        std::iter::empty::<HostModuleMirrorOccurrence>(),
+    )?;
+    let host_refresh = HostRegistryRefreshToken::new(generation.0);
     updater.changed_to(vec![(
         RootModuleRegistryUrlsKey {
-            workspace: workspace.to_path_buf(),
+            workspace: workspace.as_path().to_path_buf(),
         },
         RootModuleRegistryUrls::from(urls),
     )])?;
     updater.changed_to(vec![(
         RegistryRequestGenerationKey {
-            workspace: workspace.to_path_buf(),
+            workspace: workspace.as_path().to_path_buf(),
         },
         generation,
+    )])?;
+    updater.changed_to(vec![(
+        HostRegistryUrlsInputKey::new(workspace.dupe()),
+        host_urls,
+    )])?;
+    updater.changed_to(vec![(
+        HostModuleMirrorsInputKey::new(workspace.dupe()),
+        host_mirrors,
+    )])?;
+    updater.changed_to(vec![(
+        HostRegistryRefreshTokenKey::new(workspace),
+        host_refresh,
     )])?;
     Ok(())
 }
@@ -1168,6 +1197,65 @@ mod bridge_tests {
     const REMOTE_URL: &str = "https://registry.example/file";
     const LOCAL_URL: &str = "file:///registry-bridge/absent-decoy";
     const LOCAL_PATH: &str = "/registry-bridge/file";
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+    struct FacadeInputKey {
+        workspace: NormalizedAbsolutePath,
+    }
+
+    impl fmt::Display for FacadeInputKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "registry-facade-input:{}", self.workspace)
+        }
+    }
+
+    static FACADE_EVALUATIONS: AtomicUsize = AtomicUsize::new(0);
+
+    #[async_trait]
+    impl Key for FacadeInputKey {
+        type Value = Result<(), ()>;
+
+        async fn compute(
+            &self,
+            ctx: &mut DiceComputations,
+            _cancellations: &CancellationContext,
+        ) -> Self::Value {
+            ctx.compute(&HostRegistryUrlsInputKey::new(self.workspace.dupe()))
+                .await
+                .map_err(|_| ())?;
+            ctx.compute(&HostModuleMirrorsInputKey::new(self.workspace.dupe()))
+                .await
+                .map_err(|_| ())?;
+            ctx.compute(&HostRegistryRefreshTokenKey::new(self.workspace.dupe()))
+                .await
+                .map_err(|_| ())?;
+            FACADE_EVALUATIONS.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+
+        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+            x == y
+        }
+    }
+
+    #[derive(Default)]
+    struct FacadeTracker(Mutex<Vec<Vec<String>>>);
+
+    impl ActivationTracker for FacadeTracker {
+        fn key_activated(
+            &self,
+            key: &DynKey,
+            dependencies: &mut dyn Iterator<Item = &DynKey>,
+            _activation: ActivationData,
+        ) {
+            if key.downcast_ref::<FacadeInputKey>().is_some() {
+                self.0
+                    .lock()
+                    .unwrap()
+                    .push(dependencies.map(ToString::to_string).collect());
+            }
+        }
+    }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Response {
@@ -1485,6 +1573,120 @@ mod bridge_tests {
                 assert_eq!(actual, Ok(expected));
             }
         }
+    }
+
+    #[tokio::test]
+    async fn registry_request_facade_installs_canonical_host_inputs() {
+        FACADE_EVALUATIONS.store(0, Ordering::SeqCst);
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let tracker = Arc::new(FacadeTracker::default());
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater_with_data(UserComputationData {
+            activation_tracker: Some(tracker.dupe() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        });
+        inject_registry_request_inputs(
+            &mut updater,
+            Path::new(WORKSPACE),
+            RegistryUrls::new(std::iter::empty::<&str>()),
+            RegistryRequestGeneration(1),
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        let key = FacadeInputKey {
+            workspace: workspace.dupe(),
+        };
+        assert_eq!(transaction.compute(&key).await.unwrap(), Ok(()));
+        let host_urls = transaction
+            .compute(&HostRegistryUrlsInputKey::new(workspace.dupe()))
+            .await
+            .unwrap();
+        assert_eq!(
+            host_urls.iter().map(|url| url.as_str()).collect::<Vec<_>>(),
+            ["https://bcr.bazel.build"]
+        );
+        let mirrors = transaction
+            .compute(&HostModuleMirrorsInputKey::new(workspace.dupe()))
+            .await
+            .unwrap();
+        assert!(mirrors.get("https://bcr.bazel.build").is_none());
+        assert_eq!(
+            transaction
+                .compute(&HostRegistryRefreshTokenKey::new(workspace.dupe()))
+                .await
+                .unwrap(),
+            HostRegistryRefreshToken::new(1)
+        );
+        assert_eq!(
+            *tracker.0.lock().unwrap(),
+            vec![vec![
+                HostRegistryUrlsInputKey::new(workspace.dupe()).to_string(),
+                HostModuleMirrorsInputKey::new(workspace.dupe()).to_string(),
+                HostRegistryRefreshTokenKey::new(workspace.dupe()).to_string(),
+            ]]
+        );
+
+        let mut updater = transaction.into_updater();
+        inject_registry_request_inputs(
+            &mut updater,
+            Path::new(WORKSPACE),
+            RegistryUrls::default_bazel_registry(),
+            RegistryRequestGeneration(1),
+        )
+        .unwrap();
+        transaction = updater.commit().await;
+        assert_eq!(transaction.compute(&key).await.unwrap(), Ok(()));
+        assert_eq!(FACADE_EVALUATIONS.load(Ordering::SeqCst), 1);
+
+        let ordered = RegistryUrls::new([
+            "https://first.example///",
+            "https://second.example/",
+            "https://first.example",
+        ]);
+        let mut updater = transaction.into_updater();
+        inject_registry_request_inputs(
+            &mut updater,
+            Path::new(WORKSPACE),
+            ordered.clone(),
+            RegistryRequestGeneration(1),
+        )
+        .unwrap();
+        transaction = updater.commit().await;
+        assert_eq!(transaction.compute(&key).await.unwrap(), Ok(()));
+        let host_urls = transaction
+            .compute(&HostRegistryUrlsInputKey::new(workspace.dupe()))
+            .await
+            .unwrap();
+        assert_eq!(
+            host_urls.iter().map(|url| url.as_str()).collect::<Vec<_>>(),
+            ["https://first.example", "https://second.example"]
+        );
+        let mirrors = transaction
+            .compute(&HostModuleMirrorsInputKey::new(workspace.dupe()))
+            .await
+            .unwrap();
+        assert!(mirrors.get("https://first.example").is_none());
+
+        for generation in [2, 1] {
+            let mut updater = transaction.into_updater();
+            inject_registry_request_inputs(
+                &mut updater,
+                Path::new(WORKSPACE),
+                ordered.clone(),
+                RegistryRequestGeneration(generation),
+            )
+            .unwrap();
+            transaction = updater.commit().await;
+            assert_eq!(transaction.compute(&key).await.unwrap(), Ok(()));
+            assert_eq!(
+                transaction
+                    .compute(&HostRegistryRefreshTokenKey::new(workspace.dupe()))
+                    .await
+                    .unwrap(),
+                HostRegistryRefreshToken::new(generation)
+            );
+        }
+        assert_eq!(FACADE_EVALUATIONS.load(Ordering::SeqCst), 4);
     }
 
     #[tokio::test]

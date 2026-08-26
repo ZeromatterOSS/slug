@@ -18151,3 +18151,36 @@ Independent review accepts the eight-file implementation with exhaustive path
 retry versus infrastructure-terminal observation projection. Pinned Zabel
 remains concept-only architectural guidance; Bazel 9.2 remains behavioral
 authority. M7 stays partial and M7A -> M8 -> M7B remains.
+
+### Root external-load command proof REPLAN: archive materialization is next (2026-08-25)
+
+The retained route/load candidate is structurally green and advances the
+wildcard-bypassed rules_rust command beyond root Host loading. The next live
+terminal is not yet `repository_rule(doc=...)`: core's native materializer
+publishes a SpecError for the exact BCR `rules_rust+` archive request, and
+selected acceptance then fails closed on the non-success result.
+
+Run only `WP-4-5-6-7A-root-external-load-native-archive-frontier-audit`.
+Determine whether corrected admitted-source proof is sufficient to accept the
+retained candidate, then select one bounded physical archive owner or smaller
+prerequisite. Preserve wildcard registration, repository-rule declaration/
+schema/effects, toolchains/providers/actions/input trees and M8 as downstream.
+Pinned Bazel 9.2 owns transport/integrity/extraction behavior; pinned Zabel
+guides only semantic/physical ownership separation.
+
+### Native BCR archive design selected after corrected route acceptance (2026-08-25)
+
+The root route/load vertical is accepted; the sole command-owned repository
+materializer is now the live M7A owner. `NativeDemandCommand::progress` runs
+outside each async DICE attempt, while the current materializer performs only
+synchronous local archive I/O. The design must place network waits on a lawful
+async boundary, keep gzip/tar/filesystem work off runtime workers, hold no
+materializer lock across I/O or DICE, and revalidate the session token before
+publishing any provisional root.
+
+Run only `WP-5-6-7A-selected-registry-bcr-archive-materialization-design`.
+Specify transfer/command scratch, cancellation/join/shutdown cleanup, immutable
+root promotion, warm/A/B/A reuse and exact request equality. Split the mixed
+6,140-line `repository_io.rs` archive concern rather than adding generic
+transport/extraction breadth. Zabel guides lifecycle layering only; Bazel 9.2
+owns archive behavior.

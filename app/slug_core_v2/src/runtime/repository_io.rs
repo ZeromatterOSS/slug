@@ -9,6 +9,7 @@
 
 use std::ffi::OsString;
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::ops::Range;
 use std::path::Component;
@@ -22,6 +23,7 @@ use async_trait::async_trait;
 use dice::DiceDataBuilder;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
 use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::RepositoryIo;
@@ -233,6 +235,10 @@ enum RepositoryMaterializationAttempt {
     Local,
     Immutable {
         bytes: Vec<u8>,
+        root: tempfile::TempDir,
+    },
+    GeneratedImmutable {
+        source_identity: Arc<str>,
         root: tempfile::TempDir,
     },
     SpecError(String),
@@ -473,6 +479,13 @@ impl RepositoryMaterializer {
                     root,
                 }
             }
+            RepositoryMaterializationAttempt::GeneratedImmutable {
+                source_identity,
+                root,
+            } => PreparedMaterializationAttempt::Immutable {
+                source_identity,
+                root,
+            },
             RepositoryMaterializationAttempt::Local => PreparedMaterializationAttempt::Local,
             RepositoryMaterializationAttempt::SpecError(message) => {
                 PreparedMaterializationAttempt::Result(RepositoryMaterializationResult::SpecError(
@@ -504,6 +517,9 @@ impl RepositoryMaterializer {
                 PreparedMaterializationAttempt::Local
             ) | (
                 RepositoryMaterializationKind::Immutable,
+                PreparedMaterializationAttempt::Immutable { .. }
+            ) | (
+                RepositoryMaterializationKind::GeneratedFileEffects(_),
                 PreparedMaterializationAttempt::Immutable { .. }
             ) | (_, PreparedMaterializationAttempt::Result(_))
         );
@@ -541,6 +557,38 @@ impl RepositoryMaterializer {
             ) => RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local),
             (
                 RepositoryMaterializationKind::Immutable,
+                PreparedMaterializationAttempt::Immutable {
+                    source_identity,
+                    root,
+                },
+            ) => {
+                let mut candidate = state.next_instance;
+                let observation_instance = match allocate_observation_instance(&mut candidate) {
+                    Ok(observation_instance) => observation_instance,
+                    Err(_) => {
+                        drop(state);
+                        drop(root);
+                        return Err(RepositorySessionError::InstanceExhausted);
+                    }
+                };
+                state.next_instance = candidate;
+                let generation_root = root.path().to_path_buf();
+                matching_validated_active_mut(&mut state, token)?
+                    .provisional_roots
+                    .push(RetainedRepositoryRoot {
+                        observation_instance,
+                        root: Arc::new(root),
+                    });
+                RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Immutable {
+                        source_identity,
+                        generation_root,
+                        observation_instance,
+                    },
+                )
+            }
+            (
+                RepositoryMaterializationKind::GeneratedFileEffects(_),
                 PreparedMaterializationAttempt::Immutable {
                     source_identity,
                     root,
@@ -1177,10 +1225,158 @@ fn materialize(
     }
 }
 
+trait GeneratedRepositoryFileEffectsIo {
+    fn temporary_root(&mut self) -> Result<tempfile::TempDir, String>;
+    fn create_parent(&mut self, path: &Path) -> Result<(), String>;
+    fn create_file(&mut self, path: &Path) -> Result<File, String>;
+    fn write_file(&mut self, file: &mut File, content: &[u8]) -> Result<(), String>;
+    fn flush_file(&mut self, file: &mut File) -> Result<(), String>;
+    fn set_mode(&mut self, path: &Path, executable: bool) -> Result<(), String>;
+}
+
+struct NativeGeneratedRepositoryFileEffectsIo;
+
+impl GeneratedRepositoryFileEffectsIo for NativeGeneratedRepositoryFileEffectsIo {
+    fn temporary_root(&mut self) -> Result<tempfile::TempDir, String> {
+        tempfile::tempdir().map_err(|error| error.to_string())
+    }
+
+    fn create_parent(&mut self, path: &Path) -> Result<(), String> {
+        std::fs::create_dir_all(path).map_err(|error| error.to_string())
+    }
+
+    fn create_file(&mut self, path: &Path) -> Result<File, String> {
+        OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .map_err(|error| error.to_string())
+    }
+
+    fn write_file(&mut self, file: &mut File, content: &[u8]) -> Result<(), String> {
+        file.write_all(content).map_err(|error| error.to_string())
+    }
+
+    fn flush_file(&mut self, file: &mut File) -> Result<(), String> {
+        file.flush().map_err(|error| error.to_string())
+    }
+
+    fn set_mode(&mut self, path: &Path, executable: bool) -> Result<(), String> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            std::fs::set_permissions(
+                path,
+                std::fs::Permissions::from_mode(if executable { 0o755 } else { 0o644 }),
+            )
+            .map_err(|error| error.to_string())?;
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = (path, executable);
+            Err("generated repository executable mode is unsupported on this platform".into())
+        }
+        #[cfg(unix)]
+        Ok(())
+    }
+}
+
+fn generated_repository_file_effect_source_association(
+    plan: &GeneratedRepositoryFileEffectPlan,
+) -> Arc<str> {
+    let mut digest = Sha256::new();
+    digest.update(b"slug.generated-repository-file-effects.v1\\0");
+    for effect in plan.effects() {
+        for bytes in [effect.path().as_bytes(), effect.content()] {
+            digest.update((bytes.len() as u64).to_be_bytes());
+            digest.update(bytes);
+        }
+        digest.update([u8::from(effect.executable())]);
+    }
+    Arc::from(hex::encode(digest.finalize()))
+}
+
+fn generated_repository_file_effect_paths_are_valid(
+    plan: &GeneratedRepositoryFileEffectPlan,
+) -> bool {
+    let paths = plan
+        .effects()
+        .iter()
+        .map(|effect| effect.path())
+        .collect::<Vec<_>>();
+    paths.iter().all(|path| {
+        !path.is_empty()
+            && !path.ends_with('/')
+            && !path.contains('\\')
+            && !path.contains('\0')
+            && path
+                .split('/')
+                .all(|component| !component.is_empty() && component != "." && component != "..")
+    }) && paths.iter().enumerate().all(|(index, path)| {
+        paths.iter().skip(index + 1).all(|other| {
+            path != other
+                && !other
+                    .strip_prefix(path)
+                    .is_some_and(|suffix| suffix.starts_with('/'))
+                && !path
+                    .strip_prefix(other)
+                    .is_some_and(|suffix| suffix.starts_with('/'))
+        })
+    })
+}
+
+fn materialize_generated_repository_file_effects(
+    plan: &GeneratedRepositoryFileEffectPlan,
+    io: &mut impl GeneratedRepositoryFileEffectsIo,
+) -> RepositoryMaterializationAttempt {
+    if !generated_repository_file_effect_paths_are_valid(plan) {
+        return RepositoryMaterializationAttempt::SpecError(
+            "invalid generated repository file-effect plan".into(),
+        );
+    }
+    let source_identity = generated_repository_file_effect_source_association(plan);
+    let root = match io.temporary_root() {
+        Ok(root) => root,
+        Err(error) => return RepositoryMaterializationAttempt::MaterializationError(error),
+    };
+    for effect in plan.effects() {
+        let target = root.path().join(effect.path());
+        if let Some(parent) = target.parent()
+            && let Err(error) = io.create_parent(parent)
+        {
+            return RepositoryMaterializationAttempt::MaterializationError(error);
+        }
+        let mut file = match io.create_file(&target) {
+            Ok(file) => file,
+            Err(error) => return RepositoryMaterializationAttempt::MaterializationError(error),
+        };
+        if let Err(error) = io.write_file(&mut file, effect.content()) {
+            return RepositoryMaterializationAttempt::MaterializationError(error);
+        }
+        if let Err(error) = io.flush_file(&mut file) {
+            return RepositoryMaterializationAttempt::MaterializationError(error);
+        }
+        if let Err(error) = io.set_mode(&target, effect.executable()) {
+            return RepositoryMaterializationAttempt::MaterializationError(error);
+        }
+    }
+    RepositoryMaterializationAttempt::GeneratedImmutable {
+        source_identity,
+        root,
+    }
+}
+
 fn materialize_native_attempt(
     workspace: &Path,
     request: &RepositoryMaterializationRequest,
 ) -> RepositoryMaterializationAttempt {
+    if let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind {
+        return materialize_generated_repository_file_effects(
+            plan,
+            &mut NativeGeneratedRepositoryFileEffectsIo,
+        );
+    }
     let bzl_file = request.repo_spec.rule_id.bzl_file.to_string();
     match (
         bzl_file.as_str(),
@@ -1217,6 +1413,22 @@ fn validate_native_request(
         request.repo_spec.rule_id.rule_name.as_str(),
         &request.kind,
     ) {
+        (
+            "@@bazel_tools//tools/build_defs/repo:local.bzl",
+            "local_repository",
+            RepositoryMaterializationKind::GeneratedFileEffects(_),
+        )
+        | (
+            "@@bazel_tools//tools/build_defs/repo:http.bzl",
+            "http_archive",
+            RepositoryMaterializationKind::GeneratedFileEffects(_),
+        )
+        | (
+            "@@bazel_tools//tools/build_defs/repo:git.bzl",
+            "git_repository",
+            RepositoryMaterializationKind::GeneratedFileEffects(_),
+        ) => Err(RepositorySessionError::KindMismatch),
+        (_, _, RepositoryMaterializationKind::GeneratedFileEffects(_)) => Ok(()),
         (
             "@@bazel_tools//tools/build_defs/repo:local.bzl",
             "local_repository",
@@ -2132,15 +2344,420 @@ pub(crate) fn install(builder: &mut DiceDataBuilder) {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+    use std::path::PathBuf;
     use std::sync::Arc;
 
     use compact_str::CompactString;
     use sha2::Digest;
+    use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
     use slug_bzlmod_v2::RepoRuleId;
     use slug_identity_v2::CanonicalLabel;
     use starlark_map::small_map::SmallMap;
 
     use super::*;
+
+    fn generated_plan(
+        effects: impl IntoIterator<Item = (&'static str, &'static [u8], bool)>,
+    ) -> GeneratedRepositoryFileEffectPlan {
+        GeneratedRepositoryFileEffectPlan::build(effects.into_iter().map(
+            |(path, content, executable)| {
+                (
+                    CompactString::new(path),
+                    Arc::<[u8]>::from(content),
+                    executable,
+                )
+            },
+        ))
+        .unwrap()
+    }
+
+    #[derive(Clone, Copy)]
+    enum ScriptedGeneratedFileEffectsFailure {
+        Root,
+        Parent,
+        Create,
+        Write,
+        Flush,
+        Mode,
+    }
+
+    struct ScriptedGeneratedFileEffectsIo {
+        failure: ScriptedGeneratedFileEffectsFailure,
+        root_path: Option<PathBuf>,
+        creates: usize,
+    }
+
+    impl GeneratedRepositoryFileEffectsIo for ScriptedGeneratedFileEffectsIo {
+        fn temporary_root(&mut self) -> Result<tempfile::TempDir, String> {
+            if matches!(self.failure, ScriptedGeneratedFileEffectsFailure::Root) {
+                return Err("root".into());
+            }
+            let root = tempfile::tempdir().map_err(|error| error.to_string())?;
+            self.root_path = Some(root.path().to_path_buf());
+            Ok(root)
+        }
+
+        fn create_parent(&mut self, _path: &Path) -> Result<(), String> {
+            if matches!(self.failure, ScriptedGeneratedFileEffectsFailure::Parent) {
+                Err("parent".into())
+            } else {
+                Ok(())
+            }
+        }
+
+        fn create_file(&mut self, path: &Path) -> Result<File, String> {
+            self.creates += 1;
+            if matches!(self.failure, ScriptedGeneratedFileEffectsFailure::Create) {
+                return Err("create".into());
+            }
+            OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(path)
+                .map_err(|error| error.to_string())
+        }
+
+        fn write_file(&mut self, _file: &mut File, _content: &[u8]) -> Result<(), String> {
+            if matches!(self.failure, ScriptedGeneratedFileEffectsFailure::Write) {
+                Err("write".into())
+            } else {
+                Ok(())
+            }
+        }
+
+        fn flush_file(&mut self, _file: &mut File) -> Result<(), String> {
+            if matches!(self.failure, ScriptedGeneratedFileEffectsFailure::Flush) {
+                Err("flush".into())
+            } else {
+                Ok(())
+            }
+        }
+
+        fn set_mode(&mut self, _path: &Path, _executable: bool) -> Result<(), String> {
+            if matches!(self.failure, ScriptedGeneratedFileEffectsFailure::Mode) {
+                Err("mode".into())
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    #[test]
+    fn generated_file_effects_preflight_and_atomic_native_application_are_exact() {
+        let plan = generated_plan([
+            ("BUILD.bazel", b"exports_files([])\n" as &[u8], true),
+            ("nested/data.txt", b"exact\0bytes" as &[u8], false),
+        ]);
+        let first = generated_repository_file_effect_source_association(&plan);
+        let reordered = generated_plan([
+            ("nested/data.txt", b"exact\0bytes" as &[u8], false),
+            ("BUILD.bazel", b"exports_files([])\n" as &[u8], true),
+        ]);
+        assert_ne!(
+            first,
+            generated_repository_file_effect_source_association(&reordered)
+        );
+        let RepositoryMaterializationAttempt::GeneratedImmutable {
+            source_identity,
+            root,
+        } = materialize_generated_repository_file_effects(
+            &plan,
+            &mut NativeGeneratedRepositoryFileEffectsIo,
+        )
+        else {
+            panic!("native generated plan must materialize immutably");
+        };
+        assert_eq!(source_identity, first);
+        assert_eq!(
+            std::fs::read(root.path().join("BUILD.bazel")).unwrap(),
+            b"exports_files([])\n"
+        );
+        assert_eq!(
+            std::fs::read(root.path().join("nested/data.txt")).unwrap(),
+            b"exact\0bytes"
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            assert_eq!(
+                std::fs::metadata(root.path().join("BUILD.bazel"))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o755
+            );
+            assert_eq!(
+                std::fs::metadata(root.path().join("nested/data.txt"))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o644
+            );
+        }
+
+        let collision = generated_plan([
+            ("a", b"one" as &[u8], true),
+            ("a/b", b"two" as &[u8], false),
+        ]);
+        let mut io = ScriptedGeneratedFileEffectsIo {
+            failure: ScriptedGeneratedFileEffectsFailure::Create,
+            root_path: None,
+            creates: 0,
+        };
+        assert!(matches!(
+            materialize_generated_repository_file_effects(&collision, &mut io),
+            RepositoryMaterializationAttempt::SpecError(_)
+        ));
+        assert!(io.root_path.is_none());
+        assert_eq!(io.creates, 0);
+
+        for failure in [
+            ScriptedGeneratedFileEffectsFailure::Root,
+            ScriptedGeneratedFileEffectsFailure::Parent,
+            ScriptedGeneratedFileEffectsFailure::Create,
+            ScriptedGeneratedFileEffectsFailure::Write,
+            ScriptedGeneratedFileEffectsFailure::Flush,
+            ScriptedGeneratedFileEffectsFailure::Mode,
+        ] {
+            let mut io = ScriptedGeneratedFileEffectsIo {
+                failure,
+                root_path: None,
+                creates: 0,
+            };
+            assert!(matches!(
+                materialize_generated_repository_file_effects(&plan, &mut io),
+                RepositoryMaterializationAttempt::MaterializationError(_)
+            ));
+            if let Some(path) = io.root_path {
+                assert!(!path.exists());
+            }
+        }
+    }
+
+    #[test]
+    fn generated_file_effect_kind_is_custom_rule_only_and_nonposix_mode_fails_closed() {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let plan = generated_plan([("BUILD.bazel", b"x" as &[u8], true)]);
+        for spec in [
+            local_spec("repo"),
+            archive_spec("https://example.invalid/archive.tar".into(), "0".repeat(64)),
+            git_spec("https://example.invalid/repo.git".into(), "0".repeat(40)),
+        ] {
+            let request = native_request(
+                &workspace,
+                "generated",
+                spec,
+                RepositoryMaterializationKind::GeneratedFileEffects(plan.clone()),
+            );
+            assert_eq!(
+                validate_native_request(&workspace, &request),
+                Err(RepositorySessionError::KindMismatch)
+            );
+        }
+        let custom = RepoSpec {
+            rule_id: RepoRuleId {
+                bzl_file: CanonicalLabel::parse("@@extension+repo//:defs.bzl").unwrap(),
+                rule_name: "generated_repository".into(),
+            },
+            attributes: Arc::default(),
+        };
+        let request = native_request(
+            &workspace,
+            "generated",
+            custom,
+            RepositoryMaterializationKind::GeneratedFileEffects(plan),
+        );
+        assert_eq!(validate_native_request(&workspace, &request), Ok(()));
+
+        let source = include_str!("repository_io.rs");
+        let production = source.split_once("\n#[cfg(test)]\nmod tests {").unwrap().0;
+        let mode = &production[production
+            .find("fn set_mode(&mut self, path: &Path, executable: bool)")
+            .unwrap()
+            ..production
+                .find("fn generated_repository_file_effect_source_association")
+                .unwrap()];
+        assert!(mode.contains("#[cfg(not(unix))]"));
+        assert!(mode.contains(
+            "Err(\"generated repository executable mode is unsupported on this platform\".into())"
+        ));
+    }
+
+    #[test]
+    fn generated_file_effect_sessions_conflict_replace_reuse_restore_and_discard_post_io() {
+        let workspace_root = tempfile::tempdir().unwrap();
+        let workspace = NormalizedAbsolutePath::new(workspace_root.path().to_path_buf()).unwrap();
+        let materializer = RepositoryMaterializer::new(workspace.clone());
+        let spec = || RepoSpec {
+            rule_id: RepoRuleId {
+                bzl_file: CanonicalLabel::parse("@@extension+repo//:defs.bzl").unwrap(),
+                rule_name: "generated_repository".into(),
+            },
+            attributes: Arc::default(),
+        };
+        let request = |repo: &str, content: &'static [u8]| {
+            native_request(
+                &workspace,
+                repo,
+                spec(),
+                RepositoryMaterializationKind::GeneratedFileEffects(generated_plan([(
+                    "BUILD.bazel",
+                    content,
+                    true,
+                )])),
+            )
+        };
+        let a = request("generated", b"a");
+        let b = request("generated", b"b");
+        let a_restore = request("generated", b"a");
+        let sibling = request("sibling", b"sibling");
+
+        let token = begin_empty(&materializer);
+        materializer
+            .materialize_native(token, a.clone(), RepositoryMaterializationGeneration(1))
+            .unwrap();
+        let (a_root, a_instance) = immutable_result(&materializer, "generated");
+        materializer
+            .materialize_native(token, sibling, RepositoryMaterializationGeneration(1))
+            .unwrap();
+        let (sibling_root, _) = immutable_result(&materializer, "sibling");
+        assert_eq!(
+            materializer
+                .materialize_native(token, b.clone(), RepositoryMaterializationGeneration(1))
+                .unwrap_err(),
+            RepositorySessionError::ConflictingRequest(
+                CanonicalRepoName::new("generated").unwrap()
+            )
+        );
+        materializer
+            .accept(token, std::slice::from_ref(&a), Vec::new())
+            .unwrap();
+        assert_eq!(materializer.state.lock().unwrap().accepted_roots.len(), 1);
+        assert!(a_root.exists());
+        assert!(!sibling_root.exists());
+
+        let token = materializer.begin().unwrap();
+        materializer
+            .preflight_native(token, std::iter::empty())
+            .unwrap();
+        let before_reuse = materializer.state.lock().unwrap().next_instance;
+        materializer
+            .materialize_native(token, a.clone(), RepositoryMaterializationGeneration(2))
+            .unwrap();
+        assert_eq!(
+            materializer.state.lock().unwrap().next_instance,
+            before_reuse
+        );
+        materializer.discard(token).unwrap();
+
+        let token = begin_empty(&materializer);
+        materializer
+            .materialize_native(token, b.clone(), RepositoryMaterializationGeneration(3))
+            .unwrap();
+        let (b_root, b_instance) = immutable_result(&materializer, "generated");
+        assert_ne!(a_instance, b_instance);
+        materializer
+            .accept(token, std::slice::from_ref(&b), Vec::new())
+            .unwrap();
+        assert!(b_root.exists());
+        assert!(a_root.exists());
+        {
+            let state = materializer.state.lock().unwrap();
+            assert_eq!(state.accepted.len(), 1);
+            assert_eq!(*state.accepted[0].request, *b);
+            let RepositoryMaterializationSuccess::Immutable {
+                source_identity,
+                generation_root,
+                ..
+            } = &state.accepted[0].success
+            else {
+                panic!("generated acceptance must retain an immutable root")
+            };
+            assert_eq!(generation_root, &b_root);
+            assert_eq!(
+                source_identity,
+                &generated_repository_file_effect_source_association(&generated_plan([(
+                    "BUILD.bazel",
+                    b"b" as &[u8],
+                    true
+                )]),)
+            );
+        }
+        assert_eq!(std::fs::read(b_root.join("BUILD.bazel")).unwrap(), b"b");
+
+        let token = begin_empty(&materializer);
+        materializer
+            .materialize_native(
+                token,
+                a_restore.clone(),
+                RepositoryMaterializationGeneration(4),
+            )
+            .unwrap();
+        let (restored_root, restored_instance) = immutable_result(&materializer, "generated");
+        materializer
+            .accept(token, std::slice::from_ref(&a_restore), Vec::new())
+            .unwrap();
+        assert_ne!(restored_instance, b_instance);
+        assert!(restored_root.exists());
+        assert!(b_root.exists());
+        {
+            let state = materializer.state.lock().unwrap();
+            assert_eq!(state.accepted.len(), 1);
+            assert_eq!(*state.accepted[0].request, *a_restore);
+            let RepositoryMaterializationSuccess::Immutable {
+                source_identity,
+                generation_root,
+                ..
+            } = &state.accepted[0].success
+            else {
+                panic!("restored generated acceptance must retain an immutable root")
+            };
+            assert_eq!(generation_root, &restored_root);
+            assert_eq!(
+                source_identity,
+                &generated_repository_file_effect_source_association(&generated_plan([(
+                    "BUILD.bazel",
+                    b"a" as &[u8],
+                    true
+                )]),)
+            );
+        }
+        assert_eq!(
+            std::fs::read(restored_root.join("BUILD.bazel")).unwrap(),
+            b"a"
+        );
+
+        let token = begin_empty(&materializer);
+        let stale_request = request("generated", b"stale");
+        let mut provisional = None;
+        let error = materializer
+            .materialize_with(
+                token,
+                stale_request,
+                RepositoryMaterializationGeneration(5),
+                || {
+                    let root = tempfile::tempdir().unwrap();
+                    provisional = Some(root.path().to_path_buf());
+                    materializer.discard(token).unwrap();
+                    RepositoryMaterializationAttempt::GeneratedImmutable {
+                        source_identity: generated_repository_file_effect_source_association(
+                            &generated_plan([("BUILD.bazel", b"a" as &[u8], true)]),
+                        ),
+                        root,
+                    }
+                },
+            )
+            .unwrap_err();
+        assert!(
+            matches!(error, RepositorySessionError::StaleToken { active: None, supplied } if supplied == token)
+        );
+        assert!(!provisional.unwrap().exists());
+        assert!(restored_root.exists());
+    }
 
     fn archive_spec(url: String, sha256: String) -> RepoSpec {
         let attributes: [(CompactString, OverrideAttributeValue); 3] = [

@@ -170,6 +170,10 @@ use super::events::ProvisionalEventEpoch;
 use super::events::SealedCommandAttempt;
 use super::events::SelectedCommandSidecars;
 use super::events::SelectedTerminalToken;
+use super::generated_package_route::GeneratedPackageRouteError;
+use super::generated_package_route::GeneratedPackageRouteKey;
+use super::generated_package_route::GeneratedPackageRouteObservationError;
+use super::generated_package_route::GeneratedPackageRouteObservationKey;
 use super::request_revision::NativeFinalization;
 use super::request_revision::RequestRevisionError;
 use super::request_revision::RequestRevisionKey;
@@ -687,7 +691,7 @@ impl NativeDemandRequestInputBundle {
             environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
                 .expect("default bzlmod environment policy is valid"),
             lockfile_mode: LockfileMode::Update,
-            registry_urls: RegistryUrls::new(std::iter::empty::<&str>()),
+            registry_urls: RegistryUrls::default_bazel_registry(),
         }
     }
 }
@@ -2844,6 +2848,7 @@ enum BuildCommandErrorKind {
     RootAnchor(RootModuleLoadingAnchorError),
     Package(RootPackageLoadError),
     RepositoryRoute(RootRepositoryRouteError),
+    GeneratedRoute(GeneratedPackageRouteError),
     RepositoryPackage(RepositoryPackageLoadError),
     RepositorySource(RepositorySourceFileError, Option<Box<SourceCertificate>>),
     SourceMissing(CanonicalLabel, Option<Box<SourceCertificate>>),
@@ -2906,6 +2911,22 @@ fn external_build_complete(
     observations: PathObservationEpoch,
 ) -> ExternalBuildBranchResult {
     Ok(PreparationOutcome::Complete(Ok((result, observations))))
+}
+
+fn external_build_generated_route_outer(
+    apparent_repo: slug_identity_v2::ApparentRepoName,
+    outer: GeneratedPackageRouteObservationError,
+    observations: PathObservationEpoch,
+) -> ExternalBuildBranchResult {
+    external_build_complete(
+        Err(BuildCommandError::new(
+            BuildCommandErrorKind::GeneratedRoute(GeneratedPackageRouteError::compute(
+                apparent_repo,
+                outer,
+            )),
+        )),
+        observations,
+    )
 }
 
 fn external_build_compute_error(
@@ -3475,6 +3496,7 @@ impl fmt::Display for BuildCommandError {
             BuildCommandErrorKind::RootAnchor(error) => error.fmt(f),
             BuildCommandErrorKind::Package(error) => error.fmt(f),
             BuildCommandErrorKind::RepositoryRoute(error) => error.fmt(f),
+            BuildCommandErrorKind::GeneratedRoute(error) => error.fmt(f),
             BuildCommandErrorKind::RepositoryPackage(error) => error.fmt(f),
             BuildCommandErrorKind::RepositorySource(error, _) => write!(f, "{error:?}"),
             BuildCommandErrorKind::SourceMissing(label, _) => {
@@ -3525,6 +3547,7 @@ impl std::error::Error for BuildCommandError {
             BuildCommandErrorKind::RootAnchor(error) => Some(error),
             BuildCommandErrorKind::Package(error) => Some(error),
             BuildCommandErrorKind::RepositoryRoute(error) => Some(error),
+            BuildCommandErrorKind::GeneratedRoute(error) => Some(error),
             BuildCommandErrorKind::RepositoryPackage(error) => Some(error),
             BuildCommandErrorKind::Analysis(error) => Some(error),
             _ => None,
@@ -4434,7 +4457,7 @@ fn finish_observed_multi_build_branches(
 
 macro_rules! compute_external_build_child {
     ($ctx:expr, $mode:expr, $prefix:expr, $legacy:expr, $legacy_project:expr,
-        $observed:expr, $observed_project:expr) => {{
+        $observed:expr, $observed_outer:expr, $observed_project:expr) => {{
         let outcome = match $mode {
             BuildAnalysisMode::Legacy => match $ctx.compute(&$legacy).await {
                 Ok(outcome) => outcome
@@ -4442,7 +4465,9 @@ macro_rules! compute_external_build_child {
                 Err(error) => return external_build_compute_error($mode, error, $prefix.dupe()),
             },
             BuildAnalysisMode::Observed => match $ctx.compute(&$observed).await {
-                Ok(outcome) => outcome.map(|value| value.map($observed_project)),
+                Ok(outcome) => {
+                    outcome.map(|value| value.map_err($observed_outer).map($observed_project))
+                }
                 Err(error) => return external_build_compute_error($mode, error, $prefix.dupe()),
             },
         };
@@ -4478,7 +4503,7 @@ async fn drive_external_exported_source_build_branch(
     let observed_route_key =
         RootRepositoryRouteObservationKey::new(workspace.dupe(), label.repo().clone())
             .expect("external single target has a nonroot repository route");
-    let (route, observations, _) = compute_external_build_child!(
+    let (route, mut observations, _) = compute_external_build_child!(
         ctx,
         mode,
         &observations,
@@ -4487,6 +4512,7 @@ async fn drive_external_exported_source_build_branch(
             .as_ref()
             .clone(),
         observed_route_key,
+        |error: slug_bzlmod_v2::RootRepositoryRouteObservationError| error.ordinary_path(),
         |observed: slug_bzlmod_v2::ObservedRootRepositoryRoute| (
             observed.result().as_ref().clone(),
             observed.observations().dupe()
@@ -4494,13 +4520,71 @@ async fn drive_external_exported_source_build_branch(
     );
     let route = match route {
         Ok(route) => route,
-        Err(error) => {
-            return external_build_complete(
-                Err(BuildCommandError::new(
-                    BuildCommandErrorKind::RepositoryRoute(error),
-                )),
-                observations,
-            );
+        Err(route_error) => {
+            if !route_error.is_generated_route_fallback() {
+                return external_build_complete(
+                    Err(BuildCommandError::new(
+                        BuildCommandErrorKind::RepositoryRoute(route_error),
+                    )),
+                    observations,
+                );
+            }
+            let bridge_key = GeneratedPackageRouteKey::new(workspace.dupe(), label.repo().clone())
+                .expect("external single target has a nonroot repository route");
+            let bridge_observed_key =
+                GeneratedPackageRouteObservationKey::new(workspace.dupe(), label.repo().clone())
+                    .expect("external single target has a nonroot repository route");
+            let (bridged, incoming) = match mode {
+                BuildAnalysisMode::Legacy => match ctx.compute(&bridge_key).await {
+                    Ok(PreparationOutcome::Need(need)) => {
+                        return Ok(PreparationOutcome::Need(need));
+                    }
+                    Ok(PreparationOutcome::Complete(result)) => {
+                        (result.as_ref().clone(), PathObservationEpoch::empty())
+                    }
+                    Err(error) => return external_build_compute_error(mode, error, observations),
+                },
+                BuildAnalysisMode::Observed => match ctx.compute(&bridge_observed_key).await {
+                    Ok(PreparationOutcome::Need(need)) => {
+                        return Ok(PreparationOutcome::Need(need));
+                    }
+                    Ok(PreparationOutcome::Complete(Err(error))) => {
+                        return external_build_generated_route_outer(
+                            label.repo().clone(),
+                            error,
+                            observations,
+                        );
+                    }
+                    Ok(PreparationOutcome::Complete(Ok(observed))) => (
+                        observed.result().as_ref().clone(),
+                        observed.observations().dupe(),
+                    ),
+                    Err(error) => return external_build_compute_error(mode, error, observations),
+                },
+            };
+            observations = match union_build_observations(&observations, &incoming) {
+                Ok(observations) => observations,
+                Err(error) => return Ok(PreparationOutcome::Complete(Err(error))),
+            };
+            match bridged {
+                Ok(route) => route,
+                Err(error) if error.is_fallback_neutral() => {
+                    return external_build_complete(
+                        Err(BuildCommandError::new(
+                            BuildCommandErrorKind::RepositoryRoute(route_error),
+                        )),
+                        observations,
+                    );
+                }
+                Err(error) => {
+                    return external_build_complete(
+                        Err(BuildCommandError::new(
+                            BuildCommandErrorKind::GeneratedRoute(error),
+                        )),
+                        observations,
+                    );
+                }
+            }
         }
     };
     let (package, observations, _) = compute_external_build_child!(
@@ -4510,6 +4594,7 @@ async fn drive_external_exported_source_build_branch(
         RepositoryPackageLoadKey::new(route.clone(), label.package().clone()),
         |result: Arc<Result<LoadedPackage, RepositoryPackageLoadError>>| result.as_ref().clone(),
         RepositoryPackageLoadObservationKey::new(route.clone(), label.package().clone()),
+        |error| error,
         |observed: slug_loading_v2::ObservedRepositoryPackageLoad| (
             observed.result().as_ref().clone(),
             observed.observations().dupe()
@@ -4575,6 +4660,7 @@ async fn drive_external_exported_source_build_branch(
         HostRepositorySourceFileKey::new(route.clone(), source.clone()),
         |result: Result<HostRepositorySourceFileValue, RepositorySourceFileError>| result,
         HostRepositorySourceFileObservationKey::new(route, source),
+        |error| error,
         |observed: slug_bzlmod_v2::ObservedHostRepositorySourceFile| (
             observed.result().as_ref().clone(),
             observed.observations().dupe()

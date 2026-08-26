@@ -40,12 +40,14 @@ use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequestsError;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequestsKey;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequestsObservationError;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequestsObservationKey;
+use slug_bzlmod_v2::HostSelectedExtensionDefinitionSource;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInput;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequests;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsError;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsKey;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsObservationError;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsObservationKey;
+use slug_bzlmod_v2::HostSelectedObservationFrontier;
 use slug_bzlmod_v2::LogicalSpan;
 use slug_bzlmod_v2::RepositoryPackageSource;
 use slug_bzlmod_v2::RepositoryPackageSourceError;
@@ -63,6 +65,9 @@ use slug_bzlmod_v2::RootPackageSourceError;
 use slug_bzlmod_v2::RootPackageSourceKey;
 use slug_bzlmod_v2::RootPackageSourceObservationKey;
 use slug_bzlmod_v2::RootRepositoryRoute;
+use slug_bzlmod_v2::RootRepositoryRouteError;
+use slug_bzlmod_v2::RootRepositoryRouteKey;
+use slug_bzlmod_v2::RootRepositoryRouteObservationKey;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
@@ -877,6 +882,9 @@ pub(crate) enum HostLoadLabelError {
     UnsupportedExternalRepository {
         load: Arc<str>,
     },
+    CanonicalExternalRepository {
+        load: Arc<str>,
+    },
     ExternalPackage {
         load: Arc<str>,
     },
@@ -894,6 +902,10 @@ impl fmt::Display for HostLoadLabelError {
             Self::UnsupportedExternalRepository { load } => write!(
                 f,
                 "external repository load is not available in the root Host loader: {load}"
+            ),
+            Self::CanonicalExternalRepository { load } => write!(
+                f,
+                "canonical nonroot repository load is deferred in a root BUILD file: {load}"
             ),
             Self::ExternalPackage { load } => {
                 write!(
@@ -921,6 +933,11 @@ fn resolve_host_load_label(
         )
     } else {
         if load.starts_with("@@") && !load.starts_with("@@//") {
+            return Err(HostLoadLabelError::CanonicalExternalRepository {
+                load: Arc::from(load),
+            });
+        }
+        if load.starts_with('@') && !load.starts_with("@@//") && !load.starts_with("@//") {
             return Err(HostLoadLabelError::UnsupportedExternalRepository {
                 load: Arc::from(load),
             });
@@ -959,13 +976,13 @@ fn resolve_host_load_label(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct RepositoryBzlLabel {
+pub(crate) struct RepositoryBzlLabel {
     package: PackagePath,
     target: RootPackageBzlTarget,
 }
 
 impl RepositoryBzlLabel {
-    fn new(
+    pub(crate) fn new(
         package: PackagePath,
         target: RootPackageBzlTarget,
     ) -> Result<Self, ExternalLoadLabelError> {
@@ -1110,6 +1127,69 @@ fn resolve_external_load_label(
         )
     };
     RepositoryBzlLabel::new(package, target)
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedExternalBzlLoad {
+    route: RootRepositoryRoute,
+    label: RepositoryBzlLabel,
+}
+
+fn resolve_external_bzl_load_label(
+    route: &RootRepositoryRoute,
+    package: &PackagePath,
+    load: &str,
+) -> Result<ResolvedExternalBzlLoad, ExternalLoadLabelError> {
+    if !matches!(
+        route.source(),
+        slug_bzlmod_v2::RootRepositorySource::SelectedRegistry(_)
+    ) {
+        return resolve_external_load_label(package, load).map(|label| ResolvedExternalBzlLoad {
+            route: route.clone(),
+            label,
+        });
+    }
+    if let Some(target) = load.strip_prefix(':') {
+        return RepositoryBzlLabel::new(
+            package.clone(),
+            RootPackageBzlTarget::parse(target).map_err(|error| {
+                ExternalLoadLabelError::Target {
+                    load: Arc::from(load),
+                    error,
+                }
+            })?,
+        )
+        .map(|label| ResolvedExternalBzlLoad {
+            route: route.clone(),
+            label,
+        });
+    }
+    let label = ApparentLabel::parse(load).map_err(|message| ExternalLoadLabelError::Invalid {
+        load: Arc::from(load),
+        message: Arc::from(message),
+    })?;
+    let child_route = if label.repo().is_root() {
+        route.clone()
+    } else {
+        route.selected_bzl_load_route(label.repo()).ok_or_else(|| {
+            ExternalLoadLabelError::Repository {
+                load: Arc::from(load),
+            }
+        })?
+    };
+    RepositoryBzlLabel::new(
+        label.package().clone(),
+        RootPackageBzlTarget::parse(label.target().as_str()).map_err(|error| {
+            ExternalLoadLabelError::Target {
+                load: Arc::from(load),
+                error,
+            }
+        })?,
+    )
+    .map(|label| ResolvedExternalBzlLoad {
+        route: child_route,
+        label,
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -1351,7 +1431,7 @@ pub(crate) struct ExternalBzlModuleEvalKey {
 }
 
 impl ExternalBzlModuleEvalKey {
-    fn new(route: RootRepositoryRoute, label: RepositoryBzlLabel) -> Self {
+    pub(crate) fn new(route: RootRepositoryRoute, label: RepositoryBzlLabel) -> Self {
         Self { route, label }
     }
     fn canonical_label(&self) -> CanonicalLabel {
@@ -1389,7 +1469,7 @@ impl ExternalBzlCycleIdentity {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(crate) struct ExternalBzlModuleObservationKey(ExternalBzlModuleEvalKey);
 impl ExternalBzlModuleObservationKey {
-    fn new(route: RootRepositoryRoute, label: RepositoryBzlLabel) -> Self {
+    pub(crate) fn new(route: RootRepositoryRoute, label: RepositoryBzlLabel) -> Self {
         Self(ExternalBzlModuleEvalKey::new(route, label))
     }
     pub(crate) fn cycle_identity(&self) -> ExternalBzlCycleIdentity {
@@ -1539,6 +1619,21 @@ enum RootPackageLoadErrorInner {
         label: HostRootBzlLabel,
         error: Arc<HostBzlModuleError>,
     },
+    ExternalRoute {
+        load: Arc<str>,
+        apparent_repo: slug_identity_v2::ApparentRepoName,
+        error: RootRepositoryRouteError,
+    },
+    ExternalInfrastructure {
+        load: Arc<str>,
+        message: Arc<str>,
+    },
+    ExternalBzl {
+        origin: Arc<str>,
+        load: Arc<str>,
+        label: CanonicalLabel,
+        error: Arc<ExternalBzlModuleError>,
+    },
     Attempt(HostPackageAttemptError),
 }
 
@@ -1593,9 +1688,72 @@ impl fmt::Display for RootPackageLoadError {
                     write!(f, "loading `{load}`: {error}")
                 }
             }
+            RootPackageLoadErrorInner::ExternalRoute { error, .. } => error.fmt(f),
+            RootPackageLoadErrorInner::ExternalInfrastructure { message, .. } => {
+                f.write_str(message)
+            }
+            RootPackageLoadErrorInner::ExternalBzl { load, error, .. } => {
+                write!(f, "loading `{load}`: {error}")
+            }
             RootPackageLoadErrorInner::Attempt(error) => write!(f, "{error:?}"),
         }
     }
+}
+
+enum RootPackageDirectLoad {
+    Root(HostRootBzlLabel),
+    External {
+        apparent_repo: slug_identity_v2::ApparentRepoName,
+        label: RepositoryBzlLabel,
+    },
+}
+
+fn resolve_root_package_direct_load(
+    requesting_package: &PackagePath,
+    load: &str,
+) -> Result<RootPackageDirectLoad, HostLoadLabelError> {
+    if !load.starts_with('@') || load.starts_with("@@//") {
+        return resolve_host_load_label(requesting_package, load).map(RootPackageDirectLoad::Root);
+    }
+    if load.starts_with("@@") {
+        return Err(HostLoadLabelError::CanonicalExternalRepository {
+            load: Arc::from(load),
+        });
+    }
+    let label = ApparentLabel::parse(load).map_err(|message| HostLoadLabelError::Invalid {
+        load: Arc::from(load),
+        message: Arc::from(message),
+    })?;
+    if label.repo().is_root() {
+        return resolve_host_load_label(requesting_package, load).map(RootPackageDirectLoad::Root);
+    }
+    let target = RootPackageBzlTarget::parse(label.target().as_str()).map_err(|error| {
+        HostLoadLabelError::Target {
+            load: Arc::from(load),
+            error,
+        }
+    })?;
+    let label = RepositoryBzlLabel::new(label.package().clone(), target).map_err(|error| {
+        HostLoadLabelError::Invalid {
+            load: Arc::from(load),
+            message: Arc::from(error.to_string()),
+        }
+    })?;
+    Ok(RootPackageDirectLoad::External {
+        apparent_repo: label_for_root_build_repo(load)?,
+        label,
+    })
+}
+
+fn label_for_root_build_repo(
+    load: &str,
+) -> Result<slug_identity_v2::ApparentRepoName, HostLoadLabelError> {
+    ApparentLabel::parse(load)
+        .map_err(|message| HostLoadLabelError::Invalid {
+            load: Arc::from(load),
+            message: Arc::from(message),
+        })
+        .map(|label| label.repo().clone())
 }
 
 impl std::error::Error for RootPackageLoadError {}
@@ -2402,6 +2560,10 @@ pub(crate) enum HostLoadedModuleExtensionDefinitionError {
         label: CanonicalLabel,
         error: HostBzlModuleError,
     },
+    SelectedBzl {
+        label: CanonicalLabel,
+        error: ExternalBzlModuleError,
+    },
     Export {
         label: CanonicalLabel,
         name: CompactString,
@@ -2411,6 +2573,12 @@ pub(crate) enum HostLoadedModuleExtensionDefinitionError {
         label: CanonicalLabel,
         name: CompactString,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum DefinitionBzlModuleCarrier {
+    Root(HostBzlModuleCarrier),
+    Selected(ExternalBzlModuleCarrier),
 }
 
 impl fmt::Display for HostLoadedModuleExtensionDefinitionsError {
@@ -2613,38 +2781,97 @@ async fn loaded_extension_definition_requests(
 async fn loaded_extension_definition_bzl(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
-    label: HostRootBzlLabel,
+    request: &HostSelectedExtensionDefinitionLoadRequest,
+    target: RootPackageBzlTarget,
     mode: LoadedModuleExtensionDefinitionsMode,
 ) -> Result<
-    (HostBzlModuleCarrier, PathObservationEpoch),
+    (DefinitionBzlModuleCarrier, PathObservationEpoch),
     SourcePreparationOutcome<ObservedPathFrontierError>,
 > {
-    match mode {
-        LoadedModuleExtensionDefinitionsMode::Legacy => {
+    let root_label =
+        HostRootBzlLabel::new(request.parts().0.package().package().clone(), target.dupe());
+    let selected_label =
+        RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target)
+            .expect("the definition target was parsed before selected-source dispatch");
+    let selected_route = match request.source() {
+        HostSelectedExtensionDefinitionSource::Root => None,
+        source => RootRepositoryRoute::for_selected_extension_definition(workspace.dupe(), source),
+    };
+    match (mode, selected_route) {
+        (LoadedModuleExtensionDefinitionsMode::Legacy, None) => {
             match host_dice_invariant(
-                ctx.compute(&HostBzlModuleEvalKey::new(workspace.dupe(), label))
+                ctx.compute(&HostBzlModuleEvalKey::new(workspace.dupe(), root_label))
                     .await,
             ) {
                 SourcePreparationOutcome::Need(need) => Err(SourcePreparationOutcome::Need(need)),
-                SourcePreparationOutcome::Complete(result) => {
-                    Ok((result, PathObservationEpoch::empty()))
-                }
+                SourcePreparationOutcome::Complete(result) => Ok((
+                    DefinitionBzlModuleCarrier::Root(result),
+                    PathObservationEpoch::empty(),
+                )),
             }
         }
-        LoadedModuleExtensionDefinitionsMode::Observed => {
+        (LoadedModuleExtensionDefinitionsMode::Observed, None) => {
             match host_dice_invariant(
-                ctx.compute(&HostBzlModuleObservationKey::new(workspace.dupe(), label))
-                    .await,
+                ctx.compute(&HostBzlModuleObservationKey::new(
+                    workspace.dupe(),
+                    root_label,
+                ))
+                .await,
             ) {
                 SourcePreparationOutcome::Need(need) => Err(SourcePreparationOutcome::Need(need)),
                 SourcePreparationOutcome::Complete(Err(error)) => {
                     Err(SourcePreparationOutcome::Complete(error))
                 }
-                SourcePreparationOutcome::Complete(Ok(observed)) => {
-                    Ok((observed.result.dupe(), observed.observations().dupe()))
-                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => Ok((
+                    DefinitionBzlModuleCarrier::Root(observed.result.dupe()),
+                    observed.observations().dupe(),
+                )),
             }
         }
+        (LoadedModuleExtensionDefinitionsMode::Legacy, Some(route)) => match ctx
+            .compute(&ExternalBzlModuleEvalKey::new(
+                route,
+                selected_label.clone(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
+            Ok(SourcePreparationOutcome::Complete(result)) => Ok((
+                DefinitionBzlModuleCarrier::Selected(result),
+                PathObservationEpoch::empty(),
+            )),
+            Err(error) => Ok((
+                DefinitionBzlModuleCarrier::Selected(Arc::new(Err(
+                    ExternalBzlModuleError::SourceCompute {
+                        label: request.parts().0.clone(),
+                        message: Arc::from(error.to_string()),
+                    },
+                ))),
+                PathObservationEpoch::empty(),
+            )),
+        },
+        (LoadedModuleExtensionDefinitionsMode::Observed, Some(route)) => match ctx
+            .compute(&ExternalBzlModuleObservationKey::new(route, selected_label))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                Err(SourcePreparationOutcome::Complete(error))
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => Ok((
+                DefinitionBzlModuleCarrier::Selected(observed.result().dupe()),
+                observed.observations().dupe(),
+            )),
+            Err(error) => Ok((
+                DefinitionBzlModuleCarrier::Selected(Arc::new(Err(
+                    ExternalBzlModuleError::SourceCompute {
+                        label: request.parts().0.clone(),
+                        message: Arc::from(error.to_string()),
+                    },
+                ))),
+                PathObservationEpoch::empty(),
+            )),
+        },
     }
 }
 
@@ -2653,10 +2880,10 @@ fn finish_loaded_extension_definition_observed_child(
     request: &HostSelectedExtensionDefinitionLoadRequest,
     current: PathObservationEpoch,
     child: SourcePreparationOutcome<
-        Result<(HostBzlModuleCarrier, PathObservationEpoch), ObservedPathFrontierError>,
+        Result<(DefinitionBzlModuleCarrier, PathObservationEpoch), ObservedPathFrontierError>,
     >,
 ) -> Result<
-    (HostBzlModuleCarrier, PathObservationEpoch),
+    (DefinitionBzlModuleCarrier, PathObservationEpoch),
     LoadedModuleExtensionDefinitionsDriverOutcome,
 > {
     let (carrier, incoming) = match child {
@@ -2728,20 +2955,15 @@ async fn drive_loaded_extension_definitions(
                 );
             }
         };
-        let child = match loaded_extension_definition_bzl(
-            ctx,
-            &key.workspace,
-            HostRootBzlLabel::new(label.package().package().clone(), target),
-            mode,
-        )
-        .await
-        {
-            Ok(value) => SourcePreparationOutcome::Complete(Ok(value)),
-            Err(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
-            Err(SourcePreparationOutcome::Complete(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
-            }
-        };
+        let child =
+            match loaded_extension_definition_bzl(ctx, &key.workspace, request, target, mode).await
+            {
+                Ok(value) => SourcePreparationOutcome::Complete(Ok(value)),
+                Err(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+                Err(SourcePreparationOutcome::Complete(error)) => {
+                    SourcePreparationOutcome::Complete(Err(error))
+                }
+            };
         let (module_result, merged) = match finish_loaded_extension_definition_observed_child(
             &requests,
             request,
@@ -2752,21 +2974,39 @@ async fn drive_loaded_extension_definitions(
             Err(terminal) => return terminal,
         };
         observations = merged;
-        let module = match module_result.as_ref() {
-            Ok(module) => module.clone(),
-            Err(error) => {
-                return loaded_extension_definitions_driver_complete(
-                    Err(HostLoadedModuleExtensionDefinitionsError::Request {
-                        requests: requests.clone(),
-                        request: request.clone(),
-                        error: HostLoadedModuleExtensionDefinitionError::Bzl {
-                            label: label.clone(),
-                            error: error.clone(),
-                        },
-                    }),
-                    observations,
-                );
-            }
+        let module = match module_result {
+            DefinitionBzlModuleCarrier::Root(result) => match result.as_ref() {
+                Ok(module) => module.clone(),
+                Err(error) => {
+                    return loaded_extension_definitions_driver_complete(
+                        Err(HostLoadedModuleExtensionDefinitionsError::Request {
+                            requests: requests.clone(),
+                            request: request.clone(),
+                            error: HostLoadedModuleExtensionDefinitionError::Bzl {
+                                label: label.clone(),
+                                error: error.clone(),
+                            },
+                        }),
+                        observations,
+                    );
+                }
+            },
+            DefinitionBzlModuleCarrier::Selected(result) => match result.as_ref() {
+                Ok(module) => module.clone(),
+                Err(error) => {
+                    return loaded_extension_definitions_driver_complete(
+                        Err(HostLoadedModuleExtensionDefinitionsError::Request {
+                            requests: requests.clone(),
+                            request: request.clone(),
+                            error: HostLoadedModuleExtensionDefinitionError::SelectedBzl {
+                                label: label.clone(),
+                                error: error.clone(),
+                            },
+                        }),
+                        observations,
+                    );
+                }
+            },
         };
         let exported = match module.module.get(export) {
             Ok(value) => value,
@@ -3671,21 +3911,22 @@ async fn compute_external_bzl_children(
     ctx: &mut DiceComputations<'_>,
     key: &ExternalBzlModuleEvalKey,
     mode: ExternalBzlModuleMode,
-    resolved_loads: Vec<(String, RepositoryBzlLabel)>,
+    resolved_loads: Vec<(String, ResolvedExternalBzlLoad)>,
     mut observations: PathObservationEpoch,
 ) -> ControlFlow<ExternalBzlDriverOutcome, (Vec<(String, FrozenBzlModule)>, PathObservationEpoch)> {
     let mut loaded_modules = Vec::with_capacity(resolved_loads.len());
-    for (raw_load, label) in resolved_loads {
-        let child_label = label.canonical_label(&key.route);
-        let child = match compute_external_bzl_child(ctx, &key.route, label, mode).await {
-            SourcePreparationOutcome::Need(need) => {
-                return ControlFlow::Break(SourcePreparationOutcome::Need(need));
-            }
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                return ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)));
-            }
-            SourcePreparationOutcome::Complete(Ok(child)) => child,
-        };
+    for (raw_load, resolved) in resolved_loads {
+        let child_label = resolved.label.canonical_label(&resolved.route);
+        let child =
+            match compute_external_bzl_child(ctx, &resolved.route, resolved.label, mode).await {
+                SourcePreparationOutcome::Need(need) => {
+                    return ControlFlow::Break(SourcePreparationOutcome::Need(need));
+                }
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    return ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)));
+                }
+                SourcePreparationOutcome::Complete(Ok(child)) => child,
+            };
         let (value, incoming) = match child {
             ExternalBzlRecursiveChild::Value(value, incoming) => (value, incoming),
             ExternalBzlRecursiveChild::Compute(message) => {
@@ -3831,7 +4072,8 @@ async fn compute_external_bzl_module(
     let resolved_loads = match loads
         .iter()
         .map(|load| {
-            resolve_external_load_label(&key.label.package, load).map(|label| (load.clone(), label))
+            resolve_external_bzl_load_label(&key.route, &key.label.package, load)
+                .map(|label| (load.clone(), label))
         })
         .collect::<Result<Vec<_>, _>>()
     {
@@ -4044,6 +4286,234 @@ fn merge_root_package_observations(
     }
 }
 
+type RootPackageModuleOutcome = Result<FrozenBzlModule, RootPackageLoadDriverOutcome>;
+
+fn root_package_load_terminal(
+    error: RootPackageLoadErrorInner,
+    observations: &PathObservationEpoch,
+) -> RootPackageLoadDriverOutcome {
+    root_package_driver_complete(Err(RootPackageLoadError::new(error)), observations.dupe())
+}
+
+async fn load_root_package_host_bzl(
+    key: &RootPackageLoadKey,
+    ctx: &mut DiceComputations<'_>,
+    mode: HostPackageLoadMode,
+    label: HostRootBzlLabel,
+    origin: Arc<str>,
+    load: &str,
+    observations: &mut PathObservationEpoch,
+) -> RootPackageModuleOutcome {
+    let child = match mode {
+        HostPackageLoadMode::Legacy => host_dice_invariant(
+            ctx.compute(&HostBzlModuleEvalKey::new(
+                key.workspace.dupe(),
+                label.clone(),
+            ))
+            .await,
+        )
+        .map(|result| Ok((result.as_ref().clone(), PathObservationEpoch::empty()))),
+        HostPackageLoadMode::Observed => host_dice_invariant(
+            ctx.compute(&HostBzlModuleObservationKey::new(
+                key.workspace.dupe(),
+                label.clone(),
+            ))
+            .await,
+        )
+        .map(|value| {
+            value.map(|observed| (observed.result().clone(), observed.observations().dupe()))
+        }),
+    };
+    let (child, incoming) = match child {
+        SourcePreparationOutcome::Need(need) => {
+            return Err(SourcePreparationOutcome::Need(need));
+        }
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            return Err(SourcePreparationOutcome::Complete(Err(error)));
+        }
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+    };
+    *observations = merge_root_package_observations(mode, observations.dupe(), &incoming)
+        .map_err(|error| SourcePreparationOutcome::Complete(Err(error)))?;
+    child.map_err(|error| {
+        root_package_load_terminal(
+            RootPackageLoadErrorInner::Bzl {
+                origin,
+                load: Arc::from(load),
+                label,
+                error: Arc::new(error),
+            },
+            observations,
+        )
+    })
+}
+
+async fn load_root_package_external_route(
+    key: &RootPackageLoadKey,
+    ctx: &mut DiceComputations<'_>,
+    mode: HostPackageLoadMode,
+    apparent_repo: &slug_identity_v2::ApparentRepoName,
+    load: &str,
+    observations: &mut PathObservationEpoch,
+) -> Result<RootRepositoryRoute, RootPackageLoadDriverOutcome> {
+    let route = match mode {
+        HostPackageLoadMode::Legacy => match ctx
+            .compute(
+                &RootRepositoryRouteKey::for_root_build(
+                    key.workspace.dupe(),
+                    apparent_repo.clone(),
+                )
+                .expect("root BUILD load has nonroot repo"),
+            )
+            .await
+        {
+            Err(error) => {
+                return Err(root_package_load_terminal(
+                    RootPackageLoadErrorInner::ExternalInfrastructure {
+                        load: Arc::from(load),
+                        message: Arc::from(error.to_string()),
+                    },
+                    observations,
+                ));
+            }
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return Err(SourcePreparationOutcome::Need(need));
+            }
+            Ok(SourcePreparationOutcome::Complete(route)) => route.as_ref().clone(),
+        },
+        HostPackageLoadMode::Observed => match ctx
+            .compute(
+                &RootRepositoryRouteObservationKey::for_root_build(
+                    key.workspace.dupe(),
+                    apparent_repo.clone(),
+                )
+                .expect("root BUILD load has nonroot repo"),
+            )
+            .await
+        {
+            Err(error) => {
+                return Err(root_package_load_terminal(
+                    RootPackageLoadErrorInner::ExternalInfrastructure {
+                        load: Arc::from(load),
+                        message: Arc::from(error.to_string()),
+                    },
+                    observations,
+                ));
+            }
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return Err(SourcePreparationOutcome::Need(need));
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return Err(match error.selected_frontier() {
+                    HostSelectedObservationFrontier::Path(error) => {
+                        SourcePreparationOutcome::Complete(Err(error))
+                    }
+                    HostSelectedObservationFrontier::Infrastructure(message) => {
+                        root_package_load_terminal(
+                            RootPackageLoadErrorInner::ExternalInfrastructure {
+                                load: Arc::from(load),
+                                message,
+                            },
+                            observations,
+                        )
+                    }
+                });
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                *observations = merge_root_package_observations(
+                    mode,
+                    observations.dupe(),
+                    observed.observations(),
+                )
+                .map_err(|error| SourcePreparationOutcome::Complete(Err(error)))?;
+                observed.result().as_ref().clone()
+            }
+        },
+    };
+    route.map_err(|error| {
+        root_package_load_terminal(
+            RootPackageLoadErrorInner::ExternalRoute {
+                load: Arc::from(load),
+                apparent_repo: apparent_repo.clone(),
+                error,
+            },
+            observations,
+        )
+    })
+}
+
+async fn load_root_package_external_bzl(
+    ctx: &mut DiceComputations<'_>,
+    mode: HostPackageLoadMode,
+    route: RootRepositoryRoute,
+    label: RepositoryBzlLabel,
+    origin: Arc<str>,
+    load: &str,
+    observations: &mut PathObservationEpoch,
+) -> RootPackageModuleOutcome {
+    let canonical = label.canonical_label(&route);
+    let child = match mode {
+        HostPackageLoadMode::Legacy => match ctx
+            .compute(&ExternalBzlModuleEvalKey::new(route, label))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return Err(SourcePreparationOutcome::Need(need));
+            }
+            Ok(SourcePreparationOutcome::Complete(result)) => result.as_ref().clone(),
+            Err(error) => {
+                return Err(root_package_load_terminal(
+                    RootPackageLoadErrorInner::ExternalInfrastructure {
+                        load: Arc::from(load),
+                        message: Arc::from(error.to_string()),
+                    },
+                    observations,
+                ));
+            }
+        },
+        HostPackageLoadMode::Observed => match ctx
+            .compute(&ExternalBzlModuleObservationKey::new(route, label))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return Err(SourcePreparationOutcome::Need(need));
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return Err(SourcePreparationOutcome::Complete(Err(error)));
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                *observations = merge_root_package_observations(
+                    mode,
+                    observations.dupe(),
+                    observed.observations(),
+                )
+                .map_err(|error| SourcePreparationOutcome::Complete(Err(error)))?;
+                observed.result().as_ref().clone()
+            }
+            Err(error) => {
+                return Err(root_package_load_terminal(
+                    RootPackageLoadErrorInner::ExternalInfrastructure {
+                        load: Arc::from(load),
+                        message: Arc::from(error.to_string()),
+                    },
+                    observations,
+                ));
+            }
+        },
+    };
+    child.map_err(|error| {
+        root_package_load_terminal(
+            RootPackageLoadErrorInner::ExternalBzl {
+                origin,
+                load: Arc::from(load),
+                label: canonical,
+                error: Arc::new(error),
+            },
+            observations,
+        )
+    })
+}
+
 async fn compute_root_package(
     key: &RootPackageLoadKey,
     ctx: &mut DiceComputations<'_>,
@@ -4179,7 +4649,7 @@ async fn compute_root_package(
     let mut loaded_modules = Vec::new();
     for load in ast.loads() {
         let load = load.module_id.to_owned();
-        let label = match resolve_host_load_label(&key.package, &load) {
+        let resolved = match resolve_root_package_direct_load(&key.package, &load) {
             Ok(label) => label,
             Err(error) => {
                 return root_package_driver_complete(
@@ -4193,57 +4663,53 @@ async fn compute_root_package(
                 );
             }
         };
-        let child = match mode {
-            HostPackageLoadMode::Legacy => {
-                let child = HostBzlModuleEvalKey::new(key.workspace.dupe(), label.clone());
-                host_dice_invariant(ctx.compute(&child).await)
-                    .map(|result| Ok((result.as_ref().clone(), PathObservationEpoch::empty())))
+        let build_name: String = source
+            .relative_path()
+            .iter()
+            .copied()
+            .map(char::from)
+            .collect();
+        let origin: Arc<str> = Arc::from(if key.package.as_str().is_empty() {
+            build_name
+        } else {
+            format!("{}/{build_name}", key.package)
+        });
+        let module = match resolved {
+            RootPackageDirectLoad::Root(label) => {
+                load_root_package_host_bzl(key, ctx, mode, label, origin, &load, &mut observations)
+                    .await
             }
-            HostPackageLoadMode::Observed => {
-                let child = HostBzlModuleObservationKey::new(key.workspace.dupe(), label.clone());
-                host_dice_invariant(ctx.compute(&child).await).map(|value| {
-                    value
-                        .map(|observed| (observed.result().clone(), observed.observations().dupe()))
-                })
-            }
+            RootPackageDirectLoad::External {
+                apparent_repo,
+                label,
+            } => match load_root_package_external_route(
+                key,
+                ctx,
+                mode,
+                &apparent_repo,
+                &load,
+                &mut observations,
+            )
+            .await
+            {
+                Ok(route) => {
+                    load_root_package_external_bzl(
+                        ctx,
+                        mode,
+                        route,
+                        label,
+                        origin,
+                        &load,
+                        &mut observations,
+                    )
+                    .await
+                }
+                Err(outcome) => Err(outcome),
+            },
         };
-        let (child, incoming) = match child {
-            SourcePreparationOutcome::Need(need) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                return SourcePreparationOutcome::Complete(Err(error));
-            }
-            SourcePreparationOutcome::Complete(Ok(value)) => value,
-        };
-        observations = match merge_root_package_observations(mode, observations, &incoming) {
-            Ok(observations) => observations,
-            Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
-        };
-        let module = match child {
+        let module = match module {
             Ok(module) => module,
-            Err(error) => {
-                let build_name: String = source
-                    .relative_path()
-                    .iter()
-                    .copied()
-                    .map(char::from)
-                    .collect();
-                let inner = RootPackageLoadErrorInner::Bzl {
-                    origin: Arc::from(if key.package.as_str().is_empty() {
-                        build_name
-                    } else {
-                        format!("{}/{build_name}", key.package)
-                    }),
-                    load: Arc::from(load),
-                    label,
-                    error: Arc::new(error),
-                };
-                return root_package_driver_complete(
-                    Err(RootPackageLoadError::new(inner)),
-                    observations,
-                );
-            }
+            Err(outcome) => return outcome,
         };
         loaded_modules.push((load, module));
     }
@@ -8806,14 +9272,20 @@ mod module_extension_definition_loading_tests {
             &requests,
             &request_context,
             PathObservationEpoch::empty(),
-            SourcePreparationOutcome::Complete(Ok((carrier.dupe(), incoming))),
+            SourcePreparationOutcome::Complete(Ok((
+                DefinitionBzlModuleCarrier::Root(carrier.dupe()),
+                incoming,
+            ))),
         )
         .unwrap();
         let (_, current) = finish_loaded_extension_definition_observed_child(
             &requests,
             &request_context,
             prior.dupe(),
-            SourcePreparationOutcome::Complete(Ok((carrier.dupe(), prior.dupe()))),
+            SourcePreparationOutcome::Complete(Ok((
+                DefinitionBzlModuleCarrier::Root(carrier.dupe()),
+                prior.dupe(),
+            ))),
         )
         .unwrap();
         assert_eq!(current, prior);
@@ -8829,7 +9301,10 @@ mod module_extension_definition_loading_tests {
             &requests,
             &request_context,
             request.dupe(),
-            SourcePreparationOutcome::Complete(Ok((carrier.dupe(), duplicate))),
+            SourcePreparationOutcome::Complete(Ok((
+                DefinitionBzlModuleCarrier::Root(carrier.dupe()),
+                duplicate,
+            ))),
         )
         .unwrap();
         assert!(Arc::ptr_eq(duplicate.get(&demand).unwrap(), &first));
@@ -8845,7 +9320,10 @@ mod module_extension_definition_loading_tests {
             &requests,
             &request_context,
             request.dupe(),
-            SourcePreparationOutcome::Complete(Ok((carrier.dupe(), conflicting.dupe()))),
+            SourcePreparationOutcome::Complete(Ok((
+                DefinitionBzlModuleCarrier::Root(carrier.dupe()),
+                conflicting.dupe(),
+            ))),
         )
         .unwrap_err();
         assert!(matches!(
@@ -9098,6 +9576,35 @@ mod module_extension_definition_loading_tests {
         let recovered_retained = recovered.clone();
         assert_held_observed_loaded_handles(&recovered, &recovered_retained);
         assert_loaded_warm(&dice, root, ext_a, child_a, other, &tracker, &recovered).await;
+    }
+
+    #[test]
+    fn selected_external_dispatch_uses_each_resolved_child_route() {
+        let source = include_str!("bzl_module.rs");
+        let production = &source[..source
+            .find("mod module_extension_definition_loading_tests")
+            .unwrap()];
+        let definition_start = production
+            .find("async fn loaded_extension_definition_bzl")
+            .unwrap();
+        let definition_end = production[definition_start..]
+            .find("fn finish_loaded_extension_definition_observed_child")
+            .unwrap()
+            + definition_start;
+        let definition = &production[definition_start..definition_end];
+        assert!(definition.contains("match request.source()"));
+        assert!(definition.contains("RootRepositoryRoute::for_selected_extension_definition"));
+        assert!(definition.contains("ExternalBzlModuleEvalKey::new"));
+        assert!(definition.contains("ExternalBzlModuleObservationKey::new"));
+        let resolver = &production[production
+            .find("fn resolve_external_bzl_load_label")
+            .unwrap()..];
+        assert!(resolver.contains("selected_bzl_load_route(label.repo())"));
+        let children = &production[production
+            .find("async fn compute_external_bzl_children")
+            .unwrap()..];
+        assert!(children.contains("resolved.label.canonical_label(&resolved.route)"));
+        assert!(children.contains("compute_external_bzl_child(ctx, &resolved.route"));
     }
 }
 

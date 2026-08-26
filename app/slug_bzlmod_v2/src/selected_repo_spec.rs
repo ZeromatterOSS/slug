@@ -76,6 +76,24 @@ use crate::source_preparation::SourcePreparationNeeds;
 use crate::source_preparation::SourcePreparationNeedsError;
 use crate::source_preparation::SourcePreparationOutcome;
 
+mod selected_extension_demand;
+
+pub use selected_extension_demand::HostSelectedExtensionDemand;
+pub use selected_extension_demand::HostSelectedExtensionDemandError;
+pub use selected_extension_demand::HostSelectedExtensionDemandErrorDisposition;
+pub use selected_extension_demand::HostSelectedExtensionDemandKey;
+pub use selected_extension_demand::HostSelectedExtensionDemandObservationError;
+pub use selected_extension_demand::HostSelectedExtensionDemandObservationKey;
+pub use selected_extension_demand::HostSelectedExtensionOwner;
+pub use selected_extension_demand::HostSelectedExtensionOwnerInputs;
+pub use selected_extension_demand::HostSelectedExtensionOwnerInputsError;
+pub use selected_extension_demand::HostSelectedExtensionOwnerInputsKey;
+pub use selected_extension_demand::HostSelectedExtensionOwnerInputsObservationError;
+pub use selected_extension_demand::HostSelectedExtensionOwnerInputsObservationKey;
+pub use selected_extension_demand::HostSelectedExtensionOwnerModuleInput;
+pub use selected_extension_demand::ObservedHostSelectedExtensionDemand;
+pub use selected_extension_demand::ObservedHostSelectedExtensionOwnerInputs;
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 struct SelectedRegistryPolicyIdentity {
     original_registry: CompactString,
@@ -1509,7 +1527,7 @@ impl Key for HostSelectedRegistryRepoSpecsObservationKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostSelectedRepositoryMapping {
+pub(crate) struct HostSelectedRepositoryMapping {
     context_repo: CanonicalRepoName,
     entries: Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     order: Arc<[ApparentRepoName]>,
@@ -1524,7 +1542,7 @@ struct HostSelectedModuleRoute {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostSelectedModuleRoutes {
+pub(crate) struct HostSelectedModuleRoutes {
     entries: Arc<[HostSelectedModuleRoute]>,
 }
 
@@ -2121,6 +2139,50 @@ impl HostCanonicalSelectedModuleDefinition {
         };
         HostCanonicalSelectedModuleDefinitionView { kind, route }
     }
+
+    pub(crate) fn mapped_bzl_load(
+        &self,
+        apparent: &ApparentRepoName,
+    ) -> Option<HostSelectedBzlLoadSource> {
+        let routes = self.routes.as_ref().as_ref().ok()?;
+        let canonical = self
+            .view()
+            .mapping()
+            .find_map(|(name, target)| (name == apparent).then(|| target.clone()))?;
+        match find_canonical_route_ordinal(&canonical, routes.entries.iter()) {
+            CanonicalRouteMatch::Unique(ordinal) => match &routes.entries[ordinal].entry.source {
+                HostGraphModuleSource::Discovered(module)
+                    if matches!(
+                        module.provenance,
+                        HostDiscoveredModuleProvenance::Registry { .. }
+                    ) =>
+                {
+                    Some(HostSelectedBzlLoadSource::Selected(
+                        HostCanonicalSelectedModuleDefinition {
+                            routes: self.routes.dupe(),
+                            ordinal,
+                        },
+                    ))
+                }
+                HostGraphModuleSource::Discovered(module)
+                    if matches!(
+                        module.provenance,
+                        HostDiscoveredModuleProvenance::BuiltinBazelTools { .. }
+                    ) =>
+                {
+                    Some(HostSelectedBzlLoadSource::Builtin)
+                }
+                _ => None,
+            },
+            CanonicalRouteMatch::Missing | CanonicalRouteMatch::Duplicate { .. } => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostSelectedBzlLoadSource {
+    Selected(HostCanonicalSelectedModuleDefinition),
+    Builtin,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -2423,11 +2485,73 @@ enum CanonicalSelectedModuleDefinitionObservationError {
     Routes(HostSelectedModuleRoutesObservationError),
 }
 
+fn selected_graph_observation_frontier(
+    error: &HostSelectedModuleGraphObservationError,
+) -> crate::HostSelectedObservationFrontier {
+    match error {
+        HostSelectedModuleGraphObservationError::Root(error)
+        | HostSelectedModuleGraphObservationError::Effective(error)
+        | HostSelectedModuleGraphObservationError::Merge(error) => {
+            crate::HostSelectedObservationFrontier::Path(error.clone())
+        }
+        HostSelectedModuleGraphObservationError::Discovery(error) => error.selected_frontier(),
+    }
+}
+
+fn selected_routes_observation_frontier(
+    error: &HostSelectedModuleRoutesObservationError,
+) -> crate::HostSelectedObservationFrontier {
+    match error {
+        HostSelectedModuleRoutesObservationError::Graph(error) => {
+            selected_graph_observation_frontier(error)
+        }
+        HostSelectedModuleRoutesObservationError::RepoSpecs(error) => match error {
+            HostSelectedRegistryRepoSpecsObservationError::Graph(error) => {
+                selected_graph_observation_frontier(error)
+            }
+            HostSelectedRegistryRepoSpecsObservationError::HostRegistry { error, .. }
+            | HostSelectedRegistryRepoSpecsObservationError::RegistryFile { error, .. }
+            | HostSelectedRegistryRepoSpecsObservationError::EffectiveOverride { error, .. }
+            | HostSelectedRegistryRepoSpecsObservationError::Merge { error, .. } => {
+                crate::HostSelectedObservationFrontier::Path(error.clone())
+            }
+        },
+        HostSelectedModuleRoutesObservationError::Merge { error, .. } => {
+            crate::HostSelectedObservationFrontier::Path(error.clone())
+        }
+    }
+}
+
+fn extension_mappings_observation_frontier(
+    error: &ExtensionMappingsObservationError,
+) -> crate::HostSelectedObservationFrontier {
+    match error {
+        ExtensionMappingsObservationError::Routes(error) => {
+            selected_routes_observation_frontier(error)
+        }
+        ExtensionMappingsObservationError::RootFiles(error)
+        | ExtensionMappingsObservationError::Merge { error, .. } => {
+            crate::HostSelectedObservationFrontier::Path(error.clone())
+        }
+    }
+}
+
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct HostCanonicalSelectedModuleDefinitionObservationError(
     CanonicalSelectedModuleDefinitionObservationError,
 );
+
+impl HostCanonicalSelectedModuleDefinitionObservationError {
+    #[doc(hidden)]
+    pub fn selected_frontier(&self) -> crate::HostSelectedObservationFrontier {
+        match &self.0 {
+            CanonicalSelectedModuleDefinitionObservationError::Routes(error) => {
+                selected_routes_observation_frontier(error)
+            }
+        }
+    }
+}
 
 #[rustfmt::skip]
 #[derive(Clone, Copy)]
@@ -3404,8 +3528,19 @@ pub struct HostSelectedExtensionDefinitionLoadRequest {
     unique_name: CanonicalRepoName,
     base_mapping: HostSelectedRepositoryMapping,
     mapping: HostSelectedRepositoryMapping,
+    source: HostSelectedExtensionDefinitionSource,
     imports: Arc<[HostSelectedExtensionDefinitionImport]>,
     overrides: Arc<[HostSelectedExtensionDefinitionOverride]>,
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum HostSelectedExtensionDefinitionSource {
+    Root,
+    Selected {
+        definition: HostCanonicalSelectedModuleDefinition,
+        apparent_repo: ApparentRepoName,
+    },
 }
 
 #[doc(hidden)]
@@ -3482,6 +3617,40 @@ impl HostSelectedExtensionDefinitionLoadRequest {
     ) {
         (&self.imports, &self.overrides)
     }
+
+    #[doc(hidden)]
+    pub fn source(&self) -> &HostSelectedExtensionDefinitionSource {
+        &self.source
+    }
+}
+
+pub(super) fn selected_extension_definition_source(
+    routes: &Arc<HostSelectedModuleRoutes>,
+    mapping: &HostSelectedRepositoryMapping,
+    label: &CanonicalLabel,
+) -> Option<HostSelectedExtensionDefinitionSource> {
+    let canonical_repo = label.package().repo();
+    if canonical_repo.is_root() {
+        return Some(HostSelectedExtensionDefinitionSource::Root);
+    }
+    let ordinal = match find_canonical_route_ordinal(canonical_repo, routes.entries.iter()) {
+        CanonicalRouteMatch::Unique(ordinal) => ordinal,
+        CanonicalRouteMatch::Missing | CanonicalRouteMatch::Duplicate { .. } => return None,
+    };
+    let definition = HostCanonicalSelectedModuleDefinition {
+        routes: Arc::new(Ok((**routes).clone())),
+        ordinal,
+    };
+    (definition.view().kind() == HostCanonicalSelectedModuleKind::SelectedRegistry).then_some(())?;
+    let apparent_repo = mapping
+        .order
+        .iter()
+        .find(|apparent| mapping.entries.get(*apparent) == Some(canonical_repo))
+        .cloned()?;
+    Some(HostSelectedExtensionDefinitionSource::Selected {
+        definition,
+        apparent_repo,
+    })
 }
 
 #[doc(hidden)]
@@ -3568,7 +3737,6 @@ fn selected_extension_definition_load_requests(
     let unsupported = predecessor.usages.iter().find(|usage| {
         !matches!(usage.owner, HostGraphModuleKey::Root)
             || usage.id.isolation.is_some()
-            || !usage.id.bzl_file.package().repo().is_root()
             || usage.id.extension_name.split_ascii_whitespace().count() != 1
     });
     if let Some(usage) = unsupported {
@@ -3607,6 +3775,19 @@ fn selected_extension_definition_load_requests(
             continue;
         }
         seen.insert(usage.id.clone(), usage.unique_name.clone());
+        let source = selected_extension_definition_source(
+            &predecessor.routes,
+            root_mapping,
+            &usage.id.bzl_file,
+        )
+        .ok_or_else(|| {
+            HostSelectedExtensionDefinitionLoadRequestsError(
+                HostSelectedExtensionDefinitionLoadRequestsErrorInner::Unsupported {
+                    owner: usage.owner.clone(),
+                    id: usage.id.clone(),
+                },
+            )
+        })?;
         let imports = predecessor
             .usages
             .iter()
@@ -3630,6 +3811,7 @@ fn selected_extension_definition_load_requests(
             unique_name: usage.unique_name.clone(),
             base_mapping: root_base_mapping.clone(),
             mapping: root_mapping.clone(),
+            source,
             imports,
             overrides,
         });
@@ -4679,6 +4861,17 @@ enum RootRepositoryMappingObservationError {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct HostRootRepositoryMappingObservationError(RootRepositoryMappingObservationError);
 
+impl HostRootRepositoryMappingObservationError {
+    #[doc(hidden)]
+    pub fn selected_frontier(&self) -> crate::HostSelectedObservationFrontier {
+        match &self.0 {
+            RootRepositoryMappingObservationError::Mappings(error) => {
+                extension_mappings_observation_frontier(error)
+            }
+        }
+    }
+}
+
 type RootRepositoryMappingDriverOutcome = SourcePreparationOutcome<
     Result<
         (RootRepositoryMappingResult, PathObservationEpoch),
@@ -4864,6 +5057,36 @@ impl Key for HostRootRepositoryMappingObservationKey {
 
     fn validity(value: &Self::Value) -> bool {
         value.is_complete()
+    }
+}
+
+#[cfg(test)]
+fn selected_registry_proof_spec(module: HostGraphModuleKey) -> HostSelectedRegistryRepoSpec {
+    HostSelectedRegistryRepoSpec {
+        module,
+        policy: SelectedRegistryPolicyIdentity {
+            original_registry: "https://registry.invalid".into(),
+            resolved_registry: "https://registry.invalid".into(),
+            scheme: HostRegistryScheme::Https,
+            known_file_hashes_mode: RegistryKnownFileHashesMode::UseAndUpdate,
+            vendor_directory: None,
+            module_mirrors: Arc::from([]),
+        },
+        module_file_attempts: Arc::from([]),
+        source_json: RegistryFileObservation {
+            url: RegistryFileUrl::new("https://registry.invalid/source.json"),
+            value: RegistryFileValue::NotFound {
+                source: crate::RegistryNotFoundSource::Io404,
+                recordable_remote_expectation: None,
+            },
+        },
+        registry_json: None,
+        effective_override: HostEffectiveModuleOverride::None,
+        repo_spec: repo_spec(
+            "@@bazel_tools//tools/build_defs/repo:http.bzl",
+            "http_archive",
+            SmallMap::new(),
+        ),
     }
 }
 
@@ -5396,6 +5619,7 @@ mod tests {
             crate::RegistryRequestGeneration(generation),
         )
         .unwrap();
+        let mut updater = updater.commit().await.into_updater();
         crate::inject_root_package_policy_inputs(
             &mut updater,
             crate::RootPackagePolicyInputs::new(
@@ -7088,6 +7312,126 @@ mod tests {
         }
     }
 
+    fn selected_source_proof_request() -> HostSelectedExtensionDefinitionLoadRequest {
+        let owner = route_key("owner", "1");
+        let mapped = route_key("mapped_dep", "1");
+        let builtin = route_key("bazel_tools", "1");
+        let mut owner_entry = route_module("owner", "1", "owner_self", true);
+        let dependencies: Arc<[_]> = [
+            ("mapped_dep", mapped.clone()),
+            ("bazel_tools", builtin.clone()),
+        ]
+        .into_iter()
+        .map(
+            |(apparent, key)| crate::selected_graph::HostGraphDependency {
+                apparent_name: Some(apparent.into()),
+                key,
+            },
+        )
+        .collect();
+        owner_entry.dependencies = dependencies.clone();
+        owner_entry.original_dependencies = dependencies;
+        let routes = Arc::new(
+            selected_routes(
+                &route_graph([
+                    route_root([("owner_alias", owner.clone())], Some("root_self")),
+                    owner_entry,
+                    route_module("mapped_dep", "1", "mapped_self", true),
+                    route_module("bazel_tools", "1", "bazel_tools", false),
+                ]),
+                &HostSelectedRegistryRepoSpecs {
+                    entries: Arc::from([route_spec(owner), route_spec(mapped)]),
+                },
+            )
+            .unwrap(),
+        );
+        let mappings = selected_extension_mappings(
+            routes.clone(),
+            Arc::from([root_usage(
+                "@owner_alias//:extension.bzl",
+                "extension",
+                test_proxy("probe", []),
+                false,
+                [],
+            )]),
+        )
+        .unwrap();
+        let requests = selected_extension_definition_load_requests(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            Arc::new(mappings),
+        )
+        .unwrap();
+        requests.requests[0].clone()
+    }
+
+    #[test]
+    fn selected_definition_source_is_request_owned_and_route_structural() {
+        let request = selected_source_proof_request();
+        let source = request.source();
+        let route = crate::RootRepositoryRoute::for_selected_extension_definition(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            source,
+        )
+        .unwrap();
+        assert_eq!(route.module_name(), "owner");
+        assert_eq!(route.canonical_repo().as_str(), "owner+");
+        assert_eq!(route.apparent_repo().as_str(), "owner_alias");
+        let child = route
+            .selected_bzl_load_route(&ApparentRepoName::new("mapped_dep").unwrap())
+            .unwrap();
+        assert_eq!(
+            (child.module_name(), child.canonical_repo().as_str()),
+            ("mapped_dep", "mapped_dep+")
+        );
+        assert!(
+            route
+                .selected_bzl_load_route(&ApparentRepoName::new("bazel_tools").unwrap())
+                .unwrap()
+                .is_builtin_bazel_tools()
+        );
+        assert!(
+            route
+                .selected_bzl_load_route(&ApparentRepoName::new("missing").unwrap())
+                .is_none()
+        );
+
+        let HostSelectedExtensionDefinitionSource::Selected {
+            definition,
+            apparent_repo,
+        } = source
+        else {
+            panic!("external request must retain selected source")
+        };
+        let mut changed = definition.clone();
+        let mut entries = changed.routes.as_ref().as_ref().unwrap().entries.to_vec();
+        entries[2]
+            .registry_repo_spec
+            .as_mut()
+            .unwrap()
+            .repo_spec
+            .rule_id
+            .rule_name = "changed".into();
+        changed.routes = Arc::new(Ok(HostSelectedModuleRoutes {
+            entries: entries.into(),
+        }));
+        let changed = HostSelectedExtensionDefinitionSource::Selected {
+            definition: changed,
+            apparent_repo: apparent_repo.clone(),
+        };
+        let changed = crate::RootRepositoryRoute::for_selected_extension_definition(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            &changed,
+        )
+        .unwrap();
+        let restored = crate::RootRepositoryRoute::for_selected_extension_definition(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            source,
+        )
+        .unwrap();
+        assert_ne!(route, changed);
+        assert_eq!(route, restored);
+    }
+
     #[test]
     fn pure_extension_ids_group_isolate_collide_and_map_mvo_contexts() {
         let v1 = route_key("dep", "1");
@@ -7597,6 +7941,7 @@ mod tests {
                 order: Arc::from([]),
                 entries: Arc::new(SmallMap::new()),
             },
+            source: HostSelectedExtensionDefinitionSource::Root,
             imports: Arc::from([]),
             overrides: Arc::from([]),
         };

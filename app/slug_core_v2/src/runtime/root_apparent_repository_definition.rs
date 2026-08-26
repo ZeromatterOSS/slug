@@ -34,6 +34,7 @@ use super::generated_repository_definition::HostCanonicalRepositoryDefinitionKey
 use super::generated_repository_definition::HostCanonicalRepositoryDefinitionKind;
 use super::generated_repository_definition::HostCanonicalRepositoryDefinitionObservationError;
 use super::generated_repository_definition::HostCanonicalRepositoryDefinitionObservationKey;
+use super::generated_repository_definition::HostGeneratedRepositoryEffectSeed;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(super) struct HostRootApparentRepositoryDefinition {
@@ -54,6 +55,7 @@ pub(super) struct HostRootApparentRepositoryDefinitionView<'a> {
     kind: HostRootApparentRepositoryDefinitionKind,
     repo_spec: Option<&'a RepoSpec>,
     local_path_policy: HostRepositoryLocalPathPolicy,
+    generated_effect_seed: Option<HostGeneratedRepositoryEffectSeed<'a>>,
 }
 fn definition_policy_matches(
     kind: HostRootApparentRepositoryDefinitionKind,
@@ -94,6 +96,7 @@ impl HostRootApparentRepositoryDefinition {
             kind,
             repo_spec: definition.repo_spec(),
             local_path_policy,
+            generated_effect_seed: definition.generated_effect_seed(),
         })
     }
 }
@@ -112,6 +115,9 @@ impl<'a> HostRootApparentRepositoryDefinitionView<'a> {
     }
     pub(super) fn local_path_policy(self) -> HostRepositoryLocalPathPolicy {
         self.local_path_policy
+    }
+    pub(super) fn generated_effect_seed(self) -> Option<HostGeneratedRepositoryEffectSeed<'a>> {
+        self.generated_effect_seed
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -667,7 +673,7 @@ pub(super) mod tests {
     }
 
     #[derive(Default)]
-    struct CompositionTracker {
+    pub(in crate::runtime) struct CompositionTracker {
         composition: Mutex<Vec<ActivationKind>>,
         mapping: Mutex<Vec<ActivationKind>>,
         definition: Mutex<Vec<ActivationKind>>,
@@ -844,11 +850,12 @@ pub(super) mod tests {
         transaction(dice, module, extension, present, Some(tracker)).await
     }
 
-    async fn local_materialized_transaction(
+    pub(in crate::runtime) async fn local_materialized_transaction(
         dice: &Arc<Dice>,
         workspace: &NormalizedAbsolutePath,
         request: Arc<RepositoryMaterializationRequest>,
         tracker: Arc<CompositionTracker>,
+        success: RepositoryMaterializationSuccess,
     ) -> dice::DiceTransaction {
         let mut updater = dice.updater_with_data(UserComputationData {
             cycle_detector: Some(slug_loading_v2::bzl_load_cycle_detector()),
@@ -864,9 +871,7 @@ pub(super) mod tests {
                     workspace.clone(),
                     [RepositoryMaterializationEpochEntry {
                         request,
-                        result: RepositoryMaterializationResult::Success(
-                            RepositoryMaterializationSuccess::Local,
-                        ),
+                        result: RepositoryMaterializationResult::Success(success),
                     }],
                 )
                 .unwrap(),
@@ -1143,7 +1148,7 @@ pub(super) mod tests {
             if let SourcePreparationOutcome::Need(need) = &observed {
                 assert_eq!(family, RealRootDefinitionFamily::SelectedNonregistry);
                 let request = need.repository_materializations().values().next().unwrap().clone();
-                observed_tx = local_materialized_transaction(&observed_dice, &workspace, request, observed_tracker.clone()).await;
+                observed_tx = local_materialized_transaction(&observed_dice, &workspace, request, observed_tracker.clone(), RepositoryMaterializationSuccess::Local).await;
                 observed_tracker.clear(); observed = observed_tx.compute(&key).await.unwrap();
             }
             let carrier = observed_value(&observed);
@@ -1179,7 +1184,7 @@ pub(super) mod tests {
             if let SourcePreparationOutcome::Need(need) = &direct_mapping {
                 assert_eq!(family, RealRootDefinitionFamily::SelectedNonregistry);
                 let request = need.repository_materializations().values().next().unwrap().clone();
-                direct_tx = local_materialized_transaction(&direct_dice, &workspace, request, direct_tracker.clone()).await;
+                direct_tx = local_materialized_transaction(&direct_dice, &workspace, request, direct_tracker.clone(), RepositoryMaterializationSuccess::Local).await;
                 direct_tracker.clear(); direct_mapping = direct_tx.compute(&mapping_key).await.unwrap();
             }
             assert!(matches!(direct_mapping, SourcePreparationOutcome::Complete(Ok(_))));
@@ -1194,7 +1199,7 @@ pub(super) mod tests {
             if let SourcePreparationOutcome::Need(need) = &legacy {
                 assert_eq!(family, RealRootDefinitionFamily::SelectedNonregistry);
                 let request = need.repository_materializations().values().next().unwrap().clone();
-                legacy_tx = local_materialized_transaction(&legacy_dice, &workspace, request, legacy_tracker).await;
+                legacy_tx = local_materialized_transaction(&legacy_dice, &workspace, request, legacy_tracker, RepositoryMaterializationSuccess::Local).await;
                 legacy = legacy_tx.compute(&legacy_key).await.unwrap();
             }
             let SourcePreparationOutcome::Complete(legacy_result) = legacy else { panic!("{family:?}: legacy must complete") };

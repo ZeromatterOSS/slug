@@ -45,6 +45,7 @@ use slug_workspace_v2::ResolvedPathState;
 use crate::RootPackageLookupInputsProjectionKey;
 use crate::RootPackagePolicyProjectionError;
 use crate::RootRepositoryRoute;
+use crate::RootRepositorySource;
 use crate::host_file::HostFileBytes;
 use crate::host_file::HostFileBytesKey;
 use crate::host_file::HostFileBytesObservationKey;
@@ -1093,37 +1094,47 @@ fn finish_repository_package_source_support(
     }
 }
 
+fn requires_direct_local_module_support(route: &RootRepositoryRoute) -> bool {
+    match route.source() {
+        RootRepositorySource::Generated { .. } | RootRepositorySource::SelectedRegistry(_) => false,
+        RootRepositorySource::DirectLocal(_) | RootRepositorySource::BuiltinBazelTools(_) => true,
+    }
+}
+
 async fn drive_repository_package_source(
     key: &RepositoryPackageSourceKey,
     ctx: &mut DiceComputations<'_>,
     mode: RepositoryPackageSourceMode,
 ) -> RepositoryPackageSourceDriverOutcome {
-    let (support, mut observations) = match mode {
-        RepositoryPackageSourceMode::Legacy => {
-            match direct_local_module_support(ctx, &key.route).await {
-                SourcePreparationOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                SourcePreparationOutcome::Complete(result) => {
-                    (result, PathObservationEpoch::empty())
-                }
-            }
-        }
-        RepositoryPackageSourceMode::Observed => {
-            match repository_package_source_observed_child(
-                direct_local_module_support_observed(ctx, &key.route).await,
-            ) {
-                ControlFlow::Break(outcome) => return outcome,
-                ControlFlow::Continue(observed) => {
-                    (observed.result().dupe(), observed.observations().dupe())
+    let mut observations = PathObservationEpoch::empty();
+    if requires_direct_local_module_support(&key.route) {
+        let (support, prefix) = match mode {
+            RepositoryPackageSourceMode::Legacy => {
+                match direct_local_module_support(ctx, &key.route).await {
+                    SourcePreparationOutcome::Need(need) => {
+                        return SourcePreparationOutcome::Need(need);
+                    }
+                    SourcePreparationOutcome::Complete(result) => {
+                        (result, PathObservationEpoch::empty())
+                    }
                 }
             }
-        }
-    };
-    observations = match finish_repository_package_source_support(support.as_ref(), observations) {
-        ControlFlow::Break(outcome) => return outcome,
-        ControlFlow::Continue(observations) => observations,
-    };
+            RepositoryPackageSourceMode::Observed => {
+                match repository_package_source_observed_child(
+                    direct_local_module_support_observed(ctx, &key.route).await,
+                ) {
+                    ControlFlow::Break(outcome) => return outcome,
+                    ControlFlow::Continue(observed) => {
+                        (observed.result().dupe(), observed.observations().dupe())
+                    }
+                }
+            }
+        };
+        observations = match finish_repository_package_source_support(support.as_ref(), prefix) {
+            ControlFlow::Break(outcome) => return outcome,
+            ControlFlow::Continue(observations) => observations,
+        };
+    }
 
     let lookup_key =
         ExternalRepositoryPackageLookupKey::new(key.route.clone(), key.package.clone())
@@ -2202,9 +2213,15 @@ mod tests {
     #[cfg(unix)]
     use super::RootPackageSourceObservationKey;
     #[cfg(unix)]
+    use super::requires_direct_local_module_support;
+    #[cfg(unix)]
     use crate::BzlmodCommandPolicyKey;
     #[cfg(unix)]
     use crate::BzlmodEnvironmentPolicyKey;
+    #[cfg(unix)]
+    use crate::GeneratedRepositoryFileEffectPlan;
+    #[cfg(unix)]
+    use crate::HostRepositoryLocalPathPolicy;
     #[cfg(unix)]
     use crate::LockfileMode;
     #[cfg(unix)]
@@ -2360,6 +2377,31 @@ mod tests {
                 )])),
             },
         )
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn repository_package_source_preflight_follows_route_source_polarity() {
+        let direct = local_route("dep");
+        let generated = RootRepositoryRoute::for_generated_repo_spec(
+            path("/workspace"),
+            ApparentRepoName::new("generated").unwrap(),
+            CanonicalRepoName::new("+ext+generated").unwrap(),
+            direct.repo_spec().clone(),
+            HostRepositoryLocalPathPolicy::LocalUnsupported,
+            GeneratedRepositoryFileEffectPlan::build(std::iter::empty::<(
+                CompactString,
+                Arc<[u8]>,
+                bool,
+            )>())
+            .unwrap(),
+        )
+        .unwrap();
+        let builtin = RootRepositoryRoute::builtin_for_test(path("/workspace"));
+
+        assert!(requires_direct_local_module_support(&direct));
+        assert!(!requires_direct_local_module_support(&generated));
+        assert!(requires_direct_local_module_support(&builtin));
     }
 
     #[cfg(unix)]

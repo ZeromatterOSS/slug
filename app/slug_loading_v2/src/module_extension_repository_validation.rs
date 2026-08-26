@@ -18,6 +18,7 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionImport;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionOverride;
+use slug_bzlmod_v2::HostSelectedExtensionOwner;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalRepoName;
@@ -26,12 +27,20 @@ use slug_workspace_v2::PathObservationEpoch;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::module_extension::HostSelectedExtensionOwnerPureError;
+use crate::module_extension::HostSelectedExtensionOwnerPureKey;
+use crate::module_extension::HostSelectedExtensionOwnerPureObservationError;
+use crate::module_extension::HostSelectedExtensionOwnerPureObservationKey;
+use crate::module_extension::HostSelectedExtensionOwnerPureResult;
+use crate::module_extension_repository_instantiation::HostInstantiateModuleExtensionRequestError;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositories;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesError;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesForRequest;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesKey;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesObservationError;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesObservationKey;
+use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepository;
+use crate::module_extension_repository_instantiation::instantiate_request;
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -44,7 +53,6 @@ struct GeneratedSpecIter<'a> {
     repository: usize,
     remaining: usize,
 }
-
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy)]
 pub struct HostGeneratedRepositoryMapping<'a> {
@@ -61,6 +69,102 @@ impl<'a> HostGeneratedRepositoryMapping<'a> {
         self.entries
     }
 }
+
+#[doc(hidden)]
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostSelectedExtensionOwnerCertificate { pure: Arc<HostSelectedExtensionOwnerPureResult>, instantiated: HostInstantiatedModuleExtensionRepositoriesForRequest }
+#[rustfmt::skip]
+impl HostSelectedExtensionOwnerCertificate {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = (&CanonicalRepoName, &slug_bzlmod_v2::RepoSpec, &str, HostGeneratedRepositoryMapping<'_>)> {
+        self.instantiated.parts().1.iter().map(|repository| {
+            let (canonical, spec) = repository.spec_parts();
+            (canonical, spec, repository.generated_name(), HostGeneratedRepositoryMapping { context_repo: canonical, entries: self.instantiated.mapping_entries().as_ref() })
+        })
+    }
+
+    pub(crate) fn repository(
+        &self,
+        ordinal: usize,
+    ) -> Option<&HostInstantiatedModuleExtensionRepository> {
+        self.instantiated.parts().1.get(ordinal)
+    }
+}
+#[doc(hidden)]
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError);
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum PrivateOwnerCertificateError { Pure(HostSelectedExtensionOwnerPureError), Compute(CompactString), Instantiation { pure: Arc<HostSelectedExtensionOwnerPureResult>, error: HostInstantiateModuleExtensionRequestError }, Validation { pure: Arc<HostSelectedExtensionOwnerPureResult>, instantiated: HostInstantiatedModuleExtensionRepositoriesForRequest, error: HostValidateModuleExtensionRequestError } }
+#[rustfmt::skip]
+impl fmt::Display for HostSelectedExtensionOwnerCertificateError { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{self:?}") } }
+impl std::error::Error for HostSelectedExtensionOwnerCertificateError {}
+#[doc(hidden)]
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostSelectedExtensionOwnerCertificateKey { workspace: NormalizedAbsolutePath, owner: Arc<HostSelectedExtensionOwner> }
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostSelectedExtensionOwnerCertificateObservationKey(
+    HostSelectedExtensionOwnerCertificateKey,
+);
+#[rustfmt::skip]
+impl HostSelectedExtensionOwnerCertificateKey { pub fn new(workspace: NormalizedAbsolutePath, owner: Arc<HostSelectedExtensionOwner>) -> Self { Self { workspace, owner } } }
+#[rustfmt::skip]
+impl HostSelectedExtensionOwnerCertificateObservationKey { pub fn new(workspace: NormalizedAbsolutePath, owner: Arc<HostSelectedExtensionOwner>) -> Self { Self(HostSelectedExtensionOwnerCertificateKey::new(workspace, owner)) } }
+#[rustfmt::skip]
+impl fmt::Display for HostSelectedExtensionOwnerCertificateKey { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "host-selected-extension-owner-certificate:{}:{:?}", self.workspace, self.owner) } }
+#[rustfmt::skip]
+impl fmt::Display for HostSelectedExtensionOwnerCertificateObservationKey { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "observed-{}", self.0) } }
+type OwnerCertificateResult =
+    Arc<Result<HostSelectedExtensionOwnerCertificate, HostSelectedExtensionOwnerCertificateError>>;
+#[doc(hidden)]
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedHostSelectedExtensionOwnerCertificate { result: OwnerCertificateResult, observations: PathObservationEpoch }
+impl ObservedHostSelectedExtensionOwnerCertificate {
+    pub fn result(&self) -> &OwnerCertificateResult {
+        &self.result
+    }
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct HostSelectedExtensionOwnerCertificateObservationError(
+    HostSelectedExtensionOwnerPureObservationError,
+);
+#[derive(Clone, Copy)]
+enum OwnerCertificateMode {
+    Legacy,
+    Observed,
+}
+type OwnerCertificateDriver = SourcePreparationOutcome<
+    Result<
+        (OwnerCertificateResult, PathObservationEpoch),
+        HostSelectedExtensionOwnerCertificateObservationError,
+    >,
+>;
+#[rustfmt::skip]
+async fn compute_owner_certificate(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOwnerCertificateKey, mode: OwnerCertificateMode) -> OwnerCertificateDriver {
+    let child = match mode {
+        OwnerCertificateMode::Legacy => match ctx.compute(&HostSelectedExtensionOwnerPureKey::new(key.workspace.clone(), key.owner.clone())).await { Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need), Ok(SourcePreparationOutcome::Complete(value)) => (value, PathObservationEpoch::empty()), Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Compute(error.to_string().into())))), PathObservationEpoch::empty()))) },
+        OwnerCertificateMode::Observed => match ctx.compute(&HostSelectedExtensionOwnerPureObservationKey::new(key.workspace.clone(), key.owner.clone())).await { Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need), Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostSelectedExtensionOwnerCertificateObservationError(error))), Ok(SourcePreparationOutcome::Complete(Ok(value))) => (value.result().dupe(), value.observations().dupe()), Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Compute(error.to_string().into())))), PathObservationEpoch::empty()))) },
+    };
+    let (pure, observations) = child;
+    let pure = match pure.as_ref() { Ok(value) => Arc::new(value.clone()), Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Pure(error.clone())))), observations))) };
+    let instantiated = match instantiate_request(&pure.receipt) { Ok(value) => value, Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Instantiation { pure, error }))), observations))) };
+    let result = match validate_request(&pure.receipt, &instantiated) { Ok(()) => Ok(HostSelectedExtensionOwnerCertificate { pure, instantiated }), Err(error) => Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Validation { pure, instantiated, error })) };
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+#[async_trait]
+#[rustfmt::skip]
+impl Key for HostSelectedExtensionOwnerCertificateKey { type Value = SourcePreparationOutcome<OwnerCertificateResult>; async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value { match compute_owner_certificate(ctx, self, OwnerCertificateMode::Legacy).await { SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need), SourcePreparationOutcome::Complete(Ok((result, _))) => SourcePreparationOutcome::Complete(result), SourcePreparationOutcome::Complete(Err(_)) => unreachable!() } } fn equality(x: &Self::Value, y: &Self::Value) -> bool { x.complete_eq(y) } fn validity(value: &Self::Value) -> bool { value.is_complete() } }
+#[async_trait]
+#[rustfmt::skip]
+impl Key for HostSelectedExtensionOwnerCertificateObservationKey { type Value = SourcePreparationOutcome<Result<ObservedHostSelectedExtensionOwnerCertificate, HostSelectedExtensionOwnerCertificateObservationError>>; async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value { match compute_owner_certificate(ctx, &self.0, OwnerCertificateMode::Observed).await { SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need), SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(Err(error)), SourcePreparationOutcome::Complete(Ok((result, observations))) => SourcePreparationOutcome::Complete(Ok(ObservedHostSelectedExtensionOwnerCertificate { result, observations })) } } fn equality(x: &Self::Value, y: &Self::Value) -> bool { x.complete_eq(y) } fn validity(value: &Self::Value) -> bool { value.is_complete() } }
 
 impl HostValidatedGeneratedRepositorySpecs {
     pub fn iter(
@@ -151,6 +255,15 @@ pub(crate) enum HostModuleExtensionValidationError {
     MissingImport,
     MissingOverride,
     InjectCollision,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostValidateModuleExtensionRequestError {
+    Join(CompactString),
+    Validation {
+        offender: HostModuleExtensionValidationOffender,
+        error: HostModuleExtensionValidationError,
+    },
 }
 
 #[doc(hidden)]
@@ -376,58 +489,74 @@ fn validate_repositories(
         .zip(extensions.iter())
         .enumerate()
     {
-        let (request, repositories) = current.parts();
-        if receipt.request != *request {
-            return Err(PrivateValidationError::Join {
-                predecessor,
-                message: "invoked and instantiated extension requests differ".into(),
-            });
-        }
-        let generated = repositories
-            .iter()
-            .map(|repository| CompactString::from(repository.generated_name()))
-            .collect::<SmallSet<_>>();
-        let (imports, overrides) = request.validation_parts();
-
-        for import in imports {
-            let (_, exported, _) = import.parts();
-            if !generated.contains(exported)
-                && !overrides
-                    .iter()
-                    .any(|override_value| override_value.parts().0 == exported)
-            {
-                return Err(validation_error(
-                    predecessor.clone(),
-                    validated,
-                    current,
-                    HostModuleExtensionValidationOffender::Import(import.clone()),
-                    HostModuleExtensionValidationError::MissingImport,
-                ));
-            }
-        }
-        for override_value in overrides {
-            let (name, _, must_exist) = override_value.parts();
-            let exists = generated.contains(name);
-            let error = if must_exist && !exists {
-                Some(HostModuleExtensionValidationError::MissingOverride)
-            } else if !must_exist && exists {
-                Some(HostModuleExtensionValidationError::InjectCollision)
-            } else {
-                None
-            };
-            if let Some(error) = error {
-                return Err(validation_error(
-                    predecessor.clone(),
-                    validated,
-                    current,
-                    HostModuleExtensionValidationOffender::Override(override_value.clone()),
-                    error,
-                ));
+        if let Err(error) = validate_request(receipt, current) {
+            match error {
+                HostValidateModuleExtensionRequestError::Join(message) => {
+                    return Err(PrivateValidationError::Join {
+                        predecessor: predecessor.clone(),
+                        message,
+                    });
+                }
+                HostValidateModuleExtensionRequestError::Validation { offender, error } => {
+                    return Err(validation_error(
+                        predecessor.clone(),
+                        validated,
+                        current,
+                        offender,
+                        error,
+                    ));
+                }
             }
         }
     }
 
     Ok(HostValidatedGeneratedRepositorySpecs { predecessor })
+}
+
+pub(crate) fn validate_request(
+    receipt: &crate::module_extension::HostPureModuleExtensionInvocationReceipt,
+    current: &HostInstantiatedModuleExtensionRepositoriesForRequest,
+) -> Result<(), HostValidateModuleExtensionRequestError> {
+    let (request, repositories) = current.parts();
+    if receipt.request != *request {
+        return Err(HostValidateModuleExtensionRequestError::Join(
+            "invoked and instantiated extension requests differ".into(),
+        ));
+    }
+    let generated = repositories
+        .iter()
+        .map(|repository| CompactString::from(repository.generated_name()))
+        .collect::<SmallSet<_>>();
+    let (imports, overrides) = request.validation_parts();
+    for import in imports {
+        let (_, exported, _) = import.parts();
+        if !generated.contains(exported)
+            && !overrides.iter().any(|value| value.parts().0 == exported)
+        {
+            return Err(HostValidateModuleExtensionRequestError::Validation {
+                offender: HostModuleExtensionValidationOffender::Import(import.clone()),
+                error: HostModuleExtensionValidationError::MissingImport,
+            });
+        }
+    }
+    for value in overrides {
+        let (name, _, must_exist) = value.parts();
+        let exists = generated.contains(name);
+        let error = if must_exist && !exists {
+            Some(HostModuleExtensionValidationError::MissingOverride)
+        } else if !must_exist && exists {
+            Some(HostModuleExtensionValidationError::InjectCollision)
+        } else {
+            None
+        };
+        if let Some(error) = error {
+            return Err(HostValidateModuleExtensionRequestError::Validation {
+                offender: HostModuleExtensionValidationOffender::Override(value.clone()),
+                error,
+            });
+        }
+    }
+    Ok(())
 }
 
 fn validation_error(

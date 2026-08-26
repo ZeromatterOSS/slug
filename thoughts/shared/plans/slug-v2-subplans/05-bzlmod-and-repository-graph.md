@@ -3970,3 +3970,34 @@ Pinned Zabel guides only structural producer-owned mapping and immutable
 resolved-view consumption. Bazel 9.2 alone defines repository mapping behavior.
 Implement only the eight authorized files and do not activate selected routes
 for repository packages, query, core source preparation or generated owners.
+
+### Selected route succeeds; native BCR archive frontier exposed (2026-08-25)
+
+The retained route candidate resolves the root apparent name to the accepted
+canonical selected definition and carries its complete structural `RepoSpec`.
+The real command now requests `rules_rust+`, proving the old Unsupported route
+terminal is gone without activating ordinary callers.
+
+The request correctly preserves Bazel 9.2's archive fields: HTTPS URL, SRI,
+empty remote patch/overlay maps, registry MODULE URL/integrity and patch strip.
+Core's older native materializer rejects that complete shape because its
+admitted fixture slice accepts only one local URL, hexadecimal `sha256`, exact
+tar type and a private ustar subset. Do not erase empty or registry-MODULE
+fields in Bzlmod to fit that consumer. Freeze Rust and audit the natural physical
+archive owner. Zabel remains guidance for semantic-view/physical-realization
+separation only.
+
+### BCR archive frontier audit accepted; bounded design selected (2026-08-25)
+
+The accepted route structurally preserves the complete Bazel 9.2 archive
+`RepoSpec`; no Bzlmod correction is required. The exact rules_rust source needs
+ordered HTTPS fallback, SHA-256 SRI, gzip/GNU-tar regular/directory extraction,
+executable modes and independently verified registry MODULE replacement. Empty
+patch/overlay maps are exact no-ops; nonempty forms remain deferred.
+
+Run only `WP-5-6-7A-selected-registry-bcr-archive-materialization-design`.
+Design one private physical archive owner beneath the semantic selected view,
+one lawful async transport boundary and one implementation packet. Do not
+erase fields, infer paths, introduce a second materializer or widen generic
+repository rules. Pinned Zabel supplies this semantic/physical ownership
+guidance only; Bazel 9.2 remains behavioral authority.

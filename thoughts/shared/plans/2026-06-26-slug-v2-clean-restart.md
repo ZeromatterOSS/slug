@@ -30,18 +30,52 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; selected-registry source owner accepted** | generated `repository_ctx.file` vertical is accepted through `3ac0a85b`; fixture hygiene is reset through that commit; the exact 46-file Bazel 9.2 selected-registry source oracle plus the accepted request-owned selected-source implementation prove root association, producer-local cross-package and mapped loads, clean export, loaded-definition projection and pure reacquisition | after the parked M8 wildcard registration, root BUILD evaluation cannot load `@rules_rust//rust:defs.bzl`; `repository_rule(doc=...)`, collection schemas and later breadth remain downstream | implement only `WP-4-5-6-7A-root-package-external-bzl-load-owner-implementation`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; root selected external loading accepted; native BCR archive design active** | generated `repository_ctx.file` vertical is accepted through `3ac0a85b`; the selected-registry source owner proves producer-local self/mapped loads; the accepted root route/load vertical consumes that structural source and advances real rules_rust to native materialization without activating ordinary callers | the sole materializer rejects Bazel's complete BCR archive `RepoSpec`; HTTPS/SRI/gzip-GNU-tar/registry-MODULE ownership needs one bounded design before Rust | design only `WP-5-6-7A-selected-registry-bcr-archive-materialization-design`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-5-6-7A-root-package-external-bzl-load-owner-implementation](./slug-v2-subplans/current-packet.md).
+[WP-5-6-7A-selected-registry-bcr-archive-materialization-design](./slug-v2-subplans/current-packet.md).
 
-Add root-BUILD-only selected-registry admission to the existing structural
-root route key, then let root package loading consume that route through the
-existing external-Bzl child. Ordinary query/core/source route consumers remain
-byte-equivalent and path-outer-only.
+Design one bounded async/native owner for the exact rules_rust BCR archive
+slice, including transport, extraction, session lifetime and module-file
+replacement. Select one implementation packet or `REPLAN`; authorize no Rust.
+
+### M7 root selected external loading accepted; archive design active (2026-08-25)
+
+The reviewed audit accepts the frozen eight-file route/load vertical against
+its actual already-materialized selected-source surface. The direct transaction
+proves structural route identity, ordered external-Bzl loading, recursive
+producer views and lifecycle; broad Rust validation passes. The corrected real
+command proof advances from the old Host-loader rejection to the exact
+`rules_rust+` materialization request and drops the false downstream terminal.
+
+The sole core materializer remains the next owner. Its local tar fixture slice
+cannot consume Bazel's HTTPS/SRI/gzip-GNU-tar request or registry MODULE
+replacement. Run only the docs design packet for a bounded private archive
+owner and lawful async/session boundary. Pinned Bazel 9.2 owns behavior; pinned
+`../zabel` guides semantic-view/physical-realization separation only. M7 stays
+partial and M7A -> M8 -> M7B is unchanged.
+
+### M7 root external-load proof REPLAN exposes native archive frontier (2026-08-25)
+
+The retained eight-file candidate passes its focused and broad Rust proof and
+keeps ordinary route callers closed. With only the parked wildcard registration
+removed, real rules_rust now advances beyond the prior root Host-loader
+rejection and demands the structural `rules_rust+` source.
+
+The next command-visible terminal is earlier than the packet predicted: native
+materialization rejects Bazel's standard BCR archive `RepoSpec`, including SRI,
+empty remote patch/overlay maps and registry MODULE replacement facts. A local-
+path disguise is also rejected and is not equivalent. The candidate therefore
+remains unaccepted while a docs-only audit corrects its proof boundary and
+selects one natural archive/materializer successor.
+
+Pinned Bazel 9.2 owns archive behavior. Pinned `../zabel` guides only the
+separation of semantic repository views from nonsemantic physical realization;
+no Zig transport, archive, cache, path or behavior is adopted. M7 remains
+partial and M7A -> M8 -> M7B remains unchanged.
 
 ### M7 selected-registry source oracle accepted; corrected owner active (2026-08-25)
 

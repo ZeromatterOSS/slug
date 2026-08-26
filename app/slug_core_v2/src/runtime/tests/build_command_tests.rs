@@ -3801,3 +3801,141 @@ probe = rule(implementation = _impl)
             |(demand, result)| Arc::ptr_eq(result, snapshot.path_observations.get(demand).unwrap())
         ));
     }
+
+    #[tokio::test]
+    async fn archive_override_restores_unsupported_route_after_nonregistry_bridge_fallback() {
+        use crate::runtime::generated_repository_definition::tests::transaction;
+        use crate::runtime::generated_repository_definition::tests::EXTENSION_A;
+        use crate::runtime::generated_repository_definition::tests::WORKSPACE;
+        use crate::runtime::root_apparent_repository_definition::tests::CompositionTracker;
+        use crate::runtime::root_apparent_repository_definition::tests::local_materialized_transaction;
+
+        let module = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\narchive_override(module_name='dep', urls=['https://example.invalid/dep.tgz'], integrity='sha256-archive')\n";
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let apparent = slug_identity_v2::ApparentRepoName::new("dep").unwrap();
+        let route_key = slug_bzlmod_v2::RootRepositoryRouteKey::new(
+            workspace.clone(),
+            apparent,
+        )
+        .unwrap();
+        let build = BuildCommandRootKey::new(
+            workspace.clone(),
+            &[TargetPattern::parse("@dep//pkg:source.txt").unwrap()],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        let immutable = slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
+            source_identity: Arc::from("sha256-archive"),
+            generation_root: std::path::PathBuf::from("/immutable/archive-override"),
+            observation_instance: slug_workspace_v2::PathObservationInstanceId::new(73),
+        };
+        let materialized_epoch = |epoch: &PathObservationEpoch| {
+            let demand = |path, operation| {
+                PathObservationDemand::new(
+                    PathObservationNamespace::Materialization(
+                        slug_workspace_v2::PathObservationInstanceId::new(73),
+                    ),
+                    NormalizedAbsolutePath::new(path).unwrap(),
+                    operation,
+                )
+            };
+            let directory = || {
+                Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                    slug_workspace_v2::PathLstat::new(
+                        PathNodeKind::Directory,
+                        1,
+                        1,
+                        1,
+                        1,
+                        0o755,
+                    ),
+                )))
+            };
+            PathObservationEpoch::from_shared(
+                epoch
+                    .observations()
+                    .iter()
+                    .map(|(demand, result)| (demand.dupe(), result.dupe()))
+                    .chain([
+                        (demand("/", PathObservationOperation::Lstat), directory()),
+                        (demand("/immutable", PathObservationOperation::Lstat), directory()),
+                        (demand("/immutable/archive-override", PathObservationOperation::Lstat), directory()),
+                        (demand("/immutable/archive-override/MODULE.bazel", PathObservationOperation::Lstat), Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(slug_workspace_v2::PathLstat::new(PathNodeKind::RegularFile, 1, 1, 1, 1, 0o644))))),
+                        (demand("/immutable/archive-override/MODULE.bazel", PathObservationOperation::FileBytes), Arc::new(PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(&b"module(name='dep', version='1')\n"[..]))))),
+                    ]),
+            )
+            .unwrap()
+        };
+
+        let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let legacy_tracker = Arc::new(CompositionTracker::default());
+        let mut legacy = transaction(&legacy_dice, module, EXTENSION_A, true, Some(legacy_tracker.clone())).await;
+        let original = legacy.compute(&route_key).await.unwrap();
+        let PreparationOutcome::Complete(original) = original else {
+            panic!("archive route must complete before the bridge")
+        };
+        let original = original.as_ref().as_ref().unwrap_err().clone();
+        assert!(original.is_generated_route_fallback());
+        let PreparationOutcome::Need(need) = legacy.compute(&build).await.unwrap() else {
+            panic!("legacy archive bridge must request materialization")
+        };
+        let request = need.repository_materializations().values().next().unwrap().clone();
+        let mut legacy = local_materialized_transaction(&legacy_dice, &workspace, request, legacy_tracker, immutable.clone()).await;
+        let epoch = legacy.compute(&PathObservationEpochKey).await.unwrap();
+        let epoch = materialized_epoch(&epoch);
+        let mut updater = legacy_dice.updater();
+        updater.changed_to(vec![(PathObservationEpochKey, epoch)]).unwrap();
+        let mut legacy = updater.commit().await;
+        let legacy_outcome = legacy.compute(&build).await.unwrap();
+        let PreparationOutcome::Complete(legacy) = legacy_outcome else {
+            panic!("legacy archive bridge must complete after materialization: {legacy_outcome:?}")
+        };
+        let legacy = legacy.as_ref().as_ref().unwrap_err();
+        assert!(matches!(&legacy.kind, BuildCommandErrorKind::RepositoryRoute(error) if error.to_string() == original.to_string()));
+        assert!(legacy.source_certificate().is_none());
+
+        let observed_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let observed_tracker = Arc::new(CompositionTracker::default());
+        let mut observed = transaction(&observed_dice, module, EXTENSION_A, true, Some(observed_tracker.clone())).await;
+        let observed_key = BuildCommandRootObservationKey::new(build).unwrap();
+        let PreparationOutcome::Need(need) = observed.compute(&observed_key).await.unwrap() else {
+            panic!("observed archive bridge must request materialization")
+        };
+        let request = need.repository_materializations().values().next().unwrap().clone();
+        let mut observed = local_materialized_transaction(&observed_dice, &workspace, request, observed_tracker, immutable).await;
+        let epoch = observed.compute(&PathObservationEpochKey).await.unwrap();
+        let epoch = materialized_epoch(&epoch);
+        let mut updater = observed_dice.updater();
+        updater.changed_to(vec![(PathObservationEpochKey, epoch)]).unwrap();
+        let mut observed = updater.commit().await;
+        let PreparationOutcome::Complete(Ok(observed)) = observed.compute(&observed_key).await.unwrap() else {
+            panic!("observed archive bridge must complete after materialization")
+        };
+        let observed = observed.result().as_ref().as_ref().unwrap_err();
+        assert!(matches!(&observed.kind, BuildCommandErrorKind::RepositoryRoute(error) if error.to_string() == original.to_string()));
+        assert!(observed.source_certificate().is_none());
+    }
+
+    #[test]
+    fn generated_route_observed_outer_preserves_only_the_public_prefix() {
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/public-prefix").unwrap(),
+            PathObservationOperation::Lstat,
+        );
+        let result = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let prefix = PathObservationEpoch::from_shared([(demand.dupe(), result.dupe())]).unwrap();
+        let outcome = external_build_generated_route_outer(
+            slug_identity_v2::ApparentRepoName::new("generated").unwrap(),
+            GeneratedPackageRouteObservationError,
+            prefix,
+        )
+        .unwrap();
+        let PreparationOutcome::Complete(Ok((Err(error), returned))) = outcome else {
+            panic!("generated observation outer must become a complete route error")
+        };
+        assert!(matches!(error.kind, BuildCommandErrorKind::GeneratedRoute(_)));
+        assert!(error.source_certificate().is_none());
+        assert_eq!(returned.observations().len(), 1);
+        assert!(Arc::ptr_eq(returned.get(&demand).unwrap(), &result));
+    }

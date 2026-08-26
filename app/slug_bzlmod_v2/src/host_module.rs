@@ -39,6 +39,21 @@ use starlark_map::small_set::SmallSet;
 use crate::BuiltinBazelToolsRouteIdentity;
 use crate::BuiltinBazelToolsSnapshot;
 use crate::EvaluatedRootModule;
+use crate::GeneratedRepositoryFileEffectPlan;
+use crate::HostCanonicalSelectedModuleDefinition;
+use crate::HostCanonicalSelectedModuleDefinitionError;
+use crate::HostCanonicalSelectedModuleDefinitionErrorDisposition;
+use crate::HostCanonicalSelectedModuleDefinitionKey;
+use crate::HostCanonicalSelectedModuleDefinitionObservationError;
+use crate::HostCanonicalSelectedModuleDefinitionObservationKey;
+use crate::HostCanonicalSelectedModuleIdentity;
+use crate::HostCanonicalSelectedModuleKind;
+use crate::HostRootRepositoryMappingError;
+use crate::HostRootRepositoryMappingKey;
+use crate::HostRootRepositoryMappingObservationError;
+use crate::HostRootRepositoryMappingObservationKey;
+use crate::HostSelectedExtensionDefinitionSource;
+use crate::HostSelectedObservationFrontier;
 use crate::LogicalModuleFileId;
 use crate::LogicalSpan;
 use crate::NonrootIncludeRequest;
@@ -66,6 +81,7 @@ use crate::module_eval::evaluate_root_module_closure_with_events;
 use crate::module_eval::host_file_semantic_error;
 use crate::module_eval::root_module_ignore_dev_dependency;
 use crate::module_eval::validate_root_module_source;
+use crate::selected_repo_spec::HostSelectedBzlLoadSource;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct HostRootModuleFileValue {
@@ -972,10 +988,31 @@ impl Key for RootModuleLoadingAnchorObservationKey {
     }
 }
 
+#[derive(Debug, Clone, Allocative)]
+#[doc(hidden)]
+pub struct SelectedRegistryRepositoryRoute {
+    definition: HostCanonicalSelectedModuleDefinition,
+    repo_spec: RepoSpec,
+    local_path_policy: crate::HostRepositoryLocalPathPolicy,
+    mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
+}
+
+impl PartialEq for SelectedRegistryRepositoryRoute {
+    fn eq(&self, other: &Self) -> bool {
+        self.definition == other.definition
+            && self.repo_spec == other.repo_spec
+            && self.local_path_policy == other.local_path_policy
+            && self.mapping == other.mapping
+    }
+}
+
+impl Eq for SelectedRegistryRepositoryRoute {}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum RootRepositorySource {
     DirectLocal(RepoSpec),
     BuiltinBazelTools(BuiltinBazelToolsRouteIdentity),
+    SelectedRegistry(SelectedRegistryRepositoryRoute),
     /// Extension-generated repository routed from core's accepted private
     /// generated-definition view. Constructed only through
     /// [`RootRepositoryRoute::for_generated_repo_spec`], which enforces the
@@ -983,7 +1020,14 @@ pub enum RootRepositorySource {
     Generated {
         repo_spec: RepoSpec,
         local_path_policy: crate::HostRepositoryLocalPathPolicy,
+        plan: GeneratedRepositoryFileEffectPlan,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+enum HostRepositoryMaterializationFlavor {
+    Classified,
+    GeneratedFileEffects(GeneratedRepositoryFileEffectPlan),
 }
 
 #[doc(hidden)]
@@ -1003,6 +1047,7 @@ pub struct HostRepositorySourceCapability {
     apparent_repo: ApparentRepoName,
     canonical_repo: CanonicalRepoName,
     source: HostRepositorySourceCapabilitySource,
+    materialization_flavor: HostRepositoryMaterializationFlavor,
 }
 
 impl HostRepositorySourceCapability {
@@ -1025,7 +1070,30 @@ impl HostRepositorySourceCapability {
                     repo_spec: Arc::new(repo_spec.clone()),
                     local_path_policy,
                 },
+                materialization_flavor: HostRepositoryMaterializationFlavor::Classified,
             })
+    }
+
+    fn from_generated_repo_spec(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+        canonical_repo: CanonicalRepoName,
+        repo_spec: &RepoSpec,
+        local_path_policy: crate::HostRepositoryLocalPathPolicy,
+        plan: &GeneratedRepositoryFileEffectPlan,
+    ) -> Option<Self> {
+        Self::from_repo_spec(
+            workspace,
+            apparent_repo,
+            canonical_repo,
+            repo_spec,
+            local_path_policy,
+        )
+        .map(|mut capability| {
+            capability.materialization_flavor =
+                HostRepositoryMaterializationFlavor::GeneratedFileEffects(plan.clone());
+            capability
+        })
     }
 
     #[doc(hidden)]
@@ -1041,6 +1109,7 @@ impl HostRepositorySourceCapability {
                 apparent_repo,
                 canonical_repo,
                 source: HostRepositorySourceCapabilitySource::Builtin(identity),
+                materialization_flavor: HostRepositoryMaterializationFlavor::Classified,
             })
     }
 
@@ -1068,6 +1137,13 @@ impl HostRepositorySourceCapability {
             HostRepositorySourceCapabilitySource::RepoSpec {
                 local_path_policy, ..
             } => Some(*local_path_policy),
+        }
+    }
+
+    pub(crate) fn generated_file_effect_plan(&self) -> Option<&GeneratedRepositoryFileEffectPlan> {
+        match &self.materialization_flavor {
+            HostRepositoryMaterializationFlavor::Classified => None,
+            HostRepositoryMaterializationFlavor::GeneratedFileEffects(plan) => Some(plan),
         }
     }
 }
@@ -1135,18 +1211,29 @@ fn hash_repo_spec<H: Hasher>(spec: &RepoSpec, state: &mut H) {
     entry_hashes.hash(state);
 }
 
+impl Hash for SelectedRegistryRepositoryRoute {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        hash_repo_spec(&self.repo_spec, state);
+        self.local_path_policy.hash(state);
+        self.mapping.hash(state);
+    }
+}
+
 impl Hash for RootRepositorySource {
     fn hash<H: Hasher>(&self, state: &mut H) {
         std::mem::discriminant(self).hash(state);
         match self {
             Self::DirectLocal(spec) => hash_repo_spec(spec, state),
             Self::BuiltinBazelTools(identity) => identity.hash(state),
+            Self::SelectedRegistry(route) => route.hash(state),
             Self::Generated {
                 repo_spec,
                 local_path_policy,
+                plan,
             } => {
                 hash_repo_spec(repo_spec, state);
                 local_path_policy.hash(state);
+                plan.hash(state);
             }
         }
     }
@@ -1174,6 +1261,7 @@ impl Hash for HostRepositorySourceCapability {
         self.apparent_repo.hash(state);
         self.canonical_repo.hash(state);
         self.source.hash(state);
+        self.materialization_flavor.hash(state);
     }
 }
 
@@ -1212,13 +1300,24 @@ impl RootRepositoryRoute {
             RootRepositorySource::Generated {
                 repo_spec,
                 local_path_policy,
-            } => HostRepositorySourceCapability::from_repo_spec(
+                plan,
+            } => HostRepositorySourceCapability::from_generated_repo_spec(
                 self.workspace.dupe(),
                 self.apparent_repo.clone(),
                 self.canonical_repo.clone(),
                 repo_spec,
                 *local_path_policy,
+                plan,
             ),
+            RootRepositorySource::SelectedRegistry(route) => {
+                HostRepositorySourceCapability::from_repo_spec(
+                    self.workspace.dupe(),
+                    self.apparent_repo.clone(),
+                    self.canonical_repo.clone(),
+                    &route.repo_spec,
+                    route.local_path_policy,
+                )
+            }
             RootRepositorySource::BuiltinBazelTools(identity) => {
                 HostRepositorySourceCapability::builtin(
                     self.workspace.dupe(),
@@ -1255,6 +1354,73 @@ impl RootRepositoryRoute {
         matches!(self.source, RootRepositorySource::BuiltinBazelTools(_))
     }
 
+    #[doc(hidden)]
+    pub fn for_selected_extension_definition(
+        workspace: NormalizedAbsolutePath,
+        source: &HostSelectedExtensionDefinitionSource,
+    ) -> Option<Self> {
+        let HostSelectedExtensionDefinitionSource::Selected {
+            definition,
+            apparent_repo,
+        } = source
+        else {
+            return None;
+        };
+        let view = definition.view();
+        if view.kind() != HostCanonicalSelectedModuleKind::SelectedRegistry {
+            return None;
+        }
+        let repo_spec = view.repo_spec()?.clone();
+        let local_path_policy = view.local_path_policy()?;
+        let HostCanonicalSelectedModuleIdentity::Module { name, .. } = view.identity() else {
+            return None;
+        };
+        let canonical_repo = view.canonical_repo().clone();
+        let mapping = view
+            .mapping()
+            .map(|(name, target)| (name.clone(), target.clone()))
+            .collect();
+        Some(Self {
+            workspace,
+            apparent_repo: apparent_repo.clone(),
+            module_name: CompactString::new(name),
+            canonical_repo,
+            source: RootRepositorySource::SelectedRegistry(SelectedRegistryRepositoryRoute {
+                definition: definition.clone(),
+                repo_spec,
+                local_path_policy,
+                mapping,
+            }),
+        })
+    }
+
+    #[doc(hidden)]
+    pub fn selected_bzl_load_route(&self, apparent: &ApparentRepoName) -> Option<Self> {
+        let RootRepositorySource::SelectedRegistry(route) = &self.source else {
+            return None;
+        };
+        match route.definition.mapped_bzl_load(apparent)? {
+            HostSelectedBzlLoadSource::Selected(definition) => {
+                Self::for_selected_extension_definition(
+                    self.workspace.dupe(),
+                    &HostSelectedExtensionDefinitionSource::Selected {
+                        definition,
+                        apparent_repo: apparent.clone(),
+                    },
+                )
+            }
+            HostSelectedBzlLoadSource::Builtin => Some(Self {
+                workspace: self.workspace.dupe(),
+                apparent_repo: apparent.clone(),
+                module_name: CompactString::new("bazel_tools"),
+                canonical_repo: CanonicalRepoName::new("bazel_tools").ok()?,
+                source: RootRepositorySource::BuiltinBazelTools(
+                    BuiltinBazelToolsSnapshot::CURRENT.route_identity(),
+                ),
+            }),
+        }
+    }
+
     /// Constructs the route for an extension-generated repository from core's
     /// accepted generated-definition view. The module name is the apparent
     /// name's owning extension repository segment; polarity must be
@@ -1266,6 +1432,7 @@ impl RootRepositoryRoute {
         canonical_repo: CanonicalRepoName,
         repo_spec: RepoSpec,
         local_path_policy: crate::HostRepositoryLocalPathPolicy,
+        plan: GeneratedRepositoryFileEffectPlan,
     ) -> Option<Self> {
         if apparent_repo.is_root()
             || canonical_repo.is_root()
@@ -1282,6 +1449,7 @@ impl RootRepositoryRoute {
             source: RootRepositorySource::Generated {
                 repo_spec,
                 local_path_policy,
+                plan,
             },
         })
     }
@@ -1289,6 +1457,7 @@ impl RootRepositoryRoute {
     pub(crate) fn repo_spec(&self) -> &RepoSpec {
         match &self.source {
             RootRepositorySource::DirectLocal(spec) => spec,
+            RootRepositorySource::SelectedRegistry(route) => &route.repo_spec,
             RootRepositorySource::Generated { repo_spec, .. } => repo_spec,
             RootRepositorySource::BuiltinBazelTools(_) => {
                 panic!("built-in bazel_tools has no RepoSpec")
@@ -1339,11 +1508,28 @@ enum RootRepositoryRouteErrorKind {
         apparent_repo: ApparentRepoName,
         module_name: CompactString,
     },
+    SelectedMapping(HostRootRepositoryMappingError),
+    SelectedDefinition(HostCanonicalSelectedModuleDefinitionError),
+    SelectedInfrastructure(Arc<str>),
 }
 
 #[derive(Clone, PartialEq, Eq, Allocative)]
 pub struct RootRepositoryRouteError {
     kind: RootRepositoryRouteErrorKind,
+}
+
+impl RootRepositoryRouteError {
+    /// Distinguishes the two nonroot route failure kinds so core's external
+    /// build branch can fall back to the generated-repository bridge while
+    /// preserving every other diagnostic byte-exactly.
+    #[doc(hidden)]
+    pub fn is_generated_route_fallback(&self) -> bool {
+        matches!(
+            self.kind,
+            RootRepositoryRouteErrorKind::Unknown { .. }
+                | RootRepositoryRouteErrorKind::Unsupported { .. }
+        )
+    }
 }
 
 impl fmt::Debug for RootRepositoryRouteError {
@@ -1372,6 +1558,9 @@ impl fmt::Display for RootRepositoryRouteError {
                 apparent_repo.as_str(),
                 module_name,
             ),
+            RootRepositoryRouteErrorKind::SelectedMapping(error) => error.fmt(f),
+            RootRepositoryRouteErrorKind::SelectedDefinition(error) => error.fmt(f),
+            RootRepositoryRouteErrorKind::SelectedInfrastructure(message) => f.write_str(message),
         }
     }
 }
@@ -1382,6 +1571,13 @@ impl std::error::Error for RootRepositoryRouteError {}
 pub struct RootRepositoryRouteKey {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
+    admission: RootRepositoryRouteAdmission,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
+enum RootRepositoryRouteAdmission {
+    Ordinary,
+    RootBuild,
 }
 
 #[doc(hidden)]
@@ -1407,6 +1603,42 @@ impl ObservedRootRepositoryRoute {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct RootRepositoryRouteObservationKey(RootRepositoryRouteKey);
 
+/// The selected-only route projection distinguishes retryable path frontiers
+/// from infrastructure failures. Ordinary consumers are intentionally limited
+/// to `Path` through [`Self::ordinary_path`].
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub enum RootRepositoryRouteObservationError {
+    Path(ObservedPathFrontierError),
+    Mapping(HostRootRepositoryMappingObservationError),
+    Definition(HostCanonicalSelectedModuleDefinitionObservationError),
+    Infrastructure(Arc<str>),
+}
+
+impl RootRepositoryRouteObservationError {
+    #[doc(hidden)]
+    pub fn selected_frontier(self) -> HostSelectedObservationFrontier {
+        match self {
+            Self::Path(error) => HostSelectedObservationFrontier::Path(error),
+            Self::Mapping(error) => error.selected_frontier(),
+            Self::Definition(error) => error.selected_frontier(),
+            Self::Infrastructure(message) => {
+                HostSelectedObservationFrontier::Infrastructure(message)
+            }
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn ordinary_path(self) -> ObservedPathFrontierError {
+        match self {
+            Self::Path(error) => error,
+            Self::Mapping(_) | Self::Definition(_) | Self::Infrastructure(_) => {
+                panic!("ordinary root repository route reached selected admission")
+            }
+        }
+    }
+}
+
 impl RootRepositoryRouteKey {
     pub fn new(
         workspace: NormalizedAbsolutePath,
@@ -1418,7 +1650,18 @@ impl RootRepositoryRouteKey {
         Ok(Self {
             workspace,
             apparent_repo,
+            admission: RootRepositoryRouteAdmission::Ordinary,
         })
+    }
+
+    #[doc(hidden)]
+    pub fn for_root_build(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+    ) -> Result<Self, String> {
+        let mut key = Self::new(workspace, apparent_repo)?;
+        key.admission = RootRepositoryRouteAdmission::RootBuild;
+        Ok(key)
     }
 }
 
@@ -1430,13 +1673,25 @@ impl RootRepositoryRouteObservationKey {
     ) -> Result<Self, String> {
         RootRepositoryRouteKey::new(workspace, apparent_repo).map(Self)
     }
+
+    #[doc(hidden)]
+    pub fn for_root_build(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+    ) -> Result<Self, String> {
+        RootRepositoryRouteKey::for_root_build(workspace, apparent_repo).map(Self)
+    }
 }
 
 impl fmt::Display for RootRepositoryRouteKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "root-repository-route:{}:@{}",
+            "{}:{}:@{}",
+            match self.admission {
+                RootRepositoryRouteAdmission::Ordinary => "root-repository-route",
+                RootRepositoryRouteAdmission::RootBuild => "root-build-repository-route",
+            },
             self.workspace,
             self.apparent_repo.as_str()
         )
@@ -1522,8 +1777,107 @@ fn project_root_repository_route(
     Arc::new(value)
 }
 
-type ObservedRootRepositoryRouteOutcome =
-    SourcePreparationOutcome<Result<ObservedRootRepositoryRoute, ObservedPathFrontierError>>;
+fn original_unsupported(
+    value: &Arc<Result<RootRepositoryRoute, RootRepositoryRouteError>>,
+) -> Option<RootRepositoryRouteError> {
+    match value.as_ref() {
+        Err(error) if matches!(error.kind, RootRepositoryRouteErrorKind::Unsupported { .. }) => {
+            Some(error.clone())
+        }
+        _ => None,
+    }
+}
+
+fn selected_route(
+    key: &RootRepositoryRouteKey,
+    definition: HostCanonicalSelectedModuleDefinition,
+) -> Option<RootRepositoryRoute> {
+    let source = HostSelectedExtensionDefinitionSource::Selected {
+        definition,
+        apparent_repo: key.apparent_repo.clone(),
+    };
+    RootRepositoryRoute::for_selected_extension_definition(key.workspace.dupe(), &source)
+}
+
+fn selected_definition_for_root_mapping(
+    key: &RootRepositoryRouteKey,
+    mapping: &crate::HostRootRepositoryMapping,
+) -> Option<CanonicalRepoName> {
+    mapping.view()?.mapping().find_map(|(apparent, canonical)| {
+        (apparent == &key.apparent_repo).then(|| canonical.clone())
+    })
+}
+
+async fn admit_selected_root_repository_route(
+    ctx: &mut DiceComputations<'_>,
+    key: &RootRepositoryRouteKey,
+    original: Arc<Result<RootRepositoryRoute, RootRepositoryRouteError>>,
+) -> SourcePreparationOutcome<Arc<Result<RootRepositoryRoute, RootRepositoryRouteError>>> {
+    let Some(fallback) = original_unsupported(&original) else {
+        return SourcePreparationOutcome::Complete(original);
+    };
+    let mapping = match ctx
+        .compute(&HostRootRepositoryMappingKey::new(key.workspace.dupe()))
+        .await
+    {
+        Err(error) => {
+            return SourcePreparationOutcome::Complete(Arc::new(Err(RootRepositoryRouteError {
+                kind: RootRepositoryRouteErrorKind::SelectedInfrastructure(Arc::from(
+                    error.to_string(),
+                )),
+            })));
+        }
+        Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+        Ok(SourcePreparationOutcome::Complete(value)) => value,
+    };
+    let mapping = match mapping.as_ref() {
+        Ok(mapping) => mapping,
+        Err(error) => {
+            return SourcePreparationOutcome::Complete(Arc::new(Err(RootRepositoryRouteError {
+                kind: RootRepositoryRouteErrorKind::SelectedMapping(error.clone()),
+            })));
+        }
+    };
+    let Some(canonical) = selected_definition_for_root_mapping(key, mapping) else {
+        return SourcePreparationOutcome::Complete(Arc::new(Err(fallback)));
+    };
+    let definition = match ctx
+        .compute(&HostCanonicalSelectedModuleDefinitionKey::new(
+            key.workspace.dupe(),
+            canonical,
+        ))
+        .await
+    {
+        Err(error) => {
+            return SourcePreparationOutcome::Complete(Arc::new(Err(RootRepositoryRouteError {
+                kind: RootRepositoryRouteErrorKind::SelectedInfrastructure(Arc::from(
+                    error.to_string(),
+                )),
+            })));
+        }
+        Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+        Ok(SourcePreparationOutcome::Complete(value)) => value,
+    };
+    match definition.as_ref() {
+        Ok(definition) => match selected_route(key, definition.clone()) {
+            Some(route) => SourcePreparationOutcome::Complete(Arc::new(Ok(route))),
+            None => SourcePreparationOutcome::Complete(Arc::new(Err(fallback))),
+        },
+        Err(error)
+            if error.disposition()
+                == HostCanonicalSelectedModuleDefinitionErrorDisposition::Missing =>
+        {
+            SourcePreparationOutcome::Complete(Arc::new(Err(fallback)))
+        }
+        Err(error) => SourcePreparationOutcome::Complete(Arc::new(Err(RootRepositoryRouteError {
+            kind: RootRepositoryRouteErrorKind::SelectedDefinition(error.clone()),
+        }))),
+    }
+}
+
+type ObservedRootRepositoryRouteOutcome = SourcePreparationOutcome<
+    Result<ObservedRootRepositoryRoute, RootRepositoryRouteObservationError>,
+>;
 
 fn project_observed_root_repository_route(
     key: &RootRepositoryRouteKey,
@@ -1531,9 +1885,9 @@ fn project_observed_root_repository_route(
 ) -> ObservedRootRepositoryRouteOutcome {
     match outcome {
         SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-        SourcePreparationOutcome::Complete(Err(error)) => {
-            SourcePreparationOutcome::Complete(Err(error))
-        }
+        SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(Err(
+            RootRepositoryRouteObservationError::Path(error),
+        )),
         SourcePreparationOutcome::Complete(Ok(observed)) => {
             let result = project_root_repository_route(key, &observed.result);
             SourcePreparationOutcome::Complete(Ok(ObservedRootRepositoryRoute {
@@ -1563,7 +1917,13 @@ impl Key for RootRepositoryRouteKey {
             }
             SourcePreparationOutcome::Complete(carrier) => carrier,
         };
-        SourcePreparationOutcome::Complete(project_root_repository_route(self, &carrier))
+        let original = project_root_repository_route(self, &carrier);
+        match self.admission {
+            RootRepositoryRouteAdmission::Ordinary => SourcePreparationOutcome::Complete(original),
+            RootRepositoryRouteAdmission::RootBuild => {
+                admit_selected_root_repository_route(ctx, self, original).await
+            }
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1584,7 +1944,7 @@ impl Key for RootRepositoryRouteObservationKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        project_observed_root_repository_route(
+        let root = project_observed_root_repository_route(
             &self.0,
             dice_invariant(
                 ctx.compute(&HostRootModuleFileObservationKey::new(
@@ -1592,7 +1952,137 @@ impl Key for RootRepositoryRouteObservationKey {
                 ))
                 .await,
             ),
-        )
+        );
+        let SourcePreparationOutcome::Complete(Ok(observed)) = root else {
+            return root;
+        };
+        if self.0.admission == RootRepositoryRouteAdmission::Ordinary
+            || original_unsupported(observed.result()).is_none()
+        {
+            return SourcePreparationOutcome::Complete(Ok(observed));
+        }
+        let fallback = original_unsupported(observed.result()).expect("checked above");
+        let mut observations = observed.observations().dupe();
+        let mapping = match ctx
+            .compute(&HostRootRepositoryMappingObservationKey::new(
+                self.0.workspace.dupe(),
+            ))
+            .await
+        {
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Err(
+                    RootRepositoryRouteObservationError::Infrastructure(Arc::from(
+                        error.to_string(),
+                    )),
+                ));
+            }
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return SourcePreparationOutcome::Complete(Err(
+                    RootRepositoryRouteObservationError::Mapping(error),
+                ));
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => observed,
+        };
+        observations = match PathObservationEpoch::from_shared(
+            observations
+                .observations()
+                .iter()
+                .map(|(demand, result)| (demand.dupe(), result.dupe()))
+                .chain(
+                    mapping
+                        .observations()
+                        .observations()
+                        .iter()
+                        .map(|(demand, result)| (demand.dupe(), result.dupe())),
+                ),
+        ) {
+            Ok(observations) => observations,
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Err(
+                    RootRepositoryRouteObservationError::Path(error.into()),
+                ));
+            }
+        };
+        let mapping = match mapping.result().as_ref() {
+            Ok(mapping) => mapping,
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Ok(ObservedRootRepositoryRoute {
+                    result: Arc::new(Err(RootRepositoryRouteError {
+                        kind: RootRepositoryRouteErrorKind::SelectedMapping(error.clone()),
+                    })),
+                    observations,
+                }));
+            }
+        };
+        let Some(canonical) = selected_definition_for_root_mapping(&self.0, mapping) else {
+            return SourcePreparationOutcome::Complete(Ok(ObservedRootRepositoryRoute {
+                result: Arc::new(Err(fallback)),
+                observations,
+            }));
+        };
+        let definition = match ctx
+            .compute(&HostCanonicalSelectedModuleDefinitionObservationKey::new(
+                self.0.workspace.dupe(),
+                canonical,
+            ))
+            .await
+        {
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Err(
+                    RootRepositoryRouteObservationError::Infrastructure(Arc::from(
+                        error.to_string(),
+                    )),
+                ));
+            }
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return SourcePreparationOutcome::Complete(Err(
+                    RootRepositoryRouteObservationError::Definition(error),
+                ));
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => observed,
+        };
+        observations = match PathObservationEpoch::from_shared(
+            observations
+                .observations()
+                .iter()
+                .map(|(demand, result)| (demand.dupe(), result.dupe()))
+                .chain(
+                    definition
+                        .observations()
+                        .observations()
+                        .iter()
+                        .map(|(demand, result)| (demand.dupe(), result.dupe())),
+                ),
+        ) {
+            Ok(observations) => observations,
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Err(
+                    RootRepositoryRouteObservationError::Path(error.into()),
+                ));
+            }
+        };
+        let result = match definition.result().as_ref() {
+            Ok(definition) => selected_route(&self.0, definition.clone()).ok_or(fallback),
+            Err(error)
+                if error.disposition()
+                    == HostCanonicalSelectedModuleDefinitionErrorDisposition::Missing =>
+            {
+                Err(fallback)
+            }
+            Err(error) => Err(RootRepositoryRouteError {
+                kind: RootRepositoryRouteErrorKind::SelectedDefinition(error.clone()),
+            }),
+        };
+        SourcePreparationOutcome::Complete(Ok(ObservedRootRepositoryRoute {
+            result: Arc::new(result),
+            observations,
+        }))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1614,6 +2104,7 @@ mod tests {
     use std::sync::Arc;
     use std::sync::Mutex;
 
+    use compact_str::CompactString;
     use dice::ActivationData;
     use dice::ActivationKind;
     use dice::ActivationTracker;
@@ -1659,7 +2150,10 @@ mod tests {
     use super::RootModuleLoadingAnchorKey;
     use super::RootModuleLoadingAnchorObservationKey;
     use super::RootRepositoryRoute;
+    use super::RootRepositoryRouteError;
+    use super::RootRepositoryRouteErrorKind;
     use super::RootRepositoryRouteKey;
+    use super::RootRepositoryRouteObservationError;
     use super::RootRepositoryRouteObservationKey;
     use super::RootRepositorySource;
     use super::project_observed_root_module_loading_anchor;
@@ -1683,6 +2177,31 @@ mod tests {
     use crate::module_eval::clear_validated_root_module_logical_ids;
     use crate::module_eval::take_validated_root_module_logical_ids;
     use crate::repo_file::HostRepoFileKey;
+
+    #[test]
+    fn generated_route_fallback_classifier_is_limited_to_nonroot_route_errors() {
+        let apparent_repo = ApparentRepoName::new("extension_repo").unwrap();
+        let unknown = RootRepositoryRouteError {
+            kind: RootRepositoryRouteErrorKind::Unknown {
+                apparent_repo: apparent_repo.clone(),
+            },
+        };
+        let unsupported = RootRepositoryRouteError {
+            kind: RootRepositoryRouteErrorKind::Unsupported {
+                apparent_repo,
+                module_name: CompactString::new("extension_module"),
+            },
+        };
+        let root = RootRepositoryRouteError {
+            kind: RootRepositoryRouteErrorKind::Root(HostRootModuleFileError::CommandPolicy {
+                message: CompactString::new("root route"),
+            }),
+        };
+
+        assert!(unknown.is_generated_route_fallback());
+        assert!(unsupported.is_generated_route_fallback());
+        assert!(!root.is_generated_route_fallback());
+    }
 
     fn workspace() -> NormalizedAbsolutePath {
         NormalizedAbsolutePath::new("/workspace").unwrap()
@@ -2614,6 +3133,43 @@ mod tests {
     }
 
     #[test]
+    fn root_build_route_admission_discriminates_key_hash_and_display() {
+        let apparent = ApparentRepoName::new("dep").unwrap();
+        let ordinary = RootRepositoryRouteKey::new(workspace(), apparent.clone()).unwrap();
+        let admitted =
+            RootRepositoryRouteKey::for_root_build(workspace(), apparent.clone()).unwrap();
+        let hash = |key: &RootRepositoryRouteKey| {
+            let mut state = DefaultHasher::new();
+            key.hash(&mut state);
+            state.finish()
+        };
+        assert_ne!(ordinary, admitted);
+        assert_ne!(hash(&ordinary), hash(&admitted));
+        assert_eq!(
+            ordinary.to_string(),
+            "root-repository-route:\"/workspace\":@dep"
+        );
+        assert_eq!(
+            admitted.to_string(),
+            "root-build-repository-route:\"/workspace\":@dep"
+        );
+
+        let ordinary_observed =
+            RootRepositoryRouteObservationKey::new(workspace(), apparent.clone()).unwrap();
+        let admitted_observed =
+            RootRepositoryRouteObservationKey::for_root_build(workspace(), apparent).unwrap();
+        assert_ne!(ordinary_observed, admitted_observed);
+        assert_eq!(
+            ordinary_observed.to_string(),
+            "observed-root-repository-route:\"/workspace\":@dep"
+        );
+        assert_eq!(
+            admitted_observed.to_string(),
+            "observed-root-build-repository-route:\"/workspace\":@dep"
+        );
+    }
+
+    #[test]
     fn observed_route_projection_preserves_arcs_and_terminal_polarity() {
         let key =
             RootRepositoryRouteKey::new(workspace(), ApparentRepoName::new("bazel_tools").unwrap())
@@ -2663,7 +3219,7 @@ mod tests {
         let SourcePreparationOutcome::Complete(Err(projected)) = projected else {
             panic!("observed route outer error must remain outer");
         };
-        assert_eq!(projected, outer);
+        assert_eq!(projected, RootRepositoryRouteObservationError::Path(outer));
     }
 
     #[tokio::test]
