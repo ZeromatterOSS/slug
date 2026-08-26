@@ -114,6 +114,7 @@ use crate::AttributeKind;
 use crate::CoercedAttributeValue;
 use crate::LoadingPreparationOutcome;
 use crate::RootPackageLoadKey;
+use crate::TestRuleKind;
 use crate::cycle_detector::bzl_load_cycle_detector;
 use crate::package::BuildSettingKind;
 use crate::package::FrozenAspectDefinition;
@@ -2635,12 +2636,87 @@ fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
     );
 }
 
+fn assert_frozen_rustfmt_test_aspect(aspect: &FrozenAspectDefinition) {
+    assert_eq!(
+        aspect.attr_aspects.as_ref(),
+        ["deps", "proc_macro_deps", "crate"]
+    );
+    assert!(aspect.attributes.is_empty());
+    assert!(aspect.required_providers.is_empty());
+    assert_eq!(aspect.advertised_providers.len(), 1);
+    assert_eq!(
+        aspect.advertised_providers[0].to_string(),
+        "@@dep+//rust/private:rustfmt.bzl%RustfmtTestInfo"
+    );
+    assert_eq!(
+        aspect.defining_label,
+        CanonicalLabel::parse("@@dep+//rust/private:rustfmt.bzl").unwrap()
+    );
+    assert_eq!(
+        aspect.exported_name.as_deref(),
+        Some("_rustfmt_test_aspect")
+    );
+    let required = aspect
+        .required_aspect
+        .unwrap()
+        .downcast_ref::<FrozenAspectDefinition>()
+        .unwrap();
+    assert_frozen_rustfmt_aspect(required);
+}
+
+fn assert_frozen_rustfmt_test_rule(rule: &FrozenRuleDefinition) {
+    assert_eq!(rule.capability().rule_class, "rustfmt_test");
+    assert!(rule.capability().executable);
+    assert_eq!(rule.capability().test_kind, Some(TestRuleKind::Test));
+    let declared = &rule.schema[rule.schema.len() - 5..];
+    assert_eq!(
+        declared
+            .iter()
+            .map(|attribute| attribute.name.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "platform",
+            "transitive",
+            "_allowlist_function_transition",
+            "_runner",
+            "targets"
+        ]
+    );
+    assert!(declared[..4].iter().all(|attribute| {
+        attribute.required_providers.is_empty() && attribute.attached_aspect.is_none()
+    }));
+    let targets = &declared[4];
+    assert_eq!(targets.kind, AttributeKind::LabelList);
+    assert!(!targets.mandatory && !targets.executable && !targets.exec_configuration);
+    assert!(targets.default.is_none() && targets.allow_single_file.is_none());
+    assert_eq!(targets.required_providers.len(), 2);
+    assert_eq!(
+        targets.required_providers[0][0].to_string(),
+        "@@dep+//rust/private:providers.bzl%CrateInfo"
+    );
+    assert_eq!(
+        targets.required_providers[1][0].to_string(),
+        "@@dep+//rust/private:providers.bzl%TestCrateInfo"
+    );
+    assert_eq!(
+        targets.transition.as_ref().unwrap().output(),
+        "//command_line_option:platforms"
+    );
+    assert_frozen_rustfmt_test_aspect(
+        targets
+            .attached_aspect
+            .unwrap()
+            .downcast_ref::<FrozenAspectDefinition>()
+            .unwrap(),
+    );
+}
+
 #[tokio::test]
-async fn external_bzl_module_freezes_rustfmt_test_aspect_provides() {
+async fn external_bzl_module_freezes_rustfmt_test_rule_dependency_schema() {
     let files: &[(&str, &[u8])] = &[
         (
             "rust/private/root.bzl",
-            b"load(':rustfmt.bzl', 'RUSTFMT_TEST_ASPECT')\nIMPORTED = RUSTFMT_TEST_ASPECT\n",
+            b"load(':rustfmt.bzl', 'RUSTFMT_TEST_ASPECT', 'rustfmt_test')\nIMPORTED = RUSTFMT_TEST_ASPECT\nIMPORTED_RULE = rustfmt_test\n",
         ),
         ("rust/private/BUILD.bazel", b""),
         (
@@ -2709,6 +2785,34 @@ _rustfmt_test_aspect = aspect(
     doc = "Rolls up markers produced by rustfmt_aspect.",
 )
 RUSTFMT_TEST_ASPECT = _rustfmt_test_aspect
+def _platform_transition_impl(settings, attr):
+    fail("transition implementation must stay lazy")
+platform_transition = transition(
+    implementation = _platform_transition_impl,
+    inputs = [],
+    outputs = ["//command_line_option:platforms"],
+)
+LINT_TEST_COMMON_ATTRS = {
+    "platform": attr.label(doc = "platform"),
+    "transitive": attr.bool(doc = "transitive", default = False),
+    "_allowlist_function_transition": attr.label(default = Label("//tools/allowlists/function_transition_allowlist")),
+    "_runner": attr.label(doc = "runner", cfg = "exec", executable = True, default = Label("//rust/private/lint_test_runner")),
+}
+def _rustfmt_test_impl(ctx):
+    fail("rule implementation must stay lazy")
+rustfmt_test = rule(
+    implementation = _rustfmt_test_impl,
+    attrs = dict(LINT_TEST_COMMON_ATTRS, **{
+        "targets": attr.label_list(
+            doc = "Rust targets to run rustfmt on.",
+            providers = [[rust_common.crate_info], [rust_common.test_crate_info]],
+            aspects = [_rustfmt_test_aspect],
+            cfg = platform_transition,
+        ),
+    }),
+    test = True,
+    doc = "Runs rustfmt checks.",
+)
 "#,
         ),
     ];
@@ -2730,31 +2834,13 @@ RUSTFMT_TEST_ASPECT = _rustfmt_test_aspect
         .unwrap()
         .downcast::<FrozenAspectDefinition>()
         .unwrap();
-    assert_eq!(
-        aspect.attr_aspects.as_ref(),
-        ["deps", "proc_macro_deps", "crate"]
-    );
-    assert!(aspect.attributes.is_empty());
-    assert!(aspect.required_providers.is_empty());
-    assert_eq!(aspect.advertised_providers.len(), 1);
-    assert_eq!(
-        aspect.advertised_providers[0].to_string(),
-        "@@dep+//rust/private:rustfmt.bzl%RustfmtTestInfo"
-    );
-    assert_eq!(
-        aspect.defining_label,
-        CanonicalLabel::parse("@@dep+//rust/private:rustfmt.bzl").unwrap()
-    );
-    assert_eq!(
-        aspect.exported_name.as_deref(),
-        Some("_rustfmt_test_aspect")
-    );
-    let required = aspect
-        .required_aspect
+    assert_frozen_rustfmt_test_aspect(&aspect);
+    let rule = module
+        .get("IMPORTED_RULE")
         .unwrap()
-        .downcast_ref::<FrozenAspectDefinition>()
+        .downcast::<FrozenRuleDefinition>()
         .unwrap();
-    assert_frozen_rustfmt_aspect(required);
+    assert_frozen_rustfmt_test_rule(&rule);
 }
 
 #[test]
@@ -2812,6 +2898,70 @@ fn rustfmt_test_aspect_rejects_unadmitted_provides_shapes() {
     ] {
         assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
     }
+}
+
+#[test]
+fn rustfmt_test_rule_rejects_unadmitted_dependency_schemas() {
+    eval_global(
+        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(doc=None)})",
+        &loading_globals(),
+    )
+    .unwrap();
+    for source in [
+        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(doc=1)})",
+        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[])})",
+        "P=provider()\nQ=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[P, Q])})",
+        "P=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[P], [P]])})",
+        "P=provider()\nQ=provider()\nS=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[P], [Q], [S]])})",
+        "P=provider()\nQ=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[P, Q], [P]])})",
+        "P=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[P], [1]])})",
+        "def make_provider(): return provider()\nQ=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[make_provider()], [Q]])})",
+        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[])})",
+        "def aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\nB=aspect(implementation=aspect_impl)\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[A, B])})",
+        "def aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[A, A])})",
+        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[1])})",
+        "def aspect_impl(target, ctx): return []\nNESTED=[aspect(implementation=aspect_impl)]\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=NESTED)})",
+        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(cfg=1)})",
+    ] {
+        assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
+    }
+}
+
+#[tokio::test]
+async fn repository_package_rejects_provider_or_aspect_dependency_before_recording() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(':defs.bzl', 'probe')\nprobe(name = 'blocked')\n",
+        ),
+        (
+            "defs.bzl",
+            b"P=provider(fields={})\nQ=provider(fields={})\ndef aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\ndef transition_impl(settings, attr): return {}\nT=transition(implementation=transition_impl, inputs=[], outputs=['//:setting'])\ndef impl(ctx): return []\nprobe=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[P], [Q]], aspects=[A], cfg=T)})\n",
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, 405).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    let error = repository_package_error(&outcome);
+    assert!(
+        error.contains(
+            "target invocation for provider-constrained or aspect-bearing attribute 'targets' is not supported"
+        ),
+        "{error}"
+    );
 }
 
 #[tokio::test]

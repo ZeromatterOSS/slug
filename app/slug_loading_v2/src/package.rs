@@ -2439,6 +2439,11 @@ impl FrozenRuleDefinition {
         &self.required_toolchains
     }
 
+    #[cfg(test)]
+    pub(crate) fn capability(&self) -> &RuleCapability {
+        &self.capability
+    }
+
     fn reject_deferred_attribute_invocation(&self) -> anyhow::Result<()> {
         if let Some(attribute) = self
             .schema
@@ -2447,6 +2452,14 @@ impl FrozenRuleDefinition {
         {
             anyhow::bail!(
                 "target invocation for executable or exec-configured attribute '{}' is not supported",
+                attribute.name
+            );
+        }
+        if let Some(attribute) = self.schema.iter().find(|attribute| {
+            !attribute.required_providers.is_empty() || attribute.attached_aspect.is_some()
+        }) {
+            anyhow::bail!(
+                "target invocation for provider-constrained or aspect-bearing attribute '{}' is not supported",
                 attribute.name
             );
         }
@@ -2673,6 +2686,19 @@ fn aspect_required_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>>
     Ok(Some(*required))
 }
 
+fn label_list_required_providers(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[ProviderId]>]>> {
+    let explicit = value.is_some();
+    let providers = aspect_required_providers(value)?;
+    if explicit && providers[0] == providers[1] {
+        anyhow::bail!("label_list provider alternatives must be distinct");
+    }
+    Ok(providers)
+}
+
+fn label_list_attached_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>> {
+    aspect_required_aspect(value)
+}
+
 fn aspect_attributes<'v>(
     attrs: Option<SmallMap<String, Value<'v>>>,
     defining_label: &CanonicalLabel,
@@ -2783,6 +2809,9 @@ pub(crate) struct RuleAttributeSchemaGen<V> {
     pub(crate) executable: bool,
     #[trace(unsafe_ignore)]
     pub(crate) exec_configuration: bool,
+    #[trace(unsafe_ignore)]
+    pub(crate) required_providers: Arc<[Arc<[ProviderId]>]>,
+    pub(crate) attached_aspect: Option<V>,
 }
 type RuleAttributeSchema<'v> = RuleAttributeSchemaGen<Value<'v>>;
 type FrozenRuleAttributeSchema = RuleAttributeSchemaGen<FrozenValue>;
@@ -2803,6 +2832,8 @@ fn declared_attribute_schema<'v>(
         allow_single_file: definition.allow_single_file.clone(),
         executable: definition.executable,
         exec_configuration: definition.exec_configuration,
+        required_providers: definition.required_providers.clone(),
+        attached_aspect: definition.attached_aspect,
     }
 }
 
@@ -2830,6 +2861,8 @@ fn starlark_builtin_schema<V>(
             allow_single_file: None,
             executable: false,
             exec_configuration: false,
+            required_providers: Arc::from([]),
+            attached_aspect: None,
         });
     };
     push("name", AttributeKind::String, true, false);
@@ -3174,6 +3207,12 @@ pub(crate) struct TransitionDefinitionGen<V> {
 type TransitionDefinition<'v> = TransitionDefinitionGen<Value<'v>>;
 type FrozenTransitionDefinition = TransitionDefinitionGen<FrozenValue>;
 starlark::starlark_complex_values!(TransitionDefinition);
+impl FrozenTransitionDefinition {
+    #[cfg(test)]
+    pub(crate) fn output(&self) -> &str {
+        &self.output
+    }
+}
 impl<V> fmt::Display for TransitionDefinitionGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("transition")
@@ -3205,6 +3244,9 @@ struct AttributeDefinitionGen<V> {
     executable: bool,
     #[trace(unsafe_ignore)]
     exec_configuration: bool,
+    #[trace(unsafe_ignore)]
+    required_providers: Arc<[Arc<[ProviderId]>]>,
+    attached_aspect: Option<V>,
     transition: Option<TransitionDefinitionGen<V>>,
 }
 type AttributeDefinition<'v> = AttributeDefinitionGen<Value<'v>>;
@@ -3235,6 +3277,11 @@ impl<'v> Freeze for AttributeDefinition<'v> {
             default: self.default,
             executable: self.executable,
             exec_configuration: self.exec_configuration,
+            required_providers: self.required_providers,
+            attached_aspect: self
+                .attached_aspect
+                .map(|value| value.freeze(freezer))
+                .transpose()?,
             transition: self
                 .transition
                 .map(|value| value.freeze(freezer))
@@ -3255,6 +3302,11 @@ impl<'v> Freeze for RuleAttributeSchema<'v> {
             default: self.default,
             executable: self.executable,
             exec_configuration: self.exec_configuration,
+            required_providers: self.required_providers,
+            attached_aspect: self
+                .attached_aspect
+                .map(|value| value.freeze(freezer))
+                .transpose()?,
             transition: self
                 .transition
                 .map(|value| value.freeze(freezer))
@@ -3751,6 +3803,8 @@ fn attribute_definition<'v>(
         default,
         executable,
         exec_configuration,
+        required_providers: Arc::from([]),
+        attached_aspect: None,
         transition,
     })
 }
@@ -3848,18 +3902,27 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] mandatory: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] providers: Option<Value<'v>>,
+        #[starlark(require = named)] cfg: Option<Value<'v>>,
+        #[starlark(require = named)] aspects: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
-        attribute_definition(
+        discard_attribute_doc(doc)?;
+        let required_providers = label_list_required_providers(providers)?;
+        let mut definition = attribute_definition(
             AttributeKind::LabelList,
             mandatory.unwrap_or(false),
             configurable,
             None,
             false,
             default,
-            None,
+            cfg,
             eval,
-        )
+        )?;
+        definition.required_providers = required_providers;
+        definition.attached_aspect = label_list_attached_aspect(aspects)?;
+        Ok(definition)
     }
     fn string_keyed_label_dict<'v>(
         #[starlark(this)] _attr: Value<'v>,
