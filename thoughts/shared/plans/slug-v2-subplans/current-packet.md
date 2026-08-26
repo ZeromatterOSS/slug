@@ -1,127 +1,205 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-7A-selected-registry-bcr-transport-entry-audit`
+Packet: `WP-5-7A-selected-registry-bcr-verified-capture-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: private selected-BCR archive plan, sole repository materializer, and
-native command/runtime boundary
-Base: `1807b1d4`
+Owner: private selected-BCR archive transport below the sole repository
+materializer
+Base: `9b390370`
 
-Result: audit the now-accepted semantic-plan/physical-realization seam and
-select exactly one smallest transport-entry implementation packet or `REPLAN`.
-This packet is docs-only. Do not reactivate the earlier full archive contract
-without re-deriving its authority, hashes, dependencies, lifetimes and proof
-from the live split.
+Result: the exact accepted `SelectedBcrTarGz` plan reaches ordered HTTPS
+transport and SHA-256-SRI-verified command scratch. The capture is deleted and
+the native session publishes a generation-scoped `MaterializationError` saying
+selected-registry extraction is deferred. This is a transport-entry packet,
+not archive realization: no captured byte or path survives the callback and no
+repository root, MODULE replacement or success result is created.
 
-## Accepted entry and live observation
+## Accepted predecessor and learned facts
 
 Commit `1807b1d4` owns mutually exclusive private `LocalTar` and
 `SelectedBcrTarGz` plans. The local one-file/hex-SHA256/tar implementation and
-proof moved mechanically and remain exact. The selected BCR plan accepts only
-the produced required `type = "tar.gz"`, ordered nonempty HTTPS URLs, 32-byte
-SHA-256 SRIs, empty strip/patch/overlay fields, zero patch strip and one HTTPS
-registry MODULE fact. It owns no runtime, transport, capture or root.
+proof remain exact. The selected plan admits only the produced Bazel 9.2
+`type = "tar.gz"`, ordered nonempty HTTPS URLs, 32-byte SHA-256 SRI, empty
+strip/patch/overlay fields, zero patch strip and one HTTPS registry MODULE
+fact. Malformed shapes are stable `SpecError`; exact shapes currently stop at
+a generation-scoped deferred `TransportError`.
 
-Malformed selected BCR shapes publish stable `SpecError`; the exact valid plan
-publishes the generation-scoped Slug-native `TransportError` saying transport
-is deferred. Focused archive/parser/session proof passes 9/9. The full core
-suite is 288 pass/one independently reproduced baseline-only query diagnostic
-failure. Locked compile, formatter, feature and diff checks pass.
+The live path is `WorkspaceRuntime::drive_command`'s current-thread Tokio
+runtime -> completed DICE `Need` attempt -> synchronous
+`NativeDemandCommand::progress_inner` ->
+`RepositoryMaterializer::materialize_native` -> lock-free `materialize_with`
+callback -> `materialize_native_attempt` -> private archive plan. DICE roots,
+transactions and the materializer lock are absent while the callback runs;
+`materialize_with` rechecks the session token before publishing its result.
+The dormant `LocalRepositoryIo` path runs its callback under `spawn_blocking`
+and has no native runtime. It must keep returning the accepted deferred BCR
+transport result with zero network I/O.
 
-A fresh disposable `rules-rust-073-toolchain-owner` root with only the parked
-wildcard registration removed reaches the repository-session non-success
-terminal. The public command layer intentionally collapses its inner result to
-`repository session failed`; the direct native-session proof retains the exact
-deferred transport result. Treat this as producer-to-plan wiring evidence, not
-archive materialization or a public-diagnostic claim.
+Pinned Hyper 1.11 exposes a directly polled HTTP/1 connection future. The
+legacy client spawns its driver and its default resolver may `spawn_blocking`,
+so neither is admitted. A disposable Cargo resolution proves the three exact
+direct edges below add no package stanza and keep Rustls Ring-only; inheriting
+workspace `tokio-rustls` is rejected because its default enables AWS-LC.
 
-## Source authority and guidance
+## Behavior authority and guidance
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-remains behavior authority through `IndexRegistry#createArchiveRepoSpec`,
-`IndexRegistryTest#testGetArchiveRepoSpec`, `_http_archive_impl`, `patch`,
-`HttpDownloader#download`, `HttpConnector`, `DecompressorValue` and their named
-tests. Reuse the accepted rules_rust 0.73.0 artifact facts and producer proof
-at `app/slug_bzlmod_v2/src/selected_repo_spec.rs:857-889` and its direct
-`type = "tar.gz"` assertion. Do not add an oracle unless this audit identifies
-a discriminating evidence gap.
+is sole behavior authority. `HttpDownloader#download` and
+`HttpDownloaderTest` methods `downloadFrom2UrlsFirstOk`,
+`downloadFrom2UrlsFirstSocketTimeoutOnBodyReadSecondOk`,
+`downloadTwoUrls_firstNotFoundAndSecondOk`, and
+`downloadFrom2UrlsFirstTlsErrorSecondOk` own the admitted mirror-fallback
+cases; `downloadAndReadOneUrl_checksumMismatch` owns checksum behavior.
+`HttpConnector`, its `MAX_REDIRECTS = 40`, and
+`HttpConnectorTest#pathRedirect_301/#pathRedirect_303` own accepted response
+and redirect behavior. `_http_archive_impl`, `IndexRegistry#createArchiveRepoSpec`
+and the accepted producer proof own the selected source shape. Reuse these
+pinned-source regressions; add no oracle fixture.
 
 Pinned `../zabel` commit
-`c7298478e2e56262a2f438e9c065325744c9f0fc` is concept-only architectural
-guidance. Its selected-source contracts keep the producer-owned semantic view
-above nonsemantic physical realization and join an immutable root only after
-realization succeeds. Copy no Zabel code, scheduler, transport, cache, archive,
-digest, path, output or behavior. Bazel 9.2 alone owns compatibility claims.
+`c7298478e2e56262a2f438e9c065325744c9f0fc` is concept/test-only architectural
+guidance. Its `src/load/session_natural_bzl_repository_source.zig` joins a
+producer-owned selected view to a typed materialization fact without host I/O,
+and `src/bzlmod/session_generated_repository_materialization.zig` retains an
+immutable root only with its complete durable manifest. Apply only that
+view/realization ownership split. Copy no Zabel code, scheduler, transport,
+cache, archive, digest, path, output or behavior. Bazel 9.2 owns every
+compatibility claim.
 
-Recheck the pinned local Hyper sources: legacy clients spawn connection drivers
-and default DNS may use `spawn_blocking`; direct HTTP/1 exposes the connection
-future and permits a caller-supplied immutable resolver. Record any source/API
-drift before relying on the earlier lifecycle design.
+## Decision, compatibility and non-decisions
 
-## Audit decisions required
+- **Exact:** the accepted plan and local branch; source URLs tried in declared
+  order with no later mirror after success; mirror fallback for the pinned
+  404, TLS-certificate, body-read-timeout and SRI-mismatch cases; SHA-256 over
+  streamed response bytes; 200/206 success; only 301/302/303/307 redirects;
+  relative and absolute `Location`; follow at most 39 redirects and reject the
+  40th. Exact claims are restricted to the selected BCR plan.
+- **Slug-native:** synchronous OS DNS, resolved-address order and 64-address
+  ceiling; immediate mirror fallback for other per-URL failures; HTTPS-only
+  redirects; raw Tokio/Rustls/Hyper HTTP/1 mechanics; native trust roots;
+  Ring-local provider; timeout/error text; 128 MiB compressed-capture ceiling;
+  command/session sequencing; and the deliberate post-verification
+  `MaterializationError` terminal.
+- **Unsupported/deferred:** gzip/tar and executable modes; extraction and
+  provisional root; registry MODULE fetch/replacement; generic
+  `http_archive`; HTTP downgrade, auth/proxy/netrc; patches/overlays/links/
+  specials; Bazel recoverable same-URL retry decisions/backoff and any source
+  selection that depends on them; and all later M7A/M8 semantics.
 
-1. Trace the exact live call from `NativeDemandCommand::progress_inner` through
-   the current-thread runtime, `RepositoryMaterializer::materialize_native`,
-   the lock-free callback and post-attempt token check to the private archive
-   plan. Name where an async transfer can be driven without entering DICE or
-   structural request state.
-2. Decide whether the next bounded owner is transport-to-verified-capture only
-   or must include gzip/tar/MODULE realization to preserve atomic publication.
-   A capture-only packet needs a private command-owned continuation and exact
-   deletion condition; it may not become retained semantic state or a second
-   materializer.
-3. Revalidate the archive-private direct HTTP/1 lifecycle: synchronous
-   command-owned resolution, immutable address results, Ring-local TLS config,
-   original hostname/Host, bounded connect/header/frame/shutdown entries,
-   directly driven and joined connection future, ordered fallback/redirects,
-   fresh capture per attempt, and no executor, task, async filesystem or global
-   provider.
-4. Recompute exact Cargo authority from `1807b1d4`. Only `base64 0.21.7` is now
-   direct. Any `hyper`/`hyper-rustls`/`rustls`/`tower-service` or later
-   `flate2`/`tar` edge and every lock byte must be separately justified. Keep
-   workspace AWS-LC out of the archive path and never install a global provider.
-5. Freeze command scratch, transfer-owned memory, cancellation, timeout,
-   capture cleanup, provisional-root promotion, session generation, stale-token
-   and warm/A/B/A behavior. No lock may span DNS, runtime entry, I/O, DICE or
-   callback work; no physical path enters request equality.
-6. Select one exact file allowlist with entry hashes, complexity ceilings and
-   production/proof caps from the split modules. Preserve
-   `repository_io.rs <= 5,000`; do not merge archive ownership back into it.
-7. Specify focused loopback/lifecycle proof, direct dependent compiles and the
-   fresh rules_rust replay. If the existing public error collapse prevents a
-   claimed observable, state the internal/session proof honestly; do not widen
-   CLI/session diagnostics inside a transport packet.
+Capture-only is the smallest lawful owner because it publishes no physical
+state. A private continuation lives only inside one native materialization
+callback and owns resolver results, TLS/HTTP state, capture and hash. On exact
+SRI success the archive wrapper closes and deletes the capture before returning
+`MaterializationError("selected-registry BCR archive extraction is deferred")`.
+Real transfer failures remain `TransportError`; parser failures remain
+`SpecError`. The changed stage is the packet's direct-session observable; the
+existing public command error collapse remains unchanged.
 
-The prior full-contract artifact remains 67,196,890 compressed bytes,
-224,337,920 uncompressed bytes, 4,493 entries and SHA-256
-`2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`.
-It is real-command evidence only, not a fixture to copy.
+This discard is a temporary bridge: the remaining invariant gap is that a
+successfully verified source is not consumed into the requested immutable
+repository root. Delete it when the immediate successor consumes the same
+verified capture into a bounded gzip/tar/MODULE realization before the existing
+final token check. That successor owns the replacement. A direct test requiring
+deletion before the deferred-extraction terminal prevents retention or
+accidental success from becoming permanent.
 
-## Compatibility and STOP
+## Transport, request and memory contract
 
-- **Exact:** accepted local archive behavior; produced Bazel 9.2 selected-BCR
-  field/type/order/SRI shape; any separately evidenced URL/redirect/archive/
-  MODULE behavior selected by the successor.
-- **Slug-native:** private plan representation, Rust transport/lifecycle and
-  ceilings, diagnostics, session sequencing and physical-root lifetime.
-- **Unsupported/deferred:** all BCR physical work until a successor is
-  accepted; generic `http_archive`; HTTP/auth/proxy/netrc; nonempty patches or
-  overlays; links/specials; repository-rule semantics; wildcard registration;
-  toolchains/providers/actions/input trees; crate_universe; M8/M7B; exact
-  configuration/output bytes.
+For each declared URL, resolve `host:port` synchronously on the command owner,
+outside Tokio, DICE and locks; retain at most 64 immutable socket addresses for
+that attempt. OS resolver latency cannot be canceled or time-bounded without a
+forbidden task and is an explicit residual risk. Use the original hostname for
+TLS SNI and `Host` and origin-form path/query for the request.
 
-Write authority is this manifest, canonical Live Status, Stage 5, Stage 6 and
-at most one routing row only if a reusable `REPLAN` lesson is found. Rust,
-Cargo, tests, fixtures, generated/vendor content and `@bazel_tools` are
-read-only. Documentation caps are <=40 canonical, <=220 current, <=100 per
-stage plan, one routing row and <=460 aggregate.
+Each address uses `TcpStream -> tokio_rustls::TlsConnector -> TokioIo ->
+hyper::client::conn::http1::handshake`. Build an explicit Ring provider and
+native-root client config per callback; install no process-global provider.
+No client, connector service, pool, executor or task is retained or spawned.
+Connect, TLS/headers, each body-frame entry and final connection disposal are
+bounded at 15/30/30/5 seconds. Directly poll the pinned connection concurrently
+with request/body progress. Yield at most one body frame per runtime entry;
+write and hash that frame synchronously after leaving Tokio. After dropping
+the sender/body, poll the pinned client connection future to completion; a
+timeout drops the sole connection/socket and returns a transport failure.
 
-Validate source pins, Zabel's guidance-only role, Cargo/runtime/session trace,
-scheduling agreement, packet structure and `git diff --check`; obtain
-independent review before selecting implementation.
+Create a fresh `NamedTempFile` per top-level URL. Reject `Content-Length` or
+streamed bytes above 128 MiB, never allocate the complete body, and delete
+partial captures on every redirect/fallback/error/stale/cancellation path.
+The immutable selected plan remains request structural state. Resolver values,
+TLS config, buffers (one Hyper frame), hasher and capture are transfer-owned
+command scratch; none enters DICE, equality, a cache, retained materializer
+state or a semantic path.
 
-STOP any Rust edit, behavior claim from Zabel, legacy/shared client,
-executor/spawn/Tokio DNS, unjoined connection future, network/extraction in
-DICE, lock across I/O/DICE, retained transfer scratch, unbounded/full-buffer
-work, second materializer, semantic path, registry/global-provider change,
-subprocess/Java/JVM, fixture mutation, broader repository behavior, second
-successor or milestone closure. `REPLAN` before widening.
+The callback briefly probes the active session before a new address, redirect
+or frame and stops more work when inactive; no lock spans work. The existing
+post-callback token check then propagates the typed stale-session error and
+remains the sole publication authority. Overlapping commands own disjoint
+transport scratch. A duplicate in the same active session reuses its published
+terminal. Error terminals are not cross-session acceptance: every later
+command recaptures, while changed A/B/A requests retain existing structural
+request equality and generation behavior without a URL/path side table.
+
+## Exact dependency and file authority
+
+Entry hashes/lines from `1807b1d4` are: `Cargo.lock` 4,876/
+`29c633ff…`, core `Cargo.toml` 46/`27dfec84…`, `runtime/mod.rs`
+333/`fcd2f5b4…`, `dice.rs` 11,636/`8c791759…`, `repository_io.rs`
+4,539/`d1ceab49…`, `repository_archive.rs` 723/`1e6236d7…`, and
+`tests/repository_archive_tests.rs` 1,333/`1a1cacfb…`.
+
+Add exactly:
+
+```toml
+rustls = { version = "0.23.42", default-features = false, features = ["ring"] }
+rustls-native-certs = { workspace = true }
+tokio-rustls = { version = "0.26.4", default-features = false }
+```
+
+The isolated result is core `Cargo.toml` 49 lines/SHA-256 `847f18b0…`
+and `Cargo.lock` 4,879/`72987efb…`: only those three direct names enter the
+existing `slug_core_v2` lock dependency list, no package stanza changes, and
+the Rustls tree contains Ring/std/TLS12/logging with no AWS-LC. Existing
+Hyper/Hyper-Rustls packages and versions remain exact; the new path does not
+use Hyper-Rustls's legacy client.
+
+Write only these nine files: `Cargo.lock`, core `Cargo.toml`, `runtime/mod.rs`,
+`runtime/dice.rs`, `runtime/repository_io.rs`, `runtime/repository_archive.rs`,
+new `runtime/repository_archive_http.rs`, existing
+`runtime/tests/repository_archive_tests.rs`, and new
+`runtime/tests/repository_archive_http_tests.rs`. Ceilings are respectively
+4,879, 49, 335, 11,730, 4,700, 850, 620, 1,500 and 850 lines. Keep production
+additions <=760 and proof additions <=1,000. The >2,000-line DICE/materializer
+files may receive wiring only; all transport policy/state belongs in the new
+private module. `repository_io.rs` stays below 5,000.
+
+## Proof, validation and STOP
+
+Loopback proof uses a private test injection below production's HTTPS parser/
+TLS boundary; no fixture is added. Prove Host/origin-form request, address
+order, 200/206, 301/302/303/307, relative/absolute redirects, rejection of 308
+and HTTP downgrade, redirect 40 boundary, the four admitted mirror-fallback
+cases, immediate Slug-native fallback without a same-URL retry claim, fresh
+resolution and capture, multi-frame streaming/SHA-256, mismatch, declared/
+streamed size caps, connect/header/frame/disposal timeout, peer-held-open
+disposal, connection completion/drop and cleanup. Static proof rejects `spawn`,
+`spawn_blocking`, legacy `Client`, `GaiResolver`, executor, async filesystem,
+global provider, full-body `Vec`, extraction and root creation in the new
+transport owner.
+
+Extend direct parser/native-session proof for exact stage mapping, capture
+deletion, stale-token interruption, overlap, same-session duplicate reuse and
+cross-command A/B/A recapture. Re-run the nine accepted archive tests. Validate
+`cargo fmt --all -- --check`, `git diff
+--check`, exact lock/Cargo hashes, Ring-only `cargo tree`, focused transport,
+archive and native-session tests, `cargo check -p slug_core_v2 --locked`, the
+core lib suite with the known baseline query failure recorded separately,
+`cargo build -p slug_cli_v2 --locked`, exact `slugd` cleanup, and a fresh
+wildcard-removed rules_rust query/build replay. The public replay may claim
+only the unchanged collapsed repository-session terminal; direct proof owns
+the new inner materialization stage.
+
+STOP on dependency/version drift, AWS-LC/global provider, inability to poll and
+dispose the sole connection without a task, network under dormant repository
+I/O, DICE/lock I/O, retained capture/path/socket, full buffering, extraction or
+root effects, changed local archive bytes/diagnostics, wider repository or CLI
+behavior, fixture/Zabel/Bazel-tools mutation, subprocess/Java/JVM, cap breach,
+second materializer, or a second material correction. `REPLAN` before widening.

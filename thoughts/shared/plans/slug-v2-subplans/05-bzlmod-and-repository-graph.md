@@ -4080,3 +4080,17 @@ state; do not erase producer fields, add a selected side table or widen generic
 repository rules. Pinned Zabel remains concept-only guidance for keeping the
 semantic descriptor above physical realization. Bazel 9.2 remains behavioral
 authority.
+
+### Selected-registry verified-capture transport selected (2026-08-25)
+
+The live split supports a smaller transport-only successor. Native command
+progress may use the existing current-thread runtime after DICE has yielded and
+before the sole materializer revalidates its token. Stream the exact selected
+BCR URLs in order into bounded command scratch, verify SHA-256 SRI, delete the
+capture, and publish an honest generation-scoped deferred-extraction result.
+
+The dormant repository-I/O path remains offline and deferred. No capture,
+path, socket or transport fact enters the structural `RepoSpec`, DICE equality
+or retained materializer state; no root can be published. Pinned Zabel guides
+this semantic-view/scratch separation only, while Bazel 9.2 owns URL, redirect,
+fallback and integrity behavior.

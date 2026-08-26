@@ -18267,3 +18267,17 @@ exact dependency closure, and select one bounded transport entry or `REPLAN`.
 Do not widen CLI diagnostics, registry behavior, DICE identity or generic
 archives. Zabel guides ownership/lifetime layering only; Bazel 9.2 owns
 transport/archive behavior. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Native selected-BCR verified capture selected (2026-08-25)
+
+The reviewed runtime boundary permits transport without a new scheduler or
+materializer: synchronous command progress resolves addresses, and bounded
+entries on the existing current-thread runtime directly drive and dispose one
+raw HTTP/1 connection. Body frames leave Tokio before synchronous capture
+writes and hashing. No task, executor, DICE compute or lock owns network work.
+
+This packet ends after verified scratch deletion and a generation-scoped
+deferred-extraction materialization result. Root construction and MODULE
+replacement remain the immediate successor, and the existing post-callback
+token check remains publication authority. Pinned Zabel guides lifetime
+layering only; its scheduler and transport are not adopted.
