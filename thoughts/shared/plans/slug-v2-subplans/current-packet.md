@@ -1,9 +1,9 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-lint-test-label-default-loading`
+Packet: `WP-4-7A-lint-test-label-default-loading-r2`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owners: loading-owned attribute definition, defining external-Bzl identity and frozen rule schema
-Base: `e71db43e`
+Base: `2936c570`
 
 Result: complete declaration-time loading and freezing of the fixed
 `LINT_TEST_COMMON_ATTRS` dictionary at accepted rules_rust 0.73.0
@@ -48,7 +48,8 @@ The exact frozen results for the admitted defining identity are:
 
 - `_allowlist_function_transition` defaults to
   `@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist`;
-- `_runner` defaults to `@@dep+//rust/private:lint_test_runner` even though the
+- `_runner` defaults to
+  `@@dep+//rust/private/lint_test_runner:lint_test_runner` even though the
   root apparent dependency is `dep_alias` and the defining module's self-name
   is `rules_rust`; and
 - `_runner` retains executable true plus the accepted exec-configuration
@@ -86,6 +87,34 @@ The corrected proof is compositional and adds no semantic owner:
 
 Do not mutate the synthetic root, add registry responses, admit explicit
 built-in overrides, or change selected mapping construction in this packet.
+
+## Second implementation stop and canonical target correction
+
+The corrected proof reached the typed runner assertion and exposed a second
+material contract error before any Rust was retained. The accepted source
+spelling is `Label("//rust/private/lint_test_runner")`, with no colon. At the
+pinned Bazel 9.2 commit, `LabelValidator.parseAbsoluteLabel` assigns the whole
+post-`//` spelling to the package and derives the implicit target from its last
+path segment. `LabelParserTest.parserTable` directly authenticates
+`//foo/bar` as package `foo/bar`, target `bar`. The exact runner identity is
+therefore:
+
+```text
+@@dep+//rust/private/lint_test_runner:lint_test_runner
+```
+
+It is not `@@dep+//rust/private:lint_test_runner`; that spelling would require
+an explicit colon before `lint_test_runner` in the source. Pinned Zabel's
+`generic_label.zig` likewise keeps package path and target name as distinct
+retained identity parts and derives the no-colon raw name from the final path
+segment. That is architectural guidance for the producer-owned identity split
+only; pinned Bazel remains the sole behavior authority.
+
+Because this is the second material implementation/contract correction, the
+prior packet stops with `REPLAN`. This `-r2` packet preserves the already
+reviewed owner, proof composition, implementation allowlist and caps while
+correcting every expected runner identity. No Rust from either stopped attempt
+is retained.
 
 ## Authorities and compatibility classification
 
@@ -184,15 +213,15 @@ test:
 
 The proof must discriminate preservation from stringification: the runner
 Label is created in the defining module and reaches the schema as
-`@@dep+//rust/private:lint_test_runner`; do not pass `str(Label(...))` to the
-attribute default. Reuse the accepted Bzlmod test
+`@@dep+//rust/private/lint_test_runner:lint_test_runner`; do not pass
+`str(Label(...))` to the attribute default. Reuse the accepted Bzlmod test
 `selected_definition_source_is_request_owned_and_route_structural` as the
 route-to-built-in mapping proof. Add no fixture, registry response, network
 request or Bazel run.
 
 ## Allowlist and growth caps
 
-Only these files may change from base `e71db43e`:
+Only these files may change from base `2936c570`:
 
 | File | Base SHA-256 | Base lines | Final line cap | Purpose |
 |---|---|---:|---:|---|

@@ -4369,15 +4369,17 @@ repository mapping; an already-constructed Label is returned unchanged.
 Focused rule-class, remote-label-default and Bzlmod load tests authenticate
 conversion at declaration time, before target lookup or rule invocation.
 
-Run only `WP-4-7A-lint-test-label-default-loading`. In the existing
+Run only `WP-4-7A-lint-test-label-default-loading-r2`. In the existing
 `attribute_definition` owner, retain the full caller-aware
 `BzlModuleIdentity`; route only scalar label strings through the shared pure
 resolver and clone only an actual `StarlarkLabel`'s canonical identity into
 the existing `CoercedAttributeValue::Label`. Preserve every non-label default
 path and the accepted label-`None` case. Prove the selected registry's distinct
 root alias, module self-name and canonical repo, the exact `@@bazel_tools`
-allowlist default, the `@@dep+` runner default, recursive freeze/export and
-missing/conflicting mapping failure. Add no map, DICE compute, I/O, cache,
+allowlist default, the exact
+`@@dep+//rust/private/lint_test_runner:lint_test_runner` runner default,
+recursive freeze/export and missing/conflicting mapping failure. Add no map,
+DICE compute, I/O, cache,
 interner, hash domain or lifetime owner.
 
 Exact compatibility covers only these two scalar label-default input forms,
@@ -4411,6 +4413,21 @@ path, and freeze the exact `@bazel_tools` dictionary in a focused caller-aware
 manifest context. Do not expand the registry fixture, change mapping identity,
 or add another owner. This is a proof split only; exact/Slug-native/deferred
 classification and implementation scope are unchanged.
+
+Second implementation contract correction: the source spelling
+`Label("//rust/private/lint_test_runner")` has no colon. Pinned Bazel 9.2
+`LabelValidator.parseAbsoluteLabel` assigns the complete
+`rust/private/lint_test_runner` path to the package and the last segment
+`lint_test_runner` to the implicit target; `LabelParserTest.parserTable`
+directly authenticates the same `//foo/bar -> package foo/bar, target bar`
+rule. The exact canonical value is therefore
+`@@dep+//rust/private/lint_test_runner:lint_test_runner`, not
+`@@dep+//rust/private:lint_test_runner`. Pinned Zabel's distinct retained
+package-path and target-name projection is architectural guidance for keeping
+those identity parts producer-owned, never behavior authority. This is the
+second material correction, so the prior packet is stopped and only
+`WP-4-7A-lint-test-label-default-loading-r2` may proceed under the unchanged
+two-file boundary and caps.
 
 ### Detect-sysroot rule accepted; post-rust-analyzer frontier audit selected (2026-08-26)
 

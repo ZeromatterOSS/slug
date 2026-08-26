@@ -30,13 +30,13 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; lint-test label-default loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes lazy loading of the file's final detect-sysroot rule; `e71db43e` identifies the next recursive frontier | load and freeze the two fixed scalar label defaults in `rust/private/lint_test.bzl` through their defining-module identity; invocation, transition application, rustfmt aspects, `ctx.toolchains`, actions and bool/list targets/analysis remain deferred | run only `WP-4-7A-lint-test-label-default-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; corrected lint-test label-default loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes lazy loading of the file's final detect-sysroot rule; `e71db43e` identifies the next recursive frontier | load and freeze the two fixed scalar label defaults in `rust/private/lint_test.bzl` through their defining-module identity; invocation, transition application, rustfmt aspects, `ctx.toolchains`, actions and bool/list targets/analysis remain deferred | run only `WP-4-7A-lint-test-label-default-loading-r2`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-lint-test-label-default-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-lint-test-label-default-loading-r2](./slug-v2-subplans/current-packet.md).
 
 Load and freeze the fixed `rust/private/lint_test.bzl:45-62` common attribute
 dictionary. Resolve its raw `@bazel_tools` scalar label default through the
@@ -82,7 +82,7 @@ preserve canonical Label values, and do not defer repair to a consuming BUILD
 package. No Zig code, representation, mapping behavior, evaluator rule or DICE
 relation is copied; Bazel 9.2 remains sole behavior authority.
 
-Run only `WP-4-7A-lint-test-label-default-loading`. Reuse the complete
+Run only `WP-4-7A-lint-test-label-default-loading-r2`. Reuse the complete
 `BzlModuleIdentity`, shared label resolver, `StarlarkLabel` and existing owned
 `CoercedAttributeValue::Label`; add no map, cache, lookup, I/O, hash domain or
 lifetime owner. Exact compatibility is limited to scalar label-default string
@@ -106,6 +106,18 @@ built-in snapshot with a focused caller-aware loading context that freezes the
 exact lint-test dictionary. Keep the recursive selected fixture for the
 `rules_rust -> dep+` producer/Label path. This proof correction adds no code
 owner and does not change the compatibility classification.
+
+The corrected proof then exposed a second material contract error before any
+Rust was retained. Pinned Bazel 9.2 `LabelValidator.parseAbsoluteLabel` and
+`LabelParserTest.parserTable` prove that a no-colon absolute label uses the
+whole post-`//` path as its package and the last path segment as its implicit
+target. Therefore `Label("//rust/private/lint_test_runner")` is exactly
+`@@dep+//rust/private/lint_test_runner:lint_test_runner`, not
+`@@dep+//rust/private:lint_test_runner`. Pinned Zabel's separate retained
+package-path/target-name projection reinforces that owner shape as
+architectural guidance only. This second contract correction requires
+`REPLAN`; run only the `-r2` packet and retain the same two-file implementation
+boundary and caps.
 
 ### M7 detect-sysroot rule accepted; recursive frontier audit selected (2026-08-26)
 
