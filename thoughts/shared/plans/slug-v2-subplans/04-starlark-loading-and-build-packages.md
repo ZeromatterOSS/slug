@@ -4144,14 +4144,14 @@ documentation nor field prose participates in Bazel provider identity or
 Slug's admitted build semantics.
 
 Run only `WP-4-7A-bazel-provider-doc-loading`. Add named
-`doc: Option<NoneOr<&str>>` to the existing global adapter: the outer option is
-omission while `NoneOr` accepts explicit Starlark `None`. Consume it there
-without retention; do not touch `UserProviderCallable`, `ProviderId`, analysis,
-globals placement or DICE. Prove string and `None` acceptance, non-string
-rejection, and frozen recursive export using the existing external-Bzl harness.
-A source edit still invalidates through the existing observed module bytes;
-semantic cutoff may ignore prose-only changes because documentation is not an
-admitted build fact.
+`doc: Option<Value<'v>>` to the existing global adapter: the outer option is
+omission, and the adapter accepts only explicit Starlark `None` or a string.
+Consume it without retention; do not touch `UserProviderCallable`, `ProviderId`,
+analysis, globals placement or DICE. Prove string and `None` acceptance,
+non-string rejection, and frozen recursive export using the existing
+external-Bzl harness. A source edit still invalidates through the existing
+observed module bytes; semantic cutoff may ignore prose-only changes because
+documentation is not an admitted build fact.
 
 Exact compatibility is named string/`None` call acceptance, type rejection and
 unchanged callable export/freeze identity on the live dictionary-fields route.
