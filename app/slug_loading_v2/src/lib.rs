@@ -10,6 +10,7 @@
 
 pub mod attrs;
 pub mod bzl_module;
+mod cc_common;
 mod cycle_detector;
 pub mod file_discovery;
 pub mod glob;

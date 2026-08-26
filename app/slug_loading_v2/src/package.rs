@@ -74,6 +74,7 @@ use crate::attrs::NativeRuleClass;
 use crate::attrs::TransitionDefinition as LoadingTransitionDefinition;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::bzl_module::FrozenBzlLifetimeEntry;
+use crate::cc_common::cc_common_globals;
 use crate::glob::GlobError;
 use crate::glob::GlobSpec;
 use crate::glob::PackageListing;
@@ -5421,6 +5422,7 @@ fn complete_loading_globals(extensions: &[LibraryExtension], bool_config: bool) 
     if bool_config {
         globals.set("config", ConfigModule);
         aspect_globals(&mut globals);
+        cc_common_globals(&mut globals);
         label_globals(&mut globals);
     } else {
         globals.set("config", BuildFileConfigModule);

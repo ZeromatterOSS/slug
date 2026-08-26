@@ -3226,6 +3226,70 @@ fn eval_bzl_with_identity(
     drop(evaluator);
     Ok(module.freeze()?)
 }
+
+#[test]
+fn bazel_cc_common_private_bridge_is_bzl_only_owner_checked_and_opaque() {
+    let owner = |label: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(label).unwrap(),
+        workspace_path: PathBuf::from("/registry-rules-cc/cc/private/cc_internal.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let module = eval_bzl_with_identity(
+        "INTERNAL=cc_common.internal_DO_NOT_USE()\nHAS_BRIDGE=hasattr(cc_common, 'internal_DO_NOT_USE')\nHAS_INTERNAL_METHOD=hasattr(INTERNAL, 'check_private_api')\n",
+        owner("@@rules_cc+//cc/private:cc_internal.bzl"),
+    )
+    .unwrap();
+    assert_eq!(
+        module.get("INTERNAL").unwrap().value().get_type(),
+        "cc_internal"
+    );
+    assert_eq!(module.get("HAS_BRIDGE").unwrap().unpack_bool(), Some(true));
+    assert_eq!(
+        module.get("HAS_INTERNAL_METHOD").unwrap().unpack_bool(),
+        Some(false)
+    );
+
+    for source in [
+        "X=cc_common.internal_DO_NOT_USE(1)",
+        "X=cc_common.internal_DO_NOT_USE(value=True)",
+    ] {
+        assert!(
+            eval_bzl_with_identity(source, owner("@@rules_cc+//cc/private:cc_internal.bzl"))
+                .is_err(),
+            "{source}"
+        );
+    }
+    for (label, diagnostic_label) in [
+        (
+            "@@//cc/private:cc_internal.bzl",
+            "//cc/private:cc_internal.bzl",
+        ),
+        (
+            "@@dep+//cc/private:cc_internal.bzl",
+            "@@dep+//cc/private:cc_internal.bzl",
+        ),
+    ] {
+        let error = eval_bzl_with_identity("X=cc_common.internal_DO_NOT_USE()", owner(label))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains(&format!("file '{diagnostic_label}' cannot use private API")),
+            "{error}"
+        );
+    }
+
+    eval_global(
+        "PRESENT=hasattr(cc_common, 'internal_DO_NOT_USE')",
+        &loading_globals(),
+    )
+    .unwrap();
+    assert!(
+        eval_global("X=cc_common", &build_file_loading_globals())
+            .unwrap_err()
+            .contains("cc_common")
+    );
+}
+
 #[test]
 fn label_attribute_defaults_keep_defining_module_identity() {
     let owner = BzlModuleIdentity {
