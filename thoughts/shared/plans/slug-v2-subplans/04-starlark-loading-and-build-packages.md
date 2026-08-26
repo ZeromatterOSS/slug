@@ -5247,6 +5247,56 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Empty HeaderInfo accepted; documented provider initializer selected (2026-08-26)
+
+Commit `2ebc6fe1` accepts only no-argument empty HeaderInfo loading. The private
+capability returns a fresh immutable `HeaderInfo`; four module fields are
+`None`, four header fields are immutable empty lists, aliases retain occurrence
+identity through freeze and distinct calls differ. The value is loading-only,
+unhashable, accepts no named/non-empty inputs, and has no dependency or
+configured-analysis projection. Focused proof, all 204 loading units,
+configured analysis, locked checks, rebuilt CLI and hygiene pass at 77
+production, 74 proof and 151 total additions. Selection review corrected the
+next stop to `CcInfo`; terminal review returned `ACCEPT`.
+
+The first absent expression is now `cc/private/cc_info.bzl:260–269`:
+
+```starlark
+CcInfo, _ = provider(
+    doc = "Provider for C++ compilation and linking information.",
+    fields = { ... },
+    init = _create_cc_info,
+)
+```
+
+Pinned Bazel 9.2 normalizes a string-to-string dictionary schema before the
+same `ArgumentProcessorWithInit` and raw-constructor path used by list schemas.
+The initializer still receives original arguments, returns a string-keyed
+dictionary, permits omitted declared fields and rejects unknown fields. Both
+constructors share the exported provider identity.
+
+The same abstraction freezes `cc_info.bzl` and the later documented-dictionary
+initialized `CcLauncherInfo`. `cc_shared_library_hint_info.bzl` then needs only
+accepted direct documented providers. The LTO child declares direct documented
+providers and an already-admitted dictionary-valued instance. Source order next
+enters `cc_compilation_outputs.bzl`; its top-level empty row invokes
+`create_compilation_outputs_internal()` and first reaches the unsupported
+`_cc_internal.freeze(objects)` at line 86.
+
+Run only `WP-4-7A-bazel-documented-provider-initializer-loading`. Generalize
+only initialized schema parsing to accept a documented dictionary and feed its
+normalized names into the existing callable/raw/instance owner. Do not add a
+second identity or representation, retain documentation, admit initialized
+values to configured analysis, or implement `cc_internal.freeze`.
+
+Clean `../zabel` `0795445f…` is architectural guidance only. Its normalized
+provider schema and one `ProviderDefinition` owner keep schema, initializer,
+raw constructor, publication and export identity together. Slug follows that
+owner and phase split using its existing `Arc<[CompactString]>`, ordinal
+`SmallMap`, `Value`/`FrozenValue`, `Dupe` and `Allocative`; no Zig code, layout,
+runtime, allocator or behavior is copied, and no Buck2 utility or ledger row is
+needed. Bazel 9.2 remains sole compatibility authority.
+
 ### Provider schemas accepted; empty HeaderInfo selected (2026-08-26)
 
 Commit `f65c9ce0` accepts non-initialized schemaless, unique string-list and

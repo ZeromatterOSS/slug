@@ -1,179 +1,179 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-bazel-empty-header-info-loading`
+Packet: `WP-4-7A-bazel-documented-provider-initializer-loading`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: private C++ loading capability and empty HeaderInfo value
-Base: `f65c9ce0`
+Owners: initialized provider schema normalization and existing provider owner
+Base: `2ebc6fe1`
 
-Result: complete rules_cc's top-level empty compilation-context row by
-admitting only Bazel's no-argument empty
-`cc_internal.create_header_info()` value. Keep all non-empty, dependency,
-configured-analysis and other C++ semantics unsupported, and stop at the next
-top-level expression in the same file.
+Result: accept documented string-to-string schemas on the existing loading-only
+initialized provider family, completing rules_cc `CcInfo` and
+`CcLauncherInfo` declarations. Stop before the next private C++ method.
 
 ## Accepted starting point and source-order stop
 
-Commit `f65c9ce0` accepts omitted/`None`, unique string-list and documented-map
-provider schemas plus arbitrary optional loading values. One frozen provider
-definition owns schema and exported identity; schemaful instances use compact
-ordinal slots, schemaless instances retain dynamic names, and only the existing
-complete documented-string representation enters configured analysis. Focused
-proof, all 203 loading units, configured analysis, locked checks, rebuilt CLI,
-formatting and hygiene pass. Independent review returned `ACCEPT`.
+Commit `2ebc6fe1` accepts only the no-argument empty HeaderInfo row. The private
+capability returns a fresh immutable loading value with four `None` module
+fields and four immutable empty header-list observations. Named/non-empty
+calls, hashing, dependencies and configured C++ lowering remain unsupported.
+Focused proof, all 204 loading units, configured analysis, locked checks,
+rebuilt CLI and hygiene pass. Independent selection review corrected the next
+stop to `CcInfo`; terminal review returned `ACCEPT`.
 
-Recursive source order now freezes
-`cc/private/link/create_extra_link_time_library.bzl` and resumes rules_cc
-0.2.17 `cc/private/cc_info.bzl`. Its provider declarations and top-level
-documented provider construction are accepted. The first absent expression is
-line 134 inside the empty compilation context:
-
-```starlark
-_header_info = _cc_internal.create_header_info()
-```
-
-Once the empty HeaderInfo exists, evaluation passes the accepted linking and
-debug-context constructions plus lazy functions. It then reaches lines
-260–269 in the same file:
+The first absent expression is rules_cc 0.2.17
+`cc/private/cc_info.bzl:260–269`:
 
 ```starlark
 CcInfo, _ = provider(
     doc = "Provider for C++ compilation and linking information.",
-    fields = { ... },
+    fields = {
+        "compilation_context": "A `CcCompilationContext`.",
+        "linking_context": "A `CcLinkingContext`.",
+        "_debug_context": "A `CcDebugInfoContext`.",
+        "_legacy_transitive_native_libraries": "A `CcNativeLibraryInfo`.",
+    },
     init = _create_cc_info,
 )
 ```
 
-The accepted initializer supports only list schemas. This documented
-dictionary-schema initialized provider is the next stop and a separate audit;
-`cc_info.bzl` does not yet freeze.
+Slug's accepted initialized provider requires `fields` to be a string list.
+All callable, raw-constructor, original-argument forwarding, dictionary-result
+validation, optional-field, arbitrary-value, identity and freeze behavior is
+already present. The honest missing abstraction is documented-dictionary schema
+normalization for that same owner.
+
+After this declaration, `cc_info.bzl` freezes. Source order returns through
+`cc/private/cc_common.bzl` and reaches `cc/private/cc_launcher_info.bzl`, whose
+`CcLauncherInfo, _ = provider(fields = { ... }, init = ...)` uses the same
+shape and also freezes. The shared-library hint child uses an accepted direct
+documented provider. The LTO child uses accepted direct documented providers
+and an accepted dictionary-valued direct instance. Evaluation next enters
+`cc/private/compile/cc_compilation_outputs.bzl`; its top-level
+`EMPTY_COMPILATION_OUTPUTS = create_compilation_outputs_internal()` first calls
+`_cc_internal.freeze(objects)` at line 86. That private method is the stop.
 
 ## Fixed sources and compatibility authority
 
-Reuse the accepted rules_rust/rules_cc materialization and graph. Relevant
-fixed inputs are:
+Reuse the accepted rules_rust/rules_cc materialization. Relevant fixed inputs:
 
-- rules_cc `cc/private/cc_info.bzl` SHA-256
+- `cc/private/cc_info.bzl` SHA-256
   `4424bb876c3f8234d7cfce20652e7ab1a7b2fc34cc2c637b1cb4313590d9f1bc`;
-- Bazel `CcStarlarkInternal.java` SHA-256
-  `143e7e4f63deac9f65ca4e85e2e4d84f3fedf6560428e1dc6f975b2255424f53`;
-- Bazel `CcCompilationContext.java` SHA-256
-  `580d0af792672b35a4da506dbb837bf99222199d70887855493e7d50963a21cd`.
+- `cc/private/cc_launcher_info.bzl` SHA-256
+  `41da54762e854191c0217575d385b37cd9729380d7c78d3efbc19049177250dd`;
+- `cc/private/compile/lto_compilation_context.bzl` SHA-256
+  `a17435cd56fa165c71081e99f9af73407f7b4cc1dc086e53771dcf74df81b3f4`;
+- `cc/private/compile/cc_compilation_outputs.bzl` SHA-256
+  `294e3da16da4444122e7dee058ec1e06b30cec93d64a32f217cf9e1e3e4bfb44`.
 
 Pinned Bazel 9.2 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` is the sole behavior authority.
-`CcStarlarkInternal.createHeaderInfo` declares eight named-only parameters and
-passes a fresh Starlark-thread identity token, four optional derived-artifact
-module fields, four artifact sequences and empty dependency lists to
-`HeaderInfo.create`. With no arguments, the module fields are `None`, all four
-header sequences become immutable empty lists, and both dependency inputs are
-empty. `HeaderInfo` exposes the eight fields, compares by its identity token,
-is immutable and is hashable in Bazel.
-
-Only the zero-argument loading row and its empty field observations are
-selected. Pinned source is sufficient; no new Bazel fixture is required.
+`8220c6198837d5c13d53fea211cf3282aa12408a` is sole behavior authority.
+`StarlarkRuleClassFunctions.provider` accepts either a string sequence or a
+string-to-string dictionary as `fields`, normalizes the schema, installs a
+callable `init`, creates one provider identity and returns the provider/raw pair.
+`StarlarkProvider.ArgumentProcessorWithInit` forwards original positional and
+named arguments, requires the initializer result to be a string-keyed
+dictionary, and creates through the same schema factory as the raw constructor.
+The factory permits omitted schema fields and rejects unknown fields. Existing
+pinned tests for declared providers with init, invalid return dictionaries,
+unexpected fields and raw bypass discriminate the shared behavior; the live
+rules_cc declarations discriminate the newly admitted dictionary schema form.
+No new Bazel run is required.
 
 ## Zabel and Buck2 architectural guidance
 
 Pinned clean `../zabel` commit
 `0795445f3ab60f4e49070bdd0b94425c5610f73a` is concept/test guidance only.
-`src/starlark_host/engine/builtins_cc_primitives.zig` keeps one evaluator-local
-HeaderInfo field row, validates the full constructor before allocation, owns
-immutable header sequences with the value, and requires retained provider
-lowering to copy the row before the evaluator ends. Its rules_cc-shaped test
-separately proves the empty compilation-context call. Slug follows the owned
-loading value and later-lowering phase split but does not copy Zig code,
-representation, layout, allocator, errors, API breadth or analysis behavior.
-Bazel remains compatibility authority.
+`provider_schema.zig` owns one normalized schema abstraction for documented
+dictionaries and name sequences. `build_rule_declaration.zig` keeps schema,
+initializer, raw constructor, publication owner and export identity on one
+`ProviderDefinition`; construction projects schema ordinals from that owner.
+Slug follows the one-owner and normalization boundaries but copies no Zig code,
+representation, layout, allocator, errors, runtime or behavior. Bazel remains
+compatibility authority.
 
-The selected empty row needs no dynamic collection: retain one frozen empty
-Starlark list with the HeaderInfo and project it to the four equal list fields.
-The four module fields project `None`. Default starlark-rust value occurrence
-identity supplies distinct constructor results and remains shared by aliases
-through freeze. Reuse `FrozenValue`, `Trace`, `Freeze` and `Allocative`; add no
-counter, map, interner, registry, side store or digest. This is an existing-
-utility decision, so no Stage 9 ledger row is required.
+Reuse the current `Arc<[CompactString]>` schema names, ordinal `SmallMap`
+instance slots, `Value`/`FrozenValue`, `Dupe` and `Allocative`. Documentation
+values are validated then discarded as already done for direct documented
+providers. Add no map, interner, registry, side store or digest. No Stage 9
+ledger row is required.
 
 ## Compatibility classification
 
-- **Exact:** `.bzl` `cc_internal.create_header_info()` accepts zero arguments
-  and returns a fresh immutable value of type `HeaderInfo`; its
-  `header_module`, `pic_header_module`, `separate_module`, and
-  `separate_pic_module` fields are `None`; `modular_public_headers`,
-  `modular_private_headers`, `textual_headers`, and
-  `separate_module_headers` are immutable empty lists; aliases compare equal,
-  separate calls compare unequal; the selected rules_cc empty compilation
-  context freezes and evaluation reaches the later `CcInfo` declaration.
-- **Slug-native:** one frozen empty list may back the four observationally
-  equal empty list fields; Rust/starlark-rust storage, display text and
-  nonrequired diagnostics remain native. The value is loading-only and carries
-  no configured semantic projection.
-- **Unsupported/deferred:** every named constructor argument and non-empty
-  HeaderInfo; Bazel HeaderInfo hashing; dependency DAGs and
-  `create_header_info_with_deps`; Files/artifacts; HeaderInfo returned from or
-  consumed by configured analysis; CcCompilationContext semantics; the
-  dictionary-schema initialized `CcInfo`; every other C++ private
-  method, provider, toolchain and action surface; later rules_cc/rules_rust
-  source, M8/M7B and exact output bytes.
+- **Exact:** `.bzl` initialized `provider` accepts a string-to-string
+  documented `fields` dictionary; invalid field names/docs fail; it returns
+  the provider/raw pair; both share one assignment-bound identity and schema;
+  normal calls forward original arguments through `init`, require a string-
+  keyed dictionary, accept arbitrary freezeable values, permit omitted fields
+  and reject unknown fields; raw calls bypass `init`, reject positional
+  arguments and apply the same optional schema; the selected `CcInfo` and
+  `CcLauncherInfo` declarations freeze.
+- **Slug-native:** initialized instances remain loading-only; Rust storage,
+  valid-Unicode strings, discarded documentation and nonrequired diagnostics
+  remain native.
+- **Unsupported/deferred:** omitted/`None`/schemaless initialized providers;
+  tuple schemas; provider concatenation; initialized instances returned by
+  configured analysis; CcInfo/CcLauncherInfo configured semantics;
+  `_cc_internal.freeze` and every later C++ provider/toolchain/action method;
+  later rules_cc/rules_rust source, M8/M7B and exact output bytes.
 
 ## Ownership, lifetime and implementation boundary
 
-Keep `CcInternalModule` as the capability returned only by the accepted
-owner-checked `.bzl` bridge. Add a method table containing only
-`create_header_info`; do not install a public global or expose the method in
-BUILD evaluation.
+Keep `user_provider_from_arguments` as the only declaration adapter. When
+`init` is present, normalize either the existing unique string list or an
+existing documented string dictionary to the same canonical
+`Arc<[CompactString]>`. Feed it to the unchanged
+`InitializedUserProviderCallable::allocate_pair`. Do not add a schema-kind bit:
+list and documented schemas have identical instance membership semantics and
+documentation is not retained.
 
-Add one loading-only immutable HeaderInfo value in `cc_common.rs`. It owns a
-frozen empty list allocated in the module frozen heap and projects that value
-to the four header-list fields; module fields return `None`. Its heap occurrence
-is its identity, so the value must not be a zero-sized singleton and aliases
-must freeze to the same occurrence. Do not add a numeric identity counter or
-retain evaluator scratch. The value never crosses into the configured provider
-decoder.
+The existing initialized callable remains the sole owner of source label,
+export identity, schema, callback and raw constructor. Normal/raw instances
+continue using the generalized loading-only schemaful representation and freeze
+all values through the module heap. No configured decoder changes.
 
-`BzlModuleEvalKey` and the recursive source observations remain the sole
+`BzlModuleEvalKey` and recursive source observations remain the sole
 invalidation owner. There is no DICE, request, command, async, cache,
 publication, cancellation or shutdown change.
 
 ## Discriminating proof
 
-- Evaluate from a canonical `rules_cc+` `.bzl` owner, create two empty
-  HeaderInfos, and prove exact type, eight attributes, empty values, immutable
-  list behavior, alias equality and distinct-call inequality before and after
-  module freeze.
-- Evaluate the source-shaped `CcCompilationContextInfo(...,
-  _header_info = cc_internal.create_header_info())`, freeze it, and read the
-  nested HeaderInfo fields through the loading-only provider instance.
-- Prove positional, unknown named and selected known named arguments fail
-  closed; the known named row is explicitly deferred rather than claimed
-  exact.
-- Keep the private bridge owner/BUILD boundary test green.
-- Keep the provider-schema and initialized-provider regressions green.
-- Do not add a full rules_cc fixture or claim `cc_info.bzl` succeeds.
+- Evaluate and freeze rules_cc-shaped documented-dictionary initialized
+  `CcInfo` and `CcLauncherInfo` declarations.
+- Invoke normal construction with positional/named original arguments and
+  prove initializer execution, optional arbitrary returned fields and frozen
+  field reads.
+- Invoke the raw constructor and prove callback bypass, shared ProviderId,
+  optional fields, unknown rejection and positional rejection.
+- Reject non-string dictionary names/docs, non-callable init, non-dictionary
+  initializer results and unexpected returned fields.
+- Keep existing list-schema initialized, direct provider-schema, empty
+  HeaderInfo and configured provider analysis regressions green.
+- Do not implement or claim `_cc_internal.freeze` or full `cc_common.bzl`.
 
 ## Allowlist and caps
 
-Only these files may change from base `f65c9ce0`:
+Only these files may change from base `2ebc6fe1`:
 
 | File | Base SHA-256 | Base lines | Final cap | Purpose |
 |---|---|---:|---:|---|
-| `app/slug_loading_v2/src/cc_common.rs` | `047f0c9464092f0ec4cfc58671dc4c3033a9d19f48828752b98034e68d6a9d59` | 89 | 180 | empty HeaderInfo and one private method |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `7bc1f6f974da7cf9bb3fab2163e88445a7797194183f5458a6f97740493689c3` | 5,597 | 5,720 | identity, fields, freeze and source stop proof |
+| `app/slug_loading_v2/src/provider.rs` | `c4369ce97f6c0c53d188aebc70b85d116dfd4a5e63ca547454ba01efed67ca5a` | 957 | 1,025 | documented initialized schema normalization |
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `f77c9174c201c9256e09b49d1fa2c23b045c67d2642ffb84fbb8e7673aebd8d2` | 5,671 | 5,790 | source-shaped identity/freeze/boundary proof |
 
-Production additions are capped at 90, proof additions at 115 and total
-additions at 205. Deletions do not buy addition budget. No new or touched
-function may exceed 120 lines. The test file exceeds the 2,000-line review
-trigger, but adding the focused regression beside the existing private-bridge
-and provider tests preserves their shared evaluator helper and source-order
-narrative; moving it would require widening `lib.rs` and the packet allowlist.
+Production additions are capped at 60, proof additions at 110 and total
+additions at 170. Deletions do not buy addition budget. No new or touched
+function may exceed 120 lines. The test file exceeds the 2,000-line trigger,
+but the focused proof belongs beside the existing initialized-provider and
+provider-schema regressions sharing the same evaluator helper; splitting it
+would widen `lib.rs` and the allowlist.
 
 ## Serial validation
 
 Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
 `CARGO_BUILD_JOBS=1`:
 
-- focused empty-HeaderInfo/source-shaped test;
-- existing private bridge, provider-schema and initialized-provider tests;
-- one focused configured string-provider analysis regression;
+- focused documented initialized-provider test;
+- existing list initialized-provider, direct provider-schema and empty
+  HeaderInfo tests;
+- one configured provider analysis regression;
 - `cargo test -p slug_loading_v2 --lib`;
 - `cargo check --locked -p slug_analysis_v2 -p slug_core_v2`;
 - `cargo build -p slug_cli_v2` after Rust changes;
@@ -186,19 +186,18 @@ known stale `@external` diagnostic-order row and need not rerun unless focused
 evidence exposes integration risk. Recheck base hashes, caps, allowlist,
 function sizes, configured-analysis non-widening and the clean Zabel pin.
 
-The new retained Starlark value requires independent selection and terminal
+The schema-normalization change requires independent selection and terminal
 implementation reviews. Both must verify Bazel authority, Zabel's guidance-
-only role, immutable-list lifetime, occurrence identity through freeze,
-configured fail-closed behavior, compatibility classes and every cap.
+only role, single identity/representation, freeze safety, configured
+fail-closed behavior, compatibility classes and every cap.
 
 ## STOP / REPLAN
 
 STOP and REPLAN for a file outside the allowlist; analysis/build-api/DICE edit;
-a global or numeric identity registry; mutable or evaluator-borrowed retained
-fields; public BUILD exposure; any named/non-empty HeaderInfo admission;
-HeaderInfo dependencies, hashing or configured lowering;
-`create_header_info_with_deps`; another `cc_internal` method; initialized
-dictionary-schema providers; source/mapping/materializer/network/fixture
-change; Java/JVM work; copied Zabel code or behavior; cap violation; or a claim
-beyond the empty compilation-context row. After it succeeds, stop and audit
-the dictionary-schema initialized `CcInfo` at lines 260–269 separately.
+a second identity, callable or instance representation; retained documentation;
+schemaless/tuple initialized widening; provider concatenation; configured
+admission; `_cc_internal.freeze` or another C++ method; source/mapping/
+materializer/network/fixture change; Java/JVM work; copied Zabel code or
+behavior; cap violation; or a claim beyond the documented initialized-provider
+declarations. After `CcLauncherInfo` freezes, stop at
+`cc_compilation_outputs.bzl:86` and audit that method separately.
