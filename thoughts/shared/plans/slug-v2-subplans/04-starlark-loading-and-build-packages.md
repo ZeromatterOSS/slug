@@ -5247,6 +5247,39 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Exact rules_cc find-toolchain child accepted; utils audit selected (2026-08-26)
+
+Commit `ee9ef5254` freezes exact rules_cc 0.2.17
+`cc/find_cc_toolchain.bzl` under producer
+`@@rules_cc+//cc:find_cc_toolchain.bzl` and exact cached child
+`@@rules_cc+//cc/common:cc_common.bzl`. The authenticated 131-line source hashes
+to `3f62d3ea99f59674f71dbc669c80dd0dc5ef14637933d727b74f0bd556334655`.
+Its five source-defined names retain dict/Label/function types, while the
+canonical toolchain Label and singleton `_cc_toolchain` Label/default survive a
+proof-only rule consumer. No helper or implementation executes.
+
+All 226 loading units, both 24/31 integration suites, dependent core checks,
+rebuilt CLI and hygiene pass. Growth is 225 proof-only lines, ending at 8,160
+below the 8,235 ceiling. Independent review caught the initially mispackaged
+cached-child label; the corrected exact identity reran focused/full proof and
+received `ACCEPT`.
+
+Run only docs packet `WP-4-7A-post-find-cc-toolchain-utils-frontier-audit`.
+Resume exact `rust/private/utils.bzl` after find-toolchain returns, account for
+its cached rules_cc and providers children, classify all remaining eager values
+and select one bounded next packet or `REPLAN`. Edit no Rust and invoke no
+utility/toolchain helper.
+
+Exact compatibility covers source/identity freeze, five source-defined export
+types and eager canonical label/declaration facts. Frozen Rust representation
+and the proof consumer are Slug-native. Function execution, configured/legacy
+toolchain behavior, exact display text and later parent bodies remain deferred.
+
+Clean `../zabel` `0795445f…` guided only closure/declaration-dictionary
+reachability through module freeze. No Zig code, representation, owner pointer,
+ordering, capture algorithm, diagnostic, identity or behavior was copied.
+Bazel 9.2 remains sole authority; no retained utility or accounting changed.
+
 ### Post-paths audit selects exact rules_cc find-toolchain proof (2026-08-26)
 
 Exact `rust/private/rust.bzl` returns from paths through already-admitted
