@@ -1,127 +1,108 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-current-rust-analyzer-toolchain-rule-loading`
+Packet: `WP-4-7A-rust-analyzer-detect-sysroot-rule-loading`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: selected repository route, recursive Bzl module context and frozen rule schema
-Base: `7b9845cd`
+Owners: selected defining-module mapping, shared Label resolver and frozen rule schema
+Base: `61cb0ad0`
 
 Result: load and recursively freeze the exact
-`current_rust_analyzer_toolchain = rule(...)` declaration at accepted
-rules_rust `rust/private/rust_analyzer.bzl:423-429`. Resolve its explicit
-apparent-self Label through the innermost defining module's already-selected
-repository mapping and retain the resulting canonical one-element toolchain
-requirement. Stop before target invocation or toolchain selection.
+`rust_analyzer_detect_sysroot = rule(...)` declaration at accepted rules_rust
+`rust/private/rust_analyzer.bzl:475-484`. Resolve its two raw apparent-self
+toolchain strings through the defining module's already-retained selected
+mapping and preserve the resulting canonical mandatory requirements in source
+order. Stop before target invocation, `ctx.toolchains` or actions.
 
 ## Learned facts and authority
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
 is sole behavior authority:
 
-- `BazelModuleContext` retains each evaluated `.bzl` module's label,
-  repository mapping and loads. `LabelConverter.forBzlEvaluatingThread` reads
-  the innermost executing Starlark function's module context, so an imported
-  function keeps the exporter's mapping rather than acquiring the importing
-  module's mapping.
-- `LabelConverter.convert` delegates to `Label.parseWithPackageContext` with
-  that defining package and mapping. An apparent self-name therefore resolves
-  through a real mapping entry; it is not inferred from canonical spelling.
-- `BzlLoadFunctionTest.testLoadBzlFileFromBzlmod` proves the defining `foo`
-  module records both `foo -> foo+` and `bar_alias -> bar+` lookups in order,
-  while unresolved repositories fail as not defined. Label and Starlark string
-  representation tests prove `str(Label(...))` emits the unambiguous `@@...`
-  canonical spelling used by the fixed handoff.
-- `StarlarkRuleClassFunctions.createRule` passes
-  `LabelConverter.forBzlEvaluatingThread` to `parseToolchainTypes`. That helper
-  accepts a toolchain requirement, Label or string, preserves first-label
-  order in a `LinkedHashMap`, combines duplicates with the strictest mandatory
-  policy and makes plain Label/string entries mandatory. The fixed declaration
-  exercises one canonical string and therefore retains one mandatory
-  requirement without entering duplicate combination.
-- `StarlarkRuleClassFunctionsTest.testRuleAddToolchain`,
-  `testRuleAddToolchain_duplicate` and `testRuleOrderedRequirements` prove
-  conversion, strictest deduplication and order. The implementation function
-  at rules_rust lines 404-421 remains retained but unexecuted while the rule at
-  lines 423-429 is created and exported.
+- `BazelModuleContext` immutably retains every evaluated `.bzl` module's label,
+  repository mapping and loads. `LabelConverter.forBzlEvaluatingThread` selects
+  the innermost executing Starlark function's module context rather than the
+  importing evaluator's outer module.
+- `LabelConverter.convert` delegates each string to
+  `Label.parseWithPackageContext` using that defining package and mapping.
+  Both raw `@rules_rust//...` strings therefore resolve through the explicit
+  module-local self-name entry; canonical identity is not inferred from text.
+- `StarlarkRuleClassFunctions.createRule` supplies that converter to
+  `parseToolchainTypes`. A plain string becomes a mandatory
+  `ToolchainTypeRequirement`. Its `LinkedHashMap` projection preserves the
+  first occurrence of each distinct Label and combines duplicates with the
+  strictest policy before producing the ordered immutable set.
+- `StarlarkRuleClassFunctionsTest.testRuleAddToolchain` authenticates plain
+  strings as mandatory, `testRuleAddToolchain_duplicate` authenticates strictest
+  deduplication, and `testRuleOrderedRequirements` authenticates source order.
+  The fixed two labels are distinct, so only string conversion, mandatory
+  policy and order are active.
+- The accepted rules_rust implementation body at lines 431-473 is merely
+  retained as the rule implementation function during declaration evaluation.
+  No `ctx.toolchains` lookup, fail branch, provider field, path operation,
+  declared output, JSON write or `DefaultInfo` construction runs.
 
 The accepted rules_rust 0.73.0 archive SHA-256 is
 `2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`.
-The exact expression is
-`str(Label("@rules_rust//rust/rust_analyzer:toolchain_type"))` at line 427
-inside the one-element list at lines 426-428.
+The fixed declaration's ordered strings are
+`@rules_rust//rust:toolchain_type` and
+`@rules_rust//rust/rust_analyzer:toolchain_type` at lines 478-479. Its
+`dedent(...)` call yields an already-admitted string documentation value.
 
-Slug's selected-registry route already owns an ordered
-`Arc<[(ApparentRepoName, CanonicalRepoName)]>` mapping. It is part of route
-equality/hash, and `selected_bzl_load_route` constructs each recursive child's
-route from that child's own selected definition and mapping. The external Bzl
-DICE key owns the complete route, but `BzlModuleIdentity`, `BzlLoadManifest`
-and `BzlEvaluationContext` currently discard the mapping. The shared Label
-therefore rejects every explicit repository. Separately,
-`rule_toolchain_requirement` reparses an already-canonical external source with
-an extra `@@` prefix and accepts no canonical string handoff. These are the
-first absent facts; the selected route is their one bounded producer.
+Commit `61cb0ad0` already retains the selected route's ordered
+`Arc<[(ApparentRepoName, CanonicalRepoName)]>` on each recursive external
+`BzlModuleIdentity`, includes it in equality/hash/fingerprinting, and selects
+the complete defining identity through native-call source provenance with
+`DefInfo` fallback. The pure bounded resolver in `starlark_label.rs` resolves
+`@name//package:target` only through that mapping and rejects missing or
+duplicate/conflicting entries. `rule_toolchain_requirement` is the remaining
+gap: canonical strings have a fixed handoff, but every other string still uses
+the older root-only package parser, which rejects raw apparent repositories.
 
 Pinned `../zabel` commit
 `c7298478e2e56262a2f438e9c065325744c9f0fc` is architectural guidance only.
-Its `generic_label_value.zig` retains the defining module's canonical
-repository and selected apparent-to-canonical mapping as immutable module
-context, then lets the shared Label builtin consult the currently executing
-module. Its toolchain declaration projection reinforces canonical Label
-identity and a narrow declaration-owned result, although that native
-`toolchain(...)` surface is not the same Bazel behavior as `rule(toolchains)`.
-Follow only the explicit-input, defining-module and thin-projection lessons.
-Do not copy Zig code, storage, mapping rules, evaluator behavior or DICE
-relations; Bazel 9.2 remains authoritative.
+Its `generic_label_value.zig` keeps the selected apparent mapping with the
+immutable defining module and exposes a pure shared Label-resolution leaf.
+That supports reusing one explicit-input mapping owner and returning a thin
+canonical Label. Its `toolchain_declaration_resolution.zig` handles a native
+BUILD `toolchain(...)` declaration, not Bazel's `rule(toolchains = ...)`, so it
+is not behavior authority and contributes no conversion semantics. Do not copy
+Zig code, representation, mapping rules, evaluator behavior or DICE relations.
 
-The Buck2 utility-reuse audit selects the route's existing Arc slice,
-`CompactString`, `CanonicalLabel` and manifest Arc slices. Do not introduce a
-second map, tree, interner, cache, hash domain or lookup owner.
+The Buck2 utility-reuse audit selects the existing mapping Arc,
+`CanonicalLabel`, ordered `Vec` collection and frozen Arc slice. Do not add a
+map, tree, interner, cache, hash domain or lookup owner.
 
 ## Decision and exact boundary
 
-Expose one hidden clone of the selected route's existing mapping Arc and carry
-it in `BzlModuleIdentity` beside canonical label and workspace path. Local,
-direct-local, generated and built-in routes supply an empty mapping until a
-later packet authenticates their producers. Because mapping changes affect
-module semantics, include the ordered entries in identity equality/hash and
-the existing manifest fingerprint stream.
+Expose the existing pure `.bzl` label resolver crate-locally without changing
+its admitted syntax. In `rule_toolchain_requirement`, preserve the accepted
+canonical `@@...` branch and existing relative-string behavior. Add only a raw
+apparent `@name//package:target` branch that calls the shared resolver with the
+innermost defining `BzlModuleIdentity` already selected by the evaluator
+context.
 
-Change the recursive evaluation context's filename projection from canonical
-Label alone to the complete module identity. The accepted typed native-call
-source remains first and `DefInfo` remains fallback; the chosen identity now
-provides both defining Label and defining mapping. Missing or ambiguous source
-filenames continue to fail closed.
+Retain the two resulting `CanonicalLabel` values in the existing ordered
+`RuleDefinitionGen.required_toolchains` and `FrozenRuleDefinition` Arc. Both
+plain strings are mandatory in Bazel; Slug's currently admitted frozen owner
+represents only mandatory requirements, so no new policy field is needed.
+Distinct inputs remain distinct and source ordered. Do not admit Label objects,
+optional requirements or duplicate/strictest behavior in this packet.
 
-Extend the shared `.bzl` `Label` constructor only for one apparent repository
-form `@name//package:target`. Resolve `name` by exact lookup in the selected
-defining module's retained mapping, reject missing or duplicate/conflicting
-entries, and construct the existing `CanonicalLabel` owner. Preserve admitted
-`//...`, `:...` and Label idempotence. Do not guess self aliases or consult
-files, Bzlmod, DICE or routes from the builtin.
-
-The fixed `str(Label(...))` yields a canonical `@@...` string. Admit that
-canonical string only in `rule_toolchain_requirement`, validate that it is a
-direct target, and retain it in the existing ordered
-`RuleDefinitionGen.required_toolchains` / `FrozenRuleDefinition` Arc. Existing
-relative toolchain strings remain definition-package relative. Direct apparent
-strings such as `rule(toolchains = ["@rules_rust//..."])`, Label objects,
-optional requirements and duplicate/strictest behavior remain deferred because
-the fixed call does not exercise them.
+Missing or conflicting apparent mappings must reject before the rule freezes.
+Do not guess a self-name, parse canonical identity from apparent spelling, or
+consult routes, Bzlmod, files, DICE or I/O from either resolver or converter.
 
 ## Ownership, revision and lifetime
 
-The selected route remains the sole repository-mapping producer and already
-participates in external Bzl key equality. The module identity borrows no
-route; it clones the producer-owned mapping Arc into the frozen recursive
-manifest. Every reachable module keeps its own mapping, so imported functions
-use their defining module's context. The evaluation scratch projection dies
-with the evaluator; the mapping Arc, canonical Label and frozen requirement die
-with the existing frozen module/package owners.
+The selected route remains the sole mapping producer. Each recursive external
+module owns an Arc clone through its frozen identity; imported functions keep
+their defining module's mapping. The evaluator context borrows that identity
+only for the native call. The shared resolver returns an owned
+`CanonicalLabel`, and the existing rule definition/frozen module owners retain
+the ordered Arc until those owners die.
 
-No new DICE key, compute, lock, filesystem read, registry lookup, request
-overlay, service cache or shutdown duty is added. Retaining the complete
-selected mapping may over-invalidate relative to Bazel's consulted-entry
-recorder; this is a Slug-native representation choice that preserves semantic
-identity and never under-invalidates.
+No new DICE key, compute, lock, observation, filesystem read, registry lookup,
+request overlay, service cache or shutdown duty is added. The already-admitted
+complete-map over-invalidation remains Slug-native and cannot under-invalidate.
 
 ## Files and caps
 
@@ -129,70 +110,62 @@ Only these files may change, against the listed base SHA-256:
 
 | File | Base SHA-256 | Final line cap |
 |---|---|---:|
-| `app/slug_bzlmod_v2/src/host_module.rs` | `bf1da8d3f0c9e83386ea006d91931c4f602a428db1802e92acd19c166cb52eab` | 5,365 |
-| `app/slug_loading_v2/src/bzl_module.rs` | `f2bc3b16051a318bd74680570f3114d2bbb787bb7004759816a820556de1b633` | 9,710 |
-| `app/slug_loading_v2/src/provider.rs` | `520bc3776dd438575685ab3fee7e31312a84d6d54d0b9e24e3de85cc8f35cf0e` | 625 |
-| `app/slug_loading_v2/src/starlark_label.rs` | `9e070bdba46c19cfcd6b3b87bc84de2b6f80ad390152fa230cec2ac150e090e4` | 205 |
-| `app/slug_loading_v2/src/package.rs` | `96d1c6ebf5609c1ae727d8498a703fb785f89429e6ce9960fb9025192b18439e` | 5,515 |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `bd49cf5a2d884b33b0c91a320ba74e7e8efe8d8a9c2bcf6eab3911673e21fd05` | 4,535 |
-| `app/slug_loading_v2/src/host_package_attempt_tests.rs` | `2b1729c2722e5499dbcbc8ed32672b13b56fa75106e428df56b1e9d5a1f55280` | 535 |
+| `app/slug_loading_v2/src/starlark_label.rs` | `c650c851d16a8f00af54b63cacf9adbec7cf3e34b9fd1abf4613995635a37677` | 190 |
+| `app/slug_loading_v2/src/package.rs` | `929afc35507a803856994597a38d9edf042e1f35cfaee8374c1b7aa295e5309e` | 5,510 |
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `06c99deb45a43f565cfa6a3afc7a6d183339c2de4a613eae943cf5e8f6f7754f` | 4,580 |
 
-Cap production additions at 200, proof additions at 100 and total additions at
-300. No touched function may exceed 150 lines. Existing larger functions may
-receive only a module-identity field initialization and no other body change.
-The large files remain cohesive: `host_module.rs` owns the route projection;
-`bzl_module.rs` owns recursive identity/fingerprinting; `provider.rs` owns
-caller selection; `starlark_label.rs` owns Label construction; `package.rs`
-owns rule requirement retention; and the two existing test modules own their
-current recursive/fixture literals. `REPLAN` before an eighth Rust file or any
-cap breach.
+Cap production additions at 30, proof additions at 70 and total additions at
+100. No touched function may exceed 150 lines. The existing selected-route
+test is 142 lines and may receive only one helper call or no body change; keep
+new proof in its 30-line focused helper or a separate focused function.
+`starlark_label.rs` owns pure defining-context conversion, `package.rs` owns
+rule requirement retention and the existing test module owns the selected
+route fixture/proof. `REPLAN` before a fourth Rust file or any cap breach.
 
 ## Proof and validation
 
 Prove:
 
-- a selected registry module whose root apparent name differs from its
-  module-local self-name retains `rules_rust -> dep+`; this discriminates real
-  mapping from spelling inference;
-- a recursively imported definition evaluates the exact line-427 expression,
-  freezes `current_rust_analyzer_toolchain`, does not execute its implementation
-  and retains exactly
-  `@@dep+//rust/rust_analyzer:toolchain_type` as its one requirement;
-- direct and imported Label calls select their own defining module identities,
-  while mapping changes alter manifest equality/fingerprint;
-- an absent or duplicate/conflicting apparent mapping rejects before rule
-  freeze, and existing selected-mapping producer conflict tests remain green;
-- canonical `str(Label(...))` is accepted by the rule converter, while a raw
-  apparent string in `rule(toolchains = ...)` and non-direct labels remain
-  rejected; and
-- the accepted fixed aspect, first rust-analyzer rule schema, bounded Label,
-  recursive Bzl lifetime and toolchain requirement tests remain green.
+- the selected registry mapping still deliberately separates root apparent
+  `dep_alias`, module-local self-name `rules_rust` and canonical `dep+`;
+- a recursively imported definition evaluates the fixed two raw strings,
+  freezes `rust_analyzer_detect_sysroot`, retains exactly
+  `@@dep+//rust:toolchain_type` then
+  `@@dep+//rust/rust_analyzer:toolchain_type`, and does not execute its
+  implementation;
+- raw apparent rule strings use the defining module rather than an importer,
+  and missing or duplicate/conflicting mappings reject before freeze;
+- the accepted canonical current-toolchain handoff, relative rule requirements,
+  Label constructor, recursive identity/fingerprint and selected mapping proofs
+  remain green; and
+- the implementation body's `ctx.toolchains`, fail paths, provider fields,
+  path operations, action declaration/write and return value stay unexecuted.
 
-Run serially: focused selected-route, recursive manifest/Label and rule-
-toolchain tests; `cargo test -p slug_bzlmod_v2`; full
-`cargo test -p slug_loading_v2`; `cargo fmt --all -- --check`;
+Run serially: focused selected-route and raw-rule requirement tests; the
+accepted current-toolchain, Label and recursive provenance tests; full
+`cargo test -p slug_loading_v2 --locked`; `cargo fmt --all -- --check`;
 `cargo check -p slug_core_v2 --locked`;
 `cargo build -p slug_cli_v2 --locked`; `git diff --check`; and
 `scripts/v2_archive_status.sh`. Rebuild the CLI before any binary smoke and
 clean stale `slugd` before/after daemon-sensitive tests. Pinned source and the
-accepted rules_rust archive suffice; do not run Bazel or add an oracle fixture.
+accepted archive suffice; do not run Bazel or add an oracle fixture.
 
 ## Compatibility and STOP
 
-- **Exact:** the fixed apparent-self Label resolution from the innermost
-  selected-registry defining module, canonical string handoff, one mandatory
-  direct toolchain requirement, recursive freeze and producer export identity.
-- **Slug-native:** Arc-backed module mapping retention, complete-mapping
-  over-invalidation, fingerprint framing and nonrequired diagnostics.
-- **Unsupported/deferred:** direct-local/generated/built-in/root mapping
-  projection, wider explicit Label forms and APIs, raw apparent/Label/optional
-  or duplicate toolchain inputs, target invocation, `ctx.toolchains`,
-  toolchain registration/resolution/selection, configured dependencies,
-  analysis/actions, `_rust_analyzer_detect_sysroot_impl`, aspect application,
-  M8/M7B and exact output bytes.
+- **Exact:** the fixed selected-registry defining-module conversion of the two
+  raw strings, mandatory policy, source order, recursive freeze, documentation
+  value and producer export identity.
+- **Slug-native:** existing Arc-backed complete mapping retention,
+  over-invalidation, frozen Arc representation and nonrequired diagnostics.
+- **Unsupported/deferred:** Label objects, optional requirements,
+  duplicate/strictest behavior, wider Label forms and mapping producers,
+  target invocation, `ctx.toolchains`, toolchain registration/resolution/
+  selection, configured dependencies, provider access, path semantics, JSON
+  FileWrite action, `DefaultInfo`, aspect application, M8/M7B and exact output
+  bytes.
 
-STOP on guessed aliases, filesystem or Bzlmod lookup from a builtin, a second
-mapping owner, target invocation, `ctx.toolchains`, analysis changes, new DICE
-computes or locks, Zabel code/behavior adoption, Java/JVM work,
+STOP on guessed aliases, a second mapping owner, I/O or DICE from conversion,
+relative/canonical behavior drift, rule invocation, `ctx.toolchains`, analysis
+or action changes, Zabel code/behavior adoption, Java/JVM work,
 fixture/network/dependency drift, public rules_rust success claims or any cap
 breach. `REPLAN` before widening.

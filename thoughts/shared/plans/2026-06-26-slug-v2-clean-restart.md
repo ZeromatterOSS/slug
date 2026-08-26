@@ -30,19 +30,73 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; current rust-analyzer toolchain-rule loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain declaration schema; the mapping audit selects one bounded defining-module vertical | load and freeze `current_rust_analyzer_toolchain = rule(...)` through the selected module's apparent-self mapping and retain its canonical toolchain requirement; target invocation, `ctx.toolchains`, configured dependencies, aspect application and bool/list targets/analysis remain deferred | run only `WP-4-7A-current-rust-analyzer-toolchain-rule-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; rust-analyzer detect-sysroot rule loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain declaration schema; `61cb0ad0` accepts defining-module mapping and the current-toolchain rule | load and freeze `rust_analyzer_detect_sysroot = rule(...)` with its two ordered apparent-repository string requirements; target invocation, `ctx.toolchains`, configured dependencies, actions, aspect application and bool/list targets/analysis remain deferred | run only `WP-4-7A-rust-analyzer-detect-sysroot-rule-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-current-rust-analyzer-toolchain-rule-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-rust-analyzer-detect-sysroot-rule-loading](./slug-v2-subplans/current-packet.md).
 
 Load and recursively freeze the rule at
-`rust/private/rust_analyzer.bzl:423-429`. Carry the selected registry route's
-existing repository mapping into each defining `.bzl` module, resolve the
-explicit apparent-self Label and retain its canonical one-element toolchain
-requirement. Do not invoke the rule, access `ctx.toolchains` or enter analysis.
+`rust/private/rust_analyzer.bzl:475-484`. Resolve its two raw apparent-self
+toolchain strings through the selected defining module's already-retained
+repository mapping and preserve their canonical order. Do not invoke the rule,
+access `ctx.toolchains`, declare/write its output or enter analysis.
+
+### M7 current-toolchain rule accepted; detect-sysroot rule loading selected (2026-08-26)
+
+Commit `61cb0ad0` carries the selected route's existing repository-mapping Arc
+into every recursive external `BzlModuleIdentity`, its equality/hash and the
+manifest fingerprint. The evaluator's existing typed native-call source first
+and `DefInfo` fallback now select the complete defining identity. The shared
+`.bzl` Label resolves only the admitted `@name//package:target` form through
+that immutable mapping and fails closed on absent or conflicting entries.
+`str(Label(...))` hands one canonical direct target to the existing frozen rule
+requirement owner without changing raw apparent string behavior.
+
+A selected-registry proof deliberately separates root apparent name
+`dep_alias`, module-local self-name `rules_rust` and canonical repository
+`dep+`. It recursively freezes the exact current-toolchain declaration with
+one `@@dep+//rust/rust_analyzer:toolchain_type` requirement while its
+implementation remains lazy. Mapping changes discriminate identity and
+fingerprint, and an ambiguous mapping rejects.
+
+Focused proofs, all 545 `slug_bzlmod_v2` unit tests and its integration suites,
+and all 256 `slug_loading_v2` tests pass. Locked core check, rebuilt CLI,
+formatting and diff gates pass; the archive audit retains only its known three
+thoughts paths. Growth is 115 production and 85 proof additions, 200 total,
+within every cap. Independent review rejected the first layout because a
+touched test exceeded 150 lines; extraction reduced it to 142 lines and the
+terminal re-review returned `ACCEPT`.
+
+Pinned Zabel `c7298478…` guided only the immutable per-defining-module mapping,
+currently executing module lookup and thin canonical declaration projection.
+No Zig code, mapping behavior, representation, evaluator or DICE relation was
+copied; Bazel 9.2 remains sole behavior authority. Exact compatibility is the
+fixed selected-registry lookup, canonical handoff, mandatory requirement,
+recursive freeze and export slice. Arc retention, complete-map
+over-invalidation and fingerprint framing are Slug-native; every wider mapping,
+toolchain, invocation and analysis surface remains unsupported/deferred.
+
+Pinned-source order next traverses the lazy
+`_rust_analyzer_detect_sysroot_impl` body at lines 431-473 without executing it,
+then evaluates `rust_analyzer_detect_sysroot = rule(...)` at lines 475-484. Its
+two distinct string requirements at lines 478-479 are raw apparent-self labels.
+Pinned Bazel `LabelConverter.forBzlEvaluatingThread` and
+`parseToolchainTypes` resolve both through the defining module's package
+context, mark plain strings mandatory and preserve first-label order. Slug now
+owns that exact mapping but its rule converter still rejects raw apparent
+strings. Run only the selected packet to reuse the shared pure resolver for
+these two strings and retain their ordered canonical requirements. The
+implementation body, `ctx.toolchains`, fail paths, provider fields, path
+operations, JSON action and returned `DefaultInfo` remain lazy and deferred.
+
+Pinned Zabel guidance selects the existing immutable module context and pure
+Label-resolution leaf rather than another mapping owner. Its native BUILD
+`toolchain(...)` resolver is not a behavioral analogue for
+`rule(toolchains = ...)`; only the explicit-input/thin-canonical-projection
+shape applies.
 
 ### M7 current rust-analyzer toolchain-rule audit selects defining-module mapping (2026-08-26)
 

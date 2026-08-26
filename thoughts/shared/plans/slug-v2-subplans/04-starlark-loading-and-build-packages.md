@@ -4342,6 +4342,91 @@ Slug-native; `Label`, the complete live expression, application plus
 Boolean/StringList targets and analysis/CLI, M8/M7B and exact output bytes
 remain deferred.
 
+### Current-toolchain rule accepted; detect-sysroot rule loading selected (2026-08-26)
+
+Commit `61cb0ad0` projects the selected route's existing ordered repository
+mapping into every recursive external `BzlModuleIdentity`, its equality/hash
+and the manifest fingerprint. Local, generated and built-in identities remain
+mapping-empty and fail closed. Native-call source provenance now returns the
+complete innermost defining identity, so the shared `.bzl` Label resolves only
+the bounded `@name//package:target` form through that identity's immutable
+mapping. Missing and duplicate/conflicting entries reject without I/O, route
+lookup or a DICE compute. The fixed `str(Label(...))` canonical spelling is
+accepted only by the existing rule-toolchain string converter and retained in
+the frozen rule definition.
+
+The selected-registry proof discriminates three identities: root apparent
+`dep_alias`, module-local self-name `rules_rust`, and canonical `dep+`. A
+recursively imported declaration freezes one mandatory
+`@@dep+//rust/rust_analyzer:toolchain_type` requirement and never invokes its
+failing implementation. Complete-mapping changes alter module identity and
+fingerprint, and a conflicting apparent mapping rejects.
+
+Focused tests, all 545 `slug_bzlmod_v2` unit tests plus every integration
+suite, and all 256 `slug_loading_v2` tests pass. Formatting, locked core check,
+rebuilt CLI and diff gates pass; archive status has only the known three
+retained thoughts paths. Final additions are 115 production and 85 proof, 200
+total. Independent review first rejected a 168-line touched test; extracting a
+30-line assertion helper reduced it to 142 lines, and re-review returned
+`ACCEPT`.
+
+Exact compatibility covers the fixed defining-module lookup, canonical
+string handoff, mandatory direct requirement, recursive freeze and export.
+The Arc representation, complete-map over-invalidation, fingerprint framing
+and diagnostics are Slug-native. Wider mapping producers, raw apparent rule
+strings, Label/toolchain input breadth, invocation, selection, configured
+dependencies and analysis/actions remain unsupported/deferred.
+
+Pinned Zabel `c7298478…` guided immutable mapping ownership on the defining
+module, currently executing module lookup and a thin canonical declaration
+projection only. No Zig code, mapping behavior, storage, evaluator or DICE
+relation was copied; Bazel 9.2 remains sole behavior authority.
+
+The accepted rules_rust 0.73.0 source next reaches the lazy
+`_rust_analyzer_detect_sysroot_impl` body at
+`rust/private/rust_analyzer.bzl:431-473`, then the next evaluated declaration:
+`rust_analyzer_detect_sysroot = rule(...)` at lines 475-484. The implementation
+body is retained but not called during declaration construction. Its fixed
+toolchain list contains, in order,
+`@rules_rust//rust:toolchain_type` and
+`@rules_rust//rust/rust_analyzer:toolchain_type` at lines 478-479; its `dedent`
+call produces the already-admitted string documentation value.
+
+Pinned Bazel 9.2 `BazelModuleContext`,
+`LabelConverter.forBzlEvaluatingThread`, `Label.parseWithPackageContext`,
+`StarlarkRuleClassFunctions.createRule` and `parseToolchainTypes` establish
+that both plain strings use the innermost defining module's package context
+and repository mapping, become mandatory requirements and preserve first-label
+order through the `LinkedHashMap`/immutable-set projection. The focused
+add-toolchain and ordered-requirements tests authenticate the string,
+mandatory and ordering behavior; duplicate/strictest behavior is dormant
+because the two labels are distinct.
+
+Slug now retains the exact selected mapping and already has a pure bounded
+apparent-label resolver in `starlark_label.rs`. The first absent fact is only
+that `rule_toolchain_requirement` sends noncanonical strings to its older
+root-only package parser, which rejects `@rules_rust`. Run only
+`WP-4-7A-rust-analyzer-detect-sysroot-rule-loading`: expose the existing pure
+resolver crate-locally, reuse it only for raw apparent rule-toolchain strings,
+and freeze the two canonical requirements in source order. Do not add a map,
+cache, key, lookup owner or I/O path.
+
+Prove the exact selected-registry mapping with a deliberately different
+canonical spelling, the two ordered frozen requirements, recursive export,
+lazy implementation, and missing/conflicting failure before freeze. Preserve
+the accepted canonical handoff and relative rule-toolchain behavior. Label
+objects, optional requirements, duplicate/strictest behavior, wider Label
+forms, target invocation, `ctx.toolchains`, toolchain resolution, provider
+access, path manipulation, JSON FileWrite action, `DefaultInfo`, M8/M7B and
+exact output bytes remain deferred.
+
+Pinned Zabel's immutable retained module repository context and pure shared
+Label host guide reuse of the single selected mapping and canonical Label
+projection. Its native BUILD `toolchain(...)` declaration resolver is not the
+Bazel behavior under audit and supplies no mapping or rule-toolchain semantics.
+No Zig code, representation or DICE relation is copied. The utility-reuse
+audit selects the existing Arc slice, `CanonicalLabel` and frozen Arc order.
+
 ### Current rust-analyzer toolchain-rule audit selects defining-module mapping (2026-08-26)
 
 Pinned Bazel 9.2 authenticates the exact
