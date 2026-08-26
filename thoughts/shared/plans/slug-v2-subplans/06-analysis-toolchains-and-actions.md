@@ -18218,3 +18218,11 @@ Final sender/connection shutdown completes before return, and brief active-token
 checks between steps hold no lock across work. Implement only current through
 the existing provisional-root/final-validation lifetime. Registry, DICE
 identity and Zabel scheduling remain unchanged.
+
+### Native archive dependency closure correction (2026-08-25)
+
+The implementation worker correctly stopped because the five core edges and
+eight-package compression/archive closure require a `Cargo.lock` update while
+the contract marked it read-only. No Rust candidate remains. Current freezes
+the exact 77-line addition, existing `wasip2` and Ring-only graph; runtime/
+session/root lifetime and Zabel guidance are unchanged.

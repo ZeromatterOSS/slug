@@ -4033,3 +4033,11 @@ HTTP/1 connection without a legacy client, pool or task. Physical captures and
 roots remain scratch below the producer-owned selected view; only a verified
 root reaches the existing token-revalidated publication seam. Bazel 9.2 owns
 archive behavior; pinned Zabel supplies this ownership guidance only.
+
+### Selected-registry BCR dependency correction (2026-08-25)
+
+The accepted semantic view and archive behavior are unchanged. The direct Ring
+transport adds five core dependency edges plus the bounded `flate2`/`tar`
+closure. Current is docs-only until the exact 77-line lock addition is frozen
+without existing-version drift. Zabel continues to guide only semantic-view/
+physical-root ownership.
