@@ -3316,6 +3316,32 @@ async fn rust_stdlib_filegroup_projects_file_allowance_into_target_schema() {
     assert!(srcs.allow_single_file().is_none());
 }
 
+#[tokio::test]
+async fn scalar_label_file_allowance_projects_without_single_artifact_identity() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(':defs.bzl','r')\nr(name='probe',visibility=['//visibility:public'])\n",
+        ),
+        (
+            "defs.bzl",
+            b"def _impl(ctx): fail('must stay lazy')\nr=rule(implementation=_impl, attrs={'tool':attr.label(allow_files=True)})\n",
+        ),
+    ];
+    let outcome = load_repository_package_fixture(files, 425).await;
+    let package = repository_package_terminal(&outcome);
+    let crate::package::PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+        panic!("probe did not retain its Starlark rule")
+    };
+    let tool = rule
+        .schema()
+        .iter()
+        .find(|schema| schema.declaration_name() == "tool")
+        .unwrap();
+    assert!(tool.allow_files());
+    assert!(tool.allow_single_file().is_none());
+}
+
 #[test]
 fn bazel_data_attribute_docs_advance_rust_toolchain_to_values_constraint() {
     let owner = BzlModuleIdentity {
@@ -3374,7 +3400,9 @@ SECOND = rule(implementation = _impl, attrs = _attrs("different documentation"))
             "{invalid}"
         );
     }
-    assert!(eval_bzl_with_identity("X = attr.label(allow_files = True)", owner).is_err());
+    assert!(
+        eval_bzl_with_identity("P = provider()\nX = attr.label(providers = [P])", owner).is_err()
+    );
 }
 
 #[test]
@@ -3399,8 +3427,13 @@ STRING_EMPTY_TUPLE = rule(implementation = _impl, attrs = {"x": attr.string(valu
 STRING_NORMALIZED = rule(implementation = _impl, attrs = {"x": attr.string(values = ["rust", "cc", "rust"])})
 STRING_SAME = rule(implementation = _impl, attrs = {"x": attr.string(values = ("cc", "rust"))})
 STRING_DISTINCT = rule(implementation = _impl, attrs = {"x": attr.string(values = ["cc"])})
+LABEL_OMITTED = rule(implementation = _impl, attrs = {"x": attr.label()})
+LABEL_NONE = rule(implementation = _impl, attrs = {"x": attr.label(allow_files = None)})
+LABEL_FALSE = rule(implementation = _impl, attrs = {"x": attr.label(allow_files = False)})
+LABEL_TRUE = rule(implementation = _impl, attrs = {"x": attr.label(allow_files = True)})
+LABEL_SINGLE = rule(implementation = _impl, attrs = {"x": attr.label(allow_files = None, allow_single_file = True)})
 rust_toolchain = rule(implementation = _impl, attrs = {
-    "experimental_use_allocator_libraries_with_mangled_symbols": attr.int(doc = "allocator", values = [-1, 0, 1], default = -1), "experimental_use_cc_common_link": attr.label(default = Label("//rust/settings:cc_common_link"), doc = "cc link"), "extra_exec_rustc_flags": attr.string_list(doc = "exec flags"), "extra_rustc_flags_for_crate_types": attr.string_list_dict(doc = "crate flags"), "global_allocator_library": attr.label(default = Label("//rust/private/cc:global_allocator_library"), doc = "allocator library"), "iso_date": attr.string(doc = "date", default = ""), "linker": attr.label(doc = "linker", cfg = "exec", allow_single_file = True), "linker_preference": attr.string(doc = "preferred", values = ["cc", "rust"]), "linker_type": attr.string(doc = "type", values = ["direct", "indirect"]), "llvm_cov": attr.label(doc = "llvm-cov", cfg = "exec"),
+    "experimental_use_allocator_libraries_with_mangled_symbols": attr.int(doc = "allocator", values = [-1, 0, 1], default = -1), "experimental_use_cc_common_link": attr.label(default = Label("//rust/settings:cc_common_link"), doc = "cc link"), "extra_exec_rustc_flags": attr.string_list(doc = "exec flags"), "extra_rustc_flags_for_crate_types": attr.string_list_dict(doc = "crate flags"), "global_allocator_library": attr.label(default = Label("//rust/private/cc:global_allocator_library"), doc = "allocator library"), "iso_date": attr.string(doc = "date", default = ""), "linker": attr.label(doc = "linker", cfg = "exec", allow_single_file = True), "linker_preference": attr.string(doc = "preferred", values = ["cc", "rust"]), "linker_type": attr.string(doc = "type", values = ["direct", "indirect"]), "llvm_cov": attr.label(doc = "llvm-cov", cfg = "exec", allow_single_file = True), "llvm_lib": attr.label(doc = "libLLVM", allow_files = True, cfg = "exec"), "llvm_profdata": attr.label(doc = "profdata", allow_single_file = True, cfg = "exec"), "llvm_tools": attr.label(doc = "tools", allow_files = True),
 })
 "#;
     let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
@@ -3470,6 +3503,34 @@ rust_toolchain = rule(implementation = _impl, attrs = {
         snapshot("rust_toolchain", "linker_type").1,
         AllowedAttributeValues::String(Arc::from(["direct".into(), "indirect".into()]))
     );
+    let label_snapshot = |rule_name: &str, attribute_name: &str| {
+        let rule = module
+            .get(rule_name)
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        let schema = rule
+            .schema
+            .iter()
+            .find(|schema| schema.name == attribute_name)
+            .unwrap();
+        (schema.allow_files, schema.allow_single_file.clone())
+    };
+    for name in ["LABEL_OMITTED", "LABEL_NONE", "LABEL_FALSE"] {
+        assert_eq!(label_snapshot(name, "x"), (false, None), "{name}");
+    }
+    assert_eq!(label_snapshot("LABEL_TRUE", "x"), (true, None));
+    assert_eq!(
+        label_snapshot("LABEL_SINGLE", "x"),
+        (false, Some(AllowSingleFile::True))
+    );
+    for name in ["llvm_lib", "llvm_tools"] {
+        assert_eq!(label_snapshot("rust_toolchain", name), (true, None));
+    }
+    assert_eq!(
+        label_snapshot("rust_toolchain", "llvm_profdata"),
+        (false, Some(AllowSingleFile::True))
+    );
     for invalid in ["None", "1", "['1']", "[True]", "{}", "[2147483648]"] {
         let source = format!("X = attr.int(values = {invalid})");
         assert!(
@@ -3484,7 +3545,26 @@ rust_toolchain = rule(implementation = _impl, attrs = {
             "{invalid}"
         );
     }
-    assert!(eval_bzl_with_identity("X = attr.label(allow_files = True)", owner.clone()).is_err());
+    for invalid in ["1", "'file'", "['.so']", "{}"] {
+        let source = format!("X = attr.label(allow_files = {invalid})");
+        assert!(
+            eval_bzl_with_identity(&source, owner.clone()).is_err(),
+            "{invalid}"
+        );
+    }
+    for conflict in [
+        "X = attr.label(allow_files = True, allow_single_file = True)",
+        "X = attr.label(allow_files = False, allow_single_file = False)",
+    ] {
+        assert!(eval_bzl_with_identity(conflict, owner.clone()).is_err());
+    }
+    assert!(
+        eval_bzl_with_identity(
+            "P = provider()\nX = attr.label(providers = [P])",
+            owner.clone()
+        )
+        .is_err()
+    );
     assert!(
         eval_bzl_with_identity(
             "def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.int(values = [1])})",
@@ -3503,6 +3583,14 @@ rust_toolchain = rule(implementation = _impl, attrs = {
     assert!(
         eval_bzl_with_identity(
             "X = tag_class(attrs = {'x': attr.string(values = ['cc'])})",
+            owner.clone()
+        )
+        .is_err()
+    );
+    assert!(eval_bzl_with_identity("def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.label(allow_files = True)})", owner.clone()).is_err());
+    assert!(
+        eval_bzl_with_identity(
+            "X = tag_class(attrs = {'x': attr.label(allow_files = True)})",
             owner
         )
         .is_err()

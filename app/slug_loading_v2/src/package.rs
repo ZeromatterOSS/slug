@@ -4018,13 +4018,19 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
+        #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] allow_single_file: Option<Value<'v>>,
         #[starlark(require = named)] executable: Option<bool>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
-        attribute_definition(
+        if allow_files.is_some_and(|value| !value.is_none())
+            && allow_single_file.is_some_and(|value| !value.is_none())
+        {
+            anyhow::bail!("allow_files and allow_single_file cannot both be set");
+        }
+        let mut definition = attribute_definition(
             AttributeKind::Label,
             mandatory.unwrap_or(false),
             configurable,
@@ -4033,7 +4039,9 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             default,
             cfg,
             eval,
-        )
+        )?;
+        definition.allow_files = unpack_boolean_allow_files(allow_files)?;
+        Ok(definition)
     }
     fn label_list<'v>(
         #[starlark(this)] _attr: Value<'v>,
