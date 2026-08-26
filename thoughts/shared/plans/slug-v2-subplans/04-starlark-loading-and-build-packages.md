@@ -5247,6 +5247,37 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### String allowed values accepted; scalar-label file allowance selected (2026-08-26)
+
+Commit `80425ce9` unifies integer and string allowed-value sets in one typed,
+evaluator-free schema owner. String sets normalize once, explicit direct,
+selectable and final concatenated candidates are enforced, ordinary defaults
+remain unchecked, and repository/tag projections fail closed. Both selected
+rules_rust linker constraints freeze. All 213 loading tests and downstream
+gates pass within 77 production, 165 proof and 242 total additions;
+independent terminal review returned `ACCEPT`.
+
+Source order now reaches `llvm_lib` and `llvm_tools` in
+`rust/private/toolchain.bzl`. Each uses scalar
+`attr.label(allow_files=True)`; the intervening `llvm_profdata` uses the
+accepted single-file form. Pinned Bazel 9.2 maps Boolean true to `ANY_FILE`,
+false/omitted/`None` to no file predicate, rejects simultaneous non-None
+`allow_files` and `allow_single_file`, and sets `SINGLE_ARTIFACT` only for the
+latter. The next distinct stop is `lto` with
+`providers=[RustLtoInfo]`.
+
+Run only `WP-4-7A-bazel-label-allow-files-loading`: add the Boolean/`None`
+argument to the scalar-label adapter, perform the presence conflict before
+normalization, and reuse the existing declaration/frozen/package
+`allow_files` Boolean. Extension predicates, file resolution and scalar-label
+providers remain deferred.
+
+Clean `../zabel` `0795445f…` guides the separate file/single-file declaration
+facts and the same pre-normalization conflict boundary. No Zig code, layout or
+behavior is copied. The Buck2 audit selects the existing inline Boolean and
+`Allocative` owners, with no utility or ledger change. Bazel 9.2 remains sole
+behavior authority.
+
 ### Integer allowed values accepted; string allowed values selected (2026-08-26)
 
 Commit `563699ab` detaches the selected signed-32-bit integer allowed-value set
