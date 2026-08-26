@@ -122,6 +122,7 @@ use crate::package::FrozenAspectDefinition;
 use crate::package::FrozenRuleDefinition;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::FrozenUserProviderCallable;
+use crate::provider::OutputGroupInfo;
 use crate::provider::StarlarkUserProvider;
 use crate::provider::loading_provider_id;
 
@@ -2859,7 +2860,61 @@ rust_clippy_aspect = aspect(
     doc = "Executes the clippy checker on specified targets.",
 )
 def _rust_clippy_rule_impl(ctx):
-    fail("following rule helper must stay lazy")
+    clippy_ready_targets = [dep for dep in ctx.attr.deps if "clippy_checks" in dir(dep[OutputGroupInfo])]
+    files = depset([], transitive = [dep[OutputGroupInfo].clippy_checks for dep in clippy_ready_targets])
+    return [DefaultInfo(files = files)]
+
+rust_clippy = rule(
+    implementation = _rust_clippy_rule_impl,
+    attrs = {
+        "deps": attr.label_list(
+            doc = "Rust targets to run clippy on.",
+            providers = [
+                [rust_common.crate_info],
+                [rust_common.test_crate_info],
+            ],
+            aspects = [rust_clippy_aspect],
+        ),
+    },
+    doc = """\
+Executes the clippy checker on a specific target.
+
+Similar to `rust_clippy_aspect`, but allows specifying a list of dependencies \
+within the build system.
+
+For example, given the following example targets:
+
+```python
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "hello_lib",
+    srcs = ["src/lib.rs"],
+)
+
+rust_test(
+    name = "greeting_test",
+    srcs = ["tests/greeting.rs"],
+    deps = [":hello_lib"],
+)
+```
+
+Rust clippy can be set as a build target with the following:
+
+```python
+load("@rules_rust//rust:defs.bzl", "rust_clippy")
+
+rust_clippy(
+    name = "hello_library_clippy",
+    testonly = True,
+    deps = [
+        ":hello_lib",
+        ":greeting_test",
+    ],
+)
+```
+""",
+)
 "#;
 
 const CLIPPY_TOOLCHAINS: &str = "[str(Label('//rust:toolchain_type')), config_common.toolchain_type('@bazel_tools//tools/cpp:toolchain_type', mandatory = False)]";
@@ -2876,12 +2931,39 @@ fn clippy_owner() -> BzlModuleIdentity {
 }
 
 #[test]
+fn output_group_info_is_a_bzl_only_fail_closed_native_declaration() {
+    let module = eval_bzl_with_identity(
+        "NATIVE = OutputGroupInfo\nUSER = provider()",
+        clippy_owner(),
+    )
+    .unwrap();
+    let native = module.get("NATIVE").unwrap();
+    assert_eq!(native.to_string(), "<function OutputGroupInfo>");
+    assert!(native.downcast::<OutputGroupInfo>().is_ok());
+    assert!(
+        module
+            .get("USER")
+            .unwrap()
+            .downcast::<FrozenUserProviderCallable>()
+            .is_ok()
+    );
+    assert!(eval_global("X = OutputGroupInfo", &build_file_loading_globals()).is_err());
+    let error = eval_bzl_with_identity("X = OutputGroupInfo()", clippy_owner())
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("OutputGroupInfo construction is unsupported during loading"),
+        "{error}"
+    );
+}
+
+#[test]
 fn clippy_aspect_freezes_complete_source_declaration() {
     let source = CLIPPY_ASPECT_SOURCE.replace("TOOLCHAINS", CLIPPY_TOOLCHAINS);
     let module = eval_bzl_with_identity(&source, clippy_owner()).unwrap();
-    let aspect = module
-        .get("rust_clippy_aspect")
-        .unwrap()
+    let aspect_value = module.get("rust_clippy_aspect").unwrap();
+    let aspect = aspect_value
+        .clone()
         .downcast::<FrozenAspectDefinition>()
         .unwrap();
     let expected = [
@@ -2943,6 +3025,44 @@ fn clippy_aspect_freezes_complete_source_declaration() {
     assert_eq!(aspect.required_providers.len(), 2);
     assert_eq!(aspect.advertised_providers.len(), 1);
     assert_eq!(aspect.required_fragments.as_ref(), ["cpp"]);
+
+    let rule = module
+        .get("rust_clippy")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    assert_eq!(rule.capability().rule_class, "rust_clippy");
+    assert!(!rule.capability().executable);
+    assert_eq!(rule.capability().test_kind, None);
+    assert!(rule.required_toolchains().is_empty());
+    assert_eq!(rule.schema.len(), 23);
+    let deps = rule.schema.last().unwrap();
+    assert_eq!(deps.name, "deps");
+    assert_eq!(deps.kind, AttributeKind::LabelList);
+    assert!(!deps.mandatory && deps.configurable && !deps.allow_files);
+    assert!(deps.default.is_none() && deps.allow_single_file.is_none());
+    assert!(!deps.executable && !deps.exec_configuration && deps.transition.is_none());
+    assert_eq!(deps.required_providers.len(), 2);
+    assert_eq!(
+        deps.required_providers[0][0].to_string(),
+        "@@rules_rust+//rust/private:clippy.bzl%CrateInfo"
+    );
+    assert_eq!(
+        deps.required_providers[1][0].to_string(),
+        "@@rules_rust+//rust/private:clippy.bzl%TestCrateInfo"
+    );
+    let attached_value = deps.attached_aspect.unwrap();
+    assert!(attached_value.to_value().ptr_eq(aspect_value.value()));
+    let attached = attached_value
+        .downcast_ref::<FrozenAspectDefinition>()
+        .unwrap();
+    assert_eq!(attached.defining_label, aspect.defining_label);
+    assert_eq!(attached.exported_name, aspect.exported_name);
+    assert_eq!(attached.attributes.len(), aspect.attributes.len());
+    assert_eq!(attached.required_toolchains, aspect.required_toolchains);
+    assert_eq!(attached.required_providers, aspect.required_providers);
+    assert_eq!(attached.advertised_providers, aspect.advertised_providers);
+    assert_eq!(attached.required_fragments, aspect.required_fragments);
 }
 
 #[test]

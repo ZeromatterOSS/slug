@@ -89,6 +89,7 @@ use crate::module_extension_repository_rule::RepositoryRuleDefinition;
 use crate::provider::AnalysisBuiltinCallable;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::FrozenUserProviderCallable;
+use crate::provider::OutputGroupInfo;
 use crate::provider::UserProviderCallable;
 use crate::provider::user_provider_from_arguments;
 use crate::starlark_label::StarlarkLabel;
@@ -5773,6 +5774,7 @@ fn complete_loading_globals(extensions: &[LibraryExtension], bool_config: bool) 
         aspect_globals(&mut globals);
         cc_common_globals(&mut globals);
         label_globals(&mut globals);
+        globals.set("OutputGroupInfo", OutputGroupInfo);
     } else {
         globals.set("config", BuildFileConfigModule);
     }

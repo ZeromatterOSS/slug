@@ -45,6 +45,32 @@ use crate::bzl_module::BzlLoadManifest;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::bzl_module::manifest_starlark_sources;
 
+/// Fixed `.bzl` declaration token; configured output-group values are deferred.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub(crate) struct OutputGroupInfo;
+
+impl fmt::Display for OutputGroupInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<function OutputGroupInfo>")
+    }
+}
+
+starlark::starlark_simple_value!(OutputGroupInfo);
+
+#[starlark_value(type = "OutputGroupInfo")]
+impl<'v> StarlarkValue<'v> for OutputGroupInfo {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        _args: &Arguments<'v, '_>,
+        _eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Err(starlark::Error::new_other(anyhow::anyhow!(
+            "OutputGroupInfo construction is unsupported during loading"
+        )))
+    }
+}
+
 #[derive(Debug, ProvidesStaticType)]
 pub(crate) struct BzlEvaluationContext {
     source_label: CompactString,
