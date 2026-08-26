@@ -4105,3 +4105,61 @@ Pinned Zabel `c7298478…` guides a complete typed globals/semantic owner
 projected to all relevant consumers; it supplies no provider behavior,
 representation or identity. Pinned Bazel 9.2 remains sole compatibility
 authority. M7 stays partial and M7A -> M8 -> M7B remains.
+
+### Bazel provider `doc` audit accepted (2026-08-26)
+
+Pinned Bazel 9.2 `StarlarkRuleFunctionsApi.provider` declares named `doc` as
+`string | None` with `None` default, named `fields` as sequence/dict/`None`, and
+named `init` as an independent optional callable. `StarlarkRuleClassFunctions`
+trims a present doc string into `StarlarkProvider.Builder`; `StarlarkProvider`
+retains it for `getDocumentation`, but its exported equality/hash use only the
+`.bzl` key and exported name. `ProviderApi` exposes no Starlark field for this
+metadata.
+
+The discriminating upstream rows are
+`StarlarkRuleClassFunctionsTest.declaredProviderDocumentation`,
+`declaredProvidersDoc`, and `declaredProvidersBadTypeForDoc`, plus
+`StarlarkProviderTest.documentedProvider_getDocumentation` and
+`undocumentedProvider_getDocumentation`. `StarlarkDocumentationTest` and
+`ModuleInfoExtractorTest.providerDocstring` prove that stored documentation is
+observable to Bazel's separate documentation tooling, not to the loaded
+provider callable. That tooling is not an admitted Slug command surface.
+
+The accepted rules_rust 0.73.0 source archive has SHA-256
+`2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`.
+Its `rust/private/providers.bzl` declares 18 top-level providers; all pass a
+string `doc` and dictionary `fields`, including concatenated and parenthesized
+strings. There is no `init`, list schema or provider construction in that
+module. On successful freeze all 18 callables export; `common.bzl` then loads
+six of them and stores the callables in the already accepted `rust_common`
+struct. Provider instances appear only when rule implementations later run,
+outside this loading packet.
+
+Slug's `package_globals::provider` currently accepts the documented-fields
+map and delegates to `UserProviderCallable::from_evaluator`. The latter drops
+field prose, sorts/deduplicates semantic names, binds `ProviderId` from source
+label plus exported variable name, and freezes only that identity and schema.
+Analysis indexes dependencies with this callable identity. Neither provider
+documentation nor field prose participates in Bazel provider identity or
+Slug's admitted build semantics.
+
+Run only `WP-4-7A-bazel-provider-doc-loading`. Add named
+`doc: Option<&str>` to the existing global adapter and consume it there without
+retention; do not touch `UserProviderCallable`, `ProviderId`, analysis, globals
+placement or DICE. Prove string and `None` acceptance, non-string rejection,
+and frozen recursive export using the existing external-Bzl harness. A source
+edit still invalidates through the existing observed module bytes; semantic
+cutoff may ignore prose-only changes because documentation is not an admitted
+build fact.
+
+Exact compatibility is named string/`None` call acceptance, type rejection and
+unchanged callable export/freeze identity on the live dictionary-fields route.
+Rust storage and nonrequired diagnostic wording are Slug-native. Bazel doc
+trimming/retention and Stardoc extraction, field-doc access, fields list/`None`,
+`init`, broad provider instances, configured analysis, toolchains/actions,
+M8/M7B and exact output bytes remain unsupported/deferred.
+
+Pinned Zabel `c7298478…` guides keeping the complete globals owner and
+projecting only build-semantic provider identity/schema into retained values,
+without a second metadata registry. No Zabel code, representation or behavior
+is copied. M7 stays partial and M7A -> M8 -> M7B remains.
