@@ -3944,3 +3944,32 @@ typed semantics projection consumed by all relevant evaluators, rather than
 scattered local toggles. It is not syntax authority and no representation is
 copied; Bazel 9.2 alone defines admitted behavior. M7 stays partial and
 M7A -> M8 -> M7B remains.
+
+### Bazel keyword-only dialect audit accepted (2026-08-25)
+
+The exact rules_rust stop is the production external-Bzl parse in
+`compute_external_bzl_module`. Eight sibling Stage 4 parse calls cover Host
+BUILD/Bzl, root BUILD, external repository BUILD and the retained legacy
+package/Bzl route; the core preliminary root-BUILD evaluator also runs before
+ordinary command loading. All pass `Dialect::Standard`, while MODULE parsing
+is separately owned by Stage 5 and must remain unchanged.
+
+The retained engine needs no parser, resolver, compiler or binder repair.
+`Dialect::enable_keyword_only_arguments` gates only the bare-`*` AST form;
+`DefParams`, compiled parameters and call binding already cover required and
+defaulted named-only values and `*args` interaction. Pinned Bazel 9.2 source
+tests authenticate those rows, ordering failures and keyword-only lambda
+parameters. A retained `Dialect::Bazel` constant equal to Standard except for
+this one field is the smallest centralized owner.
+
+Run only `WP-4-7A-bazel-keyword-only-arguments`. Change the five frozen files,
+prove the dialect flags and exact parameter matrix, exercise a real external
+recursive route and the preliminary root-BUILD evaluator, then rerun fresh
+rules_rust query/build to record the next honest terminal. Positional-only
+parameters, types, f-strings, top-level forms, MODULE widening and later
+ruleset semantics remain unsupported/deferred.
+
+Pinned Zabel `c7298478…` guides one complete typed semantics/dialect value
+consumed by the relevant evaluators, not scattered reconstructed toggles.
+Bazel 9.2 remains behavioral authority. M7 stays partial and
+M7A -> M8 -> M7B remains.
