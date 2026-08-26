@@ -18,9 +18,15 @@ use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
+use starlark::values::Freeze;
+use starlark::values::FrozenValue;
+use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
+use starlark::values::Trace;
 use starlark::values::Value;
+use starlark::values::ValueLike;
+use starlark::values::list::AllocList;
 use starlark::values::starlark_value;
 
 use crate::provider::BzlEvaluationContext;
@@ -54,7 +60,77 @@ impl fmt::Display for CcInternalModule {
 }
 
 #[starlark_value(type = "cc_internal")]
-impl<'v> StarlarkValue<'v> for CcInternalModule {}
+impl<'v> StarlarkValue<'v> for CcInternalModule {
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(cc_internal_methods)
+    }
+}
+
+#[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
+struct EmptyCcHeaderInfoGen<V> {
+    empty_headers: V,
+}
+
+type EmptyCcHeaderInfo<'v> = EmptyCcHeaderInfoGen<Value<'v>>;
+type FrozenEmptyCcHeaderInfo = EmptyCcHeaderInfoGen<FrozenValue>;
+starlark::starlark_complex_values!(EmptyCcHeaderInfo);
+
+impl<V> fmt::Display for EmptyCcHeaderInfoGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("HeaderInfo")
+    }
+}
+
+#[starlark_value(type = "HeaderInfo")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for EmptyCcHeaderInfoGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    type Canonical = FrozenEmptyCcHeaderInfo;
+
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "header_module" | "pic_header_module" | "separate_module" | "separate_pic_module" => {
+                Some(Value::new_none())
+            }
+            "modular_public_headers"
+            | "modular_private_headers"
+            | "textual_headers"
+            | "separate_module_headers" => Some(self.empty_headers.to_value()),
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        [
+            "header_module",
+            "pic_header_module",
+            "modular_public_headers",
+            "modular_private_headers",
+            "textual_headers",
+            "separate_module_headers",
+            "separate_module",
+            "separate_pic_module",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect()
+    }
+}
+
+#[starlark_module]
+fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn create_header_info<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        let empty_headers = eval.frozen_heap().alloc(AllocList::EMPTY).to_value();
+        Ok(eval
+            .heap()
+            .alloc_complex(EmptyCcHeaderInfoGen { empty_headers }))
+    }
+}
 
 #[starlark_module]
 fn cc_common_methods(builder: &mut MethodsBuilder) {

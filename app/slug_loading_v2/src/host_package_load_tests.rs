@@ -3293,6 +3293,80 @@ fn bazel_cc_common_private_bridge_is_bzl_only_owner_checked_and_opaque() {
 }
 
 #[test]
+fn bazel_empty_header_info_freezes_rules_cc_compilation_context_row() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_info.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_cc/cc/private/cc_info.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let source = r#"
+cc_internal = cc_common.internal_DO_NOT_USE()
+FIRST = cc_internal.create_header_info()
+ALIAS = FIRST
+SECOND = cc_internal.create_header_info()
+HEADER_TYPE = type(FIRST)
+ALIASES_EQUAL = FIRST == ALIAS
+CALLS_DISTINCT = FIRST != SECOND
+MODULES_EMPTY = FIRST.header_module == None and FIRST.pic_header_module == None and FIRST.separate_module == None and FIRST.separate_pic_module == None
+LISTS_EMPTY = FIRST.modular_public_headers == [] and FIRST.modular_private_headers == [] and FIRST.textual_headers == [] and FIRST.separate_module_headers == []
+HAS_ALL_FIELDS = hasattr(FIRST, "header_module") and hasattr(FIRST, "pic_header_module") and hasattr(FIRST, "modular_public_headers") and hasattr(FIRST, "modular_private_headers") and hasattr(FIRST, "textual_headers") and hasattr(FIRST, "separate_module_headers") and hasattr(FIRST, "separate_module") and hasattr(FIRST, "separate_pic_module")
+CcCompilationContextInfo = provider(
+    "CcCompilationContext",
+    fields = {"_header_info": "Internal"},
+)
+EMPTY_COMPILATION_CONTEXT = CcCompilationContextInfo(_header_info = FIRST)
+NESTED_TYPE = type(EMPTY_COMPILATION_CONTEXT._header_info)
+NESTED_HEADERS = EMPTY_COMPILATION_CONTEXT._header_info.modular_public_headers
+"#;
+    let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
+    assert_eq!(
+        module.get("HEADER_TYPE").unwrap().unpack_str(),
+        Some("HeaderInfo")
+    );
+    assert_eq!(
+        module.get("NESTED_TYPE").unwrap().unpack_str(),
+        Some("HeaderInfo")
+    );
+    for name in [
+        "ALIASES_EQUAL",
+        "CALLS_DISTINCT",
+        "MODULES_EMPTY",
+        "LISTS_EMPTY",
+        "HAS_ALL_FIELDS",
+    ] {
+        assert_eq!(
+            module.get(name).unwrap().unpack_bool(),
+            Some(true),
+            "{name}"
+        );
+    }
+    assert_eq!(
+        FrozenListRef::from_value(module.get("NESTED_HEADERS").unwrap().value())
+            .unwrap()
+            .len(),
+        0
+    );
+    let first = module.get("FIRST").unwrap();
+    let alias = module.get("ALIAS").unwrap();
+    let second = module.get("SECOND").unwrap();
+    assert!(first.value().equals(alias.value()).unwrap());
+    assert!(!first.value().equals(second.value()).unwrap());
+
+    for failure in [
+        "cc_internal = cc_common.internal_DO_NOT_USE()\nX = cc_internal.create_header_info(1)",
+        "cc_internal = cc_common.internal_DO_NOT_USE()\nX = cc_internal.create_header_info(unknown = None)",
+        "cc_internal = cc_common.internal_DO_NOT_USE()\nX = cc_internal.create_header_info(header_module = None)",
+        "cc_internal = cc_common.internal_DO_NOT_USE()\ncc_internal.create_header_info().modular_public_headers.append('mutable')",
+        "cc_internal = cc_common.internal_DO_NOT_USE()\nX = {cc_internal.create_header_info(): True}",
+    ] {
+        assert!(
+            eval_bzl_with_identity(failure, owner.clone()).is_err(),
+            "{failure}"
+        );
+    }
+}
+
+#[test]
 fn bazel_initialized_provider_loads_rules_cc_artifact_categories_and_stays_separate() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/common:cc_helper_internal.bzl").unwrap(),
