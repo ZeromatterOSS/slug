@@ -5247,6 +5247,40 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Post-find-toolchain audit selects bounded utils eager-values proof (2026-08-26)
+
+Exact `rust/private/utils.bzl` returns from the find-toolchain child through
+already-admitted rules_cc `cc_common`, rules_cc `CcInfo` and rules_rust
+providers. The authenticated 1,032-line rules_rust 0.73.0 source hashes to
+`8aa49b9312d4ae5c4aed033aba65392a039a681b3ee21ca83da0f05acac28ace`.
+No unsupported eager loading expression exists.
+
+The remaining eager values are the six-string `UNSUPPORTED_FEATURES` list,
+private false kill switch, 31-pair encoding tuple, derived ordered 63-pair
+substitution list, its public alias and the public alias of lazy
+`_encode_raw_string`. Every other top-level declaration is a lazy function.
+Bazel's pinned Starlark loop/comprehension regressions establish tuple binding,
+nested clause and list-result order.
+
+Run only `WP-4-7A-rules-rust-utils-eager-values-loading-proof` in the existing
+loading test file under 0/250/250 caps. Embed five exact source slices totaling
+124 lines rather than the full module, hash each slice, and prove the exact
+ordered list/pairs, false capture, alias identities and frozen function type.
+Lines 692-740 are included solely to close `_encode_raw_string`'s lazy compiler/
+freeze dependency on `_replace_all`; invoke neither function and stop before
+later utils/allocator/parent behavior.
+
+Exact compatibility covers the five exact slice bytes and ordered eager values/
+aliases under the exact producer. Proof-only private projections and frozen
+Rust storage are Slug-native. `_replace_all` invocation/results, full-source
+freeze, utility results/diagnostics, configured toolchain/allocator semantics
+and later source remain deferred.
+
+Clean `../zabel` `0795445f…` guides only recursive freeze reachability for
+composites and aliases. No Zig code, representation, owner pointer, ordering
+algorithm, diagnostic, identity or behavior is copied. Bazel 9.2 remains sole
+authority; the retained utility review selects no action.
+
 ### Exact rules_cc find-toolchain child accepted; utils audit selected (2026-08-26)
 
 Commit `ee9ef5254` freezes exact rules_cc 0.2.17
