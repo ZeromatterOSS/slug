@@ -5247,6 +5247,30 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Empty compilation outputs accepted; cc_common compiler sentinel selected (2026-08-26)
+
+Commit `b0cd7855` accepts exact empty-list `cc_internal.freeze` and completes
+the top-level `EMPTY_COMPILATION_OUTPUTS` provider. The result is evaluator-
+owned and immutable; all non-empty and general container shapes fail closed.
+The source-shaped proof, configured regression, all 206 loading units, locked
+checks, rebuilt CLI and hygiene pass within 15 production, 69 proof and 84
+total additions. Independent terminal review returned `ACCEPT`.
+
+The recursive source audit passes `compile.bzl` and the remaining direct
+children at loading time because their semantic C++ operations stay lazy and
+their evaluated declarations use admitted shapes. At
+`cc/private/cc_common.bzl:735`, exported wrapper construction first reads
+`_cc_common_internal.do_not_use_tools_cpp_compiler_present`. Pinned Bazel 9.2
+exports that deprecated struct field as `None`; no invocation or configured
+behavior is involved.
+
+Run only `WP-4-7A-bazel-cc-common-compiler-sentinel-loading`. Add one stateless
+attribute observation to the existing `.bzl` `cc_common` value, preserve BUILD
+absence, and stop once rules_cc's wrapper freezes. Clean `../zabel`
+`0795445f…` is architectural/test guidance for the same direct-property and
+wrapper-construction boundary only; no Zig code, dispatch representation or
+behavior is copied. No retained representation or Buck2 utility changes.
+
 ### Documented provider initializer accepted; empty-list freeze selected (2026-08-26)
 
 Commit `152caa6f` accepts documented string-dictionary schemas through the
