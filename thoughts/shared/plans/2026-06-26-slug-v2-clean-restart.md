@@ -30,17 +30,44 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; Bazel keyword-only syntax accepted, `struct` audit active** | selected-registry source/root-load, verified transport and exact rules_rust root realization are accepted through `2f373248`; commit `54d28477` accepts the bounded Bazel BUILD/`.bzl` dialect and keyword-only parse/binding slice across every live Stage 4 route | rules_rust now evaluates through the prior `_support` stop and first fails because Bazel's `.bzl` `struct` global is absent from Slug's loading environment | run only `WP-4-7A-bazel-struct-builtin-audit`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; bounded Bazel `.bzl` `struct` support selected** | selected-registry source/root-load, verified transport and exact rules_rust root realization are accepted through `2f373248`; commit `54d28477` accepts the bounded Bazel BUILD/`.bzl` dialect and keyword-only parse/binding slice; the `struct` audit authenticates the live rules_rust operations and the retained engine implementation | add `StructType` only to the complete `.bzl` loading environment while preserving BUILD/MODULE/REPO environments, then prove named construction, field access and frozen recursive export | run only `WP-4-7A-bazel-bzl-struct-builtin`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-struct-builtin-audit](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-bazel-bzl-struct-builtin](./slug-v2-subplans/current-packet.md).
 
-Audit only Bazel 9.2's `.bzl` `struct` global, the retained starlark-rust
-implementation and Slug's loading-global ownership. Select one bounded shared
-globals owner or `REPLAN`; do not edit Rust in this packet.
+Implement only the audited split between complete `.bzl` and BUILD loading
+globals, activate retained `StructType` for `.bzl` evaluation, and prove the
+live rules_rust construction/field/freeze slice. Do not widen MODULE or REPO.
+
+### M7 Bazel `.bzl` `struct` implementation selected (2026-08-25)
+
+Pinned Bazel 9.2 `StarlarkGlobalsImpl` places `StructProvider.STRUCT` in fixed
+`.bzl`, cquery and SCL globals, but not fixed BUILD, MODULE or REPO globals;
+`BazelStarlarkEnvironmentTest` additionally proves BUILD-loaded and
+MODULE-loaded `.bzl` files declare the same names. The live rules_rust load
+needs named bool construction, `.std`/`.host_tools` field reads and freezing a
+dictionary of structs across recursive module export.
+
+Retained starlark-rust already implements that slice through
+`LibraryExtension::StructType`, `register_struct`, `StructGen` and its derived
+freeze. It diverges outside the selected surface: it orders structs, does not
+implement Bazel struct concatenation/provider identity, and renders spacing
+differently. Those rows remain unsupported/deferred rather than being promoted
+by exposing the builtin.
+
+The bounded successor keeps `package.rs` as the sole loading-global owner,
+adds a distinct current BUILD environment, and makes the existing complete
+loading environment the `.bzl` environment with only `Print` and `StructType`.
+Only BUILD/package evaluations in `bzl_module.rs` switch to the BUILD value;
+all `.bzl` routes share the other value. MODULE, REPO, cquery and preliminary
+core evaluation are unchanged.
+
+Pinned Zabel `c7298478…` guided the complete typed environment owner and
+consumer projection rather than per-evaluator symbol reconstruction. No Zabel
+code or behavior is copied; Bazel 9.2 remains sole compatibility authority.
 
 ### M7 Bazel keyword-only Starlark support accepted (2026-08-25)
 

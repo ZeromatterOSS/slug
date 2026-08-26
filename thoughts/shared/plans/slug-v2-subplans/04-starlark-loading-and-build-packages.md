@@ -4001,3 +4001,61 @@ evaluators consume one complete typed semantics/global environment rather than
 reconstructing symbols per call. It does not define `struct` behavior and no
 Zig code or representation may be copied; pinned Bazel 9.2 remains sole
 behavior authority. M7 stays partial and M7A -> M8 -> M7B remains.
+
+### Bazel `.bzl` `struct` audit accepted (2026-08-25)
+
+Pinned Bazel 9.2 `StarlarkGlobalsImpl` and `StarlarkGlobals` establish the
+environment matrix: `struct` is fixed in `.bzl`, cquery and SCL globals, but
+not in BUILD, MODULE or REPO globals. `BazelStarlarkEnvironmentTest` proves
+BUILD-loaded and MODULE-loaded `.bzl` files declare the same names.
+`StructProvider` plus the focused `StarlarkRuleClassFunctionsTest` rows define
+construction, fields, immutability, equality, comparison rejection,
+concatenation, representation and hashing behavior.
+
+The current rules_rust load uses a smaller discriminating slice. At module
+evaluation it constructs `_support` structs from two named bool fields, reads
+`support.std` in a dictionary comprehension, stores structs as dictionary
+values and freezes/exports that dictionary. `triple.bzl` defines further
+named-field constructors, but does not invoke them before this load completes.
+No struct comparison, concatenation, provider identity, representation, JSON
+or struct-key hashing is required at this frontier.
+
+Retained starlark-rust `LibraryExtension::StructType`, `register_struct` and
+`StructGen` already supply named-only construction, immutable field access,
+order-insensitive equality/hash and derived freeze. Do not claim its broader
+surface exact: unlike Bazel it currently orders structs, lacks Bazel struct
+concatenation/provider identity, and formats fields without Bazel's spaces.
+Those rows remain unsupported/deferred until a demonstrated consumer requires
+them.
+
+Slug's `loading_globals()` is currently shared by BUILD and `.bzl` evaluation,
+so adding `StructType` directly would incorrectly widen BUILD. Keep
+`package.rs` as the natural complete-environment owner: introduce a sibling
+BUILD environment preserving the current Print-only extension set, make the
+existing environment the `.bzl` value with exactly Print and StructType, and
+route only the two direct BUILD/package consumers to the sibling. Recursive
+Host/external/legacy `.bzl` routes continue consuming the same complete value.
+No request input, DICE key/equality, invalidation, event, source, evaluator-heap
+or retained-module ownership changes. Struct instances freeze into the
+existing retained `FrozenBzlModule`; globals remain evaluation-local.
+
+No new oracle is needed: pinned Bazel source/tests discriminate placement and
+behavior, while the accepted rules_rust source discriminates the required
+operations. The implementation proves a recursive external module constructs,
+reads and freezes the real `_support` shape and a Host BUILD still rejects
+`struct`. `package.rs` and `bzl_module.rs` exceed the size trigger, but the
+change adds one sibling to the existing globals owner and two call-site
+selections only; splitting unrelated package/loading orchestration would widen
+the packet.
+
+Run only `WP-4-7A-bazel-bzl-struct-builtin`. Exact compatibility is `.bzl`
+availability, named construction, field access and frozen recursive export for
+the live bool-valued rules_rust slice. Rust storage and nonrequired diagnostics
+are Slug-native. BUILD/MODULE/REPO exposure, struct ordering/concatenation/
+provider/format/JSON breadth and later rules_rust semantics remain unsupported
+or deferred.
+
+Pinned Zabel `c7298478…` guides one complete typed environment owner projected
+to each correct evaluator class. It supplies no behavior or representation;
+Bazel 9.2 remains sole compatibility authority. M7 stays partial and
+M7A -> M8 -> M7B remains.
