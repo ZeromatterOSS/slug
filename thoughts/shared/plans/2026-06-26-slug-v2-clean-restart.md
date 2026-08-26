@@ -30,19 +30,60 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; rust-analyzer toolchain-rule loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction with optimizer-safe defining-source provenance; the declaration-schema audit selects one fail-closed loading vertical | load and freeze the fixed `rust_analyzer_toolchain = rule(...)` schema while retaining executable/exec-transition policy; target invocation, configured exec dependencies, aspect application and bool/list targets/analysis remain deferred | run only `WP-4-7A-rust-analyzer-toolchain-rule-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; current rust-analyzer toolchain-rule audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain declaration schema | audit the next `current_rust_analyzer_toolchain = rule(...)`, including its explicit apparent self-repository Label and retained toolchain requirement; target invocation, configured exec dependencies, aspect application and bool/list targets/analysis remain deferred | run only `WP-4-7A-current-rust-analyzer-toolchain-rule-audit`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-rust-analyzer-toolchain-rule-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-current-rust-analyzer-toolchain-rule-audit](./slug-v2-subplans/current-packet.md).
 
-Load and freeze the first post-aspect source-order declaration at
-`rust/private/rust_analyzer.bzl:359-402`. Add only the documented label/string
-call shapes and retain executable plus exec-transition policy in the existing
-rule schema. Fail closed before target recording; do not configure dependencies
-or run analysis.
+Audit the next source-order rule at
+`rust/private/rust_analyzer.bzl:404-433`. Authenticate the explicit
+`@rules_rust` Label's defining repository mapping and the retained `toolchains`
+requirement, then select one bounded declaration-loading implementation or
+`REPLAN`. Do not execute the implementation or enter configured analysis.
+
+### M7 rust-analyzer toolchain declaration accepted; apparent-self Label audit selected (2026-08-26)
+
+Commit `eda81a4d` loads and recursively freezes the complete fixed
+`rust_analyzer_toolchain = rule(...)` declaration. Label and string docs accept
+omission, strings and `None` and are discarded outside the deferred
+documentation-extraction surface. Executable and exec-transition policy are
+distinct booleans in the existing descriptor/frozen rule-schema owner;
+mandatory, single-file, typed defaults and custom transitions retain their
+existing owners. Omitted and explicit-false executable values remain identical.
+
+Rules carrying executable-true or exec-configured attributes reject before
+`PackageRecorder` can record a target. Existing non-executable custom-transition
+invocation remains accepted. Recursive proof discriminates exec with omitted
+executable from executable with a retained custom transition. External default
+coercion now consumes the accepted caller-aware canonical source projection
+instead of reparsing an already-canonical repository label.
+
+Focused tests and all 256 loading tests pass; locked core check, rebuilt CLI,
+formatting and hygiene pass. The archive audit retains only its known three
+thoughts paths. Growth is 96 production, 134 proof and 230 total, within every
+cap; independent review returned `ACCEPT` after requiring the custom-transition
+freeze discriminator.
+
+Pinned Zabel `c7298478…` guided keeping executable, single-file and transition
+policy in one declaration schema separated from target-local values; no Zig
+layout, code, DICE relation or behavior was copied. Bazel 9.2 remains sole
+authority. Exact compatibility is the fixed declaration call, retention,
+freeze and export slice. Rust storage, discarded docs and fail-closed invocation
+are Slug-native; configured exec dependencies and analysis remain deferred.
+
+Source order next reaches `current_rust_analyzer_toolchain = rule(...)` at lines
+423-429. Its implementation body at lines 404-421 remains lazy, but declaration
+evaluation calls
+`Label("@rules_rust//rust/rust_analyzer:toolchain_type")` and passes its string
+at line 427 to the lines 426-428 `rule(toolchains = ...)` list. The bounded Label
+surface rejects explicit
+repositories and Slug's current rule-toolchain converter lacks a complete
+defining-module repository mapping. Run only the docs audit
+`WP-4-7A-current-rust-analyzer-toolchain-rule-audit` before changing that
+identity boundary.
 
 ### M7 rust-analyzer toolchain-rule audit selects fail-closed declaration loading (2026-08-26)
 

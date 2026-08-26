@@ -4342,6 +4342,35 @@ Slug-native; `Label`, the complete live expression, application plus
 Boolean/StringList targets and analysis/CLI, M8/M7B and exact output bytes
 remain deferred.
 
+### Rust-analyzer toolchain declaration accepted; apparent-self Label audit selected (2026-08-26)
+
+Commit `eda81a4d` accepts and freezes the exact six-attribute
+`rust_analyzer_toolchain` schema. Attribute docs validate strings/`None` and are
+discarded; executable and exec-transition fields survive descriptor and rule
+freeze independently of mandatory, single-file, defaults and custom
+transitions. Target invocation gates executable-true or exec-configured fields
+before recording, while non-executable custom transitions remain unchanged.
+Caller-aware canonical source identity now also owns external default coercion.
+
+Focused proof and all 256 loading tests pass with locked core check, rebuilt
+CLI, formatting, hygiene and the unchanged archive baseline. Growth is 96
+production, 134 proof and 230 total. Independent review returned `ACCEPT` after
+the frozen executable/custom-transition discriminator was added.
+
+Pinned Zabel `c7298478…` guided only the single declaration-schema owner and
+thin target-value projection. No Zig code, layout, mapping, DICE relation or
+behavior was adopted; Bazel 9.2 remains sole authority.
+
+The next evaluated source expression is the explicit apparent-self Label in
+`current_rust_analyzer_toolchain = rule(toolchains = ...)` at
+`rust/private/rust_analyzer.bzl:423-429`; the preceding lines 404-421
+implementation body is not executed during declaration loading. The
+toolchains list spans lines 426-428 and calls the apparent-self Label on line
+427. Run only docs audit
+`WP-4-7A-current-rust-analyzer-toolchain-rule-audit` to authenticate Bazel's
+defining-module repository mapping, the Label/string handoff and retained
+toolchain requirement before implementation or analysis.
+
 ### Rust-analyzer toolchain-rule audit selects fail-closed declaration loading (2026-08-26)
 
 The accepted rules_rust archive reaches
