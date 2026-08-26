@@ -3441,13 +3441,99 @@ BYPASSED = _new_failing(name = "raw")
     assert!(StarlarkUserProvider::from_value(raw).is_none());
 
     let failures = [
-        "def init(): return {}\nX = provider('doc', fields = {'x': 'doc'}, init = init)",
         "def init(): return {}\nX = provider('doc', fields = None, init = init)",
         "X = provider('doc', fields = ['x'], init = 1)",
         "def init(): return 'bad'\nInfo, raw = provider('doc', fields = ['x'], init = init)\nX = Info()",
         "def init(): return {1: 'bad'}\nInfo, raw = provider('doc', fields = ['x'], init = init)\nX = Info()",
         "def init(): return {'other': 'bad'}\nInfo, raw = provider('doc', fields = ['x'], init = init)\nX = Info()",
         "def init(): return {'x': 'ok'}\nInfo, raw = provider('doc', fields = ['x'], init = init)\nX = raw('bad')",
+    ];
+    for failure in failures {
+        assert!(
+            eval_bzl_with_identity(failure, owner.clone()).is_err(),
+            "{failure}"
+        );
+    }
+}
+
+#[test]
+fn bazel_documented_initialized_providers_freeze_cc_info_and_launcher_declarations() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_info.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_cc/cc/private/cc_info.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let source = r#"
+events = []
+def _create_cc_info(*, compilation_context = None, linking_context = None, debug_context = None, cc_native_library_info = None):
+    events.append("cc")
+    return dict(
+        compilation_context = compilation_context,
+        linking_context = linking_context,
+        _debug_context = debug_context,
+        _legacy_transitive_native_libraries = cc_native_library_info,
+    )
+CcInfo, _new_cc_info = provider(
+    doc = "Provider for C++ compilation and linking information.",
+    fields = {
+        "compilation_context": "A CcCompilationContext.",
+        "linking_context": "A CcLinkingContext.",
+        "_debug_context": "A CcDebugInfoContext.",
+        "_legacy_transitive_native_libraries": "A CcNativeLibraryInfo.",
+    },
+    init = _create_cc_info,
+)
+INFO = CcInfo(compilation_context = struct(marker = "context"))
+INFO_MARKER = INFO.compilation_context.marker
+def _cc_launcher_info_constructor(cc_info, compilation_outputs):
+    events.append("launcher")
+    return dict(cc_info = cc_info, compilation_outputs = compilation_outputs)
+CcLauncherInfo, _new_launcher_info = provider(
+    doc = "Provider for a C++ launcher.",
+    fields = {
+        "cc_info": "The CcInfo provider of the launcher.",
+        "compilation_outputs": "The compilation outputs.",
+    },
+    init = _cc_launcher_info_constructor,
+)
+LAUNCHER = CcLauncherInfo(INFO, ["output"])
+LAUNCHER_OUTPUT = LAUNCHER.compilation_outputs[0]
+RAW = _new_launcher_info(compilation_outputs = ["raw"])
+RAW_OUTPUT = RAW.compilation_outputs[0]
+RAW_OMITS_CC_INFO = not hasattr(RAW, "cc_info")
+"#;
+    let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
+    assert_eq!(
+        module.get("INFO_MARKER").unwrap().unpack_str(),
+        Some("context")
+    );
+    assert_eq!(
+        module.get("LAUNCHER_OUTPUT").unwrap().unpack_str(),
+        Some("output")
+    );
+    assert_eq!(module.get("RAW_OUTPUT").unwrap().unpack_str(), Some("raw"));
+    assert_eq!(
+        module.get("RAW_OMITS_CC_INFO").unwrap().unpack_bool(),
+        Some(true)
+    );
+    let events = FrozenListRef::from_value(module.get("events").unwrap().value()).unwrap();
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].to_value().unpack_str(), Some("cc"));
+    assert_eq!(events[1].to_value().unpack_str(), Some("launcher"));
+    let launcher = module.get("LAUNCHER").unwrap();
+    let raw = module.get("RAW").unwrap();
+    assert_eq!(
+        loading_provider_id(launcher.value()),
+        loading_provider_id(raw.value())
+    );
+    assert!(StarlarkUserProvider::from_value(launcher.value()).is_none());
+
+    let failures = [
+        "def init(): return {}\nInfo, raw = provider('doc', fields = {1: 'doc'}, init = init)",
+        "def init(): return {}\nInfo, raw = provider('doc', fields = {'x': 1}, init = init)",
+        "def init(): return {'other': 1}\nInfo, raw = provider('doc', fields = {'x': 'doc'}, init = init)\nX = Info()",
+        "def init(): return {}\nInfo, raw = provider('doc', fields = {'x': 'doc'}, init = init)\nX = raw(other = 1)",
+        "def init(): return {}\nInfo, raw = provider('doc', fields = {'x': 'doc'}, init = init)\nX = raw(1)",
     ];
     for failure in failures {
         assert!(

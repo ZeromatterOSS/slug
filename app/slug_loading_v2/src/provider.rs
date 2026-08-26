@@ -185,14 +185,17 @@ pub(crate) fn user_provider_from_arguments<'v>(
         if callable.is_none() {
             anyhow::bail!("provider init must be callable");
         }
-        let fields = fields
-            .and_then(ListRef::from_value)
-            .ok_or_else(|| anyhow::anyhow!("initialized provider fields must be a list"))?;
-        return InitializedUserProviderCallable::allocate_pair(
-            provider_list_fields(fields)?,
-            init,
-            eval,
-        );
+        let fields = fields.ok_or_else(|| {
+            anyhow::anyhow!("initialized provider fields must be a list or dictionary")
+        })?;
+        let fields = if let Some(fields) = ListRef::from_value(fields) {
+            provider_list_fields(fields)?
+        } else if let Some(fields) = DictRef::from_value(fields) {
+            provider_documented_fields(&fields)?
+        } else {
+            anyhow::bail!("initialized provider fields must be a list or dictionary");
+        };
+        return InitializedUserProviderCallable::allocate_pair(fields, init, eval);
     }
     let schema = match fields.filter(|value| !value.is_none()) {
         None => UserProviderSchema::Schemaless,
@@ -203,18 +206,7 @@ pub(crate) fn user_provider_from_arguments<'v>(
             let fields = DictRef::from_value(fields).ok_or_else(|| {
                 anyhow::anyhow!("provider fields must be a list, dictionary or None")
             })?;
-            let mut names = Vec::with_capacity(fields.len());
-            for (name, documentation) in fields.iter() {
-                let name = name
-                    .unpack_str()
-                    .ok_or_else(|| anyhow::anyhow!("provider field names must be strings"))?;
-                if documentation.unpack_str().is_none() {
-                    anyhow::bail!("provider field docs must be strings");
-                }
-                names.push(CompactString::new(name));
-            }
-            names.sort_unstable();
-            UserProviderSchema::Documented(names.into())
+            UserProviderSchema::Documented(provider_documented_fields(&fields)?)
         }
     };
     Ok(eval
@@ -236,6 +228,21 @@ fn provider_list_fields(fields: &ListRef<'_>) -> anyhow::Result<Arc<[CompactStri
     if names.windows(2).any(|pair| pair[0] == pair[1]) {
         anyhow::bail!("provider fields must not contain duplicates");
     }
+    Ok(names.into())
+}
+
+fn provider_documented_fields(fields: &DictRef<'_>) -> anyhow::Result<Arc<[CompactString]>> {
+    let mut names = Vec::with_capacity(fields.len());
+    for (name, documentation) in fields.iter() {
+        let name = name
+            .unpack_str()
+            .ok_or_else(|| anyhow::anyhow!("provider field names must be strings"))?;
+        if documentation.unpack_str().is_none() {
+            anyhow::bail!("provider field docs must be strings");
+        }
+        names.push(CompactString::new(name));
+    }
+    names.sort_unstable();
     Ok(names.into())
 }
 
