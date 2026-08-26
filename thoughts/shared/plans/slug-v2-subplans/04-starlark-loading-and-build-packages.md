@@ -4958,3 +4958,38 @@ package, BUILD alias rejection, missing frame-map rejection, input boundaries
 and the complete fixed aspect declaration. Pinned Zabel `c7298478…` supplies
 concept/test guidance for value/context ownership only; no code or behavior is
 copied, and Bazel 9.2 remains sole authority.
+
+### Rustfmt test aspect accepted; target-attribute audit selected (2026-08-26)
+
+Commit `50205fb3` extends the existing frozen aspect declaration with the
+fixed singleton advertised-provider identity required by
+`_rustfmt_test_aspect`. The recursive importer proof retains the third aspect,
+its required `rustfmt_aspect`, the nested `rustfmt_srcs_aspect` and
+`RustfmtTestInfo` under their defining module and first export names. Both
+required producer labels are explicit. Omitted advertised providers stay
+empty, and unsupported explicit shapes reject during loading. No aspect
+application, provider matching or implementation execution is admitted.
+
+Focused proof and all 194 loading unit tests pass. The unaffected integration
+suites, locked core check, rebuilt CLI and format/diff gates pass; the sole
+full-suite failure is the already-recorded stale `@external` expectation.
+Growth is 23 production and 101 proof lines within caps. Independent terminal
+review returned `ACCEPT` after the recursive aspect identity assertions were
+made complete.
+
+Source order reaches `rust/private/rustfmt.bzl:218-243`. Its `rustfmt_test`
+rule merges the already accepted `LINT_TEST_COMMON_ATTRS` with one `targets`
+label-list descriptor. Slug's label-list constructor currently lacks that
+descriptor's first named argument, `doc`, and also lacks its coupled
+`providers`, `aspects` and `cfg = platform_transition` facts. Run only
+`WP-4-7A-rustfmt-test-target-attribute-audit`: authenticate dict merge and
+duplicate behavior, Bazel descriptor validation/retention, provider and aspect
+producer identities, and custom dependency-transition ownership before
+selecting one bounded declaration-only implementation or `REPLAN`.
+
+Pinned Zabel `c7298478…` guides only the owner boundary: its `AttrDefinition`
+keeps provider, aspect and transition declaration values together, and its
+configured capture later detaches their identities and provenance without
+reconstructing them at a consumer. No Zig code, layout, behavior, evaluator,
+cache or analysis algorithm is adopted. Bazel 9.2 remains sole behavior
+authority.
