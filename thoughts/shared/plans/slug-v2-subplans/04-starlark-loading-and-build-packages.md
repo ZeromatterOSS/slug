@@ -4342,6 +4342,63 @@ Slug-native; `Label`, the complete live expression, application plus
 Boolean/StringList targets and analysis/CLI, M8/M7B and exact output bytes
 remain deferred.
 
+### Lint-test attributes accepted; first rustfmt aspect requirements selected (2026-08-26)
+
+Commit `2cbdb148` validates/discards the fixed lint bool documentation and
+freezes both scalar label defaults through the defining module. The raw
+`@bazel_tools` allowlist spelling resolves with that module's immutable
+repository mapping; the typed no-colon runner Label remains exactly
+`@@dep+//rust/private/lint_test_runner:lint_test_runner`. The implementation
+bodies remain lazy. Focused proof, the remaining loading integrations, locked
+core check, rebuilt CLI and hygiene pass; the one full-suite failure is
+baseline-identical stale test ordering at `5e9039fe`. Independent terminal
+review returned `ACCEPT`.
+
+Recursive source order returns to `rust/private/rustfmt.bzl`. Functions through
+line 94 remain lazy, `RustfmtTargetInfo = provider(...)` at lines 96-102 already
+constructs, and its implementation body at lines 104-117 remains lazy. The
+first unsupported expression is `rustfmt_srcs_aspect = aspect(...)` at lines
+119-127: Slug rejects `required_providers` before reaching the adjacent
+`fragments = ["cpp"]`.
+
+Pinned Bazel 9.2 `StarlarkRuleFunctionsApi.aspect`,
+`StarlarkAttrModule.buildProviderPredicate`,
+`StarlarkRuleClassFunctions.aspect`, `StarlarkDefinedAspect`, focused
+rule-class predicate tests and the aspect-fragment test establish declaration
+behavior. The outer predicate is an OR of inner AND provider sets; provider
+constructors must already be exported and retain their producer keys.
+Fragments are retained as an immutable name set. Neither fact applies an
+aspect or runs its implementation during loading.
+
+Run only `WP-4-7A-rustfmt-first-aspect-requirements-loading`. Put the fixed two
+singleton alternatives and fixed `cpp` fragment on Slug's existing transient
+and frozen aspect owners. Clone the existing producer-owned `ProviderId` from
+transient or frozen provider callables; never reconstruct it from display text
+or importer context. Preserve first-export aspect identity separately. Prove a
+recursive import through `rust_common`, exact provider IDs/order, fixed
+fragment, lazy implementation, omitted empty state, invalid predicate shapes
+and BUILD absence. No new DICE key, registry, cache, mapping, I/O or analysis
+consumer is admitted.
+
+Exact compatibility covers only the fixed nested predicate, fixed fragment,
+producer identity, recursive freeze/export and lazy implementation. Arc-backed
+Rust representation, duplicate normalization and diagnostics are Slug-native.
+Flat/native/wider predicates, other fragments, aspect application,
+advertised-provider matching, `ctx.fragments`, configured targets,
+toolchains/actions, later rustfmt declarations, M8/M7B and exact output bytes
+remain unsupported/deferred.
+
+Pinned Zabel `c7298478…` is architectural guidance only. Its
+`build_rule_declaration.zig` retains provider requirements and fragment names
+inside one complete producer-owned `AspectDefinition`, while
+`AspectExportIdentity` stays distinct and imported provider identities remain
+producer-owned. Slug follows that ownership split with its existing
+`ProviderId` and frozen aspect lifetime. No Zig code, representation, evaluator
+behavior, cache or analysis semantics are copied; Bazel 9.2 remains sole
+behavior authority. The Buck2 utility audit selects existing Arc slices,
+compact strings, provider IDs and duplicate-normalization patterns; no new
+retained utility family.
+
 ### Post-rust-analyzer audit selects defining-module scalar label defaults (2026-08-26)
 
 The accepted recursive external-Bzl evaluator computes `resolved_loads`
