@@ -5247,6 +5247,53 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### cc_common private bridge accepted; provider initializer selected (2026-08-26)
+
+Commit `4d7a9bbb` installs the public `cc_common` wrapper only in complete
+`.bzl` globals. `internal_DO_NOT_USE()` is zero-argument, accepts canonical
+`rules_cc+` defining-call owners, rejects root and foreign owners with Bazel's
+canonical-label private diagnostic, returns one frozen opaque token and leaves
+BUILD plus every internal C++ method absent. Focused proof and all 201 loading
+units pass; broad loading retains only its known line-2948 `@external`
+diagnostic-order failure. Locked core check, rebuilt CLI and hygiene pass.
+Independent review requested exact main-repository `//...` diagnostic spelling
+and returned `ACCEPT` after correction.
+
+The next recursive child `cc/private/paths.bzl` defines only the lazy
+`is_path_absolute` function and freezes on the accepted evaluator. The first
+absent evaluated call is then rules_cc 0.2.17
+`cc/common/cc_helper_internal.bzl`'s `_ArtifactCategoryInfo` declaration:
+`provider(fields = [four strings], init = _artifact_category_info_init)`. The
+same file immediately constructs its fixed rows, reads their fields, forms the
+artifact-name struct and freezes the instances.
+
+Pinned Bazel 9.2 `StarlarkRuleFunctionsApi`,
+`StarlarkRuleClassFunctions.provider`,
+`StarlarkProvider.ArgumentProcessorWithInit`/`RawArgumentProcessor`, and the
+focused `declaredProvidersWithInit`/raw-bypass/failure tests establish the
+contract. A callable initializer changes `provider()` to a two-value provider
+and raw-constructor pair; the normal constructor forwards original arguments,
+requires a string-keyed dictionary and applies the schema; raw construction
+bypasses the callback, rejects positional arguments and retains the same
+provider identity. Declared schema fields remain optional.
+
+Run only `WP-4-7A-bazel-provider-initializer-loading`. Keep the existing
+configured string-only callable/instance untouched and add a loading-only
+initialized family in the same provider owner. Its raw callable references the
+authoritative assignment-bound provider callable, and every closure, instance
+and arbitrary freezeable field value remains owned by the frozen module heap.
+Do not admit initialized instances as rule-analysis results or broaden into a
+C++ provider/toolchain/action method. Stop after this artifact-category child
+and re-audit recursive source order.
+
+Pinned Zabel `c7298478…` is architectural guidance only. Its provider
+definition co-owns schema, initializer and export identity; raw construction
+references that owner; and its rules_cc-shaped test exercises the same source
+sequence. Slug adopts the ownership and phase split through existing
+starlark-rust values without copying Zig code or behavior. The retained
+`Value`/`FrozenValue`, `CompactString`, deterministic `SmallMap`, `Dupe` and
+`Allocative` patterns already satisfy the Buck2 utility ledger.
+
 ### Config-string descriptor accepted; rules_cc private bridge selected (2026-08-26)
 
 Commit `919ecfa5` retains `.bzl` String `flag` and `allow_multiple` as one

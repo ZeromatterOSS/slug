@@ -30,18 +30,56 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; rules_cc private bridge selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes the file's final lazy rule; `2cbdb148` completes lint-test common attributes; `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` freeze the three rustfmt aspects and dependency declaration; `9685d9a7`, `52d2c6f2`, `297c2286`, and `919ecfa5` retain complete integer, Boolean, StringList, and String descriptor identity | admit only the owner-checked `cc_common.internal_DO_NOT_USE` load bridge; all C++ semantics remain deferred | run only `WP-4-7A-bazel-cc-common-private-bridge-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; provider initializer loading selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d` accepts the fixed rust-analyzer toolchain schema; `61cb0ad0` accepts defining-module mapping/current-toolchain loading; `129ff448` completes the file's final lazy rule; `2cbdb148` completes lint-test common attributes; `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` freeze the three rustfmt aspects and dependency declaration; `9685d9a7`, `52d2c6f2`, `297c2286`, `919ecfa5`, and `4d7a9bbb` retain complete typed descriptors and the owner-checked rules_cc private bridge | admit only the initialized-provider loading shape needed by rules_cc artifact categories; all configured C++ semantics remain deferred | run only `WP-4-7A-bazel-provider-initializer-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-cc-common-private-bridge-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-bazel-provider-initializer-loading](./slug-v2-subplans/current-packet.md).
 
-Admit only the first rules_cc private C++ bridge needed after the completed
-Skylib child. Expose `.bzl` `cc_common.internal_DO_NOT_USE()` with mandatory
-rules_cc owner checking and an opaque returned token; do not add any C++
-analysis method or advance into the rules_cc body.
+Admit only the `.bzl` initialized-provider declaration and construction shape
+needed for rules_cc artifact categories. Preserve the existing configured
+string-provider representation; do not add a C++ provider, toolchain, action or
+analysis consumer.
+
+### M7 cc_common private bridge accepted; provider initializer selected (2026-08-26)
+
+Commit `4d7a9bbb` adds the `.bzl`-only public `cc_common` projection, accepts
+exactly zero-argument `internal_DO_NOT_USE()` from canonical `rules_cc+`
+owners, returns a frozen opaque `cc_internal` token, and keeps BUILD and every
+C++ method absent. Focused bridge and all 201 loading units pass. Broad loading
+remains 30/31 only for the recorded stale `@external` diagnostic-order row;
+locked core check, rebuilt CLI, formatting and archive hygiene retain their
+accepted baselines. Independent review corrected root canonical diagnostic
+spelling to Bazel's `//...` form, then returned `ACCEPT` at 92 production and
+64 proof additions.
+
+Source order now passes lazy `cc/private/paths.bzl` and reaches
+`cc/common/cc_helper_internal.bzl`'s initialized `_ArtifactCategoryInfo`
+provider. Pinned Bazel 9.2 requires a string-list schema plus callable `init`,
+returns `(provider, raw_constructor)`, forwards original constructor arguments
+through `init`, validates its dictionary against the schema, and makes the raw
+constructor bypass the callback while rejecting positional arguments. Declared
+fields remain optional. The rules_cc source immediately constructs and freezes
+its fixed artifact-category instances, so declaration and instance loading form
+one child-completing abstraction.
+
+Run only `WP-4-7A-bazel-provider-initializer-loading`. Add a loading-only
+initialized callable/raw/instance family beside the unchanged configured
+string-provider representation. One assignment-bound provider identity owns
+both constructors; retained closures, references and arbitrary freezeable
+field values stay in the frozen module heap. Initialized instances remain
+unsupported as rule-analysis results. Stop before later rules_cc loads or any
+C++ provider, toolchain, action or analysis method.
+
+Pinned Zabel `c7298478…` guides the single provider-definition owner,
+normal-versus-raw split, and freeze/lifetime discipline visible in its
+rules_cc-shaped initialized-provider regression. No Zig implementation,
+representation or behavior is copied; Bazel 9.2 remains sole compatibility
+authority. Existing starlark-rust `Value`/`FrozenValue`, `CompactString`,
+`SmallMap`, `Dupe` and `Allocative` patterns satisfy the Buck2 utility review
+without a new import or ledger row.
 
 ### M7 config-string descriptor accepted; cc_common private bridge selected (2026-08-26)
 
