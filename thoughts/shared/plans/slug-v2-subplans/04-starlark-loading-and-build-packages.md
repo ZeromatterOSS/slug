@@ -5247,6 +5247,36 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Integer allowed values accepted; string allowed values selected (2026-08-26)
+
+Commit `563699ab` detaches the selected signed-32-bit integer allowed-value set
+into immutable declaration, frozen-rule and package schemas. Empty sequences
+remain unconstrained, order/duplicates normalize, explicit and plain-selector
+candidates are checked, and ordinary defaults remain unchecked exactly on the
+admitted Bazel rule path. Unsupported projections reject the constraint rather
+than erase it. All 212 loading tests and downstream gates pass at 73 production
+and 160 proof additions; independent terminal review returned `ACCEPT`.
+
+Source order next reaches `linker_preference` and `linker_type` at
+`rust/private/toolchain.bzl:766-772`. Both use `attr.string(values=...)` with
+small string sets. Pinned Bazel 9.2 shares the nonempty `AllowedValueSet`
+builder path and checks every explicit configurable candidate; its
+`ConfigurableAttributesTest` also proves string concatenation is validated
+after selector candidate combination. The next distinct stop is `llvm_lib`
+line 781, whose label `allow_files=True` remains absent.
+
+Run only `WP-4-7A-bazel-string-allowed-values-loading`: replace the
+integer-only constraint field with one typed integer/string enum, retain sorted
+deduplicated `Arc` slices through the same schemas, and reuse existing
+correlated candidate expansion for string selector/concatenation enforcement.
+Keep ordinary defaults unchecked and unsupported projections fail-closed.
+
+Clean `../zabel` `0795445f…` guides the same unified declaration-owned
+`allowed_values` fact and evaluator-detachment boundary. The Buck2 utility
+audit selects existing `Arc`, `CompactString` and `Allocative` patterns with no
+new utility import or ledger row. No Zig code, layout or behavior is copied;
+Bazel 9.2 remains sole compatibility authority.
+
 ### Data-attribute docs accepted; integer allowed values selected (2026-08-26)
 
 Commit `8d3f9b6e` accepts string/`None` documentation on the remaining int,
