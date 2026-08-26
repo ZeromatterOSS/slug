@@ -5247,6 +5247,57 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Post-rust_clippy source audit selects RunEnvironmentInfo global (2026-08-26)
+
+The selected rules_rust 0.73.0 source replay reaches
+`clippy.bzl:19-25`'s `//rust/private:lint_test.bzl` child before any remaining
+clippy-local declaration. That defining module has no child loads. Its exact
+SHA-256 is
+`4f4fade9218980db0296f99e5d199059c91ebebc7b9745bee18ad58c37b551c8`.
+The accepted rustfmt proof retained the exact common attribute/transition
+shapes but deliberately replaced both imported helper bodies; it therefore did
+not prove the real child compilation.
+
+Starlark's module scope resolver checks every function-body name during
+compilation. In the exact `lint_test_aspect_impl`, `OutputGroupInfo` and
+`depset` now resolve at lines 82-100. In `lint_test_rule_impl`, `DefaultInfo`
+and `depset` resolve first; Slug's next absent global is
+`RunEnvironmentInfo` at line 154. The following `OutputGroupInfo` call at line
+158 is already name-resolvable. No helper or provider constructor needs to run
+to expose this stop.
+
+Pinned Bazel 9.2 `StarlarkGlobalsImpl.getFixedBzlToplevels:91-107` installs
+`RunEnvironmentInfo.PROVIDER` only in fixed `.bzl` globals. Its
+`RunEnvironmentInfoProvider` is a distinct `BuiltinProvider`; the common
+`BuiltinProvider` contract provides class-owned identity and exact
+`<function RunEnvironmentInfo>` representation. The constructor's environment
+map, inherited environment, provider instance and configured executable/test
+behavior are later semantics, not part of declaration loading.
+
+Run only `WP-4-7A-run-environment-info-declaration-global-loading`. Add one
+dedicated zero-state fail-closed token beside the existing `OutputGroupInfo`
+token, install it only in complete `.bzl` globals, and recursively load an
+unabridged exact `lint_test.bzl` child through line 159. Prove BUILD absence,
+exact representation, distinct native/user/OutputGroupInfo types and helper
+nonexecution. Stop before returning to `clippy.bzl:463`; re-audit that tail
+after the defining child is genuinely complete.
+
+Exact compatibility covers the fixed global placement, representation and
+source-order helper freeze. The distinct zero-sized Rust type and fail-closed
+invocation are Slug-native. Constructor calls, equality/hash, provider values,
+fields, environment semantics, `testing.TestEnvironment`, helper execution,
+runfiles/actions/output groups, configured providers/aspects/transitions and
+the clippy tail remain unsupported/deferred.
+
+Clean `../zabel` `0795445f…` is architecture guidance only. Its separate
+`BuiltinProviderId.run_environment_info`, native/starlark identity union,
+provider-definition owner and loading binding support the same identity/phase
+split. No Zig code, discriminant, layout, constructor, value, configured
+lowering, diagnostic or behavior is copied. Bazel 9.2 remains sole authority.
+The Buck2 utility review reuses the zero-state `Allocative` simple-value
+pattern; no retained collection, interner, cache, clone path, hash owner or
+Stage 9 ledger entry is needed.
+
 ### OutputGroupInfo declaration and rust_clippy accepted; tail audit selected (2026-08-26)
 
 Commit `993ba5e4` adds a zero-state native-provider declaration token with the
