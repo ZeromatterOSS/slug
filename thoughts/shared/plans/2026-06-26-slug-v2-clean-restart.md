@@ -30,17 +30,44 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; cc_common compiler sentinel selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; `9685d9a7`, `52d2c6f2`, `297c2286`, `919ecfa5`, `4d7a9bbb`, `9c51999f`, `f65c9ce0`, `2ebc6fe1`, `152caa6f`, and `b0cd7855` retain complete typed descriptors, the private rules_cc bridge, provider loading, empty HeaderInfo, documented initialized C++ providers, and empty compilation outputs | expose Bazel's `None` compiler sentinel so rules_cc can freeze its exported `cc_common` wrapper; configured C++ semantics remain deferred | run only `WP-4-7A-bazel-cc-common-compiler-sentinel-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; label-list file allowance selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; `9685d9a7`, `52d2c6f2`, `297c2286`, `919ecfa5`, `4d7a9bbb`, `9c51999f`, `f65c9ce0`, `2ebc6fe1`, `152caa6f`, `b0cd7855`, and `4bdd64bf` retain complete typed descriptors, the private rules_cc bridge, provider loading, empty HeaderInfo, documented initialized C++ providers, empty compilation outputs, and the exported rules_cc wrapper | retain Bazel's Boolean `allow_files` predicate on `attr.label_list` so rules_rust can freeze `rust_stdlib_filegroup`; file resolution and later toolchain declarations remain deferred | run only `WP-4-7A-bazel-label-list-allow-files-loading`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-cc-common-compiler-sentinel-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-bazel-label-list-allow-files-loading](./slug-v2-subplans/current-packet.md).
 
-Expose the deprecated `do_not_use_tools_cpp_compiler_present` field as `None`,
-completing rules_cc's exported `cc_common` wrapper construction. Stop before
-any additional native C++ field or configured semantic claim.
+Retain the Boolean `allow_files` predicate on `attr.label_list`, completing the
+top-level rules_rust `rust_stdlib_filegroup` declaration. Stop before extension
+predicates, source-file resolution, the later `rust_toolchain` rule, or
+`config_common.toolchain_type`.
+
+### M7 cc_common wrapper accepted; label-list file allowance selected (2026-08-26)
+
+Commit `4bdd64bf` exposes only Bazel's deprecated
+`do_not_use_tools_cpp_compiler_present` property as `None`. Direct and captured
+reads, wrapper freezing, property presence, non-callability and unknown-field
+absence are proved while BUILD exposure and configured C++ semantics remain
+unchanged. All 207 loading units, configured analysis, locked checks, rebuilt
+CLI and hygiene pass at 4 production and 34 proof additions. Independent
+terminal review returned `ACCEPT`.
+
+Source order now resumes `rust/private/toolchain.bzl`. Its first declaration,
+`rust_stdlib_filegroup`, reaches `attr.label_list(allow_files = True)` at line
+115; Slug's label-list constructor has no `allow_files` parameter. Pinned Bazel
+9.2 maps Boolean true to `FileTypeSet.ANY_FILE` and keeps the attribute a
+non-single-artifact label list. Run only
+`WP-4-7A-bazel-label-list-allow-files-loading`: retain the normalized Boolean
+predicate through freeze, export and target schema identity, then freeze the
+source-shaped rule. Extension lists, actual source-file target resolution and
+the later `rust_toolchain` declaration remain deferred.
+
+Clean `../zabel` `0795445f…` guides the distinct declaration-owned
+`allows_files` fact and separation from single-artifact policy. No Zig code,
+layout, algorithm or behavior is copied; Bazel 9.2 remains sole compatibility
+authority. The Buck2 reuse audit selects one inline Boolean in existing
+retained schemas, with no collection, allocation, interner or ledger row.
 
 ### M7 empty compilation outputs accepted; cc_common compiler sentinel selected (2026-08-26)
 

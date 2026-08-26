@@ -5247,6 +5247,42 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Cc_common wrapper accepted; label-list file allowance selected (2026-08-26)
+
+Commit `4bdd64bf` adds only the deprecated
+`do_not_use_tools_cpp_compiler_present` property to the existing public
+`cc_common` loading value. Bazel's `None` result is visible directly and when
+captured into the frozen exported rules_cc wrapper; it remains non-callable,
+unknown fields remain absent, BUILD globals remain unchanged and no configured
+C++ behavior is admitted. All 207 loading units, configured analysis, locked
+checks, rebuilt CLI and hygiene pass at 4 production and 34 proof additions;
+independent terminal review returned `ACCEPT`.
+
+Recursive source order next enters rules_rust
+`rust/private/toolchain.bzl`. The first evaluated declaration is
+`rust_stdlib_filegroup`; its `srcs` schema calls
+`attr.label_list(allow_files = True)` at line 115. All imports, the lazy
+implementation and the remaining declaration arguments use accepted shapes,
+but Slug's label-list constructor does not accept `allow_files`.
+
+Pinned Bazel 9.2 `StarlarkAttrModule.setAllowedFileTypes` maps Boolean true to
+`FileTypeSet.ANY_FILE`; its regression proves this is a label-list file
+predicate and not `SINGLE_ARTIFACT`. Run only
+`WP-4-7A-bazel-label-list-allow-files-loading`: retain a normalized Boolean
+file-allowance fact in the existing declaration, frozen rule schema and target
+schema, prove true/false/None identity and freeze the source-shaped stdlib
+rule. Extension predicates and actual source-file target resolution remain
+fail-closed. Stop before the later `rust_toolchain` declaration and
+`config_common.toolchain_type`.
+
+Clean `../zabel` `0795445f…` supplies architectural/test guidance only: its
+declaration owns `allows_files` separately from `allows_single_file`, and its
+source-shaped tests keep the label-list schema non-single-artifact. No Zig code,
+layout, algorithm, diagnostics or behavior is copied. The Buck2 utility audit
+selects one inline Boolean in existing `Allocative` schemas; there is no new
+collection, allocation, hash, interner or Stage 9 ledger row. Bazel 9.2 remains
+sole behavior authority.
+
 ### Empty compilation outputs accepted; cc_common compiler sentinel selected (2026-08-26)
 
 Commit `b0cd7855` accepts exact empty-list `cc_internal.freeze` and completes
