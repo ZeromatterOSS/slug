@@ -1,14 +1,14 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-external-subtree-package-set-owner-design-r2`
+Packet: `WP-4-5-7A-external-subtree-package-set-owner-implementation-r2`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `ee20d5c7c`.
+Base: `ae26c9a60`.
 
-Result: freeze the loading-owned recursive package-set producer for an already
-authenticated external repository route. This packet is docs-only.
+Result: implement the reviewed loading-owned recursive package-set producer for
+an already authenticated external repository route.
 
 ## Learned facts and source basis
 
@@ -129,23 +129,17 @@ no command, service-cache, async-transfer or shutdown lifetime.
   validation, options, rules and actions. Non-Unicode and unknown-kind entries
   are explicit fail-closed errors rather than admitted membership.
 
-## Docs-only scope and review
+## Accepted design review
 
-This design packet may change only:
+Independent DICE/ownership and retained-representation review returned
+`ACCEPT` after three corrections: ignored candidates terminate before listing;
+symlink, unknown-kind and non-Unicode entries fail closed with typed redacted
+errors; and lexical output order is Slug-native rather than an exact Bazel
+claim. Commit `ae26c9a60` freezes that decision.
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`;
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
+## Active implementation scope
 
-Caps are 60, 260 and 210 net lines respectively. Run source-anchor, structure,
-scope, archive-baseline and diff checks. Require independent DICE/ownership and
-retained-representation review before selecting implementation.
-
-## Successor implementation bounds
-
-If accepted, select
-`WP-4-5-7A-external-subtree-package-set-owner-implementation-r2` with this
-allowlist:
+The implementation allowlist is:
 
 - `app/slug_loading_v2/src/external_subtree_package_set.rs` for the value,
   error, legacy/observed keys and sole DFS producer;
@@ -194,4 +188,5 @@ Commit `ee20d5c7c` accepts the branch-free public external package boundary at
 existing four-disposition private-lookup coverage composes with the sole-
 dependency projection. Together with `0055c653b`, loading now has every
 source-neutral fact required to freeze this producer without widening BCR,
-Starlark builtin or rule semantics.
+Starlark builtin or rule semantics. Commit `ae26c9a60` freezes this corrected
+producer design after independent review returned `ACCEPT`.

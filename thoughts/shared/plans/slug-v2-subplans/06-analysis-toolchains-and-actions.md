@@ -19097,3 +19097,11 @@ the manifest's bounded three-file implementation. Stop before target-pattern
 expansion, family filtering, registration, package loading, configured
 semantics, rules or actions. Bazel 9 BCR Starlark remains the rule source,
 including `cc_internal`; `cc_common` is only a generic host-ABI consumer.
+
+Independent DICE/retained-representation review required three corrections:
+ignore now terminates before listing; symlink, unknown-kind and non-Unicode
+entries fail closed with redacted typed errors; and lexical order is explicitly
+Slug-native. Rereview returned `ACCEPT`, and commit `ae26c9a60` freezes the
+design. Activate only
+`WP-4-5-7A-external-subtree-package-set-owner-implementation-r2` under the
+manifest's three-file 560/900 bounds.
