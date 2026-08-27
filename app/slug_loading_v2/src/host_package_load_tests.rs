@@ -4105,6 +4105,21 @@ load("@rules_cc//cc/private:debug_package_info.bzl", _DebugPackageInfo = "DebugP
 "###;
 const CC_PROXY_DEBUG_PACKAGE_EXPORT: &str = "DebugPackageInfo = _DebugPackageInfo\n";
 const CC_PROXY_SHARED_LIBRARY_EXPORT: &str = "CcSharedLibraryInfo = _CcSharedLibraryInfo\n";
+const RULES_CC_COMPATIBILITY_SYMBOLS_SOURCE: &str = r###"load("@rules_cc//cc/private:cc_common.bzl", _cc_common = "cc_common")
+load("@rules_cc//cc/private:cc_info.bzl", _CcInfo = "CcInfo")
+load("@rules_cc//cc/private:cc_shared_library_info.bzl", _CcSharedLibraryInfo = "CcSharedLibraryInfo")
+load("@rules_cc//cc/private:debug_package_info.bzl", _DebugPackageInfo = "DebugPackageInfo")
+load("@rules_cc//cc/private:objc_info.bzl", _ObjcInfo = "ObjcInfo")
+load("@rules_cc//cc/private/toolchain_config:cc_toolchain_config_info.bzl", _CcToolchainConfigInfo = "CcToolchainConfigInfo")
+
+cc_common = _cc_common
+CcInfo = _CcInfo
+DebugPackageInfo = _DebugPackageInfo
+CcToolchainConfigInfo = _CcToolchainConfigInfo
+ObjcInfo = _ObjcInfo
+new_objc_provider = _ObjcInfo
+CcSharedLibraryInfo = _CcSharedLibraryInfo
+"###;
 const RULES_CC_INTERNAL_SOURCE: &str = r###"# Copyright 2025 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24898,6 +24913,179 @@ fn exact_rules_cc_private_cc_common_freezes_complete_recursive_producer() {
     assert_rules_cc_private_cc_common_eager_values(&module);
     assert_rules_cc_private_cc_common_facade(&module, &children);
     assert_rules_cc_private_cc_common_inventory(&module);
+}
+
+fn complete_rules_cc_compatibility_symbols_children()
+-> Vec<(&'static str, BzlModuleIdentity, FrozenModule)> {
+    let common_children = complete_rules_cc_private_cc_common_children();
+    let common = compile_child(
+        RULES_CC_PRIVATE_CC_COMMON_SOURCE,
+        "@@rules_cc+//cc/private:cc_common.bzl",
+        "/rules_cc/cc/private/cc_common.bzl",
+        &[],
+        &common_children,
+    );
+    let info_children = complete_rules_cc_cc_info_children();
+    let info = compile_child(
+        RULES_CC_CC_INFO_SOURCE,
+        "@@rules_cc+//cc/private:cc_info.bzl",
+        "/rules_cc/cc/private/cc_info.bzl",
+        &[("bazel_skylib", "bazel_skylib+")],
+        &info_children,
+    );
+    let shared = compile_child(
+        RULES_CC_SHARED_LIBRARY_INFO_SOURCE,
+        "@@rules_cc+//cc/private:cc_shared_library_info.bzl",
+        "/rules_cc/cc/private/cc_shared_library_info.bzl",
+        &[],
+        &[],
+    );
+    let debug = compile_child(
+        RULES_CC_DEBUG_PACKAGE_INFO_SOURCE,
+        "@@rules_cc+//cc/private:debug_package_info.bzl",
+        "/rules_cc/cc/private/debug_package_info.bzl",
+        &[],
+        &[],
+    );
+    let objc = compile_child(
+        RULES_CC_OBJC_INFO_SOURCE,
+        "@@rules_cc+//cc/private:objc_info.bzl",
+        "/rules_cc/cc/private/objc_info.bzl",
+        &[],
+        &[],
+    );
+    let config_children = complete_rules_cc_toolchain_config_info_children();
+    let config = compile_child(
+        RULES_CC_TOOLCHAIN_CONFIG_INFO_SOURCE,
+        "@@rules_cc+//cc/private/toolchain_config:cc_toolchain_config_info.bzl",
+        "/rules_cc/cc/private/toolchain_config/cc_toolchain_config_info.bzl",
+        &[("bazel_skylib", "bazel_skylib+")],
+        &config_children,
+    );
+    vec![
+        ("@rules_cc//cc/private:cc_common.bzl", common.0, common.1),
+        ("@rules_cc//cc/private:cc_info.bzl", info.0, info.1),
+        (
+            "@rules_cc//cc/private:cc_shared_library_info.bzl",
+            shared.0,
+            shared.1,
+        ),
+        (
+            "@rules_cc//cc/private:debug_package_info.bzl",
+            debug.0,
+            debug.1,
+        ),
+        ("@rules_cc//cc/private:objc_info.bzl", objc.0, objc.1),
+        (
+            "@rules_cc//cc/private/toolchain_config:cc_toolchain_config_info.bzl",
+            config.0,
+            config.1,
+        ),
+    ]
+}
+
+#[rustfmt::skip]
+fn assert_rules_cc_compatibility_symbols_interfaces(
+    module: &FrozenModule,
+    children: &[(&'static str, BzlModuleIdentity, FrozenModule)],
+) {
+    let imports = [
+        ("_cc_common", 0, "cc_common"),
+        ("_CcInfo", 1, "CcInfo"),
+        ("_CcSharedLibraryInfo", 2, "CcSharedLibraryInfo"),
+        ("_DebugPackageInfo", 3, "DebugPackageInfo"),
+        ("_ObjcInfo", 4, "ObjcInfo"),
+        ("_CcToolchainConfigInfo", 5, "CcToolchainConfigInfo"),
+    ];
+    for (name, child, export) in imports {
+        let binding = module.get_any_visibility(name).unwrap().0;
+        assert!(binding.value().ptr_eq(children[child].2.get(export).unwrap().value()), "{name}");
+        assert!(module.get(name).is_err(), "{name}");
+    }
+    let exports = [
+        ("cc_common", 0, "cc_common"),
+        ("CcInfo", 1, "CcInfo"),
+        ("DebugPackageInfo", 3, "DebugPackageInfo"),
+        ("CcToolchainConfigInfo", 5, "CcToolchainConfigInfo"),
+        ("ObjcInfo", 4, "ObjcInfo"),
+        ("new_objc_provider", 4, "ObjcInfo"),
+        ("CcSharedLibraryInfo", 2, "CcSharedLibraryInfo"),
+    ];
+    for (name, child, export) in exports {
+        assert!(module.get(name).unwrap().value().ptr_eq(children[child].2.get(export).unwrap().value()), "{name}");
+    }
+    assert!(module.get("ObjcInfo").unwrap().value().ptr_eq(module.get("new_objc_provider").unwrap().value()));
+    let mut public = module.names().map(|name| name.as_str()).collect::<Vec<_>>();
+    public.sort_unstable();
+    let mut expected = exports.map(|row| row.0).to_vec();
+    expected.sort_unstable();
+    assert_eq!(public, expected);
+    let mut all = module.names_any_visibility().map(|name| name.as_str()).collect::<Vec<_>>();
+    all.sort_unstable();
+    expected.extend(imports.map(|row| row.0));
+    expected.sort_unstable();
+    assert_eq!(expected.len(), 13);
+    assert_eq!(all, expected);
+}
+
+#[test]
+fn exact_rules_cc_compatibility_symbols_freezes_complete_recursive_producer() {
+    assert_eq!(RULES_CC_COMPATIBILITY_SYMBOLS_SOURCE.lines().count(), 14);
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_CC_COMPATIBILITY_SYMBOLS_SOURCE.as_bytes())
+        ),
+        "31c58bfb31755ad1546cc295885704b69f0365a797d77c26481b4863a62c519c"
+    );
+    let children = complete_rules_cc_compatibility_symbols_children();
+    assert_eq!(children.len(), 6);
+    let suffixes = [
+        "cc/private:cc_common.bzl",
+        "cc/private:cc_info.bzl",
+        "cc/private:cc_shared_library_info.bzl",
+        "cc/private:debug_package_info.bzl",
+        "cc/private:objc_info.bzl",
+        "cc/private/toolchain_config:cc_toolchain_config_info.bzl",
+    ];
+    for (index, (child, suffix)) in children.iter().zip(suffixes).enumerate() {
+        assert_eq!(
+            child.1.label,
+            CanonicalLabel::parse(&format!("@@rules_cc+//{suffix}")).unwrap()
+        );
+        assert_eq!(
+            child.1.workspace_path,
+            PathBuf::from(format!("/rules_cc/{}", suffix.replace(':', "/")))
+        );
+        if [1, 5].contains(&index) {
+            assert_eq!(
+                child.1.repository_mapping,
+                Arc::from([(
+                    ApparentRepoName::new("bazel_skylib").unwrap(),
+                    CanonicalRepoName::new("bazel_skylib+").unwrap(),
+                )])
+            );
+        } else {
+            assert!(child.1.repository_mapping.is_empty(), "{index}");
+        }
+    }
+    let module = eval_bzl_with_loaded_children(
+        RULES_CC_COMPATIBILITY_SYMBOLS_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse(
+                "@@rules_cc++compatibility_proxy+cc_compatibility_proxy//:symbols.bzl",
+            )
+            .unwrap(),
+            workspace_path: PathBuf::from("/rules_cc_compatibility_proxy/symbols.bzl"),
+            repository_mapping: Arc::from([(
+                ApparentRepoName::new("rules_cc").unwrap(),
+                CanonicalRepoName::new("rules_cc+").unwrap(),
+            )]),
+        },
+        &children,
+    )
+    .unwrap();
+    assert_rules_cc_compatibility_symbols_interfaces(&module, &children);
 }
 
 #[test]
