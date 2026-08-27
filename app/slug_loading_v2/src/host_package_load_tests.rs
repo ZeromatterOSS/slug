@@ -2927,6 +2927,115 @@ fn assert_mandatory_aspect_toolchain(aspect: &FrozenAspectDefinition, label: &st
     assert!(requirement.mandatory());
 }
 
+#[test]
+fn rule_and_aspect_fragments_share_bazel_sequence_normalization() {
+    let source = r#"
+def rule_impl(ctx): return []
+def aspect_impl(target, ctx): return []
+RULE_ABSENT = rule(implementation = rule_impl)
+RULE_EMPTY_LIST = rule(implementation = rule_impl, fragments = [])
+RULE_EMPTY_TUPLE = rule(implementation = rule_impl, fragments = ())
+RULE_NORMALIZED = rule(implementation = rule_impl, fragments = ["cpp", "apple", "cpp", "unknown"])
+RULE_TUPLE = rule(implementation = rule_impl, fragments = ("cpp", "apple", "unknown"))
+ASPECT_ABSENT = aspect(implementation = aspect_impl)
+ASPECT_EMPTY_LIST = aspect(implementation = aspect_impl, fragments = [])
+ASPECT_EMPTY_TUPLE = aspect(implementation = aspect_impl, fragments = ())
+ASPECT_NORMALIZED = aspect(implementation = aspect_impl, fragments = ["cpp", "apple", "cpp", "unknown"])
+ASPECT_TUPLE = aspect(implementation = aspect_impl, fragments = ("cpp", "apple", "unknown"))
+"#;
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@dep+//:fragments.bzl").unwrap(),
+        workspace_path: PathBuf::from("/workspace/dep/fragments.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
+    for name in ["RULE_ABSENT", "RULE_EMPTY_LIST", "RULE_EMPTY_TUPLE"] {
+        let rule = module
+            .get(name)
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        assert!(rule.required_fragments().is_empty(), "{name}");
+    }
+    let rule_fragments = |name| {
+        module
+            .get(name)
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap()
+            .required_fragments()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        rule_fragments("RULE_NORMALIZED"),
+        ["cpp", "apple", "unknown"]
+    );
+    assert_eq!(
+        rule_fragments("RULE_TUPLE"),
+        rule_fragments("RULE_NORMALIZED")
+    );
+    for name in ["ASPECT_ABSENT", "ASPECT_EMPTY_LIST", "ASPECT_EMPTY_TUPLE"] {
+        let aspect = module
+            .get(name)
+            .unwrap()
+            .downcast::<FrozenAspectDefinition>()
+            .unwrap();
+        assert!(aspect.required_fragments.is_empty(), "{name}");
+    }
+    let aspect_fragments = |name| {
+        module
+            .get(name)
+            .unwrap()
+            .downcast::<FrozenAspectDefinition>()
+            .unwrap()
+            .required_fragments
+            .clone()
+    };
+    assert_eq!(
+        aspect_fragments("ASPECT_NORMALIZED").as_ref(),
+        ["cpp", "apple", "unknown"]
+    );
+    assert_eq!(
+        aspect_fragments("ASPECT_TUPLE"),
+        aspect_fragments("ASPECT_NORMALIZED")
+    );
+    for declaration in [
+        "rule(implementation = rule_impl",
+        "aspect(implementation = aspect_impl",
+    ] {
+        for invalid in ["None", "\"cpp\"", "[1]", "(True,)", "{}"] {
+            let source = format!(
+                "def rule_impl(ctx): return []\ndef aspect_impl(target, ctx): return []\nBAD = {declaration}, fragments = {invalid})"
+            );
+            assert!(
+                eval_bzl_with_identity(&source, owner.clone()).is_err(),
+                "{declaration}: {invalid}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn configured_fragment_rule_invocation_fails_closed_before_publication() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(':defs.bzl', 'probe')\nprobe(name = 'blocked')\n",
+        ),
+        (
+            "defs.bzl",
+            b"def _impl(ctx): return []\nprobe = rule(implementation = _impl, fragments = ['cpp'])\n",
+        ),
+    ];
+    let outcome = load_repository_package_fixture(files, 427).await;
+    let error = repository_package_error(&outcome);
+    assert!(error.contains(
+        "target invocation for rules requiring configuration fragments is not supported"
+    ));
+}
+
 fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
     assert_eq!(aspect.attributes.len(), 2);
     let config = &aspect.attributes[0];
@@ -29641,8 +29750,6 @@ fn rustfmt_first_aspect_rejects_unadmitted_requirement_shapes() {
         "P=provider()\nQ=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[P, Q], [P]])",
         "P=provider()\nQ=provider()\nR=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[P], [Q], [R]])",
         "def make_provider(): return provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[make_provider()]])",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, fragments=[])",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, fragments=['java'])",
     ] {
         assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
     }

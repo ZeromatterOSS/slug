@@ -517,6 +517,7 @@ pub struct StarlarkRuleImplementation {
     dependencies: Arc<[CanonicalLabel]>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     advertised_providers: Arc<[ProviderId]>,
+    required_fragments: Arc<[CompactString]>,
     schema: Arc<[AttributeSchema]>,
     values: Arc<[AttributeValue]>,
     capability: Arc<RuleCapability>,
@@ -530,6 +531,7 @@ impl PartialEq for StarlarkRuleImplementation {
         self.dependencies == other.dependencies
             && self.required_toolchains == other.required_toolchains
             && self.advertised_providers == other.advertised_providers
+            && self.required_fragments == other.required_fragments
             && self.schema == other.schema
             && self.values == other.values
             && self.capability == other.capability
@@ -556,6 +558,10 @@ impl StarlarkRuleImplementation {
 
     pub fn advertised_providers(&self) -> &[ProviderId] {
         &self.advertised_providers
+    }
+
+    pub fn required_fragments(&self) -> &[CompactString] {
+        &self.required_fragments
     }
 
     pub fn schema(&self) -> &[AttributeSchema] {
@@ -971,6 +977,7 @@ impl PackageRecorder {
         implementation: FrozenValue,
         required_toolchains: Arc<[ToolchainTypeRequirement]>,
         advertised_providers: Arc<[ProviderId]>,
+        required_fragments: Arc<[CompactString]>,
         capability: Arc<RuleCapability>,
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
@@ -1002,6 +1009,7 @@ impl PackageRecorder {
                 dependencies: dependencies.into(),
                 required_toolchains,
                 advertised_providers,
+                required_fragments,
                 schema,
                 values,
                 capability,
@@ -2474,6 +2482,8 @@ struct RuleDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     advertised_providers: Arc<[ProviderId]>,
     #[trace(unsafe_ignore)]
+    required_fragments: Arc<[CompactString]>,
+    #[trace(unsafe_ignore)]
     schema: Arc<[RuleAttributeSchemaGen<V>]>,
     executable: bool,
     test: bool,
@@ -2489,6 +2499,7 @@ pub(crate) struct FrozenRuleDefinition {
     implementation: FrozenValue,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     advertised_providers: Arc<[ProviderId]>,
+    required_fragments: Arc<[CompactString]>,
     pub(crate) schema: Arc<[FrozenRuleAttributeSchema]>,
     capability: Arc<RuleCapability>,
     pub(crate) build_setting_kind: Option<BuildSettingKind>,
@@ -2520,11 +2531,21 @@ impl FrozenRuleDefinition {
     }
 
     #[cfg(test)]
+    pub(crate) fn required_fragments(&self) -> &[CompactString] {
+        &self.required_fragments
+    }
+
+    #[cfg(test)]
     pub(crate) fn capability(&self) -> &RuleCapability {
         &self.capability
     }
 
     fn reject_deferred_attribute_invocation(&self) -> anyhow::Result<()> {
+        if !self.required_fragments.is_empty() {
+            anyhow::bail!(
+                "target invocation for rules requiring configuration fragments is not supported"
+            );
+        }
         if self
             .required_toolchains
             .iter()
@@ -2595,6 +2616,7 @@ impl<'v> Freeze for RuleDefinition<'v> {
             implementation: self.implementation.freeze(freezer)?,
             required_toolchains: self.required_toolchains,
             advertised_providers: self.advertised_providers,
+            required_fragments: self.required_fragments,
             schema: self
                 .schema
                 .iter()
@@ -2797,6 +2819,21 @@ fn aspect_required_providers(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[P
 
 fn aspect_advertised_providers(value: Option<Value>) -> anyhow::Result<Arc<[ProviderId]>> {
     advertised_provider_ids(value, "aspect provides")
+}
+
+fn required_configuration_fragments(
+    fragments: Option<UnpackListOrTuple<&str>>,
+) -> Arc<[CompactString]> {
+    let mut seen = SmallSet::new();
+    fragments
+        .map_or_else(Vec::new, |fragments| fragments.items)
+        .into_iter()
+        .filter_map(|fragment| {
+            let fragment = CompactString::new(fragment);
+            seen.insert(fragment.clone()).then_some(fragment)
+        })
+        .collect::<Vec<_>>()
+        .into()
 }
 
 fn aspect_required_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>> {
@@ -4802,6 +4839,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         let implementation = self.implementation;
         let required_toolchains = self.required_toolchains.clone();
         let advertised_providers = self.advertised_providers.clone();
+        let required_fragments = self.required_fragments.clone();
         let capability = self.capability.clone();
         PackageRecorder::from_evaluator(eval)
             .and_then(|recorder| {
@@ -4981,6 +5019,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     implementation,
                     required_toolchains,
                     advertised_providers,
+                    required_fragments,
                     capability,
                     schema,
                     values,
@@ -5405,6 +5444,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         attrs: Option<SmallMap<String, Value<'v>>>,
         build_setting: Option<Value<'v>>,
         toolchains: Option<Value<'v>>,
+        fragments: Option<UnpackListOrTuple<&str>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] provides: Option<Value<'v>>,
         #[starlark(default = false)] executable: bool,
@@ -5467,6 +5507,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             implementation,
             required_toolchains: toolchain_requirements(toolchains, eval)?,
             advertised_providers: advertised_provider_ids(provides, "rule provides")?,
+            required_fragments: required_configuration_fragments(fragments),
             schema: schema.into(),
             executable,
             test,
@@ -5524,7 +5565,7 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] required_providers: Option<Value<'v>>,
         #[starlark(require = named)] requires: Option<Value<'v>>,
         #[starlark(require = named)] provides: Option<Value<'v>>,
-        #[starlark(require = named)] fragments: Option<UnpackList<&str>>,
+        #[starlark(require = named)] fragments: Option<UnpackListOrTuple<&str>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AspectDefinition<'v>> {
@@ -5558,13 +5599,7 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
         let required_toolchains = toolchain_requirements(toolchains, eval)?;
         let required_providers = aspect_required_providers(required_providers)?;
         let advertised_providers = aspect_advertised_providers(provides)?;
-        let required_fragments: Arc<[CompactString]> = match fragments {
-            None => Arc::from([]),
-            Some(fragments) if fragments.items.as_slice() == ["cpp"] => {
-                Arc::from([CompactString::new("cpp")])
-            }
-            Some(_) => anyhow::bail!("only aspect(fragments = ['cpp']) is supported"),
-        };
+        let required_fragments = required_configuration_fragments(fragments);
         Ok(AspectDefinitionGen {
             implementation,
             attr_aspects,
