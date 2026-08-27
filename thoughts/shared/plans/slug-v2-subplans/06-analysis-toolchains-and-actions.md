@@ -19400,3 +19400,11 @@ merges child route/effect epochs before source. Never fabricate an alias.
 This remains generic BCR Starlark loading; Bazel 9 owns `cc_internal` and other
 rule control flow, while `cc_common` is only a generic host-ABI consumer. Zabel
 is peer design guidance only; Bazel 9.2 remains authority.
+
+Independent design review returned `ACCEPT` and commit `9d55b7157` freezes the
+two-stage boundary. Activate only
+`WP-4-5-7A-canonical-source-policy-convergence-implementation`: generalize the
+Bzlmod source/policy chain over the compact Root/Canonical carrier, preserve
+root constructors and dependency order exactly, and delete temporary canonical
+source/listing wrappers after all canonical policy callers migrate. Stage B
+loading adaptation remains read-only until Stage A is accepted.

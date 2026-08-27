@@ -1,16 +1,16 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-canonical-external-package-loading-adapter-design`
+Packet: `WP-4-5-7A-canonical-source-policy-convergence-implementation`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `85593f300`.
+Base: `9d55b7157`.
 
-Result: freeze two bounded implementation packets that let a selected
-canonical repository reach package policy, subtree discovery, external `.bzl`
-evaluation and package loading without a root-visible alias. This packet is
-docs-only and activates no behavior.
+Result: implement Stage A only: converge Bzlmod source, REPO, ignore, package
+lookup, public boundary and package-source owners over one compact Root or
+Canonical carrier, then delete the temporary canonical source/listing wrappers.
+Activate no loading subtree, `.bzl` or package-load behavior.
 
 ## Learned facts and non-decisions
 
@@ -126,10 +126,9 @@ reusable capability category.
   admitted loader, target-pattern expansion, toolchain/execution-platform
   registration, configured semantics, rules, actions and exact output identity.
 
-## Implementation packets to freeze
+## Implementation allowlist and caps
 
-Stage A becomes
-`WP-4-5-7A-canonical-source-policy-convergence-implementation` with only:
+This active Stage A packet may change only:
 
 - `app/slug_bzlmod_v2/src/source_preparation/canonical_repository_source.rs`;
 - `source_preparation.rs`, `lib.rs`, `repo_file.rs`,
@@ -142,17 +141,15 @@ Cap Stage A at 1,200 production and 1,500 proof lines, functions at 120 lines,
 and require a bounded split for any touched production file already over the
 complexity trigger. Deletions count separately and do not buy unrelated scope.
 
-Stage B becomes
+The reserved Stage B successor is
 `WP-4-5-7A-canonical-loading-package-adapter-implementation` with only:
 
 - a new `app/slug_loading_v2/src/external_repository_load_route.rs`;
 - loading `lib.rs`, `external_subtree_package_set.rs` and its tests;
 - `bzl_module.rs`, `cycle_detector.rs`, and `host_package_load_tests.rs`.
 
-Cap Stage B at 1,300 production and 1,800 proof lines, the new module below 300
-lines and functions at 120 lines. `bzl_module.rs` and its 30k-line test file are
-above complexity triggers: permit only route plumbing, bounded helper
-extraction and focused proof; no unrelated cleanup.
+Its allowlist and 1,300-production/1,800-proof caps are recorded for sequencing
+only and grant no current write authority.
 
 ## Required proof and validation
 
@@ -167,10 +164,10 @@ mapping A/B/A child identity; exact route/effect/policy/source/recursive epoch
 order; route/child-route Need and failure short-circuit; cycle identity;
 cancellation; and no fabricated alias or duplicate source owner.
 
-Each implementation runs focused owners, full bzlmod/loading, named core/query
-dependents, locked CLI build, formatting, diff/scope/cap/duplicate-owner/no-lock
-guards and the archive checker. Each requires independent DICE/public-boundary
-terminal review. Stage B starts only after Stage A is accepted.
+Run focused Bzlmod owners, full bzlmod, named loading/core/query dependents,
+locked CLI build, formatting, diff/scope/cap/duplicate-owner/no-lock guards and
+the archive checker. Require independent DICE/public-boundary terminal review.
+Stage B starts only after this Stage A packet is accepted.
 
 ## Stops
 
@@ -183,8 +180,7 @@ or activation of registration, configured semantics, rules or actions.
 
 ## Immediate predecessor and successor
 
-Commit `85593f300` is the accepted predecessor. Independent caller-chain audit
-requires this docs-only design before Rust. If independent design review
-accepts the split, activate only Stage A. Stage B follows only after Stage A;
+Commits `85593f300` and `9d55b7157` are the accepted implementation and design
+predecessors. Activate only Stage A. Stage B follows only after Stage A;
 the one shared toolchain/execution-platform registration expander follows only
 after Stage B.
