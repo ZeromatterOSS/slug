@@ -1,119 +1,114 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-bazel-configuration-field-loading-binding-r2`
+Packet: `WP-4-7A-rules-cc-semantics-complete-loading-proof-r2`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: install Bazel 9's `.bzl`-only `configuration_field` predeclared binding
-with its exact two required positional-or-named string parameters, preserve lazy
-reference/freeze, and fail every invocation closed before constructing a
-late-bound value. Do not retain or resolve a configuration field.
+Result: prove the authenticated complete dependency-free 234-line rules_cc
+`cc/common/semantics.bzl` producer freezes its eager constants/label, all 30
+lazy functions, and the exact 43-field function-capturing `semantics` struct.
+Add no production behavior and invoke nothing.
 
 ## Learned facts and decision
 
-Base commit is `ed4144030` (`Select complete C++ semantics proof`); the Rust
-authority remains action-names commit `9e312f958`. That accepted proof adds 328
-test lines and no production, byte-verifies all 220 source lines, and proves 33
-constants, the 33-field action struct, seven ordered lists, and seven final
-aliases. All 248 loading-library, 24 invalidation and 31 BUILD-loading tests,
-locked checks, CLI build and hygiene pass. Independent review returned `ACCEPT`.
+Base commit is `fc131d7aa` (`Add configuration field loading binding`). It adds
+9 production and 59 proof lines. `.bzl` loading now exposes the exact required
+positional-or-named string ABI; BUILD keeps the binding absent; every valid
+positional/named form returns the same Slug-native fail-closed error before a
+result exists. All 249 loading-library, 24 invalidation and 31 BUILD-loading
+tests, locked analysis/core checks, CLI build, formatting and hygiene pass.
+Independent review returned `ACCEPT`; no descriptor/schema/configured behavior
+or retained type was added.
 
-The attempted exact 234-line `cc/common/semantics.bzl` proof stopped before
-invocation: Starlark name resolution rejects `configuration_field` at line 80
-inside lazy `_get_coverage_attrs`. The worker changed no production and the
-candidate proof was fully removed. The first binding implementation was also
-removed after independent review found its `named-only` Rust ABI rejected
-Bazel-valid positional calls. Only the r2 scheduling documents and required
-routing row are now dirty. A test-local substitute, narrowed source or
-unclassified dummy would violate the exact-complete packet.
+The first exact semantics attempt stopped during name resolution because lazy
+`_get_coverage_attrs` referenced the then-absent `configuration_field`. The
+accepted binding now satisfies compilation/freeze without invocation. Private
+`cc_common.bzl` source order therefore returns to rules_cc 0.2.17
+`cc/common/semantics.bzl`: 234 lines, SHA-256
+`029254fd58eb8b3bf32a0f772e479b991a51ce21a6f6cc8a5739aadbce3900da`.
+It has no loads. Eager rows bind two public Booleans, 30 lazy private functions,
+one private canonical `Label`, and one public 43-field struct that captures 29
+functions plus exact strings, Booleans, three lists and two empty dictionaries.
+No function is invoked. The alternative toolchain-config branch still reaches
+the dependency-free 622-line `cc_toolchain_config_lib.bzl`, so semantics remains
+the smaller source-ordered frontier.
 
-Pinned Bazel 9.2 exposes `configuration_field(fragment, name)` only in the
-`.bzl` top-level API. Both required string parameters have `named = true` and
-retain `positional = true` from Bazel's `@Param` default, so two-positional,
-two-named and positional-then-named forms are valid. Its implementation requires
-Bzl initialization context, validates the registered fragment/field, and creates
-a late-bound default. Slug has no retained late-bound attribute value or
-configured resolver in this M7A slice. The bounded prerequisite is therefore the
-exact `.bzl` binding/type/ABI and lazy name-resolution surface, with one stable
-Slug-native fail-closed error for every otherwise valid invocation. BUILD
-absence remains exact. After acceptance, retry complete semantics without
-invoking any function.
-
-Therefore run only `WP-4-7A-bazel-configuration-field-loading-binding-r2`. Do not
-construct a descriptor, admit `attr.label(default = configuration_field(...))`,
-validate fragment names/fields, resolve configuration, retry semantics, or claim
-configured C++.
+Therefore run only
+`WP-4-7A-rules-cc-semantics-complete-loading-proof-r2`. Do not invoke any lazy
+function or `configuration_field`; do not claim `compile.bzl`, configuration
+library, legacy features, private/public `cc_common`, generated proxy, action
+execution, configured C++, or toolchain feature semantics.
 
 ## Authorities, ownership and compatibility
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-`StarlarkBuildApiGlobals` and `BazelBuildApiGlobals` are the exact authority for
-global placement and ABI. Pinned `Param.java` supplies the positional-default
-fact; existing source-backed Starlark ABI/error tests cover dual positional and
-named binding. No oracle is needed for the explicitly unsupported valid call.
-Clean `../zabel` commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only installing
-`configuration_field` as a `.bzl` predeclared binding while keeping its
-declaration-owned late-bound descriptor/resolver separate. Copy no Zig code,
-representation, algorithm, diagnostic or behavior.
+and authenticated rules_cc bytes are sole exact authority. Existing accepted
+Boolean/string/list/dictionary/struct, `.bzl` `Label`, lazy-function,
+configuration-field name-resolution and module-freeze regressions cover every
+eager evaluator shape; no fresh oracle is needed. Clean `../zabel` commit
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only declaration-owned
+generic aggregates, captured-function defining-module ownership and recursive
+freeze before publication. Copy no Zig code, representation, algorithm,
+diagnostic or behavior.
 
-- **Exact:** `configuration_field` exists as a callable only in `.bzl` loading
-  globals; `fragment` and `name` are required positional-or-named strings; all
-  lawful positional/named/mixed forms bind; lazy functions may reference the
-  binding and freeze; BUILD globals do not expose it.
-- **Slug-native:** an otherwise ABI-valid call returns one stable fail-closed
-  unsupported diagnostic before allocating or retaining a descriptor.
-- **Unsupported/deferred:** every successful invocation; fragment/field
-  validation, late-bound descriptor identity, label-attribute defaults,
-  configuration resolution/invalidation, complete semantics/compile,
-  private/public `cc_common`, toolchain config and configured C++.
+- **Exact:** complete source/hash and dependency-free owner; both public Boolean
+  constants; private Windows label value/type/visibility; all 30 private lazy
+  function types/visibility; exact 43-field `semantics` type, scalar/list/dict
+  values and order, and all 29 captured-function pointer identities.
+- **Slug-native:** realization through starlark-rust frozen values and one
+  defining-module heap that owns the struct, aggregate children and captured
+  functions; the accepted configuration-field binding remains uncalled.
+- **Unsupported/deferred:** any function or `configuration_field` invocation;
+  returned semantics, late-bound descriptors/resolution, `compile.bzl`, actions,
+  configuration-library/legacy-feature construction, private/public `cc_common`,
+  generated proxy, toolchain configuration and configured C++.
 
-The static predeclared function owns no retained semantic value and creates none
-on error. No DICE, request, cache, async, hot-path, fallback or utility-reuse
+The frozen defining-module heap owns every lazy function and every value retained
+by `semantics`; no evaluator borrow or foreign owner escapes. No production,
+DICE, request, cache, async, fixture, oracle, hot-path, fallback or utility-reuse
 decision is introduced.
 
 ## Allowlist, caps and proof
 
 Change only:
 
-- `app/slug_loading_v2/src/package.rs`;
 - `app/slug_loading_v2/src/host_package_load_tests.rs`;
 - the three scheduling documents when rolling the accepted result;
-- `.codex/skills/slug-agent-orchestration/references/routing-log.md` for this
-  material REPLAN row only.
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md` only for
+  the prerequisite acceptance and this packet's eventual terminal row.
 
-At base `ed4144030`, `package.rs` is 6,219 lines/SHA-256
-`8818b416e74ab838a65fdc60f148374c51e6ef122bc94addf2cfa9f7ae80e4fe` and the
-test authority is 12,804 lines/SHA-256
-`72c9d73c961bcbcaac256dc7b9daaafb05797ae418b1c6097bd5162199e0bba9`.
-Final ceilings are 6,239 and 12,884 lines. Each new function must remain at most
-120 physical lines.
+At base `fc131d7aa` the Rust test authority is 12,863 lines, SHA-256
+`1e5d3ba1ad2c5f05ac9fab656bc4ec0e1d56d249376296a50519973d73d47251`.
+Its final ceiling is 13,413 lines. Each new proof/helper function must remain at
+most 120 physical lines. The oversized test module remains cohesive around its
+private load harness and adjacent authenticated source constants; add no
+production responsibility or generic source archive.
 
-Caps are 20 production, 80 proof and 100 total additions; deletions do not buy
-budget. Add one `.bzl`-only predeclared Rust function with required
-positional-or-named `fragment: str` and `name: str`; on a valid call, return a
-stable unsupported error without allocating a result. Prove callable type and
-BUILD absence; identical valid-call failure for two-positional, positional-plus-
-named, two-named and reverse-named forms; exact omitted/duplicate/excess/wrong-
-type ABI rejection; lazy captured reference freeze; and no new public retained
-type. Add no fixture or oracle.
+Caps are 0 production, 550 proof and 550 total additions; deletions do not buy
+budget. Embed/hash all 234 lines; evaluate dependency-free at exact owner
+`@@rules_cc+//cc/common:semantics.bzl` with `platforms -> platforms+` mapping;
+prove both public Boolean constants, private `@@platforms+//os:windows` label,
+all 30 private function types/visibility, and the exact 43-field public struct.
+Prove every captured function pointer-identical to its defining binding, exact
+strings/Booleans, exact three list contents/order, both empty dictionaries, and
+complete multiline `malloc_docs` bytes. Invoke nothing and add no fixture/oracle.
 
 Run focused proof, all `slug_loading_v2` library tests, `bzl_invalidation`,
 `build_file_loading`, locked analysis/core checks, locked CLI build, formatting,
 diff and archive hygiene. Measure caps/ceilings and obtain independent review of
-ABI, placement, no-result failure, compatibility split, the failed-source
-evidence and Zabel's guidance-only role.
+bytes, complete field/function coverage, captured ownership, no-invocation
+boundary, compatibility split, branch selection and Zabel's guidance-only role.
 
-STOP and `REPLAN` for any retained descriptor/schema change, source-specific
-test substitute, BUILD exposure, successful invocation, fragment registry,
-configured resolution, DICE/cache change, non-stable failure, copied Zabel
-content, dirty authority, allowlist escape or cap/function violation. Stop after
-the binding and reselect the complete semantics proof.
+STOP and `REPLAN` for production change, source/hash mismatch, another missing
+global/evaluator shape, copied/narrowed source, incomplete binding/field coverage,
+any manual invocation, lost captured identity, evaluator-borrowed value,
+consumer/parent claim, unpinned source, copied Zabel content, dirty authority,
+allowlist escape or cap/function violation. Stop after semantics and re-audit
+`compile.bzl` child source order against the toolchain-config branch.
 
 ## Immediate predecessor
 
-Commit `9e312f958` completes action names. Scheduling commit `ed4144030` selected
-semantics, but exact source revealed this missing global. Commit `82b58818b`
-selected its first binding packet, whose rejected named-only candidate was fully
-removed after review exposed Bazel-valid positional calls. Neither semantics nor
-any `configuration_field` invocation is accepted.
+Commit `fc131d7aa` accepts only the `.bzl` configuration-field binding/ABI and
+fail-closed call boundary. It does not accept semantics, any successful
+configuration-field call, late-bound values, `compile.bzl`, private `cc_common`,
+toolchain config, or the generated compatibility proxy.

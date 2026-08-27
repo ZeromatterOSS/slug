@@ -5247,6 +5247,27 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Configuration-field binding accepted; complete C++ semantics retry selected (2026-08-26)
+
+Commit `fc131d7aa` adds 9 production and 59 proof lines. It exposes
+`configuration_field` only to `.bzl` loading with Bazel's two required
+positional-or-named strings, preserves BUILD absence and lazy reference freeze,
+and routes two-positional, mixed, two-named and reverse-named calls to the same
+Slug-native fail-closed diagnostic. Missing, duplicate, excess and wrong-type
+forms reject. Focused proof, 249 loading units, 24 invalidation tests, 31
+BUILD-loading tests, locked checks, CLI build and hygiene pass. Independent
+review returned `ACCEPT`; no descriptor/schema/configured behavior or retained
+type exists.
+
+The exact dependency-free 234-line `cc/common/semantics.bzl` (`029254fd…`) now
+resolves every global while retaining all function bodies lazily. Run only
+`WP-4-7A-rules-cc-semantics-complete-loading-proof-r2` under 0/550/550 caps.
+Prove complete bytes, both constants, private Windows label, all 30 lazy types,
+all 29 captured pointer identities and every exact 43-field scalar/aggregate
+shape. Invoke nothing. Clean `../zabel` `0795445f…` guides declaration-owned
+aggregate, captured-function and recursive-freeze architecture only; Bazel 9.2
+and authenticated rules_cc remain exact authority.
+
 ### Configuration-field named-only candidate REPLAN; dual ABI retry selected (2026-08-26)
 
 The first binding implementation added 12 production and 58 proof lines, passed
