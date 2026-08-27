@@ -3887,6 +3887,17 @@ const PROVIDERS_ALWAYS_ENABLE_METADATA_OUTPUT_GROUPS_SOURCE: &str = r###"AlwaysE
 )
 "###;
 
+const PROVIDERS_RUSTC_OUTPUT_DIAGNOSTICS_SOURCE: &str = r###"RustcOutputDiagnosticsInfo = provider(
+    doc = (
+        "Save json diagnostics from rustc. Json diagnostics are able to be " +
+        "consumed by tools such as rust-analyzer to provide IDE integration"
+    ),
+    fields = {
+        "rustc_output_diagnostics": "bool: Whether or not to output diagnostics",
+    },
+)
+"###;
+
 const UTILS_CAN_BUILD_METADATA_SOURCE: &str = r###"def can_build_metadata(toolchain, ctx, crate_type, *, disable_pipelining = False):
     """Can we build metadata for the target built using this context?
 
@@ -3911,6 +3922,33 @@ const UTILS_CAN_BUILD_METADATA_SOURCE: &str = r###"def can_build_metadata(toolch
          can_use_metadata_for_pipelining(toolchain, crate_type))
     )
 
+"###;
+
+const UTILS_GENERATE_OUTPUT_DIAGNOSTICS_SOURCE: &str = r###"def generate_output_diagnostics(ctx, sibling, require_process_wrapper = True):
+    """Generates a .rustc-output file if it's required.
+
+    Args:
+        ctx: (ctx): The current rule's context object
+        sibling: (File): The file to generate the diagnostics for.
+        require_process_wrapper: (bool): Whether to require the process wrapper
+          in order to generate the .rustc-output file.
+    Returns:
+        Optional[File] The .rustc-object file, if generated.
+    """
+
+    # Since this feature requires error_format=json, we usually need
+    # process_wrapper, since it can write the json here, then convert it to the
+    # regular error format so the user can see the error properly.
+    if require_process_wrapper and not ctx.attr._process_wrapper:
+        return None
+    provider = ctx.attr._rustc_output_diagnostics[RustcOutputDiagnosticsInfo]
+    if not provider.rustc_output_diagnostics:
+        return None
+
+    return ctx.actions.declare_file(
+        sibling.basename + ".rustc-output",
+        sibling = sibling,
+    )
 "###;
 
 const UTILS_DETERMINE_LIB_NAME_SOURCE: &str = r###"def determine_lib_name(name, crate_type, toolchain, lib_hash = None):
@@ -4603,6 +4641,77 @@ fn exact_rules_rust_utils_can_build_metadata_retains_loaded_provider_and_parent_
             .unwrap()
             .value()
             .ptr_eq(utils.get("can_build_metadata").unwrap().value())
+    );
+}
+
+#[test]
+fn exact_rules_rust_utils_output_diagnostics_retains_loaded_provider_and_parent_identity() {
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(PROVIDERS_RUSTC_OUTPUT_DIAGNOSTICS_SOURCE.as_bytes())
+        ),
+        "a066585ff0356b5baa65fb4ddcc3fe6d5644be4facd457bf83b5eb6886324086"
+    );
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(UTILS_GENERATE_OUTPUT_DIAGNOSTICS_SOURCE.as_bytes())
+        ),
+        "8535acbf356edec97a667da93592f211b9c0f34f5a9b88de6e0a83ac453f5bec"
+    );
+    let owner = |name: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(&format!("@@rules_rust+//rust/private:{name}.bzl")).unwrap(),
+        workspace_path: PathBuf::from(format!("/rules_rust/rust/private/{name}.bzl")),
+        repository_mapping: Arc::from([]),
+    };
+    let providers_owner = owner("providers");
+    let providers = eval_bzl_with_identity(
+        PROVIDERS_RUSTC_OUTPUT_DIAGNOSTICS_SOURCE,
+        providers_owner.clone(),
+    )
+    .unwrap();
+    let provider_binding = providers.get("RustcOutputDiagnosticsInfo").unwrap();
+    let provider = provider_binding.value();
+    assert_eq!(provider.get_type(), "provider_callable");
+    let utils_owner = owner("utils");
+    let utils_source = format!(
+        "load(\":providers.bzl\", \"RustcOutputDiagnosticsInfo\")\n{}\nLOADED_DIAGNOSTICS_PROVIDER = RustcOutputDiagnosticsInfo\n",
+        UTILS_GENERATE_OUTPUT_DIAGNOSTICS_SOURCE,
+    );
+    let utils = eval_bzl_with_loaded_children(
+        &utils_source,
+        utils_owner.clone(),
+        &[(":providers.bzl", providers_owner, providers.dupe())],
+    )
+    .unwrap();
+    assert_eq!(
+        utils
+            .get("generate_output_diagnostics")
+            .unwrap()
+            .value()
+            .get_type(),
+        "function"
+    );
+    assert!(
+        utils
+            .get("LOADED_DIAGNOSTICS_PROVIDER")
+            .unwrap()
+            .value()
+            .ptr_eq(provider)
+    );
+    let parent = eval_bzl_with_loaded_children(
+        "load(\":utils.bzl\", \"generate_output_diagnostics\")\nIMPORTED = generate_output_diagnostics\n",
+        owner("rust"),
+        &[(":utils.bzl", utils_owner, utils.dupe())],
+    )
+    .unwrap();
+    assert!(
+        parent
+            .get("IMPORTED")
+            .unwrap()
+            .value()
+            .ptr_eq(utils.get("generate_output_diagnostics").unwrap().value())
     );
 }
 
