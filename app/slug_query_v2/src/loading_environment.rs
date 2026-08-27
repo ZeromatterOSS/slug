@@ -33,6 +33,8 @@ use slug_loading_v2::RepositoryPackageLoadKey;
 use slug_loading_v2::RepositoryPackageLoadObservationKey;
 use slug_loading_v2::RootPackageLoadKey;
 use slug_loading_v2::RootPackageLoadObservationKey;
+use slug_loading_v2::RootSubtreePackageSetKey;
+use slug_loading_v2::RootSubtreePackageSetObservationKey;
 use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::TestRuleKind;
 use slug_loading_v2::discover_build_file_companion;
@@ -62,8 +64,6 @@ use crate::graph::QueryError;
 use crate::graph::QueryLabel;
 use crate::graph::QueryNode;
 use crate::graph::QueryObservationMode;
-use crate::graph::RootSubtreePackageSetKey;
-use crate::graph::RootSubtreePackageSetObservationKey;
 use crate::graph::RootUnconfiguredPackageGraphKey;
 use crate::graph::RootUnconfiguredPackageGraphObservationKey;
 use crate::graph::SubtreePackageSetKey;
@@ -657,9 +657,9 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         &mut self,
         prefix: &str,
     ) -> Result<TargetSet<QueryLabel>, QueryError> {
-        let packages = if let Some(workspace) = self.root_workspace.clone() {
+        let packages: Arc<[CompactString]> = if let Some(workspace) = self.root_workspace.clone() {
             let prefix = PackagePath::parse(prefix).map_err(QueryError::evaluation)?;
-            match self.observation_mode {
+            let packages = match self.observation_mode {
                 QueryObservationMode::Legacy => match self
                     .ctx
                     .compute(&RootSubtreePackageSetKey::new(workspace, prefix))
@@ -688,20 +688,32 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
                         packages.result().dupe()
                     }
                 },
-            }
+            };
+            packages
+                .as_ref()
+                .as_ref()
+                .map_err(|error| QueryError::evaluation(error.to_string()))?
+                .packages()
+                .dupe()
         } else {
-            self.ctx
+            let packages = self
+                .ctx
                 .compute(&SubtreePackageSetKey {
                     workspace: self.workspace.clone(),
                     prefix: PathBuf::from(prefix),
                 })
                 .await
-                .map_err(|error| QueryError::evaluation(error.to_string()))?
+                .map_err(|error| QueryError::evaluation(error.to_string()))?;
+            packages
+                .as_ref()
+                .as_ref()
+                .map_err(|error| error.clone())?
+                .packages
+                .dupe()
         };
-        let packages = packages.as_ref().as_ref().map_err(|error| error.clone())?;
         let mut result = TargetSet::default();
-        let mut graphs = Vec::with_capacity(packages.packages.len());
-        for package in packages.packages.iter() {
+        let mut graphs = Vec::with_capacity(packages.len());
+        for package in packages.iter() {
             let graph = self.package_graph(package).await?;
             for (label, node) in graph.nodes.iter() {
                 if node.kind.is_rule() {

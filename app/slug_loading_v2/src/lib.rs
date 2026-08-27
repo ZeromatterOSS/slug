@@ -27,6 +27,7 @@ mod module_extension_repository_validation;
 pub mod package;
 #[doc(hidden)]
 pub mod provider;
+mod root_subtree_package_set;
 mod starlark_label;
 pub mod visibility;
 
@@ -114,6 +115,16 @@ pub use package::RuleCapability;
 pub use package::TestMetadata;
 pub use package::TestRuleKind;
 pub use package::TestSuiteMembership;
+#[doc(hidden)]
+pub use root_subtree_package_set::ObservedRootSubtreePackageSet;
+#[doc(hidden)]
+pub use root_subtree_package_set::RootSubtreePackageSet;
+#[doc(hidden)]
+pub use root_subtree_package_set::RootSubtreePackageSetError;
+#[doc(hidden)]
+pub use root_subtree_package_set::RootSubtreePackageSetKey;
+#[doc(hidden)]
+pub use root_subtree_package_set::RootSubtreePackageSetObservationKey;
 pub use slug_bzlmod_v2::SourcePreparationNeeds as LoadingPreparationNeeds;
 pub use slug_bzlmod_v2::SourcePreparationOutcome as LoadingPreparationOutcome;
 pub use visibility::PackageGroupContents;

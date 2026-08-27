@@ -39,7 +39,8 @@ projection.
    prefix; the Rust key type necessarily moves to its natural crate owner.
 2. Move the existing computation mechanically. Preserve package-root order,
    package-marker and ignored-directory policy, non-UTF-8 handling, lexical
-   sort/dedup, Need versus observed-outer versus terminal-error precedence,
+   sort/dedup, observed-outer before accumulated Need before terminal-error
+   precedence,
    observation merging, complete-only equality/validity and display text.
 3. Give loading a loading-owned terminal type. Query converts it to the same
    `QueryError` text only at the consumer boundary and continues to merge the
@@ -76,8 +77,8 @@ source of rule definitions including `cc_internal`; neither `cc_common` nor a
 ruleset owns this traversal.
 
 - **Exact:** the already-admitted root recursive package set, package-root and
-  marker/ignore behavior, lexical result, query output, Need/error precedence
-  and observed lifecycle.
+  marker/ignore behavior, lexical result, query output, observed-outer before
+  accumulated Need before terminal-error precedence and observed lifecycle.
 - **Slug-native:** Rust module/API shape, DICE key/value layout, error wrapper
   and observation carrier.
 - **Unsupported/deferred:** selected-external subtree ownership, repository
