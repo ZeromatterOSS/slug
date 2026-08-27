@@ -7219,3 +7219,22 @@ defaults remain inside the function object. Run only
 retain exact identities, invoke nothing and inspect no callable default. Zabel
 remains peer ownership guidance; Bazel 9.2 and authenticated rules_cc bytes own
 compatibility.
+
+### Complete linker-input accepted; target types selected (2026-08-27)
+
+Commit `2c1706e70` freezes all 69 authenticated linker-input lines over complete
+`cc_internal.bzl`. It proves the private imported pointer and provider, public
+function and exact one-public/three-all inventories without invocation or
+callable-default inspection. All required suites pass at 0 production and 142
+proof additions; independent review returned `ACCEPT`.
+
+The next private `cc_common` producer reaches incomplete `cc_linking_helper.bzl`.
+Recursive source order through `cpp_link_action.bzl`, `finalize_link_action.bzl`
+and `collect_solib_dirs.bzl` first reaches complete 131-line
+`link/target_types.bzl`, SHA-256
+`12110c7dce405cd2ba4253d694502f08cc97a95bd0004444054ae8aa689da8fd`.
+Its two children are accepted. Run only
+`WP-4-7A-rules-cc-target-types-complete-loading-proof` under 0/500/500, prove
+the complete imported/string/nested-struct/function inventory and invoke
+nothing. Zabel remains peer ownership guidance; Bazel 9.2 and authenticated
+rules_cc bytes own compatibility.
