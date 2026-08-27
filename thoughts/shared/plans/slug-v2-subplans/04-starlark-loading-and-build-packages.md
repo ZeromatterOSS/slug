@@ -7200,3 +7200,22 @@ one provider and four lazy functions. Run only
 0/600/600, retain exact identities and invoke nothing. Zabel remains peer
 ownership guidance; Bazel 9.2 and authenticated rules_cc bytes own
 compatibility.
+
+### Complete create-library accepted; linker-input selected (2026-08-27)
+
+Commit `ace75573b` freezes all 291 authenticated create-library lines over five
+actual complete children. It proves exact child mappings, all six imported
+identities, the warning, provider, four functions and exact visibility
+inventories without invocation. All required suites pass at 0 production and
+463 proof additions; independent correction review returned `ACCEPT`.
+
+Private `cc_common.bzl` source order next reaches complete 69-line
+`link/create_linker_input.bzl`, SHA-256
+`e4e8a7fc9d7be8edd40a2b95e72a96710c05d5bbd610b2c1cc2f274e3672cbd1`.
+Its sole child, `cc_internal.bzl`, is accepted. Its eager surface is one private
+import, one private provider and one public lazy function; empty depset/list
+defaults remain inside the function object. Run only
+`WP-4-7A-rules-cc-create-linker-input-complete-loading-proof` under 0/300/300,
+retain exact identities, invoke nothing and inspect no callable default. Zabel
+remains peer ownership guidance; Bazel 9.2 and authenticated rules_cc bytes own
+compatibility.
