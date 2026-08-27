@@ -4189,3 +4189,13 @@ compilation-helper freeze. No additional Stage 5 implementation is selected.
 
 Zabel's immutable-universe separation remained peer architectural guidance;
 Bazel 9.2 alone owned names and behavior, and no Zig content was adopted.
+
+### Compilation-helper acceptance and Stage 4 continuation (2026-08-26)
+
+Commit `3060e4d4d` accepts the complete rules_cc compilation-helper freeze with
+no Stage 5 production or retained-state change. Stage 4's recursive audit next
+selects complete `compile_build_variables.bzl` plus its tiny native wrapper
+leaf because compile, action-template and proxy/toolchain consumers share that
+frontier. The accepted universal owner already supplies every required common
+builtin, including `set`; no additional MODULE/REPO/core overlay or builtin is
+selected. Zabel remains peer ownership guidance and Bazel 9.2 remains authority.

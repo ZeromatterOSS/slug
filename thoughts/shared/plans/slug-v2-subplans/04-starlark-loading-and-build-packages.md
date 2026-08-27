@@ -7082,3 +7082,29 @@ thoughts baselines. Retry only
 children, complete imported/eager identity and visibility, and no invocation.
 Zabel is peer ownership guidance only; Bazel 9.2 and authenticated rules_cc
 bytes own compatibility.
+
+### Complete compilation helper accepted; compile-variable producer selected (2026-08-26)
+
+Commit `3060e4d4d` freezes the exact 666-line compilation helper over its five
+complete children and proves the complete imported/public/private/captured
+inventory without invocation. Independent review found one child manifest row
+that paired a mapped frozen module with an empty mapping; the accepted proof
+retains the actual mapped defining identity and asserts all five child labels
+and mappings. All required suites pass at 0 production and 871 proof additions.
+
+Recursive source order through `compile.bzl` now reaches
+`compile_action_templates.bzl`, whose sole incomplete child is the same
+644-line `compile_build_variables.bzl` loaded directly by private
+`cc_common.bzl`. This is therefore the smallest shared proxy/toolchain
+frontier. Its additional 18-line `native_cc_common.bzl` leaf aliases the
+already admitted `.bzl` predeclared wrapper; its complete producer eagerly
+builds only one 25-field struct, an empty-schema provider and sentinel instance,
+one source-type set, function defaults and lazy functions from accepted shapes.
+
+Run only `WP-4-7A-rules-cc-compile-build-variables-complete-loading-proof`
+under 0/1050/1050 caps. Embed/hash both complete sources, retain the three child
+identities, prove exact imported/eager/public/private inventory and invoke no
+callable/provider. Zabel `0795445f…` is peer guidance for defining-module-owned
+global/default freezing and separation from invocation values only; no Zig
+content or behavior is adopted. Bazel 9.2 and authenticated rules_cc own exact
+compatibility. Re-audit action-template/compile source order after acceptance.
