@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-4-5-7A-selected-external-subtree-package-owner-design](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-routed-repository-directory-listing-owner-implementation](./slug-v2-subplans/current-packet.md).
 
 ### M7 selected-external subtree design REPLAN; routed listing prerequisite selected (2026-08-27)
 
