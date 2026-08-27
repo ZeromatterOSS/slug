@@ -4176,3 +4176,16 @@ immutable process-wide universe and separation of shared predeclared values
 from module/evaluator state inform the independently justified Rust ownership
 and allocation design. Bazel 9.2 alone owns names, default set enablement and
 compatibility. Flag-off behavior and unproved callable ABIs remain deferred.
+
+### Universal-builtin environment accepted (2026-08-26)
+
+Commit `cb71a302d` replaces independently drifting MODULE and REPO universes
+with the shared process-stable exact Bazel 9.2 owner, retains their distinct
+overlays, enables the real default set and removes REPO's stale flag-off shim.
+Root/nonroot/include MODULE and REPO placement proofs pass. No DICE key or
+retained semantic state changed. After the bounded archive-whitelist correction,
+Stage 4 may retry the complete rules_cc compilation-helper freeze; no additional
+Stage 5 implementation is selected.
+
+Zabel's immutable-universe separation remained peer architectural guidance;
+Bazel 9.2 alone owned names and behavior, and no Zig content was adopted.

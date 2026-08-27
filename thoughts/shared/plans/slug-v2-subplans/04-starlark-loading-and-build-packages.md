@@ -7064,3 +7064,20 @@ until full builtins injection is selected. No Zig code, layout, method table,
 analysis object or behavior is copied. The values are zero-sized and
 `Allocative`; the Buck2 utility audit selects no collection, interner, cache or
 utility import. Bazel 9.2 remains sole behavior authority.
+
+### Universal-builtin environment accepted; complete helper retry selected (2026-08-26)
+
+Commit `cb71a302d` centralizes the exact process-stable 30-name Bazel 9.2
+universe across active loading, MODULE, REPO and core routes, activates the real
+default `set`, removes REPO's stale shim and excludes `chr`/`ord` without
+overlay leakage. The set proof includes non-aliasing copy and frozen mutation
+rejection. Full affected regressions and independent review pass.
+
+The required archive check then exposed one checker-only omission: its explicit
+V2 app list predates `app/slug_starlark_v2`. Run the bounded
+`WP-0-4-5-slug-starlark-archive-whitelist-correction` first. Then retry only
+`WP-4-7A-rules-cc-compilation-helper-complete-loading-proof-r2` under
+0/1050/1050 caps with the identical authenticated source and five accepted
+children, complete imported/eager identity and visibility, and no invocation.
+Zabel is peer ownership guidance only; Bazel 9.2 and authenticated rules_cc
+bytes own compatibility.
