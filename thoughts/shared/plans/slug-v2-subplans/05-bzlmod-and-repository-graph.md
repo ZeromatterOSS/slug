@@ -4226,3 +4226,12 @@ linkstamp compile because all six children are accepted. The shared universal
 owner already supplies every required builtin; no MODULE/REPO/core overlay or
 additional builtin is selected. Zabel remains peer ownership guidance and
 Bazel 9.2 remains sole authority.
+
+### Linkstamp acceptance and Stage 4 continuation (2026-08-26)
+
+Commit `78acfe43f` accepts the complete linkstamp producer with no Stage 5
+production or retained-state change. Stage 4 next selects complete 540-line LTO
+backends because all four children are accepted. The shared universal owner
+already supplies every required builtin; no MODULE/REPO/core overlay or
+additional builtin is selected. Zabel remains peer ownership guidance and
+Bazel 9.2 remains sole authority.

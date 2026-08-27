@@ -7164,3 +7164,22 @@ configured semantic change is required. Run only
 caps, retain exact source/child/import identities and invoke nothing. Zabel is
 peer ownership guidance only; Bazel 9.2 and authenticated rules_cc bytes own
 compatibility. Re-audit the first link-family child after acceptance.
+
+### Complete linkstamp accepted; LTO-backends child selected (2026-08-26)
+
+Commit `78acfe43f` freezes all 111 authenticated linkstamp lines over the six
+actual complete children, including CcInfo's retained Skylib mapping. It proves
+all six imported identities, the public function and exact visibility
+inventories without invocation. All required suites pass at 0 production and
+223 proof additions; independent review returned `ACCEPT`.
+
+Private `cc_common.bzl` source order next reaches
+`link/create_library_to_link.bzl`; its first incomplete child is complete
+540-line `link/lto_backends.bzl`, SHA-256
+`078bfb686e85b584745fcea2d9e5535938f9afc1a0066f80cc88aceb699f4226`.
+All four children are accepted. Its eager surface is four imports, one provider
+and ten lazy functions using admitted shapes. Run only
+`WP-4-7A-rules-cc-lto-backends-complete-loading-proof` under 0/900/900, retain
+exact source/child/import/provider/function identities and invoke nothing.
+Zabel remains peer ownership guidance; Bazel 9.2 and authenticated rules_cc
+bytes own compatibility.
