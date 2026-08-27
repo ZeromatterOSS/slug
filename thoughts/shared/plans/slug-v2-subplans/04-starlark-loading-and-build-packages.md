@@ -5247,24 +5247,30 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
-### Exact ObjcInfo aliases accepted; remaining proxy closure audit selected (2026-08-26)
+### Remaining proxy closure audited; complete cc_internal proof selected (2026-08-26)
 
-Commit `4b2396f0a` embeds and hash-verifies complete exact ObjcInfo plus its
-initializer/provider slices and generated-proxy load/export slices. It proves
-private initializer/raw functions, public provider-callable identity, actual
-rules_cc mapping, and both public proxy aliases without invoking any callable.
-All 238 loading-library tests, 24 invalidation tests, 31 BUILD-loading tests,
-analysis/core checks and the CLI build pass; independent reviews accept
-0/185/185 scope and all deferred boundaries.
+The docs-only audit authenticates the remaining 788-line `cc_common`, 656-line
+private CcInfo and 143-line toolchain-config roots. `cc_common` has 22 direct
+loads: helper/CcInfo and bounded provider modules are partial, while compile,
+link and configuration graphs are broad. Private CcInfo first reaches partial
+`cc_helper_internal`; toolchain config reaches 1,387-line `legacy_features`,
+which loads unproved 220-line action names and 622-line toolchain-config lib.
 
-Only broad `cc_common`, private CcInfo and toolchain-config info remain in the
-eager generated proxy. Run only
-`WP-4-7A-rules-cc-remaining-compatibility-proxy-closure-audit` at zero Rust.
-Authenticate every recursive eager load/evaluated expression, classify accepted
-complete versus partial/missing dependencies, and select one smallest
-source-complete successor or record `REPLAN`. Clean `../zabel` `0795445f…`
-guides only recursive defining-module reachability and freeze ownership; no Zig
-code, representation, traversal algorithm, identity or behavior is copied.
+Their smallest shared first unaccepted complete producer is rules_cc
+`cc/private/cc_internal.bzl`: 17 lines, SHA-256 `8241ced58c265334ac3f0e063d492383f1ff7d223736dc2d6a5aa712165de6bb`.
+Its only eager expression selects `cc_common.internal_DO_NOT_USE()` when
+present. The selected `rules_cc+` branch and opaque token are accepted by
+`4d7a9bbb2`, but only through source-shaped proof. The fallback branch and all
+internal methods remain deferred.
+
+Run only `WP-4-7A-rules-cc-cc-internal-complete-loading-proof`. Add at most 80
+proof lines and zero production: embed/hash the complete file, evaluate it at
+the exact defining owner, freeze it, and prove the exported opaque type plus
+`.bzl`-only placement. Stop before private paths, complete helper/CcInfo,
+toolchain config or proxy loading. Clean `../zabel` `0795445f…` guides only the
+defining-module owner and recursive freeze-closure architecture; no Zig code,
+representation, traversal, identity, diagnostic or behavior is copied. Bazel
+9.2 and authenticated rules sources remain exact authority.
 
 ### Zero-argument depset accepted; exact ObjcInfo proxy child selected (2026-08-26)
 
