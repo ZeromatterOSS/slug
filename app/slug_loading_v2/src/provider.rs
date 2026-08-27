@@ -904,7 +904,15 @@ impl<'v> StarlarkValue<'v> for AnalysisBuiltinCallable {
     ) -> starlark::Result<Value<'v>> {
         match self.name {
             "depset" => {
-                let direct = args.positional1(eval.heap())?;
+                let mut positions = args.positions(eval.heap())?;
+                let direct = match (positions.next(), positions.next()) {
+                    (None, None) => {
+                        args.no_named_args()?;
+                        return Ok(eval.heap().alloc(StarlarkDepset { direct: Vec::new() }));
+                    }
+                    (Some(direct), None) => direct,
+                    _ => args.positional1(eval.heap())?,
+                };
                 let list = ListRef::from_value(direct).ok_or_else(|| {
                     starlark::Error::new_other(anyhow::anyhow!(
                         "depset direct elements must be a list"

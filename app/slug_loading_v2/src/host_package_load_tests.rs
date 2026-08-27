@@ -126,6 +126,7 @@ use crate::provider::BzlEvaluationContext;
 use crate::provider::FrozenUserProviderCallable;
 use crate::provider::OutputGroupInfo;
 use crate::provider::RunEnvironmentInfo;
+use crate::provider::StarlarkDepset;
 use crate::provider::StarlarkUserProvider;
 use crate::provider::loading_provider_id;
 use crate::starlark_label::StarlarkLabel;
@@ -7804,7 +7805,7 @@ async fn repository_package_rejects_bzl_aspect_factory_in_build_context() {
     assert!(repository_package_error(&outcome).contains("aspect may only be called in a .bzl"));
 }
 
-fn eval_global(source: &str, globals: &Globals) -> Result<(), String> {
+fn eval_global(source: &str, globals: &Globals) -> Result<FrozenModule, String> {
     let ast = AstModule::parse("BUILD.bazel", source.to_owned(), &Dialect::Bazel).unwrap();
     let module = Module::new();
     let context = BzlEvaluationContext::new("//:defs.bzl");
@@ -7812,8 +7813,54 @@ fn eval_global(source: &str, globals: &Globals) -> Result<(), String> {
     evaluator.extra = Some(&context);
     evaluator
         .eval_module(ast, globals)
-        .map(|_| ())
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    drop(evaluator);
+    module.freeze().map_err(|error| format!("{error:?}"))
+}
+
+#[test]
+fn bazel_zero_argument_depset_freezes_empty_in_bzl_and_build_globals() {
+    let source = "events = []\ndef eager(a = depset(), b = depset(), c = depset(), d = depset(), e = depset()):\n    events.append(\"body\")\nEMPTY = depset()\nONE = depset([\"first\", \"second\"])\n";
+    let bzl = eval_bzl_with_identity(
+        source,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_cc+//cc/private:objc_info.bzl").unwrap(),
+            workspace_path: PathBuf::from("/rules_cc/cc/private/objc_info.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+    )
+    .unwrap();
+    let build = eval_global("EMPTY = depset()", &build_file_loading_globals()).unwrap();
+    for module in [&bzl, &build] {
+        let empty = module.get("EMPTY").unwrap();
+        assert_eq!(empty.value().get_type(), "depset");
+        assert!(
+            StarlarkDepset::direct_from_value(empty.value())
+                .unwrap()
+                .is_empty()
+        );
+    }
+    let one_binding = bzl.get("ONE").unwrap();
+    let one = StarlarkDepset::direct_from_value(one_binding.value()).unwrap();
+    assert_eq!(one[0].unpack_str(), Some("first"));
+    assert_eq!(one[1].unpack_str(), Some("second"));
+    assert_eq!(
+        FrozenListRef::from_value(bzl.get("events").unwrap().value())
+            .unwrap()
+            .len(),
+        0
+    );
+    let globals = loading_globals();
+    for rejected in [
+        "X = depset(direct = [])",
+        "X = depset(transitive = [])",
+        "X = depset(order = \"default\")",
+        "X = depset(unknown = [])",
+        "X = depset(\"bad\")",
+        "X = depset([], [])",
+    ] {
+        assert!(eval_global(rejected, &globals).is_err(), "{rejected}");
+    }
 }
 
 #[test]
