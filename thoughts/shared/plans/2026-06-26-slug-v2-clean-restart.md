@@ -30,18 +30,48 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; post-private-helper utils frontier audit selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; commits through `cdd2f68f7` additionally accept clippy's complete aspect/rule tail, exact lints/paths/find-toolchain children, fixed OutputGroupInfo and RunEnvironmentInfo declaration globals, imported plain frozen attributes/transitions, retained provider/schema identities, frozen exported functions, canonical eager toolchain declarations, exact utils eager values/aliases, all seven helper-free utils parent imports, and two private-helper export closures | six utils imports remain and cross loaded providers, accepted eager composites, bazel_skylib paths or the large crate-name closure | audit only with `WP-4-7A-post-utils-private-helper-loaded-frontier-audit`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; exact utils can-build-metadata export proof selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; commits through `cdd2f68f7` additionally accept clippy's complete aspect/rule tail, exact lints/paths/find-toolchain children, fixed OutputGroupInfo and RunEnvironmentInfo declaration globals, imported plain frozen attributes/transitions, retained provider/schema identities, frozen exported functions, canonical eager toolchain declarations, exact utils eager values/aliases, all seven helper-free utils parent imports, and two private-helper export closures | six utils imports remain; the earliest minimum new-source closure is `can_build_metadata` plus one provider declaration | implement only proof packet `WP-4-7A-rules-rust-utils-can-build-metadata-export-loading-proof`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-post-utils-private-helper-loaded-frontier-audit](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-rules-rust-utils-can-build-metadata-export-loading-proof](./slug-v2-subplans/current-packet.md).
 
-Authenticate the exact source-complete freeze closures for the remaining six
-utils imports, including loaded-provider/path and accepted-eager dependencies,
-then select exactly one bounded proof successor. Make no production or proof
-implementation change.
+Freeze exact `can_build_metadata` with its exact loaded provider declaration
+and accepted `can_use_metadata_for_pipelining` dependency, prove loaded and
+parent binding identity, invoke none, and stop before the other five exports.
+
+### M7 post-private-helper audit selects can-build-metadata export (2026-08-26)
+
+Audit `f3ddca46a` authenticates all six remaining utils closures. Exact roots
+hash as follows: `compute_crate_name` `8b79565b…`, `transform_deps`
+`6983d42f…`, `transform_link_deps` `c6b644e8…`, `can_build_metadata`
+`4d57fbea…`, `transform_sources` `1006a8da…`, and
+`generate_output_diagnostics` `8535acbf…`.
+
+`compute_crate_name` reaches 104 new helper lines plus accepted eager encoding
+slices. `transform_sources` reaches 69 new local lines plus the accepted exact
+320-line Skylib paths child. Both transform-dependency functions reach exact
+rules_rust provider declarations but remain deferred because `CcInfo` crosses
+the generated compatibility proxy and broad private initialized-provider
+closure; no stub is admitted.
+
+The two minimum new-source closures are 34 lines each. Select the earlier
+parent import: exact `utils.bzl:742-765` `can_build_metadata` plus exact
+`providers.bzl:109-118` `AlwaysEnableMetadataOutputGroupsInfo`, reusing accepted
+exact `can_use_metadata_for_pipelining`. Run only
+`WP-4-7A-rules-rust-utils-can-build-metadata-export-loading-proof` under
+0/120/120 caps in the existing proof owner. Use proof-only narrowed actual
+`:providers.bzl` and `:utils.bzl` loads; prove types and pointer identities and
+invoke neither function nor the declared provider.
+
+Exact compatibility covers source bytes/hashes, producers, symbol/load
+spelling, provider/function types and imported identities. Narrowed proof
+modules and frozen representation are Slug-native. Results, diagnostics,
+configured behavior, complete provider/utils/parent loads and the other five
+exports remain deferred. Pinned Bazel 9.2 is sole behavior authority; clean
+`../zabel` `0795445f…` guides only loaded-binding reachability and ownership.
 
 ### M7 exact utils crate-root export accepted; loaded frontier audit selected (2026-08-26)
 

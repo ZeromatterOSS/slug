@@ -1,126 +1,135 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-post-utils-private-helper-loaded-frontier-audit`
+Packet: `WP-4-7A-rules-rust-utils-can-build-metadata-export-loading-proof`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: authenticate the source-complete compile/freeze closures for all six
-remaining exact `rust.bzl` imports from `utils.bzl`, then select exactly one
-bounded proof successor. Implement no Rust or test proof.
+Result: freeze exact `can_build_metadata` with its exact loaded provider
+declaration and accepted `can_use_metadata_for_pipelining` dependency, prove
+loaded and parent binding identity, invoke none, and stop before the other five
+exports.
 
-## Accepted base and learned facts
+## Accepted base and completed frontier audit
 
-Base is `cdd2f68f7` (`Prove exact utils crate root export`). Exact loading
-proofs now cover all seven helper-free parent imports plus the two bounded
+Base is `cdd2f68f7` (`Prove exact utils crate root export`). The unchanged
+proof owner is 8,858 lines at SHA-256
+`52d964ca52cae93ce56b7429e178c0e6aebf43f461c17ae38180cfae55394587`.
+Exact loading proofs cover seven helper-free parent imports plus the two
 private-helper closures `expand_dict_value_locations` and `crate_root_src`.
-All remain uninvoked.
 
-The authenticated rules_rust 0.73.0 sources remain:
+Authenticated sources:
 
-- `rust/private/utils.bzl`: 1,032 lines, SHA-256
-  `8aa49b9312d4ae5c4aed033aba65392a039a681b3ee21ca83da0f05acac28ace`;
-- `rust/private/rust.bzl`: 1,821 lines, SHA-256
-  `a645bd5db6344bd3c0997dcf73600475c0af53fb4dd025890be24b8e1e2dbfd8`;
-- exact parent load `rust.bzl:40-57`: SHA-256
-  `1ad3406b7c58cc7d74e1e86991fdb6aeadbd836d32926fc54eee9583295ab500`.
+- `utils.bzl`: 1,032 lines, SHA-256 `8aa49b9312d4ae5c4aed033aba65392a039a681b3ee21ca83da0f05acac28ace`;
+- `providers.bzl`: 238 lines, SHA-256 `57a59ec9a60b9709df197333c94bac464b572af63bc78f560ce32570b6d84ac6`;
+- exact utils provider-load block, lines 21-30: SHA-256
+  `70b9766134981b2468073457ace668c656b4b00adff6df0fe4a28b079ad9c68d`.
 
-Six parent imports remain:
+The completed six-export audit is:
 
-| Export | Known local root | Known dependency class |
+| Export/root SHA-256 | Complete closure | Classification |
 |---|---|---|
-| `can_build_metadata` | lines 742-765 | accepted `can_use_metadata_for_pipelining` plus loaded `AlwaysEnableMetadataOutputGroupsInfo` |
-| `compute_crate_name` | lines 410-445 | helpers at 374-408 and 573-740 plus accepted eager substitutions |
-| `generate_output_diagnostics` | lines 967-991 | loaded `RustcOutputDiagnosticsInfo` |
-| `transform_deps` | lines 536-554 | loaded `DepVariantInfo`, `CrateInfo`, `DepInfo`, `BuildInfo`, `CcInfo`, and `CrateGroupInfo` |
-| `transform_link_deps` | lines 556-571 | loaded `DepVariantInfo` and `CcInfo` |
-| `transform_sources` | lines 878-917 | loaded `paths` plus helper at 937-965 |
+| `can_build_metadata` 742-765, `4d57fbeaa3abeee124920697c17f08cd785655f3de64723f9e071bd2b50cb8eb` | accepted `can_use_metadata_for_pipelining` 766-786, `00078da9862fec4e91d5e0e4453a5395dca29f12e4bc6dd44f280a58643b0b5a`; provider 109-118, `3c21b9e0c388512de065d30fe0910e8fc6db274e6643662fb1922ce47787db8b` | 34 new exact lines; proof-only provider child admissible |
+| `generate_output_diagnostics` 967-991, `8535acbf356edec97a667da93592f211b9c0f34f5a9b88de6e0a83ac453f5bec` | provider 120-128, `a066585ff0356b5baa65fb4ddcc3fe6d5644be4facd457bf83b5eb6886324086` | 34 new exact lines; equally small but later parent import |
+| `compute_crate_name` 410-445, `8b79565b53edd586539f2f6697848038c598814b2706ed57fffe2c1229c0621f` | helpers 374-396 `8ef88e5e0c024de9214552db4ba8dc6e54018cf3fc52e6460d8ecd572c984c62`, 398-408 `da15bf3fe35c692ad74c76f1f80d234c0b0519697a6fee93335d3888ba745c81`, 573-595 `852e96f30111d5400489cf5512af8d27d8519f57194a3936e21600cd412b364e`, 652-662 `9347beaed27421b6f782c9f643014f8d2774dfbb9b7c83c0ed96143ac3698dc3`; accepted eager 601-650 `e0526a4d2bc5bc9d04544ecdbde305667c5a015b0c7f4597858891ae668f7b85`, 664-676 `b5ad15479c25ae84b1dba206ffc924d455003aaff98b5371773a3104f08d9027`, 692-740 `e5643897c866136bd788b242be0c983a2ae3aab511a1b7676c2d118be0200cd2` | 104 new exact helper lines; bounded but larger |
+| `transform_sources` 878-917, `1006a8daf526ca60d494f691067d417db5ca34ef350bd6fcf901b8f1d5fd14c7` | helper 937-965, `c5105f745ea0032b282f9de9825bac784ebd88ec55c80c2692017038357eaaaa`; accepted `@@bazel_skylib+//lib:paths.bzl`, 320 lines, `96cce43871d8228126a12ceff771351f9030b1e9d029f2185853aa6541766a83` | 69 new local lines plus accepted loaded child |
+| `transform_link_deps` 556-571, `c6b644e8f5106089ce3d4ea1cde4b336e9d2f6d32251d8d71cd085bb0b73d564` | provider 94-107, `19fe3a0cdd81693acea508531452189dcdd9f1cc7f4ab116e79839f8cf60e7af`; exact public `CcInfo` route | deferred: CcInfo proxy/private closure not bounded here |
+| `transform_deps` 536-554, `6983d42fd5e829722c88c303383fd53851e7b4972afbedc187f292ed3d507eea` | providers 17-56 `84dd9796019522c4b1bb0e0b04ad880c649fb70d1e92ce0033e775d6fdfd751a`, 58-72 `40cf12f9d8124bb1c16c1a97dd686c79041d111d4f73db24e851085fbd5ff803`, 74-79 `612afb9f408e48229b616feb8fa50462db59253e9a218653da256c6c3ec2fb9f`, 81-92 `6b4bf50624be50b86ee5b3fbfc6211919fe3344602f2ff47ca91eb1fbf17adbb`, 94-107 `19fe3a0cdd81693acea508531452189dcdd9f1cc7f4ab116e79839f8cf60e7af`; exact public `CcInfo` route | deferred on the same CcInfo boundary |
 
-This inventory is not yet a source-complete authentication of loaded provider
-declarations or the full crate-name helper/eager closure. Do not schedule an
-implementation from names alone.
+The exact CcInfo edge is utils line 20, SHA-256
+`3f6e30c3620c98b4cee7f2d84d921be7fd194e6579369a918c73848b8b8fd074`,
+to `@@rules_cc+//cc/common:cc_info.bzl` (18 lines,
+`bac2bc3024fb0bacdfa2ca8d7ac3af946f447fe397c76b29fea959a35271f3da`). That module
+reexports through generated compatibility `symbols.bzl` (15 lines,
+`2adedeeaaad8c0e664dc35e9bf1480b1d6dc3d7840034f9efe3ee78476fc5902`)
+to the 656-line private child
+`4424bb876c3f8234d7cfce20652e7ab1a7b2fc34cc2c637b1cb4313590d9f1bc`;
+its provider at 260-269
+(`e3cd25c06dcd4132c02b5c9a9de0f54ce56c56973a6990400644d1537aa1918b`)
+retains the initializer and eager contexts. Do not replace this source-complete
+edge with a stub.
 
-## Authorities and method
+The minimum new-source closures tie at 34 lines. Select the earlier parent
+import, `can_build_metadata`.
 
-Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, pinned
-`ResolverTest.testBindingScopeAndIndex_functionBlock` and
-`testBindingScopeAndIndex_loads`, and authenticated rules_rust/rules_cc/
-bazel_skylib sources are sole exact authority.
+## Authorities and decision
 
-Clean `../zabel` commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only how to audit
-recursively reachable defining-module and loaded bindings after evaluator
-closure. Copy no Zig code, representation, owner pointer, traversal/order
-algorithm, diagnostic, identity or behavior.
+Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
+`ResolverTest.testBindingScopeAndIndex_functionBlock` and `..._loads`, plus
+the authenticated rules sources, are sole exact authority.
 
-For each remaining export:
+Clean `../zabel` `0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only
+retaining recursively reachable defining-module and loaded bindings after
+freeze, as illustrated by its defining-module value-graph tests. Copy no Zig
+code, representation, owner pointer, traversal/order algorithm, diagnostic,
+identity or behavior.
 
-1. authenticate the exact public-function slice;
-2. recursively enumerate every same-module helper, eager value and loaded
-   binding needed to compile and freeze it without invocation;
-3. authenticate every newly required source slice/file and producer identity;
-4. mark each dependency as already accepted, proof-only admissible, missing, or
-   too broad for a bounded packet;
-5. estimate the smallest honest proof and choose exactly one successor.
-
-Prefer a coherent family only when shared loaded bindings make it smaller and
-clearer than separate proofs. Do not treat loaded-provider names as arbitrary
-stubs when exact child declarations are required for the claimed closure.
+Use a proof-only narrowed `:providers.bzl` load containing only
+`AlwaysEnableMetadataOutputGroupsInfo`, then exact `can_build_metadata` plus
+the already authenticated `can_use_metadata_for_pipelining` slice in exact
+source order under the utils producer. Use a proof-only parent with actual
+`:utils.bzl` spelling.
 
 ## Compatibility
 
-- **Exact:** authenticated source bytes/hashes, producer/load identities,
-  dependency reachability facts, and the selected successor's Bazel binding
-  surface.
-- **Slug-native:** audit decomposition, packet sizing and proof-only
-  concatenation strategy.
-- **Unsupported/deferred:** all function invocation/results/diagnostics,
-  configured behavior, whole-utils/parent freeze, and every implementation not
-  explicitly selected by the successor packet.
+- **Exact:** selected source/declaration bytes and hashes; provider, utils and
+  parent producers; symbol/load spelling; frozen provider/function types; and
+  loaded/public pointer identities.
+- **Slug-native:** narrowed proof-only provider/utils/parent modules,
+  concatenation separators and starlark-rust frozen representation.
+- **Unsupported/deferred:** invoking either function or the declared provider;
+  all results, diagnostics and configured fields; complete provider/utils/
+  parent loads; and the other five exports.
 
-## Allowlist and caps
+No production, DICE, identity, retained-memory, async, fixture, oracle, hot-path
+or Buck2-derived utility change is involved.
 
-Only these files may change:
+## Allowlist, caps and proof
 
-| File | Base SHA-256 | Base lines |
-|---|---|---:|
-| `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md` | `59d2a7c08ff439d08ccdb32d4c80910e0aa9ebbaab1f6a616dea0e716511b13d` | 4,153 |
-| `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md` | `d14c8af627fa3457f0750abcfe6a9f36184ec8129f2fa7288c1dcf2383db72a7` | 6,558 |
-| `thoughts/shared/plans/slug-v2-subplans/current-packet.md` | `4016198f307ab4de785040c6d985988369677c797561b40dbc8b851f6b0c8ef6` | 138 |
+Only `app/slug_loading_v2/src/host_package_load_tests.rs` may change. Its base
+is SHA-256 `52d964ca52cae93ce56b7429e178c0e6aebf43f461c17ae38180cfae55394587`
+at 8,858 lines; final ceiling is 8,978.
 
-Caps are 0 production, 0 proof and 240 planning additions; deletions do not buy
-addition budget. The final canonical plan and manifest must name the same one
-successor packet.
+Caps are 0 production, 120 proof and 120 total additions; deletions do not buy
+budget. Keep the test function at or below 100 lines; exact constants are
+exempt.
 
-Required deliverable:
+Required proof:
 
-- complete six-export closure table with exact line/file hashes and producer/
-  load edges;
-- accepted-versus-missing classification for every dependency;
-- one selected bounded successor with exact/Slug-native/deferred classes,
-  allowlist, base hashes/lines, production/proof/total caps, required validation
-  and STOP conditions;
-- explicit Bazel authority and Zabel guidance-only record.
+1. Embed exact unabridged `providers.bzl:109-118` and
+   `utils.bzl:742-765`; verify both hashes.
+2. Freeze the provider declaration under
+   `@@rules_rust+//rust/private:providers.bzl`; prove its exported callable
+   type without invoking it.
+3. Evaluate a narrowed actual `:providers.bzl` load followed only by exact
+   `can_build_metadata` and accepted exact, source-ordered
+   `can_use_metadata_for_pipelining` under
+   `@@rules_rust+//rust/private:utils.bzl`. Prove both functions and the
+   loaded provider pointer identity; invoke none.
+4. Import only `can_build_metadata` through actual `:utils.bzl` spelling
+   under `@@rules_rust+//rust/private:rust.bzl` and prove pointer identity.
+5. Preserve every accepted loading proof.
 
-No Rust, fixture, oracle capture, Cargo command or function invocation is
-authorized. Read-only hashing and source inspection are required.
+No new oracle is needed: authenticated source and pinned resolver tests
+discriminate the selected binding closure. The large test file remains the
+cohesive exact external-Bzl proof owner.
 
-## Validation and STOP
+## Serial validation and STOP
 
-- verify the pinned Bazel, rules_rust, rules_cc, bazel_skylib and Zabel sources
-  used by the audit are clean at their recorded commits/hashes;
-- `git diff --check`;
-- exact three-file scope and 240-line planning cap;
-- `scripts/v2_archive_status.sh` with only its three known archive-only misses;
-- independent review of the closure table and selected successor.
+Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
+`CARGO_BUILD_JOBS=1`: focused proof; loading lib; `bzl_invalidation`;
+`build_file_loading`; locked analysis/core check; locked CLI build; format,
+diff, exact scope and archive status (only the known three misses).
 
-STOP and `REPLAN` for dirty authority; missing source bytes; an unbounded or
-ambiguous dependency graph; more than one selected implementation successor;
-Rust/test/fixture/oracle changes; function invocation; Java/JVM work; copied
-Zabel content; or cap violation.
+Independent review must verify hashes, closure/load producers, narrowed-load
+classification, pointer identities, nonexecution, caps, preserved proofs,
+Zabel guidance-only use and validation.
+
+STOP and `REPLAN` for production change; selected-function or declared-provider
+constructor invocation; another provider, helper or export; complete provider/
+utils/parent loading; configured behavior; identity/registry/DICE work; Java/
+JVM work; copied Zabel content; dirty authority; or cap violation.
 
 ## Immediate predecessor
 
-`cdd2f68f7` accepted exact `crate_root_src` plus its private helper with 231
-unit, 24 invalidation and 31 BUILD-loading tests green. Independent review
-verified both hashes, source order, closure completeness, private visibility,
-public pointer identity and non-invocation.
+`f3ddca46a` authenticated all six residual closures and selected this sole
+minimum, earlier-parent successor without changing Rust, tests or fixtures.

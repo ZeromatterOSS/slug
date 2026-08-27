@@ -5247,6 +5247,30 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Post-private-helper audit selects can-build-metadata export (2026-08-26)
+
+Audit `f3ddca46a` authenticates the six residual roots and their recursive
+freeze dependencies. `compute_crate_name` needs 104 new helper lines plus the
+accepted eager encoder; `transform_sources` needs 69 new local lines plus the
+accepted exact Skylib paths child. The transform-dependency pair additionally
+needs rules_rust providers and exact `CcInfo`; the latter still crosses the
+generated compatibility proxy and broad private initialized-provider closure,
+so no proof-only stub is permitted.
+
+`can_build_metadata` and `generate_output_diagnostics` each need 34 new exact
+source lines. Select the earlier parent import: `utils.bzl:742-765` (SHA-256
+`4d57fbeaa3abeee124920697c17f08cd785655f3de64723f9e071bd2b50cb8eb`)
+plus `providers.bzl:109-118` (SHA-256
+`3c21b9e0c388512de065d30fe0910e8fc6db274e6643662fb1922ce47787db8b`),
+reusing accepted exact `can_use_metadata_for_pipelining`.
+
+Run only `WP-4-7A-rules-rust-utils-can-build-metadata-export-loading-proof`
+under 0/120/120 caps. Freeze the exact provider declaration, then the selected
+function with a narrowed actual `:providers.bzl` load and accepted helper;
+prove loaded and parent pointer identities and invoke nothing. Clean `../zabel`
+`0795445f…` guides only recursive loaded-binding retention; Bazel 9.2 and the
+authenticated rules sources remain exact authority.
+
 ### Exact utils crate-root export accepted; loaded frontier audit selected (2026-08-26)
 
 Commit `cdd2f68f7` freezes the second exact private-helper utils closure,
