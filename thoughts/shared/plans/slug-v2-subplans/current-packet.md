@@ -1,125 +1,202 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-cc-link-complete-loading-proof`
+Packet: `WP-4-7A-bazel-bzl-visibility-owner-design`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: freeze the authenticated complete 197-line rules_cc
-`cc/private/link/link.bzl` module over its four accepted children. Prove its
-complete imported/dictionary/function surface without invocation.
+Result: settle one exact-default Bazel 9.2 `.bzl` load-visibility owner and
+direct-edge enforcement architecture shared by every existing Slug Bzl and
+BUILD evaluator. Produce an independently accepted implementation contract;
+change no Rust.
 
-## Learned facts and decision
+## Learned facts and source-order trigger
 
-Commit `6959f0370` accepts the complete 44-line `create_linkstamp.bzl` source
-over its actual helper child. It proves the import, private provider identity,
-public function and exact two-public/three-all inventories without invocation.
-Focused, all 271 loading-library, 24/31 integration, locked analysis/core, CLI,
-format/diff/source and archive-baseline gates pass within 0/119/119;
-independent review returned `ACCEPT`.
+Commit `879d879f5` accepts the complete authenticated 197-line rules_cc
+`cc/private/link/link.bzl` defining-module proof. Focused, all 272 loading
+library, 24/31 integration, locked analysis/core and CLI, format/diff/source
+and archive-baseline gates pass within 0/352/352; independent review returned
+`ACCEPT`.
 
-Rules_cc 0.2.17 `cc/private/cc_common.bzl` next loads complete
-`cc/private/link/link.bzl`, 197 lines, SHA-256
-`666e819dee4777d0c3d8624e18588a905046532a6668d89d5744419cbee4a0e2`.
-All four source-order children are accepted: `cc_internal.bzl`, compilation
-outputs, linking helper and target types. The module retains five imported
-identities, eagerly constructs one private five-entry `_TARGET_TYPE`
-dictionary, and defines one public lazy function. It has no other top-level
-binding shape and invokes no function at top level.
+Rules_cc 0.2.17 `cc/private/cc_common.bzl` next reaches dependency-free
+`cc/private/rules_impl/cc_toolchain_info.bzl`, 255 lines, SHA-256
+`f19589572147b7dc8f1b16ab96791b7651923c36821aed70868a74bbfce963f5`.
+Its first executable statement is `visibility(["//cc/..."])` at line 18.
+Slug's generic `.bzl` environment has no `visibility` binding and its retained
+module value has no load-visibility fact, so a complete freeze proof is not yet
+honest. A freeze-only no-op would admit forbidden cross-package loads and is
+not an implementation candidate.
 
-Run only `WP-4-7A-rules-cc-link-complete-loading-proof`. Do not invoke `link`,
-inspect callable defaults, create linking outputs, register an action, or claim
-the `cc_common.bzl`, `cc_binary.bzl` or `cc_shared_library.bzl` consumers.
+Run only `WP-4-7A-bazel-bzl-visibility-owner-design`. Do not change Rust,
+freeze `cc_toolchain_info.bzl`, add a no-op global, or claim any C++ provider,
+toolchain, rule, configured target or action behavior.
 
-## Generic architecture, authorities and compatibility
-
-This is a generic Starlark loader/evaluator proof with authenticated BCR
-rules_cc as a demanding integration corpus; it is not a C++-specific parser or
-an alternate implementation of rules_cc. Bazel 9 C++ rule/module logic remains
-in rules_cc. The BCR `cc_internal.bzl` wrapper remains ordinary loaded
-Starlark, while its low-level object is a distinct Rust host capability behind
-`cc_common.internal_DO_NOT_USE()`.
+## Bazel authority and exact behavior family
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-and authenticated rules_cc bytes are sole exact authority. Complete source,
-accepted-child, frozen tuple/dictionary and lazy-function regressions cover
-every top-level binding shape. Rules_cc `tests/simple_binary/BUILD` and the
-configured `cc_binary.bzl`/`cc_shared_library.bzl` consumers are skipped because
-they require function invocation, configured linking and action behavior from
-an unsupported later phase. Add no fixture or oracle.
+is sole compatibility authority:
 
-Clean `../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a`
-is concept-only peer guidance: its generic-evaluator/Bazel-host split and
-producer-owned frozen module lifetime support this architecture, but no Zig
-code, representation, algorithm, diagnostic or behavior may be copied.
+- `BazelBuildApiGlobals.visibility` validates default-enabled
+  `--experimental_bzl_visibility`, `.bzl` initialization, direct module-scope
+  use, a single declaration, string-or-list input and package specifications
+  resolved in the declaring module's repository context.
+- `BzlInitThreadContext` captures the declaration only during evaluation;
+  `BzlLoadFunction` defaults an absent declaration to public and publishes the
+  policy in `BzlLoadValue`, outside the evaluator module object.
+- `BzlVisibility` normalizes empty/private/public policy and matches exact or
+  recursive package specifications. `BzlLoadFunction.checkLoadVisibilities`
+  always permits the loaded module's own package and validates every direct
+  `.bzl` or BUILD load before importer execution.
+- `BzlLoadFunctionTest` methods from `testBzlVisibility_disabledWithoutFlag`
+  through `testBzlVisibility_errorsDemotedToWarningWhenBreakGlassFlagIsSet`
+  establish implicit/explicit public, private same/cross package, empty and
+  mixed lists, dependency failure, top-level/once restrictions, exact and
+  subtree packages, declaring-repository scope, repository mappings, bad
+  types, negative rejection and the two flag surfaces.
 
-- **Exact:** complete source/hash/owner/mapping; four child labels/mappings;
-  five imported pointer identities/visibility; five `_TARGET_TYPE` key/value
-  rows independent of dictionary iteration order; one public function
-  type/visibility; exact public and all-visibility name sets.
-- **Slug-native:** realization through one starlark-rust frozen defining-module
-  heap retaining all four child heaps and owning its dictionary and function;
-  unclaimed dictionary iteration order.
-- **Unsupported/deferred:** callable-default inspection; function invocation
-  and result; link inputs/outputs, validation and diagnostics; toolchain,
-  configuration, path and linking behavior; action registration, ActionKey and
-  execution; `cc_common.bzl` and configured rule consumers.
+The implementation contract must cover one coherent default-enabled family:
+implicit/explicit public; private and empty-list behavior; string and list of
+strings only; exactly one positional-only argument returning `None`, with
+named, missing and excess arguments rejected; `public`, `private`, `//pkg`,
+`//pkg/...`, `//...`, apparent and canonical repository spellings, plus
+`:__pkg__`/`:__subpackages__` label forms accepted by Bazel's
+package-specification parser; declaring-repository mapping; top-level-only and
+once-only declaration; same-package override; and rejection of every denied
+direct `.bzl` and BUILD load before importer evaluation.
 
-The frozen defining module is the natural producer and retained owner. No
-evaluator borrow or invocation value escapes. Request/revision, DICE,
-filesystem, cache, async and fallback concerns are inapplicable because this
-is test-only source freezing with no production or retained-service change.
+## Selected ownership design
 
-## Allowlist, caps and proof
+The implementation successor may add a cohesive private
+`bzl_visibility.rs` leaf containing only immutable normalized policy,
+declaration parsing and pure `allows_load_from`/direct-edge validation. Its
+retained shape is `Public | Private | Packages(Arc<[PackageSpec]>)`, with each
+package spec carrying canonical `PackageIdentifier` identity and exact versus
+subtree kind. It derives semantic equality and `Allocative`; an `Arc` clone is
+cheap. Private rows may be removed and a list containing public may normalize
+to public because ordering and redundant denying rows are not observable.
 
-Change only `app/slug_loading_v2/src/host_package_load_tests.rs`. The canonical,
-current and Stage 4 documents may change only after terminal acceptance to roll
-the result and next packet.
+The existing evaluation-scratch `BzlEvaluationContext` is the one
+initialization context. Add an interior `Option<BzlLoadVisibility>` used only
+during the live evaluator call. The `.bzl`-only global validates direct
+module-scope use through starlark-rust's native-caller API, resolves through
+the context's exact `BzlModuleIdentity`, rejects a second call, and leaves no
+heap `Value` or context borrow in retained state. A focused regression must
+cover direct, local-function, imported-function and compiler-inlined call
+shapes; inability to distinguish them is `REPLAN`, not permission to scan raw
+source or patch starlark-rust speculatively.
 
-At base `6959f0370` the Rust test authority is 25,109 lines, SHA-256
-`1c81aa8cc33f12fbca8d9309e03d65401797a723c1050d7f47a6c141b50feee0`.
-Its final ceiling is 25,559 lines. Each new proof/helper function must remain at
-most 120 physical lines. The oversized test module remains cohesive around its
-private load harness and adjacent authenticated source constants; add no
-production responsibility or generic source archive.
+`FrozenBzlModule` is the durable semantic owner, parallel to Bazel's
+`BzlLoadValue`. It retains the extracted policy beside `BzlLoadManifest` and
+includes it in semantic equality. The manifest fingerprint covers the owner
+source digest plus every direct child's identity and transitive fingerprint;
+the root identity and repository mapping participate separately in manifest
+equality and are framed when a parent/module package consumes this value.
+Policy extraction adds no independent input and no new digest domain. Frozen
+Starlark module pointers and recursive heap ownership remain lifetime-only.
 
-Caps are 0 production, 450 proof and 450 total additions; deletions do not buy
-budget. Embed/hash all 197 authenticated lines. Evaluate at exact owner
-`@@rules_cc+//cc/private/link:link.bzl`, path
-`/rules_cc/cc/private/link/link.bzl`, with empty owner mapping and all children
-at their actual defining identities.
+Use one pure direct-edge checker before importer evaluation at all five live
+composition sites:
 
-Prove exact child mappings: `cc_internal.bzl`,
-`cc_compilation_outputs.bzl` and `target_types.bzl` have empty mappings;
-`cc_linking_helper.bzl` carries `bazel_skylib -> bazel_skylib+`. Prove private
-`_cc_internal` pointer-identical to `cc_internal` and absent publicly. Prove
-public `EMPTY_COMPILATION_OUTPUTS`, `create_cc_link_actions`, `LINKING_MODE` and
-`LINK_TARGET_TYPE` pointer-identical to their actual child exports.
+1. `compute_host_bzl_module`;
+2. `compute_external_bzl_module`;
+3. local `BzlModuleEvalKey::compute`;
+4. `evaluate_host_package_attempt`, shared by root and repository packages;
+5. local `PackageLoadKey::compute`.
 
-Prove private `_TARGET_TYPE` is a five-entry dictionary and absent publicly.
-For keys `("cpp", "executable")`, `("cpp", "dynamic_library")`,
-`("objc", "executable")`, `("objcpp", "executable")`, and
-`("objc", "archive")`, prove the exact static/dynamic pair is `None` or
-pointer-identical to the corresponding accepted `LINK_TARGET_TYPE` member.
-Do not claim dictionary iteration order. Prove public `link` is type `function`.
-Assert exact five-public/seven-all name sets. Invoke nothing.
+Bzl importers derive their canonical package from the manifest root. Package
+attempt inputs must receive canonical `PackageIdentifier` from their existing
+root or repository route; they may not infer repository identity from a path.
+Validation reads already-computed direct child values and occurs before
+creating or evaluating the importer. A typed denial retains dependency label
+and importer package, then maps through each existing driver error owner. Do
+not create a second evaluator, DICE key, side registry, post-evaluation repair,
+raw-source scanner or path-derived repository fallback.
 
-Run focused proof, all `slug_loading_v2` library tests, `bzl_invalidation`,
-`build_file_loading`, locked analysis/core checks, locked CLI build, formatting,
-diff and archive hygiene. Measure caps/ceilings and obtain independent review of
-bytes, complete child/import/dictionary/function inventory, defining
-identities, no-invocation/link/action/consumer boundary, compatibility split,
-source-order selection and Zabel's peer-guidance role.
+The existing `BzlModuleEvalKey`, `HostBzlModuleEvalKey`/observation key and
+`ExternalBzlModuleEvalKey`/observation key remain natural DICE producers.
+Their source, child, mapping and route dependencies already explain the policy.
+Source or imported-policy changes invalidate and recompute normally; equality
+cutoff compares the retained policy. There is no lock, await under a lock,
+manual invalidation edge or command-side cache.
 
-STOP and `REPLAN` for production change, source/hash mismatch, another missing
-global/evaluator shape, copied/narrowed source or child, incomplete binding or
-dictionary coverage, invocation or callable-default inspection, lost identity,
-evaluator-borrowed value, link/action/consumer claim, unpinned source, copied
-Zabel content, dirty authority, allowlist escape or cap/function violation.
-Stop after this producer and re-audit `cc_common.bzl` in source order.
+## Prior art, memory and compatibility
+
+Clean Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is
+concept/test-only peer guidance, not authority. Its `bzl_visibility.zig`,
+`engine_bzl_visibility_capture.zig`, process-stable declaration binding and
+durable-module plan independently support evaluation-scoped capture,
+canonical immutable policy, same-package-aware pure checking and enforcement
+before importer publication. Copy no Zig code, layout, parser, diagnostics or
+behavior.
+
+Buck2 commit `088c75c7e36805df99c3de29062baa95db700b8b` is utility
+guidance only. Existing Slug `Arc<[T]>`, `Dupe`, `Allocative`, canonical label
+types and `starlark_map` small collections suffice; import no utility, add no
+global interner and update no Stage 9 extraction row. The new policy is
+DICE-retained semantic memory published with `FrozenBzlModule`, released with
+that value, and never borrows evaluator, command or scratch memory. Parsing
+temporaries and the mutable declaration slot are evaluation scratch. There is
+no separate eviction, cancellation, task, join or shutdown owner.
+
+- **Exact:** Bazel 9.2 default-enabled positional-only callable ABI,
+  declaration placement/cardinality/type and package-spec behavior; declaring
+  repository/mapping identity; implicit public and normalized policy semantics;
+  same-package override; default fail-closed direct `.bzl` and BUILD edge
+  result before importer evaluation; observable A/B/A restoration of those
+  semantic results.
+- **Slug-native:** compact Rust enum/`Arc` representation, starlark-rust
+  evaluator integration, existing typed driver wrappers and diagnostic
+  prefixes; DICE keys, equality cutoff and invalidation mechanics;
+  normalization of redundant private/public rows; first-denial reporting
+  rather than Bazel's Java event aggregation.
+- **Unsupported/deferred:** `--noexperimental_bzl_visibility`; warning-only
+  `--nocheck_bzl_visibility`; exact multi-violation event aggregation and Java
+  stack/message bytes; `.scl`; BUILD-level invocation of `visibility`; any
+  target visibility, rule/provider/toolchain/configuration/action semantics;
+  complete `cc_toolchain_info.bzl` freezing until a successor proof.
+
+No request option is silently ignored: the two deferred flags remain rejected
+outside the admitted CLI option surface. The accepted default has no mutable
+request projection. Overlapping requests compute immutable key values from
+their own existing DICE dependency graph; no historical filesystem snapshot or
+cross-request mutable capture is introduced.
+
+## Evidence, implementation successor and stops
+
+This docs packet changes only this manifest, the canonical plan and the Stage
+4 owner plan under 0 production/0 test/320 documentation additions. Run source
+hash/line checks, targeted canonical/manifest agreement, structure/diff/archive
+checks and independent reserved-architecture review. Add no fixture: pinned
+Bazel source and the named upstream regression family already discriminate the
+decision.
+
+If accepted, roll one implementation packet limited to:
+
+- new private `app/slug_loading_v2/src/bzl_visibility.rs`;
+- `app/slug_loading_v2/src/{lib.rs,provider.rs,package.rs,bzl_module.rs}`;
+- colocated tests plus existing `host_package_load_tests.rs`,
+  `tests/bzl_invalidation.rs` and `tests/build_file_loading.rs` only as needed.
+
+Credible ceilings are 500 production, 850 tests and 1,350 total additions.
+Require pure parser/matcher and global positional-only ABI/return,
+placement/cardinality/type tests;
+direct/imported/inlined function negatives; implicit/public/private/list,
+same/cross/subtree/repository-mapping checks; all five composition-site guards;
+source and imported-policy A/B/A invalidation; exact rules_cc
+`visibility(["//cc/..."])` evaluation at its real owner; focused/all loading,
+24/31 integrations, locked analysis/core, CLI build, format/diff/archive and
+independent ownership/representation review. Reuse upstream test themes with
+pinned-source comments; create no oracle fixture.
+
+STOP and `REPLAN` for a new key/lock/global registry, evaluator or command
+cache; raw-source scanning; path-derived repository identity; retained heap
+value/context borrow; policy omitted from semantic equality; validation after
+importer execution; any unguarded live composition site; starlark-rust change;
+ignored option flag; copied Zabel behavior; source/hash mismatch; public API or
+cross-crate change; allowlist/cap escape; or inability to prove top-level call
+shape. Stop after design acceptance and roll the implementation successor.
 
 ## Immediate predecessor
 
-Commit `6959f0370` accepts only complete linkstamp defining-module freezing.
-`da0d9a5a5` accepts only the linking-context producer and `cb71a302d` accepts
-only the universal environment and bounded set subset. None accepts link
-function behavior, `cc_common.bzl`, configured consumers or actions.
+Commit `879d879f5` accepts only complete `link.bzl` defining-module freezing.
+It does not accept `.bzl` load visibility, `cc_toolchain_info.bzl`, function
+invocation, configured linking, toolchains or actions.

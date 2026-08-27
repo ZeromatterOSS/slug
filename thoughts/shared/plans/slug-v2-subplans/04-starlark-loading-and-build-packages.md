@@ -22,6 +22,60 @@ a Starlark-visible method needs label resolution, file reads, repo mapping, or
 repository materialization, route that through a named DICE key or async bridge
 before returning the Starlark-visible value.
 
+## Selected `.bzl` load-visibility ownership design (2026-08-27)
+
+The authenticated rules_cc traversal first requires Bazel's default-enabled
+top-level `.bzl` `visibility()` at dependency-free
+`cc/private/rules_impl/cc_toolchain_info.bzl:18`. A no-op global is invalid:
+Bazel 9.2 captures normalized policy during module initialization, publishes it
+with `BzlLoadValue`, and checks every direct Bzl and BUILD load before importer
+execution.
+
+Use the existing `BzlEvaluationContext` as evaluation scratch and
+`FrozenBzlModule` as the durable semantic owner. A private
+`bzl_visibility.rs` leaf may own only canonical immutable policy, declaration
+parsing and pure matching. Extract the policy after successful evaluation,
+default absence to public, include it in frozen-module equality, and retain no
+Starlark heap value or context borrow. Existing source/child/mapping/route DICE
+dependencies already own every input; add no key, cache, lock, registry or
+manual invalidation. Compact immutable `Arc<[PackageSpec]>`, `Dupe`,
+`Allocative` and canonical Slug identity types suffice without a new interner
+or imported utility.
+
+One direct-edge checker runs before importer evaluation in
+`compute_host_bzl_module`, `compute_external_bzl_module`, local
+`BzlModuleEvalKey`, shared root/repository `evaluate_host_package_attempt`, and
+local `PackageLoadKey`. Bzl importers use their manifest root package. Package
+attempts receive canonical package identity from the already-selected root or
+repository route and never infer repository identity from filesystem paths.
+Default exact behavior covers the one-positional-only-argument/`None` callable
+ABI, implicit/explicit public, private/empty lists, string/list types,
+exact/subtree and reserved-label package forms, declaring-repository mappings,
+top-level/once restrictions, same-package override, fail-closed direct edges
+and observable A/B/A restoration. Internal representation, DICE keys/equality
+cutoff/invalidation, first-denial diagnostics and Rust error wrapping are
+Slug-native;
+`--noexperimental_bzl_visibility`, warning-only `--nocheck_bzl_visibility`,
+Java event aggregation, `.scl` and target visibility remain deferred.
+
+Pinned Bazel 9.2 `BazelBuildApiGlobals`, `BzlInitThreadContext`,
+`BzlVisibility`, `BzlLoadValue`, `BzlLoadFunction` and the
+`BzlLoadFunctionTest.testBzlVisibility_*` family are sole exact authority.
+Clean Zabel `0795445f…` `bzl_visibility.zig` and
+`engine_bzl_visibility_capture.zig` are concept/test-only peer guidance for
+evaluation-scoped capture, immutable retained facts and pure edge checking;
+copy no code, layout, parsing, diagnostics or behavior. Buck2 `088c75c7…` is
+utility guidance only; existing Slug compact/shared primitives suffice and no
+Stage 9 extraction row changes.
+
+The reserved design packet changes documentation only and requires independent
+acceptance. Its implementation successor must stay within the private loading
+crate files and existing tests, prove all five composition sites plus source
+and imported-policy A/B/A invalidation, and `REPLAN` for a starlark-rust change,
+raw-source scan, path-derived repository, retained evaluator borrow, missing
+semantic equality, post-evaluation validation, ignored flag, new key/lock/cache
+or public/cross-crate boundary.
+
 ## Implementation Slices
 
 ### 4.1 Bazel File Discovery
