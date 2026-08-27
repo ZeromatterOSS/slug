@@ -19673,3 +19673,39 @@ identity/Bzlmod/loading plus direct query/core dependent validation and
 independent terminal review before selecting the two-family expander. Bazel 9
 BCR Starlark still owns `cc_internal`; `cc_common` remains only a demanding
 client of the generic evaluator and host ABI, and Zabel remains peer guidance.
+
+### Registration prerequisite owners accepted; shared expander active (2026-08-27)
+
+Independent correction review returns `ACCEPT`, and commit `aa79d7736` accepts
+the six-file prerequisite implementation. One absolute grammar now serves the
+unchanged command-facing apparent parser and the pure contextual canonical
+projection. Selected rows resolve one apparent name through their borrowed
+final mapping; `//` uses the declaring repository, explicit root `@//` maps to
+main and nonroot `@//` fails when the empty apparent name is not visible.
+
+One crate-private Root/Canonical `RepositoryPackageInventoryKey` plus observed
+sibling now solely owns external BUILD source, recursive `.bzl` evaluation,
+the complete `LoadedPackage`, local events and observation epochs. The old
+public package-load keys are thin policy projections: accepted terminals share
+the exact inventory result `Arc`, canonical selected-registry proof shares a
+nonempty epoch's per-demand result `Arc`s, and rejected alias/dependency-bearing
+inventories remain available to the general owner. Full identity, serial
+Bzlmod/loading, query and direct core gates pass except the recorded unrelated
+stale core expectation; archive status retains only its three known baseline
+paths.
+
+Activate only `WP-4-5-7A-shared-module-registration-expander`. Add one
+workspace-plus-family key type with independent toolchain and execution-
+platform instances, one shared loading driver, exact stable-postorder recursive
+priority, lexical targets, first-seen deduplication and retained ambiguity
+facts. Consume root packages through the existing root owner and canonical
+packages through the new general inventory; never use the old external policy
+adapter. Export the nonactivated loading API and keep analysis read-only.
+
+Clean Zabel `0795445f…` remains concept/optimization guidance only: compact
+selected-owner references, separate canonical/package/category stages and a
+consumer-derived stable-postorder view. Slug retains `Arc` slices, `SmallSet`,
+bounded scratch `SmallMap`s and native DICE identity rather than Zig storage,
+IDs or scheduling. Bazel 9.2 alone owns compatibility. BCR Starlark continues
+to own all rules including `cc_internal`; `cc_common` remains a generic
+evaluator/host-ABI stress consumer rather than a Rust C++ parser or rule engine.
