@@ -5247,6 +5247,36 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Exact utils expand-dict export accepted; crate-root export selected (2026-08-26)
+
+Commit `216b83ac0` freezes the first dependency-bearing utils export with its
+one private helper, retains the helper's hidden function visibility, and proves
+the public binding is pointer-identical through the proof-only exact parent.
+Neither body is invoked. The +145 proof/0 production change ends at 8,751;
+focused proof, 230 loading units, 24 invalidation tests, 31 BUILD-loading tests,
+dependent checks, rebuilt CLI and hygiene pass. Independent correction review
+returned `ACCEPT`.
+
+Seven dependency-bearing imports remain. The smallest closure without a loaded
+provider, accepted eager composite or bazel_skylib binding is exact
+`utils.bzl:788-816` public `crate_root_src` (29 lines, SHA-256
+`f5a21bb9e1f694a1baec8c238bb52f4eb70f7ec25014f6d0cf71b09e2670ee41`)
+plus `:818-833` private `_shortest_src_with_basename` (16 lines, SHA-256
+`7157302d387837bc1d83c2aae3caed49c2cd76a074d58d9d4b6fdc3d6f5f7bdc`).
+
+Run only `WP-4-7A-rules-rust-utils-crate-root-export-loading-proof` under
+0/130/130 caps in the existing proof owner. Freeze both slices in exact source
+order under the utils producer, retain the public/private visibility boundary,
+and prove the public export's pointer-identical proof-only parent import with
+actual `:utils.bzl` spelling. Invoke neither function. Results, diagnostics,
+configured behavior, the other six dependency-bearing exports, whole-utils
+freeze and parent body remain deferred.
+
+Clean `../zabel` `0795445f…` guides only recursive defining-module helper
+retention. No Zig code, representation, traversal/order algorithm, diagnostic,
+identity or behavior is copied; pinned Bazel 9.2 resolver tests and the
+authenticated rules_rust source remain sole exact authority.
+
 ### Exact utils leaf exports accepted; expand-dict export selected (2026-08-26)
 
 Commit `13ebf0a14` freezes all six remaining helper-free utils functions needed
