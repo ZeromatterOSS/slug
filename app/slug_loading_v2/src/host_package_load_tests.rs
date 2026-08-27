@@ -13660,6 +13660,144 @@ def _create_action_for_static_library(
             alwayslink = output_library.artifact_category == artifact_category.ALWAYSLINK_STATIC_LIBRARY,
         )
 "###;
+const RULES_CC_CREATE_LINKING_CONTEXT_SOURCE: &str = r###"# Copyright 2024 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# LINT.IfChange(forked_exports)
+"""
+The cc_common.create_linking_context_from_compilation_outputs function.
+
+Used to prepare a single library for linking. See also: cc_common.link
+"""
+
+load("//cc/private:cc_info.bzl", "create_linking_context", "merge_linking_contexts")
+load("//cc/private:cc_internal.bzl", _cc_internal = "cc_internal")
+load("//cc/private/link:cc_linking_helper.bzl", "create_cc_link_actions")
+load("//cc/private/link:create_linker_input.bzl", "create_linker_input")
+load("//cc/private/link:target_types.bzl", "LINKING_MODE", "LINK_TARGET_TYPE")
+
+# IMPORTANT: This function is public API exposed on cc_common module!
+def create_linking_context_from_compilation_outputs(
+        *,
+        actions,
+        name,
+        feature_configuration,
+        cc_toolchain,
+        language = "c++",  # buildifier: disable=unused-variable
+        disallow_static_libraries = False,
+        disallow_dynamic_library = False,
+        compilation_outputs,
+        linking_contexts = [],
+        user_link_flags = [],
+        alwayslink = False,
+        additional_inputs = [],
+        variables_extension = {},
+        # Private:
+        stamp = 0,
+        linked_dll_name_suffix = "",
+        test_only_target = False):
+    """
+    Links a single library.
+
+    Should be used for creating library rules that can propagate information downstream in
+    order to be linked later by a top level rule that does transitive linking to
+    create an executable or a dynamic library.
+
+    The function creates static libraries and "nodeps" dynamic library, using `name` to name them,
+    only linking the object files from `compilation_outputs`. Static libraries are produced in
+    nopic and/or pic version, depending on the configuration and if the toolchain supports pic.
+
+    Disable either static or dynamic library using `disallow_static_libraries` or
+    `disallow_dynamic_library`.
+
+    Callee may specify `user_link_flags`, `additional_inputs` to C++ linking action, and
+    custom `variables_extension`, which are passed to link command line.
+
+    The exception are Windows, where "nodeps" dynamic library links also all the transitive
+    libraries from `linking_context`.
+
+    TODO(b/338618120): during Starlarkification of rules several private parameters were introduced,
+    those parameters need to be eventually removed or made public.
+
+    Args:
+        actions: (Actions) `actions` object.
+        name: (str) This is used for naming the output artifacts of actions created by this method.
+        feature_configuration: (FeatureConfiguration) `feature_configuration` to be queried.
+        language: ("cpp") Only C++ supported for now. Do not use this parameter.
+        cc_toolchain: (CcToolchainInfo) CcToolchainInfo provider to be used.
+        disallow_static_libraries: (bool) Whether static libraries should be created.
+        disallow_dynamic_library: (bool) Whether a dynamic library should be created.
+        compilation_outputs: (CompilationOutputs) Compilation outputs containing object files to link.
+        linking_contexts: (list[LinkingContext]) Libraries from dependencies. These libraries will
+           be linked into the output artifact of the link() call, be it a binary or a library.
+        user_link_flags: (list[str]) Additional list of linker options.
+        alwayslink: (bool) Whether this library should always be linked.
+        additional_inputs: (list[File]|depset[File]) For additional inputs to the linking action,
+            e.g.: linking scripts.
+        variables_extension: (dict[str, str|list[str]|depset[str]]) Additional variables to pass to
+            the toolchain configuration when creating link command line.
+        stamp: (bool) undocumented.
+        linked_dll_name_suffix: (str) undocumented.
+        test_only_target: (bool) undocumented.
+
+    Returns:
+      (`CcLinkingContext`, `CcLinkingOutputs`) A pair.
+    """
+
+    # LINT.ThenChange(https://github.com/bazelbuild/bazel/blob/master/src/main/java/com/google/devtools/build/lib/starlarkbuildapi/cpp/CcModuleApi.java)
+    # TODO(b/202252560): Fix for swift_library's implicit output, remove rule_kind_cheat.
+    if alwayslink and _cc_internal.rule_class(_cc_internal.actions2ctx_cheat(actions)) != "swift_library":
+        static_link_type = LINK_TARGET_TYPE.ALWAYS_LINK_STATIC_LIBRARY
+    else:
+        static_link_type = LINK_TARGET_TYPE.STATIC_LIBRARY
+    if type(additional_inputs) == type([]):
+        additional_inputs = depset(additional_inputs)
+
+    cc_linking_outputs = create_cc_link_actions(
+        _cc_internal.wrap_link_actions(actions),
+        name,
+        None if disallow_static_libraries else static_link_type,
+        None if disallow_dynamic_library else LINK_TARGET_TYPE.NODEPS_DYNAMIC_LIBRARY,
+        LINKING_MODE.DYNAMIC,
+        feature_configuration,
+        cc_toolchain,
+        compilation_outputs,
+        linking_contexts,
+        user_link_flags,  # linkopts
+        stamp,
+        additional_inputs,  # additional_linker_inputs
+        [],  # linker_outputs
+        variables_extension,
+        alwayslink = alwayslink,
+        test_only_target = test_only_target,
+        linked_dll_name_suffix = linked_dll_name_suffix,
+    )
+
+    linker_input = create_linker_input(
+        # TODO(b/331164666): remove cheat, we always produce a file, file.owner gives us a label
+        owner = _cc_internal.actions2ctx_cheat(actions).label.same_package_label(name),
+        libraries = depset([cc_linking_outputs.library_to_link]) if cc_linking_outputs.library_to_link else None,
+        user_link_flags = user_link_flags,
+        additional_inputs = additional_inputs,
+    )
+    direct_linking_context = create_linking_context(
+        linker_inputs = depset([linker_input]),
+    )
+    linking_context = merge_linking_contexts(
+        linking_contexts = [direct_linking_context] + linking_contexts,
+    )
+    return linking_context, cc_linking_outputs
+"###;
 const RULES_CC_TOOLCHAIN_CONFIG_LIB_SOURCE: &str = r###"# Copyright 2018 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19484,6 +19622,147 @@ fn exact_rules_cc_linking_helper_freezes_complete_producer() {
     )
     .unwrap();
     assert_rules_cc_linking_helper_interfaces(&module, &children);
+}
+
+fn complete_rules_cc_create_linking_context_children()
+-> Vec<(&'static str, BzlModuleIdentity, FrozenModule)> {
+    let compile = complete_rules_cc_compile_children();
+    let helper_children = complete_rules_cc_linking_helper_children();
+    let helper = compile_child(
+        RULES_CC_LINKING_HELPER_SOURCE,
+        "@@rules_cc+//cc/private/link:cc_linking_helper.bzl",
+        "/rules_cc/cc/private/link/cc_linking_helper.bzl",
+        &[("bazel_skylib", "bazel_skylib+")],
+        &helper_children,
+    );
+    let linker_input_child = [(compile[5].0, compile[5].1.clone(), compile[5].2.dupe())];
+    let linker_input = compile_child(
+        RULES_CC_CREATE_LINKER_INPUT_SOURCE,
+        "@@rules_cc+//cc/private/link:create_linker_input.bzl",
+        "/rules_cc/cc/private/link/create_linker_input.bzl",
+        &[],
+        &linker_input_child,
+    );
+    let target_children = complete_rules_cc_target_type_children();
+    let targets = compile_child(
+        RULES_CC_TARGET_TYPES_SOURCE,
+        "@@rules_cc+//cc/private/link:target_types.bzl",
+        "/rules_cc/cc/private/link/target_types.bzl",
+        &[],
+        &target_children,
+    );
+    vec![
+        (compile[4].0, compile[4].1.clone(), compile[4].2.dupe()),
+        (compile[5].0, compile[5].1.clone(), compile[5].2.dupe()),
+        (
+            "//cc/private/link:cc_linking_helper.bzl",
+            helper.0,
+            helper.1,
+        ),
+        (
+            "//cc/private/link:create_linker_input.bzl",
+            linker_input.0,
+            linker_input.1,
+        ),
+        ("//cc/private/link:target_types.bzl", targets.0, targets.1),
+    ]
+}
+
+fn assert_rules_cc_create_linking_context_interfaces(
+    module: &FrozenModule,
+    children: &[(&'static str, BzlModuleIdentity, FrozenModule)],
+) {
+    let public = |name| module.get(name).unwrap();
+    let private = |name| module.get_any_visibility(name).unwrap().0;
+    for (name, child, export) in [
+        ("create_linking_context", 0, "create_linking_context"),
+        ("merge_linking_contexts", 0, "merge_linking_contexts"),
+        ("_cc_internal", 1, "cc_internal"),
+        ("create_cc_link_actions", 2, "create_cc_link_actions"),
+        ("create_linker_input", 3, "create_linker_input"),
+        ("LINKING_MODE", 4, "LINKING_MODE"),
+        ("LINK_TARGET_TYPE", 4, "LINK_TARGET_TYPE"),
+    ] {
+        let binding = if name.starts_with('_') {
+            private(name)
+        } else {
+            public(name)
+        };
+        assert!(
+            binding
+                .value()
+                .ptr_eq(children[child].2.get(export).unwrap().value()),
+            "{name}"
+        );
+    }
+    assert!(module.get("_cc_internal").is_err());
+    assert_eq!(
+        public("create_linking_context_from_compilation_outputs")
+            .value()
+            .get_type(),
+        "function"
+    );
+    let mut names = module.names().map(|name| name.as_str()).collect::<Vec<_>>();
+    names.sort_unstable();
+    let mut expected = "create_linking_context merge_linking_contexts create_cc_link_actions create_linker_input LINKING_MODE LINK_TARGET_TYPE create_linking_context_from_compilation_outputs".split_whitespace().collect::<Vec<_>>();
+    expected.sort_unstable();
+    assert_eq!(names, expected);
+    let mut all = module
+        .names_any_visibility()
+        .map(|name| name.as_str())
+        .collect::<Vec<_>>();
+    all.sort_unstable();
+    expected.push("_cc_internal");
+    expected.sort_unstable();
+    assert_eq!(all, expected);
+}
+
+#[test]
+fn exact_rules_cc_create_linking_context_freezes_complete_producer() {
+    assert_eq!(RULES_CC_CREATE_LINKING_CONTEXT_SOURCE.lines().count(), 137);
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_CC_CREATE_LINKING_CONTEXT_SOURCE.as_bytes())
+        ),
+        "664a461564abd348111d791aa03da0207fe158620d276b6da1936f8abb23be59"
+    );
+    let children = complete_rules_cc_create_linking_context_children();
+    for (child, label) in children.iter().zip([
+        "@@rules_cc+//cc/private:cc_info.bzl",
+        "@@rules_cc+//cc/private:cc_internal.bzl",
+        "@@rules_cc+//cc/private/link:cc_linking_helper.bzl",
+        "@@rules_cc+//cc/private/link:create_linker_input.bzl",
+        "@@rules_cc+//cc/private/link:target_types.bzl",
+    ]) {
+        assert_eq!(child.1.label, CanonicalLabel::parse(label).unwrap());
+    }
+    let skylib_mapping = Arc::from([(
+        ApparentRepoName::new("bazel_skylib").unwrap(),
+        CanonicalRepoName::new("bazel_skylib+").unwrap(),
+    )]);
+    for child in [&children[0], &children[2]] {
+        assert_eq!(child.1.repository_mapping, skylib_mapping);
+    }
+    for child in [&children[1], &children[3], &children[4]] {
+        assert!(child.1.repository_mapping.is_empty());
+    }
+    let module = eval_bzl_with_loaded_children(
+        RULES_CC_CREATE_LINKING_CONTEXT_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse(
+                "@@rules_cc+//cc/private/link:create_linking_context_from_compilation_outputs.bzl",
+            )
+            .unwrap(),
+            workspace_path: PathBuf::from(
+                "/rules_cc/cc/private/link/create_linking_context_from_compilation_outputs.bzl",
+            ),
+            repository_mapping: Arc::from([]),
+        },
+        &children,
+    )
+    .unwrap();
+    assert_rules_cc_create_linking_context_interfaces(&module, &children);
 }
 
 #[test]
