@@ -5247,6 +5247,30 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Exact utils crate-root export accepted; loaded frontier audit selected (2026-08-26)
+
+Commit `cdd2f68f7` freezes the second exact private-helper utils closure,
+retains the helper's hidden function visibility, and proves pointer-identical
+public import through the proof-only exact parent. Neither body is invoked. The
++107 proof/0 production change ends at 8,858; focused proof, 231 loading units,
+24 invalidation tests, 31 BUILD-loading tests, dependent checks, rebuilt CLI
+and hygiene pass. Independent review returned `ACCEPT`.
+
+The remaining six parent imports are `can_build_metadata`,
+`compute_crate_name`, `generate_output_diagnostics`, `transform_deps`,
+`transform_link_deps`, and `transform_sources`. Each now reaches loaded
+providers, accepted eager composites, bazel_skylib paths or the large crate-
+name helper closure. Run only
+`WP-4-7A-post-utils-private-helper-loaded-frontier-audit`: authenticate every
+local and loaded source dependency, distinguish already accepted bindings from
+missing ones, and select exactly one smallest coherent proof successor. Change
+only the three scheduling documents; do not add Rust, fixtures or oracle rows.
+
+Clean `../zabel` `0795445f…` guides only recursively reachable defining-module
+and loaded-binding retention. No Zig code, representation, traversal/order
+algorithm, diagnostic, identity or behavior is copied; pinned Bazel 9.2
+resolver tests and authenticated rules_rust source remain sole exact authority.
+
 ### Exact utils expand-dict export accepted; crate-root export selected (2026-08-26)
 
 Commit `216b83ac0` freezes the first dependency-bearing utils export with its

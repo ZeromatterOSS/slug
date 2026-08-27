@@ -1,138 +1,126 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-rust-utils-crate-root-export-loading-proof`
+Packet: `WP-4-7A-post-utils-private-helper-loaded-frontier-audit`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: freeze exact rules_rust `utils.bzl:788-816` plus `:818-833`,
-prove the public export retains its private helper and pointer-identical
-proof-only parent import, and invoke neither function.
+Result: authenticate the source-complete compile/freeze closures for all six
+remaining exact `rust.bzl` imports from `utils.bzl`, then select exactly one
+bounded proof successor. Implement no Rust or test proof.
 
 ## Accepted base and learned facts
 
-Base is `216b83ac0` (`Prove exact utils expand dict export`). It freezes the
-first dependency-bearing exact utils export with its private helper under
-producer `@@rules_rust+//rust/private:utils.bzl`, proves hidden helper
-visibility, and retains the public function pointer-identically through a
-proof-only `@@rules_rust+//rust/private:rust.bzl` parent using actual
-`:utils.bzl` spelling. Neither function body was invoked.
+Base is `cdd2f68f7` (`Prove exact utils crate root export`). Exact loading
+proofs now cover all seven helper-free parent imports plus the two bounded
+private-helper closures `expand_dict_value_locations` and `crate_root_src`.
+All remain uninvoked.
 
-The authenticated 1,032-line utils source remains SHA-256
-`8aa49b9312d4ae5c4aed033aba65392a039a681b3ee21ca83da0f05acac28ace`.
-Seven dependency-bearing parent imports remain. The smallest source-complete
-closure requiring no loaded provider, accepted eager composite or bazel_skylib
-path binding is:
+The authenticated rules_rust 0.73.0 sources remain:
 
-| Exact source | Binding | SHA-256 |
+- `rust/private/utils.bzl`: 1,032 lines, SHA-256
+  `8aa49b9312d4ae5c4aed033aba65392a039a681b3ee21ca83da0f05acac28ace`;
+- `rust/private/rust.bzl`: 1,821 lines, SHA-256
+  `a645bd5db6344bd3c0997dcf73600475c0af53fb4dd025890be24b8e1e2dbfd8`;
+- exact parent load `rust.bzl:40-57`: SHA-256
+  `1ad3406b7c58cc7d74e1e86991fdb6aeadbd836d32926fc54eee9583295ab500`.
+
+Six parent imports remain:
+
+| Export | Known local root | Known dependency class |
 |---|---|---|
-| lines 788-816 | `crate_root_src` | `f5a21bb9e1f694a1baec8c238bb52f4eb70f7ec25014f6d0cf71b09e2670ee41` |
-| lines 818-833 | `_shortest_src_with_basename` | `7157302d387837bc1d83c2aae3caed49c2cd76a074d58d9d4b6fdc3d6f5f7bdc` |
+| `can_build_metadata` | lines 742-765 | accepted `can_use_metadata_for_pipelining` plus loaded `AlwaysEnableMetadataOutputGroupsInfo` |
+| `compute_crate_name` | lines 410-445 | helpers at 374-408 and 573-740 plus accepted eager substitutions |
+| `generate_output_diagnostics` | lines 967-991 | loaded `RustcOutputDiagnosticsInfo` |
+| `transform_deps` | lines 536-554 | loaded `DepVariantInfo`, `CrateInfo`, `DepInfo`, `BuildInfo`, `CcInfo`, and `CrateGroupInfo` |
+| `transform_link_deps` | lines 556-571 | loaded `DepVariantInfo` and `CcInfo` |
+| `transform_sources` | lines 878-917 | loaded `paths` plus helper at 937-965 |
 
-These two exact slices total 45 source lines. The public function references
-only the private helper in addition to predeclared globals, field access and
-standard value operations. The private helper references only its parameters,
-predeclared `len`, field access and comparisons.
+This inventory is not yet a source-complete authentication of loaded provider
+declarations or the full crate-name helper/eager closure. Do not schedule an
+implementation from names alone.
 
-## Authorities and decision
+## Authorities and method
 
 Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, pinned
 `ResolverTest.testBindingScopeAndIndex_functionBlock` and
-`testBindingScopeAndIndex_loads`, and authenticated rules_rust source are sole
-exact authority. The packet proves function/global/load binding after freeze,
-not either function's result.
+`testBindingScopeAndIndex_loads`, and authenticated rules_rust/rules_cc/
+bazel_skylib sources are sole exact authority.
 
 Clean `../zabel` commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only recursively retaining
-a private defining-module helper reachable from an exported frozen function.
-Copy no Zig code, representation, owner pointer, traversal/order algorithm,
-diagnostic, identity or behavior.
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only how to audit
+recursively reachable defining-module and loaded bindings after evaluator
+closure. Copy no Zig code, representation, owner pointer, traversal/order
+algorithm, diagnostic, identity or behavior.
 
-Concatenate only the public slice followed by the private-helper slice in exact
-source order with a proof-only separator under the exact utils producer. Prove
-both bindings freeze as functions and only the public binding is exported. Use
-a clearly proof-only module under the exact parent producer with actual
-`:utils.bzl` spelling and import only `crate_root_src`. Invoke neither
-function.
+For each remaining export:
+
+1. authenticate the exact public-function slice;
+2. recursively enumerate every same-module helper, eager value and loaded
+   binding needed to compile and freeze it without invocation;
+3. authenticate every newly required source slice/file and producer identity;
+4. mark each dependency as already accepted, proof-only admissible, missing, or
+   too broad for a bounded packet;
+5. estimate the smallest honest proof and choose exactly one successor.
+
+Prefer a coherent family only when shared loaded bindings make it smaller and
+clearer than separate proofs. Do not treat loaded-provider names as arbitrary
+stubs when exact child declarations are required for the claimed closure.
 
 ## Compatibility
 
-- **Exact:** both source-slice bytes/hashes, child/parent producers, actual
-  relative load spelling, frozen private/public function types, private
-  visibility and helper reachability, and pointer-identical public import.
-- **Slug-native:** slice concatenation separator, proof-only parent consumer
-  and starlark-rust frozen function representation.
-- **Unsupported/deferred:** invoking either selected function; all results,
-  diagnostics and configured field behavior; the other six dependency-bearing
-  exports; exact complete parent load; whole-utils freeze; parent line 59
-  onward.
+- **Exact:** authenticated source bytes/hashes, producer/load identities,
+  dependency reachability facts, and the selected successor's Bazel binding
+  surface.
+- **Slug-native:** audit decomposition, packet sizing and proof-only
+  concatenation strategy.
+- **Unsupported/deferred:** all function invocation/results/diagnostics,
+  configured behavior, whole-utils/parent freeze, and every implementation not
+  explicitly selected by the successor packet.
 
-No production fallback, DICE key, request overlay, retained runtime memory,
-async work, fixture, hot path or Buck2-derived utility change is involved.
+## Allowlist and caps
 
-## Allowlist, proof and caps
+Only these files may change:
 
-Only this file may change:
+| File | Base SHA-256 | Base lines |
+|---|---|---:|
+| `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md` | `59d2a7c08ff439d08ccdb32d4c80910e0aa9ebbaab1f6a616dea0e716511b13d` | 4,153 |
+| `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md` | `d14c8af627fa3457f0750abcfe6a9f36184ec8129f2fa7288c1dcf2383db72a7` | 6,558 |
+| `thoughts/shared/plans/slug-v2-subplans/current-packet.md` | `4016198f307ab4de785040c6d985988369677c797561b40dbc8b851f6b0c8ef6` | 138 |
 
-| File | Base SHA-256 | Base lines | Final ceiling |
-|---|---|---:|---:|
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `9462dc063ed843169f5e0c403f809b347c87d1d036f5df21b9177d4c15f52cdc` | 8,751 | 8,881 |
+Caps are 0 production, 0 proof and 240 planning additions; deletions do not buy
+addition budget. The final canonical plan and manifest must name the same one
+successor packet.
 
-Caps are 0 production, 130 proof and 130 total additions; deletions do not buy
-addition budget. Keep the test function at or below 100 lines. Exact source
-constants are exempt from the function limit.
+Required deliverable:
 
-Required proof:
+- complete six-export closure table with exact line/file hashes and producer/
+  load edges;
+- accepted-versus-missing classification for every dependency;
+- one selected bounded successor with exact/Slug-native/deferred classes,
+  allowlist, base hashes/lines, production/proof/total caps, required validation
+  and STOP conditions;
+- explicit Bazel authority and Zabel guidance-only record.
 
-1. Embed both exact unabridged slices separately and verify both SHA-256s. Add
-   no other helper, loaded-provider stub or utils source.
-2. Concatenate only public then helper slice in exact source order with a
-   proof-only separator and freeze under exact producer
-   `@@rules_rust+//rust/private:utils.bzl`. Prove both named bindings have type
-   `function`, public lookup rejects the private helper, and public lookup
-   accepts `crate_root_src`; invoke neither.
-3. Evaluate one proof-only parent under exact producer
-   `@@rules_rust+//rust/private:rust.bzl`, using actual `:utils.bzl` spelling
-   and importing only `crate_root_src`. Prove frozen pointer identity against
-   the child export.
-4. Preserve the accepted eager values, seven helper-free exports, expand-dict
-   closure and every prior loading proof.
+No Rust, fixture, oracle capture, Cargo command or function invocation is
+authorized. Read-only hashing and source inspection are required.
 
-No new oracle fixture is needed. Authenticated source plus pinned resolver tests
-discriminate closure retention, visibility and frozen export identity.
-Invocation is deliberately skipped because source-selection behavior remains
-unsupported here.
+## Validation and STOP
 
-The large test file remains the cohesive exact external-Bzl fixture owner. The
-packet adds two bounded raw constants and one sub-100-line proof; splitting the
-owner or adding production orchestration would widen scope.
+- verify the pinned Bazel, rules_rust, rules_cc, bazel_skylib and Zabel sources
+  used by the audit are clean at their recorded commits/hashes;
+- `git diff --check`;
+- exact three-file scope and 240-line planning cap;
+- `scripts/v2_archive_status.sh` with only its three known archive-only misses;
+- independent review of the closure table and selected successor.
 
-## Serial validation and STOP
-
-Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
-`CARGO_BUILD_JOBS=1`:
-
-- focused crate-root export proof;
-- `cargo test -p slug_loading_v2 --lib --locked`;
-- `cargo test -p slug_loading_v2 --test bzl_invalidation --locked`;
-- `cargo test -p slug_loading_v2 --test build_file_loading --locked`;
-- `cargo check --locked -p slug_analysis_v2 -p slug_core_v2`;
-- `cargo build -p slug_cli_v2 --locked`;
-- `cargo fmt --all -- --check`, `git diff --check`, and
-  `scripts/v2_archive_status.sh` with only its three known archive-only misses.
-
-Independent terminal review must verify both slice hashes/lines, defining
-closure, producer and load identities, private visibility, public pointer
-identity, lazy nonexecution, caps, preserved proofs, Zabel guidance-only role
-and validation.
-
-STOP and `REPLAN` for production change; invocation; another helper/provider/
-path source; configured source-selection behavior; another export; full parent
-load/body; identity/registry/DICE work; Java/JVM work; copied Zabel content;
-dirty authority; or cap violation.
+STOP and `REPLAN` for dirty authority; missing source bytes; an unbounded or
+ambiguous dependency graph; more than one selected implementation successor;
+Rust/test/fixture/oracle changes; function invocation; Java/JVM work; copied
+Zabel content; or cap violation.
 
 ## Immediate predecessor
 
-`216b83ac0` accepted the first dependency-bearing exact utils export with 230
+`cdd2f68f7` accepted exact `crate_root_src` plus its private helper with 231
 unit, 24 invalidation and 31 BUILD-loading tests green. Independent review
-verified both source hashes, private visibility, producers, actual load
-spelling, public pointer identity and non-invocation.
+verified both hashes, source order, closure completeness, private visibility,
+public pointer identity and non-invocation.
