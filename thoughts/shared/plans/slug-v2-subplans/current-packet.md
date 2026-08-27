@@ -1,51 +1,54 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-rust-semver-complete-loading-proof`
+Packet: `WP-4-7A-rules-rust-incompatible-settings-complete-loading-proof`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: freeze the authenticated complete rules_rust `rust/private/semver.bzl`
-module and its sole public function without invocation.
+Result: freeze the authenticated complete rules_rust
+`rust/settings/incompatible.bzl` provider, rule and function declarations
+without invocation.
 
 ## Learned facts and decision
 
-Commit `a9610a724` admits the full advertised-provider declaration family and
-freezes all 302 authenticated `rust_allocator_libraries.bzl` lines over five
-complete real children. The next direct load of `rust/private/toolchain.bzl` is
-`rust/private/semver.bzl`.
+Commit `f7a3a3f10` freezes all 51 authenticated lines of dependency-free
+`rust/private/semver.bzl`. The next unresolved direct load of
+`rust/private/toolchain.bzl` is `rust/settings/incompatible.bzl`.
 
-Rules_rust 0.73.0 `rust/private/semver.bzl` is dependency-free, 51 lines, and
-has SHA-256
-`966fe4b90082dd92bac60398b2801824f41906eea71364b64f630f0c175250ab`.
-Its only top-level declaration is the public `semver` function. String
-partitioning, integer conversion, validation and result struct construction
-are all lazy and require no new loading builtin.
+Rules_rust 0.73.0 `rust/settings/incompatible.bzl` is dependency-free, 27
+lines, and has SHA-256
+`534d5103680dc47634b93ed160f639a88495707fe2c27b551defbb3c6765f040`.
+It eagerly declares documented two-field `IncompatibleFlagInfo`, one private
+implementation function, and `incompatible_flag`: a Boolean flag build-setting
+rule with one mandatory string attribute. Every eager constructor shape is
+already admitted.
 
-Run only `WP-4-7A-rules-rust-semver-complete-loading-proof`. Freeze the exact
-source at its canonical owner, prove the public function binding and exact
-one-public/one-all inventory, and invoke nothing. Do not implement or claim
-semantic-version parsing behavior and do not continue into the toolchain parent
-or following incompatible-settings child in this packet.
+Run only this packet. Freeze the exact source at its canonical owner and prove
+the provider identity/schema, private function visibility, rule class,
+build-setting descriptor, mandatory attribute and exact two-public/three-all
+inventories. Invoke nothing. Do not inspect build-setting values or continue
+into the toolchain parent.
 
 ## Generic architecture, authorities and compatibility
 
-This is generic BCR Starlark source loading and function freezing, not a Rust
-semantic-version parser. Pinned Bazel 9.2 commit
+This is generic BCR Starlark declaration loading, not incompatible-flag
+semantics implemented in Rust. Pinned Bazel 9.2 commit
 `8220c6198837d5c13d53fea211cf3282aa12408a` and authenticated rules_rust
 0.73.0 bytes are sole exact authority. Reuse accepted evidence; add no fixture
 or oracle.
 
 Clean `../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is
-architectural guidance only. Its generic evaluator/host split may guide module
-ownership, but no Zig code, representation, parser, algorithm, cache or semver
-behavior is copied and Zabel is not compatibility authority.
+architectural guidance only. Its declaration ownership may guide identity
+assertions, but no Zig code, representation, algorithm, cache, flag behavior or
+diagnostic is copied and Zabel is not compatibility authority.
 
-- **Exact:** complete 51-line source/hash; canonical owner/path/mapping; sole
-  public function binding; exact one-public/one-all inventory; complete freeze
+- **Exact:** complete 27-line source/hash; canonical owner/path/mapping;
+  provider owner/name/schema; private function binding; rule/build-setting/
+  attribute declarations; exact two-public/three-all inventory; complete freeze
   without invocation.
-- **Slug-native:** starlark-rust parse/evaluate/freeze and test representation.
-- **Unsupported/deferred:** every `semver` invocation, parse result, error,
-  comparison or configured toolchain consumer.
+- **Slug-native:** starlark-rust parse/evaluate/freeze and declaration/test
+  representations.
+- **Unsupported/deferred:** provider/rule/function invocation, flag value and
+  CLI/configuration behavior, configured providers and consumers.
 
 No retained semantic collection, evaluator borrow or invocation result is
 added. DICE, request/revision, filesystem, cache, async, memory-ledger and
@@ -57,33 +60,33 @@ fallback and no Buck2 utility change.
 Change only `app/slug_loading_v2/src/host_package_load_tests.rs`. Scheduling
 documents may change only after terminal acceptance.
 
-At base `a9610a724`, the Rust test authority is 32,794 lines, SHA-256
-`0cb11e4170e33e999bab8e1cf35728b1f11a7986c865cafa8ce87ccf3bc97168`.
-Its final ceiling is 32,944 lines. Each new proof/helper function must remain at
+At base `f7a3a3f10`, the Rust test authority is 32,877 lines, SHA-256
+`fb4c98afe3a30425de81d32df7b4e8770a3135fca8b5b9e485ab14d62055bd0b`.
+Its final ceiling is 33,027 lines. Each new proof/helper function must remain at
 most 120 physical lines. Add no production responsibility or generic archive.
 
 Caps are 0 production, 150 proof and 150 total additions; deletions do not buy
-budget. Embed/hash all 51 authenticated lines. Evaluate at
-`@@rules_rust+//rust/private:semver.bzl`, path
-`/rules_rust/rust/private/semver.bzl`, with empty mapping and no children.
-Prove the function type, public visibility and exact inventories. Invoke
-nothing.
+budget. Embed/hash all 27 authenticated lines. Evaluate at
+`@@rules_rust+//rust/settings:incompatible.bzl`, path
+`/rules_rust/rust/settings/incompatible.bzl`, with empty mapping and no
+children. Prove the eager declarations, visibility and exact inventories.
+Invoke nothing.
 
 Run the focused proof and its direct compile dependent. Because this follows a
-green full loading/integration/dependent checkpoint and changes only the same
-source-freeze test pattern, do not repeat broad suites unless focused evidence
-is suspect. Run formatting, diff, caps/function-size and archive hygiene, then
-root review of source authority, owner/inventory, no-invocation scope, generic
-architecture and Zabel's peer-guidance role.
+green full loading/integration/dependent checkpoint and another green
+proof-only source freeze, do not repeat broad suites unless focused evidence is
+suspect. Run formatting, diff, caps/function-size and archive hygiene, then
+root review of source authority, declarations/inventory, no-invocation scope,
+generic architecture and Zabel's peer-guidance role.
 
 STOP and `REPLAN` for production change, source/hash mismatch, unexpected
-dependency or eager evaluation, any function invocation, semantic-version
-behavior claim, evaluator-borrowed value, unpinned source, copied Zabel content,
-dirty authority, allowlist escape, or cap/function violation. Stop after this
-module and continue toolchain source order at
-`rust/settings/incompatible.bzl`.
+dependency/eager behavior, any provider/rule/function invocation, configured
+flag semantic claim, evaluator-borrowed value, unpinned source, copied Zabel
+content, dirty authority, allowlist escape, or cap/function violation. Stop
+after this module and re-audit the now-complete direct child set of
+`rust/private/toolchain.bzl`.
 
 ## Immediate predecessor
 
-Commit `a9610a724` accepts generic advertised-provider declaration retention
-and complete allocator-module loading without invoking allocator behavior.
+Commit `f7a3a3f10` accepts only complete semver module loading without invoking
+its parser function.
