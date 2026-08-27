@@ -5247,6 +5247,25 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Exact compute-crate-name accepted; public CcInfo route audit selected (2026-08-26)
+
+Commit `7d45bee02` adds 230 proof lines and verifies all five new crate-name
+slices plus three accepted eager slices in exact source order. It proves the
+one private and four public new bindings, accepted eager pointer retention and
+parent identity without invocation. All 235 loading-lib, 24 invalidation and 31
+BUILD-loading tests pass with analysis/core checks and the CLI build;
+independent review accepts the closure and caps.
+
+Only `transform_deps` and `transform_link_deps` remain. Both reach exact
+`CcInfo` through the 18-line public rules_cc module, generated 15-line
+compatibility proxy and 656-line private child. Accepted provider-initializer
+commits prove the declaration abstraction but not this complete loaded route.
+Run only `WP-4-7A-rules-cc-cc-info-public-route-frontier-audit`: authenticate
+the recursive route, determine whether accepted exact children make one bounded
+successor honest, and otherwise record `REPLAN`. No narrowed stub or code change
+is authorized. Clean `../zabel` `0795445f…` guides closure reachability and
+freeze ownership only; Bazel 9.2 and authenticated sources remain exact.
+
 ### Exact transform-sources export accepted; crate-name selected (2026-08-26)
 
 Commit `4d037e48d` adds 152 proof lines and verifies exact `transform_sources`,
