@@ -19105,3 +19105,44 @@ Slug-native. Rereview returned `ACCEPT`, and commit `ae26c9a60` freezes the
 design. Activate only
 `WP-4-5-7A-external-subtree-package-set-owner-implementation-r2` under the
 manifest's three-file 560/900 bounds.
+
+### External subtree owner accepted; canonical route prerequisite selected (2026-08-27)
+
+Commit `4fabef5e0` accepts the source-neutral loading-owned recursive package
+set for an authenticated external route. Its focused and dependent validation
+passes and independent terminal review returned `ACCEPT`.
+
+The planned shared registration expander cannot correctly use
+`RootRepositoryRouteKey`: that key starts from a root-apparent name and carries
+root admission state, while Bazel parses a selected module's registration
+patterns in the declaring module's canonical repository and complete mapping.
+A canonical repository can therefore be a valid pattern base without any
+root-visible apparent alias.
+
+Before expansion, move the already-accepted selected-before-generated
+canonical definition and any-context apparent mapping DICE ownership out of
+core and into loading, and design one workspace-plus-canonical-name route.
+Apparent spelling remains contextual parser/mapping/diagnostic state and must
+not enter canonical route identity. Existing root-apparent routes remain
+adapters until a separately bounded migration is justified; no duplicate
+canonical definition key is permitted.
+
+The route matrix is root, built-in `bazel_tools`, selected-registry, selected-
+nonregistry/direct-local and generated. Selected-nonregistry is a distinct
+admitted disposition: preserve its local source policy, immutable mapping,
+legacy/observed behavior and canonical A/B/A without inventing a root alias.
+
+After that prerequisite, one loading pipeline serves both toolchain and
+execution-platform registrations: contextual parse, subtree membership,
+package load and wildcard ambiguity resolution, then family-specific wildcard
+filtering and stable signed-pattern deduplication. Configured validation and
+activation remain later packets.
+
+This is generic Starlark loading and host-capability architecture. Bazel 9 BCR
+Starlark supplies the rules and control flow, including `cc_internal`;
+`cc_common` is one demanding host-ABI consumer. Plan builtins by reusable
+category—values, declarations, collections/depsets, labels/patterns,
+actions/artifacts, configuration/toolchains and repository/loading services—
+so rules_cc needs discriminate shared gaps instead of creating C++-specific
+Rust semantics. Pinned Bazel 9.2 remains behavior authority. Clean
+`../zabel` commit `0795445f…` remains peer design/optimization guidance only.

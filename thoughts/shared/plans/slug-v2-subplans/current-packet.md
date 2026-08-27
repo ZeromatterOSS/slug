@@ -1,192 +1,164 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-external-subtree-package-set-owner-implementation-r2`
+Packet: `WP-4-5-7A-loading-canonical-repository-route-owner-design`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `ae26c9a60`.
+Base: `4fabef5e0`.
 
-Result: implement the reviewed loading-owned recursive package-set producer for
-an already authenticated external repository route.
+Result: freeze a loading-owned canonical repository-definition and route
+boundary before registration target-pattern expansion. This is a docs-only
+architecture packet; it changes no production behavior.
 
-## Learned facts and source basis
+## Why this prerequisite exists
 
-Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-remains semantic authority. `PackageLookupFunction` distinguishes deleted
-current packages from repository-ignore matches. `ProcessPackageDirectory`
-obtains package existence and direct directory entries as sibling facts;
-`RecursivePkgFunction` aggregates child recursive values under a
-repository-scoped `RecursivePkgKey`. Ignore policy prunes a subtree, while
-`--deleted_packages` suppresses only the current package and leaves descendants
-eligible.
+Commit `4fabef5e0` accepts source-neutral recursive package discovery for an
+already authenticated external `RootRepositoryRoute`. The next registration
+step must expand each selected module's retained target-pattern text in that
+module's canonical repository and final apparent-to-canonical mapping.
 
-Slug now has both missing source-neutral bzlmod inputs: the accepted
-`HostRepositoryDirectoryListingKey` owns direct entries for direct-local,
-selected-registry, generated and built-in routes, and
-`HostExternalPackageBoundaryKey` owns invalid/deleted/ignored/package/no-package
-policy without exposing source paths. Loading's accepted
-`RootSubtreePackageSetKey` supplies the deterministic DFS, compact package-set
-and lifecycle precedent for the root repository, but it cannot be reused by
-projecting an external route to a filesystem root.
+`RootRepositoryRouteKey` cannot be the shared source-identity owner. It is
+keyed by a root-apparent spelling, carries that spelling in route equality and
+has root-query-specific admission modes. A selected module's own `//pkg:t`
+pattern has a canonical repository context but need not have any root-visible
+apparent alias. Requiring one would make registration semantics depend on the
+root module's presentation namespace.
 
-`docs/developers/dice.md` and Buck2 DICE ownership guidance require immutable
-complete values, dependencies computed by their natural owners, transient
-Needs, complete-only equality/validity, cancellation without partial
-publication and no lock across compute. The matching V1 extraction-ledger row
-retains package discovery in demand-driven DICE and query graphs request-
-locally; it explicitly excludes external-repository behavior from the older
-root packet.
+Slug already computes the needed selected-before-generated canonical
+repository definition and any-context apparent mapping, but their DICE keys
+are private to `slug_core_v2` in
+`runtime/generated_repository_definition.rs`. Core is an orchestration
+consumer and cannot be the reusable owner for loading and query. Adding a
+second implementation would create competing semantic keys and invalidation
+paths.
 
-Zabel's `load/session_recursive_package_discovery.zig` is concept/test guidance
-for one authenticated-source producer with sorted child names and thin
-consumers. Do not copy its session store, source identifiers, allocator,
-diagnostics, scheduler or compatibility claims. Bazel 9.2 remains behavior
-authority.
+Pinned Bazel 9.2 remains behavior authority. Its registration functions parse
+each declaration using the declaring module's canonical repository and full
+repository mapping, then expand through the common target-pattern machinery.
+Zabel is peer guidance for keeping parsing, contextual name resolution,
+package discovery and consumer filtering separate; it is not a source of
+behavior or compatibility claims.
 
-## Decision and non-decisions
+## Required ownership decision
 
-Add a loading-owned `ExternalSubtreePackageSetKey` and observed sibling. The
-semantic key is the complete authenticated `RootRepositoryRoute` plus one
-root-capable `PackagePath` prefix. The producer performs one deterministic
-repository-relative DFS. For each candidate it consumes only these bzlmod
-owners in natural order:
+Design one immutable canonical repository route value whose semantic identity
+contains:
 
-- `HostExternalPackageBoundaryKey`, which decides current-package membership
-  and whether ignore policy prunes descendants; and
-- `HostRepositoryDirectoryListingKey`, which supplies sorted direct entries
-  without exposing its source disposition or physical root.
+- workspace identity and canonical repository name;
+- root, built-in, selected-registry, selected-nonregistry/direct-local or
+  generated source disposition;
+- the complete selected definition or generated definition/effect plan needed
+  for source preparation; and
+- the repository's own immutable mapping context where applicable.
 
-The boundary is computed first. `IgnoredDirectory` records no package and
-terminates that candidate before any listing dependency; this mirrors Bazel's
-parent recursion filtering ignored children before `ProcessPackageDirectory`
-work. Every other successful boundary then computes the listing. The observed
-form merges epochs in boundary-then-listing order. Each dependency preserves
-outer failure before Need before its semantic terminal, and the boundary
-terminal precedes any listing terminal. A missing listing contributes no
-children. `DeletedPackage`, `InvalidPackageName` and `NoPackage` record no
-current package but retain directory traversal; `Package` records the package
-and retains traversal. A package terminal paired with a missing candidate
-directory is a typed fail-closed inconsistency.
+The canonical value must not contain an apparent repository spelling.
+Apparent names belong only to contextual mapping inputs, diagnostics and
+presentation adapters. The value shape should live with existing repository
+route data in `slug_bzlmod_v2`; the DICE producer and canonical-definition /
+any-context-mapping owners should live in `slug_loading_v2`.
 
-Directory-valued direct entries become children. A file entry is not a child.
-Any symlink entry fails closed with a typed repository-relative error until a
-route-owned followed-directory/cycle boundary is designed; Bazel 9.2 follows
-such entries unless its no-follow sentinel applies, so silently skipping them
-would produce an incomplete set. `Unknown` likewise fails closed rather than
-guessing. A non-Unicode directory name returns a typed redacted error carrying
-only its valid parent `PackagePath`, never lossy text or raw OS bytes.
+The loading key is exactly workspace plus `CanonicalRepoName`. It resolves
+root and built-in repositories directly, then selected-registry and selected-
+nonregistry/direct-local definitions before generated definitions. The
+nonregistry route retains its exact local source policy and immutable mapping
+without acquiring a root apparent alias. A generated route consumes the
+already accepted selected repository-file effect owner; root, built-in and
+both selected route families do not activate generated effects. Legacy and
+observed forms preserve the existing outer-error / Need / semantic-terminal
+order, exact observation merging, complete-only equality and validity, and
+A/B/A invalidation.
 
-Push admitted children in reverse lexical order for deterministic DFS, then
-lexically sort and deduplicate the final package names. That order is
-Slug-native: Bazel's stable-order nested set preserves deterministic traversal
-but does not promise a public lexical order. The result is one
-`Arc<[CompactString]>`, matching the accepted root producer. DFS stacks and
-temporary package vectors are compute scratch and never retained.
+`RootRepositoryRoute` remains an admitted adapter for existing root-apparent
+callers during this prerequisite. The design must state how it projects from
+or shares the canonical route without changing its accepted public equality,
+diagnostics or ordinary-versus-root-build admission. There must be exactly one
+canonical-definition DICE owner after extraction.
 
-This packet creates no second package policy, marker lookup, directory owner,
-source tree or query traversal. It does not load BUILD files, expand target
-patterns, resolve wildcard-name conflicts, filter registration families,
-activate registrations, evaluate rules, configure targets or create actions.
-Bazel 9 BCR Starlark remains the source of rules including `cc_internal`;
-`cc_common` is only a demanding consumer of the generic host-builtin ABI.
+## Builtin-category architecture
 
-## DICE, request and lifetime contract
+This work is general loading infrastructure, not a C++ parser or Rust rule
+implementation. Bazel 9 BCR Starlark supplies the rules and control flow,
+including `cc_internal`. `cc_common` is one demanding consumer of the generic
+Rust host-builtin ABI.
 
-The route remains intact in key equality/hash: workspace, apparent/canonical
-repository, module, source disposition, selected mapping or generated effect
-plan all participate structurally. The prefix is the only subtree selector.
-Never reconstruct or retain a materialization root, observation namespace or
-display-only repository identity.
+Future builtin work is planned by shared capability category rather than by
+individual ruleset: value constructors and immutable carriers; providers and
+rule/aspect declarations; depset and collection operations; labels and target
+patterns; actions/artifacts; configuration, fragments and toolchains; and
+repository/loading services. Category-level ABI, diagnostics, lifetime and
+invalidation contracts must be reusable by BCR rulesets. A rules_cc need may
+discriminate a missing generic capability, but must not create C++-specific
+parsing, evaluation or rule control flow in Rust.
 
-Legacy returns `SourcePreparationOutcome<Arc<Result<Value, Error>>>`. Observed
-adds the complete merged `PathObservationEpoch` and admits
-`ObservedPathFrontierError`. Both use complete-only equality and validity. No
-Need is cached as complete. DICE cancellation owns abandoned compute release,
-and equality cutoff owns reuse of successful immutable results. Overlapping
-requests share only immutable completed graph values and retain independent
-injected request revisions.
+## Registration sequence after this prerequisite
 
-The retained value owns one compact immutable slice. Each package string is
-stored once as `CompactString`; no `String`, `HashMap`, `HashSet`, interner,
-global cache, route/mapping copy or manual lock is added. The existing Buck2-
-derived `CompactString`, `Arc` slice, `Dupe` and `Allocative` patterns are
-sufficient, so no utility import or Stage 9 ledger update is needed. There is
-no command, service-cache, async-transfer or shutdown lifetime.
+Keep one shared pipeline for toolchain and execution-platform registrations:
 
-## Compatibility
+1. parse retained target-pattern text with the declaring canonical repository
+   and final apparent mapping;
+2. obtain root or external subtree package membership through loading-owned
+   producers;
+3. load packages and resolve package-wildcard ambiguity, where an explicit
+   same-name target wins; and
+4. apply the consumer family's wildcard filter, stable signed-pattern order
+   and deduplication before configured validation and activation.
 
-- **Exact:** no named command surface is activated. Within Unicode,
-  symlink-free admitted trees, package membership, marker priority inherited
-  from the boundary, ignore-versus-delete traversal and prefix containment
-  follow Bazel 9.2.
-- **Slug-native:** lexical package order, the Rust/DICE key, compact immutable
-  carrier, observation epoch, typed redacted error and source-neutral route
-  projection.
-- **Unsupported/deferred:** target-pattern expansion and wildcard conflicts,
-  followed-symlink external traversal/cycle policy, family filtering/dedupe,
-  registration activation, package loading from this producer, configured
-  validation, options, rules and actions. Non-Unicode and unknown-kind entries
-  are explicit fail-closed errors rather than admitted membership.
+Explicit targets bypass wildcard-only family filters, matching Bazel's
+registration behavior. Toolchain and execution-platform consumers share parse
+and expansion but retain distinct rule/provider filters. No part of this
+prerequisite activates that sequence.
 
-## Accepted design review
+## Retained-state and DICE constraints
 
-Independent DICE/ownership and retained-representation review returned
-`ACCEPT` after three corrections: ignored candidates terminate before listing;
-symlink, unknown-kind and non-Unicode entries fail closed with typed redacted
-errors; and lexical output order is Slug-native rather than an exact Bazel
-claim. Commit `ae26c9a60` freezes that decision.
+Follow `docs/developers/dice.md`: immutable complete values, natural-owner
+dependencies, transient Needs, no lock across compute, cancellation without
+partial publication and equality cutoff only on complete values. Reuse the
+existing Buck2-derived compact strings, immutable `Arc` slices/maps and
+structural hashing. Do not add an interner, global cache, second retained
+repository graph, route copy keyed by apparent name, or manual synchronization.
 
-## Active implementation scope
+The implementation design must identify which production definitions move
+from core to loading, how test support is split without preserving a private
+production owner in core, and how existing core adapters import the new owner
+without a dependency cycle. Movement should be mechanical where semantics are
+already accepted; new route projection should be separately bounded and
+proved.
 
-The implementation allowlist is:
+## Compatibility classification
 
-- `app/slug_loading_v2/src/external_subtree_package_set.rs` for the value,
-  error, legacy/observed keys and sole DFS producer;
-- `app/slug_loading_v2/src/external_subtree_package_set_tests.rs` for focused
-  semantic, DICE and lifecycle proof; and
-- `app/slug_loading_v2/src/lib.rs` for doc-hidden module wiring and exports.
+- **Exact:** no named command surface is activated. The extracted selected-
+  before-generated definition order, contextual mapping behavior, source
+  preparation and observation/error ordering remain as already accepted.
+- **Slug-native:** Rust/DICE key and value types, immutable carrier layout,
+  structural hash/equality and observation epochs.
+- **Unsupported/deferred:** registration pattern expansion, wildcard conflict
+  warnings, family filtering/deduplication, configured provider/settings
+  validation, activation, broader builtin categories, rules and actions.
 
-Caps are 560 production and 900 proof additions, with no dependency, fixture,
-oracle or bzlmod edit. A new loading module is required because the root module
-already combines root-specific multi-package-root and non-UTF-8 Host-path
-policy; adding route-owned external policy there would cross its cohesion
-boundary. The new module may mechanically reuse its compact carrier and
-reducer patterns, not its filesystem traversal.
+## Required design proof and stops
 
-Proof must cover root and nested prefixes; all four admitted route
-dispositions by composition through the two sole bzlmod dependencies; package,
-no-package, invalid, deleted and ignored terminals; ignored pruning versus
-deleted descendant retention; BUILD marker spelling invariance; missing,
-wrong-kind and inconsistent listings; lexical/deduplicated Slug-native output;
-typed/redacted symlink, unknown-kind and non-Unicode failures; boundary-
-before-listing activation, outer/Need/error precedence and proof that ignored
-candidates never request a listing; exact epoch merge and pointer sharing;
-complete-only equality/validity; route/source/prefix key A/B/A;
-create/delete/recreate, ignore/unignore and generated source/generation
-restoration; cancellation nonpublication; public error/debug redaction; and a
-structural sole-dependency guard.
+Inventory every production symbol in the current core owner and every caller
+before selecting an implementation allowlist. Prove one key for root,
+`bazel_tools`, selected-registry, selected-nonregistry/direct-local and
+generated canonical identities. For selected-nonregistry, prove source-policy
+and mapping retention, legacy/observed behavior and A/B/A explicitly. Also
+prove selected-before-generated and effect-activation order; exact legacy /
+observed precedence; complete-only equality/validity; canonical A/B/A
+independent of apparent aliases; contextual mapping A/B/A; and unchanged root-
+route adapter behavior. Require independent DICE/public-boundary review before
+selecting Rust implementation.
 
-Reuse accepted root-subtree, routed-listing and external-boundary evidence; add
-no new oracle because the producer activates no command surface. Run focused
-and full loading tests, direct bzlmod/loading checks, locked query/core checks
-and rebuilt locked CLI serially. Formatting, scope, cap, dependency, no-lock,
-archive-baseline and diff gates remain mandatory. Require independent terminal
-DICE/source-boundary review.
-
-STOP and `REPLAN` for following a symlink without a separately reviewed routed
-owner/cycle contract, a physical root/namespace, direct filesystem/catalog
-read, another policy or marker computation, route projection/copy, second
-retained tree, unsupported source disposition, new dependency, cap/allowlist
-expansion, command activation, traversal outside the authenticated route,
-global state or lock across compute.
+STOP and `REPLAN` for a core-owned expander, a root/query-only external slice,
+an apparent name in canonical route identity, duplicate canonical-definition
+keys, changed selected/generated order, direct filesystem access, target-
+pattern activation, rule-specific parsing/evaluation, a new dependency cycle,
+global state, or a lock across DICE compute.
 
 ## Immediate predecessor
 
-Commit `ee20d5c7c` accepts the branch-free public external package boundary at
-363 production and 408 proof additions. Its independent review confirms that
-existing four-disposition private-lookup coverage composes with the sole-
-dependency projection. Together with `0055c653b`, loading now has every
-source-neutral fact required to freeze this producer without widening BCR,
-Starlark builtin or rule semantics. Commit `ae26c9a60` freezes this corrected
-producer design after independent review returned `ACCEPT`.
+Commit `4fabef5e0` accepts `ExternalSubtreePackageSetKey` at 528 production and
+747 proof additions. Eleven focused tests plus full loading, bzlmod, query,
+core and rebuilt CLI validation pass; independent review returned `ACCEPT`.
+That producer closes recursive package membership for an authenticated route
+and exposes the canonical source-route ownership gap described here.
