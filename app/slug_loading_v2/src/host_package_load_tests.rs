@@ -5345,6 +5345,105 @@ CcSharedLibraryHintInfo = provider(
 )
 "###;
 
+const RULES_CC_LTO_COMPILATION_CONTEXT_SOURCE: &str = r###"# Copyright 2025 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+Holds information collected for .o bitcode files coming from a ThinLTO C(++) compilation.
+"""
+
+load("//cc/common:cc_helper_internal.bzl", _PRIVATE_STARLARKIFICATION_ALLOWLIST = "PRIVATE_STARLARKIFICATION_ALLOWLIST")
+load("//cc/private:cc_internal.bzl", _cc_internal = "cc_internal")
+
+LtoCompilationContextInfo = provider(
+    doc = """
+Holds information collected for .o bitcode files coming from a ThinLTO C(++) compilation.
+Specifically, maps each bitcode file to the corresponding minimized bitcode file
+that can be used for the LTO indexing step, as well as to compile flags applying to that
+compilation that should also be applied to the LTO backend compilation invocation.
+""",
+    fields = {
+        "lto_bitcode_inputs": "(dict[File, BitcodeInfo]) Maps each bitcode file to the corresponding minimized bitcode file and compile flags.",
+    },
+)
+
+BitcodeInfo = provider(
+    doc = """Holds information about a bitcode file produced by the compile action needed by
+             the LTO indexing and backend actions.""",
+    fields = {
+        "minimized_bitcode": "(File) The minimized bitcode file produced by the compile and used by LTO indexing.",
+        "copts": "(list[str]) The compiler flags used for the compile that should also be used when finishing compilation during the LTO backend.",
+    },
+)
+
+# IMPORTANT: This function is public API exposed on cc_common module!
+def create_lto_compilation_context(*, objects = {}):
+    """Creates an LtoCompilationContextInfo provider.
+
+    Args:
+        objects: (dict[File, tuple[File, list[str]]]) A map of full object to index object and copts.
+
+    Returns:
+        An LtoCompilationContextInfo provider.
+    """
+    _cc_internal.check_private_api(allowlist = _PRIVATE_STARLARKIFICATION_ALLOWLIST)
+    bitcode_infos = {}
+    for k, (minimized_bitcode, copts) in objects.items():
+        if type(minimized_bitcode) != "File" and minimized_bitcode != None:
+            fail("expected Artifact for minimized bitcode, got " + type(minimized_bitcode))
+        if type(copts) != "list":
+            fail("expected list for copts, got " + type(copts))
+        bitcode_infos[k] = BitcodeInfo(minimized_bitcode = minimized_bitcode, copts = copts)
+    if not bitcode_infos:
+        return EMPTY_LTO_COMPILATION_CONTEXT
+    return LtoCompilationContextInfo(lto_bitcode_inputs = _cc_internal.freeze(bitcode_infos))
+
+def merge_lto_compilation_contexts(*, lto_compilation_contexts):
+    """Merges a list of LtoCompilationContextInfo providers.
+
+    Args:
+        lto_compilation_contexts: (list[LtoCompilationContextInfo]) The LtoCompilationContextInfo providers to merge.
+
+    Returns:
+        An LtoCompilationContextInfo provider with the merged information.
+    """
+    if not lto_compilation_contexts:
+        return EMPTY_LTO_COMPILATION_CONTEXT
+    if len(lto_compilation_contexts) == 1:
+        return lto_compilation_contexts[0]
+    bitcode_infos = {}
+    for lto_compilation_context in lto_compilation_contexts:
+        bitcode_infos.update(lto_compilation_context.lto_bitcode_inputs)
+    return LtoCompilationContextInfo(lto_bitcode_inputs = _cc_internal.freeze(bitcode_infos))
+
+def get_minimized_bitcode_or_self(lto_compilation_context, full_bitcode):
+    """Gets the minimized bitcode corresponding to the full bitcode file, or returns full bitcode if it doesn't exist.
+
+    Args:
+        lto_compilation_context: (LtoCompilationContextInfo) The LtoCompilationContextInfo provider.
+        full_bitcode: (File) The full bitcode file.
+
+    Returns:
+        (File) The minimized bitcode file or the full bitcode file.
+    """
+    bitcode_info = lto_compilation_context.lto_bitcode_inputs.get(full_bitcode)
+    if bitcode_info == None or bitcode_info.minimized_bitcode == None:
+        return full_bitcode
+    return bitcode_info.minimized_bitcode
+
+EMPTY_LTO_COMPILATION_CONTEXT = LtoCompilationContextInfo(lto_bitcode_inputs = {})
+"###;
+
 const RULES_CC_OBJC_INFO_SOURCE: &str = r###"# Copyright 2024 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -7478,6 +7577,114 @@ fn exact_rules_cc_shared_library_hint_info_freezes_complete_producer() {
         "@@rules_cc+//cc/private:cc_shared_library_hint_info.bzl"
     );
     assert_eq!(provider.id().exported_name(), "CcSharedLibraryHintInfo");
+}
+
+#[test]
+fn exact_rules_cc_lto_compilation_context_freezes_complete_producer() {
+    assert_eq!(RULES_CC_LTO_COMPILATION_CONTEXT_SOURCE.lines().count(), 97);
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_CC_LTO_COMPILATION_CONTEXT_SOURCE.as_bytes())
+        ),
+        "a17435cd56fa165c71081e99f9af73407f7b4cc1dc086e53771dcf74df81b3f4"
+    );
+    let children = complete_rules_cc_cc_info_children();
+    let helper = &children[1];
+    let internal = &children[2];
+    let lto = eval_bzl_with_loaded_children(
+        RULES_CC_LTO_COMPILATION_CONTEXT_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse(
+                "@@rules_cc+//cc/private/compile:lto_compilation_context.bzl",
+            )
+            .unwrap(),
+            workspace_path: PathBuf::from(
+                "/rules_cc/cc/private/compile/lto_compilation_context.bzl",
+            ),
+            repository_mapping: Arc::from([]),
+        },
+        &[
+            (
+                "//cc/common:cc_helper_internal.bzl",
+                helper.1.clone(),
+                helper.2.dupe(),
+            ),
+            (
+                "//cc/private:cc_internal.bzl",
+                internal.1.clone(),
+                internal.2.dupe(),
+            ),
+        ],
+    )
+    .unwrap();
+    assert!(
+        lto.get_any_visibility("_PRIVATE_STARLARKIFICATION_ALLOWLIST")
+            .unwrap()
+            .0
+            .value()
+            .ptr_eq(
+                helper
+                    .2
+                    .get("PRIVATE_STARLARKIFICATION_ALLOWLIST")
+                    .unwrap()
+                    .value()
+            )
+    );
+    assert!(
+        lto.get_any_visibility("_cc_internal")
+            .unwrap()
+            .0
+            .value()
+            .ptr_eq(internal.2.get("cc_internal").unwrap().value())
+    );
+    assert!(lto.get("_PRIVATE_STARLARKIFICATION_ALLOWLIST").is_err());
+    assert!(lto.get("_cc_internal").is_err());
+    let providers = [
+        (
+            lto.get("LtoCompilationContextInfo").unwrap(),
+            "LtoCompilationContextInfo",
+        ),
+        (lto.get("BitcodeInfo").unwrap(), "BitcodeInfo"),
+    ];
+    for (provider, name) in providers {
+        assert_eq!(provider.value().get_type(), "provider_callable");
+        let provider = FrozenUserProviderCallable::from_value(provider.value()).unwrap();
+        assert_eq!(
+            provider.id().source_label(),
+            "@@rules_cc+//cc/private/compile:lto_compilation_context.bzl"
+        );
+        assert_eq!(provider.id().exported_name(), name);
+    }
+    assert!(
+        !lto.get("LtoCompilationContextInfo")
+            .unwrap()
+            .value()
+            .ptr_eq(lto.get("BitcodeInfo").unwrap().value())
+    );
+    for name in [
+        "create_lto_compilation_context",
+        "merge_lto_compilation_contexts",
+        "get_minimized_bitcode_or_self",
+    ] {
+        assert_eq!(lto.get(name).unwrap().value().get_type(), "function");
+    }
+    let empty = lto.get("EMPTY_LTO_COMPILATION_CONTEXT").unwrap();
+    assert_eq!(empty.value().get_type(), "provider");
+    let id = loading_provider_id(empty.value()).unwrap();
+    assert_eq!(
+        id.source_label(),
+        "@@rules_cc+//cc/private/compile:lto_compilation_context.bzl"
+    );
+    assert_eq!(id.exported_name(), "LtoCompilationContextInfo");
+    let scratch = Module::new();
+    let inputs = empty
+        .value()
+        .to_value()
+        .get_attr("lto_bitcode_inputs", scratch.heap())
+        .unwrap()
+        .unwrap();
+    assert_eq!(DictRef::from_value(inputs).unwrap().len(), 0);
 }
 
 #[test]
