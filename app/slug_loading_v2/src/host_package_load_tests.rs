@@ -9567,6 +9567,118 @@ def _maybe_declare_gcno_file(
         )
     return gcno_file
 "###;
+const RULES_CC_LINKSTAMP_COMPILE_SOURCE: &str = r###"# Copyright 2025 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+The cc_common.register_linkstamp_compile_action function.
+
+Used for C++ linkstamp compiling.
+"""
+
+load("//cc:action_names.bzl", "LINKSTAMP_COMPILE_ACTION_NAME")
+load(
+    "//cc/common:cc_helper_internal.bzl",
+    "should_stamp",
+)
+load("//cc/common:semantics.bzl", cc_semantics = "semantics")
+load("//cc/private:cc_info.bzl", "EMPTY_COMPILATION_CONTEXT")
+load("//cc/private:cc_internal.bzl", _cc_internal = "cc_internal")
+load(
+    "//cc/private/compile:compile_build_variables.bzl",
+    "get_linkstamp_compile_variables",
+)
+
+def register_linkstamp_compile_action(
+        *,
+        actions,
+        cc_toolchain,
+        feature_configuration,
+        source_file,
+        output_file,
+        compilation_inputs,
+        inputs_for_validation,
+        label_replacement,
+        output_replacement,
+        needs_pic = False,
+        stamping = None,
+        additional_linkstamp_defines = None):
+    """Registers a C++ compile action for linkstamps.
+
+    Args:
+        actions: `actions` object.
+        cc_toolchain: `CcToolchainInfo` provider to be used.
+        feature_configuration: `feature_configuration` to be queried.
+        source_file: The linkstamp source file to be compiled.
+        output_file: The output object file.
+        compilation_inputs: A depset of artifacts used for compilation.
+        inputs_for_validation: A depset of artifacts to be used as inputs for invalidation for the action.
+        label_replacement: String to replace ${LABEL} in linkstamp defines.
+        output_replacement: String to replace ${OUTPUT_PATH} in linkstamp defines.
+        needs_pic: Whether PIC compilation is needed.
+        stamping: Whether stamping is enabled. If None, it's computed based on configuration.
+        additional_linkstamp_defines: A list of additional defines for linkstamp compilation.
+    """
+    ctx = _cc_internal.actions2ctx_cheat(actions)
+
+    if stamping == None:
+        stamping = should_stamp(ctx)
+
+    output_group_info = cc_toolchain._build_info_files
+    if stamping:
+        build_info_files = output_group_info.non_redacted_build_info_files.to_list()
+    else:
+        build_info_files = output_group_info.redacted_build_info_files.to_list()
+
+    compile_build_variables = get_linkstamp_compile_variables(
+        source_file = source_file,
+        output_file = output_file,
+        label_replacement = label_replacement,
+        output_replacement = output_replacement,
+        additional_linkstamp_defines = additional_linkstamp_defines,
+        build_info_header_artifacts = build_info_files,
+        feature_configuration = feature_configuration,
+        cc_toolchain = cc_toolchain,
+        needs_pic = needs_pic,
+    )
+
+    if stamping:
+        # Makes the target depend on BUILD_INFO_KEY, which helps to discover stamped targets
+        # See b/326620485 for more details.
+        unused = ctx.version_file  # @unused
+
+    # TODO(b/447325425): Consider if inputs_for_validation could (and should?) be passed in via
+    # cc_compilation_context instead of via cache_key_inputs - a param that is used only here.
+    _cc_internal.create_cc_compile_action(
+        action_construction_context = ctx,
+        cc_compilation_context = EMPTY_COMPILATION_CONTEXT,
+        cc_toolchain = cc_toolchain,
+        configuration = ctx.configuration,
+        feature_configuration = feature_configuration,
+        source = source_file,
+        additional_compilation_inputs_set = compilation_inputs,
+        output_file = output_file,
+        use_pic = needs_pic,
+        compile_build_variables = compile_build_variables,
+        cache_key_inputs = inputs_for_validation,
+        build_info_header_files = build_info_files,
+        action_name = LINKSTAMP_COMPILE_ACTION_NAME,
+        should_scan_includes = False,
+        shareable = True,
+        needs_include_validation = cc_semantics.needs_include_validation(language = "c++"),
+        toolchain_type = cc_semantics.toolchain,
+    )
+"###;
 const RULES_CC_TOOLCHAIN_CONFIG_LIB_SOURCE: &str = r###"# Copyright 2018 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13786,6 +13898,117 @@ fn exact_rules_cc_compile_source_is_authenticated() {
         format!("{:x}", Sha256::digest(RULES_CC_COMPILE_SOURCE.as_bytes())),
         "bec506ffc3be08fffc4842b9daac498773534db9916121648a5527fac84cabea"
     );
+}
+
+#[test]
+fn exact_rules_cc_linkstamp_compile_freezes_complete_producer() {
+    assert_eq!(RULES_CC_LINKSTAMP_COMPILE_SOURCE.lines().count(), 111);
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_CC_LINKSTAMP_COMPILE_SOURCE.as_bytes())
+        ),
+        "6f5ceb39f1b6c26b65073867f3435ec01093775edf6129d2b9421bca4c7a70bb"
+    );
+    let all = complete_rules_cc_compile_children();
+    let children =
+        [1, 2, 3, 4, 5, 9].map(|index| (all[index].0, all[index].1.clone(), all[index].2.dupe()));
+    let labels = [
+        "@@rules_cc+//cc:action_names.bzl",
+        "@@rules_cc+//cc/common:cc_helper_internal.bzl",
+        "@@rules_cc+//cc/common:semantics.bzl",
+        "@@rules_cc+//cc/private:cc_info.bzl",
+        "@@rules_cc+//cc/private:cc_internal.bzl",
+        "@@rules_cc+//cc/private/compile:compile_build_variables.bzl",
+    ];
+    for (child, label) in children.iter().zip(labels) {
+        assert_eq!(child.1.label, CanonicalLabel::parse(label).unwrap());
+    }
+    assert!(children[0].1.repository_mapping.is_empty());
+    assert_eq!(
+        children[1].1.repository_mapping,
+        Arc::from([(
+            ApparentRepoName::new("bazel_skylib").unwrap(),
+            CanonicalRepoName::new("bazel_skylib+").unwrap()
+        )])
+    );
+    assert_eq!(
+        children[2].1.repository_mapping,
+        Arc::from([(
+            ApparentRepoName::new("platforms").unwrap(),
+            CanonicalRepoName::new("platforms+").unwrap()
+        )])
+    );
+    assert_eq!(
+        children[3].1.repository_mapping,
+        Arc::from([(
+            ApparentRepoName::new("bazel_skylib").unwrap(),
+            CanonicalRepoName::new("bazel_skylib+").unwrap()
+        )])
+    );
+    for child in [&children[4], &children[5]] {
+        assert!(child.1.repository_mapping.is_empty());
+    }
+    let module = eval_bzl_with_loaded_children(
+        RULES_CC_LINKSTAMP_COMPILE_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_cc+//cc/private/compile:linkstamp_compile.bzl")
+                .unwrap(),
+            workspace_path: PathBuf::from("/rules_cc/cc/private/compile/linkstamp_compile.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+        &children,
+    )
+    .unwrap();
+    let public = |name| module.get(name).unwrap();
+    let private = |name| module.get_any_visibility(name).unwrap().0;
+    for (name, child, export) in [
+        (
+            "LINKSTAMP_COMPILE_ACTION_NAME",
+            0,
+            "LINKSTAMP_COMPILE_ACTION_NAME",
+        ),
+        ("should_stamp", 1, "should_stamp"),
+        ("cc_semantics", 2, "semantics"),
+        ("EMPTY_COMPILATION_CONTEXT", 3, "EMPTY_COMPILATION_CONTEXT"),
+        ("_cc_internal", 4, "cc_internal"),
+        (
+            "get_linkstamp_compile_variables",
+            5,
+            "get_linkstamp_compile_variables",
+        ),
+    ] {
+        let value = if name.starts_with('_') {
+            private(name)
+        } else {
+            public(name)
+        };
+        assert!(
+            value
+                .value()
+                .ptr_eq(children[child].2.get(export).unwrap().value()),
+            "{name}"
+        );
+    }
+    assert_eq!(
+        public("register_linkstamp_compile_action")
+            .value()
+            .get_type(),
+        "function"
+    );
+    let mut names = module.names().map(|n| n.as_str()).collect::<Vec<_>>();
+    names.sort_unstable();
+    let mut expected="LINKSTAMP_COMPILE_ACTION_NAME should_stamp cc_semantics EMPTY_COMPILATION_CONTEXT get_linkstamp_compile_variables register_linkstamp_compile_action".split_whitespace().collect::<Vec<_>>();
+    expected.sort_unstable();
+    assert_eq!(names, expected);
+    let mut all_names = module
+        .names_any_visibility()
+        .map(|n| n.as_str())
+        .collect::<Vec<_>>();
+    all_names.sort_unstable();
+    expected.push("_cc_internal");
+    expected.sort_unstable();
+    assert_eq!(all_names, expected);
 }
 
 fn compile_owner(label: &str, path: &str, mapping: &[(&str, &str)]) -> BzlModuleIdentity {
