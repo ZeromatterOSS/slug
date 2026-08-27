@@ -7004,6 +7004,273 @@ def _compute_all_linkstamp_defines(
         for define in defines
     ]
 "###;
+const RULES_CC_COMPILE_ACTION_TEMPLATES_SOURCE: &str = r###"# Copyright 2025 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Tree artifact compilation actions"""
+
+load("@bazel_skylib//lib:paths.bzl", "paths")
+load(
+    "//cc/common:cc_helper_internal.bzl",
+    "CPP_SOURCE_TYPE_HEADER",
+    "CPP_SOURCE_TYPE_SOURCE",
+    artifact_category = "artifact_category_names",
+)
+load("//cc/common:semantics.bzl", cc_semantics = "semantics")
+load("//cc/private:cc_internal.bzl", _cc_internal = "cc_internal")
+load("//cc/private/compile:cc_compilation_helper.bzl", "dotd_files_enabled", "serialized_diagnostics_file_enabled")
+load("//cc/private/compile:compile_build_variables.bzl", "get_copts", "get_specific_compile_build_variables")
+
+# buildifier: disable=function-docstring
+def create_compile_action_templates(
+        *,
+        action_construction_context,
+        cc_compilation_context,
+        cc_toolchain,
+        configuration,
+        cpp_configuration,
+        feature_configuration,
+        language,
+        common_compile_build_variables,
+        source_dir,
+        source_type,
+        source_label,
+        label,
+        copts,
+        conlyopts,
+        cxxopts,
+        copts_filter,
+        generate_pic_action,
+        generate_no_pic_action,
+        additional_compilation_inputs,
+        additional_include_scanning_roots,
+        output_name,
+        outputs):
+    if source_type not in [CPP_SOURCE_TYPE_SOURCE, CPP_SOURCE_TYPE_HEADER]:
+        fail("Encountered invalid source types when creating CppCompileActionTemplates: " + source_type)
+    all_copts = get_copts(
+        language = language,
+        cpp_configuration = cpp_configuration,
+        source_file = source_dir,
+        conlyopts = conlyopts,
+        copts = copts,
+        cxxopts = cxxopts,
+        label = source_label,
+    )
+
+    # Currently we do not generate minimized bitcode files for tree artifacts because of issues
+    # with the indexing step.
+    # If lto_index_tree_artifact is set to a tree artifact, the minimized bitcode files will be
+    # properly generated and will be an input to the indexing step. However, the lto indexing step
+    # fails. The indexing step finds the full bitcode file by replacing the suffix of the
+    # minimized bitcode file, therefore they have to be in the same directory.
+    # Since the files are in the same directory, the command line artifact expander expands the
+    # tree artifact to both the minimized bitcode files and the full bitcode files, causing an
+    # error that functions are defined twice.
+    # TODO(b/289071777): support for minimized bitcode files.
+    lto_index_tree_artifact = None
+
+    if source_type == CPP_SOURCE_TYPE_HEADER:
+        _create_compile_action_template(
+            action_construction_context = action_construction_context,
+            cc_compilation_context = cc_compilation_context,
+            cc_toolchain = cc_toolchain,
+            configuration = configuration,
+            feature_configuration = feature_configuration,
+            copts_filter = copts_filter,
+            common_compile_build_variables = common_compile_build_variables,
+            source_dir = source_dir,
+            label = label,
+            all_copts = all_copts,
+            additional_compilation_inputs = additional_compilation_inputs,
+            additional_include_scanning_roots = additional_include_scanning_roots,
+            output_name = output_name,
+            outputs = outputs,
+            lto_output_enabled = False,
+            use_pic = generate_pic_action,
+            output_categories = [artifact_category.GENERATED_HEADER, artifact_category.PROCESSED_HEADER],
+            outputs_key = "header_tokens",
+            lto_index_tree_artifact = lto_index_tree_artifact,
+            language = language,
+        )
+    else:  # CPP_SOURCE_TYPE_SOURCE
+        lto_output_enabled = feature_configuration.is_enabled("thin_lto")
+        if generate_no_pic_action:
+            _create_compile_action_template(
+                action_construction_context = action_construction_context,
+                cc_compilation_context = cc_compilation_context,
+                cc_toolchain = cc_toolchain,
+                configuration = configuration,
+                feature_configuration = feature_configuration,
+                copts_filter = copts_filter,
+                common_compile_build_variables = common_compile_build_variables,
+                source_dir = source_dir,
+                label = label,
+                all_copts = all_copts,
+                additional_compilation_inputs = additional_compilation_inputs,
+                additional_include_scanning_roots = additional_include_scanning_roots,
+                output_name = output_name,
+                outputs = outputs,
+                lto_output_enabled = lto_output_enabled,
+                use_pic = False,
+                output_categories = [artifact_category.OBJECT_FILE],
+                outputs_key = "objects",
+                lto_index_tree_artifact = lto_index_tree_artifact,
+                language = language,
+            )
+        if generate_pic_action:
+            _create_compile_action_template(
+                action_construction_context = action_construction_context,
+                cc_compilation_context = cc_compilation_context,
+                cc_toolchain = cc_toolchain,
+                configuration = configuration,
+                feature_configuration = feature_configuration,
+                copts_filter = copts_filter,
+                common_compile_build_variables = common_compile_build_variables,
+                source_dir = source_dir,
+                label = label,
+                all_copts = all_copts,
+                additional_compilation_inputs = additional_compilation_inputs,
+                additional_include_scanning_roots = additional_include_scanning_roots,
+                output_name = output_name,
+                outputs = outputs,
+                lto_output_enabled = lto_output_enabled,
+                use_pic = True,
+                output_categories = [artifact_category.PIC_OBJECT_FILE],
+                outputs_key = "pic_objects",
+                lto_index_tree_artifact = lto_index_tree_artifact,
+                language = language,
+            )
+
+def _create_compile_action_template(
+        *,
+        action_construction_context,
+        cc_compilation_context,
+        cc_toolchain,
+        configuration,
+        feature_configuration,
+        copts_filter,
+        common_compile_build_variables,
+        source_dir,
+        label,
+        all_copts,
+        additional_compilation_inputs,
+        additional_include_scanning_roots,
+        output_name,
+        outputs,
+        lto_output_enabled,
+        use_pic,
+        output_categories,
+        outputs_key,
+        lto_index_tree_artifact,
+        language):
+    output_dir = _declare_compile_output_tree_artifact(
+        action_construction_context,
+        label,
+        output_name,
+        use_pic = use_pic,
+    )
+    specific_compile_build_variables = get_specific_compile_build_variables(
+        feature_configuration,
+        use_pic = use_pic,
+        source_file = source_dir,
+        output_file = output_dir,
+        cpp_module_map = cc_compilation_context._module_map,
+        direct_module_maps = cc_compilation_context._direct_module_maps,
+        user_compile_flags = all_copts,
+    )
+    dotd_tree_artifact = _maybe_declare_dotd_tree_artifact(
+        action_construction_context,
+        feature_configuration,
+        language,
+        label,
+        output_name,
+        use_pic = use_pic,
+    )
+    diagnostics_tree_artifact = _maybe_declare_diagnostics_tree_artifact(
+        action_construction_context,
+        feature_configuration,
+        label,
+        output_name,
+        use_pic = use_pic,
+    )
+    if lto_output_enabled:
+        outputs["lto_compilation_context"][output_dir] = (lto_index_tree_artifact, all_copts)
+    _cc_internal.create_cc_compile_action_template(
+        action_construction_context = action_construction_context,
+        cc_compilation_context = cc_compilation_context,
+        cc_toolchain = cc_toolchain,
+        configuration = configuration,
+        feature_configuration = feature_configuration,
+        copts_filter = copts_filter,
+        compile_build_variables = _cc_internal.combine_cc_toolchain_variables(
+            common_compile_build_variables,
+            specific_compile_build_variables,
+        ),
+        source = source_dir,
+        additional_compilation_inputs = additional_compilation_inputs,
+        additional_include_scanning_roots = additional_include_scanning_roots,
+        use_pic = use_pic,
+        output_categories = output_categories,
+        output_files = output_dir,
+        dotd_tree_artifact = dotd_tree_artifact,
+        diagnostics_tree_artifact = diagnostics_tree_artifact,
+        lto_indexing_tree_artifact = lto_index_tree_artifact,
+        needs_include_validation = cc_semantics.needs_include_validation(language),
+        toolchain_type = cc_semantics.toolchain,
+    )
+    outputs[outputs_key].append(output_dir)
+
+def _declare_compile_output_tree_artifact(
+        ctx,
+        label,
+        output_name,
+        use_pic):
+    return ctx.actions.declare_directory(paths.join(
+        "_pic_objs" if use_pic else "_objs",
+        label.name,
+        output_name,
+    ))
+
+def _maybe_declare_dotd_tree_artifact(
+        ctx,
+        feature_configuration,
+        language,
+        label,
+        output_name,
+        use_pic):
+    if not dotd_files_enabled(language, ctx.fragments.cpp, feature_configuration):
+        return None
+    return ctx.actions.declare_directory(paths.join(
+        "_pic_dotd" if use_pic else "_dotd",
+        label.name,
+        output_name,
+    ))
+
+def _maybe_declare_diagnostics_tree_artifact(
+        ctx,
+        feature_configuration,
+        label,
+        output_name,
+        use_pic):
+    if not serialized_diagnostics_file_enabled(feature_configuration):
+        return None
+    return ctx.actions.declare_directory(paths.join(
+        "_pic_dia" if use_pic else "_dia",
+        label.name,
+        output_name,
+    ))
+"###;
 const RULES_CC_TOOLCHAIN_CONFIG_LIB_SOURCE: &str = r###"# Copyright 2018 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -10999,6 +11266,221 @@ fn exact_rules_cc_compile_build_variables_freezes_complete_recursive_producer() 
     )
     .unwrap();
     assert_compile_build_variables_interfaces(&variables, &children);
+}
+
+fn complete_rules_cc_compile_action_template_children()
+-> Vec<(&'static str, BzlModuleIdentity, FrozenModule)> {
+    let helper_children = complete_rules_cc_compilation_helper_children();
+    let compilation_helper = eval_bzl_with_loaded_children(
+        RULES_CC_COMPILATION_HELPER_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse(
+                "@@rules_cc+//cc/private/compile:cc_compilation_helper.bzl",
+            )
+            .unwrap(),
+            workspace_path: PathBuf::from("/rules_cc/cc/private/compile/cc_compilation_helper.bzl"),
+            repository_mapping: Arc::from([(
+                ApparentRepoName::new("bazel_skylib").unwrap(),
+                CanonicalRepoName::new("bazel_skylib+").unwrap(),
+            )]),
+        },
+        &helper_children,
+    )
+    .unwrap();
+    let variables_children = complete_rules_cc_compile_build_variables_children();
+    let variables = eval_bzl_with_loaded_children(
+        RULES_CC_COMPILE_BUILD_VARIABLES_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse(
+                "@@rules_cc+//cc/private/compile:compile_build_variables.bzl",
+            )
+            .unwrap(),
+            workspace_path: PathBuf::from(
+                "/rules_cc/cc/private/compile/compile_build_variables.bzl",
+            ),
+            repository_mapping: Arc::from([]),
+        },
+        &variables_children,
+    )
+    .unwrap();
+    vec![
+        (
+            "@bazel_skylib//lib:paths.bzl",
+            helper_children[0].1.clone(),
+            helper_children[0].2.dupe(),
+        ),
+        (
+            "//cc/common:cc_helper_internal.bzl",
+            helper_children[1].1.clone(),
+            helper_children[1].2.dupe(),
+        ),
+        (
+            "//cc/common:semantics.bzl",
+            helper_children[2].1.clone(),
+            helper_children[2].2.dupe(),
+        ),
+        (
+            "//cc/private:cc_internal.bzl",
+            helper_children[4].1.clone(),
+            helper_children[4].2.dupe(),
+        ),
+        (
+            "//cc/private/compile:cc_compilation_helper.bzl",
+            BzlModuleIdentity {
+                label: CanonicalLabel::parse(
+                    "@@rules_cc+//cc/private/compile:cc_compilation_helper.bzl",
+                )
+                .unwrap(),
+                workspace_path: PathBuf::from(
+                    "/rules_cc/cc/private/compile/cc_compilation_helper.bzl",
+                ),
+                repository_mapping: Arc::from([(
+                    ApparentRepoName::new("bazel_skylib").unwrap(),
+                    CanonicalRepoName::new("bazel_skylib+").unwrap(),
+                )]),
+            },
+            compilation_helper,
+        ),
+        (
+            "//cc/private/compile:compile_build_variables.bzl",
+            BzlModuleIdentity {
+                label: CanonicalLabel::parse(
+                    "@@rules_cc+//cc/private/compile:compile_build_variables.bzl",
+                )
+                .unwrap(),
+                workspace_path: PathBuf::from(
+                    "/rules_cc/cc/private/compile/compile_build_variables.bzl",
+                ),
+                repository_mapping: Arc::from([]),
+            },
+            variables,
+        ),
+    ]
+}
+
+fn assert_compile_action_template_interfaces(
+    templates: &FrozenModule,
+    children: &[(&'static str, BzlModuleIdentity, FrozenModule)],
+) {
+    let public = |name| templates.get(name).unwrap();
+    let private = |name| templates.get_any_visibility(name).unwrap().0;
+    for (name, child, export) in [
+        ("paths", 0, "paths"),
+        ("CPP_SOURCE_TYPE_HEADER", 1, "CPP_SOURCE_TYPE_HEADER"),
+        ("CPP_SOURCE_TYPE_SOURCE", 1, "CPP_SOURCE_TYPE_SOURCE"),
+        ("artifact_category", 1, "artifact_category_names"),
+        ("cc_semantics", 2, "semantics"),
+        ("_cc_internal", 3, "cc_internal"),
+        ("dotd_files_enabled", 4, "dotd_files_enabled"),
+        (
+            "serialized_diagnostics_file_enabled",
+            4,
+            "serialized_diagnostics_file_enabled",
+        ),
+        ("get_copts", 5, "get_copts"),
+        (
+            "get_specific_compile_build_variables",
+            5,
+            "get_specific_compile_build_variables",
+        ),
+    ] {
+        let value = if name.starts_with('_') {
+            private(name)
+        } else {
+            public(name)
+        };
+        assert!(
+            value
+                .value()
+                .ptr_eq(children[child].2.get(export).unwrap().value()),
+            "{name}"
+        );
+    }
+    let private_functions = "_create_compile_action_template _declare_compile_output_tree_artifact _maybe_declare_dotd_tree_artifact _maybe_declare_diagnostics_tree_artifact";
+    for name in private_functions.split_whitespace() {
+        assert_eq!(private(name).value().get_type(), "function", "{name}");
+        assert!(templates.get(name).is_err(), "{name}");
+    }
+    assert_eq!(
+        public("create_compile_action_templates").value().get_type(),
+        "function"
+    );
+    let mut names = templates
+        .names()
+        .map(|name| name.as_str())
+        .collect::<Vec<_>>();
+    names.sort_unstable();
+    let mut expected = "paths CPP_SOURCE_TYPE_HEADER CPP_SOURCE_TYPE_SOURCE artifact_category cc_semantics dotd_files_enabled serialized_diagnostics_file_enabled get_copts get_specific_compile_build_variables create_compile_action_templates".split_whitespace().collect::<Vec<_>>();
+    expected.sort_unstable();
+    assert_eq!(names, expected);
+    let mut all = templates
+        .names_any_visibility()
+        .map(|name| name.as_str())
+        .collect::<Vec<_>>();
+    all.sort_unstable();
+    expected.extend(private_functions.split_whitespace());
+    expected.push("_cc_internal");
+    expected.sort_unstable();
+    assert_eq!(all, expected);
+}
+
+#[test]
+fn exact_rules_cc_compile_action_templates_freezes_complete_recursive_producer() {
+    assert_eq!(
+        RULES_CC_COMPILE_ACTION_TEMPLATES_SOURCE.lines().count(),
+        266
+    );
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_CC_COMPILE_ACTION_TEMPLATES_SOURCE.as_bytes())
+        ),
+        "10a43c512a85458f45a0223a7ddc7c1b56f8072872b765b1744d336ff91ec794"
+    );
+    let children = complete_rules_cc_compile_action_template_children();
+    let labels = [
+        "@@bazel_skylib+//lib:paths.bzl",
+        "@@rules_cc+//cc/common:cc_helper_internal.bzl",
+        "@@rules_cc+//cc/common:semantics.bzl",
+        "@@rules_cc+//cc/private:cc_internal.bzl",
+        "@@rules_cc+//cc/private/compile:cc_compilation_helper.bzl",
+        "@@rules_cc+//cc/private/compile:compile_build_variables.bzl",
+    ];
+    for (child, label) in children.iter().zip(labels) {
+        assert_eq!(child.1.label, CanonicalLabel::parse(label).unwrap());
+    }
+    let mapping = Arc::from([(
+        ApparentRepoName::new("bazel_skylib").unwrap(),
+        CanonicalRepoName::new("bazel_skylib+").unwrap(),
+    )]);
+    assert!(children[0].1.repository_mapping.is_empty());
+    assert_eq!(children[1].1.repository_mapping, mapping);
+    assert_eq!(
+        children[2].1.repository_mapping,
+        Arc::from([(
+            ApparentRepoName::new("platforms").unwrap(),
+            CanonicalRepoName::new("platforms+").unwrap()
+        )])
+    );
+    assert!(children[3].1.repository_mapping.is_empty());
+    assert_eq!(children[4].1.repository_mapping, mapping);
+    assert!(children[5].1.repository_mapping.is_empty());
+    let templates = eval_bzl_with_loaded_children(
+        RULES_CC_COMPILE_ACTION_TEMPLATES_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse(
+                "@@rules_cc+//cc/private/compile:compile_action_templates.bzl",
+            )
+            .unwrap(),
+            workspace_path: PathBuf::from(
+                "/rules_cc/cc/private/compile/compile_action_templates.bzl",
+            ),
+            repository_mapping: mapping,
+        },
+        &children,
+    )
+    .unwrap();
+    assert_compile_action_template_interfaces(&templates, &children);
 }
 
 fn assert_semantics_private_functions(module: &FrozenModule) {
