@@ -19475,3 +19475,35 @@ drop-before-publication and recovery proof through the canonical policy/package
 chain. Stage B alone may design Root/Canonical source-address results and
 Starlark source-name adaptation. Never infer a workspace, execroot or absolute
 filesystem path for embedded catalog content.
+
+### Canonical source/policy Stage A accepted; Stage B address design (2026-08-27)
+
+Commit `fa896aca4` accepts corrected R3. One compact
+`HostRepositorySourceRoute` now owns Root/Canonical Bzlmod path/listing, REPO,
+ignore, package lookup/boundary and selected BUILD source. All root behavior
+and dependency order remain exact, canonical selected-registry policy is
+alias-free, all four temporary wrappers are deleted, and canonical built-ins
+stop at their authenticated catalog-relative address. The focused 10/13,
+complete serial Bzlmod 577 plus integration suites, full loading/query,
+downstream core, locked CLI, formatting, caps, archive baseline and independent
+terminal review pass. Default-parallel Bzlmod still exposes one unrelated
+pre-existing selected-graph activation-order assertion that passes alone and
+in the complete serial suite.
+
+The Stage B audit found four remaining root-route owners:
+`ExternalSubtreePackageSetKey`, `RepositoryPackageLoadKey`,
+`ExternalBzlModuleEvalKey` and `ExternalBzlCycleIdentity`. Activate only
+`WP-4-5-7A-canonical-loading-source-address-design`. Retain the Stage A carrier
+as the sole semantic route; freeze a Host-vs-built-in catalog source-address
+discriminant, pure canonical-label Starlark source-name presentation, async
+canonical child-route resolution and route/effect-before-source observation
+order. Root constructors stay exact and query/core production stays
+read-only.
+
+Zabel's `source_access.zig`, `session_build_file_source.zig`,
+`session_selected_materialized_package_source.zig` and
+`session_bzl_module_source_computation.zig` are useful peer guidance: semantic
+source identity is separate from readable access, producer-owned bytes are
+retained rather than copied, and parsed syntax belongs to evaluation scratch.
+Bazel 9.2 remains behavioral authority. Bazel BCR Starlark owns rules including
+`cc_internal`; `cc_common` is only a generic host-ABI consumer.
