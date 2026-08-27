@@ -7308,3 +7308,19 @@ are accepted. Run only
 0/800/800, prove its complete fourteen-import/six-function inventory and invoke
 nothing. Zabel remains peer ownership guidance; Bazel 9.2 and authenticated
 rules_cc bytes own compatibility.
+
+### Complete link finalizer accepted; C++ link action selected (2026-08-27)
+
+Commit `aa797d082` freezes all 469 authenticated finalizer lines over eight
+actual complete children. It proves all fourteen imported identities, six
+function types/visibility and exact thirteen-public/twenty-all inventories
+without invocation. All required suites pass at 0 production and 678 proof
+additions; independent review returned `ACCEPT`.
+
+The first direct consumer is `link/cpp_link_action.bzl`, 273 lines, SHA-256
+`0cbe9d6b0ce0f6bea5abe1d9783b79435f495ba93bdaf402ad9539513a82223f`.
+All eight children are accepted. Run only
+`WP-4-7A-rules-cc-cpp-link-action-complete-loading-proof` under 0/600/600,
+prove its complete eleven-import/two-function inventory and invoke nothing.
+Zabel remains peer ownership guidance; Bazel 9.2 and authenticated rules_cc
+bytes own compatibility.
