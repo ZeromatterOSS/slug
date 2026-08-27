@@ -3898,6 +3898,66 @@ const PROVIDERS_RUSTC_OUTPUT_DIAGNOSTICS_SOURCE: &str = r###"RustcOutputDiagnost
 )
 "###;
 
+const RULES_CC_SHARED_LIBRARY_INFO_SOURCE: &str = r###"# Copyright 2025 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""CcSharedLibraryInfo"""
+
+CcSharedLibraryInfo = provider(
+    "Information about a cc shared library.",
+    fields = {
+        "dynamic_deps": "All shared libraries depended on transitively",
+        "exports": "cc_libraries that are linked statically and exported",
+        "link_once_static_libs": "All libraries linked statically into this library that should " +
+                                 "only be linked once, e.g. because they have static " +
+                                 "initializers. If we try to link them more than once, " +
+                                 "we will throw an error",
+        "linker_input": "the resulting linker input artifact for the shared library",
+    },
+)
+"###;
+const RULES_CC_DEBUG_PACKAGE_INFO_SOURCE: &str = r###"# Copyright 2025 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""A provider for the binary file and its associated .dwp files, if fission is enabled."""
+
+DebugPackageInfo = provider(
+    doc = ("A provider for the binary file and its associated .dwp files, if fission is " +
+           "enabled. If Fission (https://gcc.gnu.org/wiki/DebugFission) is not enabled, the " +
+           "dwp file will be null."),
+    fields = {
+        "target_label": "The label for the *_binary target",
+        "stripped_file": "The stripped file (the explicit '.stripped' target).",
+        "unstripped_file": "The unstripped file (the default executable target).",
+        "dwp_file": "The .dwp file (for fission builds) or null if --fission=no.",
+    },
+)
+"###;
+const CC_PROXY_DIRECT_PROVIDER_LOADS: &str = r###"load("@rules_cc//cc/private:cc_shared_library_info.bzl", _CcSharedLibraryInfo = "CcSharedLibraryInfo")
+load("@rules_cc//cc/private:debug_package_info.bzl", _DebugPackageInfo = "DebugPackageInfo")
+"###;
+const CC_PROXY_DEBUG_PACKAGE_EXPORT: &str = "DebugPackageInfo = _DebugPackageInfo\n";
+const CC_PROXY_SHARED_LIBRARY_EXPORT: &str = "CcSharedLibraryInfo = _CcSharedLibraryInfo\n";
 const UTILS_CAN_BUILD_METADATA_SOURCE: &str = r###"def can_build_metadata(toolchain, ctx, crate_type, *, disable_pipelining = False):
     """Can we build metadata for the target built using this context?
 
@@ -5253,6 +5313,104 @@ fn exact_bazel_skylib_paths_child_freezes_exported_function_bindings() {
             ("starts_with".to_owned(), "function"),
         ]
     );
+}
+
+#[test]
+fn exact_rules_cc_proxy_direct_provider_children_retain_reexport_identity() {
+    let hash = |source: &str| format!("{:x}", Sha256::digest(source.as_bytes()));
+    for (source, expected) in [
+        RULES_CC_SHARED_LIBRARY_INFO_SOURCE,
+        RULES_CC_DEBUG_PACKAGE_INFO_SOURCE,
+        CC_PROXY_DIRECT_PROVIDER_LOADS,
+        CC_PROXY_DEBUG_PACKAGE_EXPORT,
+        CC_PROXY_SHARED_LIBRARY_EXPORT,
+    ]
+    .into_iter()
+    .zip([
+        "5b7dcd1f20611891bbe14d77c81fb47bf564f982e238d0ed2bc78d316efdb2f1",
+        "b22666c62cafcb12b3e1cc01d5d3ecfcd48f530cf5b915fbdcfea4abcf8d19f8",
+        "1706f8413c5fff47df27ed55dab5c6d4b6a6d8afaf6abe8d3831ecaa5ac27007",
+        "f7d16f06aec82de1f61b38a05fbea7e0818d388bb382460011b0624bd44718ac",
+        "18858e0f3e25b8ca1ff522ae5e4518124901635e09218f6353afc0e0772a52d7",
+    ]) {
+        assert_eq!(hash(source), expected);
+    }
+    let declaration =
+        |source: &str| -> String { source.splitn(16, '\n').last().unwrap().to_owned() };
+    let declaration_hashes = [
+        hash(&declaration(RULES_CC_SHARED_LIBRARY_INFO_SOURCE)),
+        hash(&declaration(RULES_CC_DEBUG_PACKAGE_INFO_SOURCE)),
+    ];
+    assert_eq!(
+        declaration_hashes,
+        [
+            "74a2eea6f19b2ed262b2b6537b8aab209c27c52aefa6b895c2a87e1cb6a9840f",
+            "bcab9fad2a29981dba4e635e9fdb8aa41143c9a43fc9c667f69b41a40a19123a",
+        ]
+    );
+    let owner = |name: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(&format!("@@rules_cc+//cc/private:{name}.bzl")).unwrap(),
+        workspace_path: PathBuf::from(format!("/rules_cc/cc/private/{name}.bzl")),
+        repository_mapping: Arc::from([]),
+    };
+    let shared_owner = owner("cc_shared_library_info");
+    let debug_owner = owner("debug_package_info");
+    let shared =
+        eval_bzl_with_identity(RULES_CC_SHARED_LIBRARY_INFO_SOURCE, shared_owner.clone()).unwrap();
+    let debug =
+        eval_bzl_with_identity(RULES_CC_DEBUG_PACKAGE_INFO_SOURCE, debug_owner.clone()).unwrap();
+    let shared_binding = shared.get("CcSharedLibraryInfo").unwrap();
+    let debug_binding = debug.get("DebugPackageInfo").unwrap();
+    assert_eq!(shared_binding.value().get_type(), "provider_callable");
+    assert_eq!(debug_binding.value().get_type(), "provider_callable");
+    let proxy_source = [
+        CC_PROXY_DIRECT_PROVIDER_LOADS,
+        CC_PROXY_DEBUG_PACKAGE_EXPORT,
+        CC_PROXY_SHARED_LIBRARY_EXPORT,
+    ]
+    .join("\n");
+    let proxy = eval_bzl_with_loaded_children(
+        &proxy_source,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse(
+                "@@rules_cc++compatibility_proxy+cc_compatibility_proxy//:symbols.bzl",
+            )
+            .unwrap(),
+            workspace_path: PathBuf::from("/rules_cc_compatibility_proxy/symbols.bzl"),
+            repository_mapping: Arc::from([(
+                ApparentRepoName::new("rules_cc").unwrap(),
+                CanonicalRepoName::new("rules_cc+").unwrap(),
+            )]),
+        },
+        &[
+            (
+                "@rules_cc//cc/private:cc_shared_library_info.bzl",
+                shared_owner,
+                shared.dupe(),
+            ),
+            (
+                "@rules_cc//cc/private:debug_package_info.bzl",
+                debug_owner,
+                debug.dupe(),
+            ),
+        ],
+    )
+    .unwrap();
+    for (name, child) in [
+        ("CcSharedLibraryInfo", shared_binding.value()),
+        ("DebugPackageInfo", debug_binding.value()),
+    ] {
+        assert!(proxy.get(name).unwrap().value().ptr_eq(child));
+    }
+    for omitted in [
+        "cc_common",
+        "CcInfo",
+        "CcToolchainConfigInfo",
+        "ObjcInfo",
+        "new_objc_provider",
+    ] {
+        assert!(proxy.get(omitted).is_err(), "{omitted}");
+    }
 }
 
 #[test]
