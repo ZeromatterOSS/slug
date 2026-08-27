@@ -38,8 +38,13 @@ use slug_identity_v2::PackagePath;
 use slug_identity_v2::TargetName;
 use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathDirectoryListing;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::ObservedResolvedPath;
+use slug_workspace_v2::PathDirectoryListing;
+use slug_workspace_v2::PathDirectoryListingError;
+use slug_workspace_v2::PathDirectoryListingKey;
+use slug_workspace_v2::PathDirectoryListingObservationKey;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
@@ -84,6 +89,7 @@ use crate::RootModuleBootstrapRequest;
 use crate::RootModuleOverride;
 use crate::RootRepositoryRoute;
 use crate::apply_unified_patch;
+use crate::builtin_repository::BuiltinBazelToolsDirectoryListingKey;
 use crate::builtin_repository::BuiltinBazelToolsModuleError;
 use crate::builtin_repository::BuiltinBazelToolsModuleKey;
 use crate::host_package::ExternalRepositoryPackageLookup;
@@ -1443,6 +1449,120 @@ impl HostRepositoryPathValue {
 pub(crate) struct ObservedHostRepositoryPath {
     pub(crate) result: Arc<Result<HostRepositoryPathValue, RepositorySourceFileError>>,
     pub(crate) observations: PathObservationEpoch,
+}
+
+#[doc(hidden)]
+pub type HostRepositoryDirectoryListing = PathDirectoryListing;
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct HostRepositoryDirectoryListingError {
+    directory: Arc<PackagePath>,
+    kind: HostRepositoryDirectoryListingErrorKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+enum HostRepositoryDirectoryListingErrorKind {
+    Builtin,
+    BuiltinCompute,
+    Materialization,
+    MaterializationCompute,
+    InvalidMaterializedPath,
+    Observation {
+        operation: PathObservationOperation,
+    },
+    InconsistentState {
+        operation: PathObservationOperation,
+        before: Option<PathLstat>,
+        after: Option<PathLstat>,
+    },
+    WrongKind {
+        expected: PathNodeKind,
+        actual: PathNodeKind,
+    },
+    Cycle,
+    InfiniteExpansion,
+    ListingCompute,
+}
+
+impl HostRepositoryDirectoryListingError {
+    fn new(directory: Arc<PackagePath>, kind: HostRepositoryDirectoryListingErrorKind) -> Self {
+        Self { directory, kind }
+    }
+}
+
+impl fmt::Display for HostRepositoryDirectoryListingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
+}
+
+impl std::error::Error for HostRepositoryDirectoryListingError {}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostRepositoryDirectoryListingKey {
+    route: RootRepositoryRoute,
+    directory: PackagePath,
+}
+
+impl HostRepositoryDirectoryListingKey {
+    pub fn new(route: RootRepositoryRoute, directory: PackagePath) -> Self {
+        Self { route, directory }
+    }
+}
+
+impl Hash for HostRepositoryDirectoryListingKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.route.hash(state);
+        self.directory.hash(state);
+    }
+}
+
+impl fmt::Display for HostRepositoryDirectoryListingKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-repository-directory-listing:{}://{}",
+            self.route.canonical_repo(),
+            self.directory
+        )
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostRepositoryDirectoryListingObservationKey(HostRepositoryDirectoryListingKey);
+
+impl HostRepositoryDirectoryListingObservationKey {
+    pub fn new(route: RootRepositoryRoute, directory: PackagePath) -> Self {
+        Self(HostRepositoryDirectoryListingKey::new(route, directory))
+    }
+}
+
+impl fmt::Display for HostRepositoryDirectoryListingObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedHostRepositoryDirectoryListing {
+    result: Arc<Result<HostRepositoryDirectoryListing, HostRepositoryDirectoryListingError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostRepositoryDirectoryListing {
+    pub fn result(
+        &self,
+    ) -> &Arc<Result<HostRepositoryDirectoryListing, HostRepositoryDirectoryListingError>> {
+        &self.result
+    }
+
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -5812,6 +5932,219 @@ async fn drive_host_repository_path(
     }
 }
 
+type HostRepositoryDirectoryListingProjection = (
+    Result<HostRepositoryDirectoryListing, HostRepositoryDirectoryListingError>,
+    PathObservationEpoch,
+);
+type HostRepositoryDirectoryListingDriverOutcome = SourcePreparationOutcome<
+    Result<HostRepositoryDirectoryListingProjection, ObservedPathFrontierError>,
+>;
+
+fn host_repository_directory_listing_complete(
+    result: Result<HostRepositoryDirectoryListing, HostRepositoryDirectoryListingError>,
+    observations: PathObservationEpoch,
+) -> HostRepositoryDirectoryListingDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((result, observations)))
+}
+
+fn project_directory_listing_error(
+    directory: Arc<PackagePath>,
+    error: PathDirectoryListingError,
+) -> HostRepositoryDirectoryListingError {
+    match error {
+        PathDirectoryListingError::Observation { operation, .. } => {
+            HostRepositoryDirectoryListingError::new(
+                directory,
+                HostRepositoryDirectoryListingErrorKind::Observation { operation },
+            )
+        }
+        PathDirectoryListingError::InconsistentState {
+            operation,
+            before,
+            after,
+            ..
+        } => HostRepositoryDirectoryListingError::new(
+            directory,
+            HostRepositoryDirectoryListingErrorKind::InconsistentState {
+                operation,
+                before,
+                after,
+            },
+        ),
+        PathDirectoryListingError::WrongKind {
+            expected, actual, ..
+        } => HostRepositoryDirectoryListingError::new(
+            directory,
+            HostRepositoryDirectoryListingErrorKind::WrongKind { expected, actual },
+        ),
+        PathDirectoryListingError::Cycle { .. } => HostRepositoryDirectoryListingError::new(
+            directory,
+            HostRepositoryDirectoryListingErrorKind::Cycle,
+        ),
+        PathDirectoryListingError::InfiniteExpansion { .. } => {
+            HostRepositoryDirectoryListingError::new(
+                directory,
+                HostRepositoryDirectoryListingErrorKind::InfiniteExpansion,
+            )
+        }
+    }
+}
+
+fn finish_observed_host_repository_directory_listing(
+    child: PathOutcome<Result<ObservedPathDirectoryListing, ObservedPathFrontierError>>,
+    directory: Arc<PackagePath>,
+) -> HostRepositoryDirectoryListingDriverOutcome {
+    match child {
+        PathOutcome::Need(need) => SourcePreparationOutcome::path_need(need),
+        PathOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(Err(error)),
+        PathOutcome::Complete(Ok(observed)) => host_repository_directory_listing_complete(
+            observed
+                .result()
+                .clone()
+                .map_err(|error| project_directory_listing_error(directory, error)),
+            observed.observations().dupe(),
+        ),
+    }
+}
+
+async fn drive_host_repository_directory_listing(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostRepositoryDirectoryListingKey,
+    mode: HostRepositoryObservationMode,
+) -> HostRepositoryDirectoryListingDriverOutcome {
+    let directory = Arc::new(key.directory.clone());
+    let disposition = match host_repository_materialization_request(&key.route.source_capability())
+    {
+        Ok(disposition) => disposition,
+        Err(_) => {
+            return host_repository_directory_listing_complete(
+                Err(HostRepositoryDirectoryListingError::new(
+                    directory.dupe(),
+                    HostRepositoryDirectoryListingErrorKind::Materialization,
+                )),
+                PathObservationEpoch::empty(),
+            );
+        }
+    };
+    let HostRepositoryMaterializationDisposition::Request(request) = disposition else {
+        let HostRepositoryMaterializationDisposition::Builtin(identity) = disposition else {
+            unreachable!()
+        };
+        return match ctx
+            .compute(&BuiltinBazelToolsDirectoryListingKey::new(
+                identity.snapshot(),
+                key.directory.clone(),
+            ))
+            .await
+        {
+            Ok(value) => host_repository_directory_listing_complete(
+                value.as_ref().clone().map_err(|_| {
+                    HostRepositoryDirectoryListingError::new(
+                        directory.dupe(),
+                        HostRepositoryDirectoryListingErrorKind::Builtin,
+                    )
+                }),
+                PathObservationEpoch::empty(),
+            ),
+            Err(_) => host_repository_directory_listing_complete(
+                Err(HostRepositoryDirectoryListingError::new(
+                    directory.dupe(),
+                    HostRepositoryDirectoryListingErrorKind::BuiltinCompute,
+                )),
+                PathObservationEpoch::empty(),
+            ),
+        };
+    };
+    let materialization = match ctx
+        .compute(&RepositoryMaterializationResultKey { request })
+        .await
+    {
+        Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+        Ok(SourcePreparationOutcome::Complete(value)) => value,
+        Err(_) => {
+            return host_repository_directory_listing_complete(
+                Err(HostRepositoryDirectoryListingError::new(
+                    directory.dupe(),
+                    HostRepositoryDirectoryListingErrorKind::MaterializationCompute,
+                )),
+                PathObservationEpoch::empty(),
+            );
+        }
+    };
+    let materialization = match materialization.as_ref() {
+        Ok(materialization) => materialization,
+        Err(_) => {
+            return host_repository_directory_listing_complete(
+                Err(HostRepositoryDirectoryListingError::new(
+                    directory.dupe(),
+                    HostRepositoryDirectoryListingErrorKind::Materialization,
+                )),
+                PathObservationEpoch::empty(),
+            );
+        }
+    };
+    let (namespace, root) = match materialization {
+        RepositoryMaterialization::Local { source_root, .. } => {
+            (PathObservationNamespace::Host, source_root)
+        }
+        RepositoryMaterialization::Immutable {
+            generation_root,
+            observation_instance,
+            ..
+        } => (
+            PathObservationNamespace::Materialization(*observation_instance),
+            generation_root,
+        ),
+    };
+    let requested_path = match NormalizedAbsolutePath::new(root.join(key.directory.as_str())) {
+        Ok(path) => path,
+        Err(_) => {
+            return host_repository_directory_listing_complete(
+                Err(HostRepositoryDirectoryListingError::new(
+                    directory.dupe(),
+                    HostRepositoryDirectoryListingErrorKind::InvalidMaterializedPath,
+                )),
+                PathObservationEpoch::empty(),
+            );
+        }
+    };
+    match mode {
+        HostRepositoryObservationMode::Legacy => match ctx
+            .compute(&PathDirectoryListingKey::new(namespace, requested_path))
+            .await
+        {
+            Ok(PathOutcome::Need(need)) => SourcePreparationOutcome::path_need(need),
+            Ok(PathOutcome::Complete(result)) => host_repository_directory_listing_complete(
+                result.map_err(|error| project_directory_listing_error(directory.dupe(), error)),
+                PathObservationEpoch::empty(),
+            ),
+            Err(_) => host_repository_directory_listing_complete(
+                Err(HostRepositoryDirectoryListingError::new(
+                    directory.dupe(),
+                    HostRepositoryDirectoryListingErrorKind::ListingCompute,
+                )),
+                PathObservationEpoch::empty(),
+            ),
+        },
+        HostRepositoryObservationMode::Observed => match ctx
+            .compute(&PathDirectoryListingObservationKey::new(
+                namespace,
+                requested_path,
+            ))
+            .await
+        {
+            Ok(child) => finish_observed_host_repository_directory_listing(child, directory.dupe()),
+            Err(_) => host_repository_directory_listing_complete(
+                Err(HostRepositoryDirectoryListingError::new(
+                    directory.dupe(),
+                    HostRepositoryDirectoryListingErrorKind::ListingCompute,
+                )),
+                PathObservationEpoch::empty(),
+            ),
+        },
+    }
+}
+
 async fn observed_repository_source_file_from_materialization(
     ctx: &mut DiceComputations<'_>,
     materialization: SourcePreparationOutcome<
@@ -6362,6 +6695,83 @@ async fn drive_repository_source_file(
                 observations,
             )
         }
+    }
+}
+
+#[async_trait]
+impl Key for HostRepositoryDirectoryListingKey {
+    type Value = SourcePreparationResult<
+        HostRepositoryDirectoryListing,
+        HostRepositoryDirectoryListingError,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match drive_host_repository_directory_listing(
+            ctx,
+            self,
+            HostRepositoryObservationMode::Legacy,
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, _))) => {
+                SourcePreparationOutcome::Complete(result)
+            }
+            SourcePreparationOutcome::Complete(Err(_)) => unreachable!(
+                "legacy Host repository directory listing cannot produce an observed outer error"
+            ),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+
+    fn provide<'a>(&'a self, demand: &mut Demand<'a>) {
+        demand.provide_value_with(|| RepositorySourceScope {
+            workspace: self.route.workspace().dupe(),
+            module_name: CompactString::new(self.route.module_name()),
+        });
+    }
+}
+
+#[async_trait]
+impl Key for HostRepositoryDirectoryListingObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedHostRepositoryDirectoryListing, ObservedPathFrontierError>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_host_repository_directory_listing(
+            ctx,
+            &self.0,
+            HostRepositoryObservationMode::Observed,
+        )
+        .await
+        .map(|outcome| {
+            outcome.map(
+                |(result, observations)| ObservedHostRepositoryDirectoryListing {
+                    result: Arc::new(result),
+                    observations,
+                },
+            )
+        })
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+
+    fn provide<'a>(&'a self, demand: &mut Demand<'a>) {
+        self.0.provide(demand);
     }
 }
 

@@ -7,6 +7,7 @@
  * at your option, one of the above-listed licenses.
  */
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
@@ -19,6 +20,12 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_identity_v2::PackagePath;
+use slug_workspace_v2::PathDirectoryEntries;
+use slug_workspace_v2::PathDirectoryEntry;
+use slug_workspace_v2::PathDirectoryEntryKind;
+use slug_workspace_v2::PathDirectoryListing;
+use slug_workspace_v2::PathDirectoryName;
 
 use crate::EvaluatedNonrootModule;
 use crate::LogicalModuleFileId;
@@ -158,6 +165,7 @@ fn valid_relative_path(path: &str) -> bool {
 
 #[derive(Debug, Clone, Copy, Dupe, PartialEq, Eq, Allocative)]
 pub enum BuiltinBazelToolsSourceKind {
+    File,
     Directory,
 }
 
@@ -320,6 +328,134 @@ impl Key for BuiltinBazelToolsSourceFileKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum BuiltinBazelToolsDirectoryListingError {
+    Source(BuiltinBazelToolsSourceFileError),
+    ConflictingEntryKinds { path: CompactString },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct BuiltinBazelToolsDirectoryListingKey {
+    snapshot: BuiltinBazelToolsSnapshot,
+    directory: PackagePath,
+}
+
+impl BuiltinBazelToolsDirectoryListingKey {
+    pub(crate) fn new(snapshot: BuiltinBazelToolsSnapshot, directory: PackagePath) -> Self {
+        Self {
+            snapshot,
+            directory,
+        }
+    }
+}
+
+impl fmt::Display for BuiltinBazelToolsDirectoryListingKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "builtin-bazel-tools-directory-listing:{}",
+            self.directory
+        )
+    }
+}
+
+fn builtin_directory_listing(
+    directory: &PackagePath,
+) -> Result<PathDirectoryListing, BuiltinBazelToolsDirectoryListingError> {
+    for entry in CATALOG {
+        validated_file(
+            CompactString::new(entry.path),
+            entry.bytes,
+            entry.expected_sha256,
+            entry.executable,
+        )
+        .map_err(BuiltinBazelToolsDirectoryListingError::Source)?;
+    }
+
+    let directory = directory.as_str();
+    if CATALOG.iter().any(|entry| entry.path == directory) {
+        return Err(BuiltinBazelToolsDirectoryListingError::Source(
+            BuiltinBazelToolsSourceFileError::WrongKind {
+                path: CompactString::new(directory),
+                actual: BuiltinBazelToolsSourceKind::File,
+            },
+        ));
+    }
+    let prefix = if directory.is_empty() {
+        String::new()
+    } else {
+        format!("{directory}/")
+    };
+    let mut children = BTreeMap::<&str, PathDirectoryEntryKind>::new();
+    for entry in CATALOG {
+        let Some(remainder) = entry.path.strip_prefix(&prefix) else {
+            continue;
+        };
+        let (name, kind) = match remainder.split_once('/') {
+            Some((name, _)) => (name, PathDirectoryEntryKind::Directory),
+            None => (remainder, PathDirectoryEntryKind::File),
+        };
+        match children.get(name) {
+            Some(existing) if *existing != kind => {
+                return Err(
+                    BuiltinBazelToolsDirectoryListingError::ConflictingEntryKinds {
+                        path: CompactString::new(if directory.is_empty() {
+                            name.to_owned()
+                        } else {
+                            format!("{directory}/{name}")
+                        }),
+                    },
+                );
+            }
+            Some(_) => {}
+            None => {
+                children.insert(name, kind);
+            }
+        }
+    }
+    if children.is_empty() {
+        return Ok(PathDirectoryListing::Missing);
+    }
+    let entries = children
+        .into_iter()
+        .map(|(name, kind)| {
+            PathDirectoryEntry::new(
+                PathDirectoryName::new(name)
+                    .expect("pinned built-in catalog names are single path components"),
+                kind,
+            )
+        })
+        .collect::<Vec<_>>();
+    Ok(PathDirectoryListing::Present(PathDirectoryEntries::new(
+        entries,
+    )))
+}
+
+#[async_trait]
+impl Key for BuiltinBazelToolsDirectoryListingKey {
+    type Value = Arc<Result<PathDirectoryListing, BuiltinBazelToolsDirectoryListingError>>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match self.snapshot {
+            BuiltinBazelToolsSnapshot::Bazel9_2 => {
+                Arc::new(builtin_directory_listing(&self.directory))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+
+    fn validity(_value: &Self::Value) -> bool {
+        true
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct BuiltinBazelToolsModuleValue {
@@ -464,6 +600,70 @@ mod tests {
 
     fn module_source() -> BuiltinBazelToolsSourceFileValue {
         lookup(CompactString::new("MODULE.bazel")).unwrap()
+    }
+
+    fn listing_rows(directory: &str) -> Vec<(String, PathDirectoryEntryKind)> {
+        let directory = PackagePath::parse(directory).unwrap();
+        let PathDirectoryListing::Present(entries) = builtin_directory_listing(&directory).unwrap()
+        else {
+            panic!("expected present built-in directory {directory}")
+        };
+        entries
+            .entries()
+            .iter()
+            .map(|entry| {
+                (
+                    entry.name().as_os_str().to_str().unwrap().to_owned(),
+                    entry.kind(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn builtin_directory_listing_is_sorted_unique_and_direct() {
+        assert_eq!(
+            listing_rows(""),
+            [
+                ("MODULE.bazel".to_owned(), PathDirectoryEntryKind::File),
+                ("src".to_owned(), PathDirectoryEntryKind::Directory),
+                ("tools".to_owned(), PathDirectoryEntryKind::Directory),
+            ]
+        );
+        assert_eq!(
+            listing_rows("tools"),
+            [("test".to_owned(), PathDirectoryEntryKind::Directory)]
+        );
+        assert_eq!(
+            listing_rows("tools/test"),
+            [
+                ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                (
+                    "default_test_toolchain.bzl".to_owned(),
+                    PathDirectoryEntryKind::File,
+                ),
+                ("dummy.sh".to_owned(), PathDirectoryEntryKind::File),
+                ("generate-xml.sh".to_owned(), PathDirectoryEntryKind::File),
+                ("test-setup.sh".to_owned(), PathDirectoryEntryKind::File),
+            ]
+        );
+    }
+
+    #[test]
+    fn builtin_directory_listing_distinguishes_missing_and_file() {
+        assert_eq!(
+            builtin_directory_listing(&PackagePath::parse("absent").unwrap()).unwrap(),
+            PathDirectoryListing::Missing
+        );
+        assert!(matches!(
+            builtin_directory_listing(&PackagePath::parse("MODULE.bazel").unwrap()),
+            Err(BuiltinBazelToolsDirectoryListingError::Source(
+                BuiltinBazelToolsSourceFileError::WrongKind {
+                    actual: BuiltinBazelToolsSourceKind::File,
+                    ..
+                }
+            ))
+        ));
     }
 
     #[test]

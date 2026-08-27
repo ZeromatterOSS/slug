@@ -418,6 +418,14 @@ pub use selected_repo_spec::ObservedHostSelectedExtensionEvaluationInputRequests
 #[doc(hidden)]
 pub use selected_repo_spec::ObservedHostSelectedExtensionOwnerInputs;
 #[doc(hidden)]
+pub use source_preparation::HostRepositoryDirectoryListing;
+#[doc(hidden)]
+pub use source_preparation::HostRepositoryDirectoryListingError;
+#[doc(hidden)]
+pub use source_preparation::HostRepositoryDirectoryListingKey;
+#[doc(hidden)]
+pub use source_preparation::HostRepositoryDirectoryListingObservationKey;
+#[doc(hidden)]
 pub use source_preparation::HostRepositoryLocalPathPolicy;
 #[doc(hidden)]
 pub use source_preparation::HostRepositoryMaterializationDisposition;
@@ -455,6 +463,8 @@ pub use source_preparation::HostSelectedObservationFrontier;
 pub use source_preparation::ModuleSourcePreparation;
 pub use source_preparation::ModuleSourcePreparationError;
 pub use source_preparation::ModuleSourcePreparationKey;
+#[doc(hidden)]
+pub use source_preparation::ObservedHostRepositoryDirectoryListing;
 #[doc(hidden)]
 pub use source_preparation::ObservedHostRepositorySourceFile;
 pub use source_preparation::RegistryModuleFileAttempt;

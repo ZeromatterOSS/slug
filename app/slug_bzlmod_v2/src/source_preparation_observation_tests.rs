@@ -146,6 +146,481 @@ fn source_epoch(
     .unwrap()
 }
 
+fn directory_epoch(
+    namespace: PathObservationNamespace,
+    path: &str,
+    entries: &[(&str, PathDirectoryEntryKind)],
+) -> PathObservationEpoch {
+    let prefix = host_path_epoch(namespace, path, Some(PathNodeKind::Directory), None);
+    let entries = PathDirectoryEntries::new(entries.iter().map(|(name, kind)| {
+        PathDirectoryEntry::new(PathDirectoryName::new(*name).unwrap(), *kind)
+    }));
+    PathObservationEpoch::from_shared(
+        prefix
+            .observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain(std::iter::once((
+                PathObservationDemand::new(
+                    namespace,
+                    NormalizedAbsolutePath::new(path).unwrap(),
+                    PathObservationOperation::DirectoryEntries,
+                ),
+                Arc::new(PathObservationResult::DirectoryEntries(
+                    PathOperationResult::Present(entries),
+                )),
+            ))),
+    )
+    .unwrap()
+}
+
+fn symlink_directory_epoch(
+    requested: &str,
+    target: &str,
+    entry: &str,
+) -> PathObservationEpoch {
+    let prefix = symlink_path_epoch(requested, target);
+    let target = NormalizedAbsolutePath::new(target).unwrap();
+    let namespace = PathObservationNamespace::Host;
+    PathObservationEpoch::from_shared(
+        prefix
+            .observations()
+            .iter()
+            .filter(|(demand, _)| {
+                !(demand.path() == &target
+                    && demand.operation() == PathObservationOperation::Lstat)
+            })
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain([
+                (
+                    PathObservationDemand::new(
+                        namespace,
+                        target.dupe(),
+                        PathObservationOperation::Lstat,
+                    ),
+                    Arc::new(PathObservationResult::Lstat(
+                        PathOperationResult::Present(PathLstat::new(
+                            PathNodeKind::Directory,
+                            1,
+                            2,
+                            3,
+                            4,
+                            0o755,
+                        )),
+                    )),
+                ),
+                (
+                    PathObservationDemand::new(
+                        namespace,
+                        target.dupe(),
+                        PathObservationOperation::DirectoryEntries,
+                    ),
+                    Arc::new(PathObservationResult::DirectoryEntries(
+                        PathOperationResult::Present(PathDirectoryEntries::new([
+                            PathDirectoryEntry::new(
+                                PathDirectoryName::new(entry).unwrap(),
+                                PathDirectoryEntryKind::File,
+                            ),
+                        ])),
+                    )),
+                ),
+            ]),
+    )
+    .unwrap()
+}
+
+fn generated_listing_route(bytes: &'static [u8]) -> RootRepositoryRoute {
+    let plan = GeneratedRepositoryFileEffectPlan::build([(
+        CompactString::new("BUILD.bazel"),
+        Arc::<[u8]>::from(bytes),
+        true,
+    )])
+    .unwrap();
+    RootRepositoryRoute::for_generated_repo_spec(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        ApparentRepoName::new("generated").unwrap(),
+        CanonicalRepoName::new("extension+generated").unwrap(),
+        RepoSpec {
+            rule_id: crate::RepoRuleId {
+                bzl_file: CanonicalLabel::parse("@@extension+repo//:defs.bzl").unwrap(),
+                rule_name: "generated_repository".into(),
+            },
+            attributes: Arc::default(),
+        },
+        HostRepositoryLocalPathPolicy::LocalUnsupported,
+        plan,
+    )
+    .unwrap()
+}
+
+fn route_immutable_material(
+    route: &RootRepositoryRoute,
+    source_identity: &'static str,
+    generation_root: &str,
+    observation_instance: PathObservationInstanceId,
+) -> RepositoryMaterializationResultEpoch {
+    let HostRepositoryMaterializationDisposition::Request(request) =
+        host_repository_materialization_request(&route.source_capability()).unwrap()
+    else {
+        panic!("materialized listing route")
+    };
+    RepositoryMaterializationResultEpoch::new(
+        route.workspace().dupe(),
+        [RepositoryMaterializationEpochEntry {
+            request,
+            result: RepositoryMaterializationResult::Success(
+                RepositoryMaterializationSuccess::Immutable {
+                    source_identity: Arc::from(source_identity),
+                    generation_root: PathBuf::from(generation_root),
+                    observation_instance,
+                },
+            ),
+        }],
+    )
+    .unwrap()
+}
+
+fn complete_observed_listing(
+    value: &<HostRepositoryDirectoryListingObservationKey as Key>::Value,
+) -> &ObservedHostRepositoryDirectoryListing {
+    let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+        panic!("observed repository directory listing must complete")
+    };
+    observed
+}
+
+fn listing_names(listing: &PathDirectoryListing) -> Vec<(String, PathDirectoryEntryKind)> {
+    let PathDirectoryListing::Present(entries) = listing else {
+        return Vec::new();
+    };
+    entries
+        .entries()
+        .iter()
+        .map(|entry| {
+            (
+                entry.name().as_os_str().to_str().unwrap().to_owned(),
+                entry.kind(),
+            )
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn routed_directory_listing_covers_builtin_legacy_and_observed_root() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let route = RootRepositoryRoute::builtin_for_test(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    let mut transaction = dice.updater().commit().await;
+    let legacy = transaction
+        .compute(&HostRepositoryDirectoryListingKey::new(
+            route.clone(),
+            PackagePath::root(),
+        ))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(Ok(legacy)) = legacy else {
+        panic!("built-in legacy listing")
+    };
+    assert_eq!(
+        listing_names(&legacy),
+        [
+            ("MODULE.bazel".to_owned(), PathDirectoryEntryKind::File),
+            ("src".to_owned(), PathDirectoryEntryKind::Directory),
+            ("tools".to_owned(), PathDirectoryEntryKind::Directory),
+        ]
+    );
+    let observed = transaction
+        .compute(&HostRepositoryDirectoryListingObservationKey::new(
+            route,
+            PackagePath::root(),
+        ))
+        .await
+        .unwrap();
+    assert!(HostRepositoryDirectoryListingObservationKey::validity(
+        &observed
+    ));
+    let observed = complete_observed_listing(&observed);
+    assert_eq!(observed.result().as_ref(), &Ok(legacy));
+    assert!(observed.observations().observations().is_empty());
+}
+
+#[tokio::test]
+async fn routed_directory_listing_observes_local_present_missing_wrong_kind_and_need() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = HostRepositoryDirectoryListingObservationKey::new(
+        local_route(),
+        PackagePath::root(),
+    );
+    let present = directory_epoch(
+        PathObservationNamespace::Host,
+        "/workspace/dep",
+        &[
+            ("z", PathDirectoryEntryKind::File),
+            ("a", PathDirectoryEntryKind::Directory),
+        ],
+    );
+    let mut transaction =
+        observed_source_transaction(&dice, material("dep"), present.dupe(), None).await;
+    let value = transaction.compute(&key).await.unwrap();
+    let observed = complete_observed_listing(&value);
+    assert_eq!(
+        listing_names(observed.result().as_ref().as_ref().unwrap()),
+        [
+            ("a".to_owned(), PathDirectoryEntryKind::Directory),
+            ("z".to_owned(), PathDirectoryEntryKind::File),
+        ]
+    );
+    assert_selected_epoch(&mut transaction, &present, observed.observations()).await;
+
+    for (kind, expected_missing) in [
+        (None, true),
+        (Some(PathNodeKind::RegularFile), false),
+    ] {
+        let epoch = host_path_epoch(
+            PathObservationNamespace::Host,
+            "/workspace/dep",
+            kind,
+            None,
+        );
+        let mut transaction =
+            observed_source_transaction(&dice, material("dep"), epoch, None).await;
+        let value = transaction.compute(&key).await.unwrap();
+        let observed = complete_observed_listing(&value);
+        if expected_missing {
+            assert_eq!(
+                observed.result().as_ref(),
+                &Ok(PathDirectoryListing::Missing)
+            );
+        } else {
+            assert!(matches!(
+                &observed.result().as_ref().as_ref().unwrap_err().kind,
+                HostRepositoryDirectoryListingErrorKind::WrongKind {
+                    actual: PathNodeKind::RegularFile,
+                    ..
+                }
+            ));
+        }
+    }
+
+    let mut pending = observed_source_transaction(
+        &dice,
+        material("dep"),
+        PathObservationEpoch::empty(),
+        None,
+    )
+    .await;
+    let pending = pending.compute(&key).await.unwrap();
+    assert!(matches!(pending, SourcePreparationOutcome::Need(_)));
+    assert!(!HostRepositoryDirectoryListingObservationKey::validity(
+        &pending
+    ));
+    assert!(!HostRepositoryDirectoryListingObservationKey::equality(
+        &pending, &pending
+    ));
+
+    let absent_materialization = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut transaction = absent_materialization.updater().commit().await;
+    let pending = transaction.compute(&key).await.unwrap();
+    assert!(matches!(pending, SourcePreparationOutcome::Need(_)));
+}
+
+#[test]
+fn routed_directory_listing_key_is_route_and_package_exact() {
+    let hash = |key: &HostRepositoryDirectoryListingKey| {
+        let mut hasher = DefaultHasher::new();
+        key.hash(&mut hasher);
+        hasher.finish()
+    };
+    let root = HostRepositoryDirectoryListingKey::new(local_route(), PackagePath::root());
+    let nested = HostRepositoryDirectoryListingKey::new(
+        local_route(),
+        PackagePath::parse("pkg").unwrap(),
+    );
+    let restored = HostRepositoryDirectoryListingKey::new(local_route(), PackagePath::root());
+    let other_route = HostRepositoryDirectoryListingKey::new(
+        local_route_with_path("other"),
+        PackagePath::root(),
+    );
+    assert_eq!(root, restored);
+    assert_eq!(hash(&root), hash(&restored));
+    assert_ne!(root, nested);
+    assert_ne!(root, other_route);
+}
+
+#[tokio::test]
+async fn routed_directory_listing_covers_immutable_and_generated_materializations() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    for (route, root, instance, package) in [
+        (
+            immutable_route(),
+            "/generation/81",
+            PathObservationInstanceId::new(81),
+            PackagePath::parse("pkg").unwrap(),
+        ),
+        (
+            generated_listing_route(b"exports_files([])\n"),
+            "/generation/82",
+            PathObservationInstanceId::new(82),
+            PackagePath::root(),
+        ),
+    ] {
+        let namespace = PathObservationNamespace::Materialization(instance);
+        let path = if package.as_str().is_empty() {
+            root.to_owned()
+        } else {
+            format!("{root}/{}", package.as_str())
+        };
+        let epoch = directory_epoch(
+            namespace,
+            &path,
+            &[("child", PathDirectoryEntryKind::Directory)],
+        );
+        let materialization = route_immutable_material(&route, "listing-content", root, instance);
+        let mut transaction =
+            observed_source_transaction(&dice, materialization, epoch.dupe(), None).await;
+        let value = transaction
+            .compute(&HostRepositoryDirectoryListingObservationKey::new(
+                route, package,
+            ))
+            .await
+            .unwrap();
+        let observed = complete_observed_listing(&value);
+        assert_eq!(
+            listing_names(observed.result().as_ref().as_ref().unwrap()),
+            [("child".to_owned(), PathDirectoryEntryKind::Directory)]
+        );
+        assert_selected_epoch(&mut transaction, &epoch, observed.observations()).await;
+    }
+
+    let generated_a = generated_listing_route(b"exports_files(['a'])\n");
+    let generated_b = generated_listing_route(b"exports_files(['b'])\n");
+    let request = |route: &RootRepositoryRoute| {
+        let HostRepositoryMaterializationDisposition::Request(request) =
+            host_repository_materialization_request(&route.source_capability()).unwrap()
+        else {
+            panic!("generated route must materialize")
+        };
+        request
+    };
+    assert_ne!(request(&generated_a), request(&generated_b));
+}
+
+#[test]
+fn routed_directory_listing_observed_outer_and_need_remain_transient() {
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new("/physical/private").unwrap(),
+        PathObservationOperation::DirectoryEntries,
+    );
+    let outer = ObservedPathFrontierError::Epoch(
+        slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+            demand: demand.dupe(),
+            result_operation: PathObservationOperation::Lstat,
+        },
+    );
+    let projected = finish_observed_host_repository_directory_listing(
+        PathOutcome::Complete(Err(outer.dupe())),
+        Arc::new(PackagePath::root()),
+    );
+    assert!(matches!(
+        projected,
+        SourcePreparationOutcome::Complete(Err(error)) if error == outer
+    ));
+    let pending = finish_observed_host_repository_directory_listing(
+        PathOutcome::Need(NeedPathObservations::singleton(demand)),
+        Arc::new(PackagePath::root()),
+    );
+    assert!(matches!(pending, SourcePreparationOutcome::Need(_)));
+}
+
+#[tokio::test]
+async fn routed_directory_listing_tracks_materialization_identity_a_b_a() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let route = immutable_route();
+    let key = HostRepositoryDirectoryListingObservationKey::new(
+        route.clone(),
+        PackagePath::root(),
+    );
+    let cases = [
+        ("source-a", "/generation/a", 91, "a"),
+        ("source-b", "/generation/b", 92, "b"),
+        ("source-a", "/generation/a", 91, "a"),
+    ];
+    let mut results = Vec::new();
+    for (source, root, instance, child) in cases {
+        let instance = PathObservationInstanceId::new(instance);
+        let materialization = route_immutable_material(&route, source, root, instance);
+        let epoch = directory_epoch(
+            PathObservationNamespace::Materialization(instance),
+            root,
+            &[(child, PathDirectoryEntryKind::File)],
+        );
+        let mut transaction =
+            observed_source_transaction(&dice, materialization, epoch, None).await;
+        let value = transaction.compute(&key).await.unwrap();
+        results.push(
+            complete_observed_listing(&value)
+                .result()
+                .as_ref()
+                .clone(),
+        );
+    }
+    assert_ne!(results[0], results[1]);
+    assert_eq!(results[0], results[2]);
+}
+
+#[tokio::test]
+async fn routed_directory_listing_restores_local_create_delete_and_symlink_retarget() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let root_key = HostRepositoryDirectoryListingObservationKey::new(
+        local_route(),
+        PackagePath::root(),
+    );
+    let present = directory_epoch(
+        PathObservationNamespace::Host,
+        "/workspace/dep",
+        &[("a", PathDirectoryEntryKind::File)],
+    );
+    let mut first =
+        observed_source_transaction(&dice, material("dep"), present.dupe(), None).await;
+    let first = first.compute(&root_key).await.unwrap();
+    let first = complete_observed_listing(&first).result().dupe();
+    let missing = host_path_epoch(
+        PathObservationNamespace::Host,
+        "/workspace/dep",
+        None,
+        None,
+    );
+    let mut deleted = observed_source_transaction(&dice, material("dep"), missing, None).await;
+    let deleted = deleted.compute(&root_key).await.unwrap();
+    assert_eq!(
+        complete_observed_listing(&deleted).result().as_ref(),
+        &Ok(PathDirectoryListing::Missing)
+    );
+    let mut restored =
+        observed_source_transaction(&dice, material("dep"), present, None).await;
+    let restored = restored.compute(&root_key).await.unwrap();
+    assert_eq!(complete_observed_listing(&restored).result(), &first);
+
+    let link_key = HostRepositoryDirectoryListingObservationKey::new(
+        local_route(),
+        PackagePath::parse("link").unwrap(),
+    );
+    for (target, entry) in [("/physical/a", "a"), ("/physical/b", "b")] {
+        let epoch = symlink_directory_epoch("/workspace/dep/link", target, entry);
+        let mut transaction =
+            observed_source_transaction(&dice, material("dep"), epoch.dupe(), None).await;
+        let value = transaction.compute(&link_key).await.unwrap();
+        let observed = complete_observed_listing(&value);
+        assert_eq!(
+            listing_names(observed.result().as_ref().as_ref().unwrap()),
+            [(entry.to_owned(), PathDirectoryEntryKind::File)]
+        );
+        assert_selected_epoch(&mut transaction, &epoch, observed.observations()).await;
+    }
+}
+
 #[tokio::test]
 async fn observed_host_source_preserves_exact_symlink_epoch_and_isolates_families() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -9832,3 +10307,8 @@ async fn observed_selected_graph_effective_override_restores_with_fixed_policy()
     assert!(held_result.is_ok());
     assert!(!held_epoch.observations().is_empty());
 }
+use slug_workspace_v2::PathDirectoryEntries;
+use slug_workspace_v2::PathDirectoryEntry;
+use slug_workspace_v2::PathDirectoryEntryKind;
+use slug_workspace_v2::PathDirectoryListing;
+use slug_workspace_v2::PathDirectoryName;
