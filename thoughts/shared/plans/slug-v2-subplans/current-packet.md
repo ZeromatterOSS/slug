@@ -1,11 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-canonical-repository-load-route-implementation-r2`
+Packet: `WP-4-5-7A-canonical-repository-load-route-implementation-r3`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `f86bbafdb`.
+Base: `822ad6ca0`.
 
 Result: add the one apparent-free canonical repository source/load route and
 shared canonical source-file/directory-listing projections required before
@@ -26,6 +26,35 @@ drivers/accessors under `rustfmt::skip`; normal formatting measures 1,118
 production lines including wiring. R2 preserves the design and six-file
 allowlist, raises only the honest formatting cap, and makes the missing matrix
 an explicit pre-commit gate.
+
+R2 compilation established one correction to that matrix. The selected
+repository file effect has no observation input independent of its canonical
+route: removing `ext.bzl` makes validated route discovery Need first, so the
+load route must suppress the effect dependency. The admitted repository-rule
+effect ABI performs only `ctx.file` and cannot create a later source-read Need.
+Therefore an effect-only Need after route success is unreachable; proof must
+freeze shared-input route Need/no-effect and generated semantic-effect failure
+with exact route-then-effect observations. Do not fabricate a private effect
+Need or widen the ABI for a test.
+
+R2 then implemented the same boundary at 1,174 production and 1,097 proof
+lines. Focused 13/13, full bzlmod 576/576, full loading 352/352, direct
+dependents, locked CLI, formatting and archive-baseline validation passed.
+Independent terminal review still rejected the proof contract: its local and
+registry successes remained admitted by root aliases, so they did not prove
+canonical-only selection, and its hash table did not vary a selected
+repository specification independently from that selected repository's
+mapping. This is the second material correction, so no R2 Rust is retained.
+
+R3 changes no production decision. Its proof fixture must select a transitive
+registry repository that is absent from the root module's apparent mapping,
+materialize it through its canonical name, and demonstrate canonical source
+file and directory-listing success. The test must first assert that the root
+mapping cannot admit the repository. Separate A/B/A rows then keep canonical
+identity fixed while changing only that selected repository's `source.json`
+specification, and while changing only its final repository mapping through
+its own MODULE dependency declarations. This requires an honest proof cap;
+do not compress the registry graph into an alias-bearing surrogate.
 
 Commit `496168758` supplies one loading-owned
 `HostCanonicalRepositoryRouteKey` over workspace plus canonical repository.
@@ -174,7 +203,7 @@ Only these files may change:
 
 No Cargo, fixture, oracle, identity parser, MODULE evaluator, query, core,
 analysis, CLI, package loader, subtree, rule or action file may change.
-Production growth is capped at 1,200 lines and proof growth at 1,100 lines; no
+Production growth is capped at 1,200 lines and proof growth at 1,450 lines; no
 new function exceeds 120 lines, the canonical source module stays below 700
 lines, and the loading route module stays below 500 lines. New production
 drivers must be normally rustfmt-formatted; `rustfmt::skip` is not allowed in
@@ -203,13 +232,17 @@ address split.
 - load-route legacy/observed success, route-first failure/Need order,
   generated-only effect activation, exact epoch forwarding/merge,
   complete-only equality/validity, cancellation nonpublication and A/B/A;
-- a table-driven failure matrix proves selected route failure and route Need
-  publish no effect dependency, while generated effect Need/error stop before
-  projection and preserve exactly route then effect observation prefixes;
+- a table-driven failure matrix proves selected route failure and shared-input
+  route Need publish no effect dependency, while generated semantic-effect
+  error stops before projection and preserves exactly route then effect
+  observation prefixes; effect-only Need is unreachable under the admitted
+  ABI and must not be simulated;
 - built-in, local, immutable-registry and generated canonical source-file and
   direct directory-listing results match equivalent existing ordinary or
-  root-build adapters where that adapter admits the alias, while one selected
-  canonical repository with no root alias succeeds directly;
+  root-build adapters where that adapter admits the alias; additionally, a
+  transitively selected immutable-registry repository absent from the root
+  mapping succeeds directly by canonical name, with the absence asserted
+  before source and listing evaluation;
 - dependency logging for each of those four dispositions proves the exact
   built-in catalog or existing materialization-result/path-resolution/source/
   listing children, with no `HostRepositorySourceObservationKey`, second
@@ -218,12 +251,14 @@ address split.
   the canonical input/load route and no package/subtree/target-pattern/
   registration key is activated; and
 - table-driven hash/equality discriminators independently vary workspace,
-  canonical repository, built-in/selected/generated disposition, selected
-  repo specification and mapping, and generated effect plan; equality remains
-  authoritative even if a weak hash collides; `size_of` plus structural-field
-  guards account for the inline route `Arc` and disposition handle and prove
-  that the generated plan is reachable only through the existing request,
-  with no copied mapping, physical root or source bytes.
+  canonical repository, built-in/selected/generated disposition, the selected
+  repository's source specification alone, its final mapping alone, and the
+  generated effect plan; selected rows keep canonical identity fixed and
+  derive spec/mapping variation from separate transitive-registry graphs;
+  equality remains authoritative even if a weak hash collides; `size_of` plus
+  structural-field guards account for the inline route `Arc` and disposition
+  handle and prove that the generated plan is reachable only through the
+  existing request, with no copied mapping, physical root or source bytes.
 
 Run focused new owner tests, the full bzlmod and loading suites, locked checks
 for loading/core/query, then a locked `slug_cli_v2` build serially. Run Rust
@@ -248,8 +283,9 @@ expansion.
 Commit `496168758` moved the sole canonical route/mapping DICE ownership to
 loading and was independently accepted; `f86bbafdb` froze this source/load
 design. Independent pre-review accepted the boundary, effect order, retained
-identity and wrapper deletion contract. The rejected first implementation
-changed no accepted behavior and retained no Rust; r2 owns only the proof and
-honest-formatting corrections above. The immediate successor after this packet is the bounded canonical
+identity and wrapper deletion contract. Both rejected implementations changed
+no accepted behavior and retained no Rust; R3 owns only the corrected
+alias-free and independent-identity proof contract above. The immediate
+successor after this packet is the bounded canonical
 external package-loading adapter, followed by the one shared toolchain/
 execution-platform registration expander and only then configured consumers.

@@ -19341,3 +19341,41 @@ the honest r2 caps are therefore 1,200 production, 1,100 proof, 700 for the
 canonical source module and 500 for the loading route module, with no
 `rustfmt::skip` in either new production module. Activate only
 `WP-4-5-7A-canonical-repository-load-route-implementation-r2`.
+
+R2 compilation corrected one impossible proof row without widening behavior.
+The selected repository file effect has no observation demand independent of
+canonical route/validated-spec discovery: removing `ext.bzl` makes the route
+Need first, and the admitted `ctx.file`-only effect ABI cannot introduce a
+later source-read Need. The exact lifecycle proof is therefore shared-input
+route Need with no effect activation, plus generated semantic-effect failure
+retaining route-then-effect observations. An effect-only Need must not be
+fabricated through a private input or ABI expansion.
+
+### Canonical repository load-route R2 REPLAN; R3 proof contract (2026-08-27)
+
+R2 retained the accepted six-file architecture at 1,174 production and 1,097
+proof lines and passed focused 13/13, full bzlmod 576/576, full loading
+352/352, direct-dependent, locked CLI, formatting and archive-baseline gates.
+Independent terminal review rejected two proof omissions after the packet's
+one correction: local and selected-registry successes still had root-visible
+aliases, and selected repository specification and selected final mapping were
+not varied independently for equality/hash. This is a second material
+correction, so no R2 Rust is retained.
+
+R3 keeps production, ownership, deletion contract, six-file allowlist and
+1,200-production/700-source-module/500-loading-module caps unchanged. Raise
+proof to 1,450 lines. Construct a transitive registry repository absent from
+the root mapping, assert that absence, then prove canonical source and direct
+listing success. Hold its canonical name fixed while independently varying its
+`source.json` specification and its own final mapping through separate MODULE
+graphs, including A/B/A equality/hash restoration. Preserve the learned
+lifecycle contract: shared route Need suppresses the effect; generated
+semantic-effect error retains route-then-effect order; the admitted
+`ctx.file`-only ABI has no lawful effect-only Need after route success.
+
+Activate only
+`WP-4-5-7A-canonical-repository-load-route-implementation-r3`. This remains a
+generic BCR Starlark loading/source route. Bazel 9 supplies rule definitions
+and control flow, including `cc_internal`; `cc_common` is only a demanding
+host-builtin consumer. Zabel remains peer guidance for ownership and compact
+representation, while Bazel 9.2 remains behavioral authority.
