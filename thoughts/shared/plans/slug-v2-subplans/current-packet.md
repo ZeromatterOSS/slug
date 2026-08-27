@@ -1,22 +1,22 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-rust-utils-output-diagnostics-export-loading-proof`
+Packet: `WP-4-7A-rules-rust-utils-transform-sources-export-loading-proof`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: freeze exact `generate_output_diagnostics` with its exact loaded
-provider declaration, prove loaded and parent binding identity, invoke neither,
-and stop before the other four exports.
+Result: freeze exact `transform_sources` and its private helper with the
+accepted exact Skylib paths child, prove loaded/private/parent binding identity,
+invoke none, and stop before the other three exports.
 
 ## Accepted base and completed frontier audit
 
-Base is `cf76c0443` (`Prove exact utils can build metadata export`). The proof
-owner is 8,973 lines at SHA-256
-`4c3f2c5c36a1a00cd1b9ebf8b488fb335cec0eced076d05b6c26326287431a78`.
-Exact loading proofs now also cover `can_build_metadata`, its loaded
-`AlwaysEnableMetadataOutputGroupsInfo` declaration, accepted helper, and
-provider -> utils -> parent pointer identities. The provider freezes as
-`provider_callable`; the functions freeze as `function`; none is invoked.
+Base is `53c4d7d78` (`Prove exact utils output diagnostics export`). The proof
+owner is 9,082 lines at SHA-256
+`24f484b679305a786980f0203951fc6d1271c1a80b5f173d53ae72df80cfa12d`.
+Exact loading proofs now also cover `generate_output_diagnostics`, its loaded
+`RustcOutputDiagnosticsInfo` declaration and provider -> utils -> parent
+pointer identities. The provider freezes as `provider_callable`; the function
+freezes as `function`; neither is invoked.
 
 Authenticated sources:
 
@@ -30,9 +30,9 @@ The completed six-export audit is:
 | Export/root SHA-256 | Complete closure | Classification |
 |---|---|---|
 | `can_build_metadata` 742-765, `4d57fbeaa3abeee124920697c17f08cd785655f3de64723f9e071bd2b50cb8eb` | accepted `can_use_metadata_for_pipelining` 766-786, `00078da9862fec4e91d5e0e4453a5395dca29f12e4bc6dd44f280a58643b0b5a`; provider 109-118, `3c21b9e0c388512de065d30fe0910e8fc6db274e6643662fb1922ce47787db8b` | accepted by `cf76c0443` |
-| `generate_output_diagnostics` 967-991, `8535acbf356edec97a667da93592f211b9c0f34f5a9b88de6e0a83ac453f5bec` | provider 120-128, `a066585ff0356b5baa65fb4ddcc3fe6d5644be4facd457bf83b5eb6886324086` | selected 34-line exact closure |
+| `generate_output_diagnostics` 967-991, `8535acbf356edec97a667da93592f211b9c0f34f5a9b88de6e0a83ac453f5bec` | provider 120-128, `a066585ff0356b5baa65fb4ddcc3fe6d5644be4facd457bf83b5eb6886324086` | accepted by `53c4d7d78` |
 | `compute_crate_name` 410-445, `8b79565b53edd586539f2f6697848038c598814b2706ed57fffe2c1229c0621f` | helpers 374-396 `8ef88e5e0c024de9214552db4ba8dc6e54018cf3fc52e6460d8ecd572c984c62`, 398-408 `da15bf3fe35c692ad74c76f1f80d234c0b0519697a6fee93335d3888ba745c81`, 573-595 `852e96f30111d5400489cf5512af8d27d8519f57194a3936e21600cd412b364e`, 652-662 `9347beaed27421b6f782c9f643014f8d2774dfbb9b7c83c0ed96143ac3698dc3`; accepted eager 601-650 `e0526a4d2bc5bc9d04544ecdbde305667c5a015b0c7f4597858891ae668f7b85`, 664-676 `b5ad15479c25ae84b1dba206ffc924d455003aaff98b5371773a3104f08d9027`, 692-740 `e5643897c866136bd788b242be0c983a2ae3aab511a1b7676c2d118be0200cd2` | 104 new exact helper lines; bounded but larger |
-| `transform_sources` 878-917, `1006a8daf526ca60d494f691067d417db5ca34ef350bd6fcf901b8f1d5fd14c7` | helper 937-965, `c5105f745ea0032b282f9de9825bac784ebd88ec55c80c2692017038357eaaaa`; accepted `@@bazel_skylib+//lib:paths.bzl`, 320 lines, `96cce43871d8228126a12ceff771351f9030b1e9d029f2185853aa6541766a83` | 69 new local lines plus accepted loaded child |
+| `transform_sources` 878-917, `1006a8daf526ca60d494f691067d417db5ca34ef350bd6fcf901b8f1d5fd14c7` | helper 937-965, `c5105f745ea0032b282f9de9825bac784ebd88ec55c80c2692017038357eaaaa`; accepted `@@bazel_skylib+//lib:paths.bzl`, 320 lines, `96cce43871d8228126a12ceff771351f9030b1e9d029f2185853aa6541766a83` | selected 69-line local closure plus accepted loaded child |
 | `transform_link_deps` 556-571, `c6b644e8f5106089ce3d4ea1cde4b336e9d2f6d32251d8d71cd085bb0b73d564` | provider 94-107, `19fe3a0cdd81693acea508531452189dcdd9f1cc7f4ab116e79839f8cf60e7af`; exact public `CcInfo` route | deferred: CcInfo proxy/private closure not bounded here |
 | `transform_deps` 536-554, `6983d42fd5e829722c88c303383fd53851e7b4972afbedc187f292ed3d507eea` | providers 17-56 `84dd9796019522c4b1bb0e0b04ad880c649fb70d1e92ce0033e775d6fdfd751a`, 58-72 `40cf12f9d8124bb1c16c1a97dd686c79041d111d4f73db24e851085fbd5ff803`, 74-79 `612afb9f408e48229b616feb8fa50462db59253e9a218653da256c6c3ec2fb9f`, 81-92 `6b4bf50624be50b86ee5b3fbfc6211919fe3344602f2ff47ca91eb1fbf17adbb`, 94-107 `19fe3a0cdd81693acea508531452189dcdd9f1cc7f4ab116e79839f8cf60e7af`; exact public `CcInfo` route | deferred on the same CcInfo boundary |
 
@@ -49,8 +49,10 @@ its provider at 260-269
 retains the initializer and eager contexts. Do not replace this source-complete
 edge with a stub.
 
-After accepting the tied earlier import, the sole remaining minimum new-source
-closure is `generate_output_diagnostics` at 34 exact lines.
+After accepting both 34-line provider closures, `transform_sources` is the
+smallest bounded residual closure at 69 new exact local lines. The 104-line
+crate-name helper closure is larger; both dependency transforms remain deferred
+on exact CcInfo.
 
 ## Authorities and decision
 
@@ -64,21 +66,21 @@ freeze, as illustrated by its defining-module value-graph tests. Copy no Zig
 code, representation, owner pointer, traversal/order algorithm, diagnostic,
 identity or behavior.
 
-Use a proof-only narrowed `:providers.bzl` load containing only
-`RustcOutputDiagnosticsInfo`, followed by exact `generate_output_diagnostics`
-under the utils producer. Use a proof-only parent with actual `:utils.bzl`
-spelling.
+Use the actual apparent `@bazel_skylib//lib:paths.bzl` load and rules_rust
+repository mapping, followed by exact `transform_sources` then its exact private
+helper in source order under the utils producer. Reuse the accepted exact paths
+child. Use a proof-only parent with actual `:utils.bzl` spelling.
 
 ## Compatibility
 
-- **Exact:** selected source/declaration bytes and hashes; provider, utils and
-  parent producers; symbol/load spelling; frozen provider/function types; and
-  loaded/public pointer identities.
-- **Slug-native:** narrowed proof-only provider/utils/parent modules,
-  concatenation separators and starlark-rust frozen representation.
-- **Unsupported/deferred:** invoking the selected function or declared provider;
-  all results, diagnostics and configured fields; complete provider/utils/
-  parent loads; and the other four exports.
+- **Exact:** selected source bytes and hashes; paths, utils and parent producers;
+  symbol/load spelling and repository mapping; frozen struct/function types;
+  private visibility; and loaded/public pointer identities.
+- **Slug-native:** narrowed proof-only utils/parent modules, concatenation
+  separators and starlark-rust frozen representation.
+- **Unsupported/deferred:** invoking either selected function; all symlink,
+  action, path and configured results/diagnostics; complete utils/parent loads;
+  and the other three exports.
 
 No production, DICE, identity, retained-memory, async, fixture, oracle, hot-path
 or Buck2-derived utility change is involved.
@@ -86,25 +88,26 @@ or Buck2-derived utility change is involved.
 ## Allowlist, caps and proof
 
 Only `app/slug_loading_v2/src/host_package_load_tests.rs` may change. Its base
-is SHA-256 `4c3f2c5c36a1a00cd1b9ebf8b488fb335cec0eced076d05b6c26326287431a78`
-at 8,973 lines; final ceiling is 9,093.
+is SHA-256 `24f484b679305a786980f0203951fc6d1271c1a80b5f173d53ae72df80cfa12d`
+at 9,082 lines; final ceiling is 9,262.
 
-Caps are 0 production, 120 proof and 120 total additions; deletions do not buy
-budget. Keep the test function at or below 100 lines; exact constants are
+Caps are 0 production, 180 proof and 180 total additions; deletions do not buy
+budget. Keep the test function at or below 110 lines; exact constants are
 exempt.
 
 Required proof:
 
-1. Embed exact unabridged `providers.bzl:120-128` and
-   `utils.bzl:967-991`; verify both hashes.
-2. Freeze the provider declaration under
-   `@@rules_rust+//rust/private:providers.bzl`; prove its exported callable
-   type without invoking it.
-3. Evaluate a narrowed actual `:providers.bzl` load followed only by exact
-   `generate_output_diagnostics` under
-   `@@rules_rust+//rust/private:utils.bzl`. Prove the function and loaded
-   provider pointer identity; invoke neither declaration.
-4. Import only `generate_output_diagnostics` through actual `:utils.bzl` spelling
+1. Embed exact unabridged `utils.bzl:878-917` and `utils.bzl:937-965`;
+   verify hashes `1006a8da…` and `c5105f74…` and reverify accepted `PATHS_SOURCE`
+   hash `96cce438…` without duplicating its 320 exact lines.
+2. Freeze the accepted paths child under
+   `@@bazel_skylib+//lib:paths.bzl`; prove the exported `paths` struct identity.
+3. Evaluate the actual apparent `@bazel_skylib//lib:paths.bzl` load under
+   `@@rules_rust+//rust/private:utils.bzl` with its exact apparent-to-canonical
+   mapping, followed only by the two exact slices in source order. Prove both
+   function types, private helper invisibility and loaded paths pointer identity;
+   invoke none.
+4. Import only `transform_sources` through actual `:utils.bzl` spelling
    under `@@rules_rust+//rust/private:rust.bzl` and prove pointer identity.
 5. Preserve every accepted loading proof.
 
@@ -119,17 +122,17 @@ Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
 `build_file_loading`; locked analysis/core check; locked CLI build; format,
 diff, exact scope and archive status (only the known three misses).
 
-Independent review must verify hashes, closure/load producers, narrowed-load
-classification, pointer identities, nonexecution, caps, preserved proofs,
-Zabel guidance-only use and validation.
+Independent review must verify hashes, closure/load producers and repository
+mapping, helper visibility, pointer identities, nonexecution, caps, preserved
+proofs, Zabel guidance-only use and validation.
 
-STOP and `REPLAN` for production change; selected-function or declared-provider
-constructor invocation; another provider, helper or export; complete provider/
-utils/parent loading; configured behavior; identity/registry/DICE work; Java/
-JVM work; copied Zabel content; dirty authority; or cap violation.
+STOP and `REPLAN` for production change; selected-function invocation; another
+helper or export; complete utils/parent loading; action/symlink/path/configured
+behavior; identity/registry/DICE work; Java/JVM work; copied Zabel content;
+dirty authority; or cap violation.
 
 ## Immediate predecessor
 
-`cf76c0443` accepted the tied earlier can-build-metadata closure with 232 unit,
-24 invalidation and 31 BUILD-loading tests green. Independent review verified
+`53c4d7d78` accepted the output-diagnostics provider closure with 233 unit, 24
+invalidation and 31 BUILD-loading tests green. Independent review verified
 exact bytes, producer/load identities, nonexecution and caps.

@@ -5247,6 +5247,25 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Exact output-diagnostics export accepted; transform-sources selected (2026-08-26)
+
+Commit `53c4d7d78` adds only 109 proof lines and verifies exact
+`RustcOutputDiagnosticsInfo` and `generate_output_diagnostics` bytes, types,
+and provider -> utils -> parent pointer identities without invocation. All 233
+loading-lib, 24 invalidation and 31 BUILD-loading tests pass with analysis/core
+checks and the CLI build; independent review accepts the closure and caps.
+
+Run only `WP-4-7A-rules-rust-utils-transform-sources-export-loading-proof`.
+Embed exact `utils.bzl:878-917` (SHA-256
+`1006a8daf526ca60d494f691067d417db5ca34ef350bd6fcf901b8f1d5fd14c7`)
+and helper 937-965 (SHA-256
+`c5105f745ea0032b282f9de9825bac784ebd88ec55c80c2692017038357eaaaa`),
+reusing accepted exact Skylib paths source `96cce438…`. Prove the actual
+apparent Skylib load, private helper visibility and public parent identity under
+0/180/180 caps; invoke nothing. Clean `../zabel` `0795445f…` guides
+reachability and freeze ownership only; Bazel 9.2 and authenticated rules
+sources remain exact authority.
+
 ### Exact can-build-metadata export accepted; diagnostics selected (2026-08-26)
 
 Commit `cf76c0443` adds only 115 proof lines to the established external-Bzl
