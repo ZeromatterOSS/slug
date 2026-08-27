@@ -13798,6 +13798,51 @@ def create_linking_context_from_compilation_outputs(
     )
     return linking_context, cc_linking_outputs
 "###;
+const RULES_CC_CREATE_LINKSTAMP_SOURCE: &str = r###"# Copyright 2021 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Starlark implementation of create_linkstamp."""
+
+load("//cc/common:cc_helper_internal.bzl", "wrap_with_check_private_api")
+
+# A linkstamp that also knows about its declared includes.
+#
+# This object is required because linkstamp files may include other headers which will have to
+# be provided during compilation.
+_LinkstampInfo = provider(
+    doc = "Information about a C++ linkstamp.",
+    fields = {
+        "file": "The linkstamp source file, a C++ source file to be compiled and linked.",
+        "hdrs": "The headers needed to compile the linkstamp artifact.",
+    },
+)
+
+def create_linkstamp(linkstamp, headers):
+    """Creates a linkstamp.
+
+    Args:
+      linkstamp: the linkstamp source file.
+      headers: a CcCompilationContext from which to get the declared_include_srcs.
+
+    Returns:
+      A LinkstampInfo provider.
+    """
+
+    return _LinkstampInfo(
+        file = wrap_with_check_private_api(linkstamp),
+        hdrs = wrap_with_check_private_api(headers),
+    )
+"###;
 const RULES_CC_TOOLCHAIN_CONFIG_LIB_SOURCE: &str = r###"# Copyright 2018 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19763,6 +19808,80 @@ fn exact_rules_cc_create_linking_context_freezes_complete_producer() {
     )
     .unwrap();
     assert_rules_cc_create_linking_context_interfaces(&module, &children);
+}
+
+#[test]
+fn exact_rules_cc_create_linkstamp_freezes_complete_producer() {
+    assert_eq!(RULES_CC_CREATE_LINKSTAMP_SOURCE.lines().count(), 44);
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_CC_CREATE_LINKSTAMP_SOURCE.as_bytes())
+        ),
+        "8d5fc394e31c5f0eb8a84f5020f35e71f90cdbf89591e44d1c0da8a8899e6000"
+    );
+    let all = complete_rules_cc_compile_children();
+    let child = (all[2].0, all[2].1.clone(), all[2].2.dupe());
+    assert_eq!(child.0, "//cc/common:cc_helper_internal.bzl");
+    assert_eq!(
+        child.1.label,
+        CanonicalLabel::parse("@@rules_cc+//cc/common:cc_helper_internal.bzl").unwrap()
+    );
+    assert_eq!(
+        child.1.repository_mapping,
+        Arc::from([(
+            ApparentRepoName::new("bazel_skylib").unwrap(),
+            CanonicalRepoName::new("bazel_skylib+").unwrap()
+        )])
+    );
+    let module = eval_bzl_with_loaded_children(
+        RULES_CC_CREATE_LINKSTAMP_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:create_linkstamp.bzl")
+                .unwrap(),
+            workspace_path: PathBuf::from("/rules_cc/cc/private/link/create_linkstamp.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+        &[child],
+    )
+    .unwrap();
+    assert!(
+        module
+            .get("wrap_with_check_private_api")
+            .unwrap()
+            .value()
+            .ptr_eq(all[2].2.get("wrap_with_check_private_api").unwrap().value())
+    );
+    let provider_binding = module.get_any_visibility("_LinkstampInfo").unwrap().0;
+    let provider = FrozenUserProviderCallable::from_value(provider_binding.value()).unwrap();
+    assert_eq!(
+        (provider.id().source_label(), provider.id().exported_name()),
+        (
+            "@@rules_cc+//cc/private/link:create_linkstamp.bzl",
+            "_LinkstampInfo"
+        )
+    );
+    assert!(module.get("_LinkstampInfo").is_err());
+    assert_eq!(
+        module.get("create_linkstamp").unwrap().value().get_type(),
+        "function"
+    );
+    let mut names = module.names().map(|name| name.as_str()).collect::<Vec<_>>();
+    names.sort_unstable();
+    assert_eq!(names, ["create_linkstamp", "wrap_with_check_private_api"]);
+    let mut all_names = module
+        .names_any_visibility()
+        .map(|name| name.as_str())
+        .collect::<Vec<_>>();
+    all_names.sort_unstable();
+    assert_eq!(
+        all_names,
+        [
+            "_LinkstampInfo",
+            "create_linkstamp",
+            "wrap_with_check_private_api"
+        ]
+    );
 }
 
 #[test]
