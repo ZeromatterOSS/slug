@@ -5247,6 +5247,35 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Complete action names accepted; C++ semantics selected (2026-08-26)
+
+Commit `9e312f958` adds 328 proof lines and no production. It embeds and
+byte-verifies the complete dependency-free 220-line action-name producer and
+exhaustively proves all 33 public constants, every 33-field `ACTION_NAMES`
+mapping, all seven exported lists in exact order, and all seven final struct
+fields pointer-identical to those frozen lists. Focused proof, 248 loading units,
+24 invalidation tests, 31 BUILD-loading tests, locked checks, CLI build and
+hygiene pass. Independent review returned `ACCEPT`.
+
+Private `cc_common.bzl` remains in 2,295-line
+`cc/private/compile/compile.bzl`. After complete Skylib paths, action names and
+helper children, its first incomplete child is dependency-free 234-line
+`cc/common/semantics.bzl` (SHA-256 `029254fd…`). Its eager rows are two public
+Booleans, 30 lazy private functions, one private canonical `Label`, and a public
+43-field struct capturing 29 functions plus exact scalar/list/dictionary data.
+All shapes are admitted without invocation. The alternative toolchain-config
+branch now reaches the dependency-free 622-line configuration library, so
+semantics is the smaller source-ordered successor.
+
+Run only `WP-4-7A-rules-cc-semantics-complete-loading-proof` under 0/550/550
+caps. Prove complete source/hash, both constants, private label, all lazy types,
+all captured pointer identities and every exact aggregate/scalar field. Invoke
+nothing and add no production behavior. Defer compile, configuration library,
+legacy features, toolchain config, private/public `cc_common`, generated proxy
+and configured C++. Clean `../zabel` `0795445f…` guides declaration-owned
+aggregate, captured-function and defining-module recursive-freeze architecture
+only; Bazel 9.2 and authenticated rules_cc remain exact authority.
+
 ### Complete compilation outputs accepted; action names selected (2026-08-26)
 
 Commit `63d4bda76` adds exactly 450 proof lines and no production. It embeds and
