@@ -5247,6 +5247,32 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Complete shared-library hint accepted; LTO context selected (2026-08-26)
+
+Commit `9b44f0352` adds 88 proof lines and no production. It embeds and
+byte-verifies the complete dependency-free 56-line shared-library-hint producer
+and proves the public provider's exact source/export identity and type without
+invocation. Focused proof, 245 loading units, 24 invalidation tests, 31
+BUILD-loading tests, locked checks, CLI build and hygiene pass. Independent
+review accepts caps and boundaries.
+
+Private `cc_common` source order next reaches
+`cc/private/compile/cc_compilation_outputs.bzl`. Its helper and internal children
+are complete; the first incomplete child is 97-line
+`compile/lto_compilation_context.bzl` (SHA-256 `a17435cd…`). That producer loads
+only the accepted children, declares two providers and three lazy public
+functions, then eagerly constructs one empty LTO context. Toolchain config
+remains the broader later generated-proxy child.
+
+Run only
+`WP-4-7A-rules-cc-private-lto-compilation-context-complete-loading-proof` under
+0/220/220 caps. Prove complete source/hash, both imported identities, distinct
+provider IDs, lazy binding types and exact empty-context provider/dictionary
+shape; invoke no lazy binding. Defer compilation outputs, private/public
+`cc_common`, generated proxy, toolchain config and configured C++. Clean
+`../zabel` `0795445f…` guides defining-module ownership and recursive freeze
+only; Bazel 9.2 remains exact authority.
+
 ### Complete launcher info accepted; shared-library hint selected (2026-08-26)
 
 Commit `badf5844a` adds 80 proof lines and no production. It embeds and
