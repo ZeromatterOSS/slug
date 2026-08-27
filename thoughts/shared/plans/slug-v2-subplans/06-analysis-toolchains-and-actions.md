@@ -19416,3 +19416,20 @@ catalog bytes, while lawful shared-result convergence touches loading/core
 consumers outside the ten-file allowlist. Activate only
 `WP-4-5-7A-repository-source-result-convergence-design`, retain all accepted
 wrappers, and freeze the zero-copy result/consumer boundary before Rust.
+
+The completed audit found a smaller lawful boundary. Existing
+`HostRepositorySourceObservation::{Builtin, Request}` is already the shared
+zero-copy result, so leave `HostRepositorySourceFileKey`, its observed sibling
+and all loading/core exhaustive consumers unchanged. The selected prerequisite
+generalizes only the observation owner over Root/Canonical input, adds an
+observed epoch sibling, and makes the temporary canonical wrappers delegate to
+it. Keep those wrappers until corrected Stage A migrates their policy callers
+and tests; delete them there, not in the prerequisite.
+
+Freeze the six-file, 800-production/1,000-proof
+`WP-4-5-7A-repository-source-observation-owner-convergence` contract in the
+current manifest. Hash only complete structural inputs, never source bytes;
+preserve zero-copy catalog/materialized values, exact root constructors and
+dependency ordering. This remains generic BCR Starlark loading architecture:
+Bazel 9 owns rules including `cc_internal`, `cc_common` is a host-builtin
+consumer, and Zabel is peer design/optimization guidance only.

@@ -29,6 +29,29 @@ single bounded prerequisite is possible or split producer/result convergence
 from consumer adaptation. Retain accepted root outputs and canonical wrappers
 until the migration is complete; do not weaken their deletion condition.
 
+## Audit conclusion and accepted decision
+
+No new result carrier is needed. Existing
+`HostRepositorySourceObservation::{Builtin, Request}` already preserves the
+built-in catalog value and materialized `HostRepositorySourceFileValue`
+zero-copy. Its existing owner is apparent-bearing only and has no observed
+sibling. Generalize that owner over a compact Root/Canonical input enum and add
+the observed epoch carrier. Leave `HostRepositorySourceFileKey`, its observed
+sibling and every loading/core exhaustive match untouched.
+
+Keep `HostRepositorySourceObservationKey::new` exact for root input and add a
+canonical constructor. One shared legacy/observed driver computes only the
+built-in catalog child or the existing materialization/result/path children.
+Temporary canonical source wrappers delegate to this owner and remain present
+through the prerequisite. The corrected policy stage migrates their tests and
+deletes them; doing so in the prerequisite would repeat the allowlist failure.
+
+The only API ripple is the doc-hidden observation error's input accessor: it
+must expose an enumerated Root/Canonical view or distinct accessors. No live
+caller uses the current accessor. Result values deliberately remain un-hashed;
+key/input structural equality and hashing own invalidation without hashing
+source bytes.
+
 ## Learned facts and non-decisions
 
 Commit `85593f300` accepts one apparent-free canonical source input, shared
@@ -151,11 +174,47 @@ must provide the exact shared result variants and accessors, producer and
 consumer file inventory, DICE equality/hash/observation behavior, zero-copy
 built-in lifetime, compatibility classification, implementation split,
 allowlists/caps/proofs/stops and wrapper-deletion sequence. Require independent
-DICE/public-boundary/retained-representation review.
+DICE/public-boundary/retained-representation review. The audit selects the
+bounded prerequisite below; no Rust is writable until this design is accepted.
+
+## Selected prerequisite implementation contract
+
+Next packet:
+`WP-4-5-7A-repository-source-observation-owner-convergence`.
+
+Allow exactly:
+
+- new `app/slug_bzlmod_v2/src/source_preparation/repository_source_observation.rs`;
+- `app/slug_bzlmod_v2/src/source_preparation.rs`;
+- `app/slug_bzlmod_v2/src/source_preparation/canonical_repository_source.rs`;
+- `app/slug_bzlmod_v2/src/lib.rs`;
+- `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`; and
+- `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs`.
+
+Cap production at 800, proof at 1,000 and aggregate at 1,800 lines. Keep the
+new owner below 700 lines, functions at 120 lines, and additions to the already
+oversized `source_preparation.rs` at 80 mechanical lines. Add no dependency,
+fixture, oracle, core, query, builtin-repository or package-policy edit.
+
+Required proof covers root/canonical admitted builtin/local/immutable/generated
+success and error parity; root-unmapped selected-registry success; pointer,
+logical-path, SHA and executable preservation without payload copy; exact
+builtin versus materialization/path dependency logs and no legacy/canonical
+wrapper recursion; empty builtin epoch and resolution-before-file observed
+epoch; outer-error/Need/terminal ordering, cancellation and complete-only
+lifecycle; independent workspace/canonical/disposition/spec/mapping/generated
+plan A/B/A key equality/hash; retained size; unchanged old root constructors;
+and temporary canonical wrapper parity.
+
+STOP for hashing/copying source bytes, changing the shared success variants,
+changing old root key values or consumers, wrapper deletion, duplicate source
+ownership, apparent fabrication, direct IO, package-policy behavior, dependency
+or allowlist/cap expansion.
 
 ## Reserved implementation sequence
 
-The rejected Stage A allowlist is retained only as downstream context:
+The rejected Stage A allowlist is retained only as downstream context after
+the selected prerequisite:
 
 - `app/slug_bzlmod_v2/src/source_preparation/canonical_repository_source.rs`;
 - `source_preparation.rs`, `lib.rs`, `repo_file.rs`,
@@ -208,8 +267,9 @@ or activation of registration, configured semantics, rules or actions.
 ## Immediate predecessor and successor
 
 Commits `85593f300` and `9d55b7157` are the accepted implementation and design
-predecessors; `249a27162` selected the rejected Stage A contract. Activate only
-this docs design. A corrected prerequisite must be accepted before Stage A;
+predecessors; `249a27162` selected the rejected Stage A contract and
+`495edfe4f` records its preflight REPLAN. Activate only this docs design. The
+selected observation-owner prerequisite must be accepted before Stage A;
 Stage B follows only after corrected Stage A;
 the one shared toolchain/execution-platform registration expander follows only
 after Stage B.

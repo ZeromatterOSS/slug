@@ -7523,3 +7523,13 @@ built-in-capable `HostRepositorySourceObservation`, and loading/core exhaustivel
 consume the former outside the allowlist. No Rust changed. Design the shared
 zero-copy source result and its consumer migration before either adapter stage;
 retain the canonical wrappers meanwhile.
+
+The follow-up audit narrowed that prerequisite: the shared zero-copy carrier
+already exists as `HostRepositorySourceObservation`, so loading/core result
+consumers do not migrate. Generalize only its owner over Root/Canonical input,
+add the observed sibling, and preserve old root source-file keys unchanged.
+Temporary canonical wrappers delegate through the owner and remain until the
+corrected Bzlmod policy stage migrates its callers and tests. This prerequisite
+does not parse or implement C++ rules: Bazel 9 BCR Starlark, including
+`cc_internal`, remains the rule layer; `cc_common` exercises the generic host
+ABI. Zabel informs ownership and compact-retention choices only.
