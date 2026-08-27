@@ -4227,6 +4227,15 @@ owner already supplies every required builtin; no MODULE/REPO/core overlay or
 additional builtin is selected. Zabel remains peer ownership guidance and
 Bazel 9.2 remains sole authority.
 
+### LTO-backends acceptance and Stage 4 continuation (2026-08-27)
+
+Commit `ccab93d4c` accepts complete LTO backends with no Stage 5 production or
+retained-state change. Stage 4 next selects complete 291-line create-library
+because all five children are accepted. The shared universal owner already
+supplies every required builtin; no MODULE/REPO/core overlay or additional
+builtin is selected. Zabel remains peer ownership guidance and Bazel 9.2
+remains sole authority.
+
 ### Linkstamp acceptance and Stage 4 continuation (2026-08-26)
 
 Commit `78acfe43f` accepts the complete linkstamp producer with no Stage 5

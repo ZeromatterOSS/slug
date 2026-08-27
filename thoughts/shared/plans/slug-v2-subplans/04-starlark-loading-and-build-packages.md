@@ -7183,3 +7183,20 @@ and ten lazy functions using admitted shapes. Run only
 exact source/child/import/provider/function identities and invoke nothing.
 Zabel remains peer ownership guidance; Bazel 9.2 and authenticated rules_cc
 bytes own compatibility.
+
+### Complete LTO backends accepted; create-library selected (2026-08-27)
+
+Commit `ccab93d4c` freezes all 540 authenticated LTO-backend lines over four
+actual complete children. It proves every imported identity, native alias,
+provider, ten functions and exact visibility inventories without invocation.
+All required suites pass at 0 production and 657 proof additions; independent
+review returned `ACCEPT`.
+
+All five children of complete 291-line `link/create_library_to_link.bzl`,
+SHA-256 `5f57423312f24392f106aeb5959485c4f30c54ee2d8e926a45934de51a2455d1`,
+are now accepted. Its eager surface is six imports, one private warning string,
+one provider and four lazy functions. Run only
+`WP-4-7A-rules-cc-create-library-to-link-complete-loading-proof` under
+0/600/600, retain exact identities and invoke nothing. Zabel remains peer
+ownership guidance; Bazel 9.2 and authenticated rules_cc bytes own
+compatibility.
