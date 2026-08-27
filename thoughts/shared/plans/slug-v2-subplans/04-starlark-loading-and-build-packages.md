@@ -5247,6 +5247,34 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Direct-provider proxy children accepted; zero-argument depset selected (2026-08-26)
+
+Commit `0699dffe7` freezes exact complete `CcSharedLibraryInfo` and
+`DebugPackageInfo` child modules and proves their provider-callable types plus
+pointer-identical reexports through the narrowed generated-proxy slices. It
+uses the actual `rules_cc` apparent-to-canonical mapping and leaves every
+omitted proxy export absent. Focused proof, all 236 loading-library tests, 24
+invalidation tests, 31 BUILD-loading tests, analysis/core checks and the CLI
+build pass; independent review accepts 0/158/158 scope and compatibility
+classification.
+
+The next smallest child is exact 97-line `cc/private/objc_info.bzl`, but its
+five `depset()` defaults execute when `_objcinfo_init` is defined. Slug's
+loading callable currently requires one positional list, so exact full-module
+freeze fails before the initialized provider is declared. Do not substitute a
+provider-only slice.
+
+Run only `WP-4-7A-bazel-zero-argument-depset-loading`. Accept zero arguments as
+the existing empty frozen depset only when no names are supplied, preserve the
+one-list constructor and reject all further breadth under 20 production/50
+proof/70 total caps. Pinned Bazel
+9.2's default-`None` signature and `DepsetTest.testEmptyGenericType` are exact
+authority. Clean `../zabel` `0795445f…` guides only the architectural choice to
+reuse the existing empty ownership shape; no Zig code, representation, cache,
+order or behavior is copied. After acceptance, select exact complete ObjcInfo
+and prove that proxy `ObjcInfo` and `new_objc_provider` both alias its public
+callable rather than the private raw constructor.
+
 ### Public CcInfo audit selects direct-provider proxy children (2026-08-26)
 
 Audit `242325974` authenticates the public -> generated proxy -> private CcInfo
