@@ -96,6 +96,8 @@ use super::ExternalBzlModuleError;
 use super::ExternalBzlModuleEvalKey;
 use super::ExternalBzlModuleObservationKey;
 use super::ForceRootPackageObservationOuter;
+use super::HostBzlModuleError;
+use super::HostBzlModuleEvalKey;
 use super::HostPackageLoadMode;
 use super::LocalBzlLoader;
 use super::ObservedRootPackageLoad;
@@ -741,6 +743,46 @@ fn root_package_direct_load_keeps_root_and_apparent_external_dispatch_distinct()
     assert!(resolve_root_package_direct_load(&package, "@@dep+//tools:defs.bzl").is_err());
 }
 
+#[tokio::test]
+async fn host_bzl_visibility_rejects_cross_package_load_before_importer_evaluation() {
+    let mut epoch = EpochBuilder::workspace_sources(
+        "module(name = 'root')\n",
+        "",
+        &[("private.bzl", "visibility('private')\nEXPORTED = 1\n")],
+        900,
+    );
+    epoch.directory("/workspace/consumer", 900);
+    epoch.file("/workspace/consumer/BUILD.bazel", "", 900);
+    epoch.file(
+        "/workspace/consumer/importer.bzl",
+        concat!(
+            "load('//pkg:private.bzl', 'EXPORTED')\n",
+            "fail('HOST_IMPORTER_RAN')\n",
+        ),
+        900,
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, epoch.build(), false, None).await;
+    let label =
+        resolve_host_load_label(&PackagePath::parse("consumer").unwrap(), ":importer.bzl").unwrap();
+    let outcome = transaction
+        .compute(&HostBzlModuleEvalKey::new(workspace(), label))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(outcome) = outcome else {
+        panic!("complete host visibility epoch returned Need")
+    };
+    let error = outcome.as_ref().as_ref().unwrap_err();
+    assert!(matches!(error, HostBzlModuleError::Evaluation(_)));
+    let message = error.to_string();
+    assert!(
+        message.contains("@@//pkg:private.bzl is not visible"),
+        "{message}"
+    );
+    assert!(message.contains("package @@//consumer"), "{message}");
+    assert!(!message.contains("HOST_IMPORTER_RAN"), "{message}");
+}
+
 fn selected_registry_root_package_epoch() -> (PathObservationEpoch, PathObservationInstanceId) {
     let root =
         "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\n";
@@ -780,7 +822,109 @@ fn selected_registry_root_package_epoch() -> (PathObservationEpoch, PathObservat
         "print('SELECTED_NESTED')\ndef _current_rust_analyzer_toolchain_impl(ctx): fail('current implementation must stay lazy')\ncurrent_rust_analyzer_toolchain = rule(doc = 'current', implementation = _current_rust_analyzer_toolchain_impl, toolchains = [str(Label('@rules_rust//rust/rust_analyzer:toolchain_type'))])\ndef _rust_analyzer_detect_sysroot_impl(ctx): fail('detect implementation must stay lazy')\nrust_analyzer_detect_sysroot = rule(doc = 'detect', implementation = _rust_analyzer_detect_sysroot_impl, toolchains = ['@rules_rust//rust:toolchain_type', '@rules_rust//rust/rust_analyzer:toolchain_type'])\ndef _lint_impl(ctx): fail('lint implementation must stay lazy')\nlint_rule = rule(implementation = _lint_impl, attrs = {'runner': attr.label(default = Label('//rust/private/lint_test_runner'), cfg = 'exec', executable = True)})\nNESTED_NAME='selected_target'\n",
         901,
     );
+    epoch.materialized_directory(instance, "/registry-dep/owner", 901);
+    epoch.materialized_directory(instance, "/registry-dep/consumer", 901);
+    epoch.materialized_file(
+        instance,
+        "/registry-dep/owner/private.bzl",
+        "visibility('private')\nEXPORTED = 1\n",
+        901,
+    );
+    epoch.materialized_file(
+        instance,
+        "/registry-dep/consumer/importer.bzl",
+        concat!(
+            "load('//owner:private.bzl', 'EXPORTED')\n",
+            "fail('EXTERNAL_IMPORTER_RAN')\n",
+        ),
+        901,
+    );
     (epoch.build(), instance)
+}
+
+async fn selected_registry_visibility_transaction(
+    epoch: PathObservationEpoch,
+    instance: PathObservationInstanceId,
+) -> (DiceTransaction, RootRepositoryRoute) {
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, Arc::new(SelectedRegistryIo));
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let transaction = transaction(&dice, epoch, false, None).await;
+    let mut updater = transaction.into_updater();
+    inject_registry_request_inputs(
+        &mut updater,
+        workspace().as_path(),
+        RegistryUrls::new(["https://registry.invalid"]),
+        RegistryRequestGeneration(1),
+    )
+    .unwrap();
+    let mut transaction = updater.commit().await;
+    let route = transaction
+        .compute(
+            &RootRepositoryRouteObservationKey::for_root_build(
+                workspace(),
+                ApparentRepoName::new("dep_alias").unwrap(),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(route)) = route else {
+        panic!("selected route returned Need")
+    };
+    let route = route.result().as_ref().as_ref().unwrap().clone();
+    let HostRepositoryMaterializationDisposition::Request(request) =
+        host_repository_materialization_request(&route.source_capability()).unwrap()
+    else {
+        panic!("selected registry route must request materialization")
+    };
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(
+            RepositoryMaterializationResultEpochKey {
+                workspace: workspace(),
+            },
+            RepositoryMaterializationResultEpoch::new(
+                workspace(),
+                [RepositoryMaterializationEpochEntry {
+                    request,
+                    result: RepositoryMaterializationResult::Success(
+                        RepositoryMaterializationSuccess::Immutable {
+                            source_identity: Arc::from("sha256-test"),
+                            generation_root: PathBuf::from("/registry-dep"),
+                            observation_instance: instance,
+                        },
+                    ),
+                }],
+            )
+            .unwrap(),
+        )])
+        .unwrap();
+    (updater.commit().await, route)
+}
+
+#[tokio::test]
+async fn external_bzl_visibility_uses_canonical_repo_and_stops_importer_evaluation() {
+    let (epoch, instance) = selected_registry_root_package_epoch();
+    let (mut transaction, route) = selected_registry_visibility_transaction(epoch, instance).await;
+    let outcome = transaction
+        .compute(&external_bzl_key(route, "consumer", "importer.bzl"))
+        .await
+        .unwrap();
+    let ExternalBzlModuleError::Evaluation { label, message } = external_error(&outcome) else {
+        panic!("expected external visibility denial: {outcome:?}")
+    };
+    assert_eq!(
+        label.to_string(),
+        "@@dep+//consumer:importer.bzl",
+        "canonical importer identity"
+    );
+    assert!(
+        message.contains("@@dep+//owner:private.bzl is not visible"),
+        "{message}"
+    );
+    assert!(message.contains("package @@dep+//consumer"), "{message}");
+    assert!(!message.contains("EXTERNAL_IMPORTER_RAN"), "{message}");
 }
 
 async fn assert_selected_rust_analyzer_rules(

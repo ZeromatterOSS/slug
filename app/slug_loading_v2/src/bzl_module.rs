@@ -93,6 +93,9 @@ use starlark::syntax::StringEncoding;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::bzl_visibility::BzlLoadVisibility;
+use crate::bzl_visibility::BzlLoadVisibilityError;
+use crate::bzl_visibility::validate_bzl_load_visibility;
 use crate::cycle_detector::BzlLoadCycle;
 use crate::cycle_detector::BzlLoadCycleGuard;
 use crate::cycle_detector::ExternalBzlLoadCycle;
@@ -517,6 +520,7 @@ pub struct FrozenBzlModule {
     path: PathBuf,
     loads: Vec<String>,
     pub(crate) manifest: BzlLoadManifest,
+    pub(crate) bzl_load_visibility: BzlLoadVisibility,
     /// Kept separately from `manifest`: frozen module pointers are lifetime
     /// ownership, never semantic equality.
     retained_bzl_modules: Arc<[FrozenBzlLifetimeEntry]>,
@@ -532,7 +536,7 @@ pub(crate) struct FrozenBzlLifetimeEntry {
 
 impl PartialEq for FrozenBzlModule {
     fn eq(&self, other: &Self) -> bool {
-        self.manifest == other.manifest
+        self.manifest == other.manifest && self.bzl_load_visibility == other.bzl_load_visibility
     }
 }
 
@@ -546,6 +550,20 @@ impl FrozenBzlModule {
                 .map(|entry| (&entry.identity, entry.module.dupe())),
         )
     }
+}
+
+fn validate_direct_bzl_load_visibilities(
+    importer: &PackageIdentifier,
+    loaded_modules: &[(String, FrozenBzlModule)],
+) -> Result<(), BzlLoadVisibilityError> {
+    for (_, module) in loaded_modules {
+        validate_bzl_load_visibility(
+            importer,
+            &module.manifest.root.label,
+            &module.bzl_load_visibility,
+        )?;
+    }
+    Ok(())
 }
 
 impl BzlLoadManifest {
@@ -630,6 +648,7 @@ struct HostPackageAttemptInput<'a> {
     workspace: NormalizedAbsolutePath,
     logical_package_root: NormalizedAbsolutePath,
     package: PackagePath,
+    package_identifier: PackageIdentifier,
     package_dir: PathBuf,
     build_file: PathBuf,
     source: Arc<String>,
@@ -679,6 +698,16 @@ fn evaluate_host_package_attempt(
             );
         }
     };
+    if let Err(error) =
+        validate_direct_bzl_load_visibilities(&input.package_identifier, input.loaded_modules)
+    {
+        return host_package_terminal(
+            Err(HostPackageAttemptError::Loading(LoadingError::new(
+                error.to_string(),
+            ))),
+            EventBatch::empty(),
+        );
+    }
     let recorder = PackageRecorder::new_host(prepared, input.package_label.clone());
     let module = Module::new();
     let loader = LocalBzlLoader {
@@ -2381,6 +2410,16 @@ async fn compute_host_bzl_module(
         digest(source_text.as_str()),
         loaded_modules.iter().map(|(_, module)| module),
     );
+    if let Err(error) =
+        validate_direct_bzl_load_visibilities(manifest.root.label.package(), &loaded_modules)
+    {
+        return host_bzl_complete(
+            Err(HostBzlModuleError::Evaluation(LoadingError::new(
+                error.to_string(),
+            ))),
+            observations,
+        );
+    }
     let loader = LocalBzlLoader {
         modules: loaded_modules
             .iter()
@@ -2442,6 +2481,7 @@ async fn compute_host_bzl_module(
             path: source.logical_path().as_path().to_path_buf(),
             loads,
             retained_bzl_modules: retained_module_closure(&loaded_modules),
+            bzl_load_visibility: evaluation_context.bzl_load_visibility(),
             manifest,
         }),
         observations,
@@ -4120,6 +4160,17 @@ async fn compute_external_bzl_module(
         digest(source_text.as_str()),
         loaded_modules.iter().map(|(_, module)| module),
     );
+    if let Err(error) =
+        validate_direct_bzl_load_visibilities(manifest.root.label.package(), &loaded_modules)
+    {
+        return external_bzl_complete(
+            Err(ExternalBzlModuleError::Evaluation {
+                label: canonical_label,
+                message: Arc::from(error.to_string()),
+            }),
+            observations,
+        );
+    }
     let loader = LocalBzlLoader {
         modules: loaded_modules
             .iter()
@@ -4167,6 +4218,7 @@ async fn compute_external_bzl_module(
             path: logical_path.as_path().to_path_buf(),
             loads,
             retained_bzl_modules: retained_module_closure(&loaded_modules),
+            bzl_load_visibility: evaluation_context.bzl_load_visibility(),
             manifest,
         }),
         observations,
@@ -4736,6 +4788,10 @@ async fn compute_root_package(
             workspace: key.workspace.dupe(),
             logical_package_root: source.package_root().dupe(),
             package: key.package.clone(),
+            package_identifier: PackageIdentifier::new(
+                CanonicalRepoName::root(),
+                key.package.clone(),
+            ),
             package_dir,
             build_file: source.logical_path().as_path().to_path_buf(),
             source: source_text,
@@ -5267,6 +5323,10 @@ impl RepositoryPackageLoadKey {
                 workspace: self.route.workspace().dupe(),
                 logical_package_root: self.route.workspace().dupe(),
                 package: self.package.clone(),
+                package_identifier: PackageIdentifier::new(
+                    self.route.canonical_repo().clone(),
+                    self.package.clone(),
+                ),
                 package_dir: logical_package_dir,
                 build_file: logical_build_file,
                 source,
@@ -5784,6 +5844,11 @@ impl Key for BzlModuleEvalKey {
                     parsed.source_digest,
                     loaded_modules.iter().map(|(_, module)| module),
                 );
+                validate_direct_bzl_load_visibilities(
+                    manifest.root.label.package(),
+                    &loaded_modules,
+                )
+                .map_err(|error| LoadingError::new(error.to_string()))?;
                 let loader = LocalBzlLoader {
                     modules: loaded_modules
                         .iter()
@@ -5813,6 +5878,7 @@ impl Key for BzlModuleEvalKey {
                     path: self.path.clone(),
                     loads: parsed.loads.clone(),
                     retained_bzl_modules: retained_module_closure(&loaded_modules),
+                    bzl_load_visibility: evaluation_context.bzl_load_visibility(),
                     manifest,
                 })
             })())
@@ -5963,6 +6029,12 @@ impl Key for PackageLoadKey {
                     })?
                     .to_string_lossy()
                     .replace('\\', "/");
+                let package_identifier = PackageIdentifier::new(
+                    CanonicalRepoName::root(),
+                    PackagePath::parse(&package_label).map_err(LoadingError::new)?,
+                );
+                validate_direct_bzl_load_visibilities(&package_identifier, &loaded_modules)
+                    .map_err(|error| LoadingError::new(error.to_string()))?;
                 let recorder = PackageRecorder::new(listing, package_label);
                 let module = Module::new();
                 let loader = LocalBzlLoader {

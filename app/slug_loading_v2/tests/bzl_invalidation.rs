@@ -1387,6 +1387,58 @@ fn same_dice_load_edges_invalidate_and_restore_without_target_changes() {
 }
 
 #[test]
+fn same_dice_bzl_visibility_source_and_imported_policy_invalidate_and_restore() {
+    let workspace = scratch("bzl-visibility-invalidation");
+    let importer_package = workspace.join("a");
+    let entry = importer_package.join("entry.bzl");
+    let dependency = workspace.join("b/dep.bzl");
+    let policy = workspace.join("policy/policy.bzl");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    write(&entry, "load(\"//b:dep.bzl\", \"VALUE\")\nRESULT = VALUE\n");
+    write(&policy, "POLICY = [\"//a\"]\n");
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let evaluate = || {
+        evaluate_load(
+            &dice,
+            &runtime,
+            &workspace,
+            &importer_package,
+            &[entry.clone(), dependency.clone(), policy.clone()],
+            ":entry.bzl",
+        )
+    };
+
+    let public_source = "visibility(\"public\")\nVALUE = 1\n";
+    write(&dependency, public_source);
+    let direct_a = evaluate().unwrap();
+    write(&dependency, "visibility(\"private\")\nVALUE = 1\n");
+    let error = evaluate().unwrap_err().to_string();
+    assert!(error.contains("@@//b:dep.bzl is not visible"), "{error}");
+    assert!(error.contains("package @@//a"), "{error}");
+    write(&dependency, public_source);
+    assert_eq!(direct_a, evaluate().unwrap());
+
+    write(
+        &dependency,
+        concat!(
+            "load(\"//policy:policy.bzl\", \"POLICY\")\n",
+            "visibility(POLICY)\nVALUE = 1\n",
+        ),
+    );
+    let imported_a = evaluate().unwrap();
+    write(&policy, "POLICY = [\"//other\"]\n");
+    let error = evaluate().unwrap_err().to_string();
+    assert!(error.contains("@@//b:dep.bzl is not visible"), "{error}");
+    assert!(error.contains("package @@//a"), "{error}");
+    write(&policy, "POLICY = [\"//a\"]\n");
+    assert_eq!(imported_a, evaluate().unwrap());
+}
+
+#[test]
 fn build_comment_and_whitespace_edits_do_not_change_loaded_package() {
     let workspace = scratch("build-comment-equality");
     let package = workspace.join("pkg");

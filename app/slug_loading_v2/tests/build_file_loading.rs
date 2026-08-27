@@ -3145,3 +3145,47 @@ fn native_rule_attributes_keep_ruleclass_order_overrides_and_removals() {
         matches!(&generated.get("generator_location").unwrap().1.value, CoercedAttributeValue::String(value) if value.starts_with("pkg/BUILD.bazel:") && !value.ends_with(":0"))
     );
 }
+
+#[test]
+fn bzl_visibility_allows_same_package_and_rejects_build_cross_package_before_evaluation() {
+    let workspace = scratch("bzl-load-visibility");
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    let owner = workspace.join("owner");
+    let consumer = workspace.join("consumer");
+    fs::create_dir_all(&owner).unwrap();
+    fs::create_dir_all(&consumer).unwrap();
+    let defs = owner.join("defs.bzl");
+    fs::write(&defs, "visibility(\"private\")\nEXPORTED = 1\n").unwrap();
+    fs::write(
+        owner.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"EXPORTED\")\nfilegroup(name = \"same_package\")\n",
+    )
+    .unwrap();
+    assert!(
+        load_package(&workspace, &owner)
+            .targets
+            .iter()
+            .any(|target| target.name == "same_package")
+    );
+
+    fs::write(
+        consumer.join("BUILD.bazel"),
+        concat!(
+            "load(\"//owner:defs.bzl\", \"EXPORTED\")\n",
+            "fail(\"BUILD evaluation must not start after a denied load\")\n",
+        ),
+    )
+    .unwrap();
+    let error = try_load_package_with_extra_bzl(&workspace, &consumer, &[defs])
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("@@//owner:defs.bzl is not visible"),
+        "{error}"
+    );
+    assert!(error.contains("package @@//consumer"), "{error}");
+    assert!(
+        !error.contains("BUILD evaluation must not start"),
+        "{error}"
+    );
+}

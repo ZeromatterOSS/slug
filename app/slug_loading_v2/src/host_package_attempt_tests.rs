@@ -22,6 +22,8 @@ use dice_futures::cancellation::CancellationContext;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
+use slug_identity_v2::CanonicalRepoName;
+use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathDirectoryEntries;
@@ -53,6 +55,7 @@ type ScriptEntry = (PathObservationDemand, PathObservationResult);
 struct HostPackageAttemptTestKey {
     package: PackagePath,
     source: Arc<String>,
+    macro_load: Arc<str>,
     macro_source: Option<Arc<String>>,
 }
 
@@ -74,7 +77,7 @@ impl Key for HostPackageAttemptTestKey {
         let loaded_modules = self
             .macro_source
             .as_ref()
-            .map(|source| vec![(":defs.bzl".to_owned(), frozen_macro(source))])
+            .map(|source| vec![(self.macro_load.to_string(), frozen_macro(source))])
             .unwrap_or_default();
         evaluate_host_package_attempts(
             ctx,
@@ -82,6 +85,10 @@ impl Key for HostPackageAttemptTestKey {
                 workspace: path("/workspace"),
                 logical_package_root: path("/workspace"),
                 package: self.package.clone(),
+                package_identifier: PackageIdentifier::new(
+                    CanonicalRepoName::root(),
+                    self.package.clone(),
+                ),
                 package_dir: package_dir(&self.package),
                 build_file: package_dir(&self.package).join("BUILD.bazel"),
                 source: self.source.clone(),
@@ -190,6 +197,7 @@ fn key(package: &str, source: &str) -> HostPackageAttemptTestKey {
     HostPackageAttemptTestKey {
         package: PackagePath::parse(package).unwrap(),
         source: Arc::new(source.to_owned()),
+        macro_load: Arc::from(":defs.bzl"),
         macro_source: None,
     }
 }
@@ -225,6 +233,7 @@ fn frozen_macro(source: &str) -> FrozenBzlModule {
             fingerprint: digest(source),
         },
         retained_bzl_modules: Arc::from([]),
+        bzl_load_visibility: context.bzl_load_visibility(),
     }
 }
 
@@ -473,6 +482,35 @@ async fn build_environment_does_not_expose_bzl_struct_builtin() {
         "{}",
         error.message
     );
+}
+
+#[tokio::test]
+async fn bzl_visibility_rejects_cross_package_host_attempt_before_build_evaluation() {
+    let mut key = key(
+        "consumer",
+        concat!(
+            "load(\"//pkg:defs.bzl\", \"EXPORTED\")\n",
+            "fail(\"BUILD evaluation must not start after a denied load\")\n",
+        ),
+    );
+    key.macro_load = Arc::from("//pkg:defs.bzl");
+    key.macro_source = Some(Arc::new(
+        "visibility(\"private\")\nEXPORTED = 1\n".to_owned(),
+    ));
+    let mut transaction = new_transaction(prelude()).await;
+    let outcome = transaction.compute(&key).await.unwrap();
+    let terminal = complete(&outcome);
+    assert!(events(terminal).is_empty());
+    let Err(HostPackageAttemptError::Loading(error)) = &terminal.result else {
+        panic!("expected visibility denial: {:?}", terminal.result)
+    };
+    assert!(
+        error.message.contains("@@//pkg:defs.bzl is not visible"),
+        "{}",
+        error.message
+    );
+    assert!(error.message.contains("package @@//consumer"));
+    assert!(!error.message.contains("BUILD evaluation must not start"));
 }
 
 #[tokio::test]

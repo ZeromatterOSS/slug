@@ -9,6 +9,7 @@
  */
 
 use std::cell::OnceCell;
+use std::cell::RefCell;
 use std::fmt;
 #[cfg(test)]
 use std::path::PathBuf;
@@ -44,6 +45,7 @@ use starlark_map::small_map::SmallMap;
 use crate::bzl_module::BzlLoadManifest;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::bzl_module::manifest_starlark_sources;
+use crate::bzl_visibility::BzlLoadVisibility;
 
 /// Fixed `.bzl` declaration token; configured output-group values are deferred.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
@@ -102,6 +104,7 @@ pub(crate) struct BzlEvaluationContext {
     source_label: CompactString,
     source_identity: BzlModuleIdentity,
     source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    bzl_load_visibility: RefCell<Option<BzlLoadVisibility>>,
 }
 
 impl BzlEvaluationContext {
@@ -123,6 +126,17 @@ impl BzlEvaluationContext {
             },
             source_label,
             source_identities_by_filename: Arc::from([]),
+            bzl_load_visibility: RefCell::new(None),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_identity(source_identity: BzlModuleIdentity) -> Self {
+        Self {
+            source_label: source_identity.label.to_string().into(),
+            source_identity,
+            source_identities_by_filename: Arc::from([]),
+            bzl_load_visibility: RefCell::new(None),
         }
     }
 
@@ -140,6 +154,7 @@ impl BzlEvaluationContext {
             source_label,
             source_identity: manifest.root.clone(),
             source_identities_by_filename: manifest_starlark_sources(manifest),
+            bzl_load_visibility: RefCell::new(None),
         }
     }
 
@@ -151,6 +166,33 @@ impl BzlEvaluationContext {
 
     pub(crate) fn source_label(&self) -> &str {
         &self.source_label
+    }
+
+    pub(crate) fn source_identity(&self) -> &BzlModuleIdentity {
+        &self.source_identity
+    }
+
+    pub(crate) fn set_bzl_load_visibility(
+        &self,
+        visibility: BzlLoadVisibility,
+    ) -> anyhow::Result<()> {
+        let mut declaration = self.bzl_load_visibility.borrow_mut();
+        if declaration.is_some() {
+            anyhow::bail!("load visibility may not be set more than once");
+        }
+        *declaration = Some(visibility);
+        Ok(())
+    }
+
+    pub(crate) fn ensure_bzl_load_visibility_unset(&self) -> anyhow::Result<()> {
+        if self.bzl_load_visibility.borrow().is_some() {
+            anyhow::bail!("load visibility may not be set more than once");
+        }
+        Ok(())
+    }
+
+    pub(crate) fn bzl_load_visibility(&self) -> BzlLoadVisibility {
+        self.bzl_load_visibility.borrow().dupe().unwrap_or_default()
     }
 
     pub(crate) fn source_identity_for_call<'a>(
