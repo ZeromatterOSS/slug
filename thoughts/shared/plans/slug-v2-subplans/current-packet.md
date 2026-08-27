@@ -1,16 +1,33 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-canonical-source-policy-convergence-implementation`
+Packet: `WP-4-5-7A-repository-source-result-convergence-design`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `9d55b7157`.
+Base: `249a27162`.
 
-Result: implement Stage A only: converge Bzlmod source, REPO, ignore, package
-lookup, public boundary and package-source owners over one compact Root or
-Canonical carrier, then delete the temporary canonical source/listing wrappers.
-Activate no loading subtree, `.bzl` or package-load behavior.
+Result: design a shared zero-copy repository source-result carrier and bound
+its consumer migration so later source/policy convergence can delete the
+temporary canonical source/listing wrappers. This packet is docs-only.
+
+## Preflight blocker
+
+No Rust was changed. `HostRepositorySourceFileKey` has the fixed DICE value
+`HostRepositorySourceFileValue`; canonical source keys return
+`HostRepositorySourceObservation`, whose built-in variant retains the catalog
+value without copying bytes. A Root/Canonical route enum cannot select a
+different `Key::Value`. A type alias cannot reconcile those values, and
+projecting the built-in result into the root value would copy bytes and erase
+catalog provenance. The existing canonical load-route tests also construct all
+four wrappers and lie outside the Stage A allowlist.
+
+Design one shared result carrier that preserves built-in and materialized
+source variants zero-copy, then enumerate every constructor, match site, DICE
+key, loading evaluator and core consumer that must migrate. Decide whether a
+single bounded prerequisite is possible or split producer/result convergence
+from consumer adaptation. Retain accepted root outputs and canonical wrappers
+until the migration is complete; do not weaken their deletion condition.
 
 ## Learned facts and non-decisions
 
@@ -126,9 +143,19 @@ reusable capability category.
   admitted loader, target-pattern expansion, toolchain/execution-platform
   registration, configured semantics, rules, actions and exact output identity.
 
-## Implementation allowlist and caps
+## Design authority and required output
 
-This active Stage A packet may change only:
+Only the canonical plan, this manifest, Stage 4, Stage 6 and routing log/history
+may change. Rust, Cargo, fixtures and oracle files are read-only. The design
+must provide the exact shared result variants and accessors, producer and
+consumer file inventory, DICE equality/hash/observation behavior, zero-copy
+built-in lifetime, compatibility classification, implementation split,
+allowlists/caps/proofs/stops and wrapper-deletion sequence. Require independent
+DICE/public-boundary/retained-representation review.
+
+## Reserved implementation sequence
+
+The rejected Stage A allowlist is retained only as downstream context:
 
 - `app/slug_bzlmod_v2/src/source_preparation/canonical_repository_source.rs`;
 - `source_preparation.rs`, `lib.rs`, `repo_file.rs`,
@@ -137,7 +164,7 @@ This active Stage A packet may change only:
   `source_preparation_observation_tests.rs`; and
 - `host_external_package_boundary/mod.rs` and `tests.rs`.
 
-Cap Stage A at 1,200 production and 1,500 proof lines, functions at 120 lines,
+Its prior cap was 1,200 production and 1,500 proof lines, functions at 120 lines,
 and require a bounded split for any touched production file already over the
 complexity trigger. Deletions count separately and do not buy unrelated scope.
 
@@ -164,7 +191,7 @@ mapping A/B/A child identity; exact route/effect/policy/source/recursive epoch
 order; route/child-route Need and failure short-circuit; cycle identity;
 cancellation; and no fabricated alias or duplicate source owner.
 
-Run focused Bzlmod owners, full bzlmod, named loading/core/query dependents,
+The eventual implementation will run focused Bzlmod owners, full bzlmod, named loading/core/query dependents,
 locked CLI build, formatting, diff/scope/cap/duplicate-owner/no-lock guards and
 the archive checker. Require independent DICE/public-boundary terminal review.
 Stage B starts only after this Stage A packet is accepted.
@@ -181,6 +208,8 @@ or activation of registration, configured semantics, rules or actions.
 ## Immediate predecessor and successor
 
 Commits `85593f300` and `9d55b7157` are the accepted implementation and design
-predecessors. Activate only Stage A. Stage B follows only after Stage A;
+predecessors; `249a27162` selected the rejected Stage A contract. Activate only
+this docs design. A corrected prerequisite must be accepted before Stage A;
+Stage B follows only after corrected Stage A;
 the one shared toolchain/execution-platform registration expander follows only
 after Stage B.

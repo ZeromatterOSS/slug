@@ -7516,3 +7516,10 @@ then Stage B follows only after Bzlmod Stage A is accepted.
 Bazel 9 BCR Starlark owns rules and control flow including `cc_internal`;
 `cc_common` remains a generic host-builtin consumer. Zabel supplies peer
 ownership/compact-carrier guidance only, while Bazel 9.2 owns behavior.
+
+Stage A implementation preflight then exposed a fixed-value mismatch: root
+source keys return `HostRepositorySourceFileValue`, canonical keys return the
+built-in-capable `HostRepositorySourceObservation`, and loading/core exhaustively
+consume the former outside the allowlist. No Rust changed. Design the shared
+zero-copy source result and its consumer migration before either adapter stage;
+retain the canonical wrappers meanwhile.

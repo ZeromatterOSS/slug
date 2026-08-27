@@ -19408,3 +19408,11 @@ Bzlmod source/policy chain over the compact Root/Canonical carrier, preserve
 root constructors and dependency order exactly, and delete temporary canonical
 source/listing wrappers after all canonical policy callers migrate. Stage B
 loading adaptation remains read-only until Stage A is accepted.
+
+Stage A preflight returned `REPLAN` before edits. A DICE key cannot vary its
+value between root `HostRepositorySourceFileValue` and canonical
+`HostRepositorySourceObservation`; built-in projection would copy private
+catalog bytes, while lawful shared-result convergence touches loading/core
+consumers outside the ten-file allowlist. Activate only
+`WP-4-5-7A-repository-source-result-convergence-design`, retain all accepted
+wrappers, and freeze the zero-copy result/consumer boundary before Rust.
