@@ -5247,6 +5247,29 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Complete toolchain-config library accepted; compilation helper selected (2026-08-26)
+
+Commit `acca5cb68` adds 703 proof lines and no production. It embeds and hashes
+all 622 authenticated dependency-free lines, verifies the exact 27-name public
+set, all 13 provider identities/export names/source labels, 14 public functions
+and seven private functions. It invokes no provider/function and claims no
+specific retained schema or constructor behavior. Full 251/24/31 tests, locked
+checks, CLI build, formatting and hygiene pass; independent review returned
+`ACCEPT`.
+
+The smaller-looking 84-line armeabi consumer is not dependency-complete: its
+common `cc_common` and `CcToolchainConfigInfo` loads return to incomplete
+compatibility-proxy/private children. The compile branch now has five accepted
+children before 666-line `cc/private/compile/cc_compilation_helper.bzl`
+(`2c484cad…`). Run only
+`WP-4-7A-rules-cc-compilation-helper-complete-loading-proof` under 0/1050/1050
+caps. Prove complete bytes, imported pointer identities, exact public/private
+name sets, private constant/provider, all 12 lazy functions and the one-field
+captured helper struct; invoke nothing. Clean `../zabel` `0795445f…` guides
+defining-module import/capture ownership and recursive freeze only; no Zig code
+or behavior is adopted. Bazel 9.2 and authenticated rules_cc remain exact
+authority.
+
 ### Complete C++ semantics accepted; toolchain-config library selected (2026-08-26)
 
 Commit `9cc0d4ace` adds 363 proof lines and no production. It embeds and hashes
