@@ -5247,6 +5247,34 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Complete private CcInfo accepted; launcher info selected (2026-08-26)
+
+Commit `07077e23d` adds 892 proof lines and no production. It embeds and
+byte-verifies the complete 656-line private CcInfo producer, rebuilds all four
+exact children with the actual Skylib mapping, preserves every imported pointer,
+and proves all six provider identities, the initialized raw constructor, three
+complete empty-context shapes and every lazy binding type. Focused proof, 243
+loading units, 24 invalidation tests, 31 BUILD-loading tests, locked checks, CLI
+build and hygiene pass. Independent review accepts caps and boundaries.
+
+Re-audit returns to generated-proxy source order: private `cc_common.bzl` remains
+the first incomplete root. Its helper, private CcInfo and `cc_internal` children
+are now complete. The next child is 31-line
+`cc/private/cc_launcher_info.bzl` (SHA-256 `41da5476…`), which loads only the
+accepted helper, defines one lazy initializer and declares initialized
+`CcLauncherInfo` plus private raw `_`. Toolchain config still reaches 1,387-line
+legacy features, 220-line action names and the 622-line configuration library,
+so it is not the minimum source-ordered successor.
+
+Run only
+`WP-4-7A-rules-cc-private-cc-launcher-info-complete-loading-proof` under
+0/120/120 caps. Prove complete source/hash, recursive helper and imported
+identity, exact provider source/export identity, private raw/initializer types
+and visibility, and invoke nothing. Defer private/public `cc_common`, generated
+proxy, launcher instances, toolchain config and configured C++. Clean `../zabel`
+`0795445f…` guides defining-module ownership and recursive freeze only; no Zig
+code, representation or behavior is copied. Bazel 9.2 remains exact authority.
+
 ### Complete extra-link library accepted; private CcInfo proof selected (2026-08-26)
 
 Commit `30ec1de4f` embeds/hash-verifies the complete 192-line extra-link-library
