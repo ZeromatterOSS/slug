@@ -5247,6 +5247,25 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Exact ObjcInfo aliases accepted; remaining proxy closure audit selected (2026-08-26)
+
+Commit `4b2396f0a` embeds and hash-verifies complete exact ObjcInfo plus its
+initializer/provider slices and generated-proxy load/export slices. It proves
+private initializer/raw functions, public provider-callable identity, actual
+rules_cc mapping, and both public proxy aliases without invoking any callable.
+All 238 loading-library tests, 24 invalidation tests, 31 BUILD-loading tests,
+analysis/core checks and the CLI build pass; independent reviews accept
+0/185/185 scope and all deferred boundaries.
+
+Only broad `cc_common`, private CcInfo and toolchain-config info remain in the
+eager generated proxy. Run only
+`WP-4-7A-rules-cc-remaining-compatibility-proxy-closure-audit` at zero Rust.
+Authenticate every recursive eager load/evaluated expression, classify accepted
+complete versus partial/missing dependencies, and select one smallest
+source-complete successor or record `REPLAN`. Clean `../zabel` `0795445f…`
+guides only recursive defining-module reachability and freeze ownership; no Zig
+code, representation, traversal algorithm, identity or behavior is copied.
+
 ### Zero-argument depset accepted; exact ObjcInfo proxy child selected (2026-08-26)
 
 Commit `498e5efc7` admits zero/no-name `depset()` as the existing empty frozen

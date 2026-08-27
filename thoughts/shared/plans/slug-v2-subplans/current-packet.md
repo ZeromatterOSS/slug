@@ -1,125 +1,103 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-cc-compatibility-proxy-objc-info-loading-proof`
+Packet: `WP-4-7A-rules-cc-remaining-compatibility-proxy-closure-audit`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: freeze exact complete `cc/private/objc_info.bzl` and prove its two
-generated-proxy aliases preserve the public initialized-provider callable,
-never its private raw constructor. Invoke neither constructor nor init body and
-claim no complete proxy route.
+Result: authenticate the recursive freeze closure of the three remaining eager
+generated-proxy children and select exactly one smallest coherent successor, or
+record `REPLAN`. Add no Rust, fixture or oracle evidence.
 
-## Accepted base and completed prerequisite
+## Accepted base and audit question
 
-Base commit is `498e5efc7` (`Admit zero argument depset loading`). The sole
-allowed proof owner is 9,669 lines at SHA-256
-`6d551a7bba8799f5d3c0badecc57c0ce1416e2fc5907f2a05f860e13b353cf82`.
+Base commit is `4b2396f0a` (`Prove exact ObjcInfo proxy aliases`). The three
+scheduling documents are clean at:
 
-Commit `0699dffe7` accepts exact complete `CcSharedLibraryInfo` and
-`DebugPackageInfo` proxy children. Commit `498e5efc7` then admits exact empty
-`depset()` in BUILD and `.bzl` globals, which satisfies all five eagerly
-evaluated defaults in `_objcinfo_init`. The next child now has no missing loads
-or eager builtins.
+- canonical plan: 4,370 lines, SHA-256
+  `f790a0522b1503ef6e33365b465a203a58c9435b6771a0fe92acd9483c32ca16`;
+- Stage 4 subplan: 6,747 lines, SHA-256
+  `93d6f2a36618e2236cd3c41268ac74ba6119423fc6e561e1d0e306aadbe298da`;
+- current packet before replacement: 125 lines, SHA-256
+  `9c538a0c263e64d573f2440b5bc988d7af6be90c37961a71af142b5ee585f6fd`.
 
-Authenticated rules_cc 0.2.17 sources:
+Commits `0699dffe7`, `498e5efc7` and `4b2396f0a` accept three of the six
+generated `symbols.bzl` child families: exact complete `CcSharedLibraryInfo`,
+`DebugPackageInfo` and `ObjcInfo`, including their exact narrowed proxy aliases.
+They do not make the complete proxy freeze.
 
-- complete `cc/private/objc_info.bzl`: 97 lines, SHA-256
-  `675fffb06e4731d2f0f4b7c9f2d38596fff042321dec5e581f73b5e44f8fde8a`;
-- initializer definition lines 17-63: SHA-256
-  `949ae2397a00597af07e8bf51f02c0404fed065d37896fb11eb978e979e0aa66`;
-- initialized-provider declaration lines 65-96: SHA-256
-  `f75ec37fe395db4db5bb3d40aaf9c36be62e4064850b2f4246cad6b3028a6711`;
-- generated proxy load line 6: SHA-256
-  `5fdd7f63aac8d3614d498be79508aeffe0e26961979ae6082e7a594b79c276cd`;
-- proxy export lines 13-14: SHA-256
-  `9ddc47bdb453d8c0d6feb4ca0749eb01c4556397c475a90bc785f00164a4d744`.
+The remaining eager children are:
 
-The child assigns `ObjcInfo, _new_objcinfo = provider(..., init =
-_objcinfo_init)`. Public `ObjcInfo` has `provider_callable` type; private raw
-`_new_objcinfo` is a distinct callable of type `function` that retains the
-public provider definition and bypasses its initializer when invoked. Generated
-proxy `ObjcInfo = _ObjcInfo` and the
-historically named `new_objc_provider = _ObjcInfo` both alias the public value;
-the proxy does not load or expose `_new_objcinfo`.
+- `cc/private:cc_common.bzl`: 788 lines, SHA-256
+  `5e6ab737945b487759c9f039c77a066dc65bbe15cf590b566fe86029cc610762`;
+- `cc/private:cc_info.bzl`: 656 lines, SHA-256
+  `4424bb876c3f8234d7cfce20652e7ab1a7b2fc34cc2c637b1cb4313590d9f1bc`;
+- `cc/private/toolchain_config:cc_toolchain_config_info.bzl`: 143 lines,
+  SHA-256
+  `8c522773214e202b426ae43589f59a8bdbf3af19d2e595ba8ec7ac125fef5d39`.
 
-## Authorities and architecture
+`cc_common.bzl` eagerly loads a broad compile/link/toolchain graph. Private
+`cc_info.bzl` loads Skylib paths, `cc_helper_internal`, `cc_internal` and
+extra-link-time-library helpers before many provider/context declarations.
+Toolchain-config info loads exact Skylib paths, `cc_internal` and
+`legacy_features.bzl`; its local initialized provider declaration alone is not
+a complete-module proof.
+
+## Authorities and audit method
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-provider initializer/raw-constructor tests plus authenticated rules sources are
-sole exact authority. Accepted Slug initialized-provider proofs already cover
-two-value declaration, shared provider identity and distinct public/raw call
-paths; this packet exercises no call path.
+and authenticated rules_cc 0.2.17/Skylib sources are sole exact behavior and
+byte authority. Reuse accepted evidence only when it proves the same complete
+producer/binding; source-shaped snippets do not substitute for eager loads.
 
 Clean `../zabel` commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only defining-module
-ownership: its provider definition co-owns public/raw values, and reexporting a
-callable preserves definition identity. Copy no Zig code, representation,
-pointer, allocator, schema storage, invocation logic, diagnostic or behavior.
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only recursive
+defining-module value reachability, loaded-binding ownership and freeze
+closure. Copy no Zig code, representation, traversal order, owner pointer,
+algorithm, identity, diagnostic or behavior.
 
-Embed and evaluate the complete exact child under
-`@@rules_cc+//cc/private:objc_info.bzl`. Then evaluate only exact proxy load
-line 6 and export lines 13-14 under the generated compatibility-proxy producer
-with apparent `rules_cc` mapped to canonical `rules_cc+`. This narrowed proxy
-composition is proof-only Slug-native harnessing, not the complete module.
+For each remaining child:
 
-## Compatibility
+1. Authenticate its complete source and every eager `load()` edge in source
+   order, recursively through the first unaccepted evaluated expression.
+2. Mark every dependency as accepted complete, accepted partial, missing
+   bounded, or broad/deferred; cite commit/source hashes and line ranges.
+3. Identify eager calls/defaults/comprehensions/constants that execute before
+   publication and distinguish them from lazy function bodies.
+4. Determine the smallest source-complete child or prerequisite that fits one
+   reviewable packet without a stub or narrowed parity claim.
 
-- **Exact:** complete child bytes/producer; initializer and provider-declaration
-  slices; public provider-callable/private raw-function types and distinct
-  values; exact proxy slice bytes/spellings; both pointer-preserving public
-  aliases and their nonidentity with the raw callable.
-- **Slug-native:** narrowed three-line proxy composition and starlark-rust
-  frozen representation.
-- **Unsupported/deferred:** initializer or constructor invocation; field/depset
-  behavior; omitted proxy children; complete proxy/public CcInfo loading;
-  configured ObjC/C++ behavior, diagnostics, actions and analysis.
+## Compatibility and deliverable
 
-No production, DICE, retained representation, utility, async, fixture, oracle,
-registry or Java/JVM work is involved.
+- **Exact:** authenticated files, ranges, load spellings/order and already
+  accepted matching producer identities.
+- **Slug-native:** only audit organization and any proposed future narrowed
+  proof composition, explicitly labeled as such.
+- **Unsupported/deferred:** all unaudited behavior, full proxy/public CcInfo,
+  provider/helper invocation, configured C++ behavior, actions and analysis.
 
-## Allowlist, caps and proof
+Change only:
 
-Only `app/slug_loading_v2/src/host_package_load_tests.rs` may change. Caps are
-0 production, 220 proof and 220 total additions; deletions do not buy budget.
-Final ceiling is 9,889 lines. Keep the test at or below 100 lines; exact source
-constants are exempt.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`;
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
 
-Required proof:
+Caps are 0 production, 260 documentation and 260 total additions; deletions do
+not buy budget. The deliverable must update all three scheduling authorities to
+one identical successor ID, with allowlist, measured caps, proof obligations,
+validation, compatibility classes and STOP conditions. Independent review must
+verify the complete recursive classification and Zabel's guidance-only role.
 
-1. Embed and hash the complete child, initializer/declaration slices and exact
-   proxy load/export slices.
-2. Freeze the child at its exact producer; prove the private initializer and
-   raw constructor are functions, public ObjcInfo is a distinct provider
-   callable, and invoke none of them.
-3. Freeze the narrowed proxy with its actual load spelling/repository mapping;
-   prove `ObjcInfo` and `new_objc_provider` both pointer-equal public ObjcInfo
-   and neither pointer-equals the raw callable.
-4. Assert every other proxy export remains absent.
+STOP and `REPLAN` if no bounded source-complete successor exists. STOP for Rust,
+fixture/oracle generation, Java/JVM work, provider/helper invocation, full proxy
+claim, unpinned network source, copied Zabel content, dirty authority or cap
+violation.
 
-## Serial validation and STOP
+## Immediate predecessor
 
-Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
-`CARGO_BUILD_JOBS=1`: focused proof; loading lib; `bzl_invalidation`;
-`build_file_loading`; locked analysis/core check; locked CLI build; format,
-diff, exact scope and archive status (only the known three misses).
-
-Independent review must verify hashes, producer/mapping, public/raw types and
-distinctness, both proxy aliases, noninvocation, negative boundary, caps,
-compatibility classification and Zabel's guidance-only use.
-
-STOP and `REPLAN` for production change; any constructor/init invocation;
-another proxy child/export; complete-proxy/public-CcInfo claim; configured
-behavior; representation/utility/DICE/registry work; Java/JVM work; copied
-Zabel content; dirty authority; or cap violation.
-
-## Immediate predecessor and successor
-
-Commit `498e5efc7` adds 9 production and 50 proof lines. Focused proof, all 237
-loading-library tests, 24 invalidation tests, 31 BUILD-loading tests,
-analysis/core checks and the CLI build pass; two reviewers accept the exact
-zero/no-name boundary, unchanged one-list path, caps and guidance-only Zabel
-use.
-
-After this packet, re-audit the remaining `cc_common`, private CcInfo and
-toolchain-config children. Do not infer that exact public CcInfo freezes merely
-because four of six proxy children are accepted.
+Commit `4b2396f0a` adds 185 proof lines and freezes exact complete ObjcInfo. It
+proves public provider-callable/private initializer/raw-function types,
+visibility, distinctness, exact repository mapping, and pointer-identical
+`ObjcInfo`/`new_objc_provider` public proxy aliases without invocation. All 238
+loading-library, 24 invalidation and 31 BUILD-loading tests pass with
+analysis/core checks and the CLI build; two independent reviews accept hashes,
+scope and compatibility boundaries.
