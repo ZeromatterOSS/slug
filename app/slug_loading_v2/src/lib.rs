@@ -11,6 +11,9 @@
 pub mod attrs;
 pub mod bzl_module;
 mod bzl_visibility;
+mod canonical_repository_load_route;
+#[cfg(test)]
+mod canonical_repository_load_route_tests;
 mod canonical_repository_mapping;
 mod canonical_repository_route;
 #[cfg(test)]
@@ -68,6 +71,20 @@ pub use bzl_module::RootPackageLoadKey;
 #[doc(hidden)]
 pub use bzl_module::RootPackageLoadObservationKey;
 pub use bzl_module::discover_build_file_companion;
+#[doc(hidden)]
+pub use canonical_repository_load_route::HostCanonicalRepositoryLoadRoute;
+#[doc(hidden)]
+pub use canonical_repository_load_route::HostCanonicalRepositoryLoadRouteError;
+#[doc(hidden)]
+pub use canonical_repository_load_route::HostCanonicalRepositoryLoadRouteKey;
+#[doc(hidden)]
+pub use canonical_repository_load_route::HostCanonicalRepositoryLoadRouteObservationError;
+#[doc(hidden)]
+pub use canonical_repository_load_route::HostCanonicalRepositoryLoadRouteObservationKey;
+#[doc(hidden)]
+pub use canonical_repository_load_route::HostCanonicalRepositoryLoadRouteOutcome;
+#[doc(hidden)]
+pub use canonical_repository_load_route::ObservedHostCanonicalRepositoryLoadRoute;
 #[doc(hidden)]
 pub use canonical_repository_mapping::HostCanonicalRepositoryApparentMapping;
 #[doc(hidden)]

@@ -123,6 +123,9 @@ use crate::repository_ignore::HostNonregistryRepositoryIgnoreObservationKey;
 use crate::repository_ignore::HostRepositoryIgnoreError;
 use crate::repository_ignore::RepositoryIgnoreMatcher;
 
+mod canonical_repository_source;
+pub use canonical_repository_source::*;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct RepositoryMaterializationKey {
     pub workspace: PathBuf,
@@ -6013,20 +6016,30 @@ async fn drive_host_repository_directory_listing(
     key: &HostRepositoryDirectoryListingKey,
     mode: HostRepositoryObservationMode,
 ) -> HostRepositoryDirectoryListingDriverOutcome {
-    let directory = Arc::new(key.directory.clone());
     let disposition = match host_repository_materialization_request(&key.route.source_capability())
     {
         Ok(disposition) => disposition,
         Err(_) => {
             return host_repository_directory_listing_complete(
                 Err(HostRepositoryDirectoryListingError::new(
-                    directory.dupe(),
+                    Arc::new(key.directory.clone()),
                     HostRepositoryDirectoryListingErrorKind::Materialization,
                 )),
                 PathObservationEpoch::empty(),
             );
         }
     };
+    drive_repository_directory_listing_from_disposition(ctx, disposition, &key.directory, mode)
+        .await
+}
+
+async fn drive_repository_directory_listing_from_disposition(
+    ctx: &mut DiceComputations<'_>,
+    disposition: HostRepositoryMaterializationDisposition,
+    requested_directory: &PackagePath,
+    mode: HostRepositoryObservationMode,
+) -> HostRepositoryDirectoryListingDriverOutcome {
+    let directory = Arc::new(requested_directory.clone());
     let HostRepositoryMaterializationDisposition::Request(request) = disposition else {
         let HostRepositoryMaterializationDisposition::Builtin(identity) = disposition else {
             unreachable!()
@@ -6034,7 +6047,7 @@ async fn drive_host_repository_directory_listing(
         return match ctx
             .compute(&BuiltinBazelToolsDirectoryListingKey::new(
                 identity.snapshot(),
-                key.directory.clone(),
+                requested_directory.clone(),
             ))
             .await
         {
@@ -6097,7 +6110,8 @@ async fn drive_host_repository_directory_listing(
             generation_root,
         ),
     };
-    let requested_path = match NormalizedAbsolutePath::new(root.join(key.directory.as_str())) {
+    let requested_path = match NormalizedAbsolutePath::new(root.join(requested_directory.as_str()))
+    {
         Ok(path) => path,
         Err(_) => {
             return host_repository_directory_listing_complete(
