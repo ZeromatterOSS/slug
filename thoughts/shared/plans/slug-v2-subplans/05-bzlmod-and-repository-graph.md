@@ -4208,3 +4208,12 @@ compile-action-template parent because all six children are accepted. The
 shared universal owner already supplies every common builtin required by both
 sources; no MODULE/REPO/core overlay or additional builtin is selected. Zabel
 remains peer ownership guidance and Bazel 9.2 remains sole authority.
+
+### Compile-action-template acceptance and Stage 4 continuation (2026-08-26)
+
+Commit `bb11a1f73` accepts the complete action-template producer with no Stage 5
+production or retained-state change. Stage 4 next selects its complete
+2,295-line compile parent because all eleven children are accepted. The shared
+universal owner already supplies every required builtin; no MODULE/REPO/core
+overlay or additional builtin is selected. Zabel remains peer ownership
+guidance and Bazel 9.2 remains sole authority.

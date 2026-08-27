@@ -7127,3 +7127,21 @@ configured semantic change is required. Run only
 0/600/600 caps, prove complete identity/visibility and invoke nothing. Zabel is
 peer defining-module/import guidance only; Bazel 9.2 and authenticated rules_cc
 bytes own compatibility. Re-audit the complete `compile.bzl` parent afterward.
+
+### Complete action templates accepted; compile parent selected (2026-08-26)
+
+Commit `bb11a1f73` freezes all 266 authenticated action-template lines over six
+complete children and proves its complete ten-import/five-function inventory
+without invocation. All required suites pass at 0 production and 482 proof
+additions; independent review returned `ACCEPT`.
+
+The recursive frontier is now complete 2,295-line `compile.bzl`, SHA-256
+`bec506ffc3be08fffc4842b9daac498773534db9916121648a5527fac84cabea`.
+All eleven children are accepted. Its eager surface uses the existing universal
+`set`, accepted provider initializer/raw-constructor shape, four ordered sets
+and lazy functions; no new builtin or native method is required. Run only
+`WP-4-7A-rules-cc-compile-complete-loading-proof` under 0/3000/3000 caps.
+Embed/hash the complete source, retain exact child/import/eager/function
+identities and invoke nothing. Zabel is peer ownership/freeze guidance only;
+Bazel 9.2 and authenticated rules_cc bytes own compatibility. Re-audit private
+`cc_common` and proxy/toolchain consumers after acceptance.
