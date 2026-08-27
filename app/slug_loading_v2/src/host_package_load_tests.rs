@@ -13843,6 +13843,204 @@ def create_linkstamp(linkstamp, headers):
         hdrs = wrap_with_check_private_api(headers),
     )
 "###;
+const RULES_CC_LINK_SOURCE: &str = r###"# Copyright 2024 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+The cc_common.link function.
+
+Used for C++ transitive linking.
+"""
+
+load("//cc/private:cc_internal.bzl", _cc_internal = "cc_internal")
+load("//cc/private/compile:cc_compilation_outputs.bzl", "EMPTY_COMPILATION_OUTPUTS")
+load("//cc/private/link:cc_linking_helper.bzl", "create_cc_link_actions")
+load("//cc/private/link:target_types.bzl", "LINKING_MODE", "LINK_TARGET_TYPE")
+
+# Translation table from language and output type to static and dynamic target type.
+_TARGET_TYPE = {
+    ("cpp", "executable"): (None, LINK_TARGET_TYPE.EXECUTABLE),
+    ("cpp", "dynamic_library"): (None, LINK_TARGET_TYPE.DYNAMIC_LIBRARY),
+    ("objc", "executable"): (None, LINK_TARGET_TYPE.OBJC_EXECUTABLE),
+    ("objcpp", "executable"): (None, LINK_TARGET_TYPE.OBJC_EXECUTABLE),
+    ("objc", "archive"): (LINK_TARGET_TYPE.OBJC_FULLY_LINKED_ARCHIVE, None),
+}
+
+# LINT.IfChange
+
+# IMPORTANT: This function is public API exposed on cc_common module!
+def link(
+        *,
+        actions,
+        name,
+        feature_configuration,
+        cc_toolchain,
+        language = "c++",
+        output_type = "executable",
+        link_deps_statically = True,
+        compilation_outputs = EMPTY_COMPILATION_OUTPUTS,
+        linking_contexts = [],
+        user_link_flags = [],
+        stamp = 0,
+        additional_inputs = [],
+        additional_outputs = [],
+        variables_extension = {},
+        # Private:
+        use_test_only_flags = False,
+        never_link = False,
+        test_only_target = False,
+        native_deps = False,
+        whole_archive = False,
+        additional_linkstamp_defines = [],
+        always_link = False,
+        link_artifact_name_suffix = "",
+        main_output = None,
+        use_shareable_artifact_factory = False,
+        build_config = None,
+        emit_interface_shared_library = False):
+    """Used for C++ transitive linking.
+
+    In the most basic and most used case, the function creates an action for a single executable or
+    a dynamic library (`output_type`) for `language`, called `name`, linking all transitive
+    libraries using the `feature_configuration` (describing current target or package feature
+    configuration) and `cc_toolchain`.
+
+    The linking mode can be either static (`link_deps_statically` == True) or dynamic.
+
+    It links the current target's `compilation_outputs` with `linking_contexts` from target's
+    dependencies. Using custom `user_link_flags` and `stamp`-ing.
+
+    Callee may specify `additional_inputs` and `additional_outputs` to C++ linking action, and
+    custom `variables_extension`, which are passed to link command line.
+
+    When ThinLTO is enabled a second LTO indexing action is created.
+
+    TODO(b/338618120): during Starlarkification of rules several private parameters were introduced,
+    those parameters need to be eventually removed or made public.
+    The booleans control various bits and pieces of the linking or LTO indexing action.
+
+    TODO(b/338618120): `main_output`, `use_shareable_artifact_factory` and `build_config` are
+    partners in crime, making it possible for Java, Apple and Android rules to link artifacts under
+    different configurations - that's used for building dependencies for different platforms.
+
+    Special case is Objc's archive, which doesn't do transitive linking at all.
+    TODO(b/338618120): Migrate Objc to cc_common.create_linking_context_from_compilation_outputs.
+
+    Args:
+        actions: (Actions) `actions` object.
+        name: (str) This is used for naming the output artifacts of actions created by this method.
+        feature_configuration: (FeatureConfiguration) `feature_configuration` to be queried.
+        cc_toolchain: (CcToolchainInfo) CcToolchainInfo provider to be used.
+        language: ("cpp"|"objc") Only C++ supported for now. Do not use this parameter.
+        output_type: ("executable"|"dynamic_library"|"archive") Can be either 'executable' or 'dynamic_library'.
+        link_deps_statically: (bool) True to link dependencies statically, False dynamically.
+        compilation_outputs: (CompilationOutputs) Compilation outputs containing object files to link.
+        linking_contexts: (list[LinkingContext]) Linking contexts from dependencies to be linked
+                    into the linking context generated by this rule.
+        user_link_flags: (list[str]) Additional list of linker options.
+        stamp: (-1|0|1): Whether to include build information in the linked executable, if output_type is
+            'executable'. If 1, build information is always included. If 0 (the
+            default build information is always excluded. If -1, uses the default
+            behavior, which may be overridden by the --[no]stamp flag. This should be
+            unset (or set to 0) when generating the executable output for test rules.
+        additional_inputs: (list[File]|depset[File]) For additional inputs to the linking action,
+            e.g.: linking scripts.
+        additional_outputs: (list[File]) For additional outputs to the linking action, e.g.: map files.
+        variables_extension: (dict[str, str|list[str]|depset[str]]) Additional variables to pass to
+            the toolchain configuration when creating link command line.
+        use_test_only_flags: (bool) undocumented.
+        never_link: (bool) undocumented.
+        test_only_target: (bool) undocumented.
+        native_deps: (bool) undocumented.
+        whole_archive: (bool) undocumented.
+        additional_linkstamp_defines: (list[str]) undocumented.
+        always_link: (bool) undocumented.
+        link_artifact_name_suffix: (str) undocumented.
+        main_output: (File) Name of the main output artifact that will be produced by the linker.
+            Only set this if the default name generation does not match you needs
+            For output_type=executable, this is the final executable filename.
+            For output_type=dynamic_library, this is the shared library filename.
+            If not specified, then one will be computed based on `name` and `output_type`.
+        use_shareable_artifact_factory: (bool) undocumented.
+        build_config: (None|BuildConfiguration) undocumented.
+        emit_interface_shared_library: (bool) When 'output_type' is 'dynamic_library' and this
+            parameter is set to True, an interface shared library will be generated during
+            linking. On Windows the interface shared library will always be generated
+            regardless of this parameter since it is a requirement for linking.
+    Returns:
+      (CcLinkingOutputs = {
+        library_to_link: LibraryToLink,
+        all_lto_artifacts: list[LtoBackendArtifacts],
+        executable: None|File
+       })
+    """
+    # LINT.ThenChange(https://github.com/bazelbuild/bazel/blob/master/src/main/java/com/google/devtools/build/lib/starlarkbuildapi/cpp/CcModuleApi.java)
+
+    # TODO(bazel-team): Rename always_link to alwayslink before delisting. Also it looks like the
+    # suffix parameter can be removed since we can use `name` for the same thing.
+    if output_type not in ["executable", "dynamic_library", "archive"]:
+        fail("Output type '%s' is not supported" % output_type)
+    language = language.replace("++", "pp")
+    if language not in ["cpp", "objc", "objcpp"]:
+        fail("Language '%s' is not supported" % language)
+    if (language, output_type) not in _TARGET_TYPE:
+        fail("Language '%s' does not support %s" % (language, output_type))
+
+    static_link_type, dynamic_link_type = _TARGET_TYPE[(language, output_type)]
+
+    if type(additional_inputs) == type([]):
+        additional_inputs = depset(additional_inputs)
+
+    if static_link_type == LINK_TARGET_TYPE.STATIC_LIBRARY and always_link:
+        static_link_type = LINK_TARGET_TYPE.ALWAYS_LINK_STATIC_LIBRARY
+
+    linking_mode = LINKING_MODE.STATIC if link_deps_statically else LINKING_MODE.DYNAMIC
+
+    # TODO(b/338618120): Migrate Apple and Android rules, so they don't need to use build_config
+    # when calling link. This happens because they are using deps with split configuration
+    actions = _cc_internal.wrap_link_actions(actions, build_config, use_shareable_artifact_factory)
+
+    return create_cc_link_actions(
+        actions,
+        name,
+        static_link_type,
+        dynamic_link_type,
+        linking_mode,
+        feature_configuration,
+        cc_toolchain,
+        compilation_outputs,
+        linking_contexts,
+        user_link_flags,  # linkopts
+        stamp,
+        additional_inputs,
+        additional_outputs,  # linker_outputs
+        variables_extension,
+        use_test_only_flags,
+        never_link,  # neverlink
+        test_only_target,
+        whole_archive,
+        native_deps,
+        additional_linkstamp_defines,
+        # alwayslink may be deprecated but we're trying to replicate CcBinary as closely as possible for the moment.
+        # TODO(b/331164666): remove alwayslink, the information is in static_link_type already
+        always_link,
+        link_artifact_name_suffix,
+        main_output,  # linker_output_artifact
+        emit_interface_shared_libraries = dynamic_link_type == LINK_TARGET_TYPE.DYNAMIC_LIBRARY and
+                                          (emit_interface_shared_library or
+                                           feature_configuration.is_enabled("targets_windows")),
+    )
+"###;
 const RULES_CC_TOOLCHAIN_CONFIG_LIB_SOURCE: &str = r###"# Copyright 2018 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19882,6 +20080,160 @@ fn exact_rules_cc_create_linkstamp_freezes_complete_producer() {
             "wrap_with_check_private_api"
         ]
     );
+}
+
+fn complete_rules_cc_link_children() -> Vec<(&'static str, BzlModuleIdentity, FrozenModule)> {
+    let compile = complete_rules_cc_compile_children();
+    let helper_children = complete_rules_cc_linking_helper_children();
+    let helper = compile_child(
+        RULES_CC_LINKING_HELPER_SOURCE,
+        "@@rules_cc+//cc/private/link:cc_linking_helper.bzl",
+        "/rules_cc/cc/private/link/cc_linking_helper.bzl",
+        &[("bazel_skylib", "bazel_skylib+")],
+        &helper_children,
+    );
+    let target_children = complete_rules_cc_target_type_children();
+    let targets = compile_child(
+        RULES_CC_TARGET_TYPES_SOURCE,
+        "@@rules_cc+//cc/private/link:target_types.bzl",
+        "/rules_cc/cc/private/link/target_types.bzl",
+        &[],
+        &target_children,
+    );
+    vec![
+        (compile[5].0, compile[5].1.clone(), compile[5].2.dupe()),
+        (compile[7].0, compile[7].1.clone(), compile[7].2.dupe()),
+        (
+            "//cc/private/link:cc_linking_helper.bzl",
+            helper.0,
+            helper.1,
+        ),
+        ("//cc/private/link:target_types.bzl", targets.0, targets.1),
+    ]
+}
+
+fn assert_rules_cc_link_interfaces(
+    module: &FrozenModule,
+    children: &[(&'static str, BzlModuleIdentity, FrozenModule)],
+) {
+    let public = |name| module.get(name).unwrap();
+    let private = |name| module.get_any_visibility(name).unwrap().0;
+    for (name, child, export) in [
+        ("_cc_internal", 0, "cc_internal"),
+        ("EMPTY_COMPILATION_OUTPUTS", 1, "EMPTY_COMPILATION_OUTPUTS"),
+        ("create_cc_link_actions", 2, "create_cc_link_actions"),
+        ("LINKING_MODE", 3, "LINKING_MODE"),
+        ("LINK_TARGET_TYPE", 3, "LINK_TARGET_TYPE"),
+    ] {
+        let binding = if name.starts_with('_') {
+            private(name)
+        } else {
+            public(name)
+        };
+        assert!(
+            binding
+                .value()
+                .ptr_eq(children[child].2.get(export).unwrap().value()),
+            "{name}"
+        );
+    }
+    assert!(module.get("_cc_internal").is_err());
+    let table_binding = private("_TARGET_TYPE");
+    assert!(module.get("_TARGET_TYPE").is_err());
+    let table = DictRef::from_value(table_binding.value()).unwrap();
+    assert_eq!(table.len(), 5);
+    let target_binding = children[3].2.get("LINK_TARGET_TYPE").unwrap();
+    let targets = StructRef::from_value(target_binding.value()).unwrap();
+    let target = |name: &str| {
+        targets
+            .iter()
+            .find_map(|(field, value)| (field.as_str() == name).then_some(value))
+            .unwrap()
+    };
+    for (language, output, static_type, dynamic_type) in [
+        ("cpp", "executable", None, Some("EXECUTABLE")),
+        ("cpp", "dynamic_library", None, Some("DYNAMIC_LIBRARY")),
+        ("objc", "executable", None, Some("OBJC_EXECUTABLE")),
+        ("objcpp", "executable", None, Some("OBJC_EXECUTABLE")),
+        ("objc", "archive", Some("OBJC_FULLY_LINKED_ARCHIVE"), None),
+    ] {
+        let value = table
+            .iter()
+            .find_map(|(key, value)| {
+                let key = TupleRef::from_value(key)?;
+                let mut parts = key.iter();
+                (key.len() == 2
+                    && parts.next().unwrap().unpack_str() == Some(language)
+                    && parts.next().unwrap().unpack_str() == Some(output))
+                .then_some(value)
+            })
+            .unwrap();
+        let pair = TupleRef::from_value(value).unwrap();
+        assert_eq!(pair.len(), 2);
+        for (actual, expected) in pair.iter().zip([static_type, dynamic_type]) {
+            if let Some(name) = expected {
+                assert!(actual.ptr_eq(target(name)), "{language}/{output}/{name}");
+            } else {
+                assert!(actual.is_none(), "{language}/{output}");
+            }
+        }
+    }
+    assert_eq!(public("link").value().get_type(), "function");
+    let mut names = module.names().map(|name| name.as_str()).collect::<Vec<_>>();
+    names.sort_unstable();
+    let mut expected =
+        "EMPTY_COMPILATION_OUTPUTS create_cc_link_actions LINKING_MODE LINK_TARGET_TYPE link"
+            .split_whitespace()
+            .collect::<Vec<_>>();
+    expected.sort_unstable();
+    assert_eq!(names, expected);
+    let mut all = module
+        .names_any_visibility()
+        .map(|name| name.as_str())
+        .collect::<Vec<_>>();
+    all.sort_unstable();
+    expected.extend(["_TARGET_TYPE", "_cc_internal"]);
+    expected.sort_unstable();
+    assert_eq!(all, expected);
+}
+
+#[test]
+fn exact_rules_cc_link_freezes_complete_producer() {
+    assert_eq!(RULES_CC_LINK_SOURCE.lines().count(), 197);
+    assert_eq!(
+        format!("{:x}", Sha256::digest(RULES_CC_LINK_SOURCE.as_bytes())),
+        "666e819dee4777d0c3d8624e18588a905046532a6668d89d5744419cbee4a0e2"
+    );
+    let children = complete_rules_cc_link_children();
+    for (child, label) in children.iter().zip([
+        "@@rules_cc+//cc/private:cc_internal.bzl",
+        "@@rules_cc+//cc/private/compile:cc_compilation_outputs.bzl",
+        "@@rules_cc+//cc/private/link:cc_linking_helper.bzl",
+        "@@rules_cc+//cc/private/link:target_types.bzl",
+    ]) {
+        assert_eq!(child.1.label, CanonicalLabel::parse(label).unwrap());
+    }
+    for child in [&children[0], &children[1], &children[3]] {
+        assert!(child.1.repository_mapping.is_empty());
+    }
+    assert_eq!(
+        children[2].1.repository_mapping,
+        Arc::from([(
+            ApparentRepoName::new("bazel_skylib").unwrap(),
+            CanonicalRepoName::new("bazel_skylib+").unwrap()
+        )])
+    );
+    let module = eval_bzl_with_loaded_children(
+        RULES_CC_LINK_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:link.bzl").unwrap(),
+            workspace_path: PathBuf::from("/rules_cc/cc/private/link/link.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+        &children,
+    )
+    .unwrap();
+    assert_rules_cc_link_interfaces(&module, &children);
 }
 
 #[test]
