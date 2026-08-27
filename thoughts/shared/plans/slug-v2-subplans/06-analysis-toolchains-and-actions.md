@@ -19379,3 +19379,24 @@ generic BCR Starlark loading/source route. Bazel 9 supplies rule definitions
 and control flow, including `cc_internal`; `cc_common` is only a demanding
 host-builtin consumer. Zabel remains peer guidance for ownership and compact
 representation, while Bazel 9.2 remains behavioral authority.
+
+### Canonical load route accepted; package-adapter design split (2026-08-27)
+
+Commit `85593f300` accepts the apparent-free canonical source input,
+source/listing projections and loading route with root-unmapped transitive
+registry success, independent spec/mapping A/B/A, exact lifecycle and shared
+deepest owners. Full serial and independent review gates pass.
+
+The successor audit returned `REPLAN`: package boundary is not a standalone
+consumer. REPO, ignore, private lookup, public boundary and package source form
+one Bzlmod policy chain; external subtree, `.bzl` cycle identity and package
+load form a second loading chain. Freeze the two-stage design in
+`WP-4-5-7A-canonical-external-package-loading-adapter-design`. Stage A
+generalizes Bzlmod owners over a compact Root/Canonical source carrier and
+deletes temporary canonical source/listing wrappers. Stage B adds a loading
+Root/Canonical request address, resolves canonical child `.bzl` mappings and
+merges child route/effect epochs before source. Never fabricate an alias.
+
+This remains generic BCR Starlark loading; Bazel 9 owns `cc_internal` and other
+rule control flow, while `cc_common` is only a generic host-ABI consumer. Zabel
+is peer design guidance only; Bazel 9.2 remains authority.

@@ -7494,3 +7494,25 @@ host boundary. Pinned Bazel 9.2 and authenticated rules_cc bytes remain exact
 authority. Clean `../zabel` commit `0795445f…` remains concept-only guidance
 for the generic-evaluator/Bazel-host split and producer-owned frozen module
 lifetime; copy no Zig implementation or claimed behavior.
+
+### Canonical external package-loading adapter design (2026-08-27)
+
+Commit `85593f300` accepts the apparent-free canonical source/load route. The
+next caller audit found that loading's external subtree, external `.bzl` cycle
+identity and repository package load all retain `RootRepositoryRoute`, so a
+selected canonical repository without a root alias still stops before package
+loading. Do not fabricate that alias or retype the root route.
+
+The accepted design target is a loading request-address enum over the existing
+full root route or workspace plus canonical repository. Canonical evaluation
+computes the accepted canonical load route first, then uses the generalized
+Bzlmod source/policy carrier owned by the prerequisite Stage A packet.
+Cross-repository `.bzl` loads resolve through the declaring canonical mapping,
+compute the child canonical load route and merge child route/effect epochs
+before source/module epochs. Root constructors, cycle identity and callers
+remain exact. Activate no Rust until the cross-crate design packet is reviewed;
+then Stage B follows only after Bzlmod Stage A is accepted.
+
+Bazel 9 BCR Starlark owns rules and control flow including `cc_internal`;
+`cc_common` remains a generic host-builtin consumer. Zabel supplies peer
+ownership/compact-carrier guidance only, while Bazel 9.2 owns behavior.
