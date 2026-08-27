@@ -24,6 +24,8 @@ use dupe::Dupe;
 use slug_identity_v2::PackagePath;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathDirectoryEntryKind;
+use slug_workspace_v2::PathDirectoryListing;
 use slug_workspace_v2::PathNodeKind;
 #[cfg(windows)]
 use slug_workspace_v2::PathObservationDemand;
@@ -52,6 +54,9 @@ use crate::repo_file::HostRepoFileObservationKey;
 use crate::repo_file::HostRouteRepoFileError;
 use crate::repo_file::HostRouteRepoFileKey;
 use crate::repo_file::HostRouteRepoFileObservationKey;
+use crate::source_preparation::HostRepositoryDirectoryListingError;
+use crate::source_preparation::HostRepositoryDirectoryListingKey;
+use crate::source_preparation::HostRepositoryDirectoryListingObservationKey;
 use crate::source_preparation::HostRepositorySourceFileKey;
 use crate::source_preparation::HostRepositorySourceFileObservationKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
@@ -164,6 +169,10 @@ pub(crate) enum HostRepositoryIgnoreError {
     RouteRepoFile(HostRouteRepoFileError),
     NonregistryRepoFile(HostRouteRepoFileError),
     PolicyProjection(RootPackagePolicyProjectionError),
+    RepositoryListing(HostRepositoryDirectoryListingError),
+    BuiltinMetadata {
+        actual: PathDirectoryEntryKind,
+    },
     HostFile(HostFileError),
     RepositorySource(RepositorySourceFileError),
     InvalidAbsolute {
@@ -183,6 +192,11 @@ impl fmt::Display for HostRepositoryIgnoreError {
             Self::RouteRepoFile(error) => error.fmt(f),
             Self::NonregistryRepoFile(error) => error.fmt(f),
             Self::PolicyProjection(error) => error.fmt(f),
+            Self::RepositoryListing(error) => error.fmt(f),
+            Self::BuiltinMetadata { actual } => write!(
+                f,
+                "built-in .bazelignore metadata has unsupported entry kind {actual:?}"
+            ),
             Self::HostFile(error) => write!(f, "failed to read .bazelignore: {error:?}"),
             Self::RepositorySource(error) => {
                 write!(f, "failed to read routed .bazelignore: {error:?}")
@@ -1556,6 +1570,80 @@ async fn drive_host_route_repository_ignore(
             );
         }
     };
+    if key.route.is_builtin_bazel_tools() {
+        let (listing, listing_observations) = match observed_mode {
+            false => match dice_invariant(
+                ctx.compute(&HostRepositoryDirectoryListingKey::new(
+                    key.route.clone(),
+                    PackagePath::root(),
+                ))
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(listing) => {
+                    (listing, PathObservationEpoch::empty())
+                }
+            },
+            true => {
+                let observed = match dice_invariant(
+                    ctx.compute(&HostRepositoryDirectoryListingObservationKey::new(
+                        key.route.clone(),
+                        PackagePath::root(),
+                    ))
+                    .await,
+                ) {
+                    SourcePreparationOutcome::Need(need) => {
+                        return SourcePreparationOutcome::Need(need);
+                    }
+                    SourcePreparationOutcome::Complete(Err(error)) => {
+                        return SourcePreparationOutcome::Complete(Err(error));
+                    }
+                    SourcePreparationOutcome::Complete(Ok(observed)) => observed,
+                };
+                (
+                    observed.result().as_ref().clone(),
+                    observed.observations().dupe(),
+                )
+            }
+        };
+        observations = match union_observations(&observations, &listing_observations) {
+            Ok(observations) => observations,
+            Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        };
+        match listing {
+            Err(error) => {
+                return route_ignore_complete(
+                    Err(HostRepositoryIgnoreError::RepositoryListing(error)),
+                    observations,
+                );
+            }
+            Ok(PathDirectoryListing::Present(entries)) => {
+                if let Some(entry) = entries
+                    .entries()
+                    .iter()
+                    .find(|entry| entry.name().as_os_str() == ".bazelignore")
+                    && entry.kind() != PathDirectoryEntryKind::Directory
+                {
+                    return route_ignore_complete(
+                        Err(HostRepositoryIgnoreError::BuiltinMetadata {
+                            actual: entry.kind(),
+                        }),
+                        observations,
+                    );
+                }
+            }
+            Ok(PathDirectoryListing::Missing) => {}
+        }
+        return route_ignore_complete(
+            Ok(RepositoryIgnoreMatcher::new(
+                Vec::new(),
+                repo.ignored_directories().iter().cloned(),
+            )),
+            observations,
+        );
+    }
     let (source, source_observations) = match observed_mode {
         false => {
             match dice_invariant(

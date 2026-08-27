@@ -9,6 +9,7 @@
 
 #![allow(dead_code)] // Dormant until the later Host root-module packets.
 
+use std::ffi::OsStr;
 #[cfg(unix)]
 use std::ffi::OsString;
 use std::fmt;
@@ -33,6 +34,9 @@ use slug_identity_v2::TargetName;
 use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathDirectoryEntries;
+use slug_workspace_v2::PathDirectoryEntryKind;
+use slug_workspace_v2::PathDirectoryListing;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathObservationNamespace;
@@ -59,6 +63,9 @@ use crate::repository_ignore::HostRouteRepositoryIgnoreObservationKey;
 use crate::source_preparation::DirectLocalModuleSupport;
 use crate::source_preparation::DirectLocalModuleSupportError;
 use crate::source_preparation::DirectLocalUnsupportedCycle;
+use crate::source_preparation::HostRepositoryDirectoryListingError;
+use crate::source_preparation::HostRepositoryDirectoryListingKey;
+use crate::source_preparation::HostRepositoryDirectoryListingObservationKey;
 use crate::source_preparation::HostRepositoryPathKey;
 use crate::source_preparation::HostRepositoryPathObservationKey;
 use crate::source_preparation::HostRepositorySourceFileKey;
@@ -522,6 +529,7 @@ pub(crate) enum ExternalRepositoryPackageLookup {
 pub(crate) enum ExternalRepositoryPackageLookupError {
     PolicyInput(RootPackagePolicyProjectionError),
     RepositoryIgnore(HostRepositoryIgnoreError),
+    RepositoryListing(HostRepositoryDirectoryListingError),
     Path(RepositorySourceFileError),
 }
 
@@ -530,6 +538,7 @@ impl fmt::Display for ExternalRepositoryPackageLookupError {
         match self {
             Self::PolicyInput(error) => error.fmt(f),
             Self::RepositoryIgnore(error) => error.fmt(f),
+            Self::RepositoryListing(error) => error.fmt(f),
             Self::Path(error) => write!(f, "failed to inspect routed package marker: {error:?}"),
         }
     }
@@ -617,6 +626,17 @@ fn external_lookup_complete(
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
 }
 
+fn builtin_build_file(entries: &PathDirectoryEntries) -> Option<HostBuildFileName> {
+    [HostBuildFileName::BuildDotBazel, HostBuildFileName::Build]
+        .into_iter()
+        .find(|build_file_name| {
+            entries.entries().iter().any(|entry| {
+                entry.name().as_os_str() == OsStr::new(build_file_name.as_str())
+                    && entry.kind() == PathDirectoryEntryKind::File
+            })
+        })
+}
+
 async fn drive_external_repository_package_lookup(
     ctx: &mut DiceComputations<'_>,
     key: &ExternalRepositoryPackageLookupKey,
@@ -691,6 +711,69 @@ async fn drive_external_repository_package_lookup(
             Ok(ExternalRepositoryPackageLookup::Deleted),
             observations,
         );
+    }
+
+    if key.route.is_builtin_bazel_tools() {
+        let (listing, listing_observations) = match mode {
+            ExternalRepositoryPackageLookupMode::Legacy => match dice_invariant(
+                ctx.compute(&HostRepositoryDirectoryListingKey::new(
+                    key.route.clone(),
+                    key.package.package().clone(),
+                ))
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(listing) => {
+                    (listing, PathObservationEpoch::empty())
+                }
+            },
+            ExternalRepositoryPackageLookupMode::Observed => {
+                let observed = match dice_invariant(
+                    ctx.compute(&HostRepositoryDirectoryListingObservationKey::new(
+                        key.route.clone(),
+                        key.package.package().clone(),
+                    ))
+                    .await,
+                ) {
+                    SourcePreparationOutcome::Need(need) => {
+                        return SourcePreparationOutcome::Need(need);
+                    }
+                    SourcePreparationOutcome::Complete(Err(error)) => {
+                        return SourcePreparationOutcome::Complete(Err(error));
+                    }
+                    SourcePreparationOutcome::Complete(Ok(observed)) => observed,
+                };
+                (
+                    observed.result().as_ref().clone(),
+                    observed.observations().dupe(),
+                )
+            }
+        };
+        observations = match union_observations(&observations, &listing_observations) {
+            Ok(observations) => observations,
+            Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        };
+        return match listing {
+            Ok(PathDirectoryListing::Present(entries)) => external_lookup_complete(
+                Ok(builtin_build_file(&entries).map_or(
+                    ExternalRepositoryPackageLookup::NoBuildFile,
+                    ExternalRepositoryPackageLookup::Package,
+                )),
+                observations,
+            ),
+            Ok(PathDirectoryListing::Missing) => external_lookup_complete(
+                Ok(ExternalRepositoryPackageLookup::NoBuildFile),
+                observations,
+            ),
+            Err(error) => external_lookup_complete(
+                Err(ExternalRepositoryPackageLookupError::RepositoryListing(
+                    error,
+                )),
+                observations,
+            ),
+        };
     }
 
     for build_file_name in [HostBuildFileName::BuildDotBazel, HostBuildFileName::Build] {
@@ -2148,6 +2231,14 @@ mod tests {
     #[cfg(unix)]
     use slug_workspace_v2::ObservedPathFrontierError;
     #[cfg(unix)]
+    use slug_workspace_v2::PathDirectoryEntries;
+    #[cfg(unix)]
+    use slug_workspace_v2::PathDirectoryEntry;
+    #[cfg(unix)]
+    use slug_workspace_v2::PathDirectoryEntryKind;
+    #[cfg(unix)]
+    use slug_workspace_v2::PathDirectoryName;
+    #[cfg(unix)]
     use slug_workspace_v2::PathIoErrorKind;
     #[cfg(unix)]
     use slug_workspace_v2::PathLstat;
@@ -2185,6 +2276,8 @@ mod tests {
     #[cfg(unix)]
     use super::ExternalRepositoryPackageLookupKey;
     #[cfg(unix)]
+    use super::ExternalRepositoryPackageLookupObservationKey;
+    #[cfg(unix)]
     use super::HostBuildFileName;
     #[cfg(unix)]
     use super::HostRootPackageLookup;
@@ -2212,6 +2305,8 @@ mod tests {
     use super::RootPackageSourceKey;
     #[cfg(unix)]
     use super::RootPackageSourceObservationKey;
+    #[cfg(unix)]
+    use super::builtin_build_file;
     #[cfg(unix)]
     use super::requires_direct_local_module_support;
     #[cfg(unix)]
@@ -2241,9 +2336,15 @@ mod tests {
     #[cfg(unix)]
     use crate::repo_file::HostRouteRepoFileKey;
     #[cfg(unix)]
+    use crate::repo_file::HostRouteRepoFileObservationKey;
+    #[cfg(unix)]
     use crate::repository_ignore::HostRepositoryIgnoreKey;
     #[cfg(unix)]
     use crate::repository_ignore::HostRepositoryIgnoreObservationKey;
+    #[cfg(unix)]
+    use crate::repository_ignore::HostRouteRepositoryIgnoreKey;
+    #[cfg(unix)]
+    use crate::repository_ignore::HostRouteRepositoryIgnoreObservationKey;
     #[cfg(unix)]
     use crate::source_preparation::RepositoryMaterializationEpochEntry;
     #[cfg(unix)]
@@ -2377,6 +2478,249 @@ mod tests {
                 )])),
             },
         )
+    }
+
+    #[cfg(unix)]
+    fn builtin_external_key(package: &str) -> ExternalRepositoryPackageLookupKey {
+        let route = RootRepositoryRoute::builtin_for_test(path("/workspace"));
+        ExternalRepositoryPackageLookupKey::new(
+            route.clone(),
+            PackageIdentifier::new(
+                route.canonical_repo().clone(),
+                PackagePath::parse(package).unwrap(),
+            ),
+        )
+        .unwrap()
+    }
+
+    #[cfg(unix)]
+    async fn builtin_policy_transaction(dice: &Arc<Dice>, inject_policy: bool) -> DiceTransaction {
+        let mut updater = dice.updater();
+        if inject_policy {
+            inject_root_package_policy_inputs(&mut updater, inputs(&[], &[], None)).unwrap();
+        }
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::empty(),
+            )])
+            .unwrap();
+        updater.commit().await
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn builtin_marker_selection_prefers_file_build_dot_bazel_then_file_build() {
+        let entry =
+            |name, kind| PathDirectoryEntry::new(PathDirectoryName::new(name).unwrap(), kind);
+        let both_files = PathDirectoryEntries::new([
+            entry("BUILD", PathDirectoryEntryKind::File),
+            entry("BUILD.bazel", PathDirectoryEntryKind::File),
+        ]);
+        assert_eq!(
+            builtin_build_file(&both_files),
+            Some(HostBuildFileName::BuildDotBazel)
+        );
+
+        let ineligible_dot_bazel = PathDirectoryEntries::new([
+            entry("BUILD", PathDirectoryEntryKind::File),
+            entry("BUILD.bazel", PathDirectoryEntryKind::Directory),
+        ]);
+        assert_eq!(
+            builtin_build_file(&ineligible_dot_bazel),
+            Some(HostBuildFileName::Build)
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn builtin_optional_metadata_and_package_markers_use_catalog_listings() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let route = RootRepositoryRoute::builtin_for_test(path("/workspace"));
+        let mut no_policy = builtin_policy_transaction(&dice, false).await;
+
+        let SourcePreparationOutcome::Complete(repo) = no_policy
+            .compute(&HostRouteRepoFileKey::new(route.clone()))
+            .await
+            .unwrap()
+        else {
+            panic!("built-in REPO absence must be complete");
+        };
+        assert!(
+            repo.as_ref()
+                .as_ref()
+                .unwrap()
+                .ignored_directories()
+                .is_empty()
+        );
+
+        let SourcePreparationOutcome::Complete(Ok(observed_repo)) = no_policy
+            .compute(&HostRouteRepoFileObservationKey(HostRouteRepoFileKey::new(
+                route.clone(),
+            )))
+            .await
+            .unwrap()
+        else {
+            panic!("observed built-in REPO absence must be complete");
+        };
+        assert!(observed_repo.result().as_ref().is_ok());
+        assert!(observed_repo.observations().observations().is_empty());
+
+        let mut transaction = builtin_policy_transaction(&dice, true).await;
+
+        let SourcePreparationOutcome::Complete(ignore) = transaction
+            .compute(&HostRouteRepositoryIgnoreKey::new(route.clone()))
+            .await
+            .unwrap()
+        else {
+            panic!("built-in .bazelignore absence must be complete");
+        };
+        assert!(
+            ignore
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .matching_entry(&PackagePath::parse("tools/test").unwrap())
+                .is_none()
+        );
+
+        for (package, expected) in [
+            ("", ExternalRepositoryPackageLookup::NoBuildFile),
+            (
+                "src/conditions",
+                ExternalRepositoryPackageLookup::Package(HostBuildFileName::Build),
+            ),
+            (
+                "tools/test",
+                ExternalRepositoryPackageLookup::Package(HostBuildFileName::Build),
+            ),
+            (
+                "missing/package",
+                ExternalRepositoryPackageLookup::NoBuildFile,
+            ),
+        ] {
+            let outcome = transaction
+                .compute(&builtin_external_key(package))
+                .await
+                .unwrap();
+            assert_eq!(external_value(outcome), expected, "package {package:?}");
+        }
+
+        let SourcePreparationOutcome::Complete(wrong_kind) = transaction
+            .compute(&builtin_external_key("MODULE.bazel"))
+            .await
+            .unwrap()
+        else {
+            panic!("wrong-kind built-in package directory must be complete");
+        };
+        assert!(matches!(
+            wrong_kind.as_ref(),
+            Err(ExternalRepositoryPackageLookupError::RepositoryListing(_))
+        ));
+
+        let SourcePreparationOutcome::Complete(Ok(observed_ignore)) = transaction
+            .compute(&HostRouteRepositoryIgnoreObservationKey(
+                HostRouteRepositoryIgnoreKey::new(route.clone()),
+            ))
+            .await
+            .unwrap()
+        else {
+            panic!("observed built-in ignore absence must be complete");
+        };
+        assert!(observed_ignore.result().as_ref().is_ok());
+        assert!(observed_ignore.observations().observations().is_empty());
+
+        let SourcePreparationOutcome::Complete(Ok(observed_package)) = transaction
+            .compute(&ExternalRepositoryPackageLookupObservationKey(
+                builtin_external_key("tools/test"),
+            ))
+            .await
+            .unwrap()
+        else {
+            panic!("observed built-in package marker must be complete");
+        };
+        assert!(matches!(
+            observed_package.result().as_ref(),
+            Ok(ExternalRepositoryPackageLookup::Package(
+                HostBuildFileName::Build
+            ))
+        ));
+        assert!(observed_package.observations().observations().is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn builtin_optional_input_keys_retain_route_identity_a_b_a() {
+        fn key_hash(value: &impl Hash) -> u64 {
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        }
+        let route_a = RootRepositoryRoute::builtin_for_test(path("/workspace-a"));
+        let route_b = RootRepositoryRoute::builtin_for_test(path("/workspace-b"));
+        let route_restored = RootRepositoryRoute::builtin_for_test(path("/workspace-a"));
+        let package_key = |route: RootRepositoryRoute| {
+            ExternalRepositoryPackageLookupKey::new(
+                route.clone(),
+                PackageIdentifier::new(
+                    route.canonical_repo().clone(),
+                    PackagePath::parse("tools/test").unwrap(),
+                ),
+            )
+            .unwrap()
+        };
+        for hashes in [
+            [
+                key_hash(&HostRouteRepoFileKey::new(route_a.clone())),
+                key_hash(&HostRouteRepoFileKey::new(route_b.clone())),
+                key_hash(&HostRouteRepoFileKey::new(route_restored.clone())),
+            ],
+            [
+                key_hash(&HostRouteRepositoryIgnoreKey::new(route_a.clone())),
+                key_hash(&HostRouteRepositoryIgnoreKey::new(route_b.clone())),
+                key_hash(&HostRouteRepositoryIgnoreKey::new(route_restored.clone())),
+            ],
+            [
+                key_hash(&package_key(route_a)),
+                key_hash(&package_key(route_b)),
+                key_hash(&package_key(route_restored)),
+            ],
+        ] {
+            assert_eq!(hashes[0], hashes[2]);
+            assert_ne!(hashes[0], hashes[1]);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn builtin_optional_input_branches_preserve_natural_dependency_order() {
+        let repo_source = include_str!("repo_file.rs");
+        let repo_driver = &repo_source[repo_source
+            .find("async fn drive_host_route_repo_file")
+            .unwrap()..];
+        assert!(
+            repo_driver.find("is_builtin_bazel_tools").unwrap()
+                < repo_driver
+                    .find("RootRepoFileSemanticsProjectionKey")
+                    .unwrap()
+        );
+        let ignore_source = include_str!("repository_ignore.rs");
+        let ignore_driver = &ignore_source[ignore_source
+            .find("async fn drive_host_route_repository_ignore")
+            .unwrap()..];
+        assert!(
+            ignore_driver.find("is_builtin_bazel_tools").unwrap()
+                < ignore_driver
+                    .find("HostRepositorySourceFileKey::new")
+                    .unwrap()
+        );
+        let package_driver = &include_str!("host_package.rs")[include_str!("host_package.rs")
+            .find("async fn drive_external_repository_package_lookup")
+            .unwrap()..];
+        assert!(
+            package_driver.find("is_builtin_bazel_tools").unwrap()
+                < package_driver.find("HostRepositoryPathKey::new").unwrap()
+        );
     }
 
     #[cfg(unix)]

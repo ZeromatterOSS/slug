@@ -11,6 +11,7 @@
 #![allow(dead_code)] // Dormant until the root package-policy activation packet.
 
 use std::cell::RefCell;
+use std::ffi::OsStr;
 use std::fmt;
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -27,9 +28,12 @@ use slug_events_v2::EvaluationDiagnosticLevel;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
+use slug_identity_v2::PackagePath;
 use slug_starlark_v2::populate_universe;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathDirectoryEntryKind;
+use slug_workspace_v2::PathDirectoryListing;
 use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathOutcome;
 use starlark::PrintHandler;
@@ -66,6 +70,9 @@ use crate::host_file::HostFileBytesKey;
 use crate::host_file::HostFileBytesObservationKey;
 use crate::host_file::HostFileError;
 use crate::host_file::ObservedHostFileBytes;
+use crate::source_preparation::HostRepositoryDirectoryListingError;
+use crate::source_preparation::HostRepositoryDirectoryListingKey;
+use crate::source_preparation::HostRepositoryDirectoryListingObservationKey;
 use crate::source_preparation::HostRepositorySourceFileKey;
 use crate::source_preparation::HostRepositorySourceFileObservationKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
@@ -958,6 +965,8 @@ impl Key for HostRepoFileObservationKey {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) enum HostRouteRepoFileError {
     PolicyProjection(RootPackagePolicyProjectionError),
+    BuiltinListing(HostRepositoryDirectoryListingError),
+    BuiltinMetadata { actual: PathDirectoryEntryKind },
     Source(RepositorySourceFileError),
     Evaluation(HostRepoFileError),
 }
@@ -966,6 +975,11 @@ impl fmt::Display for HostRouteRepoFileError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::PolicyProjection(error) => error.fmt(f),
+            Self::BuiltinListing(error) => error.fmt(f),
+            Self::BuiltinMetadata { actual } => write!(
+                f,
+                "built-in REPO.bazel metadata has unsupported entry kind {actual:?}"
+            ),
             Self::Source(error) => write!(f, "failed to read routed REPO.bazel: {error:?}"),
             Self::Evaluation(error) => error.fmt(f),
         }
@@ -1324,6 +1338,70 @@ fn route_repo_complete(
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
 }
 
+async fn drive_builtin_route_repo_file(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostRouteRepoFileKey,
+    mode: HostRouteRepoFileMode,
+    capture_events: bool,
+) -> HostRouteRepoFileDriverOutcome {
+    let (listing, observations) = match mode {
+        HostRouteRepoFileMode::Legacy => match dice_invariant(
+            ctx.compute(&HostRepositoryDirectoryListingKey::new(
+                key.route.clone(),
+                PackagePath::root(),
+            ))
+            .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(listing) => (listing, PathObservationEpoch::empty()),
+        },
+        HostRouteRepoFileMode::Observed => {
+            let observed = match dice_invariant(
+                ctx.compute(&HostRepositoryDirectoryListingObservationKey::new(
+                    key.route.clone(),
+                    PackagePath::root(),
+                ))
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    return SourcePreparationOutcome::Complete(Err(error));
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => observed,
+            };
+            (
+                observed.result().as_ref().clone(),
+                observed.observations().dupe(),
+            )
+        }
+    };
+    let result = match listing {
+        Ok(PathDirectoryListing::Missing) => Ok(HostRepoFileValue::empty()),
+        Ok(PathDirectoryListing::Present(entries)) => entries
+            .entries()
+            .iter()
+            .find(|entry| entry.name().as_os_str() == OsStr::new("REPO.bazel"))
+            .map_or_else(
+                || Ok(HostRepoFileValue::empty()),
+                |entry| {
+                    Err(HostRouteRepoFileError::BuiltinMetadata {
+                        actual: entry.kind(),
+                    })
+                },
+            ),
+        Err(error) => Err(HostRouteRepoFileError::BuiltinListing(error)),
+    };
+    route_repo_complete(
+        ctx,
+        capture_events,
+        result,
+        observations,
+        EventBatch::empty(),
+    )
+}
+
 async fn drive_host_route_repo_file(
     ctx: &mut DiceComputations<'_>,
     key: &HostRouteRepoFileKey,
@@ -1334,6 +1412,9 @@ async fn drive_host_route_repo_file(
         .data
         .get::<CaptureEvaluationEvents>()
         .is_ok();
+    if key.route.is_builtin_bazel_tools() {
+        return drive_builtin_route_repo_file(ctx, key, mode, capture_events).await;
+    }
     let semantics = match dice_invariant(
         ctx.compute(&RootRepoFileSemanticsProjectionKey::new(
             key.route.workspace().dupe(),
