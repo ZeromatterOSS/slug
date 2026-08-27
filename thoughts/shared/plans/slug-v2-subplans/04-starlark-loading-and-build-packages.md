@@ -5247,6 +5247,37 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Exact utils leaf exports accepted; expand-dict export selected (2026-08-26)
+
+Commit `13ebf0a14` freezes all six remaining helper-free utils functions needed
+by exact `rust.bzl`, preserves their actual parent import order, and proves
+pointer-identical proof-only parent bindings without invocation. The +191
+proof/0 production change ends at 8,606; focused proof, 229 loading units, 24
+invalidation tests, 31 BUILD-loading tests, dependent checks, rebuilt CLI and
+hygiene pass. Independent review returned `ACCEPT`.
+
+Eight dependency-bearing imports remain. Source order first reaches
+`expand_dict_value_locations`. Its source-complete closure is only exact
+`utils.bzl:268-313` `_expand_location_for_build_script_runner` (46 lines,
+SHA-256 `73cd67a0bf9e2b370f7d287cefe1fa73efa20552a8f99f7cdb45ecf14c24d64d`)
+and `:315-348` `expand_dict_value_locations` (34 lines, SHA-256
+`0c8ce89317f00a453998d33aa2236824bff20eb6cdb0092dc5077604033e10bd`).
+The helper references only predeclared values and standard methods; no loaded
+provider, eager composite or other same-module definition enters the closure.
+
+Run only `WP-4-7A-rules-rust-utils-expand-dict-export-loading-proof` under
+0/180/180 caps in the existing proof owner. Freeze the two exact slices under
+the utils producer, prove both function bindings, import only the public export
+with actual `:utils.bzl` spelling in the proof-only exact parent, prove pointer
+identity and invoke neither function. Results, diagnostics, configured
+behavior, the other seven dependency-bearing exports, whole-utils freeze and
+the parent body remain deferred.
+
+Clean `../zabel` `0795445f…` guides only recursive defining-module helper
+retention. No Zig code, representation, traversal/order algorithm, diagnostic,
+identity or behavior is copied; pinned Bazel 9.2 resolver tests and the
+authenticated rules_rust source remain sole exact authority.
+
 ### Exact utils find-toolchain export accepted; leaf family selected (2026-08-26)
 
 Commit `d3cb959f6` freezes exact `utils.bzl:61-70` `find_toolchain` under
