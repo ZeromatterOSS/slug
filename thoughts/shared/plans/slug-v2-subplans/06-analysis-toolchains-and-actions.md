@@ -18815,3 +18815,101 @@ observation carrier, error projection and materialization namespaces are
 Slug-native. Selected-external subtree membership, target-pattern expansion,
 family filtering, registration activation, configured validation, rules and
 actions remain unsupported/deferred until their later packets.
+
+### Routed repository directory-listing owner accepted; external boundary projection designed (2026-08-27)
+
+Commit `0055c653b` accepts the missing route-owned direct-listing primitive.
+`HostRepositoryDirectoryListingKey` and its observed sibling retain the full
+`RootRepositoryRoute` plus a validated root-capable `PackagePath`. Direct-local,
+selected-registry and generated sources privately consume the existing
+materialization result and workspace listing owner in the correct Host or
+materialization namespace. Built-in `@bazel_tools` consumes a snapshot-keyed
+catalog listing which validates every catalog entry, deduplicates repeated
+prefixes, sorts direct children and distinguishes missing directories from
+catalog files without inventing a filesystem root.
+
+The public value reuses `PathDirectoryListing` and its immutable `Arc`-backed
+entry slice. Error carriers retain only the repository-relative package path,
+semantic tags and safe node metadata; upstream catalog, materialization,
+observation and compute payloads cannot leak a physical root or namespace via
+retained state, `Debug` or `Display`. Need remains transient, equality and
+validity are complete-only, observed outer errors are terminal, and exact path
+epochs are forwarded. No package policy, traversal, dependency, global cache,
+interner or manual lock was added.
+
+Focused tests cover seven routed listing cases plus two catalog cases. Full
+bzlmod tests pass with 561 units and all integration suites; the full loading
+suite, locked core check and rebuilt locked CLI also pass. One unrelated
+selected-graph order assertion failed once during the first full bzlmod run,
+then passed isolated and in the immediate full rerun. Formatting, scope,
+dependency, no-lock and diff gates pass at 556 production and 544 proof
+additions. The archive checker reports only its three recorded pre-existing
+thoughts-path findings. Independent DICE/source-boundary correction review
+returned `ACCEPT`.
+
+#### External package-boundary owner decision
+
+The next missing fact is now bounded. Pinned Bazel 9.2
+`PackageLookupFunction` validates the package name and checks
+`--deleted_packages` before external repository, ignore and marker lookup.
+`ProcessPackageDirectory` requests package existence and directory entries as
+sibling dependencies, while its child dependencies are filtered by the
+recursive key's `IgnoredSubdirectories`. `RecursivePkgKey` structurally retains
+repository, rooted directory and excluded paths. Therefore deleting the
+current package does not suppress traversal of its children, while an ignore
+match at the parent prevents the corresponding child recursive key.
+
+Slug's private `ExternalRepositoryPackageLookupKey` already owns validation,
+deleted policy, routed repository-ignore and `BUILD.bazel` before `BUILD`
+marker order, but it currently collapses both policy terminals to `Deleted`.
+Do not build a second policy owner. Preserve `Deleted` for deleted policy and
+add `IgnoredDirectory` at the ignore decision site, then add one doc-hidden
+projection analogous to `HostRootPackageBoundaryKey`:
+
+- `HostExternalPackageBoundaryKey` is the full authenticated route plus
+  root-capable package path;
+- it consumes only the private external lookup and reports invalid package,
+  deleted current package, ignored directory, selected package marker or no
+  package;
+- ignored directory is the only state which authorizes pruning descendants;
+  deleted and invalid suppress the current package while leaving traversal
+  policy to the later loading owner;
+- the package state exposes only the selected `BUILD.bazel` or `BUILD`
+  spelling, never a root or resolved path; and
+- public semantic errors are payload-free tags. Rich private lookup errors
+  remain available to existing package-source consumers but do not cross the
+  projection boundary.
+
+The observed projection forwards the private lookup epoch exactly and admits
+the same outer frontier. Both keys use complete-only equality/validity and
+ordinary cancellation. Retained state is one small terminal enum, optional
+static marker spelling, `Arc` result and existing epoch. It carries no mapping,
+source tree, package tree, physical root, namespace, evaluator heap or command
+scratch. A later caller merges the authenticated route predecessor epoch.
+
+This is a docs-only Slug-native DICE/public-boundary decision and activates no
+recursive membership or named Bazel surface. Existing point marker/ignore/
+deleted semantics remain exact within their admitted slice. Selected-external
+traversal, pattern expansion, name conflicts, family filtering, registration,
+configured validation, rules and actions remain unsupported/deferred. Bazel 9
+BCR Starlark remains the source of rules including `cc_internal`; `cc_common`
+is only a later generic host capability. Zabel's authenticated-source loading
+producer is concept/test guidance only.
+
+The private split has two existing consumers outside `host_package.rs`.
+Source preparation's direct-local include horizon must map both `Deleted` and
+`IgnoredDirectory` to its accepted `DirectLocalIncludePackageFailure::Deleted`;
+point package-source behavior must likewise remain unchanged. Existing host-
+package and source-preparation observation proofs must be updated to distinguish
+the private terminals while proving those consumer failures, ordering and
+equality do not change. Those production/proof files are therefore explicitly
+inside the successor allowlist; this is mechanical consumer preservation, not
+new ownership.
+
+Activate only
+`WP-4-5-7A-selected-external-package-boundary-projection-design`. Require
+independent architecture review. If accepted, select the bounded implementation
+packet recorded in the current manifest: split the private lookup terminal,
+add the small public projection module and tests, and export only its doc-hidden
+consumer surface. Stop before directory recursion, target-pattern expansion,
+package loading or registration activation.
