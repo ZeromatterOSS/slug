@@ -10512,6 +10512,76 @@ def _validate_extension(path, extensions, func = None, not_ext = [], fail = fail
         return
     fail("'%s' does not have any of the allowed extensions %s" % (path, ", ".join(extensions)))
 "###;
+const RULES_CC_CREATE_LINKER_INPUT_SOURCE: &str = r###"# Copyright 2025 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+This module contains functionality for creating linker inputs for C++ rules.
+"""
+
+load("//cc/private:cc_internal.bzl", _cc_internal = "cc_internal")
+
+_LinkerInputInfo = provider(
+    "LinkerInputInfo",
+    fields = {
+        "owner": "The owner of the linker input.",
+        "libraries": "A depset of libraries to link.",
+        "user_link_flags": "A list of user link flags.",
+        "additional_inputs": "A depset of non-code inputs.",
+        "linkstamps": "A depset of linkstamps.",
+    },
+)
+
+def create_linker_input(
+        *,
+        owner,
+        libraries = depset(),
+        user_link_flags = [],
+        additional_inputs = depset(),
+        linkstamps = depset()):
+    """Creates a LinkerInputInfo provider.
+
+    Args:
+        owner: The owner of the linker input.
+        libraries: A depset of libraries to link.
+        user_link_flags: A list of user link flags.
+        additional_inputs: A depset of non-code inputs.
+        linkstamps: A depset of linkstamps.
+
+    Returns:
+        A LinkerInputInfo provider.
+    """
+    options = []
+
+    if type(user_link_flags) == "depset":
+        options.extend(user_link_flags.to_list())
+    elif type(user_link_flags) == "list":
+        for flag in user_link_flags:
+            if type(flag) == "string":
+                options.append(flag)
+            elif type(flag) == "list":
+                options.extend(flag)
+            else:
+                fail("Elements of list in user_link_flags must be either Strings or lists.")
+
+    return _LinkerInputInfo(
+        owner = owner,
+        libraries = _cc_internal.freeze(libraries.to_list()),
+        user_link_flags = _cc_internal.freeze(options),
+        additional_inputs = _cc_internal.freeze(additional_inputs.to_list()),
+        linkstamps = _cc_internal.freeze(linkstamps.to_list()),
+    )
+"###;
 const RULES_CC_TOOLCHAIN_CONFIG_LIB_SOURCE: &str = r###"# Copyright 2018 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15018,6 +15088,78 @@ fn exact_rules_cc_create_library_to_link_freezes_complete_producer() {
     );
     expected.sort_unstable();
     assert_eq!(all, expected);
+}
+
+#[test]
+fn exact_rules_cc_create_linker_input_freezes_complete_producer() {
+    assert_eq!(RULES_CC_CREATE_LINKER_INPUT_SOURCE.lines().count(), 69);
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_CC_CREATE_LINKER_INPUT_SOURCE.as_bytes())
+        ),
+        "e4e8a7fc9d7be8edd40a2b95e72a96710c05d5bbd610b2c1cc2f274e3672cbd1"
+    );
+    let complete = complete_rules_cc_cc_info_children();
+    let child = (
+        "//cc/private:cc_internal.bzl",
+        complete[2].1.clone(),
+        complete[2].2.dupe(),
+    );
+    assert_eq!(
+        child.1.label,
+        CanonicalLabel::parse("@@rules_cc+//cc/private:cc_internal.bzl").unwrap()
+    );
+    assert!(child.1.repository_mapping.is_empty());
+    let module = eval_bzl_with_loaded_children(
+        RULES_CC_CREATE_LINKER_INPUT_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:create_linker_input.bzl")
+                .unwrap(),
+            workspace_path: PathBuf::from("/rules_cc/cc/private/link/create_linker_input.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+        &[child],
+    )
+    .unwrap();
+    let private = |name| module.get_any_visibility(name).unwrap().0;
+    assert!(
+        private("_cc_internal")
+            .value()
+            .ptr_eq(complete[2].2.get("cc_internal").unwrap().value())
+    );
+    assert!(module.get("_cc_internal").is_err());
+    let provider_binding = private("_LinkerInputInfo");
+    let provider = FrozenUserProviderCallable::from_value(provider_binding.value()).unwrap();
+    assert_eq!(
+        (provider.id().source_label(), provider.id().exported_name()),
+        (
+            "@@rules_cc+//cc/private/link:create_linker_input.bzl",
+            "_LinkerInputInfo"
+        )
+    );
+    assert!(module.get("_LinkerInputInfo").is_err());
+    assert_eq!(
+        module
+            .get("create_linker_input")
+            .unwrap()
+            .value()
+            .get_type(),
+        "function"
+    );
+    assert_eq!(
+        module.names().map(|name| name.as_str()).collect::<Vec<_>>(),
+        ["create_linker_input"]
+    );
+    let mut all = module
+        .names_any_visibility()
+        .map(|name| name.as_str())
+        .collect::<Vec<_>>();
+    all.sort_unstable();
+    assert_eq!(
+        all,
+        ["_LinkerInputInfo", "_cc_internal", "create_linker_input"]
+    );
 }
 
 #[test]
