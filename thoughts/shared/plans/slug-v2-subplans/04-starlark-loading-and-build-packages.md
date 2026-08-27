@@ -7074,8 +7074,9 @@ overlay leakage. The set proof includes non-aliasing copy and frozen mutation
 rejection. Full affected regressions and independent review pass.
 
 The required archive check then exposed one checker-only omission: its explicit
-V2 app list predates `app/slug_starlark_v2`. Run the bounded
-`WP-0-4-5-slug-starlark-archive-whitelist-correction` first. Then retry only
+V2 app list predated `app/slug_starlark_v2`. Commit `5c3b4492f` adds exactly
+that pathspec and restores the app gate without hiding the three longstanding
+thoughts baselines. Retry only
 `WP-4-7A-rules-cc-compilation-helper-complete-loading-proof-r2` under
 0/1050/1050 caps with the identical authenticated source and five accepted
 children, complete imported/eager identity and visibility, and no invocation.
