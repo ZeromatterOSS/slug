@@ -10954,6 +10954,65 @@ fn eval_global(source: &str, globals: &Globals) -> Result<FrozenModule, String> 
 }
 
 #[test]
+fn bazel_configuration_field_is_bzl_only_and_fails_closed() {
+    let bzl = loading_globals();
+    let binding = eval_global("FIELD = configuration_field", &bzl).unwrap();
+    assert_eq!(binding.get("FIELD").unwrap().value().get_type(), "function");
+    assert!(eval_global("FIELD = configuration_field", &build_file_loading_globals()).is_err());
+    for source in [
+        "X = configuration_field()",
+        "X = configuration_field('f')",
+        "X = configuration_field(name = 'n')",
+        "X = configuration_field('f', 'n', 'extra')",
+        "X = configuration_field(1, 'n')",
+        "X = configuration_field('f', 1)",
+    ] {
+        assert!(eval_global(source, &bzl).is_err(), "{source}");
+    }
+    assert!(
+        AstModule::parse(
+            "BUILD.bazel",
+            "X = configuration_field(fragment = 'f', fragment = 'again', name = 'n')".to_owned(),
+            &Dialect::Bazel
+        )
+        .is_err()
+    );
+    let error = |source| eval_global(source, &bzl).unwrap_err();
+    let diagnostic = |source| {
+        error(source)
+            .lines()
+            .find(|line| line.starts_with("error: "))
+            .unwrap()
+            .to_owned()
+    };
+    for source in [
+        "X = configuration_field('f', 'n')",
+        "X = configuration_field('f', name = 'n')",
+        "X = configuration_field(fragment = 'f', name = 'n')",
+        "X = configuration_field(name = 'n', fragment = 'f')",
+    ] {
+        assert_eq!(
+            diagnostic(source),
+            "error: configuration_field is unsupported in Slug loading"
+        );
+    }
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_cc+//cc/common:semantics.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_cc/cc/common/semantics.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let frozen = eval_bzl_with_identity(
+        "def deferred(): return configuration_field(fragment = 'f', name = 'n')\n",
+        owner,
+    )
+    .unwrap();
+    assert_eq!(
+        frozen.get("deferred").unwrap().value().get_type(),
+        "function"
+    );
+}
+
+#[test]
 fn bazel_zero_argument_depset_freezes_empty_in_bzl_and_build_globals() {
     let source = "events = []\ndef eager(a = depset(), b = depset(), c = depset(), d = depset(), e = depset()):\n    events.append(\"body\")\nEMPTY = depset()\nONE = depset([\"first\", \"second\"])\n";
     let bzl = eval_bzl_with_identity(

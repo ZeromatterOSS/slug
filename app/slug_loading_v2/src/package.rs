@@ -5795,6 +5795,14 @@ impl AllocFrozenValue for NativeModule {
     }
 }
 
+#[starlark_module]
+fn bzl_only_globals(builder: &mut GlobalsBuilder) {
+    fn configuration_field(fragment: &str, name: &str) -> anyhow::Result<NoneType> {
+        let _ = (fragment, name);
+        anyhow::bail!("configuration_field is unsupported in Slug loading")
+    }
+}
+
 fn complete_loading_globals(extensions: &[LibraryExtension], bool_config: bool) -> Globals {
     let mut globals = GlobalsBuilder::extended_by(extensions)
         .with(package_globals)
@@ -5802,6 +5810,7 @@ fn complete_loading_globals(extensions: &[LibraryExtension], bool_config: bool) 
     globals.set("native", NativeModule);
     globals.set("attr", AttrModule);
     if bool_config {
+        bzl_only_globals(&mut globals);
         globals.set("config", ConfigModule);
         globals.set("config_common", ConfigCommonModule);
         aspect_globals(&mut globals);
