@@ -5672,6 +5672,245 @@ def merge_compilation_outputs(*, compilation_outputs):
     )
 "###;
 
+const RULES_CC_SEMANTICS_SOURCE: &str = r###"# Copyright 2020 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Semantics for Bazel cc rules"""
+
+# Point virtual includes symlinks to the source root for better IDE integration.
+# See https://github.com/bazelbuild/bazel/pull/20540.
+# TODO: b/320980684 - Add a test that fails if this is flipped to True.
+USE_EXEC_ROOT_FOR_VIRTUAL_INCLUDES_SYMLINKS = False
+
+# TODO: b/142314377 - Cleanup this temporary flag.
+STRIP_INCLUDE_PREFIX_APPLIES_TO_TEXTUAL_HEADERS = True
+
+def _get_proto_aspects():
+    return []
+
+def _should_create_empty_archive():
+    return False
+
+def _validate_attributes(_ctx):
+    pass
+
+# buildifier: disable=unused-variable
+def _validate_layering_check_features(ctx, cc_toolchain, unsupported_features):
+    pass
+
+def _get_stl():
+    return attr.label()
+
+def _get_repo():
+    return "bazel_tools"
+
+def _get_platforms_root():
+    return "platforms//"
+
+def _additional_fragments():
+    return []
+
+def _get_licenses_attr():
+    # TODO(b/182226065): Change to applicable_licenses
+    return {}
+
+def _def_parser_computed_default(name, tags):
+    # This is needed to break the dependency cycle.
+    if "__DONT_DEPEND_ON_DEF_PARSER__" in tags or "def_parser" in name:
+        return None
+    else:
+        return Label("@bazel_tools//tools/def_parser:def_parser")
+
+def _get_def_parser():
+    return attr.label(
+        default = _def_parser_computed_default,
+        allow_single_file = True,
+        cfg = "exec",
+    )
+
+def _get_grep_includes():
+    return attr.label()
+
+def _get_runtimes_toolchain():
+    return []
+
+def _get_test_malloc_attr():
+    return {}
+
+def _get_coverage_attrs():
+    return {
+        "_lcov_merger": attr.label(
+            default = configuration_field(fragment = "coverage", name = "output_generator"),
+            executable = True,
+            cfg = config.exec(exec_group = "test"),
+        ),
+        "_collect_cc_coverage": attr.label(
+            default = "@bazel_tools//tools/test:collect_cc_coverage",
+            executable = True,
+            cfg = config.exec(exec_group = "test"),
+        ),
+    }  # buildifier: disable=unsorted-dict-items
+
+def _get_coverage_env(ctx):
+    return ctx.runfiles(), {}
+
+def _get_cc_runtimes(ctx, is_library):
+    if is_library:
+        return []
+
+    runtimes = [ctx.attr.link_extra_lib]
+
+    if ctx.fragments.cpp.custom_malloc != None:
+        runtimes.append(ctx.attr._default_malloc)
+    else:
+        runtimes.append(ctx.attr.malloc)
+
+    return runtimes
+
+def _get_cc_runtimes_copts(_ctx):
+    return []
+
+def _get_implementation_deps_allowed_attr():
+    return {}
+
+def _check_can_use_implementation_deps(ctx):
+    experimental_cc_implementation_deps = ctx.fragments.cpp.experimental_cc_implementation_deps()
+    if (not experimental_cc_implementation_deps and ctx.attr.implementation_deps):
+        fail("requires --experimental_cc_implementation_deps", attr = "implementation_deps")
+
+_WINDOWS_PLATFORM = Label("@platforms//os:windows")  # Resolve the label within builtins context
+
+def _get_linkstatic_default_for_test():
+    return select({
+        _WINDOWS_PLATFORM: True,
+        "//conditions:default": False,
+    })
+
+def _get_cc_link_memlimit(_compilation_mode, exec_info):
+    return exec_info
+
+def _get_nocopts_attr():
+    return {}
+
+def _is_allowed_nocopts(
+        nocopts):  # @unused
+    return False
+
+def _get_experimental_link_static_libraries_once(ctx):
+    return ctx.fragments.cpp.experimental_link_static_libraries_once()
+
+def _check_cc_shared_library_tags(_ctx):
+    pass
+
+def _cpp_modules_tools():
+    return {
+        "_aggregate_ddi": attr.label(
+            executable = True,
+            cfg = "exec",
+            default = "@" + _get_repo() + "//tools/cpp:aggregate-ddi",
+        ),
+        "_generate_modmap": attr.label(
+            executable = True,
+            cfg = "exec",
+            default = "@" + _get_repo() + "//tools/cpp:generate-modmap",
+        ),
+    }
+
+def _validate(_ctx, _rule_name):
+    pass
+
+def _validate_cc_compile_call(
+        *,
+        label,  # @unused
+        include_prefix,  # @unused
+        strip_include_prefix,  # @unused
+        additional_include_scanning_roots):
+    if additional_include_scanning_roots:
+        fail("The 'additional_include_scanning_roots' parameter doesn't do anything useful. " +
+             "This is only used internally for a mechanism we'd like to get rid of.")
+
+def _needs_include_validation(language):
+    return language == "c++" or language == "cpp" or language == None
+
+semantics = struct(
+    toolchain = "@bazel_tools//tools/cpp:toolchain_type",
+    validate = _validate,
+    allowlist_attrs = {},
+    ALLOWED_RULES_IN_DEPS = [
+        "cc_library",
+        "objc_library",
+        "cc_proto_library",
+        "cc_import",
+    ],
+    ALLOWED_FILES_IN_DEPS = [
+        ".ld",
+        ".lds",
+        ".ldscript",
+    ],
+    ALLOWED_RULES_WITH_WARNINGS_IN_DEPS = [],
+    validate_attributes = _validate_attributes,
+    validate_layering_check_features = _validate_layering_check_features,
+    get_repo = _get_repo,
+    get_platforms_root = _get_platforms_root,
+    additional_fragments = _additional_fragments,
+    get_licenses_attr = _get_licenses_attr,
+    get_def_parser = _get_def_parser,
+    get_stl = _get_stl,
+    should_create_empty_archive = _should_create_empty_archive,
+    get_grep_includes = _get_grep_includes,
+    get_implementation_deps_allowed_attr = _get_implementation_deps_allowed_attr,
+    check_can_use_implementation_deps = _check_can_use_implementation_deps,
+    get_linkstatic_default_for_test = _get_linkstatic_default_for_test,
+    get_cc_link_memlimit = _get_cc_link_memlimit,
+    get_runtimes_toolchain = _get_runtimes_toolchain,
+    get_test_malloc_attr = _get_test_malloc_attr,
+    get_cc_runtimes = _get_cc_runtimes,
+    get_cc_runtimes_copts = _get_cc_runtimes_copts,
+    get_coverage_attrs = _get_coverage_attrs,
+    get_coverage_env = _get_coverage_env,
+    get_proto_aspects = _get_proto_aspects,
+    get_nocopts_attr = _get_nocopts_attr,
+    is_allowed_nocopts = _is_allowed_nocopts,
+    get_experimental_link_static_libraries_once = _get_experimental_link_static_libraries_once,
+    cpp_modules_tools = _cpp_modules_tools,
+    check_cc_shared_library_tags = _check_cc_shared_library_tags,
+    BUILD_INFO_TRANLATOR_LABEL = "@bazel_tools//tools/build_defs/build_info:cc_build_info",
+    CC_PROTO_TOOLCHAIN = "@rules_cc//cc/proto:toolchain_type",
+    is_bazel = True,
+    validate_cc_compile_call = _validate_cc_compile_call,
+    needs_include_validation = _needs_include_validation,
+    extra_exec_groups = {},
+    dynamic_deps_extra_docs = "",
+    stamp_extra_docs = "",
+    malloc_docs = """
+ Override the default dependency on malloc.
+ <p>
+   By default, C++ binaries are linked against <code>//tools/cpp:malloc</code>,
+   which is an empty library so the binary ends up using libc malloc.
+   This label must refer to a <code>cc_library</code>. If compilation is for a non-C++
+   rule, this option has no effect. The value of this attribute is ignored if
+   <code>linkshared=True</code> is specified.
+ </p>
+""",
+    cc_binary_extra_docs = "",
+    cc_test_extra_docs = "",
+)
+"###;
+
+const SEMANTICS_FIELDS: &str = "toolchain validate allowlist_attrs ALLOWED_RULES_IN_DEPS ALLOWED_FILES_IN_DEPS ALLOWED_RULES_WITH_WARNINGS_IN_DEPS validate_attributes validate_layering_check_features get_repo get_platforms_root additional_fragments get_licenses_attr get_def_parser get_stl should_create_empty_archive get_grep_includes get_implementation_deps_allowed_attr check_can_use_implementation_deps get_linkstatic_default_for_test get_cc_link_memlimit get_runtimes_toolchain get_test_malloc_attr get_cc_runtimes get_cc_runtimes_copts get_coverage_attrs get_coverage_env get_proto_aspects get_nocopts_attr is_allowed_nocopts get_experimental_link_static_libraries_once cpp_modules_tools check_cc_shared_library_tags BUILD_INFO_TRANLATOR_LABEL CC_PROTO_TOOLCHAIN is_bazel validate_cc_compile_call needs_include_validation extra_exec_groups dynamic_deps_extra_docs stamp_extra_docs malloc_docs cc_binary_extra_docs cc_test_extra_docs";
+const SEMANTICS_FUNCTION_ROWS: &str = "validate|_validate validate_attributes|_validate_attributes validate_layering_check_features|_validate_layering_check_features get_repo|_get_repo get_platforms_root|_get_platforms_root additional_fragments|_additional_fragments get_licenses_attr|_get_licenses_attr get_def_parser|_get_def_parser get_stl|_get_stl should_create_empty_archive|_should_create_empty_archive get_grep_includes|_get_grep_includes get_implementation_deps_allowed_attr|_get_implementation_deps_allowed_attr check_can_use_implementation_deps|_check_can_use_implementation_deps get_linkstatic_default_for_test|_get_linkstatic_default_for_test get_cc_link_memlimit|_get_cc_link_memlimit get_runtimes_toolchain|_get_runtimes_toolchain get_test_malloc_attr|_get_test_malloc_attr get_cc_runtimes|_get_cc_runtimes get_cc_runtimes_copts|_get_cc_runtimes_copts get_coverage_attrs|_get_coverage_attrs get_coverage_env|_get_coverage_env get_proto_aspects|_get_proto_aspects get_nocopts_attr|_get_nocopts_attr is_allowed_nocopts|_is_allowed_nocopts get_experimental_link_static_libraries_once|_get_experimental_link_static_libraries_once cpp_modules_tools|_cpp_modules_tools check_cc_shared_library_tags|_check_cc_shared_library_tags validate_cc_compile_call|_validate_cc_compile_call needs_include_validation|_needs_include_validation";
+
 const RULES_CC_ACTION_NAMES_SOURCE: &str = r###"# Copyright 2018 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -8401,6 +8640,130 @@ fn exact_rules_cc_compilation_outputs_freezes_complete_producer() {
     .unwrap();
     assert_compilation_outputs_interfaces(&outputs, &children);
     assert_empty_compilation_outputs_shape(&outputs, &children[2].2);
+}
+
+fn assert_semantics_private_functions(module: &FrozenModule) {
+    let names = "_get_proto_aspects _should_create_empty_archive _validate_attributes _validate_layering_check_features _get_stl _get_repo _get_platforms_root _additional_fragments _get_licenses_attr _def_parser_computed_default _get_def_parser _get_grep_includes _get_runtimes_toolchain _get_test_malloc_attr _get_coverage_attrs _get_coverage_env _get_cc_runtimes _get_cc_runtimes_copts _get_implementation_deps_allowed_attr _check_can_use_implementation_deps _get_linkstatic_default_for_test _get_cc_link_memlimit _get_nocopts_attr _is_allowed_nocopts _get_experimental_link_static_libraries_once _check_cc_shared_library_tags _cpp_modules_tools _validate _validate_cc_compile_call _needs_include_validation";
+    assert_eq!(names.split_whitespace().count(), 30);
+    for name in names.split_whitespace() {
+        assert_eq!(
+            module
+                .get_any_visibility(name)
+                .unwrap()
+                .0
+                .value()
+                .get_type(),
+            "function"
+        );
+        assert!(module.get(name).is_err(), "{name}");
+    }
+}
+
+fn assert_semantics_struct(module: &FrozenModule) {
+    let binding = module.get("semantics").unwrap();
+    assert_eq!(binding.value().get_type(), "struct");
+    let semantics = StructRef::from_value(binding.value()).unwrap();
+    let mut names = semantics
+        .iter()
+        .map(|(name, _)| name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(names.len(), 43);
+    let mut expected_names = SEMANTICS_FIELDS.split_whitespace().collect::<Vec<_>>();
+    names.sort_unstable();
+    expected_names.sort_unstable();
+    assert_eq!(names, expected_names);
+    let field = |needle| {
+        semantics
+            .iter()
+            .find_map(|(name, value)| (name.as_str() == needle).then_some(value))
+            .unwrap()
+    };
+    assert_eq!(SEMANTICS_FUNCTION_ROWS.split_whitespace().count(), 29);
+    for row in SEMANTICS_FUNCTION_ROWS.split_whitespace() {
+        let (field_name, function_name) = row.split_once('|').unwrap();
+        assert!(
+            field(field_name).ptr_eq(module.get_any_visibility(function_name).unwrap().0.value())
+        );
+    }
+    for (name, expected) in [
+        ("toolchain", "@bazel_tools//tools/cpp:toolchain_type"),
+        (
+            "BUILD_INFO_TRANLATOR_LABEL",
+            "@bazel_tools//tools/build_defs/build_info:cc_build_info",
+        ),
+        ("CC_PROTO_TOOLCHAIN", "@rules_cc//cc/proto:toolchain_type"),
+        ("dynamic_deps_extra_docs", ""),
+        ("stamp_extra_docs", ""),
+        ("cc_binary_extra_docs", ""),
+        ("cc_test_extra_docs", ""),
+    ] {
+        assert_eq!(field(name).unpack_str(), Some(expected));
+    }
+    assert_eq!(field("is_bazel").unpack_bool(), Some(true));
+    for (name, expected) in [
+        (
+            "ALLOWED_RULES_IN_DEPS",
+            "cc_library objc_library cc_proto_library cc_import",
+        ),
+        ("ALLOWED_FILES_IN_DEPS", ".ld .lds .ldscript"),
+        ("ALLOWED_RULES_WITH_WARNINGS_IN_DEPS", ""),
+    ] {
+        let actual = FrozenListRef::from_value(field(name))
+            .unwrap()
+            .iter()
+            .map(|value| value.to_value().unpack_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected.split_whitespace().collect::<Vec<_>>());
+    }
+    for name in ["allowlist_attrs", "extra_exec_groups"] {
+        assert_eq!(DictRef::from_value(field(name)).unwrap().len(), 0);
+    }
+    assert_eq!(
+        field("malloc_docs").unpack_str(),
+        Some(
+            "\n Override the default dependency on malloc.\n <p>\n   By default, C++ binaries are linked against <code>//tools/cpp:malloc</code>,\n   which is an empty library so the binary ends up using libc malloc.\n   This label must refer to a <code>cc_library</code>. If compilation is for a non-C++\n   rule, this option has no effect. The value of this attribute is ignored if\n   <code>linkshared=True</code> is specified.\n </p>\n"
+        )
+    );
+}
+
+#[test]
+fn exact_rules_cc_semantics_freezes_complete_dependency_free_producer() {
+    assert_eq!(RULES_CC_SEMANTICS_SOURCE.lines().count(), 234);
+    assert_eq!(
+        format!("{:x}", Sha256::digest(RULES_CC_SEMANTICS_SOURCE.as_bytes())),
+        "029254fd58eb8b3bf32a0f772e479b991a51ce21a6f6cc8a5739aadbce3900da"
+    );
+    let module = eval_bzl_with_identity(
+        RULES_CC_SEMANTICS_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_cc+//cc/common:semantics.bzl").unwrap(),
+            workspace_path: PathBuf::from("/rules_cc/cc/common/semantics.bzl"),
+            repository_mapping: Arc::from([(
+                ApparentRepoName::new("platforms").unwrap(),
+                CanonicalRepoName::new("platforms+").unwrap(),
+            )]),
+        },
+    )
+    .unwrap();
+    for (name, value) in [
+        ("USE_EXEC_ROOT_FOR_VIRTUAL_INCLUDES_SYMLINKS", false),
+        ("STRIP_INCLUDE_PREFIX_APPLIES_TO_TEXTUAL_HEADERS", true),
+    ] {
+        assert_eq!(module.get(name).unwrap().unpack_bool(), Some(value));
+    }
+    let windows = module.get_any_visibility("_WINDOWS_PLATFORM").unwrap().0;
+    assert_eq!(windows.value().get_type(), "Label");
+    assert_eq!(
+        windows
+            .downcast::<StarlarkLabel>()
+            .unwrap()
+            .canonical()
+            .to_string(),
+        "@@platforms+//os:windows"
+    );
+    assert!(module.get("_WINDOWS_PLATFORM").is_err());
+    assert_semantics_private_functions(&module);
+    assert_semantics_struct(&module);
 }
 
 #[test]

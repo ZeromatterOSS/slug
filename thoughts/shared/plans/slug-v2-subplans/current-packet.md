@@ -53,11 +53,13 @@ diagnostic or behavior.
 
 - **Exact:** complete source/hash and dependency-free owner; both public Boolean
   constants; private Windows label value/type/visibility; all 30 private lazy
-  function types/visibility; exact 43-field `semantics` type, scalar/list/dict
-  values and order, and all 29 captured-function pointer identities.
+  function types/visibility; exact 43-field `semantics` name set and field-value
+  mappings, exact list order, and all 29 captured-function pointer identities.
 - **Slug-native:** realization through starlark-rust frozen values and one
   defining-module heap that owns the struct, aggregate children and captured
-  functions; the accepted configuration-field binding remains uncalled.
+  functions; schemaless struct iteration retains Slug constructor order rather
+  than Bazel's sorted order; the accepted configuration-field binding remains
+  uncalled.
 - **Unsupported/deferred:** any function or `configuration_field` invocation;
   returned semantics, late-bound descriptors/resolution, `compile.bzl`, actions,
   configuration-library/legacy-feature construction, private/public `cc_common`,
@@ -88,10 +90,11 @@ Caps are 0 production, 550 proof and 550 total additions; deletions do not buy
 budget. Embed/hash all 234 lines; evaluate dependency-free at exact owner
 `@@rules_cc+//cc/common:semantics.bzl` with `platforms -> platforms+` mapping;
 prove both public Boolean constants, private `@@platforms+//os:windows` label,
-all 30 private function types/visibility, and the exact 43-field public struct.
-Prove every captured function pointer-identical to its defining binding, exact
-strings/Booleans, exact three list contents/order, both empty dictionaries, and
-complete multiline `malloc_docs` bytes. Invoke nothing and add no fixture/oracle.
+all 30 private function types/visibility, and the exact 43-field name set of the
+public struct without claiming exact iteration order. Prove every captured
+function pointer-identical to its defining binding, exact strings/Booleans,
+exact three list contents/order, both empty dictionaries, and complete multiline
+`malloc_docs` bytes. Invoke nothing and add no fixture/oracle.
 
 Run focused proof, all `slug_loading_v2` library tests, `bzl_invalidation`,
 `build_file_loading`, locked analysis/core checks, locked CLI build, formatting,
