@@ -1,11 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-canonical-loading-source-address-implementation`
+Packet: `WP-4-5-7A-canonical-loading-source-address-implementation-r2`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `e47d5d4c8`.
+Base: `09de9af9e`.
 
 Result: implement the accepted Stage B source-address contract so canonical
 repository BUILD files, external subtree traversal and recursive `.bzl` loads
@@ -35,6 +35,14 @@ Commit `e47d5d4c8` freezes the independently reviewed Stage B architecture:
 - resolve canonical mapped child loads through the final canonical mapping and
   the child canonical load-route owner before observing child source.
 
+The first implementation preflight stopped before Rust edits. The canonical
+route exposes point lookup for parsed `load()` labels, but the generic
+evaluator also requires the complete final mapping for Starlark `Label()`
+construction inside BCR modules. Reconstructing it from observed loads would
+be incomplete, while copying route state into loading would create a second
+owner. R2 therefore admits one read-only projection on the existing canonical
+route owner and no route-production change.
+
 The existing `<output_base>/external/<canonical>/...` package directory and
 BUILD-file paths remain an explicitly Slug-native evaluator/publication
 projection. They are not source authority and may not be used for source IO.
@@ -56,17 +64,18 @@ compatibility authority.
 Change only these production files:
 
 1. `app/slug_bzlmod_v2/src/builtin_repository.rs`
-2. `app/slug_bzlmod_v2/src/host_package.rs`
-3. `app/slug_bzlmod_v2/src/lib.rs`
-4. `app/slug_loading_v2/src/bzl_module.rs`
-5. `app/slug_loading_v2/src/external_subtree_package_set.rs`
+2. `app/slug_bzlmod_v2/src/canonical_repository_route.rs`
+3. `app/slug_bzlmod_v2/src/host_package.rs`
+4. `app/slug_bzlmod_v2/src/lib.rs`
+5. `app/slug_loading_v2/src/bzl_module.rs`
+6. `app/slug_loading_v2/src/external_subtree_package_set.rs`
 
 Change only these proof files:
 
-6. `app/slug_bzlmod_v2/src/host_external_package_boundary/tests.rs`
-7. `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs`
-8. `app/slug_loading_v2/src/host_package_load_tests.rs`
-9. `app/slug_loading_v2/src/external_subtree_package_set_tests.rs`
+7. `app/slug_bzlmod_v2/src/host_external_package_boundary/tests.rs`
+8. `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs`
+9. `app/slug_loading_v2/src/host_package_load_tests.rs`
+10. `app/slug_loading_v2/src/external_subtree_package_set_tests.rs`
 
 The two active plan ledgers may record selection and completion. No Cargo,
 BUILD, dependency, fixture, oracle, lockfile, query/core/module-extension
@@ -94,6 +103,14 @@ Delete `BuiltinSourceAddressDeferred` only as the new discriminant becomes
 consumable in loading. Never turn a catalog-relative address into
 `NormalizedAbsolutePath`, a workspace path, an execroot path or an output-base
 path.
+
+Add one allocation-bounded read-only final-mapping projection to
+`HostCanonicalRepositoryRoute`. It returns the already-owned selected or
+generated apparent-to-canonical pairs in evaluator input shape and returns an
+empty mapping for the built-in route. It may not compute, cache, filter,
+reinterpret or become a second mapping owner. Loading uses this projection for
+the complete `BzlLoadManifest` repository mapping; parsed child `load()` labels
+still use `mapping_target` and the child canonical load-route key.
 
 ## Loading implementation
 
@@ -178,6 +195,8 @@ a demonstrated Bazel behavior gap exists:
   and `.bzl` label;
 - drop-before-publication and same-DICE recovery for canonical package and
   recursive `.bzl` loading;
+- complete canonical evaluator mapping, including a mapped `Label()` that is
+  not also present in a `load()` statement;
 - no production reference to a deleted temporary wrapper, no fabricated
   apparent alias and no fabricated absolute catalog path; and
 - retained-size bounds plus `Allocative` coverage for each changed or new
@@ -204,8 +223,8 @@ cannot accidentally become a parser name or publication path.
 
 ## Caps, validation and review
 
-Allow at most 1,400 net added production Rust lines, 2,200 proof Rust lines and
-3,600 aggregate Rust lines. Within those totals, cap `bzl_module.rs` at 950 net
+Allow at most 1,450 net added production Rust lines, 2,200 proof Rust lines and
+3,650 aggregate Rust lines. Within those totals, cap `bzl_module.rs` at 950 net
 production lines and any single proof file at 1,200 net lines. Functions are
 at most 120 lines. Extract narrow helpers inside the allowlist rather than
 expanding large drivers or performing adjacent cleanup.
@@ -241,7 +260,8 @@ absolute catalog-content path; source IO through a parser or presentation
 path; copied source bytes; a new interner/cache/dependency; a lock held across
 DICE compute; changed root output/error/event/dependency order; loading-owned
 catalog IO or materialization; retained parser scratch; canonical load-route
-production changes; query/core/module-extension production scope; Rust
+production changes or a second mapping owner; query/core/module-extension
+production scope; Rust
 ownership of BCR rule definitions or `cc_internal` control flow; a C++ parser
 or rule engine; or activation of registration/configured/rule/action behavior.
 
