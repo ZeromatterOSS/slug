@@ -1,37 +1,38 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-cc-cpp-link-action-complete-loading-proof`
+Packet: `WP-4-7A-rules-cc-lto-indexing-action-complete-loading-proof`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: freeze the authenticated complete 273-line rules_cc
-`cc/private/link/cpp_link_action.bzl` producer over its eight accepted children.
-Prove its complete imported/function surface without invocation.
+Result: freeze the authenticated complete 288-line rules_cc
+`cc/private/link/lto_indexing_action.bzl` producer over its seven accepted
+children. Prove its complete imported/function surface without invocation.
 
 ## Learned facts and decision
 
-Base implementation commit is `aa797d082` (`Prove complete C++ link finalizer
-freeze`). It byte-verifies all 469 finalizer lines over eight actual complete
-children and proves exact child mappings, fourteen imported identities, six
-function types/visibility and exact thirteen-public/twenty-all inventories
-without invocation. Focused, all 266 loading-library, 24/31 integration, locked
-analysis/core, CLI, format/diff/source and archive-baseline gates pass within
-0/678/678; independent review returned `ACCEPT`.
+Commit `8daf80a2c` accepts the complete 273-line `cpp_link_action.bzl` source
+over eight actual complete children. It proves all eleven imports, both lazy
+functions and exact ten-public/thirteen-all inventories without invocation.
+Focused, all 267 loading-library, 24/31 integration, locked analysis/core, CLI,
+format/diff/source and archive-baseline gates pass within 0/454/454;
+independent review returned `ACCEPT`.
 
-The first direct consumer is rules_cc 0.2.17
-`cc/private/link/cpp_link_action.bzl`, 273 lines, SHA-256
-`0cbe9d6b0ce0f6bea5abe1d9783b79435f495ba93bdaf402ad9539513a82223f`.
-All eight source-order children are accepted: skylib paths, helper,
-`cc_internal`, finalizer, link-build variables, LTO backends, target types and
-native `cc_common`.
+The direct parent is rules_cc 0.2.17
+`cc/private/link/cc_linking_helper.bzl`. Its source-order children through
+`cpp_link_action.bzl` and `create_library_to_link.bzl` are accepted; the first
+unresolved child is complete `lto_indexing_action.bzl`, 288 lines, SHA-256
+`03cb57e972bb7503d665ca56340a34fff3e6289f9c7a168ca87a427e57c66863`.
+All seven of that module's children are accepted: helper, `cc_internal`, LTO
+compilation context, link finalizer, link-build variables, LTO backends and
+target types.
 
-The module retains nine public and two private imported identities, one public
+The module retains eight public and one private imported identities, one public
 lazy function and one private lazy function. It has no other top-level binding
 shape and invokes nothing at top level.
 
-Run only `WP-4-7A-rules-cc-cpp-link-action-complete-loading-proof`. Do not
-invoke a function, inspect a callable default, create a link action or claim a
-consumer.
+Run only `WP-4-7A-rules-cc-lto-indexing-action-complete-loading-proof`. Do not
+invoke a function, inspect a callable default, register an action or claim the
+parent consumer.
 
 ## Authorities, ownership and compatibility
 
@@ -41,18 +42,19 @@ accepted complete-child and lazy-function regressions cover every top-level
 binding shape; invocation-oriented upstream tests are skipped because their
 configured toolchain/action behavior is an unsupported later phase. Clean
 `../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is concept-only
-peer guidance for defining-module ownership and retained frozen values. Copy no
-Zig code, representation, algorithm, diagnostic or behavior.
+peer guidance: its generic-evaluator/Bazel-host split and producer-owned frozen
+module lifetime support this architecture, but no Zig code, representation,
+algorithm, diagnostic or behavior may be copied.
 
-- **Exact:** complete source/hash/owner/mapping; all eight child labels and
-  mappings; eleven imported pointer identities/visibility; one public plus one
+- **Exact:** complete source/hash/owner/mapping; all seven child labels and
+  mappings; nine imported pointer identities/visibility; one public plus one
   private function types/visibility; exact public and all-visibility name sets.
 - **Slug-native:** realization through one starlark-rust frozen defining-module
-  heap retaining all eight child heaps and owning its functions.
+  heap retaining all seven child heaps and owning its functions.
 - **Unsupported/deferred:** every function invocation, signature/default-value
-  inspection and result; link/linkstamp/LTO variables, inputs, outputs, paths,
+  inspection and result; LTO/link variables, inputs, outputs, paths,
   toolchain/configuration behavior; action registration, ActionKey and
-  execution; private/public `cc_common` and configured C++ consumers.
+  execution; `cc_linking_helper.bzl` and configured C++ consumers.
 
 The frozen defining module is the natural producer and retained owner. No
 evaluator borrow or invocation value escapes. Request/revision, DICE,
@@ -65,36 +67,33 @@ Change only `app/slug_loading_v2/src/host_package_load_tests.rs`. The canonical,
 current and Stage 4 documents may change only after terminal acceptance to roll
 the result and next packet.
 
-At base `aa797d082` the Rust test authority is 22,975 lines, SHA-256
-`5879fbaf18c62fa186453ec1c271a9b7c84e1893ed980f10427107e702249f85`.
-Its final ceiling is 23,575 lines. Each new proof/helper function must remain at
+At base `8daf80a2c` the Rust test authority is 23,429 lines, SHA-256
+`fcf2592b332c98da3ad341212a2a9519a3da88f2f4a9d81fc305ba442338b283`.
+Its final ceiling is 24,054 lines. Each new proof/helper function must remain at
 most 120 physical lines. The oversized module remains cohesive around its
 private load harness and adjacent authenticated source constants; add no
 production responsibility or generic source archive.
 
-Caps are 0 production, 600 proof and 600 total additions; deletions do not buy
-budget. Embed/hash all 273 authenticated lines. Evaluate at exact owner
-`@@rules_cc+//cc/private/link:cpp_link_action.bzl`, path
-`/rules_cc/cc/private/link/cpp_link_action.bzl`, with exact
-`bazel_skylib -> bazel_skylib+` mapping and all accepted children at their
-actual defining identities.
+Caps are 0 production, 625 proof and 625 total additions; deletions do not buy
+budget. Embed/hash all 288 authenticated lines. Evaluate at exact owner
+`@@rules_cc+//cc/private/link:lto_indexing_action.bzl`, path
+`/rules_cc/cc/private/link/lto_indexing_action.bzl`, with empty owner mapping
+and all accepted children at their actual defining identities.
 
-Prove exact child mappings: skylib `paths.bzl`, `cc_internal.bzl`,
-`finalize_link_action.bzl`, `link_build_variables.bzl`, `target_types.bzl`, and
-`native_cc_common.bzl` have empty mappings; `cc_helper_internal.bzl` and
-`lto_backends.bzl` have `bazel_skylib -> bazel_skylib+`.
+Prove exact child mappings: `cc_helper_internal.bzl` and `lto_backends.bzl`
+carry `bazel_skylib -> bazel_skylib+`; `cc_internal.bzl`,
+`lto_compilation_context.bzl`, `finalize_link_action.bzl`,
+`link_build_variables.bzl` and `target_types.bzl` have empty mappings.
 
 Prove these public imports pointer-identical to their actual child exports:
-`paths`, `artifact_category` to `artifact_category_names`,
-`finalize_link_action`, `setup_linking_variables`,
-`create_shared_non_lto_artifacts`, `LINK_TARGET_TYPE`, `USE_ARCHIVER`,
-`USE_LINKER`, and `is_dynamic_library`. Prove private `_cc_internal`
-pointer-identical to `cc_internal`, private `_cc_common_internal`
-pointer-identical to `native_cc_common`, and both absent from public visibility.
+`root_relative_path`, `get_minimized_bitcode_or_self`, `finalize_link_action`,
+`setup_lto_indexing_variables`, `create_lto_backends`, `LINKING_MODE`,
+`LINK_TARGET_TYPE` and `is_dynamic_library`. Prove private `_cc_internal`
+pointer-identical to `cc_internal` and absent from public visibility.
 
-Prove public `link_action` and private `_map_linkstamps_to_outputs` are type
-`function` with exact visibility. Assert exact ten-public/thirteen-all name
-sets. Invoke nothing and add no fixture/oracle.
+Prove public `create_lto_artifacts_and_lto_indexing_action` and private
+`_lto_indexing_action` are type `function` with exact visibility. Assert exact
+nine-public/eleven-all name sets. Invoke nothing and add no fixture/oracle.
 
 Run focused proof, all `slug_loading_v2` library tests, `bzl_invalidation`,
 `build_file_loading`, locked analysis/core checks, locked CLI build, formatting,
@@ -108,11 +107,11 @@ global/evaluator shape, copied/narrowed source or child, incomplete binding
 coverage, invocation, callable-default inspection, lost imported identity,
 evaluator-borrowed value, action/consumer claim, unpinned source, copied Zabel
 content, dirty authority, allowlist escape or cap/function violation. Stop after
-this producer and re-audit its first consumer.
+this producer and re-audit `cc_linking_helper.bzl` in source order.
 
 ## Immediate predecessor
 
-Commit `aa797d082` accepts only complete link-finalizer defining-module
-freezing. `3b82f098c` accepts only link-build variables and `cb71a302d` accepts
-only the universal environment and bounded set subset. None accepts link-action
-function behavior, any configured C++ consumer or actions.
+Commit `8daf80a2c` accepts only complete C++ link-action defining-module
+freezing. `aa797d082` accepts only the link finalizer and `cb71a302d` accepts
+only the universal environment and bounded set subset. None accepts LTO-index
+function behavior, the parent helper, any configured C++ consumer or actions.

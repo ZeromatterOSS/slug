@@ -7324,3 +7324,25 @@ All eight children are accepted. Run only
 prove its complete eleven-import/two-function inventory and invoke nothing.
 Zabel remains peer ownership guidance; Bazel 9.2 and authenticated rules_cc
 bytes own compatibility.
+
+### Complete C++ link action accepted; LTO indexing action selected (2026-08-27)
+
+Commit `8daf80a2c` freezes all 273 authenticated C++ link-action lines over eight
+actual complete children. It proves all eleven imported identities, two
+function types/visibility and exact ten-public/thirteen-all inventories without
+invocation. All required suites pass at 0 production and 454 proof additions;
+independent review returned `ACCEPT`.
+
+The direct parent is complete `link/cc_linking_helper.bzl`. Recursive source
+order reaches accepted `cpp_link_action.bzl` and `create_library_to_link.bzl`,
+then first lacks `link/lto_indexing_action.bzl`, 288 lines, SHA-256
+`03cb57e972bb7503d665ca56340a34fff3e6289f9c7a168ca87a427e57c66863`.
+All seven of its children are accepted. Run only
+`WP-4-7A-rules-cc-lto-indexing-action-complete-loading-proof` under 0/625/625,
+prove its complete nine-import/two-function and nine-public/eleven-all
+inventories, and invoke nothing.
+
+Pinned Bazel 9.2 and authenticated BCR rules_cc bytes remain exact authority.
+Clean `../zabel` commit `0795445f…` is concept-only peer guidance for separating
+the generic evaluator from Bazel host APIs and retaining frozen values with
+their defining module; copy no Zig implementation or claimed behavior.
