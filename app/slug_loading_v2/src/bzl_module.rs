@@ -34,6 +34,11 @@ use sha2::Sha256;
 use slug_bzlmod_v2::HostRepositorySourceFileKey;
 use slug_bzlmod_v2::HostRepositorySourceFileObservationKey;
 use slug_bzlmod_v2::HostRepositorySourceFileValue;
+use slug_bzlmod_v2::HostRepositorySourceObservation;
+use slug_bzlmod_v2::HostRepositorySourceObservationEpochKey;
+use slug_bzlmod_v2::HostRepositorySourceObservationError;
+use slug_bzlmod_v2::HostRepositorySourceObservationKey;
+use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequest;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequests;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequestsError;
@@ -50,6 +55,7 @@ use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsObservationKey;
 use slug_bzlmod_v2::HostSelectedObservationFrontier;
 use slug_bzlmod_v2::LogicalSpan;
 use slug_bzlmod_v2::RepositoryPackageSource;
+use slug_bzlmod_v2::RepositoryPackageSourceAddress;
 use slug_bzlmod_v2::RepositoryPackageSourceError;
 use slug_bzlmod_v2::RepositoryPackageSourceKey;
 use slug_bzlmod_v2::RepositoryPackageSourceObservationKey;
@@ -69,6 +75,7 @@ use slug_bzlmod_v2::RootRepositoryRouteError;
 use slug_bzlmod_v2::RootRepositoryRouteKey;
 use slug_bzlmod_v2::RootRepositoryRouteObservationKey;
 use slug_bzlmod_v2::SourcePreparationOutcome;
+use slug_bzlmod_v2::host_repository_relative_path;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
@@ -93,6 +100,8 @@ use starlark::syntax::StringEncoding;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::HostCanonicalRepositoryLoadRouteKey;
+use crate::HostCanonicalRepositoryLoadRouteObservationKey;
 use crate::bzl_visibility::BzlLoadVisibility;
 use crate::bzl_visibility::BzlLoadVisibilityError;
 use crate::bzl_visibility::validate_bzl_load_visibility;
@@ -677,13 +686,30 @@ fn host_package_terminal(
     })
 }
 
+fn host_package_attempt_source_name(input: &HostPackageAttemptInput<'_>) -> String {
+    if input.package_identifier.repo().is_root() {
+        return input.build_file.display().to_string();
+    }
+    format!(
+        "{}//{}:{}",
+        input.package_identifier.repo(),
+        input.package,
+        input
+            .build_file
+            .file_name()
+            .expect("repository BUILD file has a basename")
+            .to_string_lossy()
+    )
+}
+
 #[allow(dead_code)]
 fn evaluate_host_package_attempt(
     input: &HostPackageAttemptInput<'_>,
     prepared: Arc<SmallMap<HostGlobLoadingRequest, HostGlobPrepared>>,
 ) -> HostPackageAttemptStep {
+    let source_name = host_package_attempt_source_name(input);
     let ast = match AstModule::parse_with_string_encoding(
-        &input.build_file.display().to_string(),
+        &source_name,
         input.source.as_ref().clone(),
         &Dialect::Bazel,
         StringEncoding::BazelInternal,
@@ -1029,7 +1055,7 @@ impl RepositoryBzlLabel {
         Ok(Self { package, target })
     }
 
-    fn canonical_label(&self, route: &RootRepositoryRoute) -> CanonicalLabel {
+    fn canonical_label(&self, route: &HostRepositorySourceRoute) -> CanonicalLabel {
         CanonicalLabel::parse(&format!(
             "{}//{}:{}",
             route.canonical_repo(),
@@ -1166,8 +1192,13 @@ fn resolve_external_load_label(
 
 #[derive(Debug, Clone)]
 struct ResolvedExternalBzlLoad {
-    route: RootRepositoryRoute,
+    route: HostRepositorySourceRoute,
     label: RepositoryBzlLabel,
+}
+
+enum ExternalBzlChildLoad {
+    Canonical(String),
+    Resolved(String, ResolvedExternalBzlLoad),
 }
 
 fn resolve_external_bzl_load_label(
@@ -1180,7 +1211,7 @@ fn resolve_external_bzl_load_label(
         slug_bzlmod_v2::RootRepositorySource::SelectedRegistry(_)
     ) {
         return resolve_external_load_label(package, load).map(|label| ResolvedExternalBzlLoad {
-            route: route.clone(),
+            route: HostRepositorySourceRoute::root(route.clone()),
             label,
         });
     }
@@ -1195,7 +1226,7 @@ fn resolve_external_bzl_load_label(
             })?,
         )
         .map(|label| ResolvedExternalBzlLoad {
-            route: route.clone(),
+            route: HostRepositorySourceRoute::root(route.clone()),
             label,
         });
     }
@@ -1222,9 +1253,57 @@ fn resolve_external_bzl_load_label(
         })?,
     )
     .map(|label| ResolvedExternalBzlLoad {
-        route: child_route,
+        route: HostRepositorySourceRoute::root(child_route),
         label,
     })
+}
+
+fn resolve_canonical_external_bzl_load_label(
+    route: &slug_bzlmod_v2::HostCanonicalRepositorySourceInput,
+    package: &PackagePath,
+    load: &str,
+) -> Result<(Option<CanonicalRepoName>, RepositoryBzlLabel), ExternalLoadLabelError> {
+    if let Some(target) = load.strip_prefix(':') {
+        return RepositoryBzlLabel::new(
+            package.clone(),
+            RootPackageBzlTarget::parse(target).map_err(|error| {
+                ExternalLoadLabelError::Target {
+                    load: Arc::from(load),
+                    error,
+                }
+            })?,
+        )
+        .map(|label| (None, label));
+    }
+    let apparent =
+        ApparentLabel::parse(load).map_err(|message| ExternalLoadLabelError::Invalid {
+            load: Arc::from(load),
+            message: Arc::from(message),
+        })?;
+    let child = if apparent.repo().is_root() {
+        None
+    } else {
+        Some(
+            route
+                .view()
+                .route()
+                .mapping_target(apparent.repo())
+                .cloned()
+                .ok_or_else(|| ExternalLoadLabelError::Repository {
+                    load: Arc::from(load),
+                })?,
+        )
+    };
+    RepositoryBzlLabel::new(
+        apparent.package().clone(),
+        RootPackageBzlTarget::parse(apparent.target().as_str()).map_err(|error| {
+            ExternalLoadLabelError::Target {
+                load: Arc::from(load),
+                error,
+            }
+        })?,
+    )
+    .map(|label| (child, label))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -1483,12 +1562,25 @@ impl fmt::Display for HostBzlModuleObservationKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(crate) struct ExternalBzlModuleEvalKey {
-    route: RootRepositoryRoute,
+    route: HostRepositorySourceRoute,
     label: RepositoryBzlLabel,
 }
 
 impl ExternalBzlModuleEvalKey {
     pub(crate) fn new(route: RootRepositoryRoute, label: RepositoryBzlLabel) -> Self {
+        Self {
+            route: HostRepositorySourceRoute::root(route),
+            label,
+        }
+    }
+    #[allow(dead_code)] // Direct canonical entry is exercised by the packet proof surface.
+    pub(crate) fn new_canonical(
+        input: slug_bzlmod_v2::HostCanonicalRepositorySourceInput,
+        label: RepositoryBzlLabel,
+    ) -> Self {
+        Self::from_source_route(HostRepositorySourceRoute::canonical(input), label)
+    }
+    fn from_source_route(route: HostRepositorySourceRoute, label: RepositoryBzlLabel) -> Self {
         Self { route, label }
     }
     fn canonical_label(&self) -> CanonicalLabel {
@@ -1509,18 +1601,12 @@ impl fmt::Display for ExternalBzlModuleEvalKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(crate) struct ExternalBzlCycleIdentity {
-    route: RootRepositoryRoute,
+    route: HostRepositorySourceRoute,
     label: RepositoryBzlLabel,
 }
 impl ExternalBzlCycleIdentity {
     pub(crate) fn canonical_label(&self) -> CanonicalLabel {
         self.label.canonical_label(&self.route)
-    }
-    fn source_key(&self) -> HostRepositorySourceFileObservationKey {
-        HostRepositorySourceFileObservationKey::new(
-            self.route.clone(),
-            self.label.repository_relative_path(),
-        )
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -1528,6 +1614,16 @@ pub(crate) struct ExternalBzlModuleObservationKey(ExternalBzlModuleEvalKey);
 impl ExternalBzlModuleObservationKey {
     pub(crate) fn new(route: RootRepositoryRoute, label: RepositoryBzlLabel) -> Self {
         Self(ExternalBzlModuleEvalKey::new(route, label))
+    }
+    #[allow(dead_code)] // Direct canonical entry is exercised by the packet proof surface.
+    pub(crate) fn new_canonical(
+        input: slug_bzlmod_v2::HostCanonicalRepositorySourceInput,
+        label: RepositoryBzlLabel,
+    ) -> Self {
+        Self(ExternalBzlModuleEvalKey::new_canonical(input, label))
+    }
+    fn from_source_route(route: HostRepositorySourceRoute, label: RepositoryBzlLabel) -> Self {
+        Self(ExternalBzlModuleEvalKey::from_source_route(route, label))
     }
     pub(crate) fn cycle_identity(&self) -> ExternalBzlCycleIdentity {
         self.0.cycle_identity()
@@ -1564,6 +1660,15 @@ pub(crate) enum ExternalBzlModuleError {
     Source {
         label: CanonicalLabel,
         error: RepositorySourceFileError,
+    },
+    SourceObservation {
+        label: CanonicalLabel,
+        error: HostRepositorySourceObservationError,
+    },
+    Route {
+        source: CanonicalLabel,
+        load: Arc<str>,
+        message: Arc<str>,
     },
     Absent {
         label: CanonicalLabel,
@@ -1602,6 +1707,12 @@ impl fmt::Display for ExternalBzlModuleError {
                 write!(f, "computing source for {label}: {message}")
             }
             Self::Source { label, error } => write!(f, "reading {label}: {error:?}"),
+            Self::SourceObservation { label, error } => write!(f, "reading {label}: {error}"),
+            Self::Route {
+                source,
+                load,
+                message,
+            } => write!(f, "resolving `{load}` from {source}: {message}"),
             Self::Absent { label } => write!(f, "cannot load '{label}': no such file"),
             Self::Encoding { label } => {
                 write!(
@@ -1626,12 +1737,14 @@ impl fmt::Display for ExternalBzlModuleError {
 impl std::error::Error for ExternalBzlModuleError {}
 
 impl ExternalBzlModuleError {
-    fn cycle(&self) -> Option<&ExternalBzlLoadCycle> {
+    pub(crate) fn cycle(&self) -> Option<&ExternalBzlLoadCycle> {
         match self {
             Self::Cycle(cycle) => Some(cycle),
             Self::Child { error, .. } => error.cycle(),
             Self::SourceCompute { .. }
             | Self::Source { .. }
+            | Self::SourceObservation { .. }
+            | Self::Route { .. }
             | Self::Absent { .. }
             | Self::Encoding { .. }
             | Self::Parse { .. }
@@ -1647,6 +1760,8 @@ impl ExternalBzlModuleError {
             Self::Child { error, .. } => error.missing_label(),
             Self::SourceCompute { .. }
             | Self::Source { .. }
+            | Self::SourceObservation { .. }
+            | Self::Route { .. }
             | Self::Encoding { .. }
             | Self::Parse { .. }
             | Self::LoadLabel { .. }
@@ -1866,6 +1981,7 @@ enum RepositoryPackageLoadErrorInner {
         package: PackagePath,
         message: Arc<str>,
     },
+    #[allow(dead_code)] // Retained for exact typed root-route error compatibility.
     LoadLabel {
         canonical_repo: CompactString,
         package: PackagePath,
@@ -2042,7 +2158,7 @@ impl std::error::Error for RepositoryPackageLoadError {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct RepositoryPackageLoadKey {
-    route: RootRepositoryRoute,
+    route: HostRepositorySourceRoute,
     package: PackagePath,
 }
 
@@ -2053,6 +2169,13 @@ pub struct RepositoryPackageLoadObservationKey(RepositoryPackageLoadKey);
 impl RepositoryPackageLoadObservationKey {
     pub fn new(route: RootRepositoryRoute, package: PackagePath) -> Self {
         Self(RepositoryPackageLoadKey::new(route, package))
+    }
+
+    pub fn new_canonical(
+        input: slug_bzlmod_v2::HostCanonicalRepositorySourceInput,
+        package: PackagePath,
+    ) -> Self {
+        Self(RepositoryPackageLoadKey::new_canonical(input, package))
     }
 }
 
@@ -2081,7 +2204,20 @@ impl ObservedRepositoryPackageLoad {
 
 impl RepositoryPackageLoadKey {
     pub fn new(route: RootRepositoryRoute, package: PackagePath) -> Self {
-        Self { route, package }
+        Self {
+            route: HostRepositorySourceRoute::root(route),
+            package,
+        }
+    }
+
+    pub fn new_canonical(
+        input: slug_bzlmod_v2::HostCanonicalRepositorySourceInput,
+        package: PackagePath,
+    ) -> Self {
+        Self {
+            route: HostRepositorySourceRoute::canonical(input),
+            package,
+        }
     }
 }
 
@@ -3745,8 +3881,12 @@ enum ExternalBzlModuleMode {
 }
 
 enum ExternalBzlSourceChild {
-    Value(
+    Root(
         Result<HostRepositorySourceFileValue, RepositorySourceFileError>,
+        PathObservationEpoch,
+    ),
+    Canonical(
+        Arc<Result<HostRepositorySourceObservation, HostRepositorySourceObservationError>>,
         PathObservationEpoch,
     ),
     Compute(Arc<str>),
@@ -3772,8 +3912,63 @@ fn external_bzl_complete(
 ) -> ExternalBzlDriverOutcome {
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
 }
-type ExternalBzlSourceValue = (Arc<[u8]>, NormalizedAbsolutePath, PathObservationEpoch);
+#[derive(Debug)]
+struct ExternalBzlSourceValue {
+    bytes: Arc<[u8]>,
+    source_name: String,
+    presentation_path: PathBuf,
+    observations: PathObservationEpoch,
+}
+
 fn finish_external_bzl_source(
+    child: ExternalBzlSourceChild,
+    label: CanonicalLabel,
+) -> Result<ExternalBzlSourceValue, ExternalBzlDriverOutcome> {
+    match child {
+        ExternalBzlSourceChild::Root(result, observations) => {
+            finish_root_external_bzl_source(result, label, observations)
+        }
+        ExternalBzlSourceChild::Canonical(result, observations) => {
+            let source_name = label.to_string();
+            let presentation_path = PathBuf::from(&source_name);
+            match result.as_ref() {
+                Ok(HostRepositorySourceObservation::Builtin(value)) => Ok(ExternalBzlSourceValue {
+                    bytes: value.bytes_arc().dupe(),
+                    source_name,
+                    presentation_path,
+                    observations,
+                }),
+                Ok(HostRepositorySourceObservation::Request(
+                    HostRepositorySourceFileValue::Present { bytes, .. },
+                )) => Ok(ExternalBzlSourceValue {
+                    bytes: bytes.dupe(),
+                    source_name,
+                    presentation_path,
+                    observations,
+                }),
+                Ok(HostRepositorySourceObservation::Request(
+                    HostRepositorySourceFileValue::Absent,
+                )) => Err(external_bzl_complete(
+                    Err(ExternalBzlModuleError::Absent { label }),
+                    observations,
+                )),
+                Err(error) => Err(external_bzl_complete(
+                    Err(ExternalBzlModuleError::SourceObservation {
+                        label,
+                        error: error.clone(),
+                    }),
+                    observations,
+                )),
+            }
+        }
+        ExternalBzlSourceChild::Compute(message) => Err(external_bzl_complete(
+            Err(ExternalBzlModuleError::SourceCompute { label, message }),
+            PathObservationEpoch::empty(),
+        )),
+    }
+}
+
+fn finish_root_external_bzl_source(
     result: Result<HostRepositorySourceFileValue, RepositorySourceFileError>,
     label: CanonicalLabel,
     observations: PathObservationEpoch,
@@ -3782,7 +3977,18 @@ fn finish_external_bzl_source(
         Ok(HostRepositorySourceFileValue::Present {
             bytes,
             logical_path,
-        }) => Ok((bytes, logical_path, observations)),
+        }) => match external_source_name(&logical_path) {
+            Ok(source_name) => Ok(ExternalBzlSourceValue {
+                bytes,
+                source_name,
+                presentation_path: logical_path.as_path().to_path_buf(),
+                observations,
+            }),
+            Err(()) => Err(external_bzl_complete(
+                Err(ExternalBzlModuleError::Encoding { label }),
+                observations,
+            )),
+        },
         Ok(HostRepositorySourceFileValue::Absent) => Err(external_bzl_complete(
             Err(ExternalBzlModuleError::Absent { label }),
             observations,
@@ -3800,17 +4006,72 @@ async fn compute_external_bzl_source(
     mode: ExternalBzlModuleMode,
 ) -> SourcePreparationOutcome<Result<ExternalBzlSourceChild, ObservedPathFrontierError>> {
     let source_path = key.label.repository_relative_path();
+    let HostRepositorySourceRoute::Root(route) = &key.route else {
+        let HostRepositorySourceRoute::Canonical(input) = &key.route else {
+            unreachable!()
+        };
+        let relative = host_repository_relative_path(source_path)
+            .expect("typed external bzl labels form repository-relative paths");
+        return match mode {
+            ExternalBzlModuleMode::Legacy => match ctx
+                .compute(&HostRepositorySourceObservationKey::new_canonical(
+                    input.clone(),
+                    relative,
+                ))
+                .await
+            {
+                Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+                Ok(SourcePreparationOutcome::Complete(result)) => {
+                    SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Canonical(
+                        result,
+                        PathObservationEpoch::empty(),
+                    )))
+                }
+                Err(error) => SourcePreparationOutcome::Complete(Ok(
+                    ExternalBzlSourceChild::Compute(Arc::from(error.to_string())),
+                )),
+            },
+            ExternalBzlModuleMode::Observed => match ctx
+                .compute(&HostRepositorySourceObservationEpochKey::new_canonical(
+                    input.clone(),
+                    relative,
+                ))
+                .await
+            {
+                Ok(outcome) => match external_bzl_observed_child(outcome) {
+                    ControlFlow::Continue(source) => {
+                        SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Canonical(
+                            source.result().dupe(),
+                            source.observations().dupe(),
+                        )))
+                    }
+                    ControlFlow::Break(SourcePreparationOutcome::Need(need)) => {
+                        SourcePreparationOutcome::Need(need)
+                    }
+                    ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error))) => {
+                        SourcePreparationOutcome::Complete(Err(error))
+                    }
+                    ControlFlow::Break(SourcePreparationOutcome::Complete(Ok(()))) => {
+                        unreachable!()
+                    }
+                },
+                Err(error) => SourcePreparationOutcome::Complete(Ok(
+                    ExternalBzlSourceChild::Compute(Arc::from(error.to_string())),
+                )),
+            },
+        };
+    };
     match mode {
         ExternalBzlModuleMode::Legacy => match ctx
             .compute(&HostRepositorySourceFileKey::new(
-                key.route.clone(),
+                route.clone(),
                 source_path,
             ))
             .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(result)) => {
-                SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Value(
+                SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Root(
                     result,
                     PathObservationEpoch::empty(),
                 )))
@@ -3821,14 +4082,14 @@ async fn compute_external_bzl_source(
         },
         ExternalBzlModuleMode::Observed => match ctx
             .compute(&HostRepositorySourceFileObservationKey::new(
-                key.route.clone(),
+                route.clone(),
                 source_path,
             ))
             .await
         {
             Ok(outcome) => match external_bzl_observed_child(outcome) {
                 ControlFlow::Continue(source) => {
-                    SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Value(
+                    SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Root(
                         source.result().as_ref().clone(),
                         source.observations().dupe(),
                     )))
@@ -3863,7 +4124,17 @@ async fn complete_observed_external_bzl_cycle(
             .expect("detected external bzl cycle contains the current observed module");
         for offset in 1..cycle.keys.len() {
             let identity = &cycle.keys[(current_index + offset) % cycle.keys.len()];
-            let source = match host_dice_invariant(ctx.compute(&identity.source_key()).await) {
+            let source_key = ExternalBzlModuleEvalKey::from_source_route(
+                identity.route.clone(),
+                identity.label.clone(),
+            );
+            let source = match compute_external_bzl_source(
+                ctx,
+                &source_key,
+                ExternalBzlModuleMode::Observed,
+            )
+            .await
+            {
                 SourcePreparationOutcome::Need(need) => {
                     return SourcePreparationOutcome::Need(need);
                 }
@@ -3872,17 +4143,13 @@ async fn complete_observed_external_bzl_cycle(
                 }
                 SourcePreparationOutcome::Complete(Ok(source)) => source,
             };
-            observations = match union_host_observations(&observations, source.observations()) {
+            let finished = match finish_external_bzl_source(source, identity.canonical_label()) {
+                Ok(source) => source,
+                Err(value) => return value,
+            };
+            observations = match union_host_observations(&observations, &finished.observations) {
                 Ok(observations) => observations,
                 Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
-            };
-            observations = match finish_external_bzl_source(
-                source.result().as_ref().clone(),
-                identity.canonical_label(),
-                observations,
-            ) {
-                Ok((_, _, observations)) => observations,
-                Err(value) => return value,
             };
         }
     }
@@ -3900,7 +4167,7 @@ enum ExternalBzlRecursiveChild {
 
 async fn compute_external_bzl_child(
     ctx: &mut DiceComputations<'_>,
-    route: &RootRepositoryRoute,
+    route: &HostRepositorySourceRoute,
     label: RepositoryBzlLabel,
     mode: ExternalBzlModuleMode,
 ) -> SourcePreparationOutcome<Result<ExternalBzlRecursiveChild, ObservedPathFrontierError>> {
@@ -3908,7 +4175,7 @@ async fn compute_external_bzl_child(
         .expect("external Bzl loading requires the request cycle detector");
     match mode {
         ExternalBzlModuleMode::Legacy => {
-            let child = ExternalBzlModuleEvalKey::new(route.clone(), label);
+            let child = ExternalBzlModuleEvalKey::from_source_route(route.clone(), label);
             match guard.guard_this(ctx.compute(&child)).await {
                 Ok(Ok(SourcePreparationOutcome::Need(need))) => {
                     SourcePreparationOutcome::Need(need)
@@ -3928,7 +4195,7 @@ async fn compute_external_bzl_child(
             }
         }
         ExternalBzlModuleMode::Observed => {
-            let child = ExternalBzlModuleObservationKey::new(route.clone(), label);
+            let child = ExternalBzlModuleObservationKey::from_source_route(route.clone(), label);
             match guard.guard_this(ctx.compute(&child)).await {
                 Ok(Ok(outcome)) => match external_bzl_observed_child(outcome) {
                     ControlFlow::Continue(value) => {
@@ -3962,15 +4229,216 @@ fn external_source_name(logical_path: &NormalizedAbsolutePath) -> Result<String,
     starlark_source_name(logical_path.as_path()).ok_or(())
 }
 
+fn external_repository_mapping(
+    route: &HostRepositorySourceRoute,
+) -> Arc<[(ApparentRepoName, CanonicalRepoName)]> {
+    match route {
+        HostRepositorySourceRoute::Root(route) => route.bzl_repository_mapping(),
+        HostRepositorySourceRoute::Canonical(input) => {
+            input.view().route().bzl_repository_mapping()
+        }
+    }
+}
+
+fn external_load_resolution_error(
+    source: CanonicalLabel,
+    load: &str,
+    message: impl Into<Arc<str>>,
+    observations: PathObservationEpoch,
+) -> ExternalBzlDriverOutcome {
+    external_bzl_complete(
+        Err(ExternalBzlModuleError::Route {
+            source,
+            load: Arc::from(load),
+            message: message.into(),
+        }),
+        observations,
+    )
+}
+
+async fn compute_canonical_external_child_input(
+    ctx: &mut DiceComputations<'_>,
+    workspace: NormalizedAbsolutePath,
+    child_repo: CanonicalRepoName,
+    source: CanonicalLabel,
+    load: &str,
+    mode: ExternalBzlModuleMode,
+    observations: PathObservationEpoch,
+) -> ControlFlow<
+    ExternalBzlDriverOutcome,
+    (
+        slug_bzlmod_v2::HostCanonicalRepositorySourceInput,
+        PathObservationEpoch,
+    ),
+> {
+    match mode {
+        ExternalBzlModuleMode::Legacy => match ctx
+            .compute(&HostCanonicalRepositoryLoadRouteKey::new(
+                workspace, child_repo,
+            ))
+            .await
+        {
+            Err(error) => ControlFlow::Break(external_load_resolution_error(
+                source,
+                load,
+                Arc::from(format!("{error:?}")),
+                observations,
+            )),
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                ControlFlow::Break(SourcePreparationOutcome::Need(need))
+            }
+            Ok(SourcePreparationOutcome::Complete(result)) => match result.as_ref() {
+                Ok(route) => ControlFlow::Continue((route.input().clone(), observations)),
+                Err(error) => ControlFlow::Break(external_load_resolution_error(
+                    source,
+                    load,
+                    Arc::from(error.to_string()),
+                    observations,
+                )),
+            },
+        },
+        ExternalBzlModuleMode::Observed => match ctx
+            .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+                workspace, child_repo,
+            ))
+            .await
+        {
+            Err(error) => ControlFlow::Break(external_load_resolution_error(
+                source,
+                load,
+                Arc::from(format!("{error:?}")),
+                observations,
+            )),
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                ControlFlow::Break(SourcePreparationOutcome::Need(need))
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                ControlFlow::Break(external_load_resolution_error(
+                    source,
+                    load,
+                    Arc::from(format!("{error:?}")),
+                    observations,
+                ))
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                let observations =
+                    match union_host_observations(&observations, observed.observations()) {
+                        Ok(observations) => observations,
+                        Err(error) => {
+                            return ControlFlow::Break(SourcePreparationOutcome::Complete(Err(
+                                error,
+                            )));
+                        }
+                    };
+                match observed.result().as_ref() {
+                    Ok(route) => ControlFlow::Continue((route.input().clone(), observations)),
+                    Err(error) => ControlFlow::Break(external_load_resolution_error(
+                        source,
+                        load,
+                        Arc::from(error.to_string()),
+                        observations,
+                    )),
+                }
+            }
+        },
+    }
+}
+
+async fn resolve_external_bzl_child_route(
+    ctx: &mut DiceComputations<'_>,
+    route: &HostRepositorySourceRoute,
+    package: &PackagePath,
+    source: CanonicalLabel,
+    mode: ExternalBzlModuleMode,
+    load: &str,
+    observations: PathObservationEpoch,
+) -> ControlFlow<ExternalBzlDriverOutcome, (ResolvedExternalBzlLoad, PathObservationEpoch)> {
+    let HostRepositorySourceRoute::Canonical(input) = route else {
+        let HostRepositorySourceRoute::Root(route) = route else {
+            unreachable!()
+        };
+        return match resolve_external_bzl_load_label(route, package, load) {
+            Ok(resolved) => ControlFlow::Continue((resolved, observations)),
+            Err(error) => ControlFlow::Break(external_bzl_complete(
+                Err(ExternalBzlModuleError::LoadLabel { source, error }),
+                observations,
+            )),
+        };
+    };
+    let (child_repo, label) = match resolve_canonical_external_bzl_load_label(input, package, load)
+    {
+        Ok(resolved) => resolved,
+        Err(error) => {
+            return ControlFlow::Break(external_bzl_complete(
+                Err(ExternalBzlModuleError::LoadLabel { source, error }),
+                observations,
+            ));
+        }
+    };
+    let Some(child_repo) = child_repo else {
+        return ControlFlow::Continue((
+            ResolvedExternalBzlLoad {
+                route: route.clone(),
+                label,
+            },
+            observations,
+        ));
+    };
+    let (child_input, observations) = match compute_canonical_external_child_input(
+        ctx,
+        route.workspace().dupe(),
+        child_repo,
+        source,
+        load,
+        mode,
+        observations,
+    )
+    .await
+    {
+        ControlFlow::Continue(value) => value,
+        ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
+    };
+    ControlFlow::Continue((
+        ResolvedExternalBzlLoad {
+            route: HostRepositorySourceRoute::canonical(child_input),
+            label,
+        },
+        observations,
+    ))
+}
+
 async fn compute_external_bzl_children(
     ctx: &mut DiceComputations<'_>,
     key: &ExternalBzlModuleEvalKey,
     mode: ExternalBzlModuleMode,
-    resolved_loads: Vec<(String, ResolvedExternalBzlLoad)>,
+    loads: Vec<ExternalBzlChildLoad>,
     mut observations: PathObservationEpoch,
 ) -> ControlFlow<ExternalBzlDriverOutcome, (Vec<(String, FrozenBzlModule)>, PathObservationEpoch)> {
-    let mut loaded_modules = Vec::with_capacity(resolved_loads.len());
-    for (raw_load, resolved) in resolved_loads {
+    let mut loaded_modules = Vec::with_capacity(loads.len());
+    for load in loads {
+        let (raw_load, resolved, incoming) = match load {
+            ExternalBzlChildLoad::Resolved(raw_load, resolved) => {
+                (raw_load, resolved, observations)
+            }
+            ExternalBzlChildLoad::Canonical(raw_load) => {
+                let (resolved, incoming) = match resolve_external_bzl_child_route(
+                    ctx,
+                    &key.route,
+                    &key.label.package,
+                    key.canonical_label(),
+                    mode,
+                    &raw_load,
+                    observations,
+                )
+                .await
+                {
+                    ControlFlow::Continue(resolved) => resolved,
+                    ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
+                };
+                (raw_load, resolved, incoming)
+            }
+        };
+        observations = incoming;
         let child_label = resolved.label.canonical_label(&resolved.route);
         let child =
             match compute_external_bzl_child(ctx, &resolved.route, resolved.label, mode).await {
@@ -4049,113 +4517,56 @@ async fn compute_external_bzl_children(
     ControlFlow::Continue((loaded_modules, observations))
 }
 
-async fn compute_external_bzl_module(
-    ctx: &mut DiceComputations<'_>,
+fn prepare_external_bzl_child_loads(
     key: &ExternalBzlModuleEvalKey,
-    mode: ExternalBzlModuleMode,
+    loads: &[String],
+    source: CanonicalLabel,
+    observations: &PathObservationEpoch,
+) -> Result<Vec<ExternalBzlChildLoad>, ExternalBzlDriverOutcome> {
+    let HostRepositorySourceRoute::Root(route) = &key.route else {
+        return Ok(loads
+            .iter()
+            .cloned()
+            .map(ExternalBzlChildLoad::Canonical)
+            .collect());
+    };
+    loads
+        .iter()
+        .map(|load| {
+            resolve_external_bzl_load_label(route, &key.label.package, load)
+                .map(|resolved| ExternalBzlChildLoad::Resolved(load.clone(), resolved))
+                .map_err(|error| {
+                    external_bzl_complete(
+                        Err(ExternalBzlModuleError::LoadLabel {
+                            source: source.clone(),
+                            error,
+                        }),
+                        observations.dupe(),
+                    )
+                })
+        })
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn evaluate_external_bzl_module(
+    route: &HostRepositorySourceRoute,
+    canonical_label: CanonicalLabel,
+    presentation_path: PathBuf,
+    source_text: Arc<String>,
+    ast: AstModule,
+    loads: Vec<String>,
+    loaded_modules: Vec<(String, FrozenBzlModule)>,
+    observations: PathObservationEpoch,
     capture_events: bool,
     event_batch: &mut Option<EventBatch>,
 ) -> ExternalBzlDriverOutcome {
-    let canonical_label = key.canonical_label();
-    let source = match compute_external_bzl_source(ctx, key, mode).await {
-        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
-        SourcePreparationOutcome::Complete(Err(error)) => {
-            return SourcePreparationOutcome::Complete(Err(error));
-        }
-        SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Compute(message))) => {
-            return external_bzl_complete(
-                Err(ExternalBzlModuleError::SourceCompute {
-                    label: canonical_label,
-                    message,
-                }),
-                PathObservationEpoch::empty(),
-            );
-        }
-        SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Value(
-            result,
-            observations,
-        ))) => match finish_external_bzl_source(result, canonical_label.clone(), observations) {
-            Ok(source) => source,
-            Err(value) => return value,
-        },
-    };
-    let (bytes, logical_path, observations) = source;
-    let source_text = match String::from_utf8(bytes.to_vec()) {
-        Ok(source) => Arc::new(source),
-        Err(_) => {
-            return external_bzl_complete(
-                Err(ExternalBzlModuleError::Encoding {
-                    label: canonical_label,
-                }),
-                observations,
-            );
-        }
-    };
-    let source_name = match external_source_name(&logical_path) {
-        Ok(source_name) => source_name,
-        Err(()) => {
-            return external_bzl_complete(
-                Err(ExternalBzlModuleError::Encoding {
-                    label: canonical_label,
-                }),
-                observations,
-            );
-        }
-    };
-    let ast = match AstModule::parse_with_string_encoding(
-        &source_name,
-        source_text.as_ref().clone(),
-        &Dialect::Bazel,
-        StringEncoding::BazelInternal,
-    ) {
-        Ok(ast) => ast,
-        Err(error) => {
-            return external_bzl_complete(
-                Err(ExternalBzlModuleError::Parse {
-                    label: canonical_label,
-                    message: Arc::from(error.to_string()),
-                }),
-                observations,
-            );
-        }
-    };
-    let loads = ast
-        .loads()
-        .into_iter()
-        .map(|load| load.module_id.to_owned())
-        .collect::<Vec<_>>();
-    let resolved_loads = match loads
-        .iter()
-        .map(|load| {
-            resolve_external_bzl_load_label(&key.route, &key.label.package, load)
-                .map(|label| (load.clone(), label))
-        })
-        .collect::<Result<Vec<_>, _>>()
-    {
-        Ok(loads) => loads,
-        Err(error) => {
-            return external_bzl_complete(
-                Err(ExternalBzlModuleError::LoadLabel {
-                    source: canonical_label,
-                    error,
-                }),
-                observations,
-            );
-        }
-    };
-
-    let (loaded_modules, observations) =
-        match compute_external_bzl_children(ctx, key, mode, resolved_loads, observations).await {
-            ControlFlow::Continue(value) => value,
-            ControlFlow::Break(value) => return value,
-        };
-
     let module = Module::new();
     let manifest = BzlLoadManifest::new(
         BzlModuleIdentity {
             label: canonical_label.clone(),
-            workspace_path: logical_path.as_path().to_path_buf(),
-            repository_mapping: key.route.bzl_repository_mapping(),
+            workspace_path: presentation_path.clone(),
+            repository_mapping: external_repository_mapping(route),
         },
         digest(source_text.as_str()),
         loaded_modules.iter().map(|(_, module)| module),
@@ -4215,13 +4626,96 @@ async fn compute_external_bzl_module(
     external_bzl_complete(
         Ok(FrozenBzlModule {
             module,
-            path: logical_path.as_path().to_path_buf(),
+            path: presentation_path,
             loads,
             retained_bzl_modules: retained_module_closure(&loaded_modules),
             bzl_load_visibility: evaluation_context.bzl_load_visibility(),
             manifest,
         }),
         observations,
+    )
+}
+
+async fn compute_external_bzl_module(
+    ctx: &mut DiceComputations<'_>,
+    key: &ExternalBzlModuleEvalKey,
+    mode: ExternalBzlModuleMode,
+    capture_events: bool,
+    event_batch: &mut Option<EventBatch>,
+) -> ExternalBzlDriverOutcome {
+    let canonical_label = key.canonical_label();
+    let source = match compute_external_bzl_source(ctx, key, mode).await {
+        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            return SourcePreparationOutcome::Complete(Err(error));
+        }
+        SourcePreparationOutcome::Complete(Ok(child)) => {
+            match finish_external_bzl_source(child, canonical_label.clone()) {
+                Ok(source) => source,
+                Err(value) => return value,
+            }
+        }
+    };
+    let source_text = match String::from_utf8(source.bytes.to_vec()) {
+        Ok(source) => Arc::new(source),
+        Err(_) => {
+            return external_bzl_complete(
+                Err(ExternalBzlModuleError::Encoding {
+                    label: canonical_label,
+                }),
+                source.observations,
+            );
+        }
+    };
+    let ast = match AstModule::parse_with_string_encoding(
+        &source.source_name,
+        source_text.as_ref().clone(),
+        &Dialect::Bazel,
+        StringEncoding::BazelInternal,
+    ) {
+        Ok(ast) => ast,
+        Err(error) => {
+            return external_bzl_complete(
+                Err(ExternalBzlModuleError::Parse {
+                    label: canonical_label,
+                    message: Arc::from(error.to_string()),
+                }),
+                source.observations,
+            );
+        }
+    };
+    let loads = ast
+        .loads()
+        .into_iter()
+        .map(|load| load.module_id.to_owned())
+        .collect::<Vec<_>>();
+    let child_loads = match prepare_external_bzl_child_loads(
+        key,
+        &loads,
+        canonical_label.clone(),
+        &source.observations,
+    ) {
+        Ok(child_loads) => child_loads,
+        Err(outcome) => return outcome,
+    };
+    let (loaded_modules, observations) =
+        match compute_external_bzl_children(ctx, key, mode, child_loads, source.observations).await
+        {
+            ControlFlow::Continue(value) => value,
+            ControlFlow::Break(value) => return value,
+        };
+
+    evaluate_external_bzl_module(
+        &key.route,
+        canonical_label,
+        source.presentation_path,
+        source_text,
+        ast,
+        loads,
+        loaded_modules,
+        observations,
+        capture_events,
+        event_batch,
     )
 }
 
@@ -4519,7 +5013,7 @@ async fn load_root_package_external_bzl(
     load: &str,
     observations: &mut PathObservationEpoch,
 ) -> RootPackageModuleOutcome {
-    let canonical = label.canonical_label(&route);
+    let canonical = label.canonical_label(&HostRepositorySourceRoute::root(route.clone()));
     let child = match mode {
         HostPackageLoadMode::Legacy => match ctx
             .compute(&ExternalBzlModuleEvalKey::new(route, label))
@@ -5049,8 +5543,15 @@ async fn compute_repository_package_source(
     let mut observations = PathObservationEpoch::empty();
     let result = match mode {
         RepositoryPackageLoadMode::Legacy => {
-            let source = RepositoryPackageSourceKey::new(key.route.clone(), package)
-                .expect("repository package load route and package agree");
+            let source = match &key.route {
+                HostRepositorySourceRoute::Root(route) => {
+                    RepositoryPackageSourceKey::new(route.clone(), package)
+                }
+                HostRepositorySourceRoute::Canonical(input) => {
+                    RepositoryPackageSourceKey::new_canonical(input.clone(), package)
+                }
+            }
+            .expect("repository package load route and package agree");
             match ctx.compute(&source).await {
                 Ok(SourcePreparationOutcome::Need(need)) => {
                     return ControlFlow::Break(SourcePreparationOutcome::Need(need));
@@ -5073,8 +5574,15 @@ async fn compute_repository_package_source(
             }
         }
         RepositoryPackageLoadMode::Observed => {
-            let source = RepositoryPackageSourceObservationKey::new(key.route.clone(), package)
-                .expect("repository package load route and package agree");
+            let source = match &key.route {
+                HostRepositorySourceRoute::Root(route) => {
+                    RepositoryPackageSourceObservationKey::new(route.clone(), package)
+                }
+                HostRepositorySourceRoute::Canonical(input) => {
+                    RepositoryPackageSourceObservationKey::new_canonical(input.clone(), package)
+                }
+            }
+            .expect("repository package load route and package agree");
             match ctx.compute(&source).await {
                 Ok(outcome) => match finish_repository_package_observed_child(outcome) {
                     ControlFlow::Continue(value) => {
@@ -5113,103 +5621,443 @@ async fn compute_repository_package_source(
     }
 }
 
+async fn compute_repository_package_child(
+    ctx: &mut DiceComputations<'_>,
+    mode: RepositoryPackageLoadMode,
+    resolved: ResolvedExternalBzlLoad,
+    raw_load: &str,
+    build_origin: &Arc<str>,
+    mut observations: PathObservationEpoch,
+) -> ControlFlow<RepositoryPackageLoadDriverOutcome, (FrozenBzlModule, PathObservationEpoch)> {
+    let canonical_label = resolved.label.canonical_label(&resolved.route);
+    let child_result = match mode {
+        RepositoryPackageLoadMode::Legacy => {
+            let child = ExternalBzlModuleEvalKey::from_source_route(resolved.route, resolved.label);
+            match ctx.compute(&child).await {
+                Ok(SourcePreparationOutcome::Need(need)) => {
+                    return ControlFlow::Break(SourcePreparationOutcome::Need(need));
+                }
+                Ok(SourcePreparationOutcome::Complete(value)) => value,
+                Err(error) => {
+                    return ControlFlow::Break(repository_package_driver_complete(
+                        Err(RepositoryPackageLoadError::new(
+                            RepositoryPackageLoadErrorInner::Bzl {
+                                origin: build_origin.dupe(),
+                                raw_load: Arc::from(raw_load),
+                                canonical_label: canonical_label.clone(),
+                                error: Arc::new(ExternalBzlModuleError::SourceCompute {
+                                    label: canonical_label,
+                                    message: Arc::from(error.to_string()),
+                                }),
+                            },
+                        )),
+                        observations,
+                    ));
+                }
+            }
+        }
+        RepositoryPackageLoadMode::Observed => {
+            let child =
+                ExternalBzlModuleObservationKey::from_source_route(resolved.route, resolved.label);
+            match ctx.compute(&child).await {
+                Ok(outcome) => match finish_repository_package_observed_child(outcome) {
+                    ControlFlow::Continue(value) => {
+                        observations = match merge_repository_package_observations(
+                            &observations,
+                            value.observations(),
+                        ) {
+                            Ok(observations) => observations,
+                            Err(error) => {
+                                return ControlFlow::Break(SourcePreparationOutcome::Complete(
+                                    Err(error),
+                                ));
+                            }
+                        };
+                        value.result().dupe()
+                    }
+                    ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
+                },
+                Err(error) => {
+                    return ControlFlow::Break(repository_package_driver_complete(
+                        Err(RepositoryPackageLoadError::new(
+                            RepositoryPackageLoadErrorInner::Bzl {
+                                origin: build_origin.dupe(),
+                                raw_load: Arc::from(raw_load),
+                                canonical_label: canonical_label.clone(),
+                                error: Arc::new(ExternalBzlModuleError::SourceCompute {
+                                    label: canonical_label,
+                                    message: Arc::from(error.to_string()),
+                                }),
+                            },
+                        )),
+                        observations,
+                    ));
+                }
+            }
+        }
+    };
+    match child_result.as_ref() {
+        Ok(module) => ControlFlow::Continue((module.clone(), observations)),
+        Err(error) => ControlFlow::Break(repository_package_driver_complete(
+            Err(RepositoryPackageLoadError::new(
+                RepositoryPackageLoadErrorInner::Bzl {
+                    origin: build_origin.dupe(),
+                    raw_load: Arc::from(raw_load),
+                    canonical_label,
+                    error: Arc::new(error.clone()),
+                },
+            )),
+            observations,
+        )),
+    }
+}
+
+enum RepositoryPackageChildLoad {
+    Resolved(String, ResolvedExternalBzlLoad),
+    Canonical(String),
+}
+
 async fn compute_repository_package_children(
     ctx: &mut DiceComputations<'_>,
     key: &RepositoryPackageLoadKey,
     mode: RepositoryPackageLoadMode,
-    resolved_loads: Vec<(String, RepositoryBzlLabel)>,
+    loads: Vec<RepositoryPackageChildLoad>,
+    source_label: CanonicalLabel,
     build_origin: &Arc<str>,
     mut observations: PathObservationEpoch,
 ) -> ControlFlow<
     RepositoryPackageLoadDriverOutcome,
     (Vec<(String, FrozenBzlModule)>, PathObservationEpoch),
 > {
-    let mut loaded_modules = Vec::with_capacity(resolved_loads.len());
-    for (raw_load, label) in resolved_loads {
-        let canonical_label = label.canonical_label(&key.route);
-        let child_result = match mode {
-            RepositoryPackageLoadMode::Legacy => {
-                let child = ExternalBzlModuleEvalKey::new(key.route.clone(), label);
-                match ctx.compute(&child).await {
-                    Ok(SourcePreparationOutcome::Need(need)) => {
-                        return ControlFlow::Break(SourcePreparationOutcome::Need(need));
-                    }
-                    Ok(SourcePreparationOutcome::Complete(value)) => value,
-                    Err(error) => {
-                        return ControlFlow::Break(repository_package_driver_complete(
-                            Err(RepositoryPackageLoadError::new(
-                                RepositoryPackageLoadErrorInner::Bzl {
-                                    origin: build_origin.dupe(),
-                                    raw_load: Arc::from(raw_load.as_str()),
-                                    canonical_label: canonical_label.clone(),
-                                    error: Arc::new(ExternalBzlModuleError::SourceCompute {
-                                        label: canonical_label,
-                                        message: Arc::from(error.to_string()),
-                                    }),
-                                },
-                            )),
-                            observations,
-                        ));
-                    }
-                }
+    let mut loaded_modules = Vec::with_capacity(loads.len());
+    for load in loads {
+        let (raw_load, resolved, incoming) = match load {
+            RepositoryPackageChildLoad::Resolved(raw_load, resolved) => {
+                (raw_load, resolved, observations)
             }
-            RepositoryPackageLoadMode::Observed => {
-                let child = ExternalBzlModuleObservationKey::new(key.route.clone(), label);
-                match ctx.compute(&child).await {
-                    Ok(outcome) => match finish_repository_package_observed_child(outcome) {
-                        ControlFlow::Continue(value) => {
-                            observations = match merge_repository_package_observations(
-                                &observations,
-                                value.observations(),
-                            ) {
-                                Ok(observations) => observations,
-                                Err(error) => {
-                                    return ControlFlow::Break(SourcePreparationOutcome::Complete(
-                                        Err(error),
-                                    ));
-                                }
-                            };
-                            value.result().dupe()
-                        }
-                        ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
-                    },
-                    Err(error) => {
-                        return ControlFlow::Break(repository_package_driver_complete(
-                            Err(RepositoryPackageLoadError::new(
-                                RepositoryPackageLoadErrorInner::Bzl {
-                                    origin: build_origin.dupe(),
-                                    raw_load: Arc::from(raw_load.as_str()),
-                                    canonical_label: canonical_label.clone(),
-                                    error: Arc::new(ExternalBzlModuleError::SourceCompute {
-                                        label: canonical_label,
-                                        message: Arc::from(error.to_string()),
-                                    }),
-                                },
-                            )),
-                            observations,
+            RepositoryPackageChildLoad::Canonical(raw_load) => {
+                let external_mode = match mode {
+                    RepositoryPackageLoadMode::Legacy => ExternalBzlModuleMode::Legacy,
+                    RepositoryPackageLoadMode::Observed => ExternalBzlModuleMode::Observed,
+                };
+                match resolve_external_bzl_child_route(
+                    ctx,
+                    &key.route,
+                    &key.package,
+                    source_label.clone(),
+                    external_mode,
+                    &raw_load,
+                    observations,
+                )
+                .await
+                {
+                    ControlFlow::Continue((resolved, incoming)) => (raw_load, resolved, incoming),
+                    ControlFlow::Break(outcome) => {
+                        return ControlFlow::Break(project_repository_load_resolution_error(
+                            outcome,
+                            build_origin,
+                            &raw_load,
+                            source_label,
                         ));
                     }
                 }
             }
         };
-        match child_result.as_ref() {
-            Ok(module) => loaded_modules.push((raw_load, module.clone())),
-            Err(error) => {
-                return ControlFlow::Break(repository_package_driver_complete(
-                    Err(RepositoryPackageLoadError::new(
-                        RepositoryPackageLoadErrorInner::Bzl {
-                            origin: build_origin.dupe(),
-                            raw_load: Arc::from(raw_load.as_str()),
-                            canonical_label,
-                            error: Arc::new(error.clone()),
-                        },
-                    )),
-                    observations,
-                ));
+        match compute_repository_package_child(
+            ctx,
+            mode,
+            resolved,
+            &raw_load,
+            build_origin,
+            incoming,
+        )
+        .await
+        {
+            ControlFlow::Continue((module, incoming)) => {
+                observations = incoming;
+                loaded_modules.push((raw_load, module));
             }
+            ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
         }
     }
     ControlFlow::Continue((loaded_modules, observations))
+}
+
+fn project_repository_load_resolution_error(
+    outcome: ExternalBzlDriverOutcome,
+    build_origin: &Arc<str>,
+    raw_load: &str,
+    source_label: CanonicalLabel,
+) -> RepositoryPackageLoadDriverOutcome {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            SourcePreparationOutcome::Complete(Err(error))
+        }
+        SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+            let error = result
+                .as_ref()
+                .as_ref()
+                .err()
+                .expect("load resolution break contains an external module error")
+                .clone();
+            repository_package_driver_complete(
+                Err(RepositoryPackageLoadError::new(
+                    RepositoryPackageLoadErrorInner::Bzl {
+                        origin: build_origin.dupe(),
+                        raw_load: Arc::from(raw_load),
+                        canonical_label: source_label,
+                        error: Arc::new(error),
+                    },
+                )),
+                observations,
+            )
+        }
+    }
+}
+
+struct PreparedRepositoryPackageEvaluation {
+    source_text: Arc<String>,
+    canonical_repo: CompactString,
+    logical_package_dir: PathBuf,
+    logical_build_file: PathBuf,
+    build_label: CanonicalLabel,
+    loads: Vec<String>,
+    child_loads: Vec<RepositoryPackageChildLoad>,
+    build_origin: Arc<str>,
+    observations: PathObservationEpoch,
+}
+
+fn prepare_repository_package_evaluation(
+    key: &RepositoryPackageLoadKey,
+    source: RepositoryPackageSource,
+    observations: PathObservationEpoch,
+) -> Result<PreparedRepositoryPackageEvaluation, RepositoryPackageLoadDriverOutcome> {
+    let relative_build_file = PathBuf::from(key.package.as_str()).join(source.build_file_name());
+    let source_text = match std::str::from_utf8(source.bytes().as_ref()) {
+        Ok(source) => Arc::new(source.to_owned()),
+        Err(_) => {
+            let path = match source.address() {
+                RepositoryPackageSourceAddress::Host(path) => path.as_path().to_path_buf(),
+                RepositoryPackageSourceAddress::BuiltinCatalog(path) => {
+                    path.as_path().to_path_buf()
+                }
+            };
+            return Err(repository_package_driver_complete(
+                Err(RepositoryPackageLoadError::new(
+                    RepositoryPackageLoadErrorInner::Encoding { path },
+                )),
+                observations,
+            ));
+        }
+    };
+    let canonical_repo = CompactString::new(key.route.canonical_repo().as_str());
+    let logical_package_dir = PathBuf::from("<output_base>")
+        .join("external")
+        .join(canonical_repo.as_str())
+        .join(key.package.as_str());
+    let logical_build_file = logical_package_dir.join(
+        relative_build_file
+            .file_name()
+            .expect("BUILD candidate has a basename"),
+    );
+    let build_label = CanonicalLabel::parse(&format!(
+        "{}//{}:{}",
+        key.route.canonical_repo(),
+        key.package,
+        source.build_file_name()
+    ))
+    .expect("typed repository BUILD identity is canonical");
+    let source_name = match (&key.route, source.address()) {
+        (HostRepositorySourceRoute::Root(_), RepositoryPackageSourceAddress::Host(path)) => {
+            starlark_source_name(path.as_path())
+                .expect("accepted root repository source paths have parser names")
+        }
+        (HostRepositorySourceRoute::Canonical(_), _) => build_label.to_string(),
+        _ => unreachable!("root repository sources retain Host addresses"),
+    };
+    let ast = AstModule::parse_with_string_encoding(
+        &source_name,
+        source_text.as_ref().clone(),
+        &Dialect::Bazel,
+        StringEncoding::BazelInternal,
+    )
+    .map_err(|error| {
+        repository_package_driver_complete(
+            Err(RepositoryPackageLoadError::new(
+                RepositoryPackageLoadErrorInner::Parse {
+                    canonical_repo: canonical_repo.clone(),
+                    package: key.package.clone(),
+                    message: Arc::from(error.to_string()),
+                },
+            )),
+            observations.dupe(),
+        )
+    })?;
+    let loads = ast
+        .loads()
+        .into_iter()
+        .map(|load| load.module_id.to_owned())
+        .collect::<Vec<_>>();
+    let child_loads =
+        prepare_repository_package_child_loads(key, &loads, &canonical_repo, &observations)?;
+    let build_basename = relative_build_file
+        .file_name()
+        .expect("BUILD candidate has a basename")
+        .to_string_lossy();
+    let build_origin = Arc::from(format!(
+        "@@{canonical_repo}//{}/{}",
+        key.package, build_basename
+    ));
+    Ok(PreparedRepositoryPackageEvaluation {
+        source_text,
+        canonical_repo,
+        logical_package_dir,
+        logical_build_file,
+        build_label,
+        loads,
+        child_loads,
+        build_origin,
+        observations,
+    })
+}
+
+fn prepare_repository_package_child_loads(
+    key: &RepositoryPackageLoadKey,
+    loads: &[String],
+    canonical_repo: &CompactString,
+    observations: &PathObservationEpoch,
+) -> Result<Vec<RepositoryPackageChildLoad>, RepositoryPackageLoadDriverOutcome> {
+    let HostRepositorySourceRoute::Root(route) = &key.route else {
+        return Ok(loads
+            .iter()
+            .cloned()
+            .map(RepositoryPackageChildLoad::Canonical)
+            .collect());
+    };
+    loads
+        .iter()
+        .map(|load| {
+            resolve_external_load_label(&key.package, load)
+                .map(|label| {
+                    RepositoryPackageChildLoad::Resolved(
+                        load.clone(),
+                        ResolvedExternalBzlLoad {
+                            route: HostRepositorySourceRoute::root(route.clone()),
+                            label,
+                        },
+                    )
+                })
+                .map_err(|error| {
+                    repository_package_driver_complete(
+                        Err(RepositoryPackageLoadError::new(
+                            RepositoryPackageLoadErrorInner::LoadLabel {
+                                canonical_repo: canonical_repo.clone(),
+                                package: key.package.clone(),
+                                error,
+                            },
+                        )),
+                        observations.dupe(),
+                    )
+                })
+        })
+        .collect()
+}
+
+fn evaluate_repository_package(
+    key: &RepositoryPackageLoadKey,
+    prepared: PreparedRepositoryPackageEvaluation,
+    loaded_modules: &[(String, FrozenBzlModule)],
+    observations: PathObservationEpoch,
+    capture_events: bool,
+    event_batch: &mut Option<EventBatch>,
+) -> RepositoryPackageLoadDriverOutcome {
+    let canonical_repo = prepared.canonical_repo.clone();
+    let has_loads = !prepared.loads.is_empty();
+    let input = HostPackageAttemptInput {
+        workspace: key.route.workspace().dupe(),
+        logical_package_root: key.route.workspace().dupe(),
+        package: key.package.clone(),
+        package_identifier: PackageIdentifier::new(
+            key.route.canonical_repo().clone(),
+            key.package.clone(),
+        ),
+        package_dir: prepared.logical_package_dir,
+        build_file: prepared.logical_build_file,
+        source: prepared.source_text,
+        package_label: CompactString::new(key.package.as_str()),
+        loaded_modules,
+        capture_events,
+    };
+    match evaluate_host_package_attempt(&input, Arc::new(SmallMap::new())) {
+        HostPackageAttemptStep::Pending {
+            event_batch: batch, ..
+        } => {
+            *event_batch = Some(batch);
+            repository_package_driver_complete(
+                Err(RepositoryPackageLoadError::new(
+                    RepositoryPackageLoadErrorInner::GlobUnsupported {
+                        canonical_repo,
+                        package: key.package.clone(),
+                    },
+                )),
+                observations,
+            )
+        }
+        HostPackageAttemptStep::Terminal(terminal) => {
+            *event_batch = Some(terminal.event_batch);
+            let result = terminal.result.map_err(|error| {
+                RepositoryPackageLoadError::new(RepositoryPackageLoadErrorInner::Attempt(error))
+            });
+            let result = result.and_then(|loaded| {
+                validate_loaded_repository_package(key, &canonical_repo, has_loads, loaded)
+            });
+            repository_package_driver_complete(result, observations)
+        }
+    }
+}
+
+fn validate_loaded_repository_package(
+    key: &RepositoryPackageLoadKey,
+    canonical_repo: &CompactString,
+    has_loads: bool,
+    loaded: LoadedPackage,
+) -> Result<LoadedPackage, RepositoryPackageLoadError> {
+    if !has_loads {
+        return Ok(loaded);
+    }
+    if let Some((target, reason)) = loaded_external_starlark_rule_reason(&loaded.targets) {
+        return Err(RepositoryPackageLoadError::new(
+            RepositoryPackageLoadErrorInner::LoadedStarlarkRule {
+                canonical_repo: canonical_repo.clone(),
+                package: key.package.clone(),
+                target: Arc::from(target),
+                reason,
+            },
+        ));
+    }
+    if matches!(
+        loaded.targets.as_slice(),
+        [crate::package::PackageTarget {
+            kind: PackageTargetKind::StarlarkRule(_),
+            ..
+        }]
+    ) {
+        return Ok(loaded);
+    }
+    if let Some((target, kind)) = loaded.targets.iter().find_map(|target| {
+        loaded_external_target_kind(&target.kind).map(|kind| (target.name.as_str(), kind))
+    }) {
+        return Err(RepositoryPackageLoadError::new(
+            RepositoryPackageLoadErrorInner::LoadedTargetKind {
+                canonical_repo: canonical_repo.clone(),
+                package: key.package.clone(),
+                target: Arc::from(target),
+                kind: Arc::from(kind),
+            },
+        ));
+    }
+    Ok(loaded)
 }
 
 impl RepositoryPackageLoadKey {
@@ -5220,187 +6068,38 @@ impl RepositoryPackageLoadKey {
         capture_events: bool,
         event_batch: &mut Option<EventBatch>,
     ) -> RepositoryPackageLoadDriverOutcome {
-        async {
-            let (source, observations) =
-                match compute_repository_package_source(ctx, self, mode).await {
-                    ControlFlow::Continue(value) => value,
-                    ControlFlow::Break(value) => return value,
-                };
-            let relative_build_file =
-                PathBuf::from(self.package.as_str()).join(source.build_file_name());
-            let source = match std::str::from_utf8(source.bytes().as_ref()) {
-                Ok(source) => Arc::new(source.to_owned()),
-                Err(_) => {
-                    return repository_package_driver_complete(
-                        Err(RepositoryPackageLoadError::new(
-                            RepositoryPackageLoadErrorInner::Encoding {
-                                path: relative_build_file,
-                            },
-                        )),
-                        observations,
-                    );
-                }
-            };
-            let canonical_repo = CompactString::new(self.route.canonical_repo().as_str());
-            let logical_package_dir = PathBuf::from("<output_base>")
-                .join("external")
-                .join(canonical_repo.as_str())
-                .join(self.package.as_str());
-            let logical_build_file = logical_package_dir.join(
-                relative_build_file
-                    .file_name()
-                    .expect("BUILD candidate has a basename"),
-            );
-            let ast = match AstModule::parse_with_string_encoding(
-                &logical_build_file.display().to_string(),
-                source.as_ref().clone(),
-                &Dialect::Bazel,
-                StringEncoding::BazelInternal,
-            ) {
-                Ok(ast) => ast,
-                Err(error) => {
-                    return repository_package_driver_complete(
-                        Err(RepositoryPackageLoadError::new(
-                            RepositoryPackageLoadErrorInner::Parse {
-                                canonical_repo,
-                                package: self.package.clone(),
-                                message: Arc::from(error.to_string()),
-                            },
-                        )),
-                        observations,
-                    );
-                }
-            };
-            let loads = ast
-                .loads()
-                .into_iter()
-                .map(|load| load.module_id.to_owned())
-                .collect::<Vec<_>>();
-            let resolved_loads = match loads
-                .iter()
-                .map(|load| {
-                    resolve_external_load_label(&self.package, load)
-                        .map(|label| (load.clone(), label))
-                })
-                .collect::<Result<Vec<_>, _>>()
-            {
-                Ok(loads) => loads,
-                Err(error) => {
-                    return repository_package_driver_complete(
-                        Err(RepositoryPackageLoadError::new(
-                            RepositoryPackageLoadErrorInner::LoadLabel {
-                                canonical_repo,
-                                package: self.package.clone(),
-                                error,
-                            },
-                        )),
-                        observations,
-                    );
-                }
-            };
-            let build_basename = relative_build_file
-                .file_name()
-                .expect("BUILD candidate has a basename")
-                .to_string_lossy();
-            let build_origin: Arc<str> = Arc::from(format!(
-                "@@{canonical_repo}//{}/{}",
-                self.package, build_basename
-            ));
-            let (loaded_modules, observations) = match compute_repository_package_children(
-                ctx,
-                self,
-                mode,
-                resolved_loads,
-                &build_origin,
-                observations,
-            )
-            .await
-            {
-                ControlFlow::Continue(value) => value,
-                ControlFlow::Break(value) => return value,
-            };
-            let input = HostPackageAttemptInput {
-                workspace: self.route.workspace().dupe(),
-                logical_package_root: self.route.workspace().dupe(),
-                package: self.package.clone(),
-                package_identifier: PackageIdentifier::new(
-                    self.route.canonical_repo().clone(),
-                    self.package.clone(),
-                ),
-                package_dir: logical_package_dir,
-                build_file: logical_build_file,
-                source,
-                package_label: CompactString::new(self.package.as_str()),
-                loaded_modules: &loaded_modules,
-                capture_events,
-            };
-            match evaluate_host_package_attempt(&input, Arc::new(SmallMap::new())) {
-                HostPackageAttemptStep::Pending {
-                    event_batch: batch, ..
-                } => {
-                    *event_batch = Some(batch);
-                    repository_package_driver_complete(
-                        Err(RepositoryPackageLoadError::new(
-                            RepositoryPackageLoadErrorInner::GlobUnsupported {
-                                canonical_repo,
-                                package: self.package.clone(),
-                            },
-                        )),
-                        observations,
-                    )
-                }
-                HostPackageAttemptStep::Terminal(terminal) => {
-                    *event_batch = Some(terminal.event_batch);
-                    let result = terminal.result.map_err(|error| {
-                        RepositoryPackageLoadError::new(RepositoryPackageLoadErrorInner::Attempt(
-                            error,
-                        ))
-                    });
-                    let result = result.and_then(|loaded| {
-                        if loads.is_empty() {
-                            return Ok(loaded);
-                        }
-                        if let Some((target, reason)) =
-                            loaded_external_starlark_rule_reason(&loaded.targets)
-                        {
-                            return Err(RepositoryPackageLoadError::new(
-                                RepositoryPackageLoadErrorInner::LoadedStarlarkRule {
-                                    canonical_repo,
-                                    package: self.package.clone(),
-                                    target: Arc::from(target),
-                                    reason,
-                                },
-                            ));
-                        }
-                        if matches!(
-                            loaded.targets.as_slice(),
-                            [crate::package::PackageTarget {
-                                kind: PackageTargetKind::StarlarkRule(_),
-                                ..
-                            }]
-                        ) {
-                            return Ok(loaded);
-                        }
-                        if let Some((target, kind)) = loaded.targets.iter().find_map(|target| {
-                            loaded_external_target_kind(&target.kind)
-                                .map(|kind| (target.name.as_str(), kind))
-                        }) {
-                            return Err(RepositoryPackageLoadError::new(
-                                RepositoryPackageLoadErrorInner::LoadedTargetKind {
-                                    canonical_repo,
-                                    package: self.package.clone(),
-                                    target: Arc::from(target),
-                                    kind: Arc::from(kind),
-                                },
-                            ));
-                        }
-                        Ok(loaded)
-                    });
-                    repository_package_driver_complete(result, observations)
-                }
-            }
-        }
+        let (source, observations) = match compute_repository_package_source(ctx, self, mode).await
+        {
+            ControlFlow::Continue(value) => value,
+            ControlFlow::Break(value) => return value,
+        };
+        let mut prepared = match prepare_repository_package_evaluation(self, source, observations) {
+            Ok(prepared) => prepared,
+            Err(outcome) => return outcome,
+        };
+        let child_loads = std::mem::take(&mut prepared.child_loads);
+        let (loaded_modules, observations) = match compute_repository_package_children(
+            ctx,
+            self,
+            mode,
+            child_loads,
+            prepared.build_label.clone(),
+            &prepared.build_origin,
+            prepared.observations.dupe(),
+        )
         .await
+        {
+            ControlFlow::Continue(value) => value,
+            ControlFlow::Break(value) => return value,
+        };
+        evaluate_repository_package(
+            self,
+            prepared,
+            &loaded_modules,
+            observations,
+            capture_events,
+            event_batch,
+        )
     }
 }
 

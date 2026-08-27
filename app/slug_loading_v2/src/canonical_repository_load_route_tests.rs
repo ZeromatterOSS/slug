@@ -52,14 +52,20 @@ mod tests {
     use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
     use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
     use slug_bzlmod_v2::RepositoryMaterializationSuccess;
+    use slug_bzlmod_v2::RepositoryPackageSource;
+    use slug_bzlmod_v2::RepositoryPackageSourceAddress;
     use slug_bzlmod_v2::RepositoryPackageSourceKey;
     use slug_bzlmod_v2::RepositoryPackageSourceObservationKey;
+    use slug_bzlmod_v2::RootPackageBzlTarget;
+    use slug_bzlmod_v2::RootPackagePolicyInputs;
     use slug_bzlmod_v2::RootRepositoryRouteKey;
     use slug_bzlmod_v2::SourcePreparationNeeds;
     use slug_bzlmod_v2::SourcePreparationOutcome;
     use slug_bzlmod_v2::host_canonical_repository_source_input;
     use slug_bzlmod_v2::host_repository_relative_path;
+    use slug_bzlmod_v2::inject_root_package_policy_inputs;
     use slug_identity_v2::ApparentRepoName;
+    use slug_identity_v2::CanonicalLabel;
     use slug_identity_v2::CanonicalRepoName;
     use slug_identity_v2::PackageIdentifier;
     use slug_identity_v2::PackagePath;
@@ -80,9 +86,24 @@ mod tests {
     use slug_workspace_v2::PathObservationOperation;
     use slug_workspace_v2::PathObservationResult;
     use slug_workspace_v2::PathOperationResult;
+    use starlark::environment::Module;
+    use starlark::eval::Evaluator;
+    use starlark::syntax::AstModule;
+    use starlark::syntax::Dialect;
 
     use super::super::HostCanonicalRepositoryRouteObservationKey;
     use super::super::HostSelectedRepositoryFileEffectObservationKey;
+    use crate::ObservedRepositoryPackageLoad;
+    use crate::RepositoryPackageLoadKey;
+    use crate::RepositoryPackageLoadObservationKey;
+    use crate::bzl_module::BzlLoadManifest;
+    use crate::bzl_module::BzlModuleIdentity;
+    use crate::bzl_module::ExternalBzlCycleIdentity;
+    use crate::bzl_module::ExternalBzlModuleError;
+    use crate::bzl_module::ExternalBzlModuleEvalKey;
+    use crate::bzl_module::ExternalBzlModuleObservationKey;
+    use crate::bzl_module::ObservedExternalBzlModule;
+    use crate::bzl_module::RepositoryBzlLabel;
     use crate::canonical_repository_load_route::*;
     use crate::canonical_repository_route_tests::tests::EXTENSION_A;
     use crate::canonical_repository_route_tests::tests::MODULE;
@@ -90,6 +111,12 @@ mod tests {
     use crate::canonical_repository_route_tests::tests::names;
     use crate::canonical_repository_route_tests::tests::transaction;
     use crate::canonical_repository_route_tests::tests::validated;
+    use crate::cycle_detector::bzl_load_cycle_detector;
+    use crate::external_subtree_package_set::ExternalSubtreePackageSetKey;
+    use crate::external_subtree_package_set::ExternalSubtreePackageSetObservationKey;
+    use crate::external_subtree_package_set::ObservedExternalSubtreePackageSet;
+    use crate::package::loading_globals;
+    use crate::provider::BzlEvaluationContext;
 
     const ROOT_MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='parent', version='1', repo_name='parent_alias')\n";
     const PARENT_MODULE: &[u8] =
@@ -209,6 +236,15 @@ mod tests {
         value.hash(&mut hasher);
         hasher.finish()
     }
+
+    fn assert_a_b_a<T: Eq + Hash + std::fmt::Debug>(a: &T, b: &T, restored: &T) {
+        assert_ne!(a, b);
+        assert_ne!(hash(a), hash(b));
+        assert_eq!(a, restored);
+        assert_eq!(hash(a), hash(restored));
+    }
+
+    fn assert_allocative<T: allocative::Allocative>() {}
 
     async fn selected_input(
         leaf_module: &'static [u8],
@@ -444,9 +480,22 @@ mod tests {
         )
         .unwrap();
         let mut updater = dice.updater_with_data(UserComputationData {
+            cycle_detector: Some(bzl_load_cycle_detector()),
             activation_tracker: Some(tracker),
             ..Default::default()
         });
+        inject_root_package_policy_inputs(
+            &mut updater,
+            RootPackagePolicyInputs::new(
+                request.id.workspace.clone(),
+                Arc::from([request.id.workspace.clone()]),
+                std::iter::empty::<&str>(),
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
         updater
             .changed_to(vec![(
                 RepositoryMaterializationResultEpochKey {
@@ -459,6 +508,68 @@ mod tests {
             .changed_to(vec![(PathObservationEpochKey, observations)])
             .unwrap();
         updater.commit().await
+    }
+
+    fn canonical_bzl_key(
+        input: HostCanonicalRepositorySourceInput,
+        target: &str,
+    ) -> ExternalBzlModuleObservationKey {
+        ExternalBzlModuleObservationKey::new_canonical(
+            input,
+            RepositoryBzlLabel::new(
+                PackagePath::root(),
+                RootPackageBzlTarget::parse(target).unwrap(),
+            )
+            .unwrap(),
+        )
+    }
+
+    fn bzl_source_epoch(
+        namespace: PathObservationNamespace,
+        root: &str,
+        files: &[(&str, Option<&'static [u8]>)],
+    ) -> PathObservationEpoch {
+        let demand = |value: &str, operation| {
+            PathObservationDemand::new(
+                namespace,
+                NormalizedAbsolutePath::new(value).unwrap(),
+                operation,
+            )
+        };
+        let present = |kind, stamp| {
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                kind, stamp, stamp, stamp, stamp, 0o755,
+            )))
+        };
+        let mut observations = vec![
+            (
+                demand("/", PathObservationOperation::Lstat),
+                present(PathNodeKind::Directory, 1),
+            ),
+            (
+                demand(root, PathObservationOperation::Lstat),
+                present(PathNodeKind::Directory, 2),
+            ),
+        ];
+        for (index, (relative, bytes)) in files.iter().enumerate() {
+            let path = format!("{root}/{relative}");
+            observations.push((
+                demand(&path, PathObservationOperation::Lstat),
+                bytes.map_or(
+                    PathObservationResult::Lstat(PathOperationResult::Missing),
+                    |_| present(PathNodeKind::RegularFile, index as i64 + 3),
+                ),
+            ));
+            if let Some(bytes) = bytes {
+                observations.push((
+                    demand(&path, PathObservationOperation::FileBytes),
+                    PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                        *bytes,
+                    ))),
+                ));
+            }
+        }
+        PathObservationEpoch::new(observations).unwrap()
     }
 
     async fn prove_root_adapter_parity(
@@ -574,8 +685,10 @@ mod tests {
         let package_source_result = package_source.result().as_ref().as_ref().unwrap();
         assert_eq!(package_source_result.build_file_name(), "BUILD.bazel");
         assert_eq!(
-            package_source_result.logical_path().as_path(),
-            std::path::Path::new("/registry-leaf/BUILD.bazel")
+            package_source_result.address(),
+            &RepositoryPackageSourceAddress::Host(
+                NormalizedAbsolutePath::new("/registry-leaf/BUILD.bazel").unwrap()
+            )
         );
         assert!(Arc::ptr_eq(package_source_result.bytes(), &source_bytes));
         let expected_observations = PathObservationEpoch::from_shared(
@@ -594,6 +707,26 @@ mod tests {
         )
         .unwrap();
         assert_eq!(package_source.observations(), &expected_observations);
+        let package_load_key =
+            RepositoryPackageLoadObservationKey::new_canonical(input.clone(), PackagePath::root());
+        let package_load = tx.compute(&package_load_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(package_load)) = package_load else {
+            panic!("alias-free canonical package load must complete")
+        };
+        let loaded = package_load.result().as_ref().as_ref().unwrap();
+        assert_eq!(
+            loaded
+                .targets
+                .iter()
+                .map(|target| target.name.as_str())
+                .collect::<Vec<_>>(),
+            ["leaf.txt"]
+        );
+        assert_eq!(
+            loaded.build_file,
+            PathBuf::from("<output_base>/external/leaf+/BUILD.bazel")
+        );
+        assert_eq!(package_load.observations(), &expected_observations);
         let boundary_dependencies = tracker.dependencies(&boundary_key.to_string());
         assert_eq!(boundary_dependencies.len(), 1);
         assert!(
@@ -643,15 +776,25 @@ mod tests {
     #[tokio::test]
     async fn builtin_route_source_and_listing_use_only_catalog_drivers() {
         let tracker = Arc::new(DependencyTrace::default());
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let mut tx = dice
-            .updater_with_data(UserComputationData {
-                activation_tracker: Some(tracker.clone()),
-                ..Default::default()
-            })
-            .commit()
-            .await;
+        let dice = Dice::builder().build(DetectCycles::Enabled);
         let workspace = NormalizedAbsolutePath::new("/canonical-builtin").unwrap();
+        let mut updater = dice.updater_with_data(UserComputationData {
+            activation_tracker: Some(tracker.clone()),
+            ..Default::default()
+        });
+        inject_root_package_policy_inputs(
+            &mut updater,
+            RootPackagePolicyInputs::new(
+                workspace.clone(),
+                Arc::from([workspace.clone()]),
+                std::iter::empty::<&str>(),
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let mut tx = updater.commit().await;
         let canonical = CanonicalRepoName::new("bazel_tools").unwrap();
         let load_key = HostCanonicalRepositoryLoadRouteObservationKey::new(workspace, canonical);
         let load = tx.compute(&load_key).await.unwrap();
@@ -696,6 +839,18 @@ mod tests {
             tracker.dependencies(&listing_key.to_string()),
             ["builtin-bazel-tools-directory-listing:"]
         );
+        let package_key = RepositoryPackageLoadObservationKey::new_canonical(
+            route.input().clone(),
+            PackagePath::parse("src/conditions").unwrap(),
+        );
+        let package = tx.compute(&package_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(package)) = package else {
+            panic!("built-in canonical package load must complete")
+        };
+        let error = package.result().as_ref().as_ref().unwrap_err().to_string();
+        assert!(error.contains("@@bazel_tools//src/conditions:BUILD"));
+        assert!(!error.contains("<output_base>"));
+        assert!(!error.contains("builtin/bazel_tools"));
     }
 
     #[tokio::test]
@@ -1068,39 +1223,435 @@ ext=module_extension(implementation=impl)
     }
 
     #[tokio::test]
-    async fn selected_spec_and_mapping_change_independently_with_a_b_a_restoration() {
-        let first_outcome = selected_load_outcome(LEAF_MAPPING_A, SOURCE_A).await;
-        let spec_outcome = selected_load_outcome(LEAF_MAPPING_A, SOURCE_B).await;
-        let mapping_outcome = selected_load_outcome(LEAF_MAPPING_B, SOURCE_A).await;
-        let restored_outcome = selected_load_outcome(LEAF_MAPPING_A, SOURCE_A).await;
-        assert!(HostCanonicalRepositoryLoadRouteKey::equality(
-            &first_outcome,
-            &restored_outcome
-        ));
-        assert!(!HostCanonicalRepositoryLoadRouteKey::equality(
-            &first_outcome,
-            &spec_outcome
-        ));
-        assert!(!HostCanonicalRepositoryLoadRouteKey::equality(
-            &first_outcome,
-            &mapping_outcome
-        ));
-        let first = load_route(&first_outcome).input().clone();
-        let spec_changed = load_route(&spec_outcome).input().clone();
-        let mapping_changed = load_route(&mapping_outcome).input().clone();
-        let restored = load_route(&restored_outcome).input().clone();
-        for input in [&first, &spec_changed, &mapping_changed, &restored] {
-            assert_eq!(
-                input.view().route().view().canonical_repo().as_str(),
-                "leaf+"
-            );
+    async fn complete_canonical_mapping_resolves_label_without_a_load_statement() {
+        let (_, input) = selected_input(LEAF_MAPPING_A, SOURCE_A).await;
+        let route = input.view().route();
+        let mapping = route.bzl_repository_mapping();
+        assert!(mapping.iter().any(|(apparent, canonical)| {
+            apparent.as_str() == "alias_a" && canonical.as_str() == "mapped+"
+        }));
+        let owner = BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@leaf+//:defs.bzl").unwrap(),
+            workspace_path: PathBuf::from("@@leaf+//:defs.bzl"),
+            repository_mapping: mapping,
+        };
+        let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
+            root: owner.clone(),
+            direct_children: Arc::from([]),
+            reachable: Arc::from([owner]),
+            fingerprint: [0; 32],
+        });
+        let ast = AstModule::parse(
+            "@@leaf+//:defs.bzl",
+            "mapped = Label('@alias_a//:target')\n".to_owned(),
+            &Dialect::Bazel,
+        )
+        .unwrap();
+        assert!(ast.loads().is_empty());
+        let module = Module::new();
+        let mut evaluator = Evaluator::new(&module);
+        evaluator.extra = Some(&context);
+        evaluator.eval_module(ast, &loading_globals()).unwrap();
+        drop(evaluator);
+        let module = module.freeze().unwrap();
+        assert_eq!(
+            module.get("mapped").unwrap().value().to_string(),
+            "@@mapped+//:target"
+        );
+    }
+
+    struct MappedChildFixture {
+        transaction: dice::DiceTransaction,
+        tracker: Arc<DependencyTrace>,
+        leaf_input: HostCanonicalRepositorySourceInput,
+        mapped_input: HostCanonicalRepositorySourceInput,
+    }
+
+    fn mapped_child_source_observations() -> PathObservationEpoch {
+        let leaf = PathObservationNamespace::Materialization(PathObservationInstanceId::new(71));
+        let mapped = PathObservationNamespace::Materialization(PathObservationInstanceId::new(72));
+        let demand = |namespace, value: &str, operation| {
+            PathObservationDemand::new(
+                namespace,
+                NormalizedAbsolutePath::new(value).unwrap(),
+                operation,
+            )
+        };
+        let present = |namespace, value: &str, kind, stamp| {
+            (
+                demand(namespace, value, PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                    kind, stamp, stamp, stamp, stamp, 0o755,
+                ))),
+            )
+        };
+        let missing = |namespace, value: &str| {
+            (
+                demand(namespace, value, PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Missing),
+            )
+        };
+        let bytes = |namespace, value: &str, source: &'static [u8]| {
+            (
+                demand(namespace, value, PathObservationOperation::FileBytes),
+                PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(source))),
+            )
+        };
+        PathObservationEpoch::new([
+            present(leaf, "/", PathNodeKind::Directory, 71),
+            present(leaf, "/registry-leaf", PathNodeKind::Directory, 71),
+            present(
+                leaf,
+                "/registry-leaf/BUILD.bazel",
+                PathNodeKind::RegularFile,
+                71,
+            ),
+            bytes(
+                leaf,
+                "/registry-leaf/BUILD.bazel",
+                b"load(':entry.bzl', 'mapped_rule')\nmapped_rule(name = 'leaf', visibility = ['//visibility:public'])\n",
+            ),
+            present(
+                leaf,
+                "/registry-leaf/entry.bzl",
+                PathNodeKind::RegularFile,
+                71,
+            ),
+            bytes(
+                leaf,
+                "/registry-leaf/entry.bzl",
+                b"load('@alias_a//:defs.bzl', _mapped_rule = 'mapped_rule')\nmapped_rule = _mapped_rule\n",
+            ),
+            missing(leaf, "/registry-leaf/REPO.bazel"),
+            missing(leaf, "/registry-leaf/.bazelignore"),
+            present(mapped, "/", PathNodeKind::Directory, 72),
+            present(mapped, "/registry-mapped", PathNodeKind::Directory, 72),
+            present(
+                mapped,
+                "/registry-mapped/defs.bzl",
+                PathNodeKind::RegularFile,
+                72,
+            ),
+            bytes(
+                mapped,
+                "/registry-mapped/defs.bzl",
+                b"def _impl(ctx):\n    return None\nmapped_rule = rule(implementation = _impl)\n",
+            ),
+        ])
+        .unwrap()
+    }
+
+    fn mapped_child_materializations(
+        leaf: Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>,
+        mapped: Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>,
+    ) -> RepositoryMaterializationResultEpoch {
+        let success = |source, root, instance| {
+            RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+                source_identity: Arc::from(source),
+                generation_root: PathBuf::from(root),
+                observation_instance: PathObservationInstanceId::new(instance),
+            })
+        };
+        RepositoryMaterializationResultEpoch::new(
+            leaf.id.workspace.clone(),
+            [
+                RepositoryMaterializationEpochEntry {
+                    request: leaf,
+                    result: success("leaf-load-source", "/registry-leaf", 71),
+                },
+                RepositoryMaterializationEpochEntry {
+                    request: mapped,
+                    result: success("mapped-load-source", "/registry-mapped", 72),
+                },
+            ],
+        )
+        .unwrap()
+    }
+
+    async fn mapped_child_fixture() -> MappedChildFixture {
+        let (dice, leaf_input) = selected_input(LEAF_MAPPING_A, SOURCE_A).await;
+        let mut route_tx = transaction(&dice, ROOT_MODULE, EXTENSION_A, true, None).await;
+        let mapped_route = route_tx
+            .compute(&HostCanonicalRepositoryLoadRouteKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                CanonicalRepoName::new("mapped+").unwrap(),
+            ))
+            .await
+            .unwrap();
+        let mapped_input = load_route(&mapped_route).input().clone();
+        let host = route_tx.compute(&PathObservationEpochKey).await.unwrap();
+        let request = |input: &HostCanonicalRepositorySourceInput| match input.view().disposition()
+        {
+            HostRepositorySourceInputDispositionView::Request(request) => request.clone(),
+            _ => panic!("selected route must retain a materialization request"),
+        };
+        let materialized = mapped_child_source_observations();
+        let observations = PathObservationEpoch::from_shared(
+            host.observations()
+                .iter()
+                .chain(materialized.observations())
+                .map(|(demand, result)| (demand.dupe(), result.dupe())),
+        )
+        .unwrap();
+        let tracker = Arc::new(DependencyTrace::default());
+        let mut updater = dice.updater_with_data(UserComputationData {
+            cycle_detector: Some(bzl_load_cycle_detector()),
+            activation_tracker: Some(tracker.clone()),
+            ..Default::default()
+        });
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                },
+                mapped_child_materializations(request(&leaf_input), request(&mapped_input)),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, observations)])
+            .unwrap();
+        MappedChildFixture {
+            transaction: updater.commit().await,
+            tracker,
+            leaf_input,
+            mapped_input,
         }
-        assert_eq!(first, restored);
-        assert_eq!(hash(&first), hash(&restored));
-        assert_ne!(first, spec_changed);
-        assert_ne!(hash(&first), hash(&spec_changed));
-        assert_ne!(first, mapping_changed);
-        assert_ne!(hash(&first), hash(&mapping_changed));
+    }
+
+    async fn assert_mapped_child_observation_epoch(
+        fixture: &mut MappedChildFixture,
+        observed: &ObservedRepositoryPackageLoad,
+    ) {
+        let package_source = fixture
+            .transaction
+            .compute(
+                &RepositoryPackageSourceObservationKey::new_canonical(
+                    fixture.leaf_input.clone(),
+                    PackageIdentifier::new(
+                        CanonicalRepoName::new("leaf+").unwrap(),
+                        PackagePath::root(),
+                    ),
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(package_source)) = package_source else {
+            panic!("canonical package source must complete")
+        };
+        let same_repo = fixture
+            .transaction
+            .compute(&HostRepositorySourceObservationEpochKey::new_canonical(
+                fixture.leaf_input.clone(),
+                host_repository_relative_path(PathBuf::from("entry.bzl")).unwrap(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(same_repo)) = same_repo else {
+            panic!("same-repository child source must complete")
+        };
+        let child_route = fixture
+            .transaction
+            .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                CanonicalRepoName::new("mapped+").unwrap(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(child_route)) = child_route else {
+            panic!("mapped child route must complete")
+        };
+        let child_source = fixture
+            .transaction
+            .compute(&HostRepositorySourceObservationEpochKey::new_canonical(
+                fixture.mapped_input.clone(),
+                host_repository_relative_path(PathBuf::from("defs.bzl")).unwrap(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(child_source)) = child_source else {
+            panic!("mapped child source must complete")
+        };
+        let expected = PathObservationEpoch::from_shared(
+            package_source
+                .observations()
+                .observations()
+                .iter()
+                .chain(same_repo.observations().observations().iter())
+                .chain(child_route.observations().observations().iter())
+                .chain(child_source.observations().observations().iter())
+                .map(|(demand, result)| (demand.dupe(), result.dupe())),
+        )
+        .unwrap();
+        assert_eq!(observed.observations(), &expected);
+    }
+
+    #[tokio::test]
+    async fn canonical_package_load_resolves_mapped_child_route_before_source() {
+        let mut fixture = mapped_child_fixture().await;
+        let key = RepositoryPackageLoadObservationKey::new_canonical(
+            fixture.leaf_input.clone(),
+            PackagePath::root(),
+        );
+        let outcome = fixture.transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("canonical mapped-child package load must complete: {outcome:?}")
+        };
+        let package = observed.result().as_ref().as_ref().unwrap();
+        assert_eq!(package.targets.len(), 1);
+        assert_eq!(package.targets[0].name.as_str(), "leaf");
+        assert_eq!(package.direct_load_roots.len(), 1);
+        assert_eq!(
+            package.direct_load_roots[0].label,
+            CanonicalLabel::parse("@@leaf+//:entry.bzl").unwrap()
+        );
+        assert_eq!(
+            package.direct_load_roots[0].workspace_path,
+            PathBuf::from("@@leaf+//:entry.bzl")
+        );
+        assert_eq!(
+            package.reachable_loads[1].label,
+            CanonicalLabel::parse("@@mapped+//:defs.bzl").unwrap()
+        );
+        assert_eq!(
+            package.reachable_loads[1].workspace_path,
+            PathBuf::from("@@mapped+//:defs.bzl")
+        );
+        assert_eq!(
+            package.build_file,
+            PathBuf::from("<output_base>/external/leaf+/BUILD.bazel")
+        );
+        assert_mapped_child_observation_epoch(&mut fixture, &observed).await;
+        let keys = fixture.tracker.all_keys();
+        let route_index = keys
+            .iter()
+            .position(|key| {
+                key.contains("observed-host-canonical-repository-load-route")
+                    && key.contains("mapped+")
+            })
+            .unwrap();
+        let source_index = keys
+            .iter()
+            .position(|key| {
+                key.contains("observed-host-repository-source") && key.contains("defs.bzl")
+            })
+            .unwrap();
+        assert!(route_index < source_index);
+    }
+
+    #[tokio::test]
+    async fn canonical_external_bzl_failures_cycles_and_source_names_are_carrier_exact() {
+        let (dice, input) = selected_input(LEAF_MAPPING_A, SOURCE_A).await;
+        let HostRepositorySourceInputDispositionView::Request(request) = input.view().disposition()
+        else {
+            panic!("selected route must retain a materialization request")
+        };
+        let instance = PathObservationInstanceId::new(73);
+        let namespace = PathObservationNamespace::Materialization(instance);
+        let tracker = Arc::new(DependencyTrace::default());
+        let mut tx = request_transaction_with_observations(
+            &dice,
+            request.clone(),
+            tracker,
+            RepositoryMaterializationSuccess::Immutable {
+                source_identity: Arc::from("canonical-bzl-error-source"),
+                generation_root: PathBuf::from("/registry-errors"),
+                observation_instance: instance,
+            },
+            bzl_source_epoch(
+                namespace,
+                "/registry-errors",
+                &[
+                    ("missing.bzl", None),
+                    ("parse.bzl", Some(b"VALUE =\n")),
+                    ("eval.bzl", Some(b"fail('boom')\n")),
+                    ("one.bzl", Some(b"load(':two.bzl', 'TWO')\nONE = TWO\n")),
+                    ("two.bzl", Some(b"load(':one.bzl', 'ONE')\nTWO = ONE\n")),
+                ],
+            ),
+        )
+        .await;
+
+        let missing = tx
+            .compute(&canonical_bzl_key(input.clone(), "missing.bzl"))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(missing)) = missing else {
+            panic!("canonical missing source must be a semantic terminal")
+        };
+        assert!(matches!(
+            missing.result().as_ref().as_ref().unwrap_err(),
+            ExternalBzlModuleError::Absent { label }
+                if label.to_string() == "@@leaf+//:missing.bzl"
+        ));
+
+        let parse = tx
+            .compute(&canonical_bzl_key(input.clone(), "parse.bzl"))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(parse)) = parse else {
+            panic!("canonical parse error must complete")
+        };
+        let parse = parse.result().as_ref().as_ref().unwrap_err();
+        assert!(matches!(
+            parse,
+            ExternalBzlModuleError::Parse { label, message }
+                if label.to_string() == "@@leaf+//:parse.bzl"
+                    && message.contains("@@leaf+//:parse.bzl")
+                    && !message.contains("/registry-errors")
+        ));
+
+        let evaluation = tx
+            .compute(&canonical_bzl_key(input.clone(), "eval.bzl"))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(evaluation)) = evaluation else {
+            panic!("canonical evaluation error must complete")
+        };
+        let evaluation = evaluation.result().as_ref().as_ref().unwrap_err();
+        assert!(matches!(
+            evaluation,
+            ExternalBzlModuleError::Evaluation { label, message }
+                if label.to_string() == "@@leaf+//:eval.bzl"
+                    && message.contains("@@leaf+//:eval.bzl")
+                    && !message.contains("/registry-errors")
+        ));
+
+        let cycle = tx
+            .compute(&canonical_bzl_key(input, "one.bzl"))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(cycle)) = cycle else {
+            panic!("canonical cycle must complete")
+        };
+        let cycle = cycle
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap_err()
+            .cycle()
+            .unwrap();
+        assert_eq!(
+            cycle
+                .keys
+                .iter()
+                .map(ExternalBzlCycleIdentity::canonical_label)
+                .map(|label| label.to_string())
+                .collect::<Vec<_>>(),
+            ["@@leaf+//:one.bzl", "@@leaf+//:two.bzl"]
+        );
+        assert!(cycle.keys.iter().all(|key| {
+            let label = key.canonical_label().to_string();
+            !label.contains("/registry-errors") && !label.contains("<output_base>")
+        }));
+    }
+
+    fn assert_generalized_loading_key_identity(
+        first: HostCanonicalRepositorySourceInput,
+        spec_changed: HostCanonicalRepositorySourceInput,
+        mapping_changed: HostCanonicalRepositorySourceInput,
+        restored: HostCanonicalRepositorySourceInput,
+    ) {
         let relative = host_repository_relative_path(PathBuf::from("BUILD.bazel")).unwrap();
         let first_key =
             HostRepositorySourceObservationEpochKey::new_canonical(first.clone(), relative.clone());
@@ -1146,22 +1697,73 @@ ext=module_extension(implementation=impl)
         let first_package =
             RepositoryPackageSourceKey::new_canonical(first.clone(), package_identifier.clone())
                 .unwrap();
-        let spec_package =
-            RepositoryPackageSourceKey::new_canonical(spec_changed, package_identifier.clone())
-                .unwrap();
+        let spec_package = RepositoryPackageSourceKey::new_canonical(
+            spec_changed.clone(),
+            package_identifier.clone(),
+        )
+        .unwrap();
         let mapping_package = RepositoryPackageSourceKey::new_canonical(
             mapping_changed.clone(),
             package_identifier.clone(),
         )
         .unwrap();
         let restored_package =
-            RepositoryPackageSourceKey::new_canonical(restored, package_identifier).unwrap();
+            RepositoryPackageSourceKey::new_canonical(restored.clone(), package_identifier.clone())
+                .unwrap();
         assert_eq!(first_package, restored_package);
         assert_eq!(hash(&first_package), hash(&restored_package));
         assert_ne!(first_package, spec_package);
         assert_ne!(hash(&first_package), hash(&spec_package));
         assert_ne!(first_package, mapping_package);
         assert_ne!(hash(&first_package), hash(&mapping_package));
+        assert_loading_driver_identity(first, spec_changed, mapping_changed, restored);
+    }
+
+    fn assert_loading_driver_identity(
+        first: HostCanonicalRepositorySourceInput,
+        spec_changed: HostCanonicalRepositorySourceInput,
+        mapping_changed: HostCanonicalRepositorySourceInput,
+        restored: HostCanonicalRepositorySourceInput,
+    ) {
+        let package_load =
+            |input, package| RepositoryPackageLoadObservationKey::new_canonical(input, package);
+        assert_a_b_a(
+            &package_load(first.clone(), PackagePath::root()),
+            &package_load(spec_changed.clone(), PackagePath::root()),
+            &package_load(restored.clone(), PackagePath::root()),
+        );
+        assert_ne!(
+            package_load(first.clone(), PackagePath::root()),
+            package_load(first.clone(), PackagePath::parse("other").unwrap())
+        );
+        let bzl = |input, target| canonical_bzl_key(input, target);
+        let first_bzl = bzl(first.clone(), "defs.bzl");
+        assert_a_b_a(
+            &first_bzl,
+            &bzl(mapping_changed.clone(), "defs.bzl"),
+            &bzl(restored.clone(), "defs.bzl"),
+        );
+        assert_ne!(
+            first_bzl,
+            bzl(first.clone(), "other.bzl"),
+            "external Bzl key retains its label"
+        );
+        assert_a_b_a(
+            &first_bzl.cycle_identity(),
+            &bzl(spec_changed.clone(), "defs.bzl").cycle_identity(),
+            &bzl(restored.clone(), "defs.bzl").cycle_identity(),
+        );
+        let subtree =
+            |input, package| ExternalSubtreePackageSetObservationKey::new_canonical(input, package);
+        assert_a_b_a(
+            &subtree(first.clone(), PackagePath::root()),
+            &subtree(mapping_changed.clone(), PackagePath::root()),
+            &subtree(restored.clone(), PackagePath::root()),
+        );
+        assert_ne!(
+            subtree(first.clone(), PackagePath::root()),
+            subtree(first.clone(), PackagePath::parse("other").unwrap())
+        );
         assert_eq!(
             first
                 .view()
@@ -1180,6 +1782,43 @@ ext=module_extension(implementation=impl)
                 .as_str(),
             "mapped+"
         );
+    }
+
+    #[tokio::test]
+    async fn selected_spec_and_mapping_change_independently_with_a_b_a_restoration() {
+        let first_outcome = selected_load_outcome(LEAF_MAPPING_A, SOURCE_A).await;
+        let spec_outcome = selected_load_outcome(LEAF_MAPPING_A, SOURCE_B).await;
+        let mapping_outcome = selected_load_outcome(LEAF_MAPPING_B, SOURCE_A).await;
+        let restored_outcome = selected_load_outcome(LEAF_MAPPING_A, SOURCE_A).await;
+        assert!(HostCanonicalRepositoryLoadRouteKey::equality(
+            &first_outcome,
+            &restored_outcome
+        ));
+        assert!(!HostCanonicalRepositoryLoadRouteKey::equality(
+            &first_outcome,
+            &spec_outcome
+        ));
+        assert!(!HostCanonicalRepositoryLoadRouteKey::equality(
+            &first_outcome,
+            &mapping_outcome
+        ));
+        let first = load_route(&first_outcome).input().clone();
+        let spec_changed = load_route(&spec_outcome).input().clone();
+        let mapping_changed = load_route(&mapping_outcome).input().clone();
+        let restored = load_route(&restored_outcome).input().clone();
+        for input in [&first, &spec_changed, &mapping_changed, &restored] {
+            assert_eq!(
+                input.view().route().view().canonical_repo().as_str(),
+                "leaf+"
+            );
+        }
+        assert_eq!(first, restored);
+        assert_eq!(hash(&first), hash(&restored));
+        assert_ne!(first, spec_changed);
+        assert_ne!(hash(&first), hash(&spec_changed));
+        assert_ne!(first, mapping_changed);
+        assert_ne!(hash(&first), hash(&mapping_changed));
+        assert_generalized_loading_key_identity(first, spec_changed, mapping_changed, restored);
     }
 
     #[tokio::test]
@@ -1210,18 +1849,25 @@ ext=module_extension(implementation=impl)
         }));
     }
 
-    #[tokio::test]
-    async fn route_need_suppresses_effect_and_generated_error_preserves_route_effect_prefix() {
-        const MODULE: &str = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, broken='broken')\n";
-        const EXTENSION: &str = r#"
+    const ROUTE_FAILURE_MODULE: &str = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, broken='broken')\n";
+    const ROUTE_FAILURE_EXTENSION: &str = r#"
 repo=repository_rule(implementation=lambda ctx: fail('effect failed'))
 def impl(ctx):
     repo(name='broken')
 ext=module_extension(implementation=impl)
 "#;
+
+    async fn assert_route_need_suppresses_effect() {
         let tracker = Arc::new(DependencyTrace::default());
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let mut present = transaction(&dice, MODULE, EXTENSION, true, None).await;
+        let mut present = transaction(
+            &dice,
+            ROUTE_FAILURE_MODULE,
+            ROUTE_FAILURE_EXTENSION,
+            true,
+            None,
+        )
+        .await;
         let canonical = names(&validated(&mut present).await).remove(0);
         let mut updater = dice.updater_with_data(UserComputationData {
             activation_tracker: Some(tracker.clone()),
@@ -1243,13 +1889,15 @@ ext=module_extension(implementation=impl)
             SourcePreparationOutcome::Need(_)
         ));
         assert_no_activation(&tracker, "observed-host-selected-repository-file-effect:");
+    }
 
+    async fn assert_generated_error_preserves_route_effect_prefix() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let tracker = Arc::new(DependencyTrace::default());
         let mut tx = transaction(
             &dice,
-            MODULE,
-            EXTENSION,
+            ROUTE_FAILURE_MODULE,
+            ROUTE_FAILURE_EXTENSION,
             true,
             Some(tracker.clone() as Arc<dyn ActivationTracker>),
         )
@@ -1323,6 +1971,239 @@ ext=module_extension(implementation=impl)
                 .map(|(demand, result)| (demand.dupe(), result.dupe()))
                 .collect::<Vec<_>>()
         );
+    }
+
+    #[tokio::test]
+    async fn route_need_suppresses_effect_and_generated_error_preserves_route_effect_prefix() {
+        assert_route_need_suppresses_effect().await;
+        assert_generated_error_preserves_route_effect_prefix().await;
+    }
+
+    const RECURSIVE_FAILURE_MODULE: &str = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, parent='parent', broken='broken')\n";
+    const RECURSIVE_FAILURE_EXTENSION: &str = r#"
+parent_repo=repository_rule(implementation=lambda ctx: None)
+broken_repo=repository_rule(implementation=lambda ctx: fail('effect failed'))
+def impl(ctx):
+    parent_repo(name='parent')
+    broken_repo(name='broken')
+ext=module_extension(implementation=impl)
+"#;
+
+    struct RecursiveRouteFailureFixture {
+        dice: Arc<Dice>,
+        parent_input: HostCanonicalRepositorySourceInput,
+        parent_request: Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>,
+        child_repo: CanonicalRepoName,
+        host_observations: PathObservationEpoch,
+    }
+
+    async fn recursive_route_failure_fixture() -> RecursiveRouteFailureFixture {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut tx = transaction(
+            &dice,
+            RECURSIVE_FAILURE_MODULE,
+            RECURSIVE_FAILURE_EXTENSION,
+            true,
+            None,
+        )
+        .await;
+        let generated = names(&validated(&mut tx).await);
+        let apparent = ApparentRepoName::new("broken").unwrap();
+        let mut selected = None;
+        for canonical in generated {
+            let outcome = tx
+                .compute(&HostCanonicalRepositoryLoadRouteKey::new(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    canonical,
+                ))
+                .await
+                .unwrap();
+            let SourcePreparationOutcome::Complete(result) = outcome else {
+                continue;
+            };
+            let Ok(route) = result.as_ref() else {
+                continue;
+            };
+            if let Some(child_repo) = route.input().view().route().mapping_target(&apparent) {
+                selected = Some((route.input().clone(), child_repo.clone()));
+            }
+        }
+        let (parent_input, child_repo) = selected.expect("parent route maps the broken sibling");
+        let HostRepositorySourceInputDispositionView::Request(parent_request) =
+            parent_input.view().disposition()
+        else {
+            panic!("generated parent retains its materialization request")
+        };
+        let parent_request = parent_request.clone();
+        let host_observations = tx.compute(&PathObservationEpochKey).await.unwrap();
+        RecursiveRouteFailureFixture {
+            dice,
+            parent_input,
+            parent_request,
+            child_repo,
+            host_observations,
+        }
+    }
+
+    fn recursive_parent_source_observations() -> PathObservationEpoch {
+        bzl_source_epoch(
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(74)),
+            "/generated-parent",
+            &[("entry.bzl", Some(b"load('@broken//:defs.bzl', 'VALUE')\n"))],
+        )
+    }
+
+    fn merge_observations(
+        left: &PathObservationEpoch,
+        right: &PathObservationEpoch,
+    ) -> PathObservationEpoch {
+        PathObservationEpoch::from_shared(
+            left.observations()
+                .iter()
+                .chain(right.observations().iter())
+                .map(|(demand, result)| (demand.dupe(), result.dupe())),
+        )
+        .unwrap()
+    }
+
+    async fn recursive_failure_transaction(
+        fixture: &RecursiveRouteFailureFixture,
+        host_observations: Option<&PathObservationEpoch>,
+        tracker: Arc<DependencyTrace>,
+    ) -> dice::DiceTransaction {
+        let source = recursive_parent_source_observations();
+        let observations = host_observations
+            .map(|host| merge_observations(host, &source))
+            .unwrap_or(source);
+        request_transaction_with_observations(
+            &fixture.dice,
+            fixture.parent_request.clone(),
+            tracker,
+            RepositoryMaterializationSuccess::Immutable {
+                source_identity: Arc::from("recursive-parent-source"),
+                generation_root: PathBuf::from("/generated-parent"),
+                observation_instance: PathObservationInstanceId::new(74),
+            },
+            observations,
+        )
+        .await
+    }
+
+    fn assert_no_recursive_child_source(tracker: &DependencyTrace) {
+        assert!(!tracker.all_keys().iter().any(|key| {
+            key.contains("observed-host-repository-source") && key.contains("defs.bzl")
+        }));
+    }
+
+    async fn assert_recursive_route_error(
+        fixture: &RecursiveRouteFailureFixture,
+        tx: &mut dice::DiceTransaction,
+        tracker: &DependencyTrace,
+        effect_error: bool,
+    ) {
+        let parent = tx
+            .compute(&canonical_bzl_key(
+                fixture.parent_input.clone(),
+                "entry.bzl",
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(parent)) = parent else {
+            panic!("recursive route error must complete: {parent:?}")
+        };
+        let ExternalBzlModuleError::Route {
+            source,
+            load,
+            message,
+        } = parent.result().as_ref().as_ref().unwrap_err()
+        else {
+            panic!("recursive failure must be reported at the load route")
+        };
+        assert_eq!(
+            source.to_string(),
+            format!(
+                "{}//:entry.bzl",
+                fixture.parent_input.view().route().view().canonical_repo()
+            )
+        );
+        assert_eq!(load.as_ref(), "@broken//:defs.bzl");
+        assert_eq!(message.contains("effect failed"), effect_error);
+        let child = tx
+            .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                fixture.child_repo.clone(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(child)) = child else {
+            panic!("child route error must retain an observed carrier")
+        };
+        assert_eq!(
+            child
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .is_effect_error(),
+            effect_error
+        );
+        let source = tx
+            .compute(&HostRepositorySourceObservationEpochKey::new_canonical(
+                fixture.parent_input.clone(),
+                host_repository_relative_path(PathBuf::from("entry.bzl")).unwrap(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(source)) = source else {
+            panic!("parent source must complete")
+        };
+        let expected = merge_observations(source.observations(), child.observations());
+        assert_eq!(parent.observations(), &expected);
+        assert_no_recursive_child_source(tracker);
+    }
+
+    #[tokio::test]
+    async fn recursive_mapped_child_need_and_route_errors_stop_before_child_source() {
+        let fixture = recursive_route_failure_fixture().await;
+        let tracker = Arc::new(DependencyTrace::default());
+        let mut need = recursive_failure_transaction(&fixture, None, tracker.clone()).await;
+        assert!(matches!(
+            need.compute(&canonical_bzl_key(
+                fixture.parent_input.clone(),
+                "entry.bzl"
+            ))
+            .await
+            .unwrap(),
+            SourcePreparationOutcome::Need(_)
+        ));
+        assert!(tracker.all_keys().iter().any(|key| {
+            key.contains("observed-host-canonical-repository-load-route")
+                && key.contains(fixture.child_repo.as_str())
+        }));
+        assert_no_recursive_child_source(&tracker);
+
+        let tracker = Arc::new(DependencyTrace::default());
+        let mut effect = recursive_failure_transaction(
+            &fixture,
+            Some(&fixture.host_observations),
+            tracker.clone(),
+        )
+        .await;
+        assert_recursive_route_error(&fixture, &mut effect, &tracker, true).await;
+
+        let mut invalid = transaction(
+            &fixture.dice,
+            "module(",
+            RECURSIVE_FAILURE_EXTENSION,
+            true,
+            None,
+        )
+        .await;
+        let invalid_host = invalid.compute(&PathObservationEpochKey).await.unwrap();
+        let tracker = Arc::new(DependencyTrace::default());
+        let mut semantic =
+            recursive_failure_transaction(&fixture, Some(&invalid_host), tracker.clone()).await;
+        assert_recursive_route_error(&fixture, &mut semantic, &tracker, false).await;
     }
 
     #[tokio::test]
@@ -1561,8 +2442,150 @@ ext=module_extension(implementation=impl)
         assert!(dependencies[1].starts_with("observed-host-repository-source-observation:"));
     }
 
+    #[tokio::test]
+    async fn cancellation_publishes_no_canonical_package_load_and_recovery_completes() {
+        let (dice, input) = selected_input(LEAF_MAPPING_A, SOURCE_A).await;
+        let HostRepositorySourceInputDispositionView::Request(request) = input.view().disposition()
+        else {
+            panic!("selected registry input must retain a request")
+        };
+        let tracker = Arc::new(DependencyTrace::default());
+        let instance = PathObservationInstanceId::new(74);
+        let materialization = || RepositoryMaterializationSuccess::Immutable {
+            source_identity: Arc::from("canonical-package-cancellation"),
+            generation_root: PathBuf::from("/registry-package-cancellation"),
+            observation_instance: instance,
+        };
+        let key =
+            RepositoryPackageLoadObservationKey::new_canonical(input.clone(), PackagePath::root());
+        let mut cancelled = request_transaction_with_observations(
+            &dice,
+            request.clone(),
+            tracker.clone(),
+            materialization(),
+            PathObservationEpoch::empty(),
+        )
+        .await;
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        drop(cancelled);
+        assert!(
+            !tracker
+                .all_keys()
+                .iter()
+                .any(|name| name == &key.to_string())
+        );
+
+        let mut recovered = request_transaction(
+            &dice,
+            request.clone(),
+            tracker.clone(),
+            materialization(),
+            PathObservationNamespace::Materialization(instance),
+            "/registry-package-cancellation",
+            None,
+        )
+        .await;
+        let outcome = recovered.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(package)) = outcome else {
+            panic!("recovered canonical package load must complete")
+        };
+        assert!(package.result().is_ok());
+        assert!(
+            tracker
+                .all_keys()
+                .iter()
+                .any(|name| name == &key.to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn cancellation_publishes_no_canonical_recursive_bzl_and_recovery_completes() {
+        let (dice, input) = selected_input(LEAF_MAPPING_A, SOURCE_A).await;
+        let HostRepositorySourceInputDispositionView::Request(request) = input.view().disposition()
+        else {
+            panic!("selected registry input must retain a request")
+        };
+        let tracker = Arc::new(DependencyTrace::default());
+        let instance = PathObservationInstanceId::new(75);
+        let materialization = || RepositoryMaterializationSuccess::Immutable {
+            source_identity: Arc::from("canonical-bzl-cancellation"),
+            generation_root: PathBuf::from("/registry-bzl-cancellation"),
+            observation_instance: instance,
+        };
+        let key = canonical_bzl_key(input.clone(), "entry.bzl");
+        let mut cancelled = request_transaction_with_observations(
+            &dice,
+            request.clone(),
+            tracker.clone(),
+            materialization(),
+            PathObservationEpoch::empty(),
+        )
+        .await;
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        drop(cancelled);
+        assert!(
+            !tracker
+                .all_keys()
+                .iter()
+                .any(|name| name == &key.to_string())
+        );
+
+        let namespace = PathObservationNamespace::Materialization(instance);
+        let mut recovered = request_transaction_with_observations(
+            &dice,
+            request.clone(),
+            tracker.clone(),
+            materialization(),
+            bzl_source_epoch(
+                namespace,
+                "/registry-bzl-cancellation",
+                &[("entry.bzl", Some(b"VALUE = 1\n"))],
+            ),
+        )
+        .await;
+        let outcome = recovered.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(module)) = outcome else {
+            panic!("recovered canonical external Bzl must complete")
+        };
+        let module = module.result().as_ref().as_ref().unwrap();
+        assert_eq!(
+            module.manifest.root.workspace_path,
+            PathBuf::from("@@leaf+//:entry.bzl")
+        );
+        assert!(
+            tracker
+                .all_keys()
+                .iter()
+                .any(|name| name == &key.to_string())
+        );
+    }
+
     #[test]
     fn keys_are_complete_only_and_retained_shapes_stay_compact_and_apparent_free() {
+        assert_allocative::<RepositoryPackageSourceAddress>();
+        assert_allocative::<RepositoryPackageSource>();
+        assert_allocative::<ExternalBzlModuleEvalKey>();
+        assert_allocative::<ExternalBzlModuleObservationKey>();
+        assert_allocative::<ExternalBzlCycleIdentity>();
+        assert_allocative::<ObservedExternalBzlModule>();
+        assert_allocative::<RepositoryPackageLoadKey>();
+        assert_allocative::<RepositoryPackageLoadObservationKey>();
+        assert_allocative::<ObservedRepositoryPackageLoad>();
+        assert_allocative::<ExternalSubtreePackageSetKey>();
+        assert_allocative::<ExternalSubtreePackageSetObservationKey>();
+        assert_allocative::<ObservedExternalSubtreePackageSet>();
         assert!(!HostCanonicalRepositoryLoadRouteKey::validity(
             &SourcePreparationOutcome::Need(synthetic_need())
         ));
@@ -1584,8 +2607,20 @@ ext=module_extension(implementation=impl)
         assert!(std::mem::size_of::<ObservedHostRepositorySourceObservation>() <= 48);
         assert!(std::mem::size_of::<HostExternalPackageBoundaryObservationKey>() <= 320);
         assert!(std::mem::size_of::<RepositoryPackageSourceKey>() <= 320);
+        assert!(std::mem::size_of::<RepositoryPackageSourceAddress>() <= 32);
+        assert!(std::mem::size_of::<RepositoryPackageSource>() <= 80);
         assert!(std::mem::size_of::<ObservedHostExternalPackageBoundary>() <= 48);
         assert!(std::mem::size_of::<ObservedRepositoryPackageSource>() <= 48);
+        assert!(std::mem::size_of::<ExternalBzlModuleEvalKey>() <= 320);
+        assert!(std::mem::size_of::<ExternalBzlModuleObservationKey>() <= 320);
+        assert!(std::mem::size_of::<ExternalBzlCycleIdentity>() <= 320);
+        assert!(std::mem::size_of::<ObservedExternalBzlModule>() <= 48);
+        assert!(std::mem::size_of::<RepositoryPackageLoadKey>() <= 320);
+        assert!(std::mem::size_of::<RepositoryPackageLoadObservationKey>() <= 320);
+        assert!(std::mem::size_of::<ObservedRepositoryPackageLoad>() <= 48);
+        assert!(std::mem::size_of::<ExternalSubtreePackageSetKey>() <= 320);
+        assert!(std::mem::size_of::<ExternalSubtreePackageSetObservationKey>() <= 320);
+        assert!(std::mem::size_of::<ObservedExternalSubtreePackageSet>() <= 48);
         let source = include_str!(
             "../../slug_bzlmod_v2/src/source_preparation/canonical_repository_source.rs"
         );

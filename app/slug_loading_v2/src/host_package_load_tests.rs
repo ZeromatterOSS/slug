@@ -358,6 +358,7 @@ struct EventTracker {
     batches: Mutex<Vec<TrackedBatch>>,
     package_dependencies: Mutex<Vec<Vec<String>>>,
     route_dependencies: Mutex<Vec<Vec<String>>>,
+    loading_dependencies: Mutex<Vec<(String, Vec<String>)>>,
 }
 
 impl EventTracker {
@@ -372,6 +373,16 @@ impl EventTracker {
     fn take_route_dependencies(&self) -> Vec<Vec<String>> {
         std::mem::take(&mut *self.route_dependencies.lock().unwrap())
     }
+
+    fn dependencies(&self, key: &str) -> Vec<String> {
+        self.loading_dependencies
+            .lock()
+            .unwrap()
+            .iter()
+            .rev()
+            .find_map(|(candidate, dependencies)| (candidate == key).then(|| dependencies.clone()))
+            .unwrap_or_default()
+    }
 }
 
 impl ActivationTracker for EventTracker {
@@ -381,6 +392,18 @@ impl ActivationTracker for EventTracker {
         deps: &mut dyn Iterator<Item = &DynKey>,
         _activation: ActivationData,
     ) {
+        let dependencies = deps.map(ToString::to_string).collect::<Vec<_>>();
+        let name = key.to_string();
+        if name.starts_with("external-bzl-module:")
+            || name.starts_with("observed-external-bzl-module:")
+            || name.starts_with("repository-package-load:")
+            || name.starts_with("observed-repository-package-load:")
+        {
+            self.loading_dependencies
+                .lock()
+                .unwrap()
+                .push((name, dependencies.clone()));
+        }
         if key.downcast_ref::<RootPackageLoadKey>().is_some()
             || key
                 .downcast_ref::<RootPackageLoadObservationKey>()
@@ -390,18 +413,12 @@ impl ActivationTracker for EventTracker {
                 .downcast_ref::<RepositoryPackageLoadObservationKey>()
                 .is_some()
         {
-            self.package_dependencies
-                .lock()
-                .unwrap()
-                .push(deps.map(ToString::to_string).collect());
+            self.package_dependencies.lock().unwrap().push(dependencies);
         } else if key
             .downcast_ref::<RootRepositoryRouteObservationKey>()
             .is_some()
         {
-            self.route_dependencies
-                .lock()
-                .unwrap()
-                .push(deps.map(ToString::to_string).collect());
+            self.route_dependencies.lock().unwrap().push(dependencies);
         }
     }
 
@@ -2054,6 +2071,15 @@ async fn observed_external_bzl_retains_recursive_epoch_arcs_and_local_events() {
     assert_eq!(module.manifest.reachable.len(), 4);
     assert!(ExternalBzlModuleObservationKey::validity(&value));
     assert!(ExternalBzlModuleObservationKey::equality(&value, &value));
+    assert_eq!(
+        tracker.dependencies(&key.to_string()),
+        [
+            HostRepositorySourceFileObservationKey::new(route.clone(), PathBuf::from("root.bzl"),)
+                .to_string(),
+            observed_external_bzl_key(route.clone(), "", "left.bzl").to_string(),
+            observed_external_bzl_key(route.clone(), "", "right.bzl").to_string(),
+        ]
+    );
     let batches = tracker.take();
     assert!(batches.iter().all(|entry| {
         !entry.key.starts_with("external-bzl-module:")
@@ -2258,9 +2284,11 @@ async fn observed_external_bzl_terminals_keep_decisive_prefixes_and_stop_childre
     assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first_arc));
     assert!(super::union_host_observations(&merged, &conflict).is_err());
     let absent_prefix = super::finish_external_bzl_source(
-        Ok(slug_bzlmod_v2::HostRepositorySourceFileValue::Absent),
+        super::ExternalBzlSourceChild::Root(
+            Ok(slug_bzlmod_v2::HostRepositorySourceFileValue::Absent),
+            first.dupe(),
+        ),
         CanonicalLabel::parse("@@dep+//:missing.bzl").unwrap(),
-        first.dupe(),
     )
     .unwrap_err();
     let LoadingPreparationOutcome::Complete(Ok((result, retained))) = absent_prefix else {
@@ -33807,6 +33835,18 @@ async fn observed_repository_package_load_retains_source_child_arcs_and_local_ba
         ["files"]
     );
     assert!(RepositoryPackageLoadObservationKey::validity(&value));
+    assert_eq!(
+        tracker.dependencies(&observed_key.to_string()),
+        [
+            RepositoryPackageSourceObservationKey::new(
+                route.clone(),
+                PackageIdentifier::new(route.canonical_repo().clone(), package.clone()),
+            )
+            .unwrap()
+            .to_string(),
+            observed_external_bzl_key(route.clone(), "", "defs.bzl").to_string(),
+        ]
+    );
     let source = tx
         .compute(
             &RepositoryPackageSourceObservationKey::new(

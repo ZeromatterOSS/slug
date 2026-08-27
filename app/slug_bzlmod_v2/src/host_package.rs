@@ -1045,15 +1045,22 @@ impl fmt::Display for RepositoryPackageSourceObservationKey {
 
 /// The selected BUILD identity and bytes required by external package loading.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub enum RepositoryPackageSourceAddress {
+    Host(NormalizedAbsolutePath),
+    BuiltinCatalog(Arc<PathBuf>),
+}
+
+/// The selected BUILD identity and bytes required by external package loading.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct RepositoryPackageSource {
-    logical_path: NormalizedAbsolutePath,
+    address: RepositoryPackageSourceAddress,
     build_file_name: HostBuildFileName,
     bytes: Arc<[u8]>,
 }
 
 impl RepositoryPackageSource {
-    pub fn logical_path(&self) -> &NormalizedAbsolutePath {
-        &self.logical_path
+    pub fn address(&self) -> &RepositoryPackageSourceAddress {
+        &self.address
     }
 
     pub fn build_file_name(&self) -> &'static str {
@@ -1120,9 +1127,6 @@ enum RepositoryPackageSourceErrorInner {
         logical_path: Arc<PathBuf>,
         message: Arc<str>,
     },
-    BuiltinSourceAddressDeferred {
-        logical_path: Arc<PathBuf>,
-    },
     SelectedSourceAbsent {
         logical_path: Arc<PathBuf>,
     },
@@ -1144,15 +1148,6 @@ impl RepositoryPackageSourceError {
             self.inner,
             RepositoryPackageSourceErrorInner::Unsupported { .. }
         )
-    }
-
-    pub(crate) fn deferred_builtin_source_address(&self) -> Option<&PathBuf> {
-        match &self.inner {
-            RepositoryPackageSourceErrorInner::BuiltinSourceAddressDeferred { logical_path } => {
-                Some(logical_path)
-            }
-            _ => None,
-        }
     }
 }
 
@@ -1203,13 +1198,6 @@ impl fmt::Display for RepositoryPackageSourceError {
                 "computing selected BUILD source {}: {message}",
                 logical_path.display()
             ),
-            RepositoryPackageSourceErrorInner::BuiltinSourceAddressDeferred { logical_path } => {
-                write!(
-                    f,
-                    "canonical built-in BUILD source {} requires source-address adaptation",
-                    logical_path.display()
-                )
-            }
             RepositoryPackageSourceErrorInner::SelectedSourceAbsent { logical_path } => write!(
                 f,
                 "selected BUILD source {} became absent",
@@ -1557,7 +1545,7 @@ async fn finish_canonical_repository_package_source(
     let result = match mode {
         RepositoryPackageSourceMode::Legacy => {
             match ctx
-                .compute(&key.route.source_observation_key(relative))
+                .compute(&key.route.source_observation_key(relative.clone()))
                 .await
             {
                 Ok(SourcePreparationOutcome::Need(need)) => {
@@ -1577,7 +1565,7 @@ async fn finish_canonical_repository_package_source(
         }
         RepositoryPackageSourceMode::Observed => {
             match ctx
-                .compute(&key.route.source_observation_epoch_key(relative))
+                .compute(&key.route.source_observation_epoch_key(relative.clone()))
                 .await
             {
                 Ok(outcome) => match repository_package_source_observed_child(outcome) {
@@ -1615,10 +1603,14 @@ async fn finish_canonical_repository_package_source(
             )
         }
         Ok(HostRepositorySourceObservation::Builtin(value)) => {
-            repository_package_source_error_complete(
-                RepositoryPackageSourceErrorInner::BuiltinSourceAddressDeferred {
-                    logical_path: Arc::new(PathBuf::from(value.path())),
-                },
+            repository_package_source_driver_complete(
+                Ok(RepositoryPackageSource {
+                    address: RepositoryPackageSourceAddress::BuiltinCatalog(
+                        relative.path_arc().dupe(),
+                    ),
+                    build_file_name,
+                    bytes: value.bytes_arc().dupe(),
+                }),
                 observations,
             )
         }
@@ -1650,7 +1642,7 @@ fn finish_repository_package_source_value(
             logical_path,
         }) => repository_package_source_driver_complete(
             Ok(RepositoryPackageSource {
-                logical_path: logical_path.dupe(),
+                address: RepositoryPackageSourceAddress::Host(logical_path.dupe()),
                 build_file_name,
                 bytes: bytes.dupe(),
             }),
@@ -2556,6 +2548,8 @@ mod tests {
     use super::ObservedHostRootPackageLookup;
     #[cfg(unix)]
     use super::ObservedRootPackageSource;
+    #[cfg(unix)]
+    use super::RepositoryPackageSourceAddress;
     #[cfg(unix)]
     use super::RepositoryPackageSourceError;
     #[cfg(unix)]
@@ -3790,8 +3784,10 @@ mod tests {
             assert_eq!(source.build_file_name(), expected_name);
             assert_eq!(source.bytes().as_ref(), expected_bytes);
             assert_eq!(
-                source.logical_path(),
-                &path(&format!("/workspace/dep/pkg/{expected_name}"))
+                source.address(),
+                &RepositoryPackageSourceAddress::Host(path(&format!(
+                    "/workspace/dep/pkg/{expected_name}"
+                )))
             );
             assert!(RepositoryPackageSourceKey::validity(&outcome));
             assert!(RepositoryPackageSourceKey::equality(&outcome, &outcome));

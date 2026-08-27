@@ -5,14 +5,21 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::os::unix::ffi::OsStringExt;
 use std::sync::Arc;
+use std::sync::Mutex;
 
+use dice::ActivationData;
+use dice::ActivationTracker;
 use dice::DetectCycles;
 use dice::Dice;
+use dice::DynKey;
 use dice::Key;
+use dice::UserComputationData;
 use dupe::Dupe;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
+use slug_bzlmod_v2::HostCanonicalRepositoryRoute;
+use slug_bzlmod_v2::HostExternalPackageBoundaryKey;
 use slug_bzlmod_v2::HostExternalPackageBoundaryKind;
 use slug_bzlmod_v2::HostRepositoryDirectoryListingKey;
 use slug_bzlmod_v2::HostRepositoryLocalPathPolicy;
@@ -30,6 +37,7 @@ use slug_bzlmod_v2::RootRepositoryRoute;
 use slug_bzlmod_v2::RootRepositoryRouteKey;
 use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
+use slug_bzlmod_v2::host_canonical_repository_source_input;
 use slug_bzlmod_v2::host_repository_materialization_request;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
@@ -93,6 +101,78 @@ fn generated_route(workspace: &str, bytes: &'static [u8]) -> RootRepositoryRoute
         plan,
     )
     .unwrap()
+}
+
+#[derive(Default)]
+struct DependencyTracker(Mutex<Vec<(String, Vec<String>)>>);
+
+impl ActivationTracker for DependencyTracker {
+    fn key_activated(
+        &self,
+        key: &DynKey,
+        dependencies: &mut dyn Iterator<Item = &DynKey>,
+        _: ActivationData,
+    ) {
+        self.0.lock().unwrap().push((
+            key.to_string(),
+            dependencies.map(ToString::to_string).collect(),
+        ));
+    }
+}
+
+impl DependencyTracker {
+    fn dependencies(&self, key: &str) -> Vec<String> {
+        self.0
+            .lock()
+            .unwrap()
+            .iter()
+            .rev()
+            .find_map(|(candidate, dependencies)| (candidate == key).then(|| dependencies.clone()))
+            .unwrap_or_default()
+    }
+}
+
+#[tokio::test]
+async fn canonical_builtin_subtree_uses_shared_boundary_and_listing_owners() {
+    let workspace = path("/canonical-builtin-subtree");
+    let route = Arc::new(HostCanonicalRepositoryRoute::builtin(workspace.dupe()));
+    let input = host_canonical_repository_source_input(route, None).unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        RootPackagePolicyInputs::new(
+            workspace.dupe(),
+            Arc::from([workspace]),
+            std::iter::empty::<&str>(),
+            None,
+            Some("warning"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let mut tx = updater.commit().await;
+    let value = tx
+        .compute(&ExternalSubtreePackageSetObservationKey::new_canonical(
+            input,
+            package("tools"),
+        ))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+        panic!("canonical built-in subtree must complete")
+    };
+    let packages = observed
+        .result()
+        .as_ref()
+        .as_ref()
+        .unwrap()
+        .packages()
+        .iter()
+        .map(|package| package.as_str())
+        .collect::<Vec<_>>();
+    assert!(packages.contains(&"tools/test"));
+    assert!(observed.observations().observations().is_empty());
 }
 
 fn local_epoch(child_build: Option<bool>) -> PathObservationEpoch {
@@ -515,7 +595,11 @@ async fn deleted_package_still_consumes_its_listing() {
     let prefix = package("pkg");
     let key = ExternalSubtreePackageSetKey::new(route.clone(), prefix.clone());
     let dice = Dice::builder().build(DetectCycles::Enabled);
-    let mut updater = dice.updater();
+    let tracker = Arc::new(DependencyTracker::default());
+    let mut updater = dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(tracker.clone()),
+        ..Default::default()
+    });
     inject_root_package_policy_inputs(
         &mut updater,
         RootPackagePolicyInputs::new(
@@ -530,7 +614,7 @@ async fn deleted_package_still_consumes_its_listing() {
     .unwrap();
     updater
         .changed_to(vec![(
-            HostRepositoryDirectoryListingKey::new(route, prefix),
+            HostRepositoryDirectoryListingKey::new(route.clone(), prefix.clone()),
             SourcePreparationOutcome::Complete(Ok(PathDirectoryListing::Present(
                 PathDirectoryEntries::new([]),
             ))),
@@ -542,6 +626,13 @@ async fn deleted_package_still_consumes_its_listing() {
         panic!("injected deleted package must complete");
     };
     assert!(outcome.as_ref().as_ref().unwrap().packages().is_empty());
+    assert_eq!(
+        tracker.dependencies(&key.to_string()),
+        [
+            HostExternalPackageBoundaryKey::new(route.clone(), prefix.clone()).to_string(),
+            HostRepositoryDirectoryListingKey::new(route, prefix).to_string(),
+        ]
+    );
 }
 
 #[tokio::test]

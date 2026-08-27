@@ -186,6 +186,11 @@ impl BuiltinBazelToolsSourceFileValue {
         &self.bytes
     }
 
+    #[doc(hidden)]
+    pub fn bytes_arc(&self) -> &Arc<[u8]> {
+        &self.bytes
+    }
+
     pub fn sha256(&self) -> [u8; 32] {
         self.sha256
     }

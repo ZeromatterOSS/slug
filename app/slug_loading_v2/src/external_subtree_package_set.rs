@@ -19,6 +19,7 @@ use dice::CancellationContext;
 use dice::DiceComputations;
 use dice::Key;
 use dupe::Dupe;
+use slug_bzlmod_v2::HostCanonicalRepositorySourceInput;
 use slug_bzlmod_v2::HostExternalPackageBoundary;
 use slug_bzlmod_v2::HostExternalPackageBoundaryError;
 use slug_bzlmod_v2::HostExternalPackageBoundaryKey;
@@ -28,6 +29,7 @@ use slug_bzlmod_v2::HostRepositoryDirectoryListing;
 use slug_bzlmod_v2::HostRepositoryDirectoryListingError;
 use slug_bzlmod_v2::HostRepositoryDirectoryListingKey;
 use slug_bzlmod_v2::HostRepositoryDirectoryListingObservationKey;
+use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::RootRepositoryRoute;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_identity_v2::PackagePath;
@@ -136,13 +138,23 @@ type PackageSetValue = Arc<Result<ExternalSubtreePackageSet, ExternalSubtreePack
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
 pub struct ExternalSubtreePackageSetKey {
-    route: RootRepositoryRoute,
+    route: HostRepositorySourceRoute,
     prefix: PackagePath,
 }
 
 impl ExternalSubtreePackageSetKey {
     pub fn new(route: RootRepositoryRoute, prefix: PackagePath) -> Self {
-        Self { route, prefix }
+        Self {
+            route: HostRepositorySourceRoute::root(route),
+            prefix,
+        }
+    }
+
+    pub fn new_canonical(input: HostCanonicalRepositorySourceInput, prefix: PackagePath) -> Self {
+        Self {
+            route: HostRepositorySourceRoute::canonical(input),
+            prefix,
+        }
     }
 }
 
@@ -163,6 +175,10 @@ pub struct ExternalSubtreePackageSetObservationKey(ExternalSubtreePackageSetKey)
 impl ExternalSubtreePackageSetObservationKey {
     pub fn new(route: RootRepositoryRoute, prefix: PackagePath) -> Self {
         Self(ExternalSubtreePackageSetKey::new(route, prefix))
+    }
+
+    pub fn new_canonical(input: HostCanonicalRepositorySourceInput, prefix: PackagePath) -> Self {
+        Self(ExternalSubtreePackageSetKey::new_canonical(input, prefix))
     }
 }
 
@@ -241,16 +257,20 @@ fn complete(
 
 async fn boundary(
     ctx: &mut DiceComputations<'_>,
-    route: &RootRepositoryRoute,
+    route: &HostRepositorySourceRoute,
     package: &PackagePath,
     mode: ObservationMode,
 ) -> BoundaryOutcome {
     match mode {
         ObservationMode::Legacy => match ctx
-            .compute(&HostExternalPackageBoundaryKey::new(
-                route.clone(),
-                package.clone(),
-            ))
+            .compute(&match route {
+                HostRepositorySourceRoute::Root(route) => {
+                    HostExternalPackageBoundaryKey::new(route.clone(), package.clone())
+                }
+                HostRepositorySourceRoute::Canonical(input) => {
+                    HostExternalPackageBoundaryKey::new_canonical(input.clone(), package.clone())
+                }
+            })
             .await
             .expect("external package boundary DICE invariant")
         {
@@ -261,10 +281,17 @@ async fn boundary(
             ))),
         },
         ObservationMode::Observed => match ctx
-            .compute(&HostExternalPackageBoundaryObservationKey::new(
-                route.clone(),
-                package.clone(),
-            ))
+            .compute(&match route {
+                HostRepositorySourceRoute::Root(route) => {
+                    HostExternalPackageBoundaryObservationKey::new(route.clone(), package.clone())
+                }
+                HostRepositorySourceRoute::Canonical(input) => {
+                    HostExternalPackageBoundaryObservationKey::new_canonical(
+                        input.clone(),
+                        package.clone(),
+                    )
+                }
+            })
             .await
             .expect("observed external package boundary DICE invariant")
         {
@@ -281,16 +308,20 @@ async fn boundary(
 
 async fn listing(
     ctx: &mut DiceComputations<'_>,
-    route: &RootRepositoryRoute,
+    route: &HostRepositorySourceRoute,
     package: &PackagePath,
     mode: ObservationMode,
 ) -> ListingOutcome {
     match mode {
         ObservationMode::Legacy => match ctx
-            .compute(&HostRepositoryDirectoryListingKey::new(
-                route.clone(),
-                package.clone(),
-            ))
+            .compute(&match route {
+                HostRepositorySourceRoute::Root(route) => {
+                    HostRepositoryDirectoryListingKey::new(route.clone(), package.clone())
+                }
+                HostRepositorySourceRoute::Canonical(input) => {
+                    HostRepositoryDirectoryListingKey::new_canonical(input.clone(), package.clone())
+                }
+            })
             .await
             .expect("external repository listing DICE invariant")
         {
@@ -300,10 +331,20 @@ async fn listing(
             }
         },
         ObservationMode::Observed => match ctx
-            .compute(&HostRepositoryDirectoryListingObservationKey::new(
-                route.clone(),
-                package.clone(),
-            ))
+            .compute(&match route {
+                HostRepositorySourceRoute::Root(route) => {
+                    HostRepositoryDirectoryListingObservationKey::new(
+                        route.clone(),
+                        package.clone(),
+                    )
+                }
+                HostRepositorySourceRoute::Canonical(input) => {
+                    HostRepositoryDirectoryListingObservationKey::new_canonical(
+                        input.clone(),
+                        package.clone(),
+                    )
+                }
+            })
             .await
             .expect("observed external repository listing DICE invariant")
         {

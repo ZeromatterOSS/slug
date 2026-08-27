@@ -162,6 +162,26 @@ impl HostCanonicalRepositoryRoute {
             }
         }
     }
+
+    /// Complete final mapping consumed by the generic Starlark evaluator.
+    #[doc(hidden)]
+    pub fn bzl_repository_mapping(&self) -> Arc<[(ApparentRepoName, CanonicalRepoName)]> {
+        match &self.source {
+            HostCanonicalRepositoryRouteSource::Builtin(_) => Arc::from([]),
+            HostCanonicalRepositoryRouteSource::Selected(definition) => definition
+                .view()
+                .mapping()
+                .map(|(apparent, canonical)| (apparent.clone(), canonical.clone()))
+                .collect::<Vec<_>>()
+                .into(),
+            HostCanonicalRepositoryRouteSource::Generated(generated) => generated
+                .mapping
+                .iter()
+                .map(|(apparent, canonical)| (apparent.clone(), canonical.clone()))
+                .collect::<Vec<_>>()
+                .into(),
+        }
+    }
 }
 
 impl<'a> HostCanonicalRepositoryRouteView<'a> {

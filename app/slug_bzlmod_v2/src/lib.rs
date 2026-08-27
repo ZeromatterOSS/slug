@@ -122,6 +122,7 @@ pub use host_package::ObservedRepositoryPackageSource;
 #[doc(hidden)]
 pub use host_package::ObservedRootPackageSource;
 pub use host_package::RepositoryPackageSource;
+pub use host_package::RepositoryPackageSourceAddress;
 pub use host_package::RepositoryPackageSourceError;
 pub use host_package::RepositoryPackageSourceKey;
 #[doc(hidden)]

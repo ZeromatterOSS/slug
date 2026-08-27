@@ -31,6 +31,7 @@ use super::HostExternalPackageBoundaryObservationKey;
 use crate::HostCanonicalRepositoryRoute;
 use crate::HostRepositorySourceObservationEpochKey;
 use crate::HostRepositorySourceObservationView;
+use crate::RepositoryPackageSourceAddress;
 use crate::RepositoryPackageSourceObservationKey;
 use crate::RootPackagePolicyInputs;
 use crate::RootRepositoryRoute;
@@ -217,12 +218,20 @@ async fn canonical_builtin_policy_stops_package_source_at_catalog_address() {
     let SourcePreparationOutcome::Complete(Ok(package_source)) = package_source else {
         panic!("canonical built-in package source terminal must complete")
     };
-    let error = package_source.result().as_ref().as_ref().unwrap_err();
+    let package_source_result = package_source.result().as_ref().as_ref().unwrap();
     assert_eq!(
-        error.deferred_builtin_source_address(),
-        Some(&PathBuf::from("tools/test/BUILD"))
+        package_source_result.address(),
+        &RepositoryPackageSourceAddress::BuiltinCatalog(Arc::new(PathBuf::from(
+            "tools/test/BUILD"
+        )))
     );
-    assert!(!error.to_string().contains("/workspace"));
+    assert_eq!(package_source_result.build_file_name(), "BUILD");
+    match source.result().as_ref().as_ref().unwrap().view() {
+        HostRepositorySourceObservationView::Builtin(file) => {
+            assert!(Arc::ptr_eq(package_source_result.bytes(), file.bytes_arc()));
+        }
+        _ => unreachable!(),
+    }
     assert!(boundary.observations().observations().is_empty());
     assert!(source.observations().observations().is_empty());
     assert!(package_source.observations().observations().is_empty());
