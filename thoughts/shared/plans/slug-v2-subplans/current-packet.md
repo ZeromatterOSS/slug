@@ -1,271 +1,260 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-canonical-loading-source-address-implementation-r2`
+Packet: `WP-4-5-7A-shared-registration-expander-architecture`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `09de9af9e`.
+Base: `79a36c580`.
 
-Result: implement the accepted Stage B source-address contract so canonical
-repository BUILD files, external subtree traversal and recursive `.bzl` loads
-consume the shared Root/Canonical carrier without an apparent alias, a
-fabricated absolute path for embedded content or a second semantic route.
+Result: at zero Rust, freeze the shared contextual target-pattern, general
+package-inventory and loading-owned expansion architecture used by both MODULE
+registration families, then select its bounded implementation sequence.
 
-## Accepted basis
+## Immediate predecessor
 
-Commit `fa896aca4` accepts Stage A: Bzlmod REPO, ignore, package lookup,
-boundary and BUILD-source policy share `HostRepositorySourceRoute`; canonical
-policy is alias-free; and the temporary canonical source/listing wrappers are
-deleted. Root behavior and dependency order remain exact. Built-in canonical
-package selection currently stops at its authenticated catalog-relative
-address because `RepositoryPackageSource` still requires a Host absolute path.
+Commit `79a36c580` accepts the Root/Canonical source-address implementation.
+Canonical repository BUILD files, subtree traversal and recursive `.bzl`
+loads now use one alias-free route carrier; built-in catalog bytes remain
+zero-copy; mapped child loads observe the child route/effect before source;
+and root behavior remains exact. The independently reviewed focused, complete
+crate, dependent, locked CLI, formatting, cap and archive-baseline gates pass.
 
-Commit `e47d5d4c8` freezes the independently reviewed Stage B architecture:
+That closes the prerequisite named by the accepted registration design. This
+packet must not revisit source routing or activate registrations.
 
-- retain `HostRepositorySourceRoute` as the sole Root/Canonical semantic
-  carrier;
-- distinguish Host absolute source addresses from built-in catalog-relative
-  source addresses;
-- retain producer-owned byte `Arc`s without copying;
-- derive parser/evaluator source names from semantic identity rather than
-  readable access or presentation paths;
-- generalize loading-owned subtree, package, recursive `.bzl` and cycle
-  identities over that carrier; and
-- resolve canonical mapped child loads through the final canonical mapping and
-  the child canonical load-route owner before observing child source.
+## Research basis and learned facts
 
-The first implementation preflight stopped before Rust edits. The canonical
-route exposes point lookup for parsed `load()` labels, but the generic
-evaluator also requires the complete final mapping for Starlark `Label()`
-construction inside BCR modules. Reconstructing it from observed loads would
-be incomplete, while copying route state into loading would create a second
-owner. R2 therefore admits one read-only projection on the existing canonical
-route owner and no route-production change.
+Pinned Bazel 9.2 is compatibility authority:
 
-The existing `<output_base>/external/<canonical>/...` package directory and
-BUILD-file paths remain an explicitly Slug-native evaluator/publication
-projection. They are not source authority and may not be used for source IO.
+- `ModuleFileGlobals.checkAllAbsolutePatterns`, `registerToolchains` and
+  `registerExecutionPlatforms` retain absolute raw strings after ignored-dev
+  suppression. The default
+  `experimental_single_package_toolchain_binding=false`, so recursive MODULE
+  toolchain patterns remain admitted in Bazel 9.2.
+- `TargetPattern.Parser` resolves `//` under the declaring canonical
+  repository, resolves `@apparent` through that declaration's full mapping,
+  accepts `@@canonical`, and retains the absolute `:all`, `:*` and
+  `:all-targets` wildcard-conflict shape until package lookup.
+- `TargetPattern.TargetsInPackage.getWildcardConflict` gives an existing
+  same-named explicit target precedence and emits a warning.
+- `RegisteredToolchainsFunction` and
+  `RegisteredExecutionPlatformsFunction` parse every selected module in
+  selected-graph order, expand each family independently and apply different
+  loading filters. Explicit targets bypass those filters but must exist.
+- `FilteringPolicies.ruleTypeExplicit("toolchain")` retains wildcard targets
+  whose associated rule class is `toolchain`.
+  `RegisteredExecutionPlatformsFunction.HAS_PLATFORM_INFO` retains explicit
+  targets and wildcard platform candidates; aliases can survive for later
+  configured resolution.
+- `TargetPatternUtil.expandTargetPatterns` folds patterns in input order and
+  preserves the first occurrence after duplicate suppression. MODULE rows are
+  all positive; signed CLI-option folding is a later input layer.
+- `RecursivePkgFunction` contributes child transitive sets before the direct
+  package in `STABLE_ORDER`.
+  `RegisteredToolchainsFunctionTest.testRegisteredToolchains_targetPattern_order`
+  proves lexical sibling traversal, child-before-parent package order and
+  lexical target-name order inside each package. This priority-sensitive order
+  is exact, not the Slug-native lexical identity of the existing subtree set.
 
-This is generic BCR Starlark loading architecture. Bazel 9 BCR Starlark owns
-all rule definitions and rule control flow, including `cc_internal`. Slug's
-Rust implementation supplies reusable evaluator and host-ABI capabilities;
-`cc_common` is one demanding consumer, not a Rust C++ parser, native rule
-implementation or C++ rule engine. Builtins remain organized by reusable
-capability category so later host modules do not force parser/loading churn.
+Applicable upstream tests are
+`ModuleFileFunctionTest.testRegisterToolchains_singlePackageRestriction_underDir`,
+`TargetPatternTest.validPatterns_*`, the expansion matrix in
+`TargetPatternUtilTest`,
+`RegisteredToolchainsFunctionTest.testRegisteredToolchains_targetPattern_order`,
+`testRegisteredToolchains_wildcard_fakeToolchain`, both registered-family
+`*_bzlmod` tests, and execution-platform wildcard/alias tests. Existing Slug
+oracle evidence already distinguishes wildcard spelling and ambiguity; add an
+oracle only for a remaining order, duplicate or family-filter gap.
 
-Zabel's separation of semantic source root, access, canonical runtime identity
-and parsed scratch informs the design. Zabel is peer architecture and
-optimization guidance only; Bazel 9.2 behavior and pinned source remain the
-compatibility authority.
+The live checkout shows two ownership facts the implementation must respect:
 
-## Exact implementation allowlist
+- `HostSelectedRegistrationPatterns` already retains raw rows through compact
+  route/pattern ordinals over the complete final mapping. It must remain the
+  sole declaration/mapping owner.
+- `RepositoryPackageLoadKey` currently mixes general external BUILD evaluation
+  with restrictions from an earlier configured consumer. A registration
+  wildcard needs the complete loaded target inventory, including aliases and
+  Starlark rule-class metadata. It may not duplicate BUILD evaluation or
+  weaken the old consumer silently.
 
-Change only these production files:
+Clean Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer
+guidance only. Its selected-row owner, canonical text resolution, compact
+package facts, category-specific label builders and stable-postorder recursive
+flattening support the same producer/consumer separation. Copy no Zig code,
+allocation layout or compatibility claim; Bazel 9.2 owns behavior.
 
-1. `app/slug_bzlmod_v2/src/builtin_repository.rs`
-2. `app/slug_bzlmod_v2/src/canonical_repository_route.rs`
-3. `app/slug_bzlmod_v2/src/host_package.rs`
-4. `app/slug_bzlmod_v2/src/lib.rs`
-5. `app/slug_loading_v2/src/bzl_module.rs`
-6. `app/slug_loading_v2/src/external_subtree_package_set.rs`
+## Architecture to freeze
 
-Change only these proof files:
+### Shared contextual syntax
 
-7. `app/slug_bzlmod_v2/src/host_external_package_boundary/tests.rs`
-8. `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs`
-9. `app/slug_loading_v2/src/host_package_load_tests.rs`
-10. `app/slug_loading_v2/src/external_subtree_package_set_tests.rs`
+Keep the existing command-facing `TargetPattern` representation and behavior.
+Factor its grammar into one identity-owned parser path and add a pure
+contextual projection returning canonical pattern parts:
 
-The two active plan ledgers may record selection and completion. No Cargo,
-BUILD, dependency, fixture, oracle, lockfile, query/core/module-extension
-production or other source file is admitted.
+- exact canonical target;
+- package wildcard with canonical package, exact wildcard kind and optional
+  same-named explicit-target candidate; or
+- recursive canonical package with rules-only/all-target classification.
 
-## Bzlmod source-result implementation
+The projection accepts the declaring canonical repository and a borrowed point
+lookup over its complete mapping. `//` selects the declaring repository,
+`@name` uses that mapping, and `@@name` is already canonical. It performs no
+DICE lookup, package read, interning or filesystem access. Parsed values are
+compute scratch and are never retained beside the raw selected owner.
 
-Replace the built-in-only deferred package-source terminal with one explicit
-repository source address discriminant owned by `host_package.rs`:
+Add only a borrowed point-resolution method to
+`HostSelectedRegistrationPatternView`; do not copy or republish mappings.
 
-- `Host(NormalizedAbsolutePath)` for all existing root/materialized sources;
-  and
-- `BuiltinCatalog(repository-relative path)` for embedded catalog sources.
+### General package inventory
 
-`RepositoryPackageSource` retains that address, the selected BUILD name and
-the producer-owned `Arc<[u8]>`. Preserve the existing borrowed-Arc byte API or
-an equivalently zero-copy crate-private API. A bounded crate-private built-in
-value byte-Arc accessor is admitted only to retain the producer allocation;
-do not add an interner, cache, content hash or second byte allocation.
+Split the current external repository package evaluation into one general
+Root/Canonical inventory producer plus the existing policy adapter:
 
-Existing root constructors, variants, results, errors, display and dependency
-order remain exact. Add a canonical constructor that accepts the already
-authenticated `HostCanonicalRepositorySourceInput` through the shared carrier.
-Delete `BuiltinSourceAddressDeferred` only as the new discriminant becomes
-consumable in loading. Never turn a catalog-relative address into
-`NormalizedAbsolutePath`, a workspace path, an execroot path or an output-base
-path.
+- the inventory key owns source, recursive `.bzl`, BUILD evaluation, loaded
+  targets, evaluation events and observed epochs exactly once;
+- the existing `RepositoryPackageLoadKey` becomes a projection that preserves
+  every accepted old restriction/error for current consumers; and
+- the registration expander consumes the inventory key directly.
 
-Add one allocation-bounded read-only final-mapping projection to
-`HostCanonicalRepositoryRoute`. It returns the already-owned selected or
-generated apparent-to-canonical pairs in evaluator input shape and returns an
-empty mapping for the built-in route. It may not compute, cache, filter,
-reinterpret or become a second mapping owner. Loading uses this projection for
-the complete `BzlLoadManifest` repository mapping; parsed child `load()` labels
-still use `mapping_target` and the child canonical load-route key.
+Root packages continue through the accepted root package-load owner. This
+split is not a fallback or a second evaluator: both external consumers depend
+on the same inventory node. The old policy adapter is deleted only after every
+direct command, query and configured-analysis consumer has migrated its policy
+to its natural owner and its accepted restriction/error regressions still
+pass. Until then its violated general-inventory invariant, deletion condition,
+owning consumer migrations and permanence-prevention regressions are explicit.
 
-## Loading implementation
+### Family-independent DICE shape
 
-Generalize these retained loading identities from `RootRepositoryRoute` to
-`HostRepositorySourceRoute` while preserving existing root constructors:
+Add one loading key type parameterized by a semantic
+`RegistrationFamily::{Toolchain,ExecutionPlatform}` and keyed by normalized
+workspace plus family. Separate family keys prevent a toolchain request from
+activating platform packages or errors and vice versa. Each key depends on the
+matching iterator of the observed or legacy selected-registration owner.
 
-- external subtree package-set and observed keys;
-- repository package-load and observed keys;
-- external `.bzl` evaluation and observed keys;
-- resolved external child loads; and
-- external `.bzl` cycle identities.
+For each row in selected-module/declaration order, the driver:
 
-Use a pure loading-owned adapter for parser/evaluator source names:
+1. contextually parses to canonical scratch;
+2. obtains the root route for canonical root or the accepted canonical
+   load-route for an external canonical repository;
+3. obtains the package inventory for exact/package patterns, or the accepted
+   subtree set followed by each package inventory for recursive patterns;
+4. resolves absolute wildcard-name ambiguity after package load;
+5. applies the family filter only to a true wildcard expansion;
+6. orders targets lexically by target name; and
+7. appends through one first-seen ordered set.
 
-- root Host sources retain their accepted absolute source names;
-- canonical BUILD and `.bzl` sources use stable valid-Unicode canonical-label
-  names; and
-- repository package publication retains its current Slug-native output-base
-  presentation paths.
+The existing subtree value retains its accepted Slug-native lexical identity.
+For registration scratch only, sort its complete package set with a component
+comparator that orders lexical sibling subtrees and a descendant before its
+prefix ancestor. Prove this is equivalent to Bazel stable postorder for deep,
+missing-intermediate-package and root-package cases. Do not add a second
+traversal or mutate the retained subtree value.
 
-The adapter is stack/scratch state, not a DICE key, retained cache, interner,
-filesystem capability or source address. BUILD parsing, external `.bzl`
-parsing, evaluation diagnostics and cycle diagnostics must use the same
-canonical naming rule. Keep `LoadedPackage.package_dir` and `build_file`
-equality unchanged.
+Cache resolved routes, exact subtree requests and loaded packages only in
+compute scratch so repeated/overlapping patterns merge each observation epoch
+once. DICE remains the cross-request cache. No manual lock may cross a compute.
 
-Branch root source observation explicitly through the accepted
-`HostRepositorySourceFileKey`/observed sibling so root dependency metadata and
-order do not change. Branch canonical source observation through the shared
-`HostRepositorySourceObservationKey`/epoch sibling. Do not silently migrate
-root callers to the shared observation owner.
+The retained semantic value contains one immutable ordered
+`Arc<[CanonicalLabel]>` result or typed family/row/lower error plus one ordered
+immutable slice of ambiguity-warning facts encountered before that terminal.
+Warning facts contain every field needed to render the admitted diagnostic and
+retain no evaluator heap or mapping. Complete-only equality includes both the
+terminal and warnings; label equality alone cannot cut off a warning change.
+Operational event capture derives its local diagnostic batch from those facts.
+Cancellation publishes neither value nor batch.
 
-External subtree boundary and listing demands use the existing root owners for
-Root and the accepted canonical constructors for Canonical. Preserve ignored
-pruning, deleted-descendant traversal, fail-closed child handling, event order
-and retained lexical identity.
+Observed precedence is selected-owner outer failure/Need/semantic error, then
+row-order parse, route/effect, subtree and package terminals. Within a row,
+route observations precede subtree/package source observations. An ambiguity
+warning is a local `EvaluationEvent::Diagnostic(Warning)` stored only with a
+complete semantic terminal and replays in row order.
 
-For recursive external `.bzl` loads:
+### Family policies and downstream boundary
 
-1. retain the admitted Bazel label parser and exact root resolution path;
-2. keep same-repository canonical loads on the current carrier;
-3. resolve a canonical apparent child repository through the current route's
-   final mapping;
-4. demand the child `HostCanonicalRepositoryLoadRouteKey` or observed sibling
-   by workspace and canonical repository;
-5. in observed mode merge child route/effect observation before child source;
-6. construct the child module key from the returned canonical source input;
-   and
-7. never synthesize a root apparent repository name.
+For both families an exact target must exist, bypasses the wildcard filter and
+is retained for configured validation. A wildcard toolchain result retains an
+associated rule class exactly named `toolchain`. A wildcard execution-platform
+result retains native platform and alias candidates admitted by the loaded
+inventory; exact custom advertised-`PlatformInfo` behavior remains deferred
+until that provider and `uses_toolchain_resolution` metadata are represented.
+Empty family-filter results are allowed when Bazel allows an existing package
+to expand to no candidates; a recursive request with no packages preserves the
+pinned Bazel error shape.
 
-Need, outer-frontier error, semantic route error, generated-effect error,
-source terminal, parse/evaluation terminal and child-module terminal retain
-their accepted precedence. Cycle identities contain the exact carrier and
-repository `.bzl` label. Cycle completion reobserves source through the
-carrier-appropriate owner.
+Configured provider checks, alias resolution, target settings, toolchain
+selection, extra command-line registrations and registration activation remain
+downstream. CLI extra-toolchain reversal, execution-platform option order and
+signed negative folding may reuse the canonical leaf later but are not inputs
+to this MODULE key.
 
-Do not change canonical load-route production, repository registration,
-mapping computation, source materialization, package glob behavior, target
-pattern expansion, configured analysis, provider/rule declaration semantics,
-action creation or execution.
-
-## Proof contract
-
-The allowed tests must prove all of the following without a new oracle unless
-a demonstrated Bazel behavior gap exists:
-
-- byte-for-byte root result/error/display compatibility and exact root child
-  dependency order;
-- canonical built-in BUILD success retaining the exact catalog-relative
-  address and the same byte `Arc`, with no invented absolute path;
-- alias-free selected-registry package-load success where no root apparent
-  mapping exists;
-- canonical same-repository and mapped-child `.bzl` success;
-- child canonical route/effect observation before child source, including the
-  exact merged observation-epoch order;
-- child route Need, route semantic error, effect error, missing source,
-  parse/evaluation error and recursive-cycle polarity;
-- canonical external subtree traversal through the shared boundary/listing
-  owners;
-- key/equality/hash A/B/A discrimination across workspace, canonical name,
-  disposition, selected specification, final mapping, generated plan, package
-  and `.bzl` label;
-- drop-before-publication and same-DICE recovery for canonical package and
-  recursive `.bzl` loading;
-- complete canonical evaluator mapping, including a mapped `Label()` that is
-  not also present in a `load()` statement;
-- no production reference to a deleted temporary wrapper, no fabricated
-  apparent alias and no fabricated absolute catalog path; and
-- retained-size bounds plus `Allocative` coverage for each changed or new
-  retained enum, key and value.
-
-Explicitly protect source-name consistency across BUILD parsing, external
-`.bzl` parsing, evaluation/cycle diagnostics and published package
-presentation. A canonical test must distinguish each domain so an access path
-cannot accidentally become a parser name or publication path.
+This is generic Starlark loading/toolchain-service architecture. Bazel 9 BCR
+Starlark owns every rule definition and control-flow layer, including
+`cc_internal`. `cc_common` is a demanding client of the reusable evaluator and
+host ABI, never a Rust C++ parser or rule implementation. Future builtins stay
+grouped by reusable values, declarations, collections/depsets,
+labels/patterns, actions/artifacts, configuration/toolchains and
+repository/loading services.
 
 ## Compatibility classification
 
-- **Exact:** Bazel 9.2 package-marker selection, repository mapping and
-  admitted load-label resolution; BCR catalog bytes; root load results,
-  diagnostics, events and dependency order; source observation before
-  evaluation; and admitted error/Need precedence.
-- **Slug-native:** Root/Canonical carrier and key layout, source-address enum,
-  canonical-label parser source names, explicit output-base repository-package
-  presentation, structural hashes and retained-memory accounting.
-- **Unsupported/deferred:** unadmitted load-label forms, broader glob/package
-  traversal, registration expansion, configured semantics, additional host
-  builtin categories including `cc_common`, rule/action execution and exact
-  output identity.
+- **Exact:** admitted Bazel 9.2 MODULE `//`, `@apparent` and `@@canonical`
+  exact/package/recursive patterns; declaration and selected-module order;
+  wildcard conflict polarity and warning presence; deep stable-postorder
+  package order; lexical target order; family filtering for represented native
+  and Starlark `toolchain` classes, native platforms and aliases; first-seen
+  duplicate suppression; exact-target existence; and predecessor/route/source
+  Need and error precedence.
+- **Slug-native:** Rust key/value layout, canonical parser result types,
+  Root/Canonical route carrier, scratch caches/comparator, structural hashes,
+  observation transport and retained-memory accounting.
+- **Unsupported/deferred:** configured providers/settings/alias resolution and
+  selection; custom Starlark `PlatformInfo` candidates until their metadata is
+  represented; CLI option registrations and signed folding; exact diagnostic
+  text outside accepted fixtures; symlink traversal beyond the accepted
+  subtree boundary; registration activation; additional host builtin
+  categories including `cc_common`; rules and actions.
 
-## Caps, validation and review
+## Implementation sequence selected by this design
 
-Allow at most 1,450 net added production Rust lines, 2,200 proof Rust lines and
-3,650 aggregate Rust lines. Within those totals, cap `bzl_module.rs` at 950 net
-production lines and any single proof file at 1,200 net lines. Functions are
-at most 120 lines. Extract narrow helpers inside the allowlist rather than
-expanding large drivers or performing adjacent cleanup.
+1. `WP-4-5-7A-registration-expansion-prerequisite-owners`: add the contextual
+   canonical syntax projection and selected-view point lookup; extract the
+   general package-inventory key under the old policy adapter; preserve all
+   current command/query/analysis behavior. No registration key yet.
+2. `WP-4-5-7A-shared-module-registration-expander`: add both family keys and
+   the one shared driver, exact ordering/filter/ambiguity/dedup behavior,
+   lifecycle proof and a read-only analysis compile dependent. Do not activate
+   configured consumers.
+3. Later configured packets consume only expanded canonical labels and own
+   provider/settings/alias/selection semantics before the ordinary Stage 10.3
+   graph is retried.
 
-Terminal accounting must report gross additions and deletions as well as net
-growth for `bzl_module.rs`, and review its changed drivers for duplicated
-control flow. The net cap may not conceal a broad rewrite or parallel root and
-canonical implementations where one carrier-aware helper suffices.
+## Docs-only allowlist, validation and review
 
-Run Cargo commands serially in one target directory:
+Change only:
 
-1. focused Bzlmod package-boundary/source tests;
-2. focused canonical load-route, host package-load and external-subtree tests;
-3. full `slug_bzlmod_v2` with `--test-threads=1`, recording the accepted
-   pre-existing default-parallel activation-order flake separately;
-4. full `slug_loading_v2` and `slug_query_v2` suites;
-5. focused core root-apparent and generated-package-route regressions;
-6. locked `cargo build -p slug_cli_v2` before any `SLUG_V2_BIN` smoke;
-7. formatting, checks, `git diff --check`, scope/cap/function/structural guards;
-   and
-8. `scripts/v2_archive_status.sh`, permitting only its known three-row
-   baseline.
+1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
+2. `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
+3. `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
 
-Require independent DICE/loading/retained-representation terminal review.
-Review must explicitly adjudicate root dependency compatibility, source-name
-domain consistency, zero-copy built-in ownership, canonical child observation
-order and the absence of a second route or apparent alias.
+No Rust, Cargo, BUILD, fixture, oracle, lockfile or other plan file is admitted.
+Run targeted source/structure checks, `git diff --check`, packet/canonical ID
+agreement and the archive-status baseline. Require independent review of DICE
+ownership, package-producer split, exact recursive order, family isolation,
+warning-bearing equality, retained memory and the generic Starlark/host-ABI
+boundary before selecting step 1. Require A/B/A proof where `:all` conflict and
+`:*` wildcard forms produce the same ordered labels but only the conflict form
+produces the warning; the restored state must restore the warning, while Need
+and cancellation publish no value or batch.
 
 ## Stops
 
-STOP and `REPLAN` for a second semantic route; a fabricated apparent alias; an
-absolute catalog-content path; source IO through a parser or presentation
-path; copied source bytes; a new interner/cache/dependency; a lock held across
-DICE compute; changed root output/error/event/dependency order; loading-owned
-catalog IO or materialization; retained parser scratch; canonical load-route
-production changes or a second mapping owner; query/core/module-extension
-production scope; Rust
-ownership of BCR rule definitions or `cc_internal` control flow; a C++ parser
-or rule engine; or activation of registration/configured/rule/action behavior.
-
-On acceptance, freeze the shared registration-expander architecture before
-implementation. Additional builtin categories, including `cc_common`, follow
-through the same generic evaluator/host-ABI architecture rather than through
-language-specific parsing.
+STOP and `REPLAN` for a second raw declaration or mapping owner; retained
+parsed rows; a second BUILD evaluator or recursive traversal; a family-combined
+key; root mapping used for a nonroot declaration; apparent spelling in
+canonical route identity; direct filesystem IO; lexical recursive priority; a
+package restriction left inside the general inventory owner; configured
+provider/selection work; a manual lock across DICE; unbounded plan scope; Rust
+ownership of BCR rules or `cc_internal`; a C++ parser/rule engine; or treating
+Zabel as compatibility authority.

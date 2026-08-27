@@ -19507,3 +19507,137 @@ source identity is separate from readable access, producer-owned bytes are
 retained rather than copied, and parsed syntax belongs to evaluation scratch.
 Bazel 9.2 remains behavioral authority. Bazel BCR Starlark owns rules including
 `cc_internal`; `cc_common` is only a generic host-ABI consumer.
+
+### Canonical loading accepted; shared registration-expander architecture selected (2026-08-27)
+
+Commit `79a36c580` accepts the complete Root/Canonical loading adaptation. One
+semantic carrier now reaches external subtree discovery, repository BUILD
+loading, recursive `.bzl` evaluation and cycle identity. Host and built-in
+catalog addresses remain distinct, source bytes retain their producer `Arc`,
+canonical evaluator names never become access paths, complete mappings remain
+borrowed from the canonical route owner, and mapped child route/effect
+observations precede child source. Root results, errors and dependency order
+remain exact. Focused, full serial crate, direct-dependent, locked CLI,
+formatting, cap and archive-baseline gates pass; independent terminal review
+returned `ACCEPT`.
+
+The final registration audit corrects three earlier planning assumptions.
+First, Bazel 9.2 accepts canonical `@@repo` target-pattern spelling as well as
+`//` and mapped `@repo`, so the registration projection must share grammar with
+the existing identity parser but return canonical scratch rather than forcing
+canonical spelling into the command-facing apparent type. Second,
+`RecursivePkgFunction` uses child transitives before the direct package in a
+stable-order nested set; the exact registered-toolchain order test proves
+lexical sibling subtrees, child-before-parent packages and lexical target names.
+The accepted Slug subtree value's final lexical set therefore remains semantic
+identity, while the registration driver derives exact stable postorder from
+that complete set in scratch. Third, MODULE registrations are all positive;
+signed negative folding belongs to later CLI option inputs, not this selected
+MODULE owner.
+
+The current `RepositoryPackageLoadKey` also contains restrictions inherited
+from an earlier configured vertical: after an external BUILD performs a
+`load()`, aliases and most Starlark-rule inventories can be rejected even
+though loading produced their semantic metadata. Wildcard registration needs
+that inventory for explicit-name conflict and family filtering. The natural
+correction is one general Root/Canonical inventory producer owning source,
+recursive `.bzl`, BUILD evaluation, loaded targets, events and observation
+epochs, with the existing key preserved as a policy projection for its current
+consumers. The expander consumes the general producer. No source read or BUILD
+evaluation is duplicated. Delete the policy projection only after every direct
+command, query and configured-analysis consumer has migrated its policy to its
+natural owner and all accepted old restriction/error regressions remain
+protected.
+
+Freeze these ownership decisions in
+`WP-4-5-7A-shared-registration-expander-architecture`:
+
+1. Identity owns one grammar and a pure contextual projection to exact target,
+   package-wildcard conflict candidate or recursive canonical package. It
+   accepts declaring canonical context plus borrowed mapping point lookup and
+   performs no DICE, package or filesystem work.
+2. `HostSelectedRegistrationPatterns` remains the sole raw declaration/full
+   mapping owner. Its view gains only borrowed point resolution; parsed rows
+   stay compute scratch.
+3. Loading owns one workspace-plus-family key type. Toolchain and execution-
+   platform instances compute independently, so one family cannot activate
+   the other's packages, errors or warnings.
+4. Each family driver processes selected module/declaration order, resolves
+   Root or canonical routes, demands the general package inventory, resolves
+   absolute wildcard-name ambiguity, applies the family filter, sorts each
+   package by target name and performs first-seen ordered deduplication.
+5. Recursive rows demand the accepted subtree set and derive a component-wise
+   lexical-sibling/descendant-before-prefix ordering in scratch. Route,
+   subtree and package results are scratch-cached only to avoid duplicate
+   observation merges across repeated or overlapping patterns.
+6. The retained semantic value owns an ordered `Arc<[CanonicalLabel]>` result
+   or typed family/row/lower error plus ordered ambiguity-warning facts. Those
+   facts retain every diagnostic field but no mapping or evaluator heap, and
+   participate in equality so label-equal warning changes cannot cut off.
+   Legacy/observed keys preserve selected-owner outer/Need/semantic order,
+   route/effect before subtree/package source, complete-only equality, A/B/A
+   restoration and cancellation nonpublication. Operational local diagnostic
+   batches derive from the retained facts only for a complete semantic
+   terminal.
+7. Exact targets must exist and bypass wildcard filtering. Wildcard toolchains
+   retain associated rule class `toolchain`; wildcard execution platforms
+   retain represented native platform and alias candidates. Configured
+   provider/settings/alias resolution and custom advertised `PlatformInfo`
+   metadata remain downstream.
+
+Pinned Bazel authority is `ModuleFileGlobals`, `TargetPattern.Parser` and
+`TargetsInPackage.getWildcardConflict`, `TargetPatternUtil`,
+`RecursivePkgFunction`, `FilteringPolicies.ruleTypeExplicit`,
+`PlatformLookupUtil.hasPlatformInfo`, both registered-family functions, and
+their focused parser, order, wildcard-fake-toolchain, alias, reload and Bzlmod
+tests. The default
+`experimental_single_package_toolchain_binding=false`, so recursive MODULE
+toolchains are part of the Bazel 9.2 surface. Reuse the existing Slug
+wildcard/ambiguity oracle and add evidence only for an uncovered order,
+duplicate or filter distinction.
+
+Slug `docs/developers/dice.md` requires the general inventory, selected owner,
+family key and configured consumers to remain auditable DICE producers with
+complete semantic identity and no lock across a compute. Route/package caches,
+parse values, comparator buffers and ordered-set construction are compute
+scratch. The final label slice is DICE-retained semantic memory; events remain
+request-selected operational data, while ordered ambiguity facts are retained
+semantic diagnostic state. Require A/B/A where `:all` conflict and `:*`
+wildcard declarations produce the same labels but only the conflict state has
+a warning; restoration must restore it, and Need/cancellation publish no value
+or batch. Cancellation releases all scratch. No process cache, interner, side
+table, new collection dependency or retained evaluator heap is admitted.
+
+Clean Zabel `0795445f…` supports only the concept/test split:
+`selected_registration_patterns.zig` retains compact owner references,
+`registered_labels_projection.zig` separates canonical text, package facts and
+category builders, and `session_recursive_package_discovery.zig` exposes a
+stable-postorder consumer projection. Slug does not copy Zig code, store IDs,
+packed allocation layout or behavioral claims. Bazel 9.2 remains authority.
+
+Compatibility is **exact** for admitted MODULE `//`, `@apparent` and
+`@@canonical` direct/package/recursive patterns, selected/declaration order,
+explicit wildcard conflict polarity and warning presence, stable-postorder
+package priority, lexical target order, represented family filters,
+first-seen deduplication, exact-target existence and predecessor/route/source
+terminal order. Rust key layout, carrier, scratch comparator/caches, hashes,
+epochs and memory accounting are **Slug-native**. Configured
+provider/settings/alias resolution and selection, custom Starlark
+`PlatformInfo`, CLI extra-registration/signed folding, unaccepted diagnostic
+text, symlink breadth, activation, other builtin categories, rules and actions
+remain **unsupported/deferred**.
+
+After independent architecture review, implement in two bounded packets. The
+first adds contextual syntax, selected-view point lookup and the general
+inventory beneath the behavior-preserving old adapter. The second adds both
+family keys and their one shared driver, with a read-only analysis compile
+dependent but no activation. Later configured packets consume only expanded
+canonical labels.
+
+This remains generic Starlark loading and host-service architecture. Bazel 9
+BCR Starlark owns all rule definitions and rule control flow, including
+`cc_internal`. `cc_common` is a demanding client of shared evaluator/host-ABI
+capabilities, never a Rust C++ parser or rule engine. Builtins continue to be
+planned in reusable values, declarations, collections/depsets,
+labels/patterns, actions/artifacts, configuration/toolchains and
+repository/loading categories.
