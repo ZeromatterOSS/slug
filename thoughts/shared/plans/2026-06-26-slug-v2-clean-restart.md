@@ -30,17 +30,34 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; complete launcher-info proof selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4b2396f0a` accept bounded loading breadth through direct-provider and ObjcInfo proxy children plus exact empty `depset()`; `07077e23d` completes private CcInfo | private `cc_common` first reaches incomplete 31-line launcher info; toolchain config remains broad | run only `WP-4-7A-rules-cc-private-cc-launcher-info-complete-loading-proof`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; complete shared-library hint proof selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4b2396f0a` accept bounded loading breadth through direct-provider and ObjcInfo proxy children plus exact empty `depset()`; `07077e23d` completes private CcInfo and `badf5844a` completes launcher info | private `cc_common` next reaches incomplete dependency-free shared-library hint info; toolchain config remains broad | run only `WP-4-7A-rules-cc-private-cc-shared-library-hint-info-complete-loading-proof`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-rules-cc-private-cc-launcher-info-complete-loading-proof](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-rules-cc-private-cc-shared-library-hint-info-complete-loading-proof](./slug-v2-subplans/current-packet.md).
 
-Prove exact complete private `cc_launcher_info.bzl` loads the accepted helper,
-declares its initialized provider/raw pair, and freezes its lazy constructor.
-Add no production behavior and invoke neither callable.
+Prove exact complete dependency-free private
+`cc_shared_library_hint_info.bzl` freezes its provider callable identity. Add no
+production behavior and invoke no provider.
+
+### M7 complete launcher info accepted; shared-library hint selected (2026-08-26)
+
+Commit `badf5844a` adds 80 proof lines and no production. It byte-verifies all
+31 launcher-info lines, rebuilds the complete helper closure, retains the loaded
+wrapper identity, and proves initialized provider/raw/private-constructor
+identities and types without invocation. All 244 loading-library, 24
+invalidation and 31 BUILD-loading tests, locked checks, CLI build and hygiene
+pass. Independent review accepts caps and boundaries.
+
+Private `cc_common` source order next reaches dependency-free 56-line
+`cc_shared_library_hint_info.bzl` (`7d067aad…`), whose only evaluated row is the
+public two-field provider declaration. Run only
+`WP-4-7A-rules-cc-private-cc-shared-library-hint-info-complete-loading-proof`
+under 0/100/100 caps. Clean `../zabel` `0795445f…` guides defining-module
+ownership/freeze only; Bazel 9.2 and authenticated rules_cc remain exact
+authority.
 
 ### M7 complete private CcInfo accepted; launcher info selected (2026-08-26)
 

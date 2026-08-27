@@ -5247,6 +5247,30 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Complete launcher info accepted; shared-library hint selected (2026-08-26)
+
+Commit `badf5844a` adds 80 proof lines and no production. It embeds and
+byte-verifies the complete 31-line launcher-info producer, rebuilds the accepted
+helper closure, preserves the imported wrapper pointer, and proves the exact
+initialized provider identity plus private raw and constructor visibility/types
+without invocation. Focused proof, 244 loading units, 24 invalidation tests, 31
+BUILD-loading tests, locked checks, CLI build and hygiene pass. Independent
+review accepts caps and boundaries.
+
+Private `cc_common` source order next reaches dependency-free 56-line
+`cc/private/cc_shared_library_hint_info.bzl` (SHA-256 `7d067aad…`). It has no
+loads or lazy functions and eagerly declares only public
+`CcSharedLibraryHintInfo` with its authenticated two-field schema. Toolchain
+config remains a broader later generated-proxy child.
+
+Run only
+`WP-4-7A-rules-cc-private-cc-shared-library-hint-info-complete-loading-proof`
+under 0/100/100 caps. Prove complete source/hash, dependency-free evaluation and
+the callable's canonical provider identity/type/public visibility; invoke
+nothing. Defer instances, private/public `cc_common`, generated proxy, toolchain
+config and configured C++. Clean `../zabel` `0795445f…` guides defining-module
+ownership/freeze only; Bazel 9.2 remains exact authority.
+
 ### Complete private CcInfo accepted; launcher info selected (2026-08-26)
 
 Commit `07077e23d` adds 892 proof lines and no production. It embeds and
