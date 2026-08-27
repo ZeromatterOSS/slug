@@ -18522,3 +18522,54 @@ Activate only
 unexpected route lifetime, mapping, source-order, DICE observation, analysis
 adapter or cap contradiction. Do not opportunistically enter syntax expansion,
 package traversal, configured toolchain behavior or the next bootstrap error.
+
+### Selected registration-pattern retention owner accepted (2026-08-27)
+
+Commit `0cd339800` implements sequence step 1. Root and nonroot MODULE
+evaluation now share one collector and retain exact absolute text in
+`ModuleRegistrationPattern`; ignored dev rows short-circuit before tuple or
+element inspection. Root command-policy order and DICE equality remain exact.
+
+`HostSelectedRegistrationPatterns` retains the successful selected-extension-
+mapping predecessor and two immutable arrays of checked `(u32, u32)` route and
+pattern ordinals. Views borrow raw text from the route source and canonical
+owner plus ordered apparent mapping from the same route's final post-`use_repo`
+mapping. The authenticated rules_rust `@rust_toolchains//:all` row therefore
+sees `+extension+generated`, and a pointer-identity test proves that neither the
+predecessor nor its mappings are copied. Typed failures retain the predecessor
+for mapping-count and ordinal invalidity.
+
+Legacy and observed keys depend directly on selected extension mappings and
+preserve Need/compute/outer-error/epoch order, complete-only validity/equality,
+warm reuse, A/B/A restoration and cancellation nonpublication. No lock is held
+across a DICE compute and no package, parser, traversal or configured owner is
+activated. The current analysis adapter accepts only direct root labels; it
+fails package/recursive registrations closed before package publication and
+continues to defer external registration errors until the already-accepted
+package Needs have resolved.
+
+Validation passes all 552 bzlmod units and their integration suites, all
+analysis suites, all 307 loading units plus BUILD/loading/invalidation suites,
+the locked core check and locked CLI build. The 1,076 additions are 607
+production and 469 proof, with every new helper/test below 100 lines. Formatting,
+diff, allowlist, DICE ownership and no-lock gates pass; archive status reports
+only its three known archive-only paths. A rebuilt ordinary `slug query '//...'`
+passes the former MODULE registration rejection and remains CPU-active without
+output for a bounded two-minute replay; it was interrupted, so completion and a
+new terminal remain unclaimed.
+
+The utility audit records one compact raw string in place of a parsed
+three-component apparent label. The selected owner retains one predecessor
+`Arc`, two `Arc` slice handles and one 8-byte ordinal pair per declaration,
+with no copied route, string or mapping. Existing Buck2-derived
+`CompactString`, immutable slices, `SmallMap`, `Dupe` and `Allocative` are
+sufficient; no dependency or utility-ledger row is added. Zabel's raw text /
+contextual resolution / expansion split and packed references informed this
+review as peer guidance, never behavioral authority.
+
+Activate only `WP-4-5-7A-registration-target-pattern-syntax`. It completes the
+shared absolute package/recursive wildcard syntax and retained ambiguity shape
+in `slug_identity_v2`, backed by Bazel 9.2 source and focused oracle evidence.
+It must mechanically preserve accepted query/build behavior and stop before
+repository mapping, package lookup, conflict resolution, expansion, traversal,
+registration-family filtering or configured semantics.
