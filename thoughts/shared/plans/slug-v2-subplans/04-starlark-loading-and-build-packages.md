@@ -7238,3 +7238,21 @@ Its two children are accepted. Run only
 the complete imported/string/nested-struct/function inventory and invoke
 nothing. Zabel remains peer ownership guidance; Bazel 9.2 and authenticated
 rules_cc bytes own compatibility.
+
+### Complete target types accepted; solib dirs selected (2026-08-27)
+
+Commit `49e139212` freezes all 131 authenticated target-type lines over two
+actual complete children. It proves exact named imports, strings, linking-mode
+and all ten six-field target mappings, the function and exact seven-public/
+seven-all inventories without invocation; struct iteration order remains
+Slug-native. All required suites pass at 0 production and 283 proof additions;
+independent review returned `ACCEPT`.
+
+Recursive source order resumes at complete 479-line
+`link/collect_solib_dirs.bzl`, SHA-256
+`f25b0f978bce3a3cf810b36c6897a85adefce7036ec68ba53613352afa218125`.
+Its three children are accepted. Run only
+`WP-4-7A-rules-cc-collect-solib-dirs-complete-loading-proof` under 0/750/750,
+prove the complete five-import/seven-function inventory and invoke nothing.
+Zabel remains peer ownership guidance; Bazel 9.2 and authenticated rules_cc
+bytes own compatibility.
