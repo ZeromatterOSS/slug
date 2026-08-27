@@ -7368,3 +7368,26 @@ Pinned Bazel 9.2 and authenticated BCR rules_cc bytes remain exact authority.
 Clean `../zabel` commit `0795445f…` remains concept-only guidance for the
 generic-evaluator/Bazel-host split and producer-owned frozen module lifetime;
 copy no Zig implementation or claimed behavior.
+
+### Complete linking helper accepted; linking-context producer selected (2026-08-27)
+
+Commit `233cdf9ef` freezes all 675 authenticated C++ linking-helper lines over
+eight actual complete children. It proves all fourteen imported identities,
+eight function types/visibility and exact twelve-public/twenty-two-all
+inventories without invocation. All required suites pass at 0 production and
+862 proof additions; independent review returned `ACCEPT`.
+
+Public `cc/private/cc_common.bzl` first loads
+`link/create_linking_context_from_compilation_outputs.bzl`, 137 lines, SHA-256
+`664a461564abd348111d791aa03da0207fe158620d276b6da1936f8abb23be59`,
+before its other direct linking-helper consumer `link.bzl`. All five children
+of the first producer are accepted: CcInfo, `cc_internal`, linking helper,
+linker-input creator and target types. Run only
+`WP-4-7A-rules-cc-create-linking-context-complete-loading-proof` under
+0/400/400, prove its complete seven-import/one-function and
+seven-public/eight-all inventories, and invoke nothing.
+
+Pinned Bazel 9.2 and authenticated BCR rules_cc bytes remain exact authority.
+Clean `../zabel` commit `0795445f…` remains concept-only guidance for the
+generic-evaluator/Bazel-host split and producer-owned frozen module lifetime;
+copy no Zig implementation or claimed behavior.
