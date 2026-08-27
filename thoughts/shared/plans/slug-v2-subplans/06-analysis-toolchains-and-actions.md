@@ -19456,3 +19456,22 @@ structural hashes are Slug-native; Bazel 9.2 policy/mapping behavior and catalog
 bytes remain exact. Bazel BCR Starlark owns rules including `cc_internal`,
 `cc_common` remains a generic host-builtin consumer, and Zabel is peer
 architecture/optimization guidance only.
+
+### Canonical policy R2 address/cancellation REPLAN (2026-08-27)
+
+Independent implementation review rejected the R2 draft before acceptance.
+The canonical built-in package-source branch fabricated an absolute
+`.slug-builtin` Host path from a catalog-relative address, crossing the frozen
+Stage B adaptation boundary, and the draft proved cancellation only at the
+canonical load route rather than through the generalized policy/package chain.
+
+Activate only
+`WP-4-5-7A-canonical-source-policy-convergence-implementation-r3`. Retain the
+compact Root/Canonical carrier, root behavior, wrapper deletion, allowlisted
+policy migration and existing caps. Remove `builtin_repository.rs` from the
+allowlist; canonical built-in policy retains its exact catalog-relative address
+and ends in a typed deferred-address package-source terminal. Add
+drop-before-publication and recovery proof through the canonical policy/package
+chain. Stage B alone may design Root/Canonical source-address results and
+Starlark source-name adaptation. Never infer a workspace, execroot or absolute
+filesystem path for embedded catalog content.
