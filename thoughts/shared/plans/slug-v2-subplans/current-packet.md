@@ -93,6 +93,8 @@ Base is `3a1d19f40`. Change only:
 - `app/slug_bzlmod_v2/src/selected_repo_spec.rs` (13,741 lines);
 - `app/slug_bzlmod_v2/src/lib.rs` (475 lines);
 - `app/slug_bzlmod_v2/src/host_module.rs` (5,349 lines, proof/adapters only);
+- `app/slug_bzlmod_v2/tests/nonroot_module_eval.rs` (701 lines, raw-pattern
+  type adaptation/proof only);
 - `app/slug_bzlmod_v2/tests/root_module_dice.rs` (2,429 lines); and
 - `app/slug_analysis_v2/src/dice.rs` (2,964 lines, direct-only adapter/proof).
 
@@ -119,3 +121,14 @@ cap escape or a new terminal before the expected fail-closed adapter.
 Commit `3a1d19f40` selects and the canonical subplan records the complete shared
 registration-pattern architecture. This packet implements only its final raw
 declaration and selected-owner representation.
+
+## Replan record
+
+The live source audit found that `NonrootModuleBuilder` is intentionally public
+and its integration test constructs registration rows directly. A nominal
+validated raw-pattern type therefore requires the corresponding mechanical test
+adaptation. The original allowlist omitted
+`app/slug_bzlmod_v2/tests/nonroot_module_eval.rs`; adding that proof-only file is
+the smallest correction that preserves requirement 1 instead of weakening it
+to an unenforced `CompactString` alias. Scope, caps, architecture, compatibility
+classification and all stop conditions are otherwise unchanged.
