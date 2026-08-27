@@ -18612,3 +18612,35 @@ Mechanically move the existing root subtree package-set DICE owner from query
 to loading and preserve every accepted query result, Need/error/observation
 order and lifecycle. Stop before selected-external traversal, mapping, target-
 pattern expansion, family filtering or registration activation.
+
+### Loading-owned root subtree package producer accepted (2026-08-27)
+
+Commit `b9736cb47` implements sequence step 3a. One cohesive loading module now
+owns the root subtree package-set value, terminal, legacy and observed DICE
+keys, multi-root traversal and non-UTF-8 marker probe. Query imports that owner,
+converts only its terminal, merges its observation epoch and consumes its
+immutable compact package slice. The legacy non-root query-only filesystem key
+is unchanged, and no second root traversal remains.
+
+The move preserves normalized workspace-plus-prefix semantic input, complete-
+only equality/validity, package-root order, marker and ignored-directory
+policy, lexical sort/dedup, cancellation, and observed-outer before accumulated
+Need before terminal precedence. All 308 loading units and integration suites,
+all 54 query units plus 56 loading-query, one observed-query and 11 query
+integration tests, the focused multi-root lifecycle, locked query/core checks
+and rebuilt locked CLI pass. Formatting, diff, scope, dependency, no-lock and
+archive-baseline gates pass at 691 production and 25 proof additions with 593
+deletions. Independent DICE ownership review returned `ACCEPT` after the
+packet stated the unchanged terminal order explicitly.
+
+The retained state remains one `Arc` slice of `CompactString` package names and
+the existing observed epoch. The extraction adds no dependency, mapping or
+source copy, interner, global state, manual lock or utility-ledger row. Zabel's
+natural recursive loading producer and separate query/toolchain consumers were
+useful peer guidance only; Bazel 9.2 remains semantic authority.
+
+Activate only `WP-4-5-7A-selected-external-subtree-package-owner-design`.
+Freeze the selected-external route/source, DICE identity, observation and
+lifecycle contract at zero Rust before implementing sequence step 3b. Stop for
+any source kind without a lawful observed directory owner; do not reconstruct
+paths, add a second traversal, expand patterns or activate registrations.

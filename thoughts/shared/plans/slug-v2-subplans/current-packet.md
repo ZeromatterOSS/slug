@@ -1,133 +1,113 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-loading-root-subtree-package-owner-extraction`
+Packet: `WP-4-5-7A-selected-external-subtree-package-owner-design`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Result: move the existing root-workspace subtree package-set DICE owner from
-the query crate into loading, and make query consume that same owner with no
-observable behavior change. Do not add external traversal, target-pattern
-expansion or registration activation.
+Result: design the one loading-owned selected-external subtree package-set
+producer needed by shared target-pattern expansion. Freeze its route/source,
+DICE identity, observation, error and lifecycle contract. Make no Rust change
+and activate no traversal or registration.
 
-## Learned facts and decision
+## Learned facts and design question
 
-Commit `e9947e8ba` completes the shared absolute package and recursive target-
-pattern syntax. Registration expansion now needs one package-enumeration
-primitive that is not query-owned.
+Commit `b9736cb47` moves root subtree package discovery from query into loading
+without changing behavior. Root query now consumes that natural producer. The
+next missing primitive is its selected-external counterpart.
 
-Today `slug_query_v2::graph` owns `RootSubtreePackageSetKey`, its observed key,
-result, traversal and marker probes. The computation depends only on loading,
-bzlmod and Host path/package-boundary inputs. Query adds no semantic input; it
-only converts the loading terminal to `QueryError`, merges the observed epoch
-into its request and loads each discovered package. The accepted
-`typed_recursive_query_unions_package_roots_and_replays_package_lifecycle`
-regression already discriminates Need propagation, multiple package roots,
-root precedence, ignore/package-policy changes and create/edit/delete/restore.
+External packages already load through `RootRepositoryRoute` and
+`RepositoryPackageLoadKey`. A route structurally carries canonical repository
+identity, source capability and mapping across direct-local, selected-registry,
+generated and built-in sources; observed variants retain route/source
+observations rather than trusting a physical path. Recursive discovery must
+reuse those owners and cannot reconstruct a repository root, scan the host
+filesystem directly or make query/registration own a second traversal.
 
-Bazel 9.2 `RecursivePkgFunction`, `RecursiveDirectoryTraversalFunction` and
-`RecursivePkgFunctionTest` treat recursive package discovery as a reusable
-Skyframe loading primitive below target-pattern consumers. The natural Slug
-owner is therefore `slug_loading_v2`, not query and not the future registration
-projection.
+The design must decide the smallest semantic key/value and exact predecessor
+chain that enumerate packages below one canonical external repository prefix
+for all source kinds actually admitted by selected MODULE registrations. It
+must also decide whether one source-owned directory-listing primitive is
+missing and therefore needs a separate prerequisite.
 
-## Required implementation
+## Required audit and decision
 
-1. Add one cohesive loading module for the existing root subtree package-set
-   result, terminal error, legacy/observed DICE keys and traversal helpers.
-   Preserve semantic key inputs/equality as normalized workspace plus package
-   prefix; the Rust key type necessarily moves to its natural crate owner.
-2. Move the existing computation mechanically. Preserve package-root order,
-   package-marker and ignored-directory policy, non-UTF-8 handling, lexical
-   sort/dedup, observed-outer before accumulated Need before terminal-error
-   precedence,
-   observation merging, complete-only equality/validity and display text.
-3. Give loading a loading-owned terminal type. Query converts it to the same
-   `QueryError` text only at the consumer boundary and continues to merge the
-   observed epoch before loading packages.
-4. Remove the moved owner and now-unused Host traversal imports from
-   `slug_query_v2::graph`; import the loading-owned keys/value in the loading
-   query environment. The legacy non-root `SubtreePackageSetKey` remains query-
-   local and unchanged.
-5. Preserve the accepted recursive-query lifecycle regression byte-for-byte
-   where practical. Add only small loading owner/API regressions needed to
-   distinguish key construction, display, result/error access and complete-
-   only behavior; do not copy its large query harness.
-6. Compare the moved production body and dependency inventory against the
-   predecessor so this packet proves ownership extraction, not a semantic
-   rewrite.
+1. Trace `RootRepositoryRouteKey` and its observed form through every admitted
+   route source, materialization/source capability, repository package lookup,
+   marker/ignore policy and `RepositoryPackageLoadKey`. Name exact natural
+   producers and retained Arcs; do not infer paths from display strings.
+2. Trace the accepted root subtree key's Need, observed-outer, terminal,
+   observation merge, equality/validity, cancellation, lexical ordering and
+   lifecycle behavior. State which pieces are shared policy and which are root-
+   specific.
+3. Audit pinned Bazel 9.2 `RecursivePkgKey`, `RecursivePkgFunction`,
+   `RecursiveDirectoryTraversalFunction`, repository package lookup and tests
+   for repository identity, ignored subdirectories, package roots, ordering
+   and errors. Reuse accepted oracle evidence unless a demonstrated observable
+   gap remains.
+4. Audit Zabel's `load/session_recursive_package_discovery.zig`, its routed
+   source access and query/toolchain consumers as concept/test guidance only.
+   Record useful ownership and compactness ideas separately from behavior.
+5. Freeze one key/value/predecessor design with legacy and observed variants,
+   complete-only equality/validity, outer/Need/terminal precedence, retained
+   representation and public loading view. State request overlap,
+   invalidation, cancellation and release.
+6. Decide whether direct-local, selected-registry, generated and built-in
+   routes fit one bounded implementation. If a source kind lacks a lawful
+   observed directory-listing owner, select the smallest prerequisite and
+   `REPLAN` rather than adding a bypass or false parity claim.
+7. Specify the implementation allowlist/caps, direct owner tests, downstream
+   consumer proof, source/oracle evidence, helper limits, complexity triggers,
+   no-lock audit and exact stop conditions. Keep root query unchanged.
 
-## Architecture, compatibility and guidance
+## Architecture and compatibility guardrails
 
-Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`,
-`RecursivePkgFunction.java`, `RecursiveDirectoryTraversalFunction.java` and
-`RecursivePkgFunctionTest.java` are pinned semantic guidance. No new oracle is
-needed because the accepted recursive-query lifecycle is more discriminating
-for this ownership-only change and public output must remain identical.
+This remains general Starlark/loading infrastructure. Bazel 9 BCR Starlark is
+the source of rule definitions, including `cc_internal`; `cc_common` is only a
+host-capability consumer. The design must support both toolchain and execution-
+platform registration families through the later shared expander and must not
+encode C++ or rules_rust policy.
 
-Zabel is peer guidance only. Its `load/session_recursive_package_discovery.zig`
-keeps recursive package discovery behind a natural loading producer, while
-`query/main_workspace_recursive_deps_command.zig` and toolchain consumers
-demand that producer without owning a second traversal. Slug adopts that
-ownership lesson, not Zabel's Zig types, session store, allocation model,
-diagnostics or behavior authority.
+- **Exact candidate:** repository-scoped recursive package membership,
+  ignored-subdirectory and package-marker behavior, deterministic ordering and
+  admitted Need/error/lifecycle behavior backed by Bazel 9.2 evidence.
+- **Slug-native candidate:** Rust/DICE key and observation carrier shape,
+  compact retained representation and source-capability plumbing.
+- **Unsupported/deferred:** target-pattern expansion, wildcard-name conflict
+  lookup, family filters, stable cross-pattern dedupe, configured provider or
+  target-setting validation, option registrations, rule implementations and
+  actions.
 
-This is general Starlark/loading architecture. Bazel 9 BCR Starlark remains the
-source of rule definitions including `cc_internal`; neither `cc_common` nor a
-ruleset owns this traversal.
+Zabel remains peer guidance, never source of truth. No Zabel type, session
+store, allocator, diagnostic or compatibility claim may be copied. Reuse
+Slug's Buck2-derived compact strings, immutable `Arc` slices, `Dupe`,
+`Allocative` and small ordered collections where justified; add no interner,
+global cache or manual lock.
 
-- **Exact:** the already-admitted root recursive package set, package-root and
-  marker/ignore behavior, lexical result, query output, observed-outer before
-  accumulated Need before terminal-error precedence and observed lifecycle.
-- **Slug-native:** Rust module/API shape, DICE key/value layout, error wrapper
-  and observation carrier.
-- **Unsupported/deferred:** selected-external subtree ownership, repository
-  mapping, target-pattern conflict lookup or expansion, registration filters,
-  configured provider/settings validation, rule implementations and actions.
+## Allowlist, validation and stops
 
-The result remains DICE-retained semantic state as one `Arc` slice of compact
-package strings plus the existing observed epoch. Moving its module does not
-change publication, equality cutoff, invalidation, cancellation or release.
-No command scratch is retained and no lock may span a DICE compute. Both
-touched query production files exceed 2,000 lines; extracting this cohesive
-owner reduces mixed responsibility rather than adding another concern there.
+Base is `b9736cb47`. This is docs-only. Change only:
 
-## Allowlist and validation
+- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`;
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md` for terminal
+  scheduling state.
 
-Base is `e9947e8ba`. Change only:
+Caps are 0 Rust and 900 documentation additions. Read-only probes may compile
+or run existing focused tests but add no fixture. Run source-anchor, structure,
+scope, link, archive and diff checks. Because this selects a public retained
+DICE owner, require independent architecture review before `ACCEPT`.
 
-- new `app/slug_loading_v2/src/root_subtree_package_set.rs`;
-- `app/slug_loading_v2/src/lib.rs` (module and narrow exports only);
-- `app/slug_query_v2/src/graph.rs` (remove the moved owner/imports only); and
-- `app/slug_query_v2/src/loading_environment.rs` (loading-owned imports and
-  terminal conversion only).
-
-The first exact extraction showed that the 583 removed query lines require 688
-production and 19 proof additions after the loading-owned terminal, exports
-and boundary adaptation are counted. The original 620-line production cap was
-a planning miss, not a scope or behavior change. Corrected caps are 740
-production, 100 proof and 840 total additions; deletions do not buy budget.
-Each genuinely new helper/test is at most 100 lines; mechanically moved
-predecessor helpers retain their reviewed shape. Add no dependency, new
-DICE key semantics, external route/source input, traversal branch, package
-load, pattern parser, expansion, mapping, registration activation, interner,
-global state or manual lock.
-
-Run all `slug_loading_v2` tests, the named recursive-query lifecycle regression,
-all `slug_query_v2` tests, locked query/core checks and locked CLI build
-serially. Run format, diff, scope/cap/helper, archive, moved-body, dependency,
-DICE/no-lock and utility/retained-size audits. Public cross-crate review must
-confirm that query is only a consumer and that no second traversal remains.
-
-STOP and `REPLAN` for changed result/error/Need ordering, a new filesystem or
-fresh-graph bypass, query-specific policy in loading, an external repository
-owner, mapping or expansion, copied lifecycle harness, new retained utility,
-allowlist/cap escape or any accepted recursive-query result change.
+STOP and `REPLAN` for an unresolved source kind, path reconstruction, direct
+filesystem/fresh-graph bypass, query-owned policy, a second traversal, missing
+observed directory owner, copied mapping/source tree, lock across DICE compute,
+new global state, new exact claim without evidence or implementation pressure
+inside this docs packet.
 
 ## Immediate predecessor
 
-Commit `e9947e8ba` accepts `WP-4-5-7A-registration-target-pattern-syntax` at
-147 production and 445 proof lines. It preserves suffix spelling and wildcard
-ambiguity while newly represented all-target forms fail closed before loading.
-This packet implements only bounded registration-architecture sequence step
-3a; the selected-external subtree owner remains the next separate slice.
+Commit `b9736cb47` accepts `WP-4-5-7A-loading-root-subtree-package-owner-
+extraction`. The loading crate is now the sole root recursive package producer,
+query is a pure consumer, and observed outer errors remain ordered before
+accumulated Needs and terminal errors. This design packet completes sequence
+step 3 planning before any selected-external Rust.
