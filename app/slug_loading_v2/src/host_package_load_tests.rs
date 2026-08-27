@@ -5672,6 +5672,272 @@ def merge_compilation_outputs(*, compilation_outputs):
     )
 "###;
 
+const RULES_CC_ACTION_NAMES_SOURCE: &str = r###"# Copyright 2018 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Constants for action names used for C++ rules."""
+
+# Keep in sync with //cc/toolchains/actions:BUILD.
+
+# Name for the C compilation action.
+C_COMPILE_ACTION_NAME = "c-compile"
+
+# Name of the C++ compilation action.
+CPP_COMPILE_ACTION_NAME = "c++-compile"
+
+# Name of the linkstamp-compile action.
+LINKSTAMP_COMPILE_ACTION_NAME = "linkstamp-compile"
+
+# Name of the action used to compute CC_FLAGS make variable.
+CC_FLAGS_MAKE_VARIABLE_ACTION_NAME = "cc-flags-make-variable"
+
+# Name of the C++ module codegen action.
+CPP_MODULE_CODEGEN_ACTION_NAME = "c++-module-codegen"
+
+# Name of the C++ header parsing action.
+CPP_HEADER_PARSING_ACTION_NAME = "c++-header-parsing"
+
+# Name of the C++ deps scanning action.
+CPP_MODULE_DEPS_SCANNING_ACTION_NAME = "c++-module-deps-scanning"
+
+# Name of the C++20 module compile action.
+CPP20_MODULE_COMPILE_ACTION_NAME = "c++20-module-compile"
+CPP20_MODULE_CODEGEN_ACTION_NAME = "c++20-module-codegen"
+
+# Name of the C++ module compile action.
+CPP_MODULE_COMPILE_ACTION_NAME = "c++-module-compile"
+
+# Name of the assembler action.
+ASSEMBLE_ACTION_NAME = "assemble"
+
+# Name of the assembly preprocessing action.
+PREPROCESS_ASSEMBLE_ACTION_NAME = "preprocess-assemble"
+
+# Name of the coverage action.
+LLVM_COV = "llvm-cov"
+
+# Name of the action producing ThinLto index.
+LTO_INDEXING_ACTION_NAME = "lto-indexing"
+
+# Name of the action producing ThinLto index for executable.
+LTO_INDEX_FOR_EXECUTABLE_ACTION_NAME = "lto-index-for-executable"
+
+# Name of the action producing ThinLto index for dynamic library.
+LTO_INDEX_FOR_DYNAMIC_LIBRARY_ACTION_NAME = "lto-index-for-dynamic-library"
+
+# Name of the action producing ThinLto index for nodeps dynamic library.
+LTO_INDEX_FOR_NODEPS_DYNAMIC_LIBRARY_ACTION_NAME = "lto-index-for-nodeps-dynamic-library"
+
+# Name of the action compiling lto bitcodes into native objects.
+LTO_BACKEND_ACTION_NAME = "lto-backend"
+
+CPP_HEADER_ANALYSIS_ACTION_NAME = "c++-header-analysis"
+
+# Name of the link action producing executable binary.
+CPP_LINK_EXECUTABLE_ACTION_NAME = "c++-link-executable"
+
+# Name of the link action producing dynamic library.
+CPP_LINK_DYNAMIC_LIBRARY_ACTION_NAME = "c++-link-dynamic-library"
+
+# Name of the link action producing dynamic library that doesn't include it's
+# transitive dependencies.
+CPP_LINK_NODEPS_DYNAMIC_LIBRARY_ACTION_NAME = "c++-link-nodeps-dynamic-library"
+
+# Name of the archiving action producing static library.
+CPP_LINK_STATIC_LIBRARY_ACTION_NAME = "c++-link-static-library"
+
+# Name of the action stripping the binary.
+STRIP_ACTION_NAME = "strip"
+
+# A string constant for the objc compilation action.
+OBJC_COMPILE_ACTION_NAME = "objc-compile"
+
+# A string constant for the objc++ compile action.
+OBJCPP_COMPILE_ACTION_NAME = "objc++-compile"
+
+# A string constant for the objc executable link action.
+OBJC_EXECUTABLE_ACTION_NAME = "objc-executable"
+
+# A string constant for the objc executable link action.
+OBJCPP_EXECUTABLE_ACTION_NAME = "objc++-executable"
+
+# A string constant for the objc fully-link link action.
+OBJC_FULLY_LINK_ACTION_NAME = "objc-fully-link"
+
+# A string constant for the clif actions.
+CLIF_MATCH_ACTION_NAME = "clif-match"
+
+# A string constant for the obj copy actions.
+OBJ_COPY_ACTION_NAME = "objcopy_embed_data"
+
+# A string constant for the validation action for cc_static_library.
+VALIDATE_STATIC_LIBRARY = "validate-static-library"
+
+# Name of the DWARF packaging utility action.
+DWP = "dwp"
+
+ACTION_NAMES = struct(
+    c_compile = C_COMPILE_ACTION_NAME,
+    cpp_compile = CPP_COMPILE_ACTION_NAME,
+    linkstamp_compile = LINKSTAMP_COMPILE_ACTION_NAME,
+    cc_flags_make_variable = CC_FLAGS_MAKE_VARIABLE_ACTION_NAME,
+    cpp_module_codegen = CPP_MODULE_CODEGEN_ACTION_NAME,
+    cpp_header_parsing = CPP_HEADER_PARSING_ACTION_NAME,
+    cpp_module_deps_scanning = CPP_MODULE_DEPS_SCANNING_ACTION_NAME,
+    cpp20_module_compile = CPP20_MODULE_COMPILE_ACTION_NAME,
+    cpp20_module_codegen = CPP20_MODULE_CODEGEN_ACTION_NAME,
+    cpp_module_compile = CPP_MODULE_COMPILE_ACTION_NAME,
+    assemble = ASSEMBLE_ACTION_NAME,
+    preprocess_assemble = PREPROCESS_ASSEMBLE_ACTION_NAME,
+    llvm_cov = LLVM_COV,
+    lto_indexing = LTO_INDEXING_ACTION_NAME,
+    lto_backend = LTO_BACKEND_ACTION_NAME,
+    cpp_header_analysis = CPP_HEADER_ANALYSIS_ACTION_NAME,
+    lto_index_for_executable = LTO_INDEX_FOR_EXECUTABLE_ACTION_NAME,
+    lto_index_for_dynamic_library = LTO_INDEX_FOR_DYNAMIC_LIBRARY_ACTION_NAME,
+    lto_index_for_nodeps_dynamic_library = LTO_INDEX_FOR_NODEPS_DYNAMIC_LIBRARY_ACTION_NAME,
+    cpp_link_executable = CPP_LINK_EXECUTABLE_ACTION_NAME,
+    cpp_link_dynamic_library = CPP_LINK_DYNAMIC_LIBRARY_ACTION_NAME,
+    cpp_link_nodeps_dynamic_library = CPP_LINK_NODEPS_DYNAMIC_LIBRARY_ACTION_NAME,
+    cpp_link_static_library = CPP_LINK_STATIC_LIBRARY_ACTION_NAME,
+    strip = STRIP_ACTION_NAME,
+    objc_compile = OBJC_COMPILE_ACTION_NAME,
+    objc_executable = OBJC_EXECUTABLE_ACTION_NAME,
+    objc_fully_link = OBJC_FULLY_LINK_ACTION_NAME,
+    objcpp_compile = OBJCPP_COMPILE_ACTION_NAME,
+    objcpp_executable = OBJCPP_EXECUTABLE_ACTION_NAME,
+    clif_match = CLIF_MATCH_ACTION_NAME,
+    objcopy_embed_data = OBJ_COPY_ACTION_NAME,
+    validate_static_library = VALIDATE_STATIC_LIBRARY,
+    dwp = DWP,
+)
+
+# Names of actions that parse or compile C++ code.
+ALL_CPP_COMPILE_ACTION_NAMES = [
+    ACTION_NAMES.linkstamp_compile,
+    ACTION_NAMES.cpp_compile,
+    ACTION_NAMES.cpp_header_parsing,
+    ACTION_NAMES.cpp_module_compile,
+    ACTION_NAMES.cpp_module_codegen,
+    ACTION_NAMES.lto_backend,
+    ACTION_NAMES.clif_match,
+    ACTION_NAMES.objcpp_compile,
+]
+
+# Names of actions that parse or compile C, C++ and assembly code.
+ALL_CC_COMPILE_ACTION_NAMES = ALL_CPP_COMPILE_ACTION_NAMES + [
+    ACTION_NAMES.c_compile,
+    ACTION_NAMES.preprocess_assemble,
+    ACTION_NAMES.assemble,
+    ACTION_NAMES.objc_compile,
+]
+
+# Names of actions that link C, C++ and assembly code.
+ALL_CC_LINK_ACTION_NAMES = [
+    ACTION_NAMES.cpp_link_executable,
+    ACTION_NAMES.cpp_link_dynamic_library,
+    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+    ACTION_NAMES.lto_index_for_executable,
+    ACTION_NAMES.lto_index_for_dynamic_library,
+    ACTION_NAMES.lto_index_for_nodeps_dynamic_library,
+    ACTION_NAMES.objc_executable,
+]
+
+# Names of actions that link entire programs.
+CC_LINK_EXECUTABLE_ACTION_NAMES = [
+    ACTION_NAMES.cpp_link_executable,
+    ACTION_NAMES.lto_index_for_executable,
+    ACTION_NAMES.objc_executable,
+]
+
+# Names of actions that link dynamic libraries.
+DYNAMIC_LIBRARY_LINK_ACTION_NAMES = [
+    ACTION_NAMES.cpp_link_dynamic_library,
+    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+    ACTION_NAMES.lto_index_for_dynamic_library,
+    ACTION_NAMES.lto_index_for_nodeps_dynamic_library,
+]
+
+# Names of actions that link nodeps dynamic libraries.
+NODEPS_DYNAMIC_LIBRARY_LINK_ACTION_NAMES = [
+    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+    ACTION_NAMES.lto_index_for_nodeps_dynamic_library,
+]
+
+# Names of actions that link transitive dependencies.
+TRANSITIVE_LINK_ACTION_NAMES = [
+    ACTION_NAMES.cpp_link_executable,
+    ACTION_NAMES.cpp_link_dynamic_library,
+    ACTION_NAMES.lto_index_for_executable,
+    ACTION_NAMES.lto_index_for_dynamic_library,
+    ACTION_NAMES.objc_executable,
+]
+
+ACTION_NAME_GROUPS = struct(
+    all_cc_compile_actions = ALL_CC_COMPILE_ACTION_NAMES,
+    all_cc_link_actions = ALL_CC_LINK_ACTION_NAMES,
+    all_cpp_compile_actions = ALL_CPP_COMPILE_ACTION_NAMES,
+    cc_link_executable_actions = CC_LINK_EXECUTABLE_ACTION_NAMES,
+    dynamic_library_link_actions = DYNAMIC_LIBRARY_LINK_ACTION_NAMES,
+    nodeps_dynamic_library_link_actions = NODEPS_DYNAMIC_LIBRARY_LINK_ACTION_NAMES,
+    transitive_link_actions = TRANSITIVE_LINK_ACTION_NAMES,
+)
+"###;
+
+const ACTION_NAME_ROWS: &str = r#"C_COMPILE_ACTION_NAME|c_compile|c-compile
+CPP_COMPILE_ACTION_NAME|cpp_compile|c++-compile
+LINKSTAMP_COMPILE_ACTION_NAME|linkstamp_compile|linkstamp-compile
+CC_FLAGS_MAKE_VARIABLE_ACTION_NAME|cc_flags_make_variable|cc-flags-make-variable
+CPP_MODULE_CODEGEN_ACTION_NAME|cpp_module_codegen|c++-module-codegen
+CPP_HEADER_PARSING_ACTION_NAME|cpp_header_parsing|c++-header-parsing
+CPP_MODULE_DEPS_SCANNING_ACTION_NAME|cpp_module_deps_scanning|c++-module-deps-scanning
+CPP20_MODULE_COMPILE_ACTION_NAME|cpp20_module_compile|c++20-module-compile
+CPP20_MODULE_CODEGEN_ACTION_NAME|cpp20_module_codegen|c++20-module-codegen
+CPP_MODULE_COMPILE_ACTION_NAME|cpp_module_compile|c++-module-compile
+ASSEMBLE_ACTION_NAME|assemble|assemble
+PREPROCESS_ASSEMBLE_ACTION_NAME|preprocess_assemble|preprocess-assemble
+LLVM_COV|llvm_cov|llvm-cov
+LTO_INDEXING_ACTION_NAME|lto_indexing|lto-indexing
+LTO_INDEX_FOR_EXECUTABLE_ACTION_NAME|lto_index_for_executable|lto-index-for-executable
+LTO_INDEX_FOR_DYNAMIC_LIBRARY_ACTION_NAME|lto_index_for_dynamic_library|lto-index-for-dynamic-library
+LTO_INDEX_FOR_NODEPS_DYNAMIC_LIBRARY_ACTION_NAME|lto_index_for_nodeps_dynamic_library|lto-index-for-nodeps-dynamic-library
+LTO_BACKEND_ACTION_NAME|lto_backend|lto-backend
+CPP_HEADER_ANALYSIS_ACTION_NAME|cpp_header_analysis|c++-header-analysis
+CPP_LINK_EXECUTABLE_ACTION_NAME|cpp_link_executable|c++-link-executable
+CPP_LINK_DYNAMIC_LIBRARY_ACTION_NAME|cpp_link_dynamic_library|c++-link-dynamic-library
+CPP_LINK_NODEPS_DYNAMIC_LIBRARY_ACTION_NAME|cpp_link_nodeps_dynamic_library|c++-link-nodeps-dynamic-library
+CPP_LINK_STATIC_LIBRARY_ACTION_NAME|cpp_link_static_library|c++-link-static-library
+STRIP_ACTION_NAME|strip|strip
+OBJC_COMPILE_ACTION_NAME|objc_compile|objc-compile
+OBJCPP_COMPILE_ACTION_NAME|objcpp_compile|objc++-compile
+OBJC_EXECUTABLE_ACTION_NAME|objc_executable|objc-executable
+OBJCPP_EXECUTABLE_ACTION_NAME|objcpp_executable|objc++-executable
+OBJC_FULLY_LINK_ACTION_NAME|objc_fully_link|objc-fully-link
+CLIF_MATCH_ACTION_NAME|clif_match|clif-match
+OBJ_COPY_ACTION_NAME|objcopy_embed_data|objcopy_embed_data
+VALIDATE_STATIC_LIBRARY|validate_static_library|validate-static-library
+DWP|dwp|dwp
+"#;
+
+const ACTION_NAME_LIST_ROWS: &str = r#"ALL_CPP_COMPILE_ACTION_NAMES|all_cpp_compile_actions|linkstamp-compile c++-compile c++-header-parsing c++-module-compile c++-module-codegen lto-backend clif-match objc++-compile
+ALL_CC_COMPILE_ACTION_NAMES|all_cc_compile_actions|linkstamp-compile c++-compile c++-header-parsing c++-module-compile c++-module-codegen lto-backend clif-match objc++-compile c-compile preprocess-assemble assemble objc-compile
+ALL_CC_LINK_ACTION_NAMES|all_cc_link_actions|c++-link-executable c++-link-dynamic-library c++-link-nodeps-dynamic-library lto-index-for-executable lto-index-for-dynamic-library lto-index-for-nodeps-dynamic-library objc-executable
+CC_LINK_EXECUTABLE_ACTION_NAMES|cc_link_executable_actions|c++-link-executable lto-index-for-executable objc-executable
+DYNAMIC_LIBRARY_LINK_ACTION_NAMES|dynamic_library_link_actions|c++-link-dynamic-library c++-link-nodeps-dynamic-library lto-index-for-dynamic-library lto-index-for-nodeps-dynamic-library
+NODEPS_DYNAMIC_LIBRARY_LINK_ACTION_NAMES|nodeps_dynamic_library_link_actions|c++-link-nodeps-dynamic-library lto-index-for-nodeps-dynamic-library
+TRANSITIVE_LINK_ACTION_NAMES|transitive_link_actions|c++-link-executable c++-link-dynamic-library lto-index-for-executable lto-index-for-dynamic-library objc-executable
+"#;
+
 const RULES_CC_OBJC_INFO_SOURCE: &str = r###"# Copyright 2024 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -8135,6 +8401,68 @@ fn exact_rules_cc_compilation_outputs_freezes_complete_producer() {
     .unwrap();
     assert_compilation_outputs_interfaces(&outputs, &children);
     assert_empty_compilation_outputs_shape(&outputs, &children[2].2);
+}
+
+#[test]
+fn exact_rules_cc_action_names_freezes_complete_producer() {
+    assert_eq!(RULES_CC_ACTION_NAMES_SOURCE.lines().count(), 220);
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_CC_ACTION_NAMES_SOURCE.as_bytes())
+        ),
+        "e52d16474bd3ad3a0e0a4cd0cb1ad60b968ac5b0b2bcb0b1cffe85aedf80ed9d"
+    );
+    let module = eval_bzl_with_identity(
+        RULES_CC_ACTION_NAMES_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_cc+//cc:action_names.bzl").unwrap(),
+            workspace_path: PathBuf::from("/rules_cc/cc/action_names.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+    )
+    .unwrap();
+    let names_value = module.get("ACTION_NAMES").unwrap();
+    assert_eq!(names_value.value().get_type(), "struct");
+    let names = StructRef::from_value(names_value.value()).unwrap();
+    assert_eq!(ACTION_NAME_ROWS.lines().count(), 33);
+    assert_eq!(names.iter().count(), 33);
+    for row in ACTION_NAME_ROWS.lines() {
+        let (constant, row) = row.split_once('|').unwrap();
+        let (field, expected) = row.split_once('|').unwrap();
+        assert_eq!(module.get(constant).unwrap().unpack_str(), Some(expected));
+        assert_eq!(
+            names
+                .iter()
+                .find_map(|(name, value)| (name.as_str() == field).then_some(value))
+                .unwrap()
+                .unpack_str(),
+            Some(expected)
+        );
+    }
+    let groups_value = module.get("ACTION_NAME_GROUPS").unwrap();
+    assert_eq!(groups_value.value().get_type(), "struct");
+    let groups = StructRef::from_value(groups_value.value()).unwrap();
+    assert_eq!(ACTION_NAME_LIST_ROWS.lines().count(), 7);
+    assert_eq!(groups.iter().count(), 7);
+    for row in ACTION_NAME_LIST_ROWS.lines() {
+        let (list_name, row) = row.split_once('|').unwrap();
+        let (field, expected) = row.split_once('|').unwrap();
+        let list = module.get(list_name).unwrap();
+        let actual = FrozenListRef::from_value(list.value())
+            .unwrap()
+            .iter()
+            .map(|value| value.to_value().unpack_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected.split_whitespace().collect::<Vec<_>>());
+        assert!(
+            groups
+                .iter()
+                .find_map(|(name, value)| (name.as_str() == field).then_some(value))
+                .unwrap()
+                .ptr_eq(list.value())
+        );
+    }
 }
 
 #[test]
