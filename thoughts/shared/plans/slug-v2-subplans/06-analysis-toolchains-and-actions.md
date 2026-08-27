@@ -18340,3 +18340,185 @@ deferred-extraction materialization result. Root construction and MODULE
 replacement remain the immediate successor, and the existing post-callback
 token check remains publication authority. Pinned Zabel guides lifetime
 layering only; its scheduler and transport are not adopted.
+
+### Complete MODULE registration-pattern category design accepted (2026-08-27)
+
+The authenticated rules_rust toolchain parent now freezes, and the first
+ordinary `slug query '//...'` replay stops at root MODULE evaluation of
+`register_toolchains("@rust_toolchains//:all")`. The stop is representation,
+not C++ or rules_rust semantics: root registrations are stored as
+`ApparentLabel`, while Bazel stores target-pattern text for later expansion.
+
+#### Bazel authority and behavior inventory
+
+Pinned Bazel 9.2 `ModuleFileGlobals.checkAllAbsolutePatterns`,
+`registerToolchains` and `registerExecutionPlatforms` establish the declaration
+boundary. The Starlark binder validates Boolean `dev_dependency`; an ignored
+dev registration performs no variadic element-type validation, absolute-pattern
+validation or retention. Retained ordinary registrations require string
+spelling beginning with `//` or `@`. They are not labels and no package is
+loaded during MODULE evaluation. A fresh Bazel 9.2 query oracle confirms that
+both ignored `"relative/skipped"` and ignored integer `42` registrations
+succeed under `--ignore_dev_dependency`.
+
+`InterimModule` retains the raw strings. `BazelDepGraphFunction` supplies the
+selected-module order and canonical names. `RegisteredToolchainsFunction` and
+`RegisteredExecutionPlatformsFunction` iterate every selected module in that
+order and parse each declaration with that module's canonical repository and
+full repository mapping. The root is not a privileged parsing special case.
+
+Pinned `TargetPattern`, `TargetPatternUtil` and focused registered-toolchain/
+platform tests establish these syntax and expansion classes:
+
+- an exact target;
+- package wildcards spelled `:all`, `:*` or `:all-targets`;
+- recursive `...` patterns, including rules-only versus all-target variants;
+- an absolute wildcard spelling that may instead name a real explicit target,
+  resolved only after package lookup;
+- lexical target order within each multi-target expansion and stable
+  declaration/selected-module precedence across expansions; and
+- stable duplicate suppression after signed-pattern processing.
+
+The two registration families share parsing and expansion but not their
+post-expansion policy. A wildcard toolchain pattern filters to `toolchain` rule
+candidates; a wildcard execution-platform pattern filters to platform
+candidates. An explicit target is retained by the loading filter and may then
+fail configured provider validation. Target-setting applicability is also a
+configured phase. Those distinctions prevent package loading from claiming
+configured semantics.
+
+Exact diagnostic text beyond a focused oracle remains unclaimed. Before the
+syntax/expansion packets, add one Bazel 9.2 matrix only for behavior not already
+discriminated by `ModuleFileFunctionTest`,
+`RegisteredToolchainsFunctionTest`,
+`RegisteredExecutionPlatformsFunctionTest` and `TargetPatternTest`: ignored-dev
+type versus absolute validation, wildcard/explicit name conflict, cross-pattern
+duplicate order and family-specific explicit-versus-wildcard error timing.
+
+#### Final representation and ownership
+
+Use one validated compact `ModuleRegistrationPattern` text type for root and
+nonroot MODULE results. It owns the raw absolute spelling in `CompactString`
+and deliberately does not implement label accessors. Root and nonroot
+evaluation call one collector that preserves variadic and source order. The
+collector suppresses ignored dev rows before inspecting variadic elements;
+ordinary rows then validate strings and absolute spelling before storage. This
+matches the Bazel 9.2 oracle and avoids two drifting builtins.
+
+Add a selected-registration projection beside the existing post-extension
+mapping owner. `HostSelectedExtensionMappings` already retains, in selected
+order:
+
+- each evaluated root or nonroot module;
+- its canonical repository;
+- its base and final apparent-to-canonical repository mappings, including
+  `use_repo` generated repositories and root overrides; and
+- registry/nonregistry provenance.
+
+The new value retains that existing extension-mapping result plus two immutable
+arrays of compact references `(route_ordinal, pattern_ordinal)`, one for
+toolchains and one for execution platforms. Pattern text resolves through the
+retained route/source at the same ordinal; canonical owner and ordered mapping
+resolve through the final mapping at that ordinal. This is necessary for the
+live `@rust_toolchains` pattern, whose apparent name comes from `use_repo` and
+is absent from the base dependency-only route mapping. The view does not copy a
+mapping per pattern, retain a physical path, reconstruct a canonical name, or
+publish internal graph/source types. Ordinals are checked before narrowing;
+overflow is a typed terminal error. Extension mapping and route/source equality
+remain semantic invalidation authority and view lifetime cannot outlive its
+owner.
+
+This projection is a DICE key depending on the existing selected-extension-
+mappings key. Legacy and observed forms preserve its Need/error/epoch ordering
+and complete-only equality. DICE itself serializes each key. No manual lock,
+process-global cache, side table or guard across `ctx.compute` is permitted.
+The selected projection is the sole bridge from MODULE declarations to later
+loading expansion.
+
+#### Shared parser and loading expansion
+
+Extend the existing `slug_identity_v2::TargetPattern` vocabulary rather than
+adding a registration parser. Parsed syntax retains wildcard spelling and the
+possibility that an absolute wildcard-like name is an explicit target. Parsing
+resolves apparent repository spelling with the declaration view's mapping but
+does not inspect a package. Canonical labels produced here use the declaring
+mapping, not root mapping and never a filesystem root.
+
+Create one loading-owned target-pattern expansion projection consumed with a
+policy enum (`ToolchainRegistration` or `ExecutionPlatformRegistration`). It
+depends on selected registration views and existing root/external package-load
+keys. Package lookup resolves wildcard-name ambiguity, supplies target kinds
+for loading filters and sorts each wildcard result lexically by target name.
+The projection appends expansions in selected-module/declaration order and uses
+the existing small ordered-set family for first-seen duplicate suppression.
+The policy is semantic key input. Empty expansions, missing packages, missing
+explicit targets and invalid mapped repositories fail in Bazel order.
+
+Recursive expansion requires a shared loading primitive. The current
+`RootSubtreePackageSetKey` is query-private even though its Host traversal and
+package-marker semantics are not query semantics. Extract that owner downward
+to loading and make query reuse it before registration recursion. Add the
+corresponding selected-external subtree owner rather than walking repository
+files inside analysis. This extraction must preserve observed Need/event/
+cancellation behavior and must precede recursive registration activation.
+
+Configured analysis consumes only expanded canonical labels. Toolchain and
+platform configured-provider checks, target settings and precedence with
+configuration-option registrations remain separate consumers. Extra
+toolchain/execution-platform options may later feed the same parser/expander
+with their Bazel precedence, but this MODULE category makes no option claim.
+
+#### Bounded implementation sequence
+
+1. `WP-4-5-7A-selected-registration-pattern-retention-owner`: replace root
+   direct-label storage with the final compact raw type, unify root/nonroot
+   declaration collection, add the post-extension-mapping-backed public
+   projection,
+   and make the current analysis adapter accept only direct parsed patterns and
+   fail closed for unexpanded patterns. This finalizes representation and owner
+   mapping without package loading or semantic activation.
+2. A focused Bazel oracle plus shared target-pattern syntax packet adds the
+   missing wildcard spellings/ambiguity representation to the existing
+   identity parser without package lookup. Existing query/build consumers must
+   retain their accepted behavior.
+3. Extract root subtree package enumeration from query into loading with no
+   behavior change; then add the selected-external subtree owner with its
+   route/source observation proof.
+4. Add the one loading expansion projection for both registration families,
+   including package wildcard, recursive, mapping, lexical order, stable
+   dedupe, kind policy, invalidation and lifecycle matrices.
+5. Connect configured toolchain and execution-platform consumers to expanded
+   labels, then admit provider/settings semantics in their own configured
+   packets. Only afterward retry the ordinary Stage 10.3 graph.
+
+Each slice keeps the final declaration/view/parser/expansion split. No slice
+stores a wildcard as a label, expands during MODULE evaluation, creates a
+second parser/traversal, or implements a Rust C++/rules_rust rule.
+
+#### Utility and compatibility audit
+
+Reuse `CompactString` for raw pattern text, `Arc` slices/results for immutable
+retention, `SmallMap` for ordered mappings, the existing small ordered-set
+family for expansion dedupe, `Dupe` handles and `Allocative` on every retained
+value. The route-backed ordinal view avoids repeated mapping allocation and is
+the Slug analogue of Zabel's raw-pattern/declaring-owner packed rows. No Zabel
+type, Zig code, diagnostics or authority is copied, and no new dependency,
+interner, `HashMap` or global cache is justified. Record any retained-size
+change in the existing Buck2-utility audit; no new ledger row is needed unless
+implementation introduces a new retained utility.
+
+Compatibility is **exact** for the eventually admitted MODULE ABI, dev
+filtering, selected/declaration order, owner mapping, pattern vocabulary,
+lexical expansion, stable dedupe and family loading-filter timing backed by
+Bazel 9.2 sources/tests/oracle. The compact representation, ordinal views,
+DICE keys, observation carriers and memory accounting are **Slug-native**.
+Configuration-option inputs, configured provider/settings validation,
+rule/toolchain implementations, actions/input trees, invalid diagnostics not
+proved by oracle and exact configuration/output identity remain
+**unsupported/deferred**.
+
+Activate only
+`WP-4-5-7A-selected-registration-pattern-retention-owner`. STOP at the first
+unexpected route lifetime, mapping, source-order, DICE observation, analysis
+adapter or cap contradiction. Do not opportunistically enter syntax expansion,
+package traversal, configured toolchain behavior or the next bootstrap error.

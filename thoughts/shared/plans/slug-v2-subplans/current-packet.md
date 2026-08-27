@@ -1,15 +1,14 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-6-7A-complete-module-registration-pattern-category-design`
+Packet: `WP-4-5-7A-selected-registration-pattern-retention-owner`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Result: freeze one complete architecture for MODULE
-`register_toolchains` and `register_execution_platforms` target patterns before
-any more Rust. The design must cover declaration, selected-module ownership,
-parsing, expansion, kind filtering and configured validation as distinct
-layers shared by both builtins.
+Result: implement the first accepted ownership slice of the complete MODULE
+registration-pattern design. Retain final raw pattern declarations for both
+builtins and publish one post-extension-mapping-backed owner projection. Do not
+parse wildcards through package loading or activate configured behavior.
 
 ## Learned facts and decision
 
@@ -29,46 +28,37 @@ validate configured providers/settings. Patterns expanding to multiple targets
 are lexical by target name; direct, `:all`, `:*`, `:all-targets` and recursive
 forms belong to one category, including explicit-target/wildcard ambiguity.
 
-Do not patch only `:all`, store a wildcard as a fake label, or expand patterns
-inside MODULE evaluation. That would lose owner mapping, selected-module order,
-ambiguity and the shared expansion boundary and would force churn when the
-second builtin or recursive patterns arrive.
+The complete design is recorded in
+`06-analysis-toolchains-and-actions.md`. This packet finalizes only its
+declaration and selected-owner representation so later syntax and expansion
+packets do not replace it.
 
-## Required design
+## Required implementation
 
-Record one reviewed design in
-`thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-and update the canonical/current manifests. It must specify:
-
-1. A compact immutable declaration row retaining raw absolute pattern text and
-   its declaring selected-module owner. Owner context must be sufficient to
-   recover the canonical repository and complete repository mapping; physical
-   repository paths are not semantic identity.
-2. One parsed target-pattern vocabulary shared with ordinary query/build
-   patterns while preserving wildcard spelling and absolute-target ambiguity.
-   Parsing must not perform package lookup.
-3. One DICE-owned expansion projection used by both registration families.
-   It loads package targets through existing loading owners, preserves selected
-   module and declaration order, gives each multi-target expansion Bazel lexical
-   order, deduplicates stably and participates structurally in invalidation.
-4. Separate policies after expansion: wildcard toolchain patterns select
-   toolchain-rule candidates; wildcard execution-platform patterns select
-   platform candidates; explicit targets survive loading filters and fail later
-   if their configured provider is wrong. Target-setting checks remain a
-   configured-analysis concern.
-5. Root and selected nonroot registrations, dev-dependency suppression,
-   apparent repository mapping, direct/package/recursive patterns, empty and
-   duplicate expansions, invalid patterns, missing packages/targets and
-   A/B/A/cancellation/warm behavior. Both builtins must be handled together.
-6. A bounded implementation sequence with exact allowlists, line/function
-   caps, oracle/pinned-source evidence and one first packet. Slices may follow
-   ownership boundaries, but no slice may invent a representation that the
-   complete category later replaces.
-
-Configuration-option registrations may feed the same future expansion owner,
-but are not silently claimed by this MODULE category. Rule implementations,
-toolchain resolution, action creation, input trees and bootstrap execution stay
-downstream.
+1. Add one compact validated raw registration-pattern text type used by root
+   and nonroot MODULE results. It preserves exact spelling/source order and
+   deliberately exposes no label accessors.
+2. Use one collector for both builtins and root/nonroot evaluation. Suppress
+   ignored dev rows before inspecting variadic elements; ordinary rows then
+   require string values beginning with `//` or `@`. A fresh Bazel 9.2 oracle
+   proves ignored relative strings and ignored integers both succeed.
+3. Replace `RootModuleRegistrations` direct labels with immutable raw rows.
+   Preserve DICE equality, include order, command-policy filtering and all
+   existing direct registration behavior.
+4. Add a public selected-registration-pattern key/value/view beside the private
+   selected extension mappings. Retain that predecessor plus compact checked
+   `(route_ordinal, pattern_ordinal)` arrays for each family. Pattern text comes
+   from its retained route/source; owner and ordered mapping come from its final
+   post-`use_repo` mapping at the same ordinal. Do not use the base route mapping:
+   it cannot resolve the live generated `@rust_toolchains` apparent name.
+5. Supply legacy and observed keys with existing selected-extension-mapping
+   Need/error/epoch order, complete-only equality/validity, warm reuse, semantic
+   A/B/A restoration, cancellation and nonactivation proof.
+6. Adapt current analysis compilation by parsing only already-supported direct
+   patterns. A package/recursive pattern must fail closed with an explicit
+   unexpanded-registration error before loading/configured publication. Query
+   may advance past MODULE evaluation, but this packet makes no expansion or
+   toolchain-resolution claim.
 
 ## Architecture, compatibility and guidance
 
@@ -85,40 +75,47 @@ compatibility claims are not copied. Reuse existing Buck2-derived compact
 strings, small collections, immutable slices and DICE patterns in Slug; the
 design must include a utility-reuse audit and memory-accounting impact.
 
-- **Exact:** MODULE ABI and dev filtering; selected-module/declaration order;
-  owner-relative mapping; accepted pattern vocabulary; lexical expansion,
-  stable deduplication and family-specific filtering/error timing admitted by
-  the eventual implementation.
+- **Exact:** MODULE ABI/type and dev filtering, absolute raw retention,
+  selected-module/declaration order and selected canonical owner/mapping views.
 - **Slug-native:** Rust retained representation, compact allocation, DICE keys,
   cancellation carriers and memory accounting.
-- **Unsupported/deferred:** configuration-option registration inputs unless
-  explicitly selected, configured provider/settings validation not already
-  owned, rule/toolchain implementation behavior, actions/input trees, exact
-  configuration/output identity and invalid diagnostics not oracle-proved.
+- **Unsupported/deferred:** wildcard parsing/ambiguity, package or recursive
+  expansion, deduplication/filter activation, configuration-option inputs,
+  configured provider/settings validation, rule/toolchain implementation,
+  actions/input trees and exact configuration/output identity.
 
 ## Allowlist and validation
 
-This is docs/design only. Change only:
+Base is `3a1d19f40`. Change only:
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
-- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`.
+- `app/slug_bzlmod_v2/src/interim_module.rs` (452 lines);
+- `app/slug_bzlmod_v2/src/module_eval.rs` (6,672 lines);
+- `app/slug_bzlmod_v2/src/selected_repo_spec.rs` (13,741 lines);
+- `app/slug_bzlmod_v2/src/lib.rs` (475 lines);
+- `app/slug_bzlmod_v2/src/host_module.rs` (5,349 lines, proof/adapters only);
+- `app/slug_bzlmod_v2/tests/root_module_dice.rs` (2,429 lines); and
+- `app/slug_analysis_v2/src/dice.rs` (2,964 lines, direct-only adapter/proof).
 
-Run no Rust mutation and make no live network or credential access. Read the
-live checkout, Bazel 9.2 authority and the relevant Zabel peer implementation.
-Validate plan/current agreement, exact source citations, one bounded successor,
-`git diff --check`, scope and archive hygiene. Root review must reject an
-`:all` special case, direct-label storage, root-only semantic claims, merged
-declaration/expansion/configured phases, a parallel target-pattern parser,
-package loading outside DICE, or copied Zabel authority.
+Caps are 500 production, 650 proof and 1,150 total additions; deletions do not
+buy budget. Each new helper/test is at most 100 lines. Add no dependency,
+global state, lock, package traversal, target-pattern parser or copied mapping.
+Use existing `CompactString`, `Arc`, `SmallMap`, `Dupe` and `Allocative`; record
+the Buck2 utility audit and retained-size effect.
 
-STOP and `REPLAN` if the complete category cannot be bounded, owner mapping is
-unavailable, existing target-pattern/loading owners cannot be reused safely, a
-new lock would cross DICE compute, exact ordering/filter behavior lacks source
-or oracle evidence, or the design would enter downstream toolchain/action work.
+Run focused root/nonroot declaration and selected-projection tests, all
+`slug_bzlmod_v2` tests, `slug_analysis_v2` tests, loading/BUILD/invalidation
+suites, locked core check and locked CLI build serially. Rebuild
+`slug_cli_v2`, clean `slugd`, and replay `slug query '//...'`; acceptance is
+advancement beyond the MODULE registration rejection, not query success. Run
+format, diff, scope/cap/helper, archive and no-lock/DICE ownership review.
+
+STOP and `REPLAN` for route/source lifetime duplication, missing owner mapping,
+ordinal overflow without typed failure, changed selected order, package loading,
+wildcard activation, a new parser/traversal, configured publication, allowlist/
+cap escape or a new terminal before the expected fail-closed adapter.
 
 ## Immediate predecessor
 
-Commit `0a799e522` accepts the shared JSON category and complete authenticated
-rules_rust toolchain parent without invocation. The ordinary bootstrap replay
-now exposes wildcard registration representation as the next real boundary.
+Commit `3a1d19f40` selects and the canonical subplan records the complete shared
+registration-pattern architecture. This packet implements only its final raw
+declaration and selected-owner representation.
