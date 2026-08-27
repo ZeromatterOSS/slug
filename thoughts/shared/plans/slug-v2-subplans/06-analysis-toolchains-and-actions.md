@@ -19167,3 +19167,151 @@ route and contextual mapping owners do not compute
 effects and a dropped plan could defeat equality cutoff. The existing later
 source adapter remains the sole effect-key consumer and structurally retains
 the resulting plan.
+
+### Canonical route owner accepted; apparent-free source/load bridge designed (2026-08-27)
+
+Commit `496168758` implements the accepted route decision. One bzlmod carrier
+and loading-owned legacy/observed keys now resolve root, built-in,
+selected-registry, selected-nonregistry and generated repositories by workspace
+plus canonical name. Core's prior semantic owners are gone, root-apparent
+callers remain adapters, and route/mapping lookup never activates the generated
+repository-file effect key. Carrier, owner, dependent and broad crate proof
+passes; independent DICE/retained-representation review returned `ACCEPT`.
+
+#### Live contradiction and non-decisions
+
+The planned registration expander still cannot consume the route. The accepted
+external source chain takes `RootRepositoryRoute` at every public layer:
+`HostRepositoryDirectoryListingKey`, `HostExternalPackageBoundaryKey`,
+`ExternalSubtreePackageSetKey`, `RepositoryPackageSourceKey`, external `.bzl`
+evaluation and `RepositoryPackageLoadKey`. That carrier includes a root-
+apparent alias and cannot represent a selected canonical repository that the
+root does not name. The canonical route cannot be passed to those owners, and
+constructing a `RootRepositoryRoute` with the canonical spelling in its
+apparent field would silently invent repository-mapping state.
+
+The natural source owner below those adapters is already canonical.
+`RepositoryMaterializationRequestId` and `RepositoryMaterializationResultKey`
+use workspace plus canonical repository; built-in catalog identity is snapshot
+structural; Host and immutable path observations are keyed below the private
+logical root. The missing boundary is therefore an apparent-free source input
+and load route, not another parser, directory walk, materializer or repository
+resolver.
+
+Do not widen `RootRepositoryRoute`, make apparent spelling optional inside it,
+or migrate every root caller in one packet. Do not copy a selected mapping or
+repository specification into a command-side repair, infer a physical source
+root, expose a materialization namespace, or activate package/registration
+behavior. Existing root-apparent source keys remain exact adapters until their
+bounded consumer migration.
+
+#### Accepted bridge and ownership
+
+Add a bzlmod `HostCanonicalRepositorySourceInput`. It retains one
+`Arc<HostCanonicalRepositoryRoute>` and the existing materialization
+disposition required by source Needs. For a generated route, the disposition
+also owns the computed `GeneratedRepositoryFileEffectPlan`; missing generated
+plans and extraneous non-generated plans fail closed. Root fails as a typed
+non-external source. The input exposes canonical workspace/name, source policy,
+mapping context through the predecessor, and source disposition views only. It
+contains no apparent spelling, physical root, namespace, materialized path,
+source tree or command scratch.
+
+Add loading legacy/observed `HostCanonicalRepositoryLoadRouteKey` owners over
+workspace plus canonical repository. They first compute the already accepted
+canonical route. Only generated success computes the existing
+`HostSelectedRepositoryFileEffectKey` or observed sibling and merges its epoch
+after the route epoch. Built-in and selected success project directly. Route
+Need/error/outer failure is terminal before any effect work; effect failure is
+terminal; source-input/materialization projection runs after those natural
+predecessors and any projection failure is a typed terminal retaining the
+accumulated observations; root is a typed terminal. One returned load-route
+value owns the canonical source input and borrows all mapping/label context
+through its retained route.
+
+Add bzlmod canonical source-file observation and direct-directory-listing keys
+over that input. Factor only the smallest internal drivers needed so both the
+new canonical and existing root-apparent wrappers converge on the same built-
+in catalog, materialization-result, path-resolution and directory-listing
+keys. They may create separate address-level wrapper nodes temporarily, but
+must not create a second source/materialization/path semantic owner or perform
+IO directly. Structural dependency proof, not a nominal shared helper alone,
+must demonstrate convergence. The observed source-file/listing siblings own
+only their source/path epochs; later composite consumers merge the observed
+load-route epoch first rather than placing observations in semantic key
+identity.
+
+This bridge has an explicit deletion condition. Once
+`HostExternalPackageBoundaryKey`, `ExternalSubtreePackageSetKey`,
+`RepositoryPackageSourceKey`, external `.bzl` evaluation and
+`RepositoryPackageLoadKey` accept the canonical load route, delete any
+canonical/root address wrapper split that no longer protects accepted root
+behavior. The immediate successor owns that migration under
+`WP-4-5-7A-canonical-external-package-loading-adapter`; its regression must
+retain alias-free selected-canonical success and shared underlying source
+dependencies. Only after that migration does sequence step 4 implement the one
+toolchain/execution-platform expander.
+
+#### Evidence, lifecycle and utility decision
+
+Pinned Bazel 9.2
+`RegisteredToolchainsFunction#getBzlmodToolchains`,
+`RegisteredExecutionPlatformsFunction#getBzlmodExecutionPlatforms`, their
+bzlmod tests and `TargetPatternUtil` remain authority: registration patterns
+are parsed under each selected module's canonical repository/full mapping,
+then expanded in stable signed-pattern order. The bridge activates none of
+that named behavior, so existing source, route and structural regressions are
+the applicable proof; add no oracle fixture.
+
+Slug `docs/developers/dice.md` and Buck2 DICE `writing_computations.md`,
+`incrementality.md` and `cancellations.md` support one semantic key, recorded
+predecessor edges, complete-only equality, shared in-flight work and release on
+cancellation. Zabel's `selected_registration_patterns.zig`,
+`registered_labels_projection.zig` and
+`session_recursive_package_discovery.zig` support only the concept/test split
+between declaration context, authenticated source identity, package facts and
+configured consumers. Copy no Zig code or compatibility claim.
+
+The retained value is DICE semantic memory: one route `Arc`, one existing
+materialization disposition and, only for generated sources, one effect plan.
+The existing Need projection may clone its repository specification as it does
+today; no second mapping, route graph or source cache is admitted. Epoch merge
+and constructor scratch release at compute completion. Cancellation publishes
+no complete value. No manual lock, process global, interner or new collection
+is needed. Existing `Arc`, `Dupe`, structural hashing and `Allocative` are
+sufficient, so no Stage 9 ledger row is added. Require retained-size accounting
+for the route `Arc`, disposition/request handle and generated-only plan. This
+callerless substrate activates no demonstrated execution hot path, so a
+benchmark is not required; wrapper-node count is residual until the immediate
+successor deletes the address split.
+
+Compatibility is **exact** for unchanged root-apparent source/file/listing
+behavior and for sharing the already accepted underlying source facts; no
+named registration surface is activated. Carrier layout, key names, typed root
+rejection, equality/hash and observation transport are **Slug-native**.
+Canonical external package boundary/subtree/package loading, pattern
+expansion, wildcard ambiguity and family filters, configured validation,
+options, rules and actions remain **unsupported/deferred**.
+
+Activate only
+`WP-4-5-7A-canonical-repository-load-route-implementation` under the manifest's
+six-file 900-production/1,100-proof caps. Because `source_preparation.rs`
+exceeds the complexity trigger, its additions are capped at 100 production
+lines and the cohesive owner belongs in a new submodule. Require independent
+DICE/public-boundary/retained-representation terminal review. Stop for an
+apparent name, fabricated alias, non-generated effect work, duplicate source
+owner, copied mapping, physical root, direct loading IO, root behavior change,
+package/target-pattern/registration activation, dependency, cap or allowlist
+expansion.
+
+This remains generic repository/loading architecture. Bazel 9 BCR Starlark
+owns rule definitions and control flow, including `cc_internal`; `cc_common`
+is one demanding consumer of the generic host-builtin ABI. Builtins continue
+to be planned by reusable capability category. Zabel is peer guidance only;
+Bazel 9.2 owns behavior.
+
+Independent DICE/public-boundary/retained-representation pre-review returned
+`ACCEPT`: generated effects are route-success-only, both address wrappers
+converge on the existing materialization/path owners, retained state is
+structural without alias/mapping copies, observed epoch composition is
+explicit, and the wrapper deletion owner/regression is concrete.
