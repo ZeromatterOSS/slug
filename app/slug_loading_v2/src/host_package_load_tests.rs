@@ -3875,6 +3875,44 @@ const UTILS_CAN_USE_METADATA_SOURCE: &str = r###"def can_use_metadata_for_pipeli
            crate_type in ("rlib", "lib")
 "###;
 
+const PROVIDERS_ALWAYS_ENABLE_METADATA_OUTPUT_GROUPS_SOURCE: &str = r###"AlwaysEnableMetadataOutputGroupsInfo = provider(
+    doc = (
+        "Enable the 'metadata' and 'rustc_rmeta_output' groups for all targets, " +
+        "even if not a library or if pipelining is disabled"
+    ),
+    fields = {
+        "always_enable_metadata_output_groups": ("bool: Whether or not to always enable " +
+                                                 "metadata-related output groups"),
+    },
+)
+"###;
+
+const UTILS_CAN_BUILD_METADATA_SOURCE: &str = r###"def can_build_metadata(toolchain, ctx, crate_type, *, disable_pipelining = False):
+    """Can we build metadata for the target built using this context?
+
+    Args:
+        toolchain (toolchain): The rust toolchain
+        ctx (ctx): The rule's context object
+        crate_type (String): The rule's crate type
+        disable_pipelining: Does the rule have pipelining explicitly disabled?
+
+    Returns:
+        bool: whether we can build metadata for this rule.
+    """
+
+    # Building metadata requires that:
+    # 1) process_wrapper is enabled (this is disabled when compiling process_wrapper itself)
+    # 2) either:
+    #   * always_enable_metadata_output_groups is set
+    #   * this target can use metadata for pipelined compilation
+    return bool(ctx.attr._process_wrapper) and (
+        ctx.attr._always_enable_metadata_output_groups[AlwaysEnableMetadataOutputGroupsInfo].always_enable_metadata_output_groups or
+        (not disable_pipelining and
+         can_use_metadata_for_pipelining(toolchain, crate_type))
+    )
+
+"###;
+
 const UTILS_DETERMINE_LIB_NAME_SOURCE: &str = r###"def determine_lib_name(name, crate_type, toolchain, lib_hash = None):
     """See https://github.com/bazelbuild/rules_rust/issues/405
 
@@ -4489,6 +4527,83 @@ IMPORTED_LEAVES = [can_use_metadata_for_pipelining, dedent, deduplicate, determi
     for (value, name) in imported.iter().zip(names) {
         assert!(value.to_value().ptr_eq(child.get(name).unwrap().value()));
     }
+}
+
+#[test]
+fn exact_rules_rust_utils_can_build_metadata_retains_loaded_provider_and_parent_identity() {
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(PROVIDERS_ALWAYS_ENABLE_METADATA_OUTPUT_GROUPS_SOURCE.as_bytes())
+        ),
+        "3c21b9e0c388512de065d30fe0910e8fc6db274e6643662fb1922ce47787db8b"
+    );
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(UTILS_CAN_BUILD_METADATA_SOURCE.as_bytes())
+        ),
+        "4d57fbeaa3abeee124920697c17f08cd785655f3de64723f9e071bd2b50cb8eb"
+    );
+    let owner = |name: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(&format!("@@rules_rust+//rust/private:{name}.bzl")).unwrap(),
+        workspace_path: PathBuf::from(format!("/rules_rust/rust/private/{name}.bzl")),
+        repository_mapping: Arc::from([]),
+    };
+    let providers_owner = owner("providers");
+    let providers = eval_bzl_with_identity(
+        PROVIDERS_ALWAYS_ENABLE_METADATA_OUTPUT_GROUPS_SOURCE,
+        providers_owner.clone(),
+    )
+    .unwrap();
+    let provider_binding = providers
+        .get("AlwaysEnableMetadataOutputGroupsInfo")
+        .unwrap();
+    let provider = provider_binding.value();
+    assert_eq!(provider.get_type(), "provider_callable");
+    let utils_owner = owner("utils");
+    let utils_source = format!(
+        "load(\":providers.bzl\", \"AlwaysEnableMetadataOutputGroupsInfo\")\n{}\n{}\nLOADED_METADATA_PROVIDER = AlwaysEnableMetadataOutputGroupsInfo\n",
+        UTILS_CAN_BUILD_METADATA_SOURCE, UTILS_CAN_USE_METADATA_SOURCE,
+    );
+    let utils = eval_bzl_with_loaded_children(
+        &utils_source,
+        utils_owner.clone(),
+        &[(":providers.bzl", providers_owner, providers.dupe())],
+    )
+    .unwrap();
+    assert_eq!(
+        utils.get("can_build_metadata").unwrap().value().get_type(),
+        "function"
+    );
+    assert_eq!(
+        utils
+            .get("can_use_metadata_for_pipelining")
+            .unwrap()
+            .value()
+            .get_type(),
+        "function"
+    );
+    assert!(
+        utils
+            .get("LOADED_METADATA_PROVIDER")
+            .unwrap()
+            .value()
+            .ptr_eq(provider)
+    );
+    let parent = eval_bzl_with_loaded_children(
+        "load(\":utils.bzl\", \"can_build_metadata\")\nIMPORTED = can_build_metadata\n",
+        owner("rust"),
+        &[(":utils.bzl", utils_owner, utils.dupe())],
+    )
+    .unwrap();
+    assert!(
+        parent
+            .get("IMPORTED")
+            .unwrap()
+            .value()
+            .ptr_eq(utils.get("can_build_metadata").unwrap().value())
+    );
 }
 
 #[test]
