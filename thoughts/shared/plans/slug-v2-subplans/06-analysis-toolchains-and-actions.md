@@ -18913,3 +18913,9 @@ packet recorded in the current manifest: split the private lookup terminal,
 add the small public projection module and tests, and export only its doc-hidden
 consumer surface. Stop before directory recursion, target-pattern expansion,
 package loading or registration activation.
+
+Independent architecture review returned `ACCEPT` after adding the exhaustive
+source-preparation consumer and existing observation proof files to the
+allowlist. Commit `5ec7f3c79` freezes the design. Activate only
+`WP-4-5-7A-selected-external-package-boundary-projection-implementation` at
+base `5ec7f3c79` under the manifest's corrected bounds.

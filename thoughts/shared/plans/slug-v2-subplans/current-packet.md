@@ -1,15 +1,15 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-selected-external-package-boundary-projection-design`
+Packet: `WP-4-5-7A-selected-external-package-boundary-projection-implementation`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `0055c653b`.
+Base: `5ec7f3c79`.
 
-Result: freeze one public, route-owned external package-boundary projection
+Result: implement one public, route-owned external package-boundary projection
 which distinguishes ignore pruning from current-package deletion before any
-selected-external traversal is implemented. This packet is docs-only.
+selected-external traversal is implemented.
 
 ## Learned facts and source basis
 
@@ -115,24 +115,9 @@ DICE values and retain independent injected request revisions.
   family policy/dedupe, registration activation, configured validation,
   options, rules and actions.
 
-## Docs-only allowlist and review
+## Active allowlist and review
 
-This design packet may change only:
-
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`;
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
-
-Caps are 50, 260 and 190 net lines respectively. Run source-anchor, structure,
-scope, archive-baseline and diff checks. Require independent architecture
-review before selecting implementation because this freezes a new public DICE
-boundary.
-
-## Successor implementation bounds
-
-If accepted, select
-`WP-4-5-7A-selected-external-package-boundary-projection-implementation` with
-this implementation allowlist:
+This implementation packet may change only:
 
 - `app/slug_bzlmod_v2/src/host_package.rs` only to split the existing private
   lookup's deleted and ignored terminals and preserve its current consumers;
@@ -148,7 +133,7 @@ this implementation allowlist:
   mechanical private-terminal proof updates if the split requires them; and
 - `app/slug_bzlmod_v2/src/lib.rs` for doc-hidden exports and module wiring.
 
-Implementation caps are 560 production and 900 proof additions, with no
+Caps are 560 production and 900 proof additions, with no
 dependency, fixture or oracle. `host_package.rs` exceeds the complexity trigger
 but remains the cohesive private lookup owner; the new public projection is
 split into its own small module so no new responsibility is added there.
@@ -183,4 +168,6 @@ across DICE compute.
 Commit `0055c653b` accepts the generic routed repository directory-listing
 owner for direct-local, selected-registry, generated and built-in sources. It
 activates no rule semantics: Bazel 9 BCR Starlark remains the rule source, and
-Zabel remains peer guidance only.
+Zabel remains peer guidance only. Commit `5ec7f3c79` freezes this public
+boundary design after independent review corrected its exhaustive consumer and
+proof allowlist.
