@@ -98,7 +98,7 @@ Base is `3a1d19f40`. Change only:
 - `app/slug_bzlmod_v2/tests/root_module_dice.rs` (2,429 lines); and
 - `app/slug_analysis_v2/src/dice.rs` (2,964 lines, direct-only adapter/proof).
 
-Caps are 500 production, 650 proof and 1,150 total additions; deletions do not
+Caps are 650 production, 500 proof and 1,150 total additions; deletions do not
 buy budget. Each new helper/test is at most 100 lines. Add no dependency,
 global state, lock, package traversal, target-pattern parser or copied mapping.
 Use existing `CompactString`, `Arc`, `SmallMap`, `Dupe` and `Allocative`; record
@@ -132,3 +132,11 @@ adaptation. The original allowlist omitted
 the smallest correction that preserves requirement 1 instead of weakening it
 to an unenforced `CompactString` alias. Scope, caps, architecture, compatibility
 classification and all stop conditions are otherwise unchanged.
+
+The implementation audit then measured roughly 585 production additions for
+the nominal raw type, borrowed owner views, typed ordinal failures and both
+legacy/observed DICE carrier families. The original 500-line production split
+could only be met by removing required carriers or hiding their ownership in a
+packet-local macro. Rebalance the unchanged 1,150-line total ceiling to 650
+production and 500 proof additions; no behavior, file, dependency or
+architecture scope is added.
