@@ -11,6 +11,7 @@
 mod builtin_repository;
 pub mod dice;
 mod generated_repository_file_effect;
+mod host_external_package_boundary;
 mod host_file;
 mod host_include;
 mod host_lockfile;
@@ -78,6 +79,14 @@ pub use generated_repository_file_effect::GeneratedRepositoryFileEffectPlan;
 pub use generated_repository_file_effect::GeneratedRepositoryFileEffectPlanBuilder;
 #[doc(hidden)]
 pub use generated_repository_file_effect::GeneratedRepositoryFileEffectPlanError;
+pub use host_external_package_boundary::HostExternalPackageBoundary;
+pub use host_external_package_boundary::HostExternalPackageBoundaryError;
+pub use host_external_package_boundary::HostExternalPackageBoundaryKey;
+pub use host_external_package_boundary::HostExternalPackageBoundaryKind;
+#[doc(hidden)]
+pub use host_external_package_boundary::HostExternalPackageBoundaryObservationKey;
+#[doc(hidden)]
+pub use host_external_package_boundary::ObservedHostExternalPackageBoundary;
 #[doc(hidden)]
 pub use host_module::HostRepositorySourceCapability;
 #[doc(hidden)]

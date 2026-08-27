@@ -84,7 +84,7 @@ pub(crate) enum HostBuildFileName {
 }
 
 impl HostBuildFileName {
-    fn as_str(self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::BuildDotBazel => "BUILD.bazel",
             Self::Build => "BUILD",
@@ -522,6 +522,7 @@ pub(crate) enum ExternalRepositoryPackageLookup {
     Package(HostBuildFileName),
     NoBuildFile,
     Deleted,
+    IgnoredDirectory,
     InvalidPackageName { message: Arc<str> },
 }
 
@@ -601,6 +602,17 @@ impl ObservedExternalRepositoryPackageLookup {
 
     pub(crate) fn observations(&self) -> &PathObservationEpoch {
         &self.observations
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(
+        result: Result<ExternalRepositoryPackageLookup, ExternalRepositoryPackageLookupError>,
+        observations: PathObservationEpoch,
+    ) -> Self {
+        Self {
+            result: Arc::new(result),
+            observations,
+        }
     }
 }
 
@@ -708,7 +720,7 @@ async fn drive_external_repository_package_lookup(
         .is_some()
     {
         return external_lookup_complete(
-            Ok(ExternalRepositoryPackageLookup::Deleted),
+            Ok(ExternalRepositoryPackageLookup::IgnoredDirectory),
             observations,
         );
     }
@@ -1279,7 +1291,10 @@ async fn drive_repository_package_source(
                 observations,
             );
         }
-        Ok(ExternalRepositoryPackageLookup::Deleted) => {
+        Ok(
+            ExternalRepositoryPackageLookup::Deleted
+            | ExternalRepositoryPackageLookup::IgnoredDirectory,
+        ) => {
             return repository_package_source_error_complete(
                 RepositoryPackageSourceErrorInner::Deleted {
                     package: key.package.clone(),
@@ -3204,7 +3219,7 @@ mod tests {
                         .await
                         .unwrap()
                 ),
-                ExternalRepositoryPackageLookup::Deleted
+                ExternalRepositoryPackageLookup::IgnoredDirectory
             );
         }
         let activations = tracker.take();

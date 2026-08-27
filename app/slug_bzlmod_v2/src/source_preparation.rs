@@ -2541,9 +2541,10 @@ fn finish_direct_local_include_package_horizon_observed(
                     message: message.dupe(),
                 }
             }
-            Ok(ExternalRepositoryPackageLookup::Deleted) => {
-                DirectLocalIncludePackageFailure::Deleted
-            }
+            Ok(
+                ExternalRepositoryPackageLookup::Deleted
+                | ExternalRepositoryPackageLookup::IgnoredDirectory,
+            ) => DirectLocalIncludePackageFailure::Deleted,
             Ok(ExternalRepositoryPackageLookup::NoBuildFile) => {
                 DirectLocalIncludePackageFailure::NoBuildFile
             }

@@ -690,7 +690,7 @@ async fn observed_external_lookup_distinguishes_deleted_prefixes_and_marker_prio
     let ignored = observed_value(&ignored);
     assert!(matches!(
         ignored.result().as_ref(),
-        Ok(ExternalRepositoryPackageLookup::Deleted)
+        Ok(ExternalRepositoryPackageLookup::IgnoredDirectory)
     ));
     assert!(!ignored.observations().observations().is_empty());
 

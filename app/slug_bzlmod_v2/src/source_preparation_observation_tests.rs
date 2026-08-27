@@ -2562,7 +2562,10 @@ fn observed_horizon_reducer_is_prefix_bounded_left_first_and_complete_only() {
     );
     let outcomes = batch(
         Ok(SourcePreparationOutcome::Need(path_need.dupe())),
-        observed_horizon_lookup(ExternalRepositoryPackageLookup::Deleted, q_epoch),
+        observed_horizon_lookup(
+            ExternalRepositoryPackageLookup::IgnoredDirectory,
+            q_epoch,
+        ),
         Ok(SourcePreparationOutcome::Complete(Err(outer.dupe()))),
     );
     assert!(matches!(
