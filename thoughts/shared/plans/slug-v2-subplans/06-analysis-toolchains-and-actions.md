@@ -19433,3 +19433,10 @@ preserve zero-copy catalog/materialized values, exact root constructors and
 dependency ordering. This remains generic BCR Starlark loading architecture:
 Bazel 9 owns rules including `cc_internal`, `cc_common` is a host-builtin
 consumer, and Zabel is peer design/optimization guidance only.
+
+Independent design review returned `ACCEPT`, and commit `fdd13400d` freezes the
+six-file contract. Activate only
+`WP-4-5-7A-repository-source-observation-owner-convergence` under
+800-production/1,000-proof/1,800-total caps. All root keys/consumers and all
+four canonical wrappers remain; package-policy and loading adaptation stay
+read-only.
