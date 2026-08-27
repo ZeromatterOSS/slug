@@ -3951,6 +3951,79 @@ const UTILS_GENERATE_OUTPUT_DIAGNOSTICS_SOURCE: &str = r###"def generate_output_
     )
 "###;
 
+const UTILS_TRANSFORM_SOURCES_SOURCE: &str = r###"def transform_sources(ctx, srcs, compile_data, crate_root):
+    """Creates symlinks of the source files if needed.
+
+    Rustc assumes that the source files are located next to the crate root.
+    In case of a mix between generated and non-generated source files, this
+    we violate this assumption, as part of the sources will be located under
+    bazel-out/... . In order to allow for targets that contain both generated
+    and non-generated source files, we generate symlinks for all non-generated
+    files.
+
+    Args:
+        ctx (struct): The current rule's context.
+        srcs (List[File]): The sources listed in the `srcs` attribute
+        compile_data (List[File]): The sources listed in the `compile_data`
+                                   attribute
+        crate_root (File): The file specified in the `crate_root` attribute,
+                           if it exists, otherwise None
+
+    Returns:
+        Tuple(List[File], List[File], File): The transformed srcs, compile_data
+                                             and crate_root
+    """
+    has_generated_sources = (
+        len([src for src in srcs if not src.is_source]) +
+        len([src for src in compile_data if not src.is_source]) >
+        0
+    )
+
+    if not has_generated_sources:
+        return srcs, compile_data, crate_root
+
+    package_root = paths.join(ctx.label.workspace_root, ctx.label.package)
+    generated_sources = [_symlink_for_non_generated_source(ctx, src, package_root) for src in srcs if src != crate_root]
+    generated_compile_data = [_symlink_for_non_generated_source(ctx, src, package_root) for src in compile_data]
+    generated_root = crate_root
+    if crate_root:
+        generated_root = _symlink_for_non_generated_source(ctx, crate_root, package_root)
+        generated_sources.append(generated_root)
+
+    return generated_sources, generated_compile_data, generated_root
+"###;
+
+const UTILS_SYMLINK_NON_GENERATED_SOURCE: &str = r###"def _symlink_for_non_generated_source(ctx, src_file, package_root):
+    """Creates and returns a symlink for non-generated source files.
+
+    This rule uses the full path to the source files and the rule directory to compute
+    the relative paths. This is needed, instead of using `short_path`, because of non-generated
+    source files in external repositories possibly returning relative paths depending on the
+    current version of Bazel.
+
+    Args:
+        ctx (struct): The current rule's context.
+        src_file (File): The source file.
+        package_root (File): The full path to the directory containing the current rule.
+
+    Returns:
+        File: The created symlink if a non-generated file, or the file itself.
+    """
+
+    src_short_path = paths.relativize(src_file.path, src_file.root.path)
+    if (src_file.is_source or src_file.root.path != ctx.bin_dir.path) and paths.starts_with(src_short_path, package_root):
+        src_short_path = paths.relativize(src_file.path, src_file.root.path)
+        src_symlink = ctx.actions.declare_file(paths.relativize(src_short_path, package_root))
+        ctx.actions.symlink(
+            output = src_symlink,
+            target_file = src_file,
+            progress_message = "Creating symlink to source file: {}".format(src_file.path),
+        )
+        return src_symlink
+    else:
+        return src_file
+"###;
+
 const UTILS_DETERMINE_LIB_NAME_SOURCE: &str = r###"def determine_lib_name(name, crate_type, toolchain, lib_hash = None):
     """See https://github.com/bazelbuild/rules_rust/issues/405
 
@@ -4712,6 +4785,85 @@ fn exact_rules_rust_utils_output_diagnostics_retains_loaded_provider_and_parent_
             .unwrap()
             .value()
             .ptr_eq(utils.get("generate_output_diagnostics").unwrap().value())
+    );
+}
+
+#[test]
+fn exact_rules_rust_utils_transform_sources_retains_paths_helper_and_parent_identity() {
+    let slices = [
+        (
+            UTILS_TRANSFORM_SOURCES_SOURCE,
+            "transform_sources",
+            "1006a8daf526ca60d494f691067d417db5ca34ef350bd6fcf901b8f1d5fd14c7",
+        ),
+        (
+            UTILS_SYMLINK_NON_GENERATED_SOURCE,
+            "_symlink_for_non_generated_source",
+            "c5105f745ea0032b282f9de9825bac784ebd88ec55c80c2692017038357eaaaa",
+        ),
+    ];
+    for (source, _, expected) in slices {
+        assert_eq!(format!("{:x}", Sha256::digest(source.as_bytes())), expected);
+    }
+    assert_eq!(
+        format!("{:x}", Sha256::digest(PATHS_SOURCE.as_bytes())),
+        "96cce43871d8228126a12ceff771351f9030b1e9d029f2185853aa6541766a83"
+    );
+    let paths_owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@bazel_skylib+//lib:paths.bzl").unwrap(),
+        workspace_path: PathBuf::from("/bazel_skylib/lib/paths.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let paths_module = eval_bzl_with_identity(PATHS_SOURCE, paths_owner.clone()).unwrap();
+    let paths_binding = paths_module.get("paths").unwrap();
+    let paths = paths_binding.value();
+    assert_eq!(paths.get_type(), "struct");
+    let utils_owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_rust+//rust/private:utils.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_rust/rust/private/utils.bzl"),
+        repository_mapping: Arc::from([(
+            ApparentRepoName::new("bazel_skylib").unwrap(),
+            CanonicalRepoName::new("bazel_skylib+").unwrap(),
+        )]),
+    };
+    let utils_source = format!(
+        "load(\"@bazel_skylib//lib:paths.bzl\", \"paths\")\n{}\n{}\nLOADED_PATHS = paths\n",
+        UTILS_TRANSFORM_SOURCES_SOURCE, UTILS_SYMLINK_NON_GENERATED_SOURCE,
+    );
+    let utils = eval_bzl_with_loaded_children(
+        &utils_source,
+        utils_owner.clone(),
+        &[(
+            "@bazel_skylib//lib:paths.bzl",
+            paths_owner,
+            paths_module.dupe(),
+        )],
+    )
+    .unwrap();
+    for (_, name, _) in slices {
+        assert_eq!(
+            utils.get_any_visibility(name).unwrap().0.value().get_type(),
+            "function"
+        );
+    }
+    assert!(utils.get("_symlink_for_non_generated_source").is_err());
+    assert!(utils.get("LOADED_PATHS").unwrap().value().ptr_eq(paths));
+    let parent = eval_bzl_with_loaded_children(
+        "load(\":utils.bzl\", \"transform_sources\")\nIMPORTED = transform_sources\n",
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_rust+//rust/private:rust.bzl").unwrap(),
+            workspace_path: PathBuf::from("/rules_rust/rust/private/rust.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+        &[(":utils.bzl", utils_owner, utils.dupe())],
+    )
+    .unwrap();
+    assert!(
+        parent
+            .get("IMPORTED")
+            .unwrap()
+            .value()
+            .ptr_eq(utils.get("transform_sources").unwrap().value())
     );
 }
 
