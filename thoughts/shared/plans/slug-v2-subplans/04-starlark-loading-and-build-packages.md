@@ -5247,6 +5247,22 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Exact transform-sources export accepted; crate-name selected (2026-08-26)
+
+Commit `4d037e48d` adds 152 proof lines and verifies exact `transform_sources`,
+its private helper, the accepted Skylib paths child, actual repository mapping,
+loaded identity and parent identity without invocation. All 234 loading-lib, 24
+invalidation and 31 BUILD-loading tests pass with analysis/core checks and the
+CLI build; independent review accepts the closure and caps.
+
+Run only `WP-4-7A-rules-rust-utils-compute-crate-name-export-loading-proof`
+under 0/240/240 caps. Freeze exact `compute_crate_name` and the four dependency
+helper slices authenticated by audit `6381223ce`, reusing accepted eager
+encoding slices in source order. Prove hashes, exact visibility and parent
+identities and nonexecution. Defer both dependency transforms on their exact
+CcInfo closure. Clean `../zabel` `0795445f…` guides reachability and freeze
+ownership only; Bazel 9.2 and authenticated rules sources remain exact.
+
 ### Exact output-diagnostics export accepted; transform-sources selected (2026-08-26)
 
 Commit `53c4d7d78` adds only 109 proof lines and verifies exact
