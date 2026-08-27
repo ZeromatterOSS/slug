@@ -1,16 +1,15 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-builtin-optional-package-input-projection-implementation`
+Packet: `WP-4-5-7A-builtin-optional-package-input-projection-implementation-r2-correction-design`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `078518b88`.
+Base: `3b73a99cf`.
 
-Result: implement the smallest generic routed-source correction which lets the
-catalog-backed built-in repository represent absent optional `REPO.bazel`,
-`.bazelignore`, `BUILD.bazel` and `BUILD` inputs without inventing a physical
-root.
+Result: freeze one bounded correction which moves built-in REPO absence before
+root Starlark-semantics projection, proves it without injected policy inputs,
+and corrects the implementation production ceiling from 220 to 280 lines.
 
 ## Learned facts and source basis
 
@@ -40,6 +39,12 @@ repository-ignore error for a valid built-in package decision. Its complete
 unaccepted Rust diff was removed; no split terminal or public boundary module
 is retained.
 
+The first prerequisite candidate also ordered `RootRepoFileSemanticsProjectionKey`
+before its built-in root listing. That makes an absent built-in `REPO.bazel`
+depend on unrelated Starlark policy and lets missing policy fail before normal
+absence. The focused test initially masked this by injecting policy inputs.
+Pinned Bazel requests REPO semantics only after discovering a REPO file.
+
 Buck2 DICE guidance in `docs/developers/dice.md` requires each natural owner to
 depend on the accepted listing key, keep Need transient, forward complete
 observations and avoid locks across compute. No new oracle or fixture is
@@ -61,8 +66,9 @@ no second retained entry-kind key or source tree. Each existing semantic owner
 adds only the built-in branch appropriate to the fact it already owns:
 
 - `HostRouteRepoFileKey` obtains the built-in root listing. Absence of
-  `REPO.bazel` yields the existing empty REPO value. Materialized routes keep
-  their current source-file path, evaluation, event and observation behavior.
+  `REPO.bazel` yields the existing empty REPO value **before** computing root
+  REPO Starlark semantics. Materialized routes keep their current policy,
+  source-file, evaluation, event and observation behavior.
 - `HostRouteRepositoryIgnoreKey` obtains the same built-in root listing after
   its REPO predecessor. Absence of `.bazelignore` contributes no additional
   prefixes. Materialized routes keep their current source-file and parser
@@ -130,7 +136,22 @@ no async transfer or shutdown lifetime.
   registration activation, configured validation, language builtin breadth,
   rules and actions.
 
-## Proof and implementation scope
+## Correction-design scope
+
+The exact rejected Rust candidate remains in the worktree. It compiles and its
+focused built-in optional-input matrix passes only because that test injects
+policy inputs before the REPO check. It must not be changed, accepted or
+committed during this docs-only design. The candidate adds 252 production and
+148 proof lines across three of the four allowed Rust files.
+
+This correction may change only this manifest, the canonical plan, Stage 6,
+`.codex/skills/slug-agent-orchestration/references/routing-log.md`, and
+`.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`.
+Require independent ordering/cap/scope review. If accepted, select
+`WP-4-5-7A-builtin-optional-package-input-projection-implementation-r2` at the
+docs commit, make only the ordering/test correction, then rerun validation.
+
+## Preserved implementation scope
 
 The active implementation allowlist is:
 
@@ -142,7 +163,7 @@ The active implementation allowlist is:
 - `app/slug_bzlmod_v2/src/host_package_observation_tests.rs` only when the
   existing owner-local tests cannot express the observed cross-owner proof.
 
-Caps are 220 production and 420 proof additions, no dependency,
+Corrected caps are 280 production and 420 proof additions, no dependency,
 fixture, oracle, source asset or export. All three production files exceed the
 2,000-line complexity trigger, but each change stays in its existing cohesive
 semantic owner; a new central module would duplicate or expose private
@@ -157,6 +178,8 @@ listing failure projection, legacy/observed equality and complete-only
 validity, empty built-in epoch, route/source A/B/A identity, and structural
 dependency separation. Existing direct-local symlink/special-file, selected-
 registry and generated marker/source tests must remain unchanged and green.
+The built-in REPO-absence proof must use a transaction with no injected root
+package-policy or REPO-semantics input; any policy dependency is a regression.
 Run focused and full bzlmod tests plus downstream loading checks/tests,
 formatting, diff, scope, cap, dependency, no-lock and archive-baseline gates.
 
@@ -171,3 +194,7 @@ reviewed external-boundary design remains the successor after this prerequisite.
 Commit `078518b88` freezes this prerequisite design after independent review
 accepted its built-in-only listing branch, fail-closed metadata boundary,
 materialized-route preservation and bounded implementation scope.
+Commit `3b73a99cf` selected implementation at 220/420. The compiled candidate's
+252 production and 148 proof additions exceeded only the production ceiling;
+independent cap review then found the masked built-in REPO policy-order defect.
+No other semantic, proof, allowlist, dependency or validation defect is known.

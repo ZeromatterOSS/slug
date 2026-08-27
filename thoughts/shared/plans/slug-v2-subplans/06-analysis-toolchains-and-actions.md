@@ -18975,3 +18975,17 @@ explicitly named both files used by the bounded routing-log compaction. Commit
 `078518b88` freezes the design. Activate only
 `WP-4-5-7A-builtin-optional-package-input-projection-implementation` at that
 base under 220 production and 420 proof additions.
+
+The exact compiled candidate then reached `REPLAN`. It adds 252 production and
+148 proof lines across `repo_file.rs`, `repository_ignore.rs` and
+`host_package.rs`, exceeding the 220 production cap. Focused built-in proof
+passes, but independent cap review found that the test injected policy inputs
+and masked a real order defect: `HostRouteRepoFileKey` computes root Starlark
+semantics before proving built-in `REPO.bazel` absent.
+
+Run only
+`WP-4-5-7A-builtin-optional-package-input-projection-implementation-r2-correction-design`.
+Freeze moving the built-in listing terminal before semantics, a direct
+no-policy regression and a 280 production cap. Preserve the same owners,
+four-file allowlist, 420 proof cap and every other behavior/stop. After
+independent review, implement only that correction as `-implementation-r2`.
