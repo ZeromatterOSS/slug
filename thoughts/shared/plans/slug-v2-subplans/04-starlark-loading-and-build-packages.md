@@ -5247,30 +5247,30 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
-### Complete cc_internal producer accepted; private paths proof selected (2026-08-26)
+### Complete private paths accepted; helper-internal proof selected (2026-08-26)
 
-Commit `888a305a3` embeds exact complete `cc/private/cc_internal.bzl`, verifies
-SHA-256 `8241ced5…`, and evaluates it at canonical
-`@@rules_cc+//cc/private:cc_internal.bzl`. The frozen public binding has the
-accepted opaque type, proving the selected bridge branch without invoking any
-member; BUILD remains without `cc_common`. Growth is 0/43/43. Focused proof,
-239 loading units, 24 invalidation tests, 31 BUILD-loading tests, locked checks,
-CLI build, formatting and hygiene pass. Independent review returns `ACCEPT`.
+Commit `c4e49424c` embeds all 39 rules_cc private-paths lines, verifies SHA-256
+`c982ac68…`, evaluates canonical `@@rules_cc+//cc/private:paths.bzl`, and freezes
+the public lazy function without invocation. Growth is 0/66/66. Focused proof,
+240 loading units, 24 invalidation tests, 31 BUILD-loading tests, locked checks,
+CLI build and hygiene pass. Independent review returns `ACCEPT`.
 
-Source order resumes in 383-line `cc_helper_internal.bzl`: complete Skylib
-paths and complete `cc_internal` are followed by dependency-free private
-`cc/private/paths.bzl`, 39 lines with SHA-256
-`c982ac685f0bfbd32602d82d1c37f3bf50a2714ca6a13bfd3c08d4e5cc8b8872`.
-Its sole declaration is lazy public `is_path_absolute`; evaluation and freeze
-invoke no body. No accepted exact proof yet owns the complete producer.
+The exact 383-line `cc_helper_internal.bzl` (`793ab429…`) now has three complete
+children in source order: Skylib paths, rules_cc `cc_internal`, and rules_cc
+private paths. Its remaining eager rows are admitted list construction/extend,
+structs, one initialized provider/raw pair, 22 fixed instances and a dictionary
+comprehension; lines 216-383 declare only lazy functions. Existing source-shaped
+proof is not a complete producer proof.
 
-Run only `WP-4-7A-rules-cc-private-paths-complete-loading-proof`. Add no
-production and at most 80 proof lines: embed/hash all 39 lines, evaluate at the
-canonical defining owner, and prove the frozen public function without calling
-it. Stop before the helper's eager constants, list mutation, structs or
-initialized-provider instances. Clean `../zabel` `0795445f…` guides only
-defining-module ownership and recursive freeze closure; no Zig implementation,
-representation or behavior is copied. Bazel 9.2 remains exact authority.
+Run only `WP-4-7A-rules-cc-helper-internal-complete-loading-proof`. Under
+0/480/480 caps embed/hash all 383 lines, load the three exact frozen children,
+prove imported pointer identity and eager/private/public frozen types, and
+permit only the exact 22 source-owned eager provider/initializer calls; invoke
+no lazy helper or callable manually. The large test module remains cohesive
+around its private load harness and authenticated source constants. Stop before private CcInfo,
+`cc_common` or proxy loading. Clean `../zabel` `0795445f…` guides only defining
+module identity and recursive freeze closure; no Zig implementation or behavior
+is copied. Bazel 9.2 remains exact authority.
 
 ### Zero-argument depset accepted; exact ObjcInfo proxy child selected (2026-08-26)
 

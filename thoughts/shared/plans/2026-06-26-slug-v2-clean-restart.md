@@ -30,34 +30,33 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; complete rules_cc private-paths proof selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4b2396f0a` accept bounded loading breadth through direct-provider and ObjcInfo proxy children plus exact empty `depset()`; `888a305a3` proves the complete shared `cc_internal` producer | `cc_helper_internal` next loads a dependency-free 39-line private paths producer without an accepted complete-source proof; later children remain partial or broad | run only `WP-4-7A-rules-cc-private-paths-complete-loading-proof`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; complete rules_cc helper-internal proof selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4b2396f0a` accept bounded loading breadth through direct-provider and ObjcInfo proxy children plus exact empty `depset()`; `888a305a3` and `c4e49424c` complete helper-internal's two rules_cc child producers | the three helper children are exact complete, while the 383-line parent has only source-shaped eager-row proof; later roots remain partial or broad | run only `WP-4-7A-rules-cc-helper-internal-complete-loading-proof`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-rules-cc-private-paths-complete-loading-proof](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-rules-cc-helper-internal-complete-loading-proof](./slug-v2-subplans/current-packet.md).
 
-Prove the exact complete 39-line rules_cc private `paths.bzl` producer freezes
-its exported lazy function without invocation. Add no production behavior and
-stop before the helper's own eager expressions or complete proxy loading.
+Prove exact complete `cc_helper_internal.bzl` loads its three complete children,
+evaluates its admitted eager rows and freezes all lazy helpers without invoking
+them. Add no production behavior or complete proxy claim.
 
-### M7 complete cc_internal producer accepted; private paths proof selected (2026-08-26)
+### M7 complete private paths accepted; helper-internal proof selected (2026-08-26)
 
-Commit `888a305a3` adds 43 proof lines and no production. It embeds and hashes
-all 17 rules_cc `cc_internal.bzl` lines, evaluates the exact `rules_cc+` owner,
-freezes the selected opaque bridge token, and keeps `cc_common` absent in BUILD.
-Focused proof, all 239 loading-library tests, 24 invalidation tests, 31
-BUILD-loading tests, locked analysis/core checks and CLI build pass; independent
-review accepts bytes, caps, noninvocation and compatibility boundaries.
+Commit `c4e49424c` adds 66 proof lines and no production. It embeds/hashes exact
+complete private `paths.bzl`, evaluates its canonical `rules_cc+` owner and
+freezes public lazy `is_path_absolute` without calling it. All 240 loading
+library tests, 24 invalidation tests, 31 BUILD-loading tests, locked checks and
+CLI build pass; independent review accepts bytes, caps and boundaries.
 
-The next `cc_helper_internal` load is dependency-free 39-line private
-`paths.bzl` (`c982ac68…`), containing only lazy `is_path_absolute`. Run only
-`WP-4-7A-rules-cc-private-paths-complete-loading-proof` under 0/80/80 caps.
-Hash and freeze the complete producer and public function without invocation,
-then re-audit the helper's eager expressions. Clean `../zabel` `0795445f…`
-guides defining-module ownership and recursive freeze only; Bazel 9.2 and
-authenticated rules bytes remain exact authority.
+All three 383-line `cc_helper_internal.bzl` children are now exact complete.
+Its eager constants, list extensions, structs, initialized provider and 22
+instances use accepted evaluator shapes; lines 216-383 are lazy functions. Run
+only `WP-4-7A-rules-cc-helper-internal-complete-loading-proof` under 0/480/480
+caps. Prove exact full-source freeze and child pointer identities without
+invocation. Clean `../zabel` `0795445f…` guides defining-module and recursive
+freeze ownership only; Bazel 9.2 and authenticated source remain authority.
 
 ### M7 zero-argument depset accepted; exact ObjcInfo selected (2026-08-26)
 
