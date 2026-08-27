@@ -30,17 +30,40 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; exact utils can-build-metadata export proof selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; commits through `cdd2f68f7` additionally accept clippy's complete aspect/rule tail, exact lints/paths/find-toolchain children, fixed OutputGroupInfo and RunEnvironmentInfo declaration globals, imported plain frozen attributes/transitions, retained provider/schema identities, frozen exported functions, canonical eager toolchain declarations, exact utils eager values/aliases, all seven helper-free utils parent imports, and two private-helper export closures | six utils imports remain; the earliest minimum new-source closure is `can_build_metadata` plus one provider declaration | implement only proof packet `WP-4-7A-rules-rust-utils-can-build-metadata-export-loading-proof`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; exact utils output-diagnostics export proof selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4aed2438` additionally retain complete typed descriptors, the private rules_cc bridge, provider loading, empty C++ rows, the exported rules_cc wrapper, rules_rust's stdlib filegroup, data-attribute documentation, integer/string allowed values, scalar-label file allowance/provider predicates, and typed mandatory/optional rule toolchain requirements; commits through `cf76c0443` additionally accept clippy's complete aspect/rule tail, exact lints/paths/find-toolchain children, fixed OutputGroupInfo and RunEnvironmentInfo declaration globals, imported plain frozen attributes/transitions, retained provider/schema identities, frozen exported functions, canonical eager toolchain declarations, exact utils eager values/aliases, all seven helper-free utils parent imports, two private-helper export closures, and the exact can-build-metadata loaded-provider closure | five utils imports remain; the minimum new-source closure is `generate_output_diagnostics` plus one provider declaration | implement only proof packet `WP-4-7A-rules-rust-utils-output-diagnostics-export-loading-proof`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-rules-rust-utils-can-build-metadata-export-loading-proof](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-rules-rust-utils-output-diagnostics-export-loading-proof](./slug-v2-subplans/current-packet.md).
 
-Freeze exact `can_build_metadata` with its exact loaded provider declaration
-and accepted `can_use_metadata_for_pipelining` dependency, prove loaded and
-parent binding identity, invoke none, and stop before the other five exports.
+Freeze exact `generate_output_diagnostics` with its exact loaded provider
+declaration, prove loaded and parent binding identity, invoke neither, and stop
+before the other four exports.
+
+### M7 exact utils can-build-metadata export accepted; diagnostics selected (2026-08-26)
+
+Commit `cf76c0443` embeds and hash-verifies exact
+`providers.bzl:109-118` and `utils.bzl:742-765`, reuses accepted exact
+`can_use_metadata_for_pipelining` in source order, and freezes the narrowed
+provider -> utils -> parent chain under exact producer and load spellings. The
+proof establishes `provider_callable`/function types plus loaded and public
+pointer identities without invoking either function or the provider.
+
+Focused proof, all 232 loading-library tests, 24 invalidation tests, 31 BUILD
+loading tests, analysis/core checks and the CLI build pass. Independent review
+accepts exact bytes, owners, identities, nonexecution, 115/120 proof scope, and
+Zabel's guidance-only role.
+
+Select the sole remaining minimum closure from audit `6381223ce`: exact
+`utils.bzl:967-991` `generate_output_diagnostics` (SHA-256 `8535acbf…`) plus
+exact `providers.bzl:120-128` `RustcOutputDiagnosticsInfo` (SHA-256
+`a066585f…`). Use only a narrowed provider child, narrowed utils load and actual
+parent `:utils.bzl` import under 0/120/120 caps. Prove types and pointer
+identities; invoke neither declaration and admit no diagnostic/action behavior.
+Pinned Bazel remains exact authority; clean `../zabel` `0795445f…` continues
+to guide only loaded-binding reachability and freeze ownership.
 
 ### M7 post-private-helper audit selects can-build-metadata export (2026-08-26)
 

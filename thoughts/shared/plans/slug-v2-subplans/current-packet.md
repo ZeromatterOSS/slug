@@ -1,21 +1,22 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-rust-utils-can-build-metadata-export-loading-proof`
+Packet: `WP-4-7A-rules-rust-utils-output-diagnostics-export-loading-proof`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: freeze exact `can_build_metadata` with its exact loaded provider
-declaration and accepted `can_use_metadata_for_pipelining` dependency, prove
-loaded and parent binding identity, invoke none, and stop before the other five
-exports.
+Result: freeze exact `generate_output_diagnostics` with its exact loaded
+provider declaration, prove loaded and parent binding identity, invoke neither,
+and stop before the other four exports.
 
 ## Accepted base and completed frontier audit
 
-Base is `cdd2f68f7` (`Prove exact utils crate root export`). The unchanged
-proof owner is 8,858 lines at SHA-256
-`52d964ca52cae93ce56b7429e178c0e6aebf43f461c17ae38180cfae55394587`.
-Exact loading proofs cover seven helper-free parent imports plus the two
-private-helper closures `expand_dict_value_locations` and `crate_root_src`.
+Base is `cf76c0443` (`Prove exact utils can build metadata export`). The proof
+owner is 8,973 lines at SHA-256
+`4c3f2c5c36a1a00cd1b9ebf8b488fb335cec0eced076d05b6c26326287431a78`.
+Exact loading proofs now also cover `can_build_metadata`, its loaded
+`AlwaysEnableMetadataOutputGroupsInfo` declaration, accepted helper, and
+provider -> utils -> parent pointer identities. The provider freezes as
+`provider_callable`; the functions freeze as `function`; none is invoked.
 
 Authenticated sources:
 
@@ -28,8 +29,8 @@ The completed six-export audit is:
 
 | Export/root SHA-256 | Complete closure | Classification |
 |---|---|---|
-| `can_build_metadata` 742-765, `4d57fbeaa3abeee124920697c17f08cd785655f3de64723f9e071bd2b50cb8eb` | accepted `can_use_metadata_for_pipelining` 766-786, `00078da9862fec4e91d5e0e4453a5395dca29f12e4bc6dd44f280a58643b0b5a`; provider 109-118, `3c21b9e0c388512de065d30fe0910e8fc6db274e6643662fb1922ce47787db8b` | 34 new exact lines; proof-only provider child admissible |
-| `generate_output_diagnostics` 967-991, `8535acbf356edec97a667da93592f211b9c0f34f5a9b88de6e0a83ac453f5bec` | provider 120-128, `a066585ff0356b5baa65fb4ddcc3fe6d5644be4facd457bf83b5eb6886324086` | 34 new exact lines; equally small but later parent import |
+| `can_build_metadata` 742-765, `4d57fbeaa3abeee124920697c17f08cd785655f3de64723f9e071bd2b50cb8eb` | accepted `can_use_metadata_for_pipelining` 766-786, `00078da9862fec4e91d5e0e4453a5395dca29f12e4bc6dd44f280a58643b0b5a`; provider 109-118, `3c21b9e0c388512de065d30fe0910e8fc6db274e6643662fb1922ce47787db8b` | accepted by `cf76c0443` |
+| `generate_output_diagnostics` 967-991, `8535acbf356edec97a667da93592f211b9c0f34f5a9b88de6e0a83ac453f5bec` | provider 120-128, `a066585ff0356b5baa65fb4ddcc3fe6d5644be4facd457bf83b5eb6886324086` | selected 34-line exact closure |
 | `compute_crate_name` 410-445, `8b79565b53edd586539f2f6697848038c598814b2706ed57fffe2c1229c0621f` | helpers 374-396 `8ef88e5e0c024de9214552db4ba8dc6e54018cf3fc52e6460d8ecd572c984c62`, 398-408 `da15bf3fe35c692ad74c76f1f80d234c0b0519697a6fee93335d3888ba745c81`, 573-595 `852e96f30111d5400489cf5512af8d27d8519f57194a3936e21600cd412b364e`, 652-662 `9347beaed27421b6f782c9f643014f8d2774dfbb9b7c83c0ed96143ac3698dc3`; accepted eager 601-650 `e0526a4d2bc5bc9d04544ecdbde305667c5a015b0c7f4597858891ae668f7b85`, 664-676 `b5ad15479c25ae84b1dba206ffc924d455003aaff98b5371773a3104f08d9027`, 692-740 `e5643897c866136bd788b242be0c983a2ae3aab511a1b7676c2d118be0200cd2` | 104 new exact helper lines; bounded but larger |
 | `transform_sources` 878-917, `1006a8daf526ca60d494f691067d417db5ca34ef350bd6fcf901b8f1d5fd14c7` | helper 937-965, `c5105f745ea0032b282f9de9825bac784ebd88ec55c80c2692017038357eaaaa`; accepted `@@bazel_skylib+//lib:paths.bzl`, 320 lines, `96cce43871d8228126a12ceff771351f9030b1e9d029f2185853aa6541766a83` | 69 new local lines plus accepted loaded child |
 | `transform_link_deps` 556-571, `c6b644e8f5106089ce3d4ea1cde4b336e9d2f6d32251d8d71cd085bb0b73d564` | provider 94-107, `19fe3a0cdd81693acea508531452189dcdd9f1cc7f4ab116e79839f8cf60e7af`; exact public `CcInfo` route | deferred: CcInfo proxy/private closure not bounded here |
@@ -48,8 +49,8 @@ its provider at 260-269
 retains the initializer and eager contexts. Do not replace this source-complete
 edge with a stub.
 
-The minimum new-source closures tie at 34 lines. Select the earlier parent
-import, `can_build_metadata`.
+After accepting the tied earlier import, the sole remaining minimum new-source
+closure is `generate_output_diagnostics` at 34 exact lines.
 
 ## Authorities and decision
 
@@ -64,10 +65,9 @@ code, representation, owner pointer, traversal/order algorithm, diagnostic,
 identity or behavior.
 
 Use a proof-only narrowed `:providers.bzl` load containing only
-`AlwaysEnableMetadataOutputGroupsInfo`, then exact `can_build_metadata` plus
-the already authenticated `can_use_metadata_for_pipelining` slice in exact
-source order under the utils producer. Use a proof-only parent with actual
-`:utils.bzl` spelling.
+`RustcOutputDiagnosticsInfo`, followed by exact `generate_output_diagnostics`
+under the utils producer. Use a proof-only parent with actual `:utils.bzl`
+spelling.
 
 ## Compatibility
 
@@ -76,9 +76,9 @@ source order under the utils producer. Use a proof-only parent with actual
   loaded/public pointer identities.
 - **Slug-native:** narrowed proof-only provider/utils/parent modules,
   concatenation separators and starlark-rust frozen representation.
-- **Unsupported/deferred:** invoking either function or the declared provider;
+- **Unsupported/deferred:** invoking the selected function or declared provider;
   all results, diagnostics and configured fields; complete provider/utils/
-  parent loads; and the other five exports.
+  parent loads; and the other four exports.
 
 No production, DICE, identity, retained-memory, async, fixture, oracle, hot-path
 or Buck2-derived utility change is involved.
@@ -86,8 +86,8 @@ or Buck2-derived utility change is involved.
 ## Allowlist, caps and proof
 
 Only `app/slug_loading_v2/src/host_package_load_tests.rs` may change. Its base
-is SHA-256 `52d964ca52cae93ce56b7429e178c0e6aebf43f461c17ae38180cfae55394587`
-at 8,858 lines; final ceiling is 8,978.
+is SHA-256 `4c3f2c5c36a1a00cd1b9ebf8b488fb335cec0eced076d05b6c26326287431a78`
+at 8,973 lines; final ceiling is 9,093.
 
 Caps are 0 production, 120 proof and 120 total additions; deletions do not buy
 budget. Keep the test function at or below 100 lines; exact constants are
@@ -95,17 +95,16 @@ exempt.
 
 Required proof:
 
-1. Embed exact unabridged `providers.bzl:109-118` and
-   `utils.bzl:742-765`; verify both hashes.
+1. Embed exact unabridged `providers.bzl:120-128` and
+   `utils.bzl:967-991`; verify both hashes.
 2. Freeze the provider declaration under
    `@@rules_rust+//rust/private:providers.bzl`; prove its exported callable
    type without invoking it.
 3. Evaluate a narrowed actual `:providers.bzl` load followed only by exact
-   `can_build_metadata` and accepted exact, source-ordered
-   `can_use_metadata_for_pipelining` under
-   `@@rules_rust+//rust/private:utils.bzl`. Prove both functions and the
-   loaded provider pointer identity; invoke none.
-4. Import only `can_build_metadata` through actual `:utils.bzl` spelling
+   `generate_output_diagnostics` under
+   `@@rules_rust+//rust/private:utils.bzl`. Prove the function and loaded
+   provider pointer identity; invoke neither declaration.
+4. Import only `generate_output_diagnostics` through actual `:utils.bzl` spelling
    under `@@rules_rust+//rust/private:rust.bzl` and prove pointer identity.
 5. Preserve every accepted loading proof.
 
@@ -131,5 +130,6 @@ JVM work; copied Zabel content; dirty authority; or cap violation.
 
 ## Immediate predecessor
 
-`f3ddca46a` authenticated all six residual closures and selected this sole
-minimum, earlier-parent successor without changing Rust, tests or fixtures.
+`cf76c0443` accepted the tied earlier can-build-metadata closure with 232 unit,
+24 invalidation and 31 BUILD-loading tests green. Independent review verified
+exact bytes, producer/load identities, nonexecution and caps.

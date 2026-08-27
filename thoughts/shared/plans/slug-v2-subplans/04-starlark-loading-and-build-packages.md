@@ -5247,6 +5247,26 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Exact can-build-metadata export accepted; diagnostics selected (2026-08-26)
+
+Commit `cf76c0443` adds only 115 proof lines to the established external-Bzl
+owner. It verifies exact `AlwaysEnableMetadataOutputGroupsInfo` and
+`can_build_metadata` bytes, exact provider/function types, and provider ->
+utils -> parent pointer identity while invoking nothing. All 232 loading-lib,
+24 invalidation and 31 BUILD-loading tests pass with analysis/core checks and
+the CLI build; independent review accepts the closure and caps.
+
+Audit `6381223ce` already authenticates the next minimum closure. Run only
+`WP-4-7A-rules-rust-utils-output-diagnostics-export-loading-proof`: exact
+`utils.bzl:967-991` (SHA-256
+`8535acbf356edec97a667da93592f211b9c0f34f5a9b88de6e0a83ac453f5bec`)
+plus exact `providers.bzl:120-128` (SHA-256
+`a066585ff0356b5baa65fb4ddcc3fe6d5644be4facd457bf83b5eb6886324086`)
+under 0/120/120 caps. Prove only loaded and parent binding identity; do not
+invoke the provider or function or admit diagnostic/action behavior. Clean
+`../zabel` `0795445f…` guides reachability and freeze ownership only; Bazel 9.2
+and authenticated rules sources remain exact authority.
+
 ### Post-private-helper audit selects can-build-metadata export (2026-08-26)
 
 Audit `f3ddca46a` authenticates the six residual roots and their recursive
