@@ -108,6 +108,7 @@ this baseline implicitly.
 | Proposed | Stage 8 | V1 `slug-v1-archive:tests/core/query/test_bazel_compat_query.py` plus focused `tests/core/query/{uquery,cquery,aquery}` themes | Migrate useful graph/function/set/format scenarios, rewriting fixture metadata and expected results against Bazel 9.2.0; V1 golden output is not the oracle | Stage 1 `query-parser-and-sets`, `query-functions-and-patterns`, `cquery-provider-starlark`, and expanded `aquery-action-shape` fixtures |
 | Reference only | Stage 10 | V1 root `MODULE.bazel`, `BUILD.bazel`, and Buck-generated build metadata | Reject as the bootstrap graph because it encodes V1/Buck-shaped ownership; inspect only for source inventory | Fresh Bazel 9.2.0 bzlmod/rules_rust graph; Bazel/BuildBuddy build and stage0→stage1→stage2 fixed-point proof |
 | Proposed | Stage 6 | V1 shared-DAG sources `slug-v1-archive:app/slug_build_api/src/interpreter/rule_defs/nested_set.rs`, `slug-v1-archive:app/slug_build_api/src/interpreter/rule_defs/transitive_set/traversal.rs`; archived design record `slug-v1-archive:thoughts/shared/plans/slug-bazel-subplans/54-depset-transitive-set-shared-core.md` | Port shared node/traversal concepts; keep the Bazel depset facade V2-owned and reject implicit `transitive_set` coercion | Generate `depset-orders-and-rejections` first; then prove shared child identity and no implicit flattening |
+| Reference only | Stage 6 | Zabel `0795445f3ab60f4e49070bdd0b94425c5610f73a`: `src/analysis/{nested_set,depset,generic_depset_traversal,file_depset_traversal,generic_depset_fingerprint,file_depset_fingerprint,file_depset_action_importer}.zig`, `src/starlark_host/engine/generic_depset.zig`, and depset oracle scenarios | Use its Bazel-specialized packed rows/bit layout, dense indexes, construction/traversal algorithms, generic/File specialization, external producer references, late materialization/action import, and invocation-local caching as the starting design for an independently implemented V2 Rust core; copy no Zabel production code. Test scenarios may be rewritten with provenance, but every expected result is regenerated from Bazel 9.2. Buck2 ideas are optional later measured refinements | Stage 6 Zabel-informed retained depset core gate; all orders plus alias/equal-leaf/diamond/depth/error-precedence fixtures; measured retained bytes, allocations, cold/warm flattening, and direct action consumption |
 | Proposed | Stage 7 | V1 input-tree source `slug-v1-archive:app/slug_execute/src/execute/inputs_directory.rs`; V1 protocol source `slug-v1-archive:remote_execution/oss/re_grpc_proto/proto/build/bazel/remote/execution/v2/remote_execution.proto` | Port the protobuf/Merkle contract behind V2 action types; reject Buck paths and executor configuration | Generate serialized `Command`/`Directory`/`Action` expectations first; then run `shell-action-reapi` and `reapi-paramfile-input-tree` through NativeLink |
 | Proposed | Stage 5 | `slug-v1-archive:app/slug_bzlmod/src/parser.rs` | Rewrite through starlark-rust; retain directive recording only as scaffold | `MODULE.bazel` evaluation fixtures against Bazel |
 | Proposed | Stage 5 | `slug-v1-archive:app/slug_bzlmod/src/extension_execution_dice.rs` | Rewrite from behavior plus selective port | module extension replay fixtures |
@@ -704,6 +705,41 @@ Expected evidence artifact: Stage 1 oracle expected output remains placeholder u
 Implementation summary: Rewrote behavior into V2 depset/provider/context substrates without importing V1 Buck labels, `transitive_set` coercions, or direct-local assumptions. On 2026-07-14, replaced recursive by-value depset storage with immutable shared `Arc` nodes and child slices; composition preserves child identity and flattening is explicit. Retained Buck2 `FxHashSet` is used only for flattening deduplication. The V1 nested-set sources remain behavior/reference inputs, not imported Buck-facing code.
 Validation: `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_build_api_v2 depset --no-fail-fast`; the focused structural regression proves shared child identity; `cargo test -p slug_analysis_v2`; `py -3 -B tools/v2_oracle list`; Stage 6 shortcut grep recorded in `06-analysis-toolchains-and-actions.md`
 Residual risk: Starlark evaluator integration and Slug-side Bazel oracle execution remain pending
+
+### Stage 6 Zabel-informed retained depset core design
+
+Status: Proposed
+Primary design reference: Zabel
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` generic/File depset, retained
+nested-set, traversal, fingerprint, action-import, and architecture sources;
+Buck2 `088c75c7e36805df99c3de29062baa95db700b8b` transitive-set nodes and
+traversals remain optional sources for later measured refinements
+Bazel oracle: pinned Bazel 9.2 `DepsetTest`, `NestedSetTest`,
+`NestedSetTopologyTest`, `NestedSetFingerprintCacheTest`, and freshly generated
+fixture results; Zabel fixtures are scenario inputs, never semantic authority
+V2 fixture: extend `depset-orders-and-rejections` with topological aliases,
+distinct equal leaves, diamonds, empty incompatible children, multi-child
+depth, validation precedence, and supported-limit stack safety; add direct
+Args/action-input consumption and cross-owner provider fixtures
+Implementation summary: independently implement a Rust dense retained store
+starting from Zabel's packed rows and Bazel-specific construction/traversal
+algorithms, specialized File storage, external producer references, late
+materialization, direct action import, and invocation-local caches. Copy no
+Zabel production code. Treat the current `Arc` DAG as migration scaffolding.
+Retain the declared Bazel order and exact construction-time validation, while
+permitting internal traversal selection and work at consumption time when every
+observable result and error boundary remains exact. Consider Buck2 ideas only
+after this baseline works and measurements identify a concrete improvement; do
+not expose Buck2 tset orders, projections, reductions, BFS/DFS, or coercion.
+Validation: exact Bazel 9.2 outputs and diagnostics plus retained-byte,
+allocation, composition, cold/warm flatten, direct-consumption, and realistic
+rules_cc/rules_rust fan-in measurements; `Allocative`, release, DICE-identity,
+action-projection, and stack-safety tests
+Decision: select the Zabel-informed packed/dense Bazel-specialized design as
+the starting point; Buck2-inspired changes require later focused measurements
+Residual risk: Starlark value identity/equality, cross-owner topology lifetime,
+cache bounds, exact topological alias behavior, action/Aquery topology, and
+Bazel ActionKey projections remain part of the gate
 
 ### Stage 6 recursive configured custom-rule analysis
 

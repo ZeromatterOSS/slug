@@ -157,6 +157,61 @@ shape fits instead of default owned `String`, `Vec`, or std hash collections.
   implementation paths named above, but public types must be Bazel-shaped and
   Stage-3 label based.
 
+#### 6.2A Zabel-informed retained depset core gate
+
+Before the first broad ruleset consumer depends on nonempty transitive depsets,
+implement one bounded Zabel-informed retained core behind the exact Bazel
+`depset` facade. Bazel 9.2 remains the semantic oracle. Use Zabel commit
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` as the primary design reference,
+but independently implement the Rust types and algorithms and copy no Zabel
+production code. Zabel test scenarios may seed independently written V2
+fixtures only when their provenance is recorded and their expected results are
+regenerated with the pinned Bazel 9.2 oracle.
+
+Start from a dense retained store informed by Zabel's packed row/bit layout,
+compact node and edge indexes, distinct node-identity and leaf-equality
+deduplication, Bazel-specific construction normalization and traversal,
+generic/File specialization, producer-qualified external references, late leaf
+materialization, direct action-input import, and invocation-local flatten
+caches. Treat the current immutable per-node `Arc` DAG as migration scaffolding,
+not the presumptive long-lived representation.
+
+Construction must retain the user-declared Bazel order and perform Bazel's
+construction-time validation at the exact public boundary. The internal
+traversal algorithm may be selected and executed only when a consumer needs a
+projection: delayed computation is not itself observable. Every consumer must
+nevertheless receive the exact result for the retained declared order, and the
+Bazel facade must not expose Buck2's ability to choose a different order at
+consumption time. Keep node/topology identity, leaf equality deduplication,
+semantic DICE equality, flattened values, action-input topology, and action or
+REAPI fingerprints as distinct domains.
+
+The gate must include:
+
+- all four Bazel orders, mixed/default compatibility, empty-set behavior,
+  singleton reuse, multi-child depth, validation precedence, and the configured
+  depth limit;
+- diamonds, repeated child aliases, distinct nodes with equal leaves, duplicate
+  direct values, and cross-owner forwarding; in particular pin Bazel's
+  topological `[a, b, c, b] -> [a, c, b]` alias result;
+- a non-recursive or otherwise stack-safe traversal at the supported maximum
+  depth;
+- cold and repeated `to_list()`, direct action/Args consumption without
+  flattening, provider freeze/materialization, and release of retained owners;
+- retained bytes, allocations, construction cost, cold/warm consumption cost,
+  and realistic rules_cc/rules_rust fan-in and diamond graphs; and
+- `Allocative` coverage plus proof that caches are request/evaluator scoped or
+  explicitly bounded and never become unmodeled DICE semantic state.
+
+Record the resulting representation and measurements. After the exact
+Zabel-informed baseline works, optional focused experiments may adopt isolated
+Buck2 ideas only when they improve a measured Slug workload without widening
+the surface or weakening Bazel semantics. Public Buck2 `transitive_set`
+definitions, projections, reductions, BFS/DFS, and implicit `depset` coercion
+remain unsupported/deferred; an internal late projection is admissible only
+when its Bazel-visible values, errors, timing boundary, action inputs, and
+identity projections remain exact.
+
 ### 6.3 Rule Implementation Context
 
 - Implement `ctx.attr`, `ctx.file`, `ctx.files`, `ctx.executable`,
@@ -398,6 +453,10 @@ under M9.
 - Custom Starlark rule fixtures produce the same providers/actions as Bazel.
 - Depset construction is cheap shared-DAG composition; flattening/copying is
   confined to explicit Bazel-visible operations.
+- The retained depset core starts from an independently implemented,
+  Zabel-informed dense/packed design and records Bazel 9.2 oracle evidence plus
+  retained-memory and consumption measurements. Buck2 ideas are optional later
+  experiments, and no Zabel production code is copied.
 - Toolchain and platform fixtures match Bazel for focused public examples.
 - Action declarations produce REAPI-ready command/input/output structures.
 - No analysis shortcut depends on Buck cells or direct filesystem scans outside
