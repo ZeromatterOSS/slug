@@ -7256,3 +7256,20 @@ Its three children are accepted. Run only
 prove the complete five-import/seven-function inventory and invoke nothing.
 Zabel remains peer ownership guidance; Bazel 9.2 and authenticated rules_cc
 bytes own compatibility.
+
+### Complete solib dirs accepted; link values selected (2026-08-27)
+
+Commit `6833c72de` freezes all 479 authenticated solib-directory lines over
+three actual complete children. It proves all five imported identities, seven
+function types/visibility and exact six-public/twelve-all inventories without
+invocation. All required suites pass at 0 production and 599 proof additions;
+independent review returned `ACCEPT`.
+
+`finalize_link_action.bzl` source order next reaches complete 363-line
+`link/create_libraries_to_link_values.bzl`, SHA-256
+`7d8df512d6b0df2178a2ca9cd30cb36d1a22c96877dd8e69f49bd3cf739a3764`.
+Its sole child is accepted. Run only
+`WP-4-7A-rules-cc-create-libraries-to-link-values-complete-loading-proof`
+under 0/650/650, prove its complete imported/struct/provider/function inventory
+and invoke nothing. Zabel remains peer ownership guidance; Bazel 9.2 and
+authenticated rules_cc bytes own compatibility.
