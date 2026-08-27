@@ -7391,3 +7391,28 @@ Pinned Bazel 9.2 and authenticated BCR rules_cc bytes remain exact authority.
 Clean `../zabel` commit `0795445f…` remains concept-only guidance for the
 generic-evaluator/Bazel-host split and producer-owned frozen module lifetime;
 copy no Zig implementation or claimed behavior.
+
+### Complete linking-context producer accepted; linkstamp producer selected (2026-08-27)
+
+Commit `da0d9a5a5` freezes all 137 authenticated
+`create_linking_context_from_compilation_outputs.bzl` lines over five actual
+complete children. It proves all seven imported identities, one function and
+exact seven-public/eight-all inventories without invocation. All required
+suites pass at 0 production and 279 proof additions; independent review
+returned `ACCEPT`.
+
+Private `cc_common.bzl` source order next reaches complete 44-line
+`link/create_linkstamp.bzl`, SHA-256
+`8d5fc394e31c5f0eb8a84f5020f35e71f90cdbf89591e44d1c0da8a8899e6000`.
+Its helper child is accepted. Its eager surface is one public imported
+function, one private provider declaration and one public lazy function. Run
+only `WP-4-7A-rules-cc-create-linkstamp-complete-loading-proof` under
+0/250/250, retain the complete source and exact identities, and invoke nothing.
+
+This remains generic Starlark loading/evaluation against authenticated BCR
+rules_cc, not C++-specific parsing. Rules_cc owns the Starlark rule/module
+logic; Bazel host primitives consumed by those modules remain a distinct Rust
+host boundary. Pinned Bazel 9.2 and authenticated rules_cc bytes remain exact
+authority. Clean `../zabel` commit `0795445f…` remains concept-only guidance
+for the generic-evaluator/Bazel-host split and producer-owned frozen module
+lifetime; copy no Zig implementation or claimed behavior.

@@ -30,16 +30,33 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; complete linking-context producer selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4b2396f0a` accept bounded loading breadth through direct-provider and ObjcInfo proxy children plus exact empty `depset()`; private CcInfo, following source children, shared action names, configuration-field binding, complete semantics and the dependency-free toolchain library are accepted through `acca5cb68`; `cb71a302d` accepts the exact shared Bazel universe and bounded default-enabled set subset; `5c3b4492f` restores the archive app-path gate; commits through `233cdf9ef` accept the complete compile and first link-family producer chain through the C++ linking helper | `cc_common.bzl` first lacks complete `create_linking_context_from_compilation_outputs.bzl`; all five children are accepted | run only `WP-4-7A-rules-cc-create-linking-context-complete-loading-proof`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; complete linkstamp producer selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4b2396f0a` accept bounded loading breadth through direct-provider and ObjcInfo proxy children plus exact empty `depset()`; private CcInfo, following source children, shared action names, configuration-field binding, complete semantics and the dependency-free toolchain library are accepted through `acca5cb68`; `cb71a302d` accepts the exact shared Bazel universe and bounded default-enabled set subset; `5c3b4492f` restores the archive app-path gate; commits through `da0d9a5a5` accept the complete compile and first link-family producer chain through the linking-context producer | `cc_common.bzl` next lacks complete `create_linkstamp.bzl`; its helper child is accepted | run only `WP-4-7A-rules-cc-create-linkstamp-complete-loading-proof`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-rules-cc-create-linking-context-complete-loading-proof](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-rules-cc-create-linkstamp-complete-loading-proof](./slug-v2-subplans/current-packet.md).
 
-Freeze the authenticated complete 137-line rules_cc linking-context producer
-over its five accepted children. Prove its full imported/function inventory
+### M7 complete linking-context producer accepted; linkstamp producer selected (2026-08-27)
+
+Commit `da0d9a5a5` byte-verifies all 137 linking-context-producer lines over
+five actual complete children and proves all seven imported identities, one
+function and exact seven-public/eight-all inventories. Focused, 270 library,
+24/31 integration, locked checks and CLI build pass within 0/279/279;
+independent review returned `ACCEPT`.
+
+The generic authenticated rules_cc traversal next reaches complete 44-line
+`link/create_linkstamp.bzl` (`8d5fc394…`) over accepted
+`cc_helper_internal.bzl`. Run only its defining-module proof under 0/250/250,
+prove the import, provider identity, function and exact visibility inventory,
+and invoke nothing. This remains generic Starlark evaluation of BCR-owned
+modules, not a C++ parser; low-level Bazel host capabilities remain a separate
+boundary. Zabel remains peer ownership/optimization guidance while Bazel 9.2
+and authenticated rules_cc bytes remain sole compatibility authority.
+
+Freeze the authenticated complete 44-line rules_cc linkstamp producer over its
+accepted helper child. Prove its full imported/provider/function inventory
 without invocation.
 
 ### M7 complete linking helper accepted; linking-context producer selected (2026-08-27)
