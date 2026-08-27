@@ -4158,6 +4158,92 @@ load("@cc_compatibility_proxy//:symbols.bzl", _CcInfo = "CcInfo")
 
 CcInfo = _CcInfo
 "###;
+const RULES_RUST_COMMON_SOURCE: &str = r###"# Copyright 2021 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""A resilient API layer wrapping compilation and other logic for Rust rules.
+
+This module is meant to be used by custom rules that need to compile Rust code
+and cannot simply rely on writing a macro that wraps `rust_library`. This module
+provides the lower-level interface to Rust providers, actions, and functions.
+Do not load this file directly; instead, load the top-level `defs.bzl` file,
+which exports the `rust_common` struct.
+
+In the Bazel lingo, `rust_common` gives the access to the Rust Sandwich API.
+"""
+
+load(":providers.bzl", "CrateGroupInfo", "CrateInfo", "DepInfo", "DepVariantInfo", "StdLibInfo", "TestCrateInfo")
+
+# This constant only represents the default value for attributes and macros
+# defined in `rules_rust`. Like any attribute public attribute, it can be
+# overwritten by the user on the rules they're defined on.
+#
+# Note: Code in `.github/workflows/crate_universe.yaml` looks for this line, if
+# you remove it or change its format, you will also need to update that code.
+DEFAULT_RUST_VERSION = "1.97.1"
+
+DEFAULT_NIGHTLY_ISO_DATE = "2026-07-16"
+
+def _create_crate_info(**kwargs):
+    """A constructor for a `CrateInfo` provider
+
+    This function should be used in place of directly creating a `CrateInfo`
+    provider to improve API stability.
+
+    Args:
+        **kwargs: An initial set of keyword arguments.
+
+    Returns:
+        CrateInfo: A provider
+    """
+    if not "wrapped_crate_type" in kwargs:
+        kwargs.update({"wrapped_crate_type": None})
+    if not "metadata" in kwargs:
+        kwargs.update({"metadata": None})
+    if not "metadata_supports_pipelining" in kwargs:
+        kwargs.update({"metadata_supports_pipelining": False})
+    if not "rustc_rmeta_output" in kwargs:
+        kwargs.update({"rustc_rmeta_output": None})
+    if not "rustc_output" in kwargs:
+        kwargs.update({"rustc_output": None})
+    if not "extra_named_deps" in kwargs:
+        kwargs.update({"extra_named_deps": depset([])})
+    if not "rustc_env_files" in kwargs:
+        kwargs.update({"rustc_env_files": []})
+    if not "data" in kwargs:
+        kwargs.update({"data": depset([])})
+    if not "root_path" in kwargs:
+        kwargs.update({"root_path": ""})
+    return CrateInfo(**kwargs)
+
+rust_common = struct(
+    create_crate_info = _create_crate_info,
+    crate_info = CrateInfo,
+    dep_info = DepInfo,
+    dep_variant_info = DepVariantInfo,
+    stdlib_info = StdLibInfo,
+    test_crate_info = TestCrateInfo,
+    crate_group_info = CrateGroupInfo,
+    default_version = DEFAULT_RUST_VERSION,
+)
+
+COMMON_PROVIDERS = [
+    CrateInfo,
+    DepInfo,
+    DefaultInfo,
+]
+"###;
 const RULES_RUST_PROVIDERS_SOURCE: &str = r###"# Copyright 2021 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25665,6 +25751,128 @@ fn exact_rules_cc_public_cc_info_freezes_complete_recursive_producer() {
         .collect::<Vec<_>>();
     all.sort_unstable();
     assert_eq!(all, ["CcInfo", "_CcInfo"]);
+}
+
+#[test]
+fn exact_rules_rust_common_freezes_complete_provider_facade() {
+    assert_eq!(RULES_RUST_COMMON_SOURCE.lines().count(), 85);
+    assert_eq!(
+        format!("{:x}", Sha256::digest(RULES_RUST_COMMON_SOURCE.as_bytes())),
+        "cee50122624c7fd9c9a6545a647062f350dd25bc8cf6dda873944290463d4db6"
+    );
+    let providers_owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_rust+//rust/private:providers.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_rust/rust/private/providers.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let providers =
+        eval_bzl_with_loaded_children(RULES_RUST_PROVIDERS_SOURCE, providers_owner.clone(), &[])
+            .unwrap();
+    let module = eval_bzl_with_loaded_children(
+        RULES_RUST_COMMON_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_rust+//rust/private:common.bzl").unwrap(),
+            workspace_path: PathBuf::from("/rules_rust/rust/private/common.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+        &[(":providers.bzl", providers_owner, providers.dupe())],
+    )
+    .unwrap();
+    for name in "CrateGroupInfo CrateInfo DepInfo DepVariantInfo StdLibInfo TestCrateInfo"
+        .split_whitespace()
+    {
+        assert!(
+            module
+                .get(name)
+                .unwrap()
+                .value()
+                .ptr_eq(providers.get(name).unwrap().value()),
+            "{name}"
+        );
+    }
+    assert_eq!(
+        module.get("DEFAULT_RUST_VERSION").unwrap().unpack_str(),
+        Some("1.97.1")
+    );
+    assert_eq!(
+        module.get("DEFAULT_NIGHTLY_ISO_DATE").unwrap().unpack_str(),
+        Some("2026-07-16")
+    );
+    let private = module.get_any_visibility("_create_crate_info").unwrap().0;
+    assert_eq!(private.value().get_type(), "function");
+    assert!(module.get("_create_crate_info").is_err());
+    let scratch = Module::new();
+    let facade = module.get("rust_common").unwrap();
+    for (field, source) in [
+        ("crate_info", "CrateInfo"),
+        ("dep_info", "DepInfo"),
+        ("dep_variant_info", "DepVariantInfo"),
+        ("stdlib_info", "StdLibInfo"),
+        ("test_crate_info", "TestCrateInfo"),
+        ("crate_group_info", "CrateGroupInfo"),
+    ] {
+        assert!(
+            facade
+                .value()
+                .to_value()
+                .get_attr(field, scratch.heap())
+                .unwrap()
+                .unwrap()
+                .ptr_eq(providers.get(source).unwrap().value().to_value()),
+            "{field}"
+        );
+    }
+    assert!(
+        facade
+            .value()
+            .to_value()
+            .get_attr("create_crate_info", scratch.heap())
+            .unwrap()
+            .unwrap()
+            .ptr_eq(private.value().to_value())
+    );
+    assert_eq!(
+        facade
+            .value()
+            .to_value()
+            .get_attr("default_version", scratch.heap())
+            .unwrap()
+            .unwrap()
+            .unpack_str(),
+        Some("1.97.1")
+    );
+    let common =
+        FrozenListRef::from_value(module.get("COMMON_PROVIDERS").unwrap().value()).unwrap();
+    assert_eq!(common.len(), 3);
+    for (value, name) in common.iter().take(2).zip(["CrateInfo", "DepInfo"]) {
+        assert!(
+            value
+                .to_value()
+                .ptr_eq(providers.get(name).unwrap().value().to_value())
+        );
+    }
+    let default_info = common.iter().last().unwrap().to_value();
+    assert_eq!(default_info.get_type(), "analysis_builtin");
+    assert_eq!(default_info.to_string(), "DefaultInfo");
+    let mut public = module.names().map(|name| name.as_str()).collect::<Vec<_>>();
+    public.sort_unstable();
+    assert_eq!(
+        public,
+        "COMMON_PROVIDERS CrateGroupInfo CrateInfo DEFAULT_NIGHTLY_ISO_DATE DEFAULT_RUST_VERSION DepInfo DepVariantInfo StdLibInfo TestCrateInfo rust_common"
+            .split_whitespace()
+            .collect::<Vec<_>>()
+    );
+    let mut all = module
+        .names_any_visibility()
+        .map(|name| name.as_str())
+        .collect::<Vec<_>>();
+    all.sort_unstable();
+    assert_eq!(
+        all,
+        "COMMON_PROVIDERS CrateGroupInfo CrateInfo DEFAULT_NIGHTLY_ISO_DATE DEFAULT_RUST_VERSION DepInfo DepVariantInfo StdLibInfo TestCrateInfo _create_crate_info rust_common"
+            .split_whitespace()
+            .collect::<Vec<_>>()
+    );
 }
 
 #[test]
