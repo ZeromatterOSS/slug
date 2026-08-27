@@ -3959,6 +3959,24 @@ load("@rules_cc//cc/private:debug_package_info.bzl", _DebugPackageInfo = "DebugP
 "###;
 const CC_PROXY_DEBUG_PACKAGE_EXPORT: &str = "DebugPackageInfo = _DebugPackageInfo\n";
 const CC_PROXY_SHARED_LIBRARY_EXPORT: &str = "CcSharedLibraryInfo = _CcSharedLibraryInfo\n";
+const RULES_CC_INTERNAL_SOURCE: &str = r###"# Copyright 2025 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Gracefully resolve cc_internal."""
+
+# buildifier: disable=native-cc-common
+cc_internal = cc_common.internal_DO_NOT_USE() if hasattr(cc_common, "internal_DO_NOT_USE") else struct()
+"###;
 const RULES_CC_OBJC_INFO_SOURCE: &str = r###"# Copyright 2024 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -5513,6 +5531,31 @@ fn exact_rules_cc_proxy_direct_provider_children_retain_reexport_identity() {
     ] {
         assert!(proxy.get(omitted).is_err(), "{omitted}");
     }
+}
+
+#[test]
+fn exact_rules_cc_internal_complete_source_freezes_selected_private_bridge() {
+    assert_eq!(RULES_CC_INTERNAL_SOURCE.lines().count(), 17);
+    assert_eq!(
+        format!("{:x}", Sha256::digest(RULES_CC_INTERNAL_SOURCE.as_bytes())),
+        "8241ced58c265334ac3f0e063d492383f1ff7d223736dc2d6a5aa712165de6bb"
+    );
+    let module = eval_bzl_with_identity(
+        RULES_CC_INTERNAL_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_internal.bzl").unwrap(),
+            workspace_path: PathBuf::from("/rules_cc/cc/private/cc_internal.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+    )
+    .unwrap();
+    let internal = module.get("cc_internal").unwrap();
+    assert_eq!(internal.value().get_type(), "cc_internal");
+    assert!(
+        eval_global("X=cc_common", &build_file_loading_globals())
+            .unwrap_err()
+            .contains("cc_common")
+    );
 }
 
 #[test]
