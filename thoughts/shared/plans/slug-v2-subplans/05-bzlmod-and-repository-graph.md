@@ -4217,3 +4217,12 @@ production or retained-state change. Stage 4 next selects its complete
 universal owner already supplies every required builtin; no MODULE/REPO/core
 overlay or additional builtin is selected. Zabel remains peer ownership
 guidance and Bazel 9.2 remains sole authority.
+
+### Compile-parent acceptance and Stage 4 continuation (2026-08-26)
+
+Commit `d32e2602d` accepts the complete compile producer with no Stage 5
+production or retained-state change. Stage 4 next selects complete 111-line
+linkstamp compile because all six children are accepted. The shared universal
+owner already supplies every required builtin; no MODULE/REPO/core overlay or
+additional builtin is selected. Zabel remains peer ownership guidance and
+Bazel 9.2 remains sole authority.

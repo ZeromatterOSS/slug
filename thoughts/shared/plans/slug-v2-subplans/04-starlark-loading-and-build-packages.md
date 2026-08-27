@@ -7145,3 +7145,22 @@ Embed/hash the complete source, retain exact child/import/eager/function
 identities and invoke nothing. Zabel is peer ownership/freeze guidance only;
 Bazel 9.2 and authenticated rules_cc bytes own compatibility. Re-audit private
 `cc_common` and proxy/toolchain consumers after acceptance.
+
+### Complete compile producer accepted; linkstamp child selected (2026-08-26)
+
+Commit `d32e2602d` freezes all 2,295 authenticated compile lines over eleven
+complete children. It proves the complete 25-import, four-set, initialized
+provider/raw-constructor and 28-function inventories without invocation. All
+required suites pass at 0 production and 2,694 proof additions; independent
+review returned `ACCEPT`.
+
+Private `cc_common.bzl` source order now reaches complete 111-line
+`compile/linkstamp_compile.bzl`, SHA-256
+`6f5ceb39f1b6c26b65073867f3435ec01093775edf6129d2b9421bca4c7a70bb`.
+All six children are accepted. Its eager surface is exactly six imported
+aliases and one public lazy function, so no builtin, provider, native method or
+configured semantic change is required. Run only
+`WP-4-7A-rules-cc-linkstamp-compile-complete-loading-proof` under 0/300/300
+caps, retain exact source/child/import identities and invoke nothing. Zabel is
+peer ownership guidance only; Bazel 9.2 and authenticated rules_cc bytes own
+compatibility. Re-audit the first link-family child after acceptance.
