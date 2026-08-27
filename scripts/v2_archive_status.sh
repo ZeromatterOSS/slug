@@ -144,6 +144,7 @@ app_v1_paths=$(git ls-files -- app \
   ':!app/slug_query_v2/**' \
   ':!app/slug_reapi_v2/**' \
   ':!app/slug_server_v2/**' \
+  ':!app/slug_starlark_v2/**' \
   ':!app/slug_workspace_v2/**' 2>/dev/null || true)
 if [ -n "$app_v1_paths" ]; then
   fail "tracked non-V2 app paths remain:"
