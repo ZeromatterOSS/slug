@@ -5254,6 +5254,39 @@ def merge_cc_infos(*, direct_cc_infos = [], cc_infos = []):
     )
 "###;
 
+const RULES_CC_LAUNCHER_INFO_SOURCE: &str = r###"# Copyright 2025 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Provider that signals that rules that use launchers can use this target as the launcher."""
+
+load("//cc/common:cc_helper_internal.bzl", "wrap_with_check_private_api")
+
+def _cc_launcher_info_constructor(cc_info, compilation_outputs):
+    return dict(
+        cc_info = wrap_with_check_private_api(cc_info),
+        compilation_outputs = wrap_with_check_private_api(compilation_outputs),
+    )
+
+CcLauncherInfo, _ = provider(
+    doc = "Provider that signals that rules that use launchers can use this target as the launcher.",
+    fields = {
+        "cc_info": "The CcInfo provider of the launcher.",
+        "compilation_outputs": "The CcCompilationOutputs of the launcher.",
+    },
+    init = _cc_launcher_info_constructor,
+)
+"###;
+
 const RULES_CC_OBJC_INFO_SOURCE: &str = r###"# Copyright 2024 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -7312,6 +7345,53 @@ fn exact_rules_cc_info_freezes_complete_recursive_producer() {
     assert_cc_info_interface_bindings(&cc_info, &children);
     assert_cc_info_empty_context_shapes(&cc_info);
 }
+
+#[test]
+fn exact_rules_cc_launcher_info_freezes_complete_producer() {
+    assert_eq!(RULES_CC_LAUNCHER_INFO_SOURCE.lines().count(), 31);
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_CC_LAUNCHER_INFO_SOURCE.as_bytes())
+        ),
+        "41da54762e854191c0217575d385b37cd9729380d7c78d3efbc19049177250dd"
+    );
+    let children = complete_rules_cc_cc_info_children();
+    let helper = &children[1];
+    let launcher = eval_bzl_with_loaded_children(
+        RULES_CC_LAUNCHER_INFO_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_launcher_info.bzl").unwrap(),
+            workspace_path: PathBuf::from("/rules_cc/cc/private/cc_launcher_info.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+        &[(
+            "//cc/common:cc_helper_internal.bzl",
+            helper.1.clone(),
+            helper.2.dupe(),
+        )],
+    )
+    .unwrap();
+    let provider = launcher.get("CcLauncherInfo").unwrap();
+    assert!(
+        launcher
+            .get("wrap_with_check_private_api")
+            .unwrap()
+            .value()
+            .ptr_eq(helper.2.get("wrap_with_check_private_api").unwrap().value())
+    );
+    assert_eq!(provider.value().get_type(), "provider_callable");
+    assert_eq!(
+        provider.value().to_string(),
+        "provider[@@rules_cc+//cc/private:cc_launcher_info.bzl%CcLauncherInfo]"
+    );
+    for name in ["_", "_cc_launcher_info_constructor"] {
+        let value = launcher.get_any_visibility(name).unwrap().0;
+        assert_eq!(value.value().get_type(), "function");
+        assert!(launcher.get(name).is_err());
+    }
+}
+
 #[test]
 fn exact_rules_cc_objc_info_child_retains_public_proxy_aliases() {
     let hash = |source: &str| format!("{:x}", Sha256::digest(source.as_bytes()));
