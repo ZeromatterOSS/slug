@@ -1,13 +1,12 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-bazel-bzl-visibility-owner-design`
+Packet: `WP-4-7A-bazel-bzl-visibility-loading`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: settle one exact-default Bazel 9.2 `.bzl` load-visibility owner and
-direct-edge enforcement architecture shared by every existing Slug Bzl and
-BUILD evaluator. Produce an independently accepted implementation contract;
-change no Rust.
+Result: implement the accepted exact-default Bazel 9.2 `.bzl` load-visibility
+owner and direct-edge enforcement architecture shared by every existing Slug
+Bzl and BUILD evaluator.
 
 ## Learned facts and source-order trigger
 
@@ -16,6 +15,14 @@ Commit `879d879f5` accepts the complete authenticated 197-line rules_cc
 library, 24/31 integration, locked analysis/core and CLI, format/diff/source
 and archive-baseline gates pass within 0/352/352; independent review returned
 `ACCEPT`.
+
+Commit `33b7009a2` accepts the reserved ownership design after independent
+review and one focused documentation correction. It selects one
+evaluation-scratch declaration slot, one immutable `FrozenBzlModule` policy,
+one pure checker at all five live composition sites, existing DICE producers
+and no new key, cache, lock, registry or digest domain. The correction makes
+the positional-only ABI explicit, distinguishes manifest fingerprint inputs
+from root identity/mapping equality and classifies DICE mechanics Slug-native.
 
 Rules_cc 0.2.17 `cc/private/cc_common.bzl` next reaches dependency-free
 `cc/private/rules_impl/cc_toolchain_info.bzl`, 255 lines, SHA-256
@@ -26,9 +33,10 @@ module value has no load-visibility fact, so a complete freeze proof is not yet
 honest. A freeze-only no-op would admit forbidden cross-package loads and is
 not an implementation candidate.
 
-Run only `WP-4-7A-bazel-bzl-visibility-owner-design`. Do not change Rust,
-freeze `cc_toolchain_info.bzl`, add a no-op global, or claim any C++ provider,
-toolchain, rule, configured target or action behavior.
+Run only `WP-4-7A-bazel-bzl-visibility-loading`. Implement the complete named
+default-enabled behavior family. Do not freeze complete
+`cc_toolchain_info.bzl` or claim any C++ provider, toolchain, rule, configured
+target or action behavior.
 
 ## Bazel authority and exact behavior family
 
@@ -160,24 +168,29 @@ request projection. Overlapping requests compute immutable key values from
 their own existing DICE dependency graph; no historical filesystem snapshot or
 cross-request mutable capture is introduced.
 
-## Evidence, implementation successor and stops
+## Allowlist, caps, evidence and stops
 
-This docs packet changes only this manifest, the canonical plan and the Stage
-4 owner plan under 0 production/0 test/320 documentation additions. Run source
-hash/line checks, targeted canonical/manifest agreement, structure/diff/archive
-checks and independent reserved-architecture review. Add no fixture: pinned
-Bazel source and the named upstream regression family already discriminate the
-decision.
-
-If accepted, roll one implementation packet limited to:
+Change only:
 
 - new private `app/slug_loading_v2/src/bzl_visibility.rs`;
 - `app/slug_loading_v2/src/{lib.rs,provider.rs,package.rs,bzl_module.rs}`;
 - colocated tests plus existing `host_package_load_tests.rs`,
   `tests/bzl_invalidation.rs` and `tests/build_file_loading.rs` only as needed.
 
-Credible ceilings are 500 production, 850 tests and 1,350 total additions.
-Require pure parser/matcher and global positional-only ABI/return,
+At base `33b7009a2`, production files are: `bzl_module.rs` 9,652 lines SHA-256
+`0d3acc5760b98a127065ad8e7189c7de957c2dc5b9d6cf779a2fbb890832236f`;
+`provider.rs` 1,024 lines `d467da80188b07478f2ade2cedeccb5c36f09248faf7aaaa3f028e731f5ffdd8`;
+`package.rs` 6,228 lines `e02b917e1db11326bb8ab63524f23576c74fcdb688dc221b345e756dadc9ae3d`;
+and `lib.rs` 121 lines
+`ed09419a6e259d2df44fa90fd4bf57b4d6966b891f4e772c814fbffceb0050be`.
+The oversized `bzl_module.rs` remains cohesive as the sole DICE loading owner;
+the new semantic parser/matcher is split into `bzl_visibility.rs`, and existing
+files receive only context/global/value/checker integration. Do not add another
+responsibility or broad cleanup.
+
+Caps are 500 production, 850 tests and 1,350 total additions; deletions do not
+buy budget. Each new or materially changed function stays at most 150 physical
+lines. Require pure parser/matcher and global positional-only ABI/return,
 placement/cardinality/type tests;
 direct/imported/inlined function negatives; implicit/public/private/list,
 same/cross/subtree/repository-mapping checks; all five composition-site guards;
@@ -187,16 +200,24 @@ source and imported-policy A/B/A invalidation; exact rules_cc
 independent ownership/representation review. Reuse upstream test themes with
 pinned-source comments; create no oracle fixture.
 
+Run focused visibility tests, all `slug_loading_v2` library tests,
+`bzl_invalidation`, `build_file_loading`, locked analysis/core checks, locked
+CLI build, formatting, diff and archive hygiene. Measure caps/function sizes
+and obtain independent review of ABI, parser/matcher, repository identity,
+five-site enforcement, equality/invalidation, lifetime and compatibility.
+
 STOP and `REPLAN` for a new key/lock/global registry, evaluator or command
 cache; raw-source scanning; path-derived repository identity; retained heap
 value/context borrow; policy omitted from semantic equality; validation after
 importer execution; any unguarded live composition site; starlark-rust change;
 ignored option flag; copied Zabel behavior; source/hash mismatch; public API or
 cross-crate change; allowlist/cap escape; or inability to prove top-level call
-shape. Stop after design acceptance and roll the implementation successor.
+shape. Stop after the implementation and re-audit the complete
+`cc_toolchain_info.bzl` proof separately.
 
 ## Immediate predecessor
 
-Commit `879d879f5` accepts only complete `link.bzl` defining-module freezing.
-It does not accept `.bzl` load visibility, `cc_toolchain_info.bzl`, function
-invocation, configured linking, toolchains or actions.
+Commit `33b7009a2` accepts only the `.bzl` load-visibility ownership design and
+authorizes this bounded implementation. It changes no Rust and accepts no
+visibility behavior, `cc_toolchain_info.bzl`, configured linking, toolchains or
+actions.

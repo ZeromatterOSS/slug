@@ -22,7 +22,7 @@ a Starlark-visible method needs label resolution, file reads, repo mapping, or
 repository materialization, route that through a named DICE key or async bridge
 before returning the Starlark-visible value.
 
-## Selected `.bzl` load-visibility ownership design (2026-08-27)
+## Accepted `.bzl` load-visibility design; implementation activated (2026-08-27)
 
 The authenticated rules_cc traversal first requires Bazel's default-enabled
 top-level `.bzl` `visibility()` at dependency-free
@@ -68,13 +68,13 @@ copy no code, layout, parsing, diagnostics or behavior. Buck2 `088c75c7…` is
 utility guidance only; existing Slug compact/shared primitives suffice and no
 Stage 9 extraction row changes.
 
-The reserved design packet changes documentation only and requires independent
-acceptance. Its implementation successor must stay within the private loading
-crate files and existing tests, prove all five composition sites plus source
-and imported-policy A/B/A invalidation, and `REPLAN` for a starlark-rust change,
-raw-source scan, path-derived repository, retained evaluator borrow, missing
-semantic equality, post-evaluation validation, ignored flag, new key/lock/cache
-or public/cross-crate boundary.
+Commit `33b7009a2` accepts this reserved design after independent correction
+rereview. Run only `WP-4-7A-bazel-bzl-visibility-loading` within the private
+loading crate files and existing tests. Prove all five composition sites plus
+source and imported-policy A/B/A invalidation, and `REPLAN` for a
+starlark-rust change, raw-source scan, path-derived repository, retained
+evaluator borrow, missing semantic equality, post-evaluation validation,
+ignored flag, new key/lock/cache or public/cross-crate boundary.
 
 ## Implementation Slices
 
