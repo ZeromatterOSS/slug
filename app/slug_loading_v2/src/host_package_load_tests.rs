@@ -14186,6 +14186,151 @@ def link(
                                            feature_configuration.is_enabled("targets_windows")),
     )
 "###;
+const RULES_CC_TOOLCHAIN_CONFIG_INFO_SOURCE: &str = r###"# Copyright 2025 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Information describing C++ toolchain derived from CROSSTOOL file."""
+
+load("@bazel_skylib//lib:paths.bzl", "paths")
+load("//cc/private:cc_internal.bzl", _cc_internal = "cc_internal")
+load(
+    "//cc/private/toolchain_config:legacy_features.bzl",
+    "get_features_to_appear_last",
+    "get_legacy_action_configs",
+    "get_legacy_features",
+)
+
+def _init(**_kwargs):
+    fail("CcToolchainConfigInfo can only be instantiated via cc_common.create_cc_toolchain_config_info()")
+
+CcToolchainConfigInfo, _new_cc_toolchain_config_info = provider(
+    "Additional layer of configurability for C++ rules. Encapsulates platform-dependent " +
+    "specifics of C++ actions through features and action configs. It is used to " +
+    "configure the C++ toolchain, and later on for command line construction. " +
+    "Replaces the functionality of CROSSTOOL file.",
+    fields = [
+        "_action_configs_DO_NOT_USE",
+        "_artifact_name_patterns_DO_NOT_USE",
+        "_exec_os_DO_NOT_USE",
+        "_features_DO_NOT_USE",
+        "abi_libc_version",
+        "abi_version",
+        "builtin_sysroot",
+        "compiler",
+        "cxx_builtin_include_directories",
+        "make_variables",
+        "target_cpu",
+        "target_libc",
+        "target_system_name",
+        "tool_paths",
+        "toolchain_id",
+    ],
+    init = _init,
+)
+
+# buildifier: disable=function-docstring
+def create_cc_toolchain_config_info(
+        *,
+        ctx,
+        toolchain_identifier,
+        compiler,
+        features = [],
+        action_configs = [],
+        artifact_name_patterns = [],
+        cxx_builtin_include_directories = [],
+        # buildifier: disable=unused-variable
+        host_system_name = None,
+        target_system_name = None,
+        target_cpu = None,
+        target_libc = None,
+        abi_version = None,
+        abi_libc_version = None,
+        tool_paths = [],
+        make_variables = [],
+        builtin_sysroot = None,
+        # buildifier: disable=unused-variable
+        cc_target_os = None):
+    feature_names = set([f.name for f in features])
+    action_config_names = set([a.action_name for a in action_configs])
+    if "no_legacy_features" not in feature_names:
+        gcc_tool_path = "DUMMY_GCC_TOOL"
+        linker_tool_path = "DUMMY_LINKER_TOOL"
+        ar_tool_path = "DUMMY_AR_TOOL"
+        strip_tool_path = "DUMMY_STRIP_TOOL"
+        for tool in tool_paths:
+            if tool.name == "gcc":
+                gcc_tool_path = tool.path
+                linker_tool_path = paths.join(ctx.label.workspace_root, ctx.label.package, tool.path)
+            elif tool.name == "ar":
+                ar_tool_path = tool.path
+            elif tool.name == "strip":
+                strip_tool_path = tool.path
+
+        legacy_features = []
+
+        # TODO(b/30109612): Remove fragile legacyCompileFlags shuffle once there
+        # are no legacy crosstools.
+        # Existing projects depend on flags from legacy toolchain fields appearing
+        # first on the compile command line. 'legacy_compile_flags' feature contains
+        # all these flags, and so it needs to appear before other features.
+        if "legacy_compile_flags" in feature_names:
+            legacy_compile_flags = ([f for f in features if f.name == "legacy_compile_flags"])[0]
+            legacy_features.append(legacy_compile_flags)
+        if "default_compile_flags" in feature_names:
+            default_compile_flags = ([f for f in features if f.name == "default_compile_flags"])[0]
+            legacy_features.append(default_compile_flags)
+        platform = "mac" if target_libc == "macosx" else "linux"
+        legacy_features.extend(get_legacy_features(
+            ctx,
+            platform,
+            feature_names,
+            linker_tool_path,
+        ))
+        legacy_features.extend([f for f in features if f.name not in ["legacy_compile_flags", "default_compile_flags"]])
+        legacy_features.extend(get_features_to_appear_last(feature_names))
+
+        legacy_action_configs = []
+        legacy_action_configs.extend(get_legacy_action_configs(
+            platform,
+            gcc_tool_path,
+            ar_tool_path,
+            strip_tool_path,
+            action_config_names,
+        ))
+        legacy_action_configs.extend(action_configs)
+
+        features = legacy_features
+        action_configs = legacy_action_configs
+
+    return _new_cc_toolchain_config_info(
+        _action_configs_DO_NOT_USE = action_configs,
+        _artifact_name_patterns_DO_NOT_USE = artifact_name_patterns,
+        _features_DO_NOT_USE = features,
+        _exec_os_DO_NOT_USE = _cc_internal.exec_os(ctx),
+        abi_libc_version = abi_libc_version or "",
+        abi_version = abi_version or "",
+        builtin_sysroot = builtin_sysroot or "",
+        compiler = compiler,
+        cxx_builtin_include_directories = cxx_builtin_include_directories,
+        make_variables = make_variables,
+        target_cpu = target_cpu or "",
+        target_libc = target_libc or "",
+        target_system_name = target_system_name or "",
+        tool_paths = tool_paths,
+        toolchain_id = toolchain_identifier,
+    )
+"###;
+
 const RULES_CC_LEGACY_FEATURES_SOURCE: &str = r###"# Copyright 2025 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22919,6 +23064,198 @@ fn exact_rules_cc_legacy_features_freezes_complete_recursive_producer() {
     expected.push("_platform_specific_value");
     expected.sort_unstable();
     assert_eq!(all, expected);
+}
+
+fn complete_rules_cc_toolchain_config_info_children()
+-> [(&'static str, BzlModuleIdentity, FrozenModule); 3] {
+    let owner = |label: &str, path: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(label).unwrap(),
+        workspace_path: PathBuf::from(path),
+        repository_mapping: Arc::from([]),
+    };
+    let paths_owner = owner(
+        "@@bazel_skylib+//lib:paths.bzl",
+        "/bazel_skylib/lib/paths.bzl",
+    );
+    let internal_owner = owner(
+        "@@rules_cc+//cc/private:cc_internal.bzl",
+        "/rules_cc/cc/private/cc_internal.bzl",
+    );
+    let action_owner = owner(
+        "@@rules_cc+//cc:action_names.bzl",
+        "/rules_cc/cc/action_names.bzl",
+    );
+    let config_owner = owner(
+        "@@rules_cc+//cc:cc_toolchain_config_lib.bzl",
+        "/rules_cc/cc/cc_toolchain_config_lib.bzl",
+    );
+    let legacy_owner = owner(
+        "@@rules_cc+//cc/private/toolchain_config:legacy_features.bzl",
+        "/rules_cc/cc/private/toolchain_config/legacy_features.bzl",
+    );
+    let paths = eval_bzl_with_identity(PATHS_SOURCE, paths_owner.clone()).unwrap();
+    let internal =
+        eval_bzl_with_identity(RULES_CC_INTERNAL_SOURCE, internal_owner.clone()).unwrap();
+    let action_names =
+        eval_bzl_with_identity(RULES_CC_ACTION_NAMES_SOURCE, action_owner.clone()).unwrap();
+    let config =
+        eval_bzl_with_identity(RULES_CC_TOOLCHAIN_CONFIG_LIB_SOURCE, config_owner.clone()).unwrap();
+    let legacy = eval_bzl_with_loaded_children(
+        RULES_CC_LEGACY_FEATURES_SOURCE,
+        legacy_owner.clone(),
+        &[
+            ("//cc:action_names.bzl", action_owner, action_names),
+            ("//cc:cc_toolchain_config_lib.bzl", config_owner, config),
+        ],
+    )
+    .unwrap();
+    [
+        ("@bazel_skylib//lib:paths.bzl", paths_owner, paths),
+        ("//cc/private:cc_internal.bzl", internal_owner, internal),
+        (
+            "//cc/private/toolchain_config:legacy_features.bzl",
+            legacy_owner,
+            legacy,
+        ),
+    ]
+}
+
+fn assert_rules_cc_toolchain_config_info_interfaces(
+    module: &FrozenModule,
+    children: &[(&str, BzlModuleIdentity, FrozenModule); 3],
+) {
+    let paths = &children[0].2;
+    let internal = &children[1].2;
+    let legacy = &children[2].2;
+    assert!(
+        module
+            .get("paths")
+            .unwrap()
+            .value()
+            .ptr_eq(paths.get("paths").unwrap().value())
+    );
+    assert!(
+        module
+            .get_any_visibility("_cc_internal")
+            .unwrap()
+            .0
+            .value()
+            .ptr_eq(internal.get("cc_internal").unwrap().value())
+    );
+    let legacy_imports = [
+        "get_features_to_appear_last",
+        "get_legacy_action_configs",
+        "get_legacy_features",
+    ];
+    for name in legacy_imports {
+        assert!(
+            module
+                .get(name)
+                .unwrap()
+                .value()
+                .ptr_eq(legacy.get(name).unwrap().value()),
+            "{name}"
+        );
+    }
+    let provider = module.get("CcToolchainConfigInfo").unwrap();
+    assert_eq!(provider.value().get_type(), "provider_callable");
+    assert_eq!(
+        provider.value().to_string(),
+        "provider[@@rules_cc+//cc/private/toolchain_config:cc_toolchain_config_info.bzl%CcToolchainConfigInfo]"
+    );
+    assert_eq!(
+        module
+            .get("create_cc_toolchain_config_info")
+            .unwrap()
+            .value()
+            .get_type(),
+        "function"
+    );
+    for name in ["_cc_internal", "_init", "_new_cc_toolchain_config_info"] {
+        assert!(module.get(name).is_err(), "{name}");
+        assert_eq!(
+            module
+                .get_any_visibility(name)
+                .unwrap()
+                .0
+                .value()
+                .get_type(),
+            if name == "_cc_internal" {
+                "cc_internal"
+            } else {
+                "function"
+            }
+        );
+    }
+    let mut public = module.names().map(|name| name.as_str()).collect::<Vec<_>>();
+    public.sort_unstable();
+    let mut expected = [
+        "CcToolchainConfigInfo",
+        "create_cc_toolchain_config_info",
+        "paths",
+    ]
+    .into_iter()
+    .chain(legacy_imports)
+    .collect::<Vec<_>>();
+    expected.sort_unstable();
+    assert_eq!(public, expected);
+    let mut all = module
+        .names_any_visibility()
+        .map(|name| name.as_str())
+        .collect::<Vec<_>>();
+    all.sort_unstable();
+    expected.extend(["_cc_internal", "_init", "_new_cc_toolchain_config_info"]);
+    expected.sort_unstable();
+    assert_eq!(all, expected);
+}
+
+#[test]
+fn exact_rules_cc_toolchain_config_info_freezes_complete_recursive_producer() {
+    assert_eq!(RULES_CC_TOOLCHAIN_CONFIG_INFO_SOURCE.lines().count(), 143);
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_CC_TOOLCHAIN_CONFIG_INFO_SOURCE.as_bytes())
+        ),
+        "8c522773214e202b426ae43589f59a8bdbf3af19d2e595ba8ec7ac125fef5d39"
+    );
+    let children = complete_rules_cc_toolchain_config_info_children();
+    assert_eq!(
+        children
+            .iter()
+            .map(|child| child.1.label.clone())
+            .collect::<Vec<_>>(),
+        vec![
+            CanonicalLabel::parse("@@bazel_skylib+//lib:paths.bzl").unwrap(),
+            CanonicalLabel::parse("@@rules_cc+//cc/private:cc_internal.bzl").unwrap(),
+            CanonicalLabel::parse("@@rules_cc+//cc/private/toolchain_config:legacy_features.bzl",)
+                .unwrap(),
+        ]
+    );
+    assert!(
+        children
+            .iter()
+            .all(|child| child.1.repository_mapping.is_empty())
+    );
+    let module = eval_bzl_with_loaded_children(
+        RULES_CC_TOOLCHAIN_CONFIG_INFO_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse(
+                "@@rules_cc+//cc/private/toolchain_config:cc_toolchain_config_info.bzl",
+            )
+            .unwrap(),
+            workspace_path: PathBuf::from(
+                "/rules_cc/cc/private/toolchain_config/cc_toolchain_config_info.bzl",
+            ),
+            repository_mapping: Arc::from([(
+                ApparentRepoName::new("bazel_skylib").unwrap(),
+                CanonicalRepoName::new("bazel_skylib+").unwrap(),
+            )]),
+        },
+        &children,
+    )
+    .unwrap();
+    assert_rules_cc_toolchain_config_info_interfaces(&module, &children);
 }
 
 #[test]
