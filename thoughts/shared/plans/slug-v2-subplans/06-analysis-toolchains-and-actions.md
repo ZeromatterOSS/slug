@@ -18994,3 +18994,40 @@ Independent ordering/cap/scope review returned `ACCEPT`. Commit `caff3bfc1`
 freezes the correction. Activate only
 `WP-4-5-7A-builtin-optional-package-input-projection-implementation-r2` under
 280 production and 420 proof additions.
+
+### Built-in optional-input projection accepted; external boundary resumed (2026-08-27)
+
+Commit `18cd8f35b` completes the prerequisite. Built-in routed REPO discovers
+normal `REPO.bazel` absence from the accepted root listing before computing
+root Starlark semantics, so the direct regression succeeds without injected
+policy inputs. Routed ignore consumes its REPO predecessor and built-in root
+listing; missing `.bazelignore` contributes no prefixes. External point lookup
+uses the candidate-package listing and selects only file-valued `BUILD.bazel`
+then `BUILD`. Unexpected future built-in metadata remains a typed,
+repository-relative fail-closed stop.
+
+Materialized direct-local, selected-registry and generated routes retain their
+existing path/source dependencies, symlink and special-file behavior, events,
+terminals and observations. Legacy and observed built-in paths agree and carry
+the empty catalog epoch; the complete route and package remain in key identity.
+No retained value, dependency, physical path, catalog read, evaluator surface,
+global state or lock was added.
+
+The focused no-policy, metadata, marker, priority, route A/B/A and structural-
+ordering proofs pass. Full `slug_bzlmod_v2` and `slug_loading_v2` suites plus
+locked loading/core checks pass. The 513 additions split into 252 production
+and 261 proof, inside 280/420. Formatting, diff, scope, dependency, no-lock and
+archive-baseline gates pass; the archive checker reports only its three known
+retained thoughts paths. The GNU-Windows no-run gate exposes an unchanged
+predecessor test defect: a Windows-only repository-ignore test uses `Dice` and
+`DetectCycles` whose imports were already Unix-gated at `483749667`.
+Independent DICE/source-boundary review returned `ACCEPT`.
+
+Resume only
+`WP-4-5-7A-selected-external-package-boundary-projection-implementation-r2` at
+`18cd8f35b`. The accepted `5ec7f3c79` design and 560/900 bounds remain intact;
+the implementation may now prove all four admitted route dispositions through
+the shared private lookup. Stop before recursive traversal, target-pattern
+expansion, registration, loading or rules. Bazel 9 BCR Starlark remains the
+rule source, including `cc_internal`; `cc_common` is only a generic host-ABI
+consumer. Zabel remains peer guidance, never semantic authority.
