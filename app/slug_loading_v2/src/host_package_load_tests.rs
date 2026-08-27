@@ -4279,6 +4279,309 @@ def construct_lto_arguments(ctx, toolchain, crate_info):
 
     return args
 "###;
+const RULES_RUST_ALLOCATOR_LIBRARIES_SOURCE: &str = r###""""Rust allocator library rules"""
+
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
+load(
+    "//rust/private:utils.bzl",
+    "dedent",
+    "find_toolchain",
+)
+load(
+    ":common.bzl",
+    "rust_common",
+)
+load(
+    ":providers.bzl",
+    "AllocatorLibrariesImplInfo",
+    "AllocatorLibrariesInfo",
+)
+
+def _ltl(library, actions, cc_toolchain, feature_configuration):
+    """A helper to generate `LibraryToLink` objects
+
+    Args:
+        library (File): A rust library file to link.
+        actions: The rule's ctx.actions object.
+        cc_toolchain (CcToolchainInfo): A cc toolchain provider to be used (can be None).
+        feature_configuration (feature_configuration): feature_configuration to be queried (can be None).
+
+    Returns:
+        LibraryToLink: A provider containing information about libraries to link.
+    """
+    return cc_common.create_library_to_link(
+        actions = actions,
+        feature_configuration = feature_configuration,
+        cc_toolchain = cc_toolchain,
+        static_library = library,
+        pic_static_library = library,
+    )
+
+def make_libstd_and_allocator_ccinfo(
+        *,
+        cc_toolchain,
+        feature_configuration,
+        label,
+        actions,
+        experimental_link_std_dylib,
+        rust_std,
+        allocator_library,
+        std = "std"):
+    """Make the CcInfo (if possible) for libstd and allocator libraries.
+
+    Args:
+        cc_toolchain (CcToolchainInfo): A cc toolchain provider to be used.
+        feature_configuration (feature_configuration): feature_configuration to be queried.
+        label (Label): The rule's label.
+        actions: The rule's ctx.actions object.
+        experimental_link_std_dylib (boolean): The value of the standard library's `_experimental_link_std_dylib(ctx)`.
+        rust_std: The Rust standard library.
+        allocator_library (struct): The target to use for providing allocator functions.
+          This should be a struct with either:
+          * a cc_info field of type CcInfo
+          * an allocator_libraries_impl_info field, which should be None or of type AllocatorLibrariesImplInfo.
+        std: Standard library flavor. Currently only "std" and "no_std_with_alloc" are supported,
+             accompanied with the default panic behavior.
+
+
+    Returns:
+        A CcInfo object for the required libraries, or None if no such libraries are available.
+    """
+    cc_infos = []
+    if not type(allocator_library) == "struct":
+        fail("Unexpected type of allocator_library, it must be a struct.")
+    if not any([hasattr(allocator_library, field) for field in ["cc_info", "allocator_libraries_impl_info"]]):
+        fail("Unexpected contents of allocator_library, it must provide either a cc_info or an allocator_libraries_impl_info.")
+
+    if not rust_common.stdlib_info in rust_std:
+        fail(dedent("""\
+            {} --
+            The `rust_lib` ({}) must be a target providing `rust_common.stdlib_info`
+            (typically `rust_stdlib_filegroup` rule from @rules_rust//rust:defs.bzl).
+            See https://github.com/bazelbuild/rules_rust/pull/802 for more information.
+        """).format(label, rust_std))
+    rust_stdlib_info = rust_std[rust_common.stdlib_info]
+
+    if rust_stdlib_info.self_contained_files:
+        compilation_outputs = cc_common.create_compilation_outputs(
+            objects = depset(rust_stdlib_info.self_contained_files),
+        )
+
+        # Include C++ toolchain files as additional inputs for cross-compilation scenarios
+        additional_inputs = []
+        if cc_toolchain:
+            if cc_toolchain.all_files:
+                additional_inputs = cc_toolchain.all_files.to_list()
+
+            linking_context, _linking_outputs = cc_common.create_linking_context_from_compilation_outputs(
+                name = label.name,
+                actions = actions,
+                feature_configuration = feature_configuration,
+                cc_toolchain = cc_toolchain,
+                compilation_outputs = compilation_outputs,
+                additional_inputs = additional_inputs,
+            )
+
+            cc_infos.append(CcInfo(
+                linking_context = linking_context,
+            ))
+
+    if rust_stdlib_info.std_rlibs:
+        allocator_library_inputs = []
+
+        if hasattr(allocator_library, "allocator_libraries_impl_info") and allocator_library.allocator_libraries_impl_info:
+            static_archive = allocator_library.allocator_libraries_impl_info.static_archive
+            allocator_library_inputs = [depset(
+                [_ltl(static_archive, actions, cc_toolchain, feature_configuration)],
+            )]
+
+        alloc_inputs = depset(
+            [_ltl(f, actions, cc_toolchain, feature_configuration) for f in rust_stdlib_info.alloc_files],
+            transitive = allocator_library_inputs,
+            order = "topological",
+        )
+        between_alloc_and_core_inputs = depset(
+            [_ltl(f, actions, cc_toolchain, feature_configuration) for f in rust_stdlib_info.between_alloc_and_core_files],
+            transitive = [alloc_inputs],
+            order = "topological",
+        )
+        core_inputs = depset(
+            [_ltl(f, actions, cc_toolchain, feature_configuration) for f in rust_stdlib_info.core_files],
+            transitive = [between_alloc_and_core_inputs],
+            order = "topological",
+        )
+
+        # The libraries panic_abort and panic_unwind are alternatives.
+        # The std by default requires panic_unwind.
+        # Exclude panic_abort if panic_unwind is present.
+        # TODO: Provide a setting to choose between panic_abort and panic_unwind.
+        filtered_between_core_and_std_files = rust_stdlib_info.between_core_and_std_files
+        has_panic_unwind = [
+            f
+            for f in filtered_between_core_and_std_files
+            if "panic_unwind" in f.basename
+        ]
+        if has_panic_unwind:
+            filtered_between_core_and_std_files = [
+                f
+                for f in filtered_between_core_and_std_files
+                if "abort" not in f.basename
+            ]
+            core_alloc_and_panic_inputs = depset(
+                [
+                    _ltl(f, actions, cc_toolchain, feature_configuration)
+                    for f in rust_stdlib_info.panic_files
+                    if "unwind" not in f.basename
+                ],
+                transitive = [core_inputs],
+                order = "topological",
+            )
+        else:
+            core_alloc_and_panic_inputs = depset(
+                [
+                    _ltl(f, actions, cc_toolchain, feature_configuration)
+                    for f in rust_stdlib_info.panic_files
+                    if "unwind" not in f.basename
+                ],
+                transitive = [core_inputs],
+                order = "topological",
+            )
+        memchr_inputs = depset(
+            [
+                _ltl(f, actions, cc_toolchain, feature_configuration)
+                for f in rust_stdlib_info.memchr_files
+            ],
+            transitive = [core_inputs],
+            order = "topological",
+        )
+        between_core_and_std_inputs = depset(
+            [
+                _ltl(f, actions, cc_toolchain, feature_configuration)
+                for f in filtered_between_core_and_std_files
+            ],
+            transitive = [memchr_inputs],
+            order = "topological",
+        )
+
+        if experimental_link_std_dylib:
+            # std dylib has everything so that we do not need to include all std_files
+            std_inputs = depset(
+                [cc_common.create_library_to_link(
+                    actions = actions,
+                    feature_configuration = feature_configuration,
+                    cc_toolchain = cc_toolchain,
+                    dynamic_library = rust_stdlib_info.std_dylib,
+                )],
+            )
+        else:
+            std_inputs = depset(
+                [
+                    _ltl(f, actions, cc_toolchain, feature_configuration)
+                    for f in rust_stdlib_info.std_files
+                ],
+                transitive = [between_core_and_std_inputs],
+                order = "topological",
+            )
+
+        test_inputs = depset(
+            [
+                _ltl(f, actions, cc_toolchain, feature_configuration)
+                for f in rust_stdlib_info.test_files
+            ],
+            transitive = [std_inputs],
+            order = "topological",
+        )
+
+        if std == "std":
+            link_inputs = cc_common.create_linker_input(
+                owner = rust_std.label,
+                libraries = test_inputs,
+            )
+        elif std == "no_std_with_alloc":
+            link_inputs = cc_common.create_linker_input(
+                owner = rust_std.label,
+                libraries = core_alloc_and_panic_inputs,
+            )
+        else:
+            fail("Requested '{}' std mode is currently not supported.".format(std))
+
+        allocator_inputs = None
+        if hasattr(allocator_library, "cc_info"):
+            allocator_inputs = [allocator_library.cc_info.linking_context.linker_inputs]
+
+        cc_infos.append(CcInfo(
+            linking_context = cc_common.create_linking_context(
+                linker_inputs = depset(
+                    [link_inputs],
+                    transitive = allocator_inputs,
+                    order = "topological",
+                ),
+            ),
+        ))
+
+    if cc_infos:
+        return cc_common.merge_cc_infos(
+            direct_cc_infos = cc_infos,
+        )
+    return None
+
+# Attributes for rust-based allocator library support.
+# Can't add it directly to RUSTC_ATTRS above, as those are used as
+# aspect parameters and only support simple types ('bool', 'int' or 'string').
+RUSTC_ALLOCATOR_LIBRARIES_ATTRS = {
+    # This is really internal. Not prefixed with `_` since we need to adapt this
+    # in bootstrapping situations, e.g., when building the process wrapper
+    # or allocator libraries themselves.
+    "allocator_libraries": attr.label(
+        default = Label("//ffi/rs:default_allocator_libraries"),
+        providers = [AllocatorLibrariesInfo],
+    ),
+}
+
+def _rust_allocator_libraries_impl(ctx):
+    allocator_library = ctx.attr.allocator_library[AllocatorLibrariesImplInfo] if ctx.attr.allocator_library else None
+    global_allocator_library = ctx.attr.global_allocator_library[AllocatorLibrariesImplInfo] if ctx.attr.global_allocator_library else None
+
+    toolchain = find_toolchain(ctx)
+
+    def make_cc_info(info, std):
+        return toolchain.make_libstd_and_allocator_ccinfo(
+            ctx.label,
+            ctx.actions,
+            struct(allocator_libraries_impl_info = info),
+            std,
+        )
+
+    providers = [AllocatorLibrariesInfo(
+        allocator_library = allocator_library,
+        global_allocator_library = global_allocator_library,
+        libstd_and_allocator_ccinfo = make_cc_info(allocator_library, "std"),
+        libstd_and_global_allocator_ccinfo = make_cc_info(global_allocator_library, "std"),
+        nostd_and_global_allocator_ccinfo = make_cc_info(global_allocator_library, "no_std_with_alloc"),
+    )]
+
+    return providers
+
+rust_allocator_libraries = rule(
+    implementation = _rust_allocator_libraries_impl,
+    provides = [AllocatorLibrariesInfo],
+    attrs = {
+        "allocator_library": attr.label(
+            doc = "An optional library to provide when a default rust allocator is used.",
+            providers = [AllocatorLibrariesImplInfo],
+        ),
+        "global_allocator_library": attr.label(
+            doc = "An optional library to provide when a default rust allocator is used.",
+            providers = [AllocatorLibrariesImplInfo],
+        ),
+    },
+    toolchains = [
+        str(Label("//rust:toolchain_type")),
+        config_common.toolchain_type("@bazel_tools//tools/cpp:toolchain_type", mandatory = False),
+    ],
+)
+"###;
 const RULES_RUST_UTILS_SOURCE: &str = r###"# Copyright 2015 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26841,6 +27144,50 @@ fn complete_rules_rust_utils_children() -> Vec<(&'static str, BzlModuleIdentity,
     ]
 }
 
+fn complete_rules_rust_allocator_children() -> Vec<(&'static str, BzlModuleIdentity, FrozenModule)>
+{
+    let utils_children = complete_rules_rust_utils_children();
+    let utils_owner = compile_owner(
+        "@@rules_rust+//rust/private:utils.bzl",
+        "/rules_rust/rust/private/utils.bzl",
+        &[("bazel_skylib", "bazel_skylib+"), ("rules_cc", "rules_cc+")],
+    );
+    let utils = eval_bzl_with_loaded_children(
+        RULES_RUST_UTILS_SOURCE,
+        utils_owner.clone(),
+        &utils_children,
+    )
+    .unwrap();
+    let providers_owner = utils_children[4].1.clone();
+    let providers = utils_children[4].2.dupe();
+    let common_owner = compile_owner(
+        "@@rules_rust+//rust/private:common.bzl",
+        "/rules_rust/rust/private/common.bzl",
+        &[],
+    );
+    let common = eval_bzl_with_loaded_children(
+        RULES_RUST_COMMON_SOURCE,
+        common_owner.clone(),
+        &[(":providers.bzl", providers_owner.clone(), providers.dupe())],
+    )
+    .unwrap();
+    vec![
+        (
+            "@rules_cc//cc/common:cc_common.bzl",
+            utils_children[2].1.clone(),
+            utils_children[2].2.dupe(),
+        ),
+        (
+            "@rules_cc//cc/common:cc_info.bzl",
+            utils_children[3].1.clone(),
+            utils_children[3].2.dupe(),
+        ),
+        ("//rust/private:utils.bzl", utils_owner, utils),
+        (":common.bzl", common_owner, common),
+        (":providers.bzl", providers_owner, providers),
+    ]
+}
+
 #[rustfmt::skip]
 fn assert_rules_cc_compatibility_symbols_interfaces(
     module: &FrozenModule,
@@ -27249,6 +27596,283 @@ fn exact_rules_rust_providers_freeze_complete_family() {
         .collect::<Vec<_>>();
     all.sort_unstable();
     assert_eq!(all, expected);
+}
+
+#[test]
+fn advertised_provider_sequences_are_shared_normalized_declaration_semantics() {
+    let source = r#"
+P = provider()
+Q = provider()
+def rule_impl(ctx): return []
+def aspect_impl(target, ctx): return []
+EMPTY_RULE = rule(implementation = rule_impl, provides = [])
+MULTI_RULE = rule(implementation = rule_impl, provides = (P, Q, P))
+EMPTY_ASPECT = aspect(implementation = aspect_impl, provides = ())
+MULTI_ASPECT = aspect(implementation = aspect_impl, provides = [P, Q, P])
+"#;
+    let module = eval_bzl_with_identity(source, clippy_owner()).unwrap();
+    let empty_rule = module
+        .get("EMPTY_RULE")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    assert!(empty_rule.advertised_providers().is_empty());
+    let rule = module
+        .get("MULTI_RULE")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    let aspect = module
+        .get("MULTI_ASPECT")
+        .unwrap()
+        .downcast::<FrozenAspectDefinition>()
+        .unwrap();
+    let expected = [
+        "@@rules_rust+//rust/private:clippy.bzl%P",
+        "@@rules_rust+//rust/private:clippy.bzl%Q",
+    ];
+    assert_eq!(
+        rule.advertised_providers()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        expected
+    );
+    assert_eq!(
+        aspect.advertised_providers.as_ref(),
+        rule.advertised_providers()
+    );
+    let empty_aspect = module
+        .get("EMPTY_ASPECT")
+        .unwrap()
+        .downcast::<FrozenAspectDefinition>()
+        .unwrap();
+    assert!(empty_aspect.advertised_providers.is_empty());
+    for invalid in [
+        "def impl(ctx): return []\nR=rule(implementation=impl, provides=1)",
+        "def impl(ctx): return []\nR=rule(implementation=impl, provides=[1])",
+        "N=[provider()]\ndef impl(ctx): return []\nR=rule(implementation=impl, provides=N)",
+    ] {
+        assert!(eval_bzl_with_identity(invalid, clippy_owner()).is_err());
+    }
+}
+
+#[tokio::test]
+async fn advertised_rule_providers_participate_in_loaded_target_equality() {
+    let build = b"load(':defs.bzl','r')\nr(name='probe',visibility=['//visibility:public'])\n";
+    let one = [
+        ("BUILD.bazel", build.as_slice()),
+        (
+            "defs.bzl",
+            b"P=provider()\ndef _impl(ctx): return [P()]\nr=rule(implementation=_impl,provides=[P])\n"
+                .as_slice(),
+        ),
+    ];
+    let two = [
+        ("BUILD.bazel", build.as_slice()),
+        (
+            "defs.bzl",
+            b"P=provider()\nQ=provider()\ndef _impl(ctx): return [P(),Q()]\nr=rule(implementation=_impl,provides=[P,Q])\n"
+                .as_slice(),
+        ),
+    ];
+    let one_outcome = load_repository_package_fixture(&one, 426).await;
+    let two_outcome = load_repository_package_fixture(&two, 427).await;
+    let rule = |outcome| {
+        let package = repository_package_terminal(outcome);
+        let crate::package::PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+            panic!("probe did not retain its Starlark rule")
+        };
+        rule.clone()
+    };
+    let one_rule = rule(&one_outcome);
+    let two_rule = rule(&two_outcome);
+    assert_eq!(one_rule.advertised_providers().len(), 1);
+    assert_eq!(two_rule.advertised_providers().len(), 2);
+    assert_ne!(one_rule, two_rule);
+}
+
+fn assert_rules_rust_allocator_imports(
+    module: &FrozenModule,
+    children: &[(&'static str, BzlModuleIdentity, FrozenModule)],
+) {
+    for (name, child, export) in [
+        ("cc_common", 0, "cc_common"),
+        ("CcInfo", 1, "CcInfo"),
+        ("dedent", 2, "dedent"),
+        ("find_toolchain", 2, "find_toolchain"),
+        ("rust_common", 3, "rust_common"),
+        (
+            "AllocatorLibrariesImplInfo",
+            4,
+            "AllocatorLibrariesImplInfo",
+        ),
+        ("AllocatorLibrariesInfo", 4, "AllocatorLibrariesInfo"),
+    ] {
+        assert!(
+            module
+                .get(name)
+                .unwrap()
+                .value()
+                .ptr_eq(children[child].2.get(export).unwrap().value()),
+            "{name}"
+        );
+    }
+}
+
+fn assert_rules_rust_allocator_declarations(module: &FrozenModule) {
+    let attrs_value = module.get("RUSTC_ALLOCATOR_LIBRARIES_ATTRS").unwrap();
+    let attrs = DictRef::from_value(attrs_value.value().to_value()).unwrap();
+    let entries = attrs.iter().collect::<Vec<_>>();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].0.unpack_str(), Some("allocator_libraries"));
+    assert_eq!(entries[0].1.get_type(), "attribute");
+    let rule = module
+        .get("rust_allocator_libraries")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    assert_eq!(rule.capability().rule_class, "rust_allocator_libraries");
+    assert_eq!(rule.advertised_providers().len(), 1);
+    assert_eq!(
+        rule.advertised_providers()[0].to_string(),
+        "@@rules_rust+//rust/private:providers.bzl%AllocatorLibrariesInfo"
+    );
+    let expected_toolchains = [
+        ("@@rules_rust+//rust:toolchain_type", true),
+        ("@@bazel_tools+//tools/cpp:toolchain_type", false),
+    ];
+    for (actual, (label, mandatory)) in rule.required_toolchains().iter().zip(expected_toolchains) {
+        assert_eq!(actual.label().to_string(), label);
+        assert_eq!(actual.mandatory(), mandatory);
+    }
+    for name in ["allocator_library", "global_allocator_library"] {
+        let attribute = rule
+            .schema
+            .iter()
+            .find(|schema| schema.name == name)
+            .unwrap();
+        assert_eq!(attribute.kind, AttributeKind::Label);
+        assert_eq!(attribute.required_providers.len(), 1);
+        assert_eq!(
+            attribute.required_providers[0][0].to_string(),
+            "@@rules_rust+//rust/private:providers.bzl%AllocatorLibrariesImplInfo"
+        );
+    }
+}
+
+#[test]
+fn exact_rules_rust_allocator_libraries_freezes_complete_recursive_producer() {
+    assert_eq!(RULES_RUST_ALLOCATOR_LIBRARIES_SOURCE.lines().count(), 302);
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_RUST_ALLOCATOR_LIBRARIES_SOURCE.as_bytes())
+        ),
+        "ae4acb50ac6a1b922254a07346d97b4649810d33836f2be4824fd0b7a81e536e"
+    );
+    let children = complete_rules_rust_allocator_children();
+    let expected_children = [
+        (
+            "@@rules_cc+//cc/common:cc_common.bzl",
+            "/rules_cc/cc/common/cc_common.bzl",
+        ),
+        (
+            "@@rules_cc+//cc/common:cc_info.bzl",
+            "/rules_cc/cc/common/cc_info.bzl",
+        ),
+        (
+            "@@rules_rust+//rust/private:utils.bzl",
+            "/rules_rust/rust/private/utils.bzl",
+        ),
+        (
+            "@@rules_rust+//rust/private:common.bzl",
+            "/rules_rust/rust/private/common.bzl",
+        ),
+        (
+            "@@rules_rust+//rust/private:providers.bzl",
+            "/rules_rust/rust/private/providers.bzl",
+        ),
+    ];
+    for (child, (label, path)) in children.iter().zip(expected_children) {
+        assert_eq!(child.1.label, CanonicalLabel::parse(label).unwrap());
+        assert_eq!(child.1.workspace_path, PathBuf::from(path));
+    }
+    assert_eq!(
+        children[0].1.repository_mapping,
+        children[1].1.repository_mapping
+    );
+    assert_eq!(
+        children[0].1.repository_mapping,
+        Arc::from([(
+            ApparentRepoName::new("cc_compatibility_proxy").unwrap(),
+            CanonicalRepoName::new("rules_cc++compatibility_proxy+cc_compatibility_proxy").unwrap(),
+        )])
+    );
+    assert_eq!(
+        children[2].1.repository_mapping,
+        Arc::from([
+            (
+                ApparentRepoName::new("bazel_skylib").unwrap(),
+                CanonicalRepoName::new("bazel_skylib+").unwrap(),
+            ),
+            (
+                ApparentRepoName::new("rules_cc").unwrap(),
+                CanonicalRepoName::new("rules_cc+").unwrap(),
+            ),
+        ])
+    );
+    assert!(children[3].1.repository_mapping.is_empty());
+    assert!(children[4].1.repository_mapping.is_empty());
+    let module = eval_bzl_with_loaded_children(
+        RULES_RUST_ALLOCATOR_LIBRARIES_SOURCE,
+        compile_owner(
+            "@@rules_rust+//rust/private:rust_allocator_libraries.bzl",
+            "/rules_rust/rust/private/rust_allocator_libraries.bzl",
+            &[("bazel_tools", "bazel_tools+"), ("rules_cc", "rules_cc+")],
+        ),
+        &children,
+    )
+    .unwrap();
+    assert_rules_rust_allocator_imports(&module, &children);
+    assert_rules_rust_allocator_declarations(&module);
+    for name in [
+        "_ltl",
+        "make_libstd_and_allocator_ccinfo",
+        "_rust_allocator_libraries_impl",
+    ] {
+        assert_eq!(
+            module
+                .get_any_visibility(name)
+                .unwrap()
+                .0
+                .value()
+                .get_type(),
+            "function"
+        );
+    }
+    for name in ["_ltl", "_rust_allocator_libraries_impl"] {
+        assert!(module.get(name).is_err());
+    }
+    let mut public = module.names().map(|name| name.as_str()).collect::<Vec<_>>();
+    public.sort_unstable();
+    assert_eq!(
+        public,
+        "AllocatorLibrariesImplInfo AllocatorLibrariesInfo CcInfo RUSTC_ALLOCATOR_LIBRARIES_ATTRS cc_common dedent find_toolchain make_libstd_and_allocator_ccinfo rust_allocator_libraries rust_common"
+            .split_whitespace()
+            .collect::<Vec<_>>()
+    );
+    let mut all = module
+        .names_any_visibility()
+        .map(|name| name.as_str())
+        .collect::<Vec<_>>();
+    all.sort_unstable();
+    assert_eq!(
+        all,
+        "AllocatorLibrariesImplInfo AllocatorLibrariesInfo CcInfo RUSTC_ALLOCATOR_LIBRARIES_ATTRS _ltl _rust_allocator_libraries_impl cc_common dedent find_toolchain make_libstd_and_allocator_ccinfo rust_allocator_libraries rust_common"
+            .split_whitespace()
+            .collect::<Vec<_>>()
+    );
 }
 
 #[test]
@@ -28510,13 +29134,10 @@ fn rustfmt_second_aspect_rejects_unadmitted_declaration_shapes() {
 }
 
 #[test]
-fn rustfmt_test_aspect_rejects_unadmitted_provides_shapes() {
+fn rustfmt_test_aspect_rejects_invalid_provides_shapes() {
     for source in [
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, provides=[])",
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, provides=1)",
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, provides=[1])",
-        "P=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, provides=[P, P])",
-        "P=provider()\nQ=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, provides=[P, Q])",
         "NESTED=[provider()]\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, provides=NESTED)",
     ] {
         assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
@@ -29886,7 +30507,6 @@ fn bazel_aspect_definition_validates_admitted_fixed_abi_and_build_absence() {
         "A=aspect(implementation=print)",
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, attr_aspects=['*', 'deps'])",
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, doc=1)",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, provides=[])",
     ] {
         assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
     }

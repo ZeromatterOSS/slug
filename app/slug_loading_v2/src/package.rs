@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use dupe::Dupe;
 use slug_build_api_v2::ProviderId;
 use slug_bzlmod_v2::NonrootAttributeValue;
 use slug_identity_v2::ApparentLabel;
@@ -515,6 +516,7 @@ pub struct StarlarkRuleImplementation {
     implementation: FrozenValue,
     dependencies: Arc<[CanonicalLabel]>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
+    advertised_providers: Arc<[ProviderId]>,
     schema: Arc<[AttributeSchema]>,
     values: Arc<[AttributeValue]>,
     capability: Arc<RuleCapability>,
@@ -527,6 +529,7 @@ impl PartialEq for StarlarkRuleImplementation {
         // address is not package semantics and must not defeat DICE equality.
         self.dependencies == other.dependencies
             && self.required_toolchains == other.required_toolchains
+            && self.advertised_providers == other.advertised_providers
             && self.schema == other.schema
             && self.values == other.values
             && self.capability == other.capability
@@ -549,6 +552,10 @@ impl StarlarkRuleImplementation {
     /// These are loading-only retained metadata, not ordinary dependencies.
     pub fn required_toolchains(&self) -> &[ToolchainTypeRequirement] {
         &self.required_toolchains
+    }
+
+    pub fn advertised_providers(&self) -> &[ProviderId] {
+        &self.advertised_providers
     }
 
     pub fn schema(&self) -> &[AttributeSchema] {
@@ -963,6 +970,7 @@ impl PackageRecorder {
         name: String,
         implementation: FrozenValue,
         required_toolchains: Arc<[ToolchainTypeRequirement]>,
+        advertised_providers: Arc<[ProviderId]>,
         capability: Arc<RuleCapability>,
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
@@ -993,6 +1001,7 @@ impl PackageRecorder {
                 implementation,
                 dependencies: dependencies.into(),
                 required_toolchains,
+                advertised_providers,
                 schema,
                 values,
                 capability,
@@ -2463,6 +2472,8 @@ struct RuleDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     #[trace(unsafe_ignore)]
+    advertised_providers: Arc<[ProviderId]>,
+    #[trace(unsafe_ignore)]
     schema: Arc<[RuleAttributeSchemaGen<V>]>,
     executable: bool,
     test: bool,
@@ -2477,6 +2488,7 @@ struct RuleDefinitionGen<V> {
 pub(crate) struct FrozenRuleDefinition {
     implementation: FrozenValue,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
+    advertised_providers: Arc<[ProviderId]>,
     pub(crate) schema: Arc<[FrozenRuleAttributeSchema]>,
     capability: Arc<RuleCapability>,
     pub(crate) build_setting_kind: Option<BuildSettingKind>,
@@ -2500,6 +2512,11 @@ impl FrozenRuleDefinition {
     #[cfg(test)]
     pub(crate) fn required_toolchains(&self) -> &[ToolchainTypeRequirement] {
         &self.required_toolchains
+    }
+
+    #[cfg(test)]
+    pub(crate) fn advertised_providers(&self) -> &[ProviderId] {
+        &self.advertised_providers
     }
 
     #[cfg(test)]
@@ -2577,6 +2594,7 @@ impl<'v> Freeze for RuleDefinition<'v> {
         Ok(FrozenRuleDefinition {
             implementation: self.implementation.freeze(freezer)?,
             required_toolchains: self.required_toolchains,
+            advertised_providers: self.advertised_providers,
             schema: self
                 .schema
                 .iter()
@@ -2712,17 +2730,42 @@ impl<'v> Freeze for AspectDefinition<'v> {
     }
 }
 
-fn aspect_provider_id(value: Value) -> anyhow::Result<ProviderId> {
+fn declaration_provider_id(value: Value, argument: &str) -> anyhow::Result<ProviderId> {
     if let Some(provider) = value.downcast_ref::<UserProviderCallable>() {
         return provider
             .id()
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!("aspect providers must be exported"));
+            .map(Dupe::dupe)
+            .ok_or_else(|| anyhow::anyhow!("{argument} providers must be exported"));
     }
     if let Some(provider) = value.downcast_ref::<FrozenUserProviderCallable>() {
-        return Ok(provider.id().clone());
+        return Ok(provider.id().dupe());
     }
-    anyhow::bail!("aspect providers must be user provider constructors")
+    anyhow::bail!("{argument} must contain user provider constructors")
+}
+
+fn advertised_provider_ids(
+    value: Option<Value>,
+    argument: &str,
+) -> anyhow::Result<Arc<[ProviderId]>> {
+    let Some(value) = value else {
+        return Ok(Arc::from([]));
+    };
+    let providers = if let Some(list) = ListRef::from_value(value) {
+        list.iter().collect::<Vec<_>>()
+    } else if let Some(tuple) = TupleRef::from_value(value) {
+        tuple.iter().collect::<Vec<_>>()
+    } else {
+        anyhow::bail!("{argument} must be a sequence")
+    };
+    let mut seen = SmallSet::new();
+    let mut result = Vec::with_capacity(providers.len());
+    for provider in providers {
+        let id = declaration_provider_id(provider, argument)?;
+        if seen.insert(id.dupe()) {
+            result.push(id);
+        }
+    }
+    Ok(result.into())
 }
 
 fn aspect_required_providers(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[ProviderId]>]>> {
@@ -2743,22 +2786,17 @@ fn aspect_required_providers(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[P
             if providers.len() != 1 {
                 anyhow::bail!("aspect required_providers alternatives must be singletons");
             }
-            Ok(Arc::from([aspect_provider_id(providers[0])?]))
+            Ok(Arc::from([declaration_provider_id(
+                providers[0],
+                "aspect required_providers",
+            )?]))
         })
         .collect::<anyhow::Result<Vec<_>>>()
         .map(Arc::from)
 }
 
 fn aspect_advertised_providers(value: Option<Value>) -> anyhow::Result<Arc<[ProviderId]>> {
-    let Some(value) = value else {
-        return Ok(Arc::from([]));
-    };
-    let providers = ListRef::from_value(value)
-        .ok_or_else(|| anyhow::anyhow!("aspect provides must be a list"))?;
-    let [provider] = providers.content() else {
-        anyhow::bail!("only one advertised aspect provider is supported");
-    };
-    Ok(Arc::from([aspect_provider_id(*provider)?]))
+    advertised_provider_ids(value, "aspect provides")
 }
 
 fn aspect_required_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>> {
@@ -2803,7 +2841,10 @@ fn label_required_provider(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[Pro
     let [provider] = providers.content() else {
         anyhow::bail!("label providers supports exactly one exported provider");
     };
-    Ok(Arc::from([Arc::from([aspect_provider_id(*provider)?])]))
+    Ok(Arc::from([Arc::from([declaration_provider_id(
+        *provider,
+        "attribute providers",
+    )?])]))
 }
 
 fn label_list_attached_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>> {
@@ -4760,6 +4801,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         };
         let implementation = self.implementation;
         let required_toolchains = self.required_toolchains.clone();
+        let advertised_providers = self.advertised_providers.clone();
         let capability = self.capability.clone();
         PackageRecorder::from_evaluator(eval)
             .and_then(|recorder| {
@@ -4938,6 +4980,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     name.to_owned(),
                     implementation,
                     required_toolchains,
+                    advertised_providers,
                     capability,
                     schema,
                     values,
@@ -5363,6 +5406,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         build_setting: Option<Value<'v>>,
         toolchains: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] provides: Option<Value<'v>>,
         #[starlark(default = false)] executable: bool,
         #[starlark(default = false)] test: bool,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -5422,6 +5466,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         Ok(RuleDefinition {
             implementation,
             required_toolchains: toolchain_requirements(toolchains, eval)?,
+            advertised_providers: advertised_provider_ids(provides, "rule provides")?,
             schema: schema.into(),
             executable,
             test,
