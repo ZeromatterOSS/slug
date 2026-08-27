@@ -3,6 +3,7 @@
 use std::error::Error;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use dice::DetectCycles;
@@ -27,15 +28,21 @@ use super::HostExternalPackageBoundaryError;
 use super::HostExternalPackageBoundaryKey;
 use super::HostExternalPackageBoundaryKind;
 use super::HostExternalPackageBoundaryObservationKey;
+use crate::HostCanonicalRepositoryRoute;
+use crate::HostRepositorySourceObservationEpochKey;
+use crate::HostRepositorySourceObservationView;
+use crate::RepositoryPackageSourceObservationKey;
 use crate::RootPackagePolicyInputs;
 use crate::RootRepositoryRoute;
 use crate::SourcePreparationNeeds;
 use crate::SourcePreparationOutcome;
+use crate::host_canonical_repository_source_input;
 use crate::host_package::ExternalRepositoryPackageLookup;
 use crate::host_package::ExternalRepositoryPackageLookupKey;
 use crate::host_package::ExternalRepositoryPackageLookupObservationKey;
 use crate::host_package::HostBuildFileName;
 use crate::host_package::ObservedExternalRepositoryPackageLookup;
+use crate::host_repository_relative_path;
 use crate::inject_root_package_policy_inputs;
 
 fn path(value: &str) -> NormalizedAbsolutePath {
@@ -134,6 +141,91 @@ async fn real_builtin_boundary(
         ))
         .await
         .unwrap()
+}
+
+#[tokio::test]
+async fn canonical_builtin_policy_stops_package_source_at_catalog_address() {
+    let workspace = path("/workspace");
+    let input = host_canonical_repository_source_input(
+        Arc::new(HostCanonicalRepositoryRoute::builtin(workspace.dupe())),
+        None,
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        RootPackagePolicyInputs::new(
+            workspace,
+            Vec::<NormalizedAbsolutePath>::new(),
+            std::iter::empty::<&str>(),
+            None,
+            Some("warning"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let mut transaction = updater.commit().await;
+    let package_path = package("tools/test");
+    let boundary = transaction
+        .compute(&HostExternalPackageBoundaryObservationKey::new_canonical(
+            input.clone(),
+            package_path.clone(),
+        ))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(Ok(boundary)) = boundary else {
+        panic!("canonical built-in boundary must complete")
+    };
+    assert_eq!(
+        boundary.result().as_ref().unwrap().kind(),
+        HostExternalPackageBoundaryKind::Package
+    );
+    assert_eq!(
+        boundary
+            .result()
+            .as_ref()
+            .unwrap()
+            .selected_build_file_name(),
+        Some("BUILD")
+    );
+
+    let source_key = HostRepositorySourceObservationEpochKey::new_canonical(
+        input.clone(),
+        host_repository_relative_path(PathBuf::from("tools/test/BUILD")).unwrap(),
+    );
+    let source = transaction.compute(&source_key).await.unwrap();
+    let SourcePreparationOutcome::Complete(Ok(source)) = source else {
+        panic!("canonical built-in source must complete")
+    };
+    match source.result().as_ref().as_ref().unwrap().view() {
+        HostRepositorySourceObservationView::Builtin(file) => {
+            assert_eq!(file.path(), "tools/test/BUILD");
+            assert!(!file.bytes().is_empty());
+        }
+        _ => panic!("canonical built-in source must retain the catalog variant"),
+    }
+    let package_source_key = RepositoryPackageSourceObservationKey::new_canonical(
+        input,
+        PackageIdentifier::new(
+            slug_identity_v2::CanonicalRepoName::new("bazel_tools").unwrap(),
+            package_path,
+        ),
+    )
+    .unwrap();
+    let package_source = transaction.compute(&package_source_key).await.unwrap();
+    let SourcePreparationOutcome::Complete(Ok(package_source)) = package_source else {
+        panic!("canonical built-in package source terminal must complete")
+    };
+    let error = package_source.result().as_ref().as_ref().unwrap_err();
+    assert_eq!(
+        error.deferred_builtin_source_address(),
+        Some(&PathBuf::from("tools/test/BUILD"))
+    );
+    assert!(!error.to_string().contains("/workspace"));
+    assert!(boundary.observations().observations().is_empty());
+    assert!(source.observations().observations().is_empty());
+    assert!(package_source.observations().observations().is_empty());
 }
 
 #[tokio::test]

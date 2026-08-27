@@ -51,15 +51,20 @@ use crate::repo_file::HostNonregistryRepoFileObservationKey;
 use crate::repo_file::HostRepoFileError;
 use crate::repo_file::HostRepoFileKey;
 use crate::repo_file::HostRepoFileObservationKey;
+use crate::repo_file::HostRepoFileValue;
 use crate::repo_file::HostRouteRepoFileError;
 use crate::repo_file::HostRouteRepoFileKey;
 use crate::repo_file::HostRouteRepoFileObservationKey;
+use crate::source_preparation::HostCanonicalRepositorySourceInput;
 use crate::source_preparation::HostRepositoryDirectoryListingError;
 use crate::source_preparation::HostRepositoryDirectoryListingKey;
 use crate::source_preparation::HostRepositoryDirectoryListingObservationKey;
 use crate::source_preparation::HostRepositorySourceFileKey;
 use crate::source_preparation::HostRepositorySourceFileObservationKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
+use crate::source_preparation::HostRepositorySourceObservation;
+use crate::source_preparation::HostRepositorySourceObservationError;
+use crate::source_preparation::HostRepositorySourceRoute;
 use crate::source_preparation::RepositorySourceFileError;
 use crate::source_preparation::RepositorySourceFileKey;
 use crate::source_preparation::RepositorySourceFileObservationKey;
@@ -175,6 +180,7 @@ pub(crate) enum HostRepositoryIgnoreError {
     },
     HostFile(HostFileError),
     RepositorySource(RepositorySourceFileError),
+    RepositorySourceObservation(HostRepositorySourceObservationError),
     InvalidAbsolute {
         logical_path: NormalizedAbsolutePath,
         normalized: Arc<[u16]>,
@@ -200,6 +206,9 @@ impl fmt::Display for HostRepositoryIgnoreError {
             Self::HostFile(error) => write!(f, "failed to read .bazelignore: {error:?}"),
             Self::RepositorySource(error) => {
                 write!(f, "failed to read routed .bazelignore: {error:?}")
+            }
+            Self::RepositorySourceObservation(error) => {
+                write!(f, "failed to read canonical .bazelignore: {error:?}")
             }
             Self::InvalidAbsolute {
                 logical_path,
@@ -1457,11 +1466,23 @@ impl Key for HostNonregistryRepositoryIgnoreObservationKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct HostRouteRepositoryIgnoreKey {
-    route: RootRepositoryRoute,
+    route: HostRepositorySourceRoute,
 }
 
 impl HostRouteRepositoryIgnoreKey {
     pub(crate) fn new(route: RootRepositoryRoute) -> Self {
+        Self {
+            route: HostRepositorySourceRoute::root(route),
+        }
+    }
+
+    pub(crate) fn new_canonical(input: HostCanonicalRepositorySourceInput) -> Self {
+        Self {
+            route: HostRepositorySourceRoute::canonical(input),
+        }
+    }
+
+    pub(crate) fn from_source_route(route: HostRepositorySourceRoute) -> Self {
         Self { route }
     }
 }
@@ -1513,12 +1534,180 @@ type HostRouteRepositoryIgnoreProjection =
 type HostRouteRepositoryIgnoreDriverOutcome = SourcePreparationOutcome<
     Result<HostRouteRepositoryIgnoreProjection, ObservedPathFrontierError>,
 >;
+type HostRouteIgnoreSourceProjection = (
+    Result<HostRepositorySourceFileValue, HostRepositoryIgnoreError>,
+    PathObservationEpoch,
+);
+type HostRouteIgnoreSourceOutcome =
+    SourcePreparationOutcome<Result<HostRouteIgnoreSourceProjection, ObservedPathFrontierError>>;
 
 fn route_ignore_complete(
     result: Result<RepositoryIgnoreMatcher, HostRepositoryIgnoreError>,
     observations: PathObservationEpoch,
 ) -> HostRouteRepositoryIgnoreDriverOutcome {
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+async fn drive_route_ignore_source(
+    ctx: &mut DiceComputations<'_>,
+    route: &HostRepositorySourceRoute,
+    observed_mode: bool,
+) -> HostRouteIgnoreSourceOutcome {
+    if let Some(root) = route.root_route() {
+        return if !observed_mode {
+            match dice_invariant(
+                ctx.compute(&HostRepositorySourceFileKey::new(
+                    root.clone(),
+                    ".bazelignore".into(),
+                ))
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(source) => {
+                    SourcePreparationOutcome::Complete(Ok((
+                        source.map_err(HostRepositoryIgnoreError::RepositorySource),
+                        PathObservationEpoch::empty(),
+                    )))
+                }
+            }
+        } else {
+            match dice_invariant(
+                ctx.compute(&HostRepositorySourceFileObservationKey::new(
+                    root.clone(),
+                    ".bazelignore".into(),
+                ))
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    SourcePreparationOutcome::Complete(Err(error))
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => {
+                    SourcePreparationOutcome::Complete(Ok((
+                        observed
+                            .result()
+                            .as_ref()
+                            .clone()
+                            .map_err(HostRepositoryIgnoreError::RepositorySource),
+                        observed.observations().dupe(),
+                    )))
+                }
+            }
+        };
+    }
+
+    let relative = crate::host_repository_relative_path(".bazelignore".into())
+        .expect(".bazelignore is a valid repository-relative path");
+    let (result, observations) = if !observed_mode {
+        match dice_invariant(ctx.compute(&route.source_observation_key(relative)).await) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(result) => (result, PathObservationEpoch::empty()),
+        }
+    } else {
+        let observed = match dice_invariant(
+            ctx.compute(&route.source_observation_epoch_key(relative))
+                .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Err(error));
+            }
+            SourcePreparationOutcome::Complete(Ok(observed)) => observed,
+        };
+        (observed.result().dupe(), observed.observations().dupe())
+    };
+    let source = match result.as_ref() {
+        Err(error) => Err(error.request_error().map_or_else(
+            || HostRepositoryIgnoreError::RepositorySourceObservation(error.clone()),
+            |error| HostRepositoryIgnoreError::RepositorySource(error.clone()),
+        )),
+        Ok(value) => match value {
+            HostRepositorySourceObservation::Request(value) => Ok(value.clone()),
+            HostRepositorySourceObservation::Builtin(_) => {
+                unreachable!("built-in ignore source is handled by directory listing")
+            }
+        },
+    };
+    SourcePreparationOutcome::Complete(Ok((source, observations)))
+}
+
+async fn finish_builtin_route_repository_ignore(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostRouteRepositoryIgnoreKey,
+    observed_mode: bool,
+    repo: &HostRepoFileValue,
+    mut observations: PathObservationEpoch,
+) -> HostRouteRepositoryIgnoreDriverOutcome {
+    let (listing, listing_observations) = match observed_mode {
+        false => match dice_invariant(
+            ctx.compute(&HostRepositoryDirectoryListingKey::from_source_route(
+                key.route.clone(),
+                PackagePath::root(),
+            ))
+            .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(listing) => (listing, PathObservationEpoch::empty()),
+        },
+        true => {
+            let observed = match dice_invariant(
+                ctx.compute(
+                    &HostRepositoryDirectoryListingObservationKey::from_source_route(
+                        key.route.clone(),
+                        PackagePath::root(),
+                    ),
+                )
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    return SourcePreparationOutcome::Complete(Err(error));
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => observed,
+            };
+            (
+                observed.result().as_ref().clone(),
+                observed.observations().dupe(),
+            )
+        }
+    };
+    observations = match union_observations(&observations, &listing_observations) {
+        Ok(observations) => observations,
+        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+    };
+    match listing {
+        Err(error) => {
+            return route_ignore_complete(
+                Err(HostRepositoryIgnoreError::RepositoryListing(error)),
+                observations,
+            );
+        }
+        Ok(PathDirectoryListing::Present(entries)) => {
+            if let Some(entry) = entries
+                .entries()
+                .iter()
+                .find(|entry| entry.name().as_os_str() == ".bazelignore")
+                && entry.kind() != PathDirectoryEntryKind::Directory
+            {
+                return route_ignore_complete(
+                    Err(HostRepositoryIgnoreError::BuiltinMetadata {
+                        actual: entry.kind(),
+                    }),
+                    observations,
+                );
+            }
+        }
+        Ok(PathDirectoryListing::Missing) => {}
+    }
+    route_ignore_complete(
+        Ok(RepositoryIgnoreMatcher::new(
+            Vec::new(),
+            repo.ignored_directories().iter().cloned(),
+        )),
+        observations,
+    )
 }
 
 async fn drive_host_route_repository_ignore(
@@ -1529,7 +1718,7 @@ async fn drive_host_route_repository_ignore(
     let (repo, mut observations) = match observed_mode {
         false => {
             match dice_invariant(
-                ctx.compute(&HostRouteRepoFileKey::new(key.route.clone()))
+                ctx.compute(&HostRouteRepoFileKey::from_source_route(key.route.clone()))
                     .await,
             ) {
                 SourcePreparationOutcome::Need(need) => {
@@ -1542,9 +1731,9 @@ async fn drive_host_route_repository_ignore(
         }
         true => {
             let observed = match dice_invariant(
-                ctx.compute(&HostRouteRepoFileObservationKey(HostRouteRepoFileKey::new(
-                    key.route.clone(),
-                )))
+                ctx.compute(&HostRouteRepoFileObservationKey(
+                    HostRouteRepoFileKey::from_source_route(key.route.clone()),
+                ))
                 .await,
             ) {
                 SourcePreparationOutcome::Need(need) => {
@@ -1571,118 +1760,23 @@ async fn drive_host_route_repository_ignore(
         }
     };
     if key.route.is_builtin_bazel_tools() {
-        let (listing, listing_observations) = match observed_mode {
-            false => match dice_invariant(
-                ctx.compute(&HostRepositoryDirectoryListingKey::new(
-                    key.route.clone(),
-                    PackagePath::root(),
-                ))
-                .await,
-            ) {
-                SourcePreparationOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                SourcePreparationOutcome::Complete(listing) => {
-                    (listing, PathObservationEpoch::empty())
-                }
-            },
-            true => {
-                let observed = match dice_invariant(
-                    ctx.compute(&HostRepositoryDirectoryListingObservationKey::new(
-                        key.route.clone(),
-                        PackagePath::root(),
-                    ))
-                    .await,
-                ) {
-                    SourcePreparationOutcome::Need(need) => {
-                        return SourcePreparationOutcome::Need(need);
-                    }
-                    SourcePreparationOutcome::Complete(Err(error)) => {
-                        return SourcePreparationOutcome::Complete(Err(error));
-                    }
-                    SourcePreparationOutcome::Complete(Ok(observed)) => observed,
-                };
-                (
-                    observed.result().as_ref().clone(),
-                    observed.observations().dupe(),
-                )
-            }
-        };
-        observations = match union_observations(&observations, &listing_observations) {
-            Ok(observations) => observations,
-            Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
-        };
-        match listing {
-            Err(error) => {
-                return route_ignore_complete(
-                    Err(HostRepositoryIgnoreError::RepositoryListing(error)),
-                    observations,
-                );
-            }
-            Ok(PathDirectoryListing::Present(entries)) => {
-                if let Some(entry) = entries
-                    .entries()
-                    .iter()
-                    .find(|entry| entry.name().as_os_str() == ".bazelignore")
-                    && entry.kind() != PathDirectoryEntryKind::Directory
-                {
-                    return route_ignore_complete(
-                        Err(HostRepositoryIgnoreError::BuiltinMetadata {
-                            actual: entry.kind(),
-                        }),
-                        observations,
-                    );
-                }
-            }
-            Ok(PathDirectoryListing::Missing) => {}
-        }
-        return route_ignore_complete(
-            Ok(RepositoryIgnoreMatcher::new(
-                Vec::new(),
-                repo.ignored_directories().iter().cloned(),
-            )),
+        return finish_builtin_route_repository_ignore(
+            ctx,
+            key,
+            observed_mode,
+            &repo,
             observations,
-        );
+        )
+        .await;
     }
-    let (source, source_observations) = match observed_mode {
-        false => {
-            match dice_invariant(
-                ctx.compute(&HostRepositorySourceFileKey::new(
-                    key.route.clone(),
-                    ".bazelignore".into(),
-                ))
-                .await,
-            ) {
-                SourcePreparationOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                SourcePreparationOutcome::Complete(source) => {
-                    (source, PathObservationEpoch::empty())
-                }
+    let (source, source_observations) =
+        match drive_route_ignore_source(ctx, &key.route, observed_mode).await {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Err(error));
             }
-        }
-        true => {
-            let observed = match dice_invariant(
-                ctx.compute(&HostRepositorySourceFileObservationKey::new(
-                    key.route.clone(),
-                    ".bazelignore".into(),
-                ))
-                .await,
-            ) {
-                SourcePreparationOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                SourcePreparationOutcome::Complete(Err(error)) => {
-                    return SourcePreparationOutcome::Complete(Err(error));
-                }
-                SourcePreparationOutcome::Complete(Ok(observed)) => observed,
-            };
-            (
-                observed.result().as_ref().clone(),
-                observed.observations().dupe(),
-            )
-        }
-    };
+            SourcePreparationOutcome::Complete(Ok(source)) => source,
+        };
     observations = match union_observations(&observations, &source_observations) {
         Ok(observations) => observations,
         Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
@@ -1693,16 +1787,13 @@ async fn drive_host_route_repository_ignore(
             bytes,
             logical_path,
         }) => Some((bytes, logical_path)),
-        Err(RepositorySourceFileError::WrongKind {
-            actual: PathNodeKind::Directory,
-            ..
-        }) => None,
-        Err(error) => {
-            return route_ignore_complete(
-                Err(HostRepositoryIgnoreError::RepositorySource(error)),
-                observations,
-            );
-        }
+        Err(HostRepositoryIgnoreError::RepositorySource(
+            RepositorySourceFileError::WrongKind {
+                actual: PathNodeKind::Directory,
+                ..
+            },
+        )) => None,
+        Err(error) => return route_ignore_complete(Err(error), observations),
     };
     let mut prefixes = Vec::new();
     if let Some((bytes, logical_path)) = source {

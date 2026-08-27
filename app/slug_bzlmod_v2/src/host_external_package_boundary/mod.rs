@@ -26,6 +26,7 @@ use slug_identity_v2::PackagePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathObservationEpoch;
 
+use crate::HostCanonicalRepositorySourceInput;
 use crate::RootRepositoryRoute;
 use crate::SourcePreparationOutcome;
 use crate::host_package::ExternalRepositoryPackageLookup;
@@ -33,6 +34,7 @@ use crate::host_package::ExternalRepositoryPackageLookupError;
 use crate::host_package::ExternalRepositoryPackageLookupKey;
 use crate::host_package::ExternalRepositoryPackageLookupObservationKey;
 use crate::host_package::HostBuildFileName;
+use crate::source_preparation::HostRepositorySourceRoute;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
 pub enum HostExternalPackageBoundaryKind {
@@ -157,17 +159,27 @@ impl std::error::Error for HostExternalPackageBoundaryError {}
 /// Complete authenticated identity for one external package candidate.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct HostExternalPackageBoundaryKey {
-    route: RootRepositoryRoute,
+    route: HostRepositorySourceRoute,
     package: PackagePath,
 }
 
 impl HostExternalPackageBoundaryKey {
     pub fn new(route: RootRepositoryRoute, package: PackagePath) -> Self {
-        Self { route, package }
+        Self {
+            route: HostRepositorySourceRoute::root(route),
+            package,
+        }
+    }
+
+    pub fn new_canonical(input: HostCanonicalRepositorySourceInput, package: PackagePath) -> Self {
+        Self {
+            route: HostRepositorySourceRoute::canonical(input),
+            package,
+        }
     }
 
     fn lookup_key(&self) -> ExternalRepositoryPackageLookupKey {
-        ExternalRepositoryPackageLookupKey::new(
+        ExternalRepositoryPackageLookupKey::from_source_route(
             self.route.clone(),
             PackageIdentifier::new(self.route.canonical_repo().clone(), self.package.clone()),
         )
@@ -175,7 +187,7 @@ impl HostExternalPackageBoundaryKey {
     }
 
     fn lookup_observation_key(&self) -> ExternalRepositoryPackageLookupObservationKey {
-        ExternalRepositoryPackageLookupObservationKey::new(
+        ExternalRepositoryPackageLookupObservationKey::from_source_route(
             self.route.clone(),
             PackageIdentifier::new(self.route.canonical_repo().clone(), self.package.clone()),
         )
@@ -218,6 +230,12 @@ pub struct HostExternalPackageBoundaryObservationKey(HostExternalPackageBoundary
 impl HostExternalPackageBoundaryObservationKey {
     pub fn new(route: RootRepositoryRoute, package: PackagePath) -> Self {
         Self(HostExternalPackageBoundaryKey::new(route, package))
+    }
+
+    pub fn new_canonical(input: HostCanonicalRepositorySourceInput, package: PackagePath) -> Self {
+        Self(HostExternalPackageBoundaryKey::new_canonical(
+            input, package,
+        ))
     }
 }
 

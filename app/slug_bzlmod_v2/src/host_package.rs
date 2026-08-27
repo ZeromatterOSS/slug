@@ -63,6 +63,7 @@ use crate::repository_ignore::HostRouteRepositoryIgnoreObservationKey;
 use crate::source_preparation::DirectLocalModuleSupport;
 use crate::source_preparation::DirectLocalModuleSupportError;
 use crate::source_preparation::DirectLocalUnsupportedCycle;
+use crate::source_preparation::HostCanonicalRepositorySourceInput;
 use crate::source_preparation::HostRepositoryDirectoryListingError;
 use crate::source_preparation::HostRepositoryDirectoryListingKey;
 use crate::source_preparation::HostRepositoryDirectoryListingObservationKey;
@@ -71,6 +72,9 @@ use crate::source_preparation::HostRepositoryPathObservationKey;
 use crate::source_preparation::HostRepositorySourceFileKey;
 use crate::source_preparation::HostRepositorySourceFileObservationKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
+use crate::source_preparation::HostRepositorySourceObservation;
+use crate::source_preparation::HostRepositorySourceObservationError;
+use crate::source_preparation::HostRepositorySourceRoute;
 use crate::source_preparation::RepositorySourceFileError;
 use crate::source_preparation::SourcePreparationNeeds;
 use crate::source_preparation::SourcePreparationOutcome;
@@ -549,12 +553,26 @@ impl std::error::Error for ExternalRepositoryPackageLookupError {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct ExternalRepositoryPackageLookupKey {
-    route: RootRepositoryRoute,
+    route: HostRepositorySourceRoute,
     package: PackageIdentifier,
 }
 
 impl ExternalRepositoryPackageLookupKey {
     pub(crate) fn new(route: RootRepositoryRoute, package: PackageIdentifier) -> Option<Self> {
+        Self::from_source_route(HostRepositorySourceRoute::root(route), package)
+    }
+
+    pub(crate) fn new_canonical(
+        input: HostCanonicalRepositorySourceInput,
+        package: PackageIdentifier,
+    ) -> Option<Self> {
+        Self::from_source_route(HostRepositorySourceRoute::canonical(input), package)
+    }
+
+    pub(crate) fn from_source_route(
+        route: HostRepositorySourceRoute,
+        package: PackageIdentifier,
+    ) -> Option<Self> {
         (package.repo() == route.canonical_repo()).then_some(Self { route, package })
     }
 }
@@ -578,6 +596,20 @@ pub(crate) struct ExternalRepositoryPackageLookupObservationKey(ExternalReposito
 impl ExternalRepositoryPackageLookupObservationKey {
     pub(crate) fn new(route: RootRepositoryRoute, package: PackageIdentifier) -> Option<Self> {
         ExternalRepositoryPackageLookupKey::new(route, package).map(Self)
+    }
+
+    pub(crate) fn new_canonical(
+        input: HostCanonicalRepositorySourceInput,
+        package: PackageIdentifier,
+    ) -> Option<Self> {
+        ExternalRepositoryPackageLookupKey::new_canonical(input, package).map(Self)
+    }
+
+    pub(crate) fn from_source_route(
+        route: HostRepositorySourceRoute,
+        package: PackageIdentifier,
+    ) -> Option<Self> {
+        ExternalRepositoryPackageLookupKey::from_source_route(route, package).map(Self)
     }
 }
 
@@ -649,151 +681,87 @@ fn builtin_build_file(entries: &PathDirectoryEntries) -> Option<HostBuildFileNam
         })
 }
 
-async fn drive_external_repository_package_lookup(
+async fn drive_builtin_external_repository_package_lookup(
     ctx: &mut DiceComputations<'_>,
     key: &ExternalRepositoryPackageLookupKey,
     mode: ExternalRepositoryPackageLookupMode,
+    mut observations: PathObservationEpoch,
 ) -> ExternalRepositoryPackageLookupDriverOutcome {
-    if let Some(message) = invalid_package_name(key.package.package()) {
-        return external_lookup_complete(
-            Ok(ExternalRepositoryPackageLookup::InvalidPackageName { message }),
-            PathObservationEpoch::empty(),
-        );
-    }
-    let deleted = match dice_invariant(
-        ctx.compute(&CanonicalDeletedPackagesProjectionKey::new(
-            key.route.workspace().dupe(),
-        ))
-        .await,
-    ) {
-        Ok(deleted) => deleted,
-        Err(error) => {
-            return external_lookup_complete(
-                Err(ExternalRepositoryPackageLookupError::PolicyInput(error)),
-                PathObservationEpoch::empty(),
-            );
-        }
-    };
-    if deleted.contains(&key.package) {
-        return external_lookup_complete(
-            Ok(ExternalRepositoryPackageLookup::Deleted),
-            PathObservationEpoch::empty(),
-        );
-    }
-
-    let (repository_ignore, mut observations) = match mode {
+    let (listing, listing_observations) = match mode {
         ExternalRepositoryPackageLookupMode::Legacy => match dice_invariant(
-            ctx.compute(&HostRouteRepositoryIgnoreKey::new(key.route.clone()))
-                .await,
-        ) {
-            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(value) => (value, PathObservationEpoch::empty()),
-        },
-        ExternalRepositoryPackageLookupMode::Observed => match dice_invariant(
-            ctx.compute(&HostRouteRepositoryIgnoreObservationKey(
-                HostRouteRepositoryIgnoreKey::new(key.route.clone()),
+            ctx.compute(&HostRepositoryDirectoryListingKey::from_source_route(
+                key.route.clone(),
+                key.package.package().clone(),
             ))
             .await,
         ) {
             SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                return SourcePreparationOutcome::Complete(Err(error));
-            }
-            SourcePreparationOutcome::Complete(Ok(value)) => {
-                (value.result().clone(), value.observations().dupe())
-            }
+            SourcePreparationOutcome::Complete(listing) => (listing, PathObservationEpoch::empty()),
         },
-    };
-    let repository_ignore = match repository_ignore.as_ref() {
-        Ok(value) => value,
-        Err(error) => {
-            return external_lookup_complete(
-                Err(ExternalRepositoryPackageLookupError::RepositoryIgnore(
-                    error.clone(),
-                )),
-                observations,
-            );
-        }
-    };
-    if repository_ignore
-        .matching_entry(key.package.package())
-        .is_some()
-    {
-        return external_lookup_complete(
-            Ok(ExternalRepositoryPackageLookup::IgnoredDirectory),
-            observations,
-        );
-    }
-
-    if key.route.is_builtin_bazel_tools() {
-        let (listing, listing_observations) = match mode {
-            ExternalRepositoryPackageLookupMode::Legacy => match dice_invariant(
-                ctx.compute(&HostRepositoryDirectoryListingKey::new(
-                    key.route.clone(),
-                    key.package.package().clone(),
-                ))
+        ExternalRepositoryPackageLookupMode::Observed => {
+            let observed = match dice_invariant(
+                ctx.compute(
+                    &HostRepositoryDirectoryListingObservationKey::from_source_route(
+                        key.route.clone(),
+                        key.package.package().clone(),
+                    ),
+                )
                 .await,
             ) {
                 SourcePreparationOutcome::Need(need) => {
                     return SourcePreparationOutcome::Need(need);
                 }
-                SourcePreparationOutcome::Complete(listing) => {
-                    (listing, PathObservationEpoch::empty())
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    return SourcePreparationOutcome::Complete(Err(error));
                 }
-            },
-            ExternalRepositoryPackageLookupMode::Observed => {
-                let observed = match dice_invariant(
-                    ctx.compute(&HostRepositoryDirectoryListingObservationKey::new(
-                        key.route.clone(),
-                        key.package.package().clone(),
-                    ))
-                    .await,
-                ) {
-                    SourcePreparationOutcome::Need(need) => {
-                        return SourcePreparationOutcome::Need(need);
-                    }
-                    SourcePreparationOutcome::Complete(Err(error)) => {
-                        return SourcePreparationOutcome::Complete(Err(error));
-                    }
-                    SourcePreparationOutcome::Complete(Ok(observed)) => observed,
-                };
-                (
-                    observed.result().as_ref().clone(),
-                    observed.observations().dupe(),
-                )
-            }
-        };
-        observations = match union_observations(&observations, &listing_observations) {
-            Ok(observations) => observations,
-            Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
-        };
-        return match listing {
-            Ok(PathDirectoryListing::Present(entries)) => external_lookup_complete(
-                Ok(builtin_build_file(&entries).map_or(
-                    ExternalRepositoryPackageLookup::NoBuildFile,
-                    ExternalRepositoryPackageLookup::Package,
-                )),
-                observations,
-            ),
-            Ok(PathDirectoryListing::Missing) => external_lookup_complete(
-                Ok(ExternalRepositoryPackageLookup::NoBuildFile),
-                observations,
-            ),
-            Err(error) => external_lookup_complete(
-                Err(ExternalRepositoryPackageLookupError::RepositoryListing(
-                    error,
-                )),
-                observations,
-            ),
-        };
+                SourcePreparationOutcome::Complete(Ok(observed)) => observed,
+            };
+            (
+                observed.result().as_ref().clone(),
+                observed.observations().dupe(),
+            )
+        }
+    };
+    observations = match union_observations(&observations, &listing_observations) {
+        Ok(observations) => observations,
+        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+    };
+    match listing {
+        Ok(PathDirectoryListing::Present(entries)) => external_lookup_complete(
+            Ok(builtin_build_file(&entries).map_or(
+                ExternalRepositoryPackageLookup::NoBuildFile,
+                ExternalRepositoryPackageLookup::Package,
+            )),
+            observations,
+        ),
+        Ok(PathDirectoryListing::Missing) => external_lookup_complete(
+            Ok(ExternalRepositoryPackageLookup::NoBuildFile),
+            observations,
+        ),
+        Err(error) => external_lookup_complete(
+            Err(ExternalRepositoryPackageLookupError::RepositoryListing(
+                error,
+            )),
+            observations,
+        ),
     }
+}
 
+async fn drive_external_repository_package_marker_lookup(
+    ctx: &mut DiceComputations<'_>,
+    key: &ExternalRepositoryPackageLookupKey,
+    mode: ExternalRepositoryPackageLookupMode,
+    mut observations: PathObservationEpoch,
+) -> ExternalRepositoryPackageLookupDriverOutcome {
     for build_file_name in [HostBuildFileName::BuildDotBazel, HostBuildFileName::Build] {
         let marker = PathBuf::from(key.package.package().as_str()).join(build_file_name.as_str());
         let path = match mode {
             ExternalRepositoryPackageLookupMode::Legacy => match dice_invariant(
-                ctx.compute(&HostRepositoryPathKey::new(key.route.clone(), marker))
-                    .await,
+                ctx.compute(&HostRepositoryPathKey::from_source_route(
+                    key.route.clone(),
+                    marker,
+                ))
+                .await,
             ) {
                 SourcePreparationOutcome::Need(need) => {
                     return SourcePreparationOutcome::Need(need);
@@ -801,8 +769,9 @@ async fn drive_external_repository_package_lookup(
                 SourcePreparationOutcome::Complete(result) => result,
             },
             ExternalRepositoryPackageLookupMode::Observed => match dice_invariant(
-                ctx.compute(&HostRepositoryPathObservationKey(
-                    HostRepositoryPathKey::new(key.route.clone(), marker),
+                ctx.compute(&HostRepositoryPathObservationKey::from_source_route(
+                    key.route.clone(),
+                    marker,
                 ))
                 .await,
             ) {
@@ -849,6 +818,91 @@ async fn drive_external_repository_package_lookup(
         Ok(ExternalRepositoryPackageLookup::NoBuildFile),
         observations,
     )
+}
+
+async fn drive_external_repository_package_lookup(
+    ctx: &mut DiceComputations<'_>,
+    key: &ExternalRepositoryPackageLookupKey,
+    mode: ExternalRepositoryPackageLookupMode,
+) -> ExternalRepositoryPackageLookupDriverOutcome {
+    if let Some(message) = invalid_package_name(key.package.package()) {
+        return external_lookup_complete(
+            Ok(ExternalRepositoryPackageLookup::InvalidPackageName { message }),
+            PathObservationEpoch::empty(),
+        );
+    }
+    let deleted = match dice_invariant(
+        ctx.compute(&CanonicalDeletedPackagesProjectionKey::new(
+            key.route.workspace().dupe(),
+        ))
+        .await,
+    ) {
+        Ok(deleted) => deleted,
+        Err(error) => {
+            return external_lookup_complete(
+                Err(ExternalRepositoryPackageLookupError::PolicyInput(error)),
+                PathObservationEpoch::empty(),
+            );
+        }
+    };
+    if deleted.contains(&key.package) {
+        return external_lookup_complete(
+            Ok(ExternalRepositoryPackageLookup::Deleted),
+            PathObservationEpoch::empty(),
+        );
+    }
+
+    let (repository_ignore, observations) = match mode {
+        ExternalRepositoryPackageLookupMode::Legacy => match dice_invariant(
+            ctx.compute(&HostRouteRepositoryIgnoreKey::from_source_route(
+                key.route.clone(),
+            ))
+            .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(value) => (value, PathObservationEpoch::empty()),
+        },
+        ExternalRepositoryPackageLookupMode::Observed => match dice_invariant(
+            ctx.compute(&HostRouteRepositoryIgnoreObservationKey(
+                HostRouteRepositoryIgnoreKey::from_source_route(key.route.clone()),
+            ))
+            .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Err(error));
+            }
+            SourcePreparationOutcome::Complete(Ok(value)) => {
+                (value.result().clone(), value.observations().dupe())
+            }
+        },
+    };
+    let repository_ignore = match repository_ignore.as_ref() {
+        Ok(value) => value,
+        Err(error) => {
+            return external_lookup_complete(
+                Err(ExternalRepositoryPackageLookupError::RepositoryIgnore(
+                    error.clone(),
+                )),
+                observations,
+            );
+        }
+    };
+    if repository_ignore
+        .matching_entry(key.package.package())
+        .is_some()
+    {
+        return external_lookup_complete(
+            Ok(ExternalRepositoryPackageLookup::IgnoredDirectory),
+            observations,
+        );
+    }
+
+    if key.route.is_builtin_bazel_tools() {
+        drive_builtin_external_repository_package_lookup(ctx, key, mode, observations).await
+    } else {
+        drive_external_repository_package_marker_lookup(ctx, key, mode, observations).await
+    }
 }
 
 #[async_trait]
@@ -923,12 +977,26 @@ impl Key for ExternalRepositoryPackageLookupObservationKey {
 /// DICE identity for the selected BUILD source of one routed external package.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct RepositoryPackageSourceKey {
-    route: RootRepositoryRoute,
+    route: HostRepositorySourceRoute,
     package: PackageIdentifier,
 }
 
 impl RepositoryPackageSourceKey {
     pub fn new(route: RootRepositoryRoute, package: PackageIdentifier) -> Option<Self> {
+        Self::from_source_route(HostRepositorySourceRoute::root(route), package)
+    }
+
+    pub fn new_canonical(
+        input: HostCanonicalRepositorySourceInput,
+        package: PackageIdentifier,
+    ) -> Option<Self> {
+        Self::from_source_route(HostRepositorySourceRoute::canonical(input), package)
+    }
+
+    fn from_source_route(
+        route: HostRepositorySourceRoute,
+        package: PackageIdentifier,
+    ) -> Option<Self> {
         (package.repo() == route.canonical_repo()).then_some(Self { route, package })
     }
 }
@@ -953,6 +1021,13 @@ pub struct RepositoryPackageSourceObservationKey(RepositoryPackageSourceKey);
 impl RepositoryPackageSourceObservationKey {
     pub fn new(route: RootRepositoryRoute, package: PackageIdentifier) -> Option<Self> {
         RepositoryPackageSourceKey::new(route, package).map(Self)
+    }
+
+    pub fn new_canonical(
+        input: HostCanonicalRepositorySourceInput,
+        package: PackageIdentifier,
+    ) -> Option<Self> {
+        RepositoryPackageSourceKey::new_canonical(input, package).map(Self)
     }
 }
 
@@ -1037,9 +1112,16 @@ enum RepositoryPackageSourceErrorInner {
         logical_path: Arc<PathBuf>,
         error: RepositorySourceFileError,
     },
+    SourceObservation {
+        logical_path: Arc<PathBuf>,
+        error: HostRepositorySourceObservationError,
+    },
     SourceCompute {
         logical_path: Arc<PathBuf>,
         message: Arc<str>,
+    },
+    BuiltinSourceAddressDeferred {
+        logical_path: Arc<PathBuf>,
     },
     SelectedSourceAbsent {
         logical_path: Arc<PathBuf>,
@@ -1062,6 +1144,15 @@ impl RepositoryPackageSourceError {
             self.inner,
             RepositoryPackageSourceErrorInner::Unsupported { .. }
         )
+    }
+
+    pub(crate) fn deferred_builtin_source_address(&self) -> Option<&PathBuf> {
+        match &self.inner {
+            RepositoryPackageSourceErrorInner::BuiltinSourceAddressDeferred { logical_path } => {
+                Some(logical_path)
+            }
+            _ => None,
+        }
     }
 }
 
@@ -1096,6 +1187,14 @@ impl fmt::Display for RepositoryPackageSourceError {
                 "reading selected BUILD source {}: {error:?}",
                 logical_path.display()
             ),
+            RepositoryPackageSourceErrorInner::SourceObservation {
+                logical_path,
+                error,
+            } => write!(
+                f,
+                "reading selected canonical BUILD source {}: {error:?}",
+                logical_path.display()
+            ),
             RepositoryPackageSourceErrorInner::SourceCompute {
                 logical_path,
                 message,
@@ -1104,6 +1203,13 @@ impl fmt::Display for RepositoryPackageSourceError {
                 "computing selected BUILD source {}: {message}",
                 logical_path.display()
             ),
+            RepositoryPackageSourceErrorInner::BuiltinSourceAddressDeferred { logical_path } => {
+                write!(
+                    f,
+                    "canonical built-in BUILD source {} requires source-address adaptation",
+                    logical_path.display()
+                )
+            }
             RepositoryPackageSourceErrorInner::SelectedSourceAbsent { logical_path } => write!(
                 f,
                 "selected BUILD source {} became absent",
@@ -1189,6 +1295,13 @@ fn finish_repository_package_source_support(
     }
 }
 
+fn direct_local_module_support_route(
+    route: &HostRepositorySourceRoute,
+) -> Option<&RootRepositoryRoute> {
+    let route = route.root_route()?;
+    requires_direct_local_module_support(route).then_some(route)
+}
+
 fn requires_direct_local_module_support(route: &RootRepositoryRoute) -> bool {
     match route.source() {
         RootRepositorySource::Generated { .. } | RootRepositorySource::SelectedRegistry(_) => false,
@@ -1196,44 +1309,55 @@ fn requires_direct_local_module_support(route: &RootRepositoryRoute) -> bool {
     }
 }
 
+async fn drive_repository_package_source_support(
+    route: &HostRepositorySourceRoute,
+    ctx: &mut DiceComputations<'_>,
+    mode: RepositoryPackageSourceMode,
+) -> ControlFlow<RepositoryPackageSourceDriverOutcome, PathObservationEpoch> {
+    let Some(root_route) = direct_local_module_support_route(route) else {
+        return ControlFlow::Continue(PathObservationEpoch::empty());
+    };
+    let (support, observations) = match mode {
+        RepositoryPackageSourceMode::Legacy => {
+            match direct_local_module_support(ctx, root_route).await {
+                SourcePreparationOutcome::Need(need) => {
+                    return ControlFlow::Break(SourcePreparationOutcome::Need(need));
+                }
+                SourcePreparationOutcome::Complete(result) => {
+                    (result, PathObservationEpoch::empty())
+                }
+            }
+        }
+        RepositoryPackageSourceMode::Observed => {
+            match repository_package_source_observed_child(
+                direct_local_module_support_observed(ctx, root_route).await,
+            ) {
+                ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
+                ControlFlow::Continue(observed) => {
+                    (observed.result().dupe(), observed.observations().dupe())
+                }
+            }
+        }
+    };
+    finish_repository_package_source_support(support.as_ref(), observations)
+}
+
 async fn drive_repository_package_source(
     key: &RepositoryPackageSourceKey,
     ctx: &mut DiceComputations<'_>,
     mode: RepositoryPackageSourceMode,
 ) -> RepositoryPackageSourceDriverOutcome {
-    let mut observations = PathObservationEpoch::empty();
-    if requires_direct_local_module_support(&key.route) {
-        let (support, prefix) = match mode {
-            RepositoryPackageSourceMode::Legacy => {
-                match direct_local_module_support(ctx, &key.route).await {
-                    SourcePreparationOutcome::Need(need) => {
-                        return SourcePreparationOutcome::Need(need);
-                    }
-                    SourcePreparationOutcome::Complete(result) => {
-                        (result, PathObservationEpoch::empty())
-                    }
-                }
-            }
-            RepositoryPackageSourceMode::Observed => {
-                match repository_package_source_observed_child(
-                    direct_local_module_support_observed(ctx, &key.route).await,
-                ) {
-                    ControlFlow::Break(outcome) => return outcome,
-                    ControlFlow::Continue(observed) => {
-                        (observed.result().dupe(), observed.observations().dupe())
-                    }
-                }
-            }
-        };
-        observations = match finish_repository_package_source_support(support.as_ref(), prefix) {
+    let mut observations =
+        match drive_repository_package_source_support(&key.route, ctx, mode).await {
             ControlFlow::Break(outcome) => return outcome,
             ControlFlow::Continue(observations) => observations,
         };
-    }
 
-    let lookup_key =
-        ExternalRepositoryPackageLookupKey::new(key.route.clone(), key.package.clone())
-            .expect("public source key enforces route/package identity");
+    let lookup_key = ExternalRepositoryPackageLookupKey::from_source_route(
+        key.route.clone(),
+        key.package.clone(),
+    )
+    .expect("public source key enforces route/package identity");
     let lookup = match mode {
         RepositoryPackageSourceMode::Legacy => match ctx.compute(&lookup_key).await {
             Ok(SourcePreparationOutcome::Need(need)) => {
@@ -1328,6 +1452,39 @@ async fn finish_repository_package_source(
     ctx: &mut DiceComputations<'_>,
     mode: RepositoryPackageSourceMode,
     build_file_name: HostBuildFileName,
+    observations: PathObservationEpoch,
+) -> RepositoryPackageSourceDriverOutcome {
+    match key.route.root_route() {
+        Some(route) => {
+            finish_root_repository_package_source(
+                key,
+                route,
+                ctx,
+                mode,
+                build_file_name,
+                observations,
+            )
+            .await
+        }
+        None => {
+            finish_canonical_repository_package_source(
+                key,
+                ctx,
+                mode,
+                build_file_name,
+                observations,
+            )
+            .await
+        }
+    }
+}
+
+async fn finish_root_repository_package_source(
+    key: &RepositoryPackageSourceKey,
+    route: &RootRepositoryRoute,
+    ctx: &mut DiceComputations<'_>,
+    mode: RepositoryPackageSourceMode,
+    build_file_name: HostBuildFileName,
     mut observations: PathObservationEpoch,
 ) -> RepositoryPackageSourceDriverOutcome {
     let logical_path =
@@ -1335,7 +1492,7 @@ async fn finish_repository_package_source(
     let source = match mode {
         RepositoryPackageSourceMode::Legacy => match ctx
             .compute(&HostRepositorySourceFileKey::new(
-                key.route.clone(),
+                route.clone(),
                 logical_path.as_ref().clone(),
             ))
             .await
@@ -1356,7 +1513,7 @@ async fn finish_repository_package_source(
         },
         RepositoryPackageSourceMode::Observed => match ctx
             .compute(&HostRepositorySourceFileObservationKey::new(
-                key.route.clone(),
+                route.clone(),
                 logical_path.as_ref().clone(),
             ))
             .await
@@ -1384,6 +1541,101 @@ async fn finish_repository_package_source(
         },
     };
     finish_repository_package_source_value(build_file_name, logical_path, &source, observations)
+}
+
+async fn finish_canonical_repository_package_source(
+    key: &RepositoryPackageSourceKey,
+    ctx: &mut DiceComputations<'_>,
+    mode: RepositoryPackageSourceMode,
+    build_file_name: HostBuildFileName,
+    mut observations: PathObservationEpoch,
+) -> RepositoryPackageSourceDriverOutcome {
+    let logical_path =
+        Arc::new(PathBuf::from(key.package.package().as_str()).join(build_file_name.as_str()));
+    let relative = crate::host_repository_relative_path(logical_path.as_ref().clone())
+        .expect("validated package and BUILD names form a repository-relative path");
+    let result = match mode {
+        RepositoryPackageSourceMode::Legacy => {
+            match ctx
+                .compute(&key.route.source_observation_key(relative))
+                .await
+            {
+                Ok(SourcePreparationOutcome::Need(need)) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                Ok(SourcePreparationOutcome::Complete(result)) => result,
+                Err(error) => {
+                    return repository_package_source_error_complete(
+                        RepositoryPackageSourceErrorInner::SourceCompute {
+                            logical_path,
+                            message: Arc::from(error.to_string()),
+                        },
+                        observations,
+                    );
+                }
+            }
+        }
+        RepositoryPackageSourceMode::Observed => {
+            match ctx
+                .compute(&key.route.source_observation_epoch_key(relative))
+                .await
+            {
+                Ok(outcome) => match repository_package_source_observed_child(outcome) {
+                    ControlFlow::Break(outcome) => return outcome,
+                    ControlFlow::Continue(observed) => {
+                        observations =
+                            match union_observations(&observations, observed.observations()) {
+                                Ok(observations) => observations,
+                                Err(error) => {
+                                    return SourcePreparationOutcome::Complete(Err(error));
+                                }
+                            };
+                        observed.result().dupe()
+                    }
+                },
+                Err(error) => {
+                    return repository_package_source_error_complete(
+                        RepositoryPackageSourceErrorInner::SourceCompute {
+                            logical_path,
+                            message: Arc::from(error.to_string()),
+                        },
+                        observations,
+                    );
+                }
+            }
+        }
+    };
+    match result.as_ref() {
+        Ok(HostRepositorySourceObservation::Request(value)) => {
+            finish_repository_package_source_value(
+                build_file_name,
+                logical_path,
+                &Ok(value.clone()),
+                observations,
+            )
+        }
+        Ok(HostRepositorySourceObservation::Builtin(value)) => {
+            repository_package_source_error_complete(
+                RepositoryPackageSourceErrorInner::BuiltinSourceAddressDeferred {
+                    logical_path: Arc::new(PathBuf::from(value.path())),
+                },
+                observations,
+            )
+        }
+        Err(error) => repository_package_source_error_complete(
+            match error.request_error() {
+                Some(error) => RepositoryPackageSourceErrorInner::Source {
+                    logical_path,
+                    error: error.clone(),
+                },
+                None => RepositoryPackageSourceErrorInner::SourceObservation {
+                    logical_path,
+                    error: error.clone(),
+                },
+            },
+            observations,
+        ),
+    }
 }
 
 fn finish_repository_package_source_value(
@@ -2725,16 +2977,16 @@ mod tests {
             .unwrap()..];
         assert!(
             ignore_driver.find("is_builtin_bazel_tools").unwrap()
-                < ignore_driver
-                    .find("HostRepositorySourceFileKey::new")
-                    .unwrap()
+                < ignore_driver.find("drive_route_ignore_source").unwrap()
         );
         let package_driver = &include_str!("host_package.rs")[include_str!("host_package.rs")
             .find("async fn drive_external_repository_package_lookup")
             .unwrap()..];
         assert!(
             package_driver.find("is_builtin_bazel_tools").unwrap()
-                < package_driver.find("HostRepositoryPathKey::new").unwrap()
+                < package_driver
+                    .find("HostRepositoryPathKey::from_source_route")
+                    .unwrap()
         );
     }
 

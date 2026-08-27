@@ -436,16 +436,6 @@ pub use selected_repo_spec::ObservedHostSelectedExtensionEvaluationInputRequests
 #[doc(hidden)]
 pub use selected_repo_spec::ObservedHostSelectedExtensionOwnerInputs;
 #[doc(hidden)]
-pub use source_preparation::HostCanonicalRepositoryDirectoryListingKey;
-#[doc(hidden)]
-pub use source_preparation::HostCanonicalRepositoryDirectoryListingObservationKey;
-#[doc(hidden)]
-pub use source_preparation::HostCanonicalRepositorySourceFileError;
-#[doc(hidden)]
-pub use source_preparation::HostCanonicalRepositorySourceFileKey;
-#[doc(hidden)]
-pub use source_preparation::HostCanonicalRepositorySourceFileObservationKey;
-#[doc(hidden)]
 pub use source_preparation::HostCanonicalRepositorySourceInput;
 #[doc(hidden)]
 pub use source_preparation::HostCanonicalRepositorySourceInputError;
@@ -499,12 +489,12 @@ pub use source_preparation::HostRepositorySourceObservationResult;
 #[doc(hidden)]
 pub use source_preparation::HostRepositorySourceObservationView;
 #[doc(hidden)]
+pub use source_preparation::HostRepositorySourceRoute;
+#[doc(hidden)]
 pub use source_preparation::HostSelectedObservationFrontier;
 pub use source_preparation::ModuleSourcePreparation;
 pub use source_preparation::ModuleSourcePreparationError;
 pub use source_preparation::ModuleSourcePreparationKey;
-#[doc(hidden)]
-pub use source_preparation::ObservedHostCanonicalRepositorySourceFile;
 #[doc(hidden)]
 pub use source_preparation::ObservedHostRepositoryDirectoryListing;
 #[doc(hidden)]

@@ -70,12 +70,16 @@ use crate::host_file::HostFileBytesKey;
 use crate::host_file::HostFileBytesObservationKey;
 use crate::host_file::HostFileError;
 use crate::host_file::ObservedHostFileBytes;
+use crate::source_preparation::HostCanonicalRepositorySourceInput;
 use crate::source_preparation::HostRepositoryDirectoryListingError;
 use crate::source_preparation::HostRepositoryDirectoryListingKey;
 use crate::source_preparation::HostRepositoryDirectoryListingObservationKey;
 use crate::source_preparation::HostRepositorySourceFileKey;
 use crate::source_preparation::HostRepositorySourceFileObservationKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
+use crate::source_preparation::HostRepositorySourceObservation;
+use crate::source_preparation::HostRepositorySourceObservationError;
+use crate::source_preparation::HostRepositorySourceRoute;
 use crate::source_preparation::RepositorySourceFileError;
 use crate::source_preparation::RepositorySourceFileKey;
 use crate::source_preparation::RepositorySourceFileObservationKey;
@@ -968,6 +972,7 @@ pub(crate) enum HostRouteRepoFileError {
     BuiltinListing(HostRepositoryDirectoryListingError),
     BuiltinMetadata { actual: PathDirectoryEntryKind },
     Source(RepositorySourceFileError),
+    SourceObservation(HostRepositorySourceObservationError),
     Evaluation(HostRepoFileError),
 }
 
@@ -981,6 +986,9 @@ impl fmt::Display for HostRouteRepoFileError {
                 "built-in REPO.bazel metadata has unsupported entry kind {actual:?}"
             ),
             Self::Source(error) => write!(f, "failed to read routed REPO.bazel: {error:?}"),
+            Self::SourceObservation(error) => {
+                write!(f, "failed to read canonical REPO.bazel: {error:?}")
+            }
             Self::Evaluation(error) => error.fmt(f),
         }
     }
@@ -1261,11 +1269,23 @@ impl Key for HostNonregistryRepoFileObservationKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct HostRouteRepoFileKey {
-    route: RootRepositoryRoute,
+    route: HostRepositorySourceRoute,
 }
 
 impl HostRouteRepoFileKey {
     pub(crate) fn new(route: RootRepositoryRoute) -> Self {
+        Self {
+            route: HostRepositorySourceRoute::root(route),
+        }
+    }
+
+    pub(crate) fn new_canonical(input: HostCanonicalRepositorySourceInput) -> Self {
+        Self {
+            route: HostRepositorySourceRoute::canonical(input),
+        }
+    }
+
+    pub(crate) fn from_source_route(route: HostRepositorySourceRoute) -> Self {
         Self { route }
     }
 }
@@ -1319,6 +1339,12 @@ type HostRouteRepoFileProjection = (
 );
 type HostRouteRepoFileDriverOutcome =
     SourcePreparationOutcome<Result<HostRouteRepoFileProjection, ObservedPathFrontierError>>;
+type HostRouteRepoSourceProjection = (
+    Result<HostRepositorySourceFileValue, HostRouteRepoFileError>,
+    PathObservationEpoch,
+);
+type HostRouteRepoSourceOutcome =
+    SourcePreparationOutcome<Result<HostRouteRepoSourceProjection, ObservedPathFrontierError>>;
 
 fn store_route_repo_batch(ctx: &mut DiceComputations<'_>, capture_events: bool, batch: EventBatch) {
     if capture_events {
@@ -1346,7 +1372,7 @@ async fn drive_builtin_route_repo_file(
 ) -> HostRouteRepoFileDriverOutcome {
     let (listing, observations) = match mode {
         HostRouteRepoFileMode::Legacy => match dice_invariant(
-            ctx.compute(&HostRepositoryDirectoryListingKey::new(
+            ctx.compute(&HostRepositoryDirectoryListingKey::from_source_route(
                 key.route.clone(),
                 PackagePath::root(),
             ))
@@ -1357,10 +1383,12 @@ async fn drive_builtin_route_repo_file(
         },
         HostRouteRepoFileMode::Observed => {
             let observed = match dice_invariant(
-                ctx.compute(&HostRepositoryDirectoryListingObservationKey::new(
-                    key.route.clone(),
-                    PackagePath::root(),
-                ))
+                ctx.compute(
+                    &HostRepositoryDirectoryListingObservationKey::from_source_route(
+                        key.route.clone(),
+                        PackagePath::root(),
+                    ),
+                )
                 .await,
             ) {
                 SourcePreparationOutcome::Need(need) => {
@@ -1402,6 +1430,96 @@ async fn drive_builtin_route_repo_file(
     )
 }
 
+async fn drive_route_repo_source(
+    ctx: &mut DiceComputations<'_>,
+    route: &HostRepositorySourceRoute,
+    mode: HostRouteRepoFileMode,
+) -> HostRouteRepoSourceOutcome {
+    if let Some(root) = route.root_route() {
+        return match mode {
+            HostRouteRepoFileMode::Legacy => {
+                match dice_invariant(
+                    ctx.compute(&HostRepositorySourceFileKey::new(
+                        root.clone(),
+                        "REPO.bazel".into(),
+                    ))
+                    .await,
+                ) {
+                    SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                    SourcePreparationOutcome::Complete(source) => {
+                        SourcePreparationOutcome::Complete(Ok((
+                            source.map_err(HostRouteRepoFileError::Source),
+                            PathObservationEpoch::empty(),
+                        )))
+                    }
+                }
+            }
+            HostRouteRepoFileMode::Observed => match dice_invariant(
+                ctx.compute(&HostRepositorySourceFileObservationKey::new(
+                    root.clone(),
+                    "REPO.bazel".into(),
+                ))
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    SourcePreparationOutcome::Complete(Err(error))
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => {
+                    SourcePreparationOutcome::Complete(Ok((
+                        observed
+                            .result()
+                            .as_ref()
+                            .clone()
+                            .map_err(HostRouteRepoFileError::Source),
+                        observed.observations().dupe(),
+                    )))
+                }
+            },
+        };
+    }
+
+    let relative = crate::host_repository_relative_path("REPO.bazel".into())
+        .expect("REPO.bazel is a valid repository-relative path");
+    let (result, observations) = match mode {
+        HostRouteRepoFileMode::Legacy => {
+            match dice_invariant(ctx.compute(&route.source_observation_key(relative)).await) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(result) => {
+                    (result, PathObservationEpoch::empty())
+                }
+            }
+        }
+        HostRouteRepoFileMode::Observed => {
+            let observed = match dice_invariant(
+                ctx.compute(&route.source_observation_epoch_key(relative))
+                    .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    return SourcePreparationOutcome::Complete(Err(error));
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => observed,
+            };
+            (observed.result().dupe(), observed.observations().dupe())
+        }
+    };
+    let source = match result.as_ref() {
+        Err(error) => Err(HostRouteRepoFileError::SourceObservation(error.clone())),
+        Ok(value) => match value {
+            HostRepositorySourceObservation::Request(value) => Ok(value.clone()),
+            HostRepositorySourceObservation::Builtin(_) => {
+                unreachable!("built-in REPO source is handled by directory listing")
+            }
+        },
+    };
+    SourcePreparationOutcome::Complete(Ok((source, observations)))
+}
+
 async fn drive_host_route_repo_file(
     ctx: &mut DiceComputations<'_>,
     key: &HostRouteRepoFileKey,
@@ -1432,33 +1550,12 @@ async fn drive_host_route_repo_file(
             );
         }
     };
-    let source_key = HostRepositorySourceFileKey::new(key.route.clone(), "REPO.bazel".into());
-    let (source, observations) = match mode {
-        HostRouteRepoFileMode::Legacy => match dice_invariant(ctx.compute(&source_key).await) {
-            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(source) => (source, PathObservationEpoch::empty()),
-        },
-        HostRouteRepoFileMode::Observed => {
-            let observed = match dice_invariant(
-                ctx.compute(&HostRepositorySourceFileObservationKey::new(
-                    key.route.clone(),
-                    "REPO.bazel".into(),
-                ))
-                .await,
-            ) {
-                SourcePreparationOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                SourcePreparationOutcome::Complete(Err(error)) => {
-                    return SourcePreparationOutcome::Complete(Err(error));
-                }
-                SourcePreparationOutcome::Complete(Ok(observed)) => observed,
-            };
-            (
-                observed.result().as_ref().clone(),
-                observed.observations().dupe(),
-            )
+    let (source, observations) = match drive_route_repo_source(ctx, &key.route, mode).await {
+        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            return SourcePreparationOutcome::Complete(Err(error));
         }
+        SourcePreparationOutcome::Complete(Ok(source)) => source,
     };
     let (bytes, logical_path) = match source {
         Ok(HostRepositorySourceFileValue::Absent) => {
@@ -1478,7 +1575,7 @@ async fn drive_host_route_repo_file(
             return route_repo_complete(
                 ctx,
                 capture_events,
-                Err(HostRouteRepoFileError::Source(error)),
+                Err(error),
                 observations,
                 EventBatch::empty(),
             );
