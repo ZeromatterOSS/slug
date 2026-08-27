@@ -1,89 +1,63 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-cc-cc-internal-complete-loading-proof`
+Packet: `WP-4-7A-rules-cc-private-paths-complete-loading-proof`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: prove the authenticated complete 17-line rules_cc
-`cc/private/cc_internal.bzl` producer loads and freezes through the already
-accepted narrow private bridge. Add no production behavior.
+Result: prove the authenticated complete 39-line rules_cc
+`cc/private/paths.bzl` producer loads and freezes its lazy exported function.
+Add no production behavior and invoke no path helper.
 
 ## Learned facts and decision
 
-The predecessor audit starts from commit `eb4110f25`. Pinned rules_cc 0.2.17
-provides these remaining generated-proxy roots:
+Base commit is `888a305a3` (`Prove complete cc_internal producer freeze`). It
+embeds and hash-verifies exact complete `cc/private/cc_internal.bzl`, evaluates
+it at the canonical `rules_cc+` defining owner, freezes the selected opaque
+bridge token, and rechecks BUILD absence. Growth is 0 production and 43 proof;
+focused proof, 239 library tests, 24 invalidation tests, 31 BUILD-loading tests,
+locked analysis/core checks, CLI build, formatting and hygiene pass. Independent
+review accepts exact bytes, scope, caps and compatibility boundaries.
 
-- `cc/private/cc_common.bzl`: 788 lines, SHA-256 `5e6ab737...`;
-- `cc/private/cc_info.bzl`: 656 lines, SHA-256 `4424bb87...`;
-- `cc/private/toolchain_config/cc_toolchain_config_info.bzl`: 143 lines,
-  SHA-256 `8c522773...`.
+The remaining `cc_common.bzl` recursive front is
+`cc/common/cc_helper_internal.bzl` (383 lines, SHA-256 `793ab429...`). In source
+order it loads:
 
-All three recursively load `cc/private/cc_internal.bzl`: 17 lines, SHA-256
-`8241ced58c265334ac3f0e063d492383f1ff7d223736dc2d6a5aa712165de6bb`.
-It has no loads and one eager expression at line 17:
-`cc_common.internal_DO_NOT_USE() if hasattr(...) else struct()`. Commit
-`4d7a9bbb2` accepts the selected `rules_cc+` bridge behavior through a
-source-shaped test, but no accepted proof evaluates and freezes the complete
-authenticated producer.
+1. accepted exact complete Skylib `lib/paths.bzl` (320, `96cce438...`);
+2. now accepted exact complete rules_cc `cc_internal.bzl` (17, `8241ced5...`);
+3. rules_cc `cc/private/paths.bzl` (39,
+   `c982ac685f0bfbd32602d82d1c37f3bf50a2714ca6a13bfd3c08d4e5cc8b8872`).
 
-The audit classifies exact Skylib `lib/paths.bzl` as accepted complete. The
-following are accepted only in source-shaped slices: `cc_helper_internal`,
-private CcInfo, launcher/shared-library-hint info, compilation outputs, LTO
-context, extra-link-time-library, linker-input/linkstamp/toolchain providers,
-and `native_cc_common`. Compile, link, configure-features, legacy-features and
-their action-name/toolchain graphs remain broad/deferred. In particular,
-toolchain config reaches 1,387-line `legacy_features.bzl`, then 220-line
-`action_names.bzl` and 622-line `cc_toolchain_config_lib.bzl`; none is smaller
-than the shared 17-line prerequisite.
-
-The complete `cc_common.bzl` direct-load inventory, in source order, is:
-
-| Child | Lines / SHA-256 prefix | Audit class |
-|---|---:|---|
-| `cc_helper_internal` | 383 / `793ab429` | partial; first reaches `cc_internal` |
-| `cc_info` | 656 / `4424bb87` | partial/broad |
-| `cc_internal` | 17 / `8241ced5` | missing complete proof; selected |
-| launcher / shared-library-hint info | 31 / `41da5476`; 56 / `7d067aad` | partial |
-| compilation outputs / compile / compile variables | 226 / `294e3da1`; 2,295 / `bec506ff`; 644 / `463ea66c` | partial; broad; broad |
-| linkstamp compile / LTO context | 111 / `6f5ceb39`; 97 / `a17435cd` | broad; partial |
-| extra library / library-to-link / linker-input | 192 / `522312ac`; 291 / `5f574233`; 69 / `e4e8a7fc` | partial; broad; partial |
-| linking-context-from-outputs / linkstamp / link | 137 / `664a4615`; 44 / `8d5fc394`; 197 / `666e819d` | broad; partial; broad |
-| link variables / LTO backends | 392 / `bdf03036`; 540 / `078bfb68` | broad |
-| toolchain info / native wrapper | 255 / `f1958957`; 18 / `d8e5feda` | partial |
-| toolchain-config info / configure-features | 143 / `8c522773`; 232 / `d950aa9a` | partial/broad; broad |
-
-`cc_helper_internal` first loads complete Skylib paths, then `cc_internal`,
-then dependency-free lazy private paths (39 lines, `c982ac68...`). Its later
-list extensions, structs, initialized instances and comprehension shapes are
-admitted but do not constitute a complete 383-line producer proof. Private
-CcInfo also reaches the same incomplete helper/internal producers before its
-eager provider/context instances. Lazy function bodies are not invoked by any
-of these freezes.
+The third child has no loads, eager calls, defaults, constants or
+comprehensions. Lines 16-39 declare the lazy exported `is_path_absolute`
+function; its body is not executed during module evaluation or freeze. Slug's
+accepted evaluator can parse and freeze this shape, but no accepted proof owns
+the authenticated complete producer. It is the next source-order incomplete
+closure unit and is smaller than the 383-line parent or any later root.
 
 Therefore run only
-`WP-4-7A-rules-cc-cc-internal-complete-loading-proof`. Do not widen a partial
-child into a complete-producer or full-proxy claim.
+`WP-4-7A-rules-cc-private-paths-complete-loading-proof`. A complete helper or
+proxy claim remains premature even though its next syntax is already admitted.
 
 ## Authorities, ownership and compatibility
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-and authenticated rules_cc bytes are sole exact authority. Clean `../zabel`
-commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` guides the architectural
-decision that the defining module owns the loaded binding and that recursive
-freeze must close over the selected producer before reexport. Copy no Zig code,
-representation, traversal order, identity, diagnostic or behavior.
+and authenticated rules_cc 0.2.17 bytes are sole exact authority. Clean
+`../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only
+the architecture: the defining module owns the exported function and recursive
+freeze must close over that producer before the parent imports it. Copy no Zig
+code, representation, function behavior, traversal, identity or diagnostic.
 
-- **Exact:** all 17 source lines and SHA-256; canonical `rules_cc+` defining
-  owner; `hasattr` selected branch; frozen exported binding and type.
-- **Slug-native:** the already accepted narrow public/private bridge and opaque
-  token, pending full Bazel builtins injection.
-- **Unsupported/deferred:** the fallback `struct()` branch as a parity claim;
-  every internal method; complete helper/private CcInfo/toolchain/`cc_common`
-  producers; the generated proxy; provider invocation, analysis and actions.
+- **Exact:** all 39 source lines and SHA-256; canonical `rules_cc+` defining
+  owner; public function binding, type, visibility and frozen lifetime.
+- **Slug-native:** only the proof composition through Slug's existing frozen
+  module heap.
+- **Unsupported/deferred:** invoking `is_path_absolute`; complete
+  `cc_helper_internal`, private CcInfo, toolchain config, `cc_common` or proxy;
+  provider/helper invocation, configured C++ behavior, actions and analysis.
 
-The frozen module heap naturally owns the exported token and no new retained,
-request, async or DICE state is introduced. This proof has no fixture or oracle
-generation, fallback, memory-growth, hot-path or utility-reuse decision.
+The frozen module heap naturally owns the function and its source environment.
+No production, retained request, DICE, cache, async, fixture, oracle, hot-path,
+memory-growth, fallback or utility-reuse decision is introduced.
 
 ## Allowlist, caps and proof
 
@@ -92,35 +66,31 @@ Change only:
 - `app/slug_loading_v2/src/host_package_load_tests.rs`;
 - the three scheduling documents when rolling the accepted result.
 
-The sole Rust authority is 9,854 lines at base `eb4110f25`, SHA-256
-`23a42c43f52b4663549a2f900811ae47fdde862cfbed7bf7798f2524578b059f`.
-Its final ceiling is 9,934 lines. The new test function must remain at most 80
+At base `888a305a3` the Rust authority is 9,897 lines, SHA-256
+`e5c05e839146f4387224352fac6c5dcdfd4dfe965119ce2d6028fa4c039c4be0`.
+Its final ceiling is 9,977 lines. The new test function must remain at most 80
 physical lines; a file-scope exact-source constant is exempt from that function
 ceiling but counts against the packet cap.
 
 Caps are 0 production, 80 proof and 80 total additions; deletions do not buy
-budget. Embed all 17 authenticated lines, assert their SHA-256, evaluate them at
-exact owner `@@rules_cc+//cc/private:cc_internal.bzl`, freeze the module, and
-prove exported `cc_internal` has the accepted opaque type. Also prove the
-selected branch exists and remains `.bzl`-only. Invoke no internal member and
-add no fixture or fresh Bazel oracle.
+budget. Embed all 39 authenticated lines, assert line count and SHA-256,
+evaluate at exact owner `@@rules_cc+//cc/private:paths.bzl`, freeze the module,
+and prove public `is_path_absolute` is a function while absent private names
+remain absent. Invoke no helper and add no fixture or Bazel oracle.
 
-Run focused proof, all `slug_loading_v2` library tests, invalidation and BUILD
-loading integration, locked core/analysis checks, formatting, hygiene and
-`cargo build -p slug_cli_v2`. Measure final additions and obtain independent
-review of exact bytes/hash, branch ownership, Zabel's guidance-only role and
+Run focused proof, all `slug_loading_v2` library tests, `bzl_invalidation`,
+`build_file_loading`, locked analysis/core checks, locked CLI build, formatting,
+diff and archive hygiene. Measure final additions and obtain independent review
+of exact bytes/hash, noninvocation, ownership, Zabel's guidance-only role and
 compatibility boundaries.
 
-STOP and `REPLAN` for any production change, source/hash mismatch, need to
-implement the fallback branch or an internal method, evaluator-owned retained
-value, full-child/proxy claim, unpinned source, copied Zabel content, dirty
-authority, allowlist escape or cap violation. Stop after this complete producer
-and re-audit `cc_helper_internal`; do not continue into private paths or a later
-root in the same packet.
+STOP and `REPLAN` for production change, source/hash mismatch, helper invocation,
+captured evaluator lifetime, complete-parent/proxy claim, unpinned source,
+copied Zabel content, dirty authority, allowlist escape or cap violation. Stop
+after this producer and re-audit `cc_helper_internal`'s own eager expressions.
 
 ## Immediate predecessor
 
-Commit `4b2396f0a` completes exact ObjcInfo proxy aliases after `498e5efc7`
-accepts zero-argument `depset()`. Three of six generated-proxy child families
-are exact complete; the other three remain deferred behind this audited shared
-prerequisite.
+Commit `888a305a3` completes the smallest shared producer found by the remaining
+compatibility-proxy closure audit. It does not complete any of the three
+remaining generated-proxy child families.
