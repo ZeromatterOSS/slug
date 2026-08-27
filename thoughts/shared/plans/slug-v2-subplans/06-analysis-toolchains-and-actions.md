@@ -18989,3 +18989,8 @@ Freeze moving the built-in listing terminal before semantics, a direct
 no-policy regression and a 280 production cap. Preserve the same owners,
 four-file allowlist, 420 proof cap and every other behavior/stop. After
 independent review, implement only that correction as `-implementation-r2`.
+
+Independent ordering/cap/scope review returned `ACCEPT`. Commit `caff3bfc1`
+freezes the correction. Activate only
+`WP-4-5-7A-builtin-optional-package-input-projection-implementation-r2` under
+280 production and 420 proof additions.

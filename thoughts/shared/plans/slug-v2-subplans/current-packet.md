@@ -1,15 +1,16 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-builtin-optional-package-input-projection-implementation-r2-correction-design`
+Packet: `WP-4-5-7A-builtin-optional-package-input-projection-implementation-r2`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `3b73a99cf`.
+Base: `caff3bfc1`.
 
-Result: freeze one bounded correction which moves built-in REPO absence before
+Result: implement one bounded correction which moves built-in REPO absence before
 root Starlark-semantics projection, proves it without injected policy inputs,
-and corrects the implementation production ceiling from 220 to 280 lines.
+and complete the reviewed optional-input projection under corrected 280/420
+caps.
 
 ## Learned facts and source basis
 
@@ -136,22 +137,7 @@ no async transfer or shutdown lifetime.
   registration activation, configured validation, language builtin breadth,
   rules and actions.
 
-## Correction-design scope
-
-The exact rejected Rust candidate remains in the worktree. It compiles and its
-focused built-in optional-input matrix passes only because that test injects
-policy inputs before the REPO check. It must not be changed, accepted or
-committed during this docs-only design. The candidate adds 252 production and
-148 proof lines across three of the four allowed Rust files.
-
-This correction may change only this manifest, the canonical plan, Stage 6,
-`.codex/skills/slug-agent-orchestration/references/routing-log.md`, and
-`.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`.
-Require independent ordering/cap/scope review. If accepted, select
-`WP-4-5-7A-builtin-optional-package-input-projection-implementation-r2` at the
-docs commit, make only the ordering/test correction, then rerun validation.
-
-## Preserved implementation scope
+## Implementation scope
 
 The active implementation allowlist is:
 
@@ -198,3 +184,5 @@ Commit `3b73a99cf` selected implementation at 220/420. The compiled candidate's
 252 production and 148 proof additions exceeded only the production ceiling;
 independent cap review then found the masked built-in REPO policy-order defect.
 No other semantic, proof, allowlist, dependency or validation defect is known.
+Commit `caff3bfc1` freezes the ordering/no-policy regression and 280/420 cap
+correction after independent review returned `ACCEPT`.
