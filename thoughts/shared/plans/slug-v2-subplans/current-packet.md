@@ -1,53 +1,56 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-cc-find-toolchain-complete-recursive-loading-proof`
+Packet: `WP-4-7A-rules-rust-utils-complete-loading-proof`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: refreeze the authenticated complete rules_cc
-`cc/find_cc_toolchain.bzl` over the actual complete public `cc_common` child,
-replacing the accepted narrowed child proof without invoking any function.
+Result: freeze the authenticated complete rules_rust
+`rust/private/utils.bzl` utility family over its five complete direct children,
+proving all loaded, eager and function bindings without invocation.
 
 ## Learned facts and decision
 
-Commit `5e7864995` accepts complete `rust/private/common.bzl`. The next
-toolchain load is `lto.bzl`, whose `utils.bzl` child loads five modules. Four
-are complete, but audit found that the authenticated full-source proof for
-rules_cc `find_cc_toolchain.bzl` used a narrowed `cc_common = struct()` child.
-That proves source/eager declarations, not the real recursive load route.
+Commit `feb0b204c` replaces the narrowed rules_cc find-toolchain edge with a
+complete recursive freeze over the actual public `cc_common` child. Every direct
+`utils.bzl` child is now complete: Bazel Skylib paths, rules_cc find-toolchain,
+public `cc_common`, public `CcInfo`, and rules_rust providers.
 
-The already-embedded rules_cc 0.2.17 `cc/find_cc_toolchain.bzl` has SHA-256
-`3f62d3ea99f59674f71dbc669c80dd0dc5ef14637933d727b74f0bd556334655`.
-Its sole direct child, public `cc/common/cc_common.bzl`, is now complete through
-commit `be1562848`. This packet recomposes the exact parent over that actual
-child and proves retained identity and inventories without invocation.
+Rules_rust 0.73.0 `rust/private/utils.bzl` is 1,032 lines, SHA-256
+`8aa49b9312d4ae5c4aed033aba65392a039a681b3ee21ca83da0f05acac28ace`.
+It contains 11 loaded values, 39 functions, and six eager assignments. Existing
+accepted slices cover the eager encoding/substitution values and representative
+exports; this packet closes the whole utility category rather than adding more
+per-function harnesses.
 
-Run only `WP-4-7A-rules-cc-find-toolchain-complete-recursive-loading-proof`.
-Do not invoke a function or facade field, inspect toolchain output, or evaluate
-rules_rust `utils.bzl` in the same packet.
+Run only `WP-4-7A-rules-rust-utils-complete-loading-proof`. Do not invoke a
+function, provider, `cc_common` field or rule implementation, and do not
+evaluate `lto.bzl` in the same packet.
 
 ## Generic architecture, authorities and compatibility
 
-This is generic recursive BCR Starlark loading and frozen-value retention, not
-C++ toolchain discovery implemented in Rust. It removes a narrowed test edge so
-the future complete utility module can use only real complete children.
+This is generic recursive BCR Starlark loading, composition and freezing, not a
+Rust or C++ utility implementation in Rust. Slug retains each actual complete
+child value through the shared Buck2-derived evaluator. Completing the whole
+utility module establishes the reusable architecture for its function family
+and prevents leaf-by-leaf churn.
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-and authenticated rules_cc 0.2.17 bytes are sole exact authority. Reuse the
-accepted source and complete child; add no fixture or oracle.
+and authenticated rules_rust 0.73.0 bytes are sole exact authority. Reuse
+accepted evidence; add no fixture or oracle.
 
 Clean `../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is
-architectural guidance only. Its producer-owned identity model may guide the
-recursive edge assertion, but no Zig code, representation, algorithm, cache or
-toolchain behavior is copied and Zabel is not compatibility authority.
+architectural guidance only. Its producer-owned composition/freeze model may
+guide ownership assertions, but no Zig code, representation, algorithm, cache,
+ordering or utility behavior is copied and Zabel is not compatibility authority.
 
-- **Exact:** existing full source/hash; canonical parent and complete public
-  child owners/paths/mappings; loaded `cc_common` pointer identity; eager label
-  and attribute dictionary; three function bindings; exact inventories;
-  complete recursive freeze without invocation.
+- **Exact:** complete 1,032-line source/hash; canonical parent and all five
+  child owners/mappings; all 11 loaded identities; exact eager values and alias
+  identities already accepted; 39 function bindings; exact 46-public/56-all
+  inventories; complete freeze without invocation.
 - **Slug-native:** starlark-rust parse/evaluate/freeze and test representation.
-- **Unsupported/deferred:** every function/facade invocation and output;
-  toolchain resolution, configurations, actions, ActionKeys and execution.
+- **Unsupported/deferred:** every function/provider/facade invocation and
+  output; contexts, files, labels and actions consumed by those functions;
+  rules, toolchains, actions, ActionKeys and execution.
 
 No evaluator borrow or invocation result escapes. DICE, request/revision,
 filesystem, cache, async and fallback concerns are inapplicable to this
@@ -58,33 +61,34 @@ test-only proof. There is no fallback.
 Change only `app/slug_loading_v2/src/host_package_load_tests.rs`. Scheduling
 documents may change only after terminal acceptance.
 
-At base `5e7864995`, the Rust test authority is 30,512 lines, SHA-256
-`d53a095a81ef72c16c72fea5b3b4280c576037e21133eb5d80d3f2cf38f6dd3b`.
-Its final ceiling is 30,762 lines. Each new proof/helper function must remain at
+At base `feb0b204c`, the Rust test authority is 30,604 lines, SHA-256
+`6180ddf55436e67cb36a82ccf8d99168dfc0c5ca83b980ae0d5736193f0a82cc`.
+Its final ceiling is 32,604 lines. Each new proof/helper function must remain at
 most 120 physical lines. Add no production responsibility or generic archive.
 
-Caps are 0 production, 250 proof and 250 total additions; deletions do not buy
-budget. Reuse/hash the existing exact parent source. Build the actual complete
-public `cc_common` wrapper and its compatibility/private closure. Evaluate the
-parent at `@@rules_cc+//cc:find_cc_toolchain.bzl`, path
-`/rules_cc/cc/find_cc_toolchain.bzl`, mapping `bazel_tools -> bazel_tools+` and
-`rules_cc -> rules_cc+`. Prove child/import identity, eager values, functions,
-visibility and exact inventories. Invoke nothing.
+Caps are 0 production, 2,000 proof and 2,000 total additions; deletions do not
+buy budget. Embed/hash all 1,032 authenticated lines. Build the five actual
+complete children at their canonical owners, workspace paths and mappings.
+Evaluate the parent at `@@rules_rust+//rust/private:utils.bzl`, path
+`/rules_rust/rust/private/utils.bzl`, mapping `bazel_skylib -> bazel_skylib+`
+and `rules_cc -> rules_cc+`. Prove child/import identity, all eager values and
+aliases, function visibility/types and exact inventories. Invoke nothing.
 
 Run focused proof, all `slug_loading_v2` library tests, `bzl_invalidation`,
 `build_file_loading`, locked analysis/core checks, locked CLI build, formatting,
 diff and archive hygiene. Measure caps/function sizes and perform root review of
-source, complete child route, identities/inventories, no-invocation scope,
+source, child closure, identities/eager values/inventories, no-invocation scope,
 generic architecture and Zabel's peer-guidance role.
 
 STOP and `REPLAN` for production change, source/hash mismatch, incomplete or
 stubbed child, missing parser/global/evaluator shape, any invocation/output
-inspection, evaluator-borrowed value, C++ semantic claim, unpinned source,
+inspection, evaluator-borrowed value, Rust/C++ semantic claim, unpinned source,
 copied Zabel content, dirty authority, allowlist escape, or cap/function
-violation. After acceptance, return to complete rules_rust `utils.bzl`.
+violation. Stop after this complete utility family and then return to complete
+`lto.bzl`.
 
 ## Immediate predecessor
 
-Commit `5e7864995` accepts complete rules_rust common-facade loading. The older
-find-toolchain proof authenticates the parent over a narrowed child; it does not
-accept this complete recursive route or any toolchain behavior.
+Commit `feb0b204c` accepts the final complete direct child. Earlier commits
+accept selected utility slices, but not the complete `utils.bzl` module or any
+utility behavior.
