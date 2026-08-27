@@ -1,11 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-canonical-repository-load-route-implementation`
+Packet: `WP-4-5-7A-canonical-repository-load-route-implementation-r2`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `496168758`.
+Base: `f86bbafdb`.
 
 Result: add the one apparent-free canonical repository source/load route and
 shared canonical source-file/directory-listing projections required before
@@ -13,6 +13,19 @@ selected-module registration patterns can reuse package loading. Activate no
 package, target-pattern, registration, configured, rule or action behavior.
 
 ## Learned facts and accepted decision
+
+The first implementation candidate reached terminal `REPLAN` after its one
+allowed test-only correction; no Rust was retained. Its semantic shape fit the
+accepted design and all serial validation passed, but independent latest-diff
+review found three proof gaps: only the built-in source/listing wrappers logged
+their exact deepest owners; route failure/Need and generated-effect failure did
+not freeze short-circuit/epoch behavior; and structural hash plus retained-size
+coverage did not exercise route source/mapping/effect-plan changes. The
+candidate measured 897 production lines only by placing eleven cohesive
+drivers/accessors under `rustfmt::skip`; normal formatting measures 1,118
+production lines including wiring. R2 preserves the design and six-file
+allowlist, raises only the honest formatting cap, and makes the missing matrix
+an explicit pre-commit gate.
 
 Commit `496168758` supplies one loading-owned
 `HostCanonicalRepositoryRouteKey` over workspace plus canonical repository.
@@ -161,9 +174,11 @@ Only these files may change:
 
 No Cargo, fixture, oracle, identity parser, MODULE evaluator, query, core,
 analysis, CLI, package loader, subtree, rule or action file may change.
-Production growth is capped at 900 lines and proof growth at 1,100 lines; no
-new function exceeds 120 lines and each new production module stays below 650
-lines. `source_preparation.rs` is already above the 2,000-line complexity
+Production growth is capped at 1,200 lines and proof growth at 1,100 lines; no
+new function exceeds 120 lines, the canonical source module stays below 700
+lines, and the loading route module stays below 500 lines. New production
+drivers must be normally rustfmt-formatted; `rustfmt::skip` is not allowed in
+the new modules. `source_preparation.rs` is already above the 2,000-line complexity
 trigger: add at most 100 production lines there and put the cohesive new owner
 in its submodule. Mechanical shared-driver extraction does not authorize
 unrelated cleanup.
@@ -188,21 +203,27 @@ address split.
 - load-route legacy/observed success, route-first failure/Need order,
   generated-only effect activation, exact epoch forwarding/merge,
   complete-only equality/validity, cancellation nonpublication and A/B/A;
-- built-in, local, immutable and generated canonical source-file and direct
-  directory-listing results match equivalent existing root adapters where an
-  alias exists, while one selected canonical repository with no root alias
-  succeeds directly;
-- dependency logging proves built-in uses the pinned catalog and all other
-  sources converge on the existing materialization/result/path keys, with no
-  second filesystem/materialization owner and no route/mapping effect
-  activation;
+- a table-driven failure matrix proves selected route failure and route Need
+  publish no effect dependency, while generated effect Need/error stop before
+  projection and preserve exactly route then effect observation prefixes;
+- built-in, local, immutable-registry and generated canonical source-file and
+  direct directory-listing results match equivalent existing ordinary or
+  root-build adapters where that adapter admits the alias, while one selected
+  canonical repository with no root alias succeeds directly;
+- dependency logging for each of those four dispositions proves the exact
+  built-in catalog or existing materialization-result/path-resolution/source/
+  listing children, with no `HostRepositorySourceObservationKey`, second
+  filesystem/materialization owner or route/mapping effect activation;
 - structural guards prove no apparent spelling or physical source root enters
   the canonical input/load route and no package/subtree/target-pattern/
   registration key is activated; and
-- hash/equality discriminators cover workspace, canonical repository, route
-  disposition/source/mapping and generated effect plan without using a weak
-  hash as semantic identity; retained-size accounting proves the bounded
-  route/disposition/generated-plan shape without a mapping or source copy.
+- table-driven hash/equality discriminators independently vary workspace,
+  canonical repository, built-in/selected/generated disposition, selected
+  repo specification and mapping, and generated effect plan; equality remains
+  authoritative even if a weak hash collides; `size_of` plus structural-field
+  guards account for the inline route `Arc` and disposition handle and prove
+  that the generated plan is reachable only through the existing request,
+  with no copied mapping, physical root or source bytes.
 
 Run focused new owner tests, the full bzlmod and loading suites, locked checks
 for loading/core/query, then a locked `slug_cli_v2` build serially. Run Rust
@@ -225,8 +246,10 @@ expansion.
 ## Immediate predecessor and successor
 
 Commit `496168758` moved the sole canonical route/mapping DICE ownership to
-loading and was independently accepted. Independent pre-review accepted this
-source/load boundary, effect order, retained identity and wrapper deletion
-contract. The immediate successor after this packet is the bounded canonical
+loading and was independently accepted; `f86bbafdb` froze this source/load
+design. Independent pre-review accepted the boundary, effect order, retained
+identity and wrapper deletion contract. The rejected first implementation
+changed no accepted behavior and retained no Rust; r2 owns only the proof and
+honest-formatting corrections above. The immediate successor after this packet is the bounded canonical
 external package-loading adapter, followed by the one shared toolchain/
 execution-platform registration expander and only then configured consumers.

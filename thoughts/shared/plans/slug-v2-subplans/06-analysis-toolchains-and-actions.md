@@ -19294,8 +19294,8 @@ expansion, wildcard ambiguity and family filters, configured validation,
 options, rules and actions remain **unsupported/deferred**.
 
 Activate only
-`WP-4-5-7A-canonical-repository-load-route-implementation` under the manifest's
-six-file 900-production/1,100-proof caps. Because `source_preparation.rs`
+`WP-4-5-7A-canonical-repository-load-route-implementation-r2` under the manifest's
+six-file 1,200-production/1,100-proof caps. Because `source_preparation.rs`
 exceeds the complexity trigger, its additions are capped at 100 production
 lines and the cohesive owner belongs in a new submodule. Require independent
 DICE/public-boundary/retained-representation terminal review. Stop for an
@@ -19315,3 +19315,29 @@ Independent DICE/public-boundary/retained-representation pre-review returned
 converge on the existing materialization/path owners, retained state is
 structural without alias/mapping copies, observed epoch composition is
 explicit, and the wrapper deletion owner/regression is concrete.
+
+### Canonical repository load-route implementation REPLAN; r2 proof correction (2026-08-27)
+
+The first compiled candidate matched the accepted owner design at 897
+production and 623 proof lines and passed focused 9/9, full loading and bzlmod,
+locked dependent/CLI, formatting and archive-baseline gates. One mixed-horizon
+bzlmod ordering test failed once, then passed exact and in the full rerun.
+Independent latest-diff review still rejected the packet after its one allowed
+test-only correction: only built-in source/listing wrappers proved exact child
+ownership; route failure/Need and generated-effect failure did not freeze
+short-circuit and observed-prefix behavior; and source/mapping/effect-plan hash
+plus retained-size discriminators remained incomplete. No Rust is retained.
+
+R2 changes no semantic decision or allowlist. It requires table-driven
+built-in, local, immutable-registry and generated source-file/listing parity
+against admitted ordinary/root-build adapters, exact dependency logs down to
+the existing catalog/materialization/result/path/source/listing owners, and a
+route/effect Need/error prefix matrix before acceptance. It independently
+varies workspace, canonical name, source disposition/spec/mapping and generated
+plan, and accounts for the inline route/disposition handles without copied
+mapping, physical root or bytes. Removing the rejected candidate's eleven
+`rustfmt::skip` attributes yields 1,118 normally formatted production lines;
+the honest r2 caps are therefore 1,200 production, 1,100 proof, 700 for the
+canonical source module and 500 for the loading route module, with no
+`rustfmt::skip` in either new production module. Activate only
+`WP-4-5-7A-canonical-repository-load-route-implementation-r2`.
