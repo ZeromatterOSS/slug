@@ -3993,6 +3993,120 @@ const UTILS_TRANSFORM_SOURCES_SOURCE: &str = r###"def transform_sources(ctx, src
     return generated_sources, generated_compile_data, generated_root
 "###;
 
+const UTILS_NAME_TO_CRATE_NAME_SOURCE: &str = r###"def name_to_crate_name(name):
+    """Converts a build target's name into the name of its associated crate.
+
+    Crate names cannot contain certain characters, such as -, which are allowed
+    in build target names. All illegal characters will be converted to
+    underscores.
+
+    This is a similar conversion as that which cargo does, taking a
+    `Cargo.toml`'s `package.name` and canonicalizing it
+
+    Note that targets can specify the `crate_name` attribute to customize their
+    crate name; in situations where this is important, use the
+    compute_crate_name() function instead.
+
+    Args:
+        name (str): The name of the target.
+
+    Returns:
+        str: The name of the crate for this target.
+    """
+    for illegal in ("-", "/"):
+        name = name.replace(illegal, "_")
+    return name
+"###;
+
+const UTILS_INVALID_CHARS_IN_CRATE_NAME_SOURCE: &str = r###"def _invalid_chars_in_crate_name(name):
+    """Returns any invalid chars in the given crate name.
+
+    Args:
+        name (str): Name to test.
+
+    Returns:
+        list: List of invalid characters in the crate name.
+    """
+
+    return dict([(c, ()) for c in name.elems() if not (c.isalnum() or c == "_")]).keys()
+"###;
+
+const UTILS_COMPUTE_CRATE_NAME_SOURCE: &str = r###"def compute_crate_name(workspace_name, label, toolchain, name_override = None):
+    """Returns the crate name to use for the current target.
+
+    Args:
+        workspace_name (string): The current workspace name.
+        label (struct): The label of the current target.
+        toolchain (struct): The toolchain in use for the target.
+        name_override (String): An optional name to use (as an override of label.name).
+
+    Returns:
+        str: The crate name to use for this target.
+    """
+    if name_override:
+        invalid_chars = _invalid_chars_in_crate_name(name_override)
+        if invalid_chars:
+            fail("Crate name '{}' contains invalid character(s): {}".format(
+                name_override,
+                " ".join(invalid_chars),
+            ))
+        return name_override
+
+    if (toolchain and label and toolchain._rename_first_party_crates and
+        should_encode_label_in_crate_name(workspace_name, label, toolchain._third_party_dir)):
+        crate_name = encode_label_as_crate_name(label.package, label.name)
+    else:
+        crate_name = name_to_crate_name(label.name)
+
+    invalid_chars = _invalid_chars_in_crate_name(crate_name)
+    if invalid_chars:
+        fail(
+            "Crate name '{}' ".format(crate_name) +
+            "derived from Bazel target name '{}' ".format(label.name) +
+            "contains invalid character(s): {}\n".format(" ".join(invalid_chars)) +
+            "Consider adding a crate_name attribute to set a valid crate name",
+        )
+    return crate_name
+"###;
+
+const UTILS_SHOULD_ENCODE_LABEL_IN_CRATE_NAME_SOURCE: &str = r###"def should_encode_label_in_crate_name(workspace_name, label, third_party_dir):
+    """Determines if the crate's name should include the Bazel label, encoded.
+
+    Crate names may only encode the label if the target is in the current repo,
+    the target is not in the third_party_dir, and the current repo is not
+    rules_rust.
+
+    Args:
+        workspace_name (string): The name of the current workspace.
+        label (Label): The package in question.
+        third_party_dir (string): The directory in which third-party packages are kept.
+
+    Returns:
+        True if the crate name should encode the label, False otherwise.
+    """
+
+    # TODO(hlopko): This code assumes a monorepo; make it work with external
+    # repositories as well.
+    return (
+        workspace_name != "rules_rust" and
+        not label.workspace_root and
+        not ("//" + label.package + "/").startswith(third_party_dir + "/")
+    )
+"###;
+
+const UTILS_ENCODE_LABEL_AS_CRATE_NAME_SOURCE: &str = r###"def encode_label_as_crate_name(package, name):
+    """Encodes the package and target names in a format suitable for a crate name.
+
+    Args:
+        package (string): The package of the target in question.
+        name (string): The name of the target in question.
+
+    Returns:
+        A string that encodes the package and target name, to be used as the crate's name.
+    """
+    return _encode_raw_string(package + ":" + name)
+"###;
+
 const UTILS_SYMLINK_NON_GENERATED_SOURCE: &str = r###"def _symlink_for_non_generated_source(ctx, src_file, package_root):
     """Creates and returns a symlink for non-generated source files.
 
@@ -4864,6 +4978,122 @@ fn exact_rules_rust_utils_transform_sources_retains_paths_helper_and_parent_iden
             .unwrap()
             .value()
             .ptr_eq(utils.get("transform_sources").unwrap().value())
+    );
+}
+
+#[test]
+fn exact_rules_rust_utils_compute_crate_name_retains_eager_helpers_and_parent_identity() {
+    let selected = [
+        (
+            UTILS_NAME_TO_CRATE_NAME_SOURCE,
+            "8ef88e5e0c024de9214552db4ba8dc6e54018cf3fc52e6460d8ecd572c984c62",
+        ),
+        (
+            UTILS_INVALID_CHARS_IN_CRATE_NAME_SOURCE,
+            "da15bf3fe35c692ad74c76f1f80d234c0b0519697a6fee93335d3888ba745c81",
+        ),
+        (
+            UTILS_COMPUTE_CRATE_NAME_SOURCE,
+            "8b79565b53edd586539f2f6697848038c598814b2706ed57fffe2c1229c0621f",
+        ),
+        (
+            UTILS_SHOULD_ENCODE_LABEL_IN_CRATE_NAME_SOURCE,
+            "852e96f30111d5400489cf5512af8d27d8519f57194a3936e21600cd412b364e",
+        ),
+        (
+            UTILS_ENCODE_LABEL_AS_CRATE_NAME_SOURCE,
+            "9347beaed27421b6f782c9f643014f8d2774dfbb9b7c83c0ed96143ac3698dc3",
+        ),
+    ];
+    let accepted = [
+        (
+            UTILS_SUBSTITUTIONS_SOURCE,
+            "e0526a4d2bc5bc9d04544ecdbde305667c5a015b0c7f4597858891ae668f7b85",
+        ),
+        (
+            UTILS_ENCODE_SOURCE,
+            "b5ad15479c25ae84b1dba206ffc924d455003aaff98b5371773a3104f08d9027",
+        ),
+        (
+            UTILS_REPLACE_ALL_SOURCE,
+            "e5643897c866136bd788b242be0c983a2ae3aab511a1b7676c2d118be0200cd2",
+        ),
+    ];
+    for (source, expected) in selected.into_iter().chain(accepted) {
+        assert_eq!(format!("{:x}", Sha256::digest(source.as_bytes())), expected);
+    }
+    let source = [
+        UTILS_NAME_TO_CRATE_NAME_SOURCE,
+        UTILS_INVALID_CHARS_IN_CRATE_NAME_SOURCE,
+        UTILS_COMPUTE_CRATE_NAME_SOURCE,
+        UTILS_SHOULD_ENCODE_LABEL_IN_CRATE_NAME_SOURCE,
+        UTILS_SUBSTITUTIONS_SOURCE,
+        UTILS_ENCODE_LABEL_AS_CRATE_NAME_SOURCE,
+        UTILS_ENCODE_SOURCE,
+        UTILS_REPLACE_ALL_SOURCE,
+        "CRATE_NAME_EAGER_PROOF = struct(substitutions = _substitutions, encode = _encode_raw_string, replace = _replace_all)\n",
+    ].join("\n");
+    let utils_owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_rust+//rust/private:utils.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_rust/rust/private/utils.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let utils = eval_bzl_with_identity(&source, utils_owner.clone()).unwrap();
+    for name in [
+        "name_to_crate_name",
+        "compute_crate_name",
+        "should_encode_label_in_crate_name",
+        "encode_label_as_crate_name",
+    ] {
+        assert_eq!(utils.get(name).unwrap().value().get_type(), "function");
+    }
+    let invalid = utils
+        .get_any_visibility("_invalid_chars_in_crate_name")
+        .unwrap()
+        .0;
+    assert_eq!(invalid.value().get_type(), "function");
+    assert!(utils.get("_invalid_chars_in_crate_name").is_err());
+    let proof_binding = utils.get("CRATE_NAME_EAGER_PROOF").unwrap();
+    let proof = StructRef::from_value(proof_binding.value()).unwrap();
+    let proof_field = |name: &str| {
+        proof
+            .iter()
+            .find_map(|(field, value)| (field.as_str() == name).then_some(value))
+            .unwrap()
+    };
+    assert!(
+        utils
+            .get("substitutions_for_testing")
+            .unwrap()
+            .value()
+            .ptr_eq(proof_field("substitutions"))
+    );
+    assert!(
+        utils
+            .get("encode_raw_string_for_testing")
+            .unwrap()
+            .value()
+            .ptr_eq(proof_field("encode"))
+    );
+    assert_eq!(proof_field("replace").get_type(), "function");
+    assert!(utils.get("_encode_raw_string").is_err());
+    assert!(utils.get("_replace_all").is_err());
+    let parent = eval_bzl_with_loaded_children(
+        "load(\":utils.bzl\", \"compute_crate_name\")\nIMPORTED = compute_crate_name\n",
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_rust+//rust/private:rust.bzl").unwrap(),
+            workspace_path: PathBuf::from("/rules_rust/rust/private/rust.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+        &[(":utils.bzl", utils_owner, utils.dupe())],
+    )
+    .unwrap();
+    assert!(
+        parent
+            .get("IMPORTED")
+            .unwrap()
+            .value()
+            .ptr_eq(utils.get("compute_crate_name").unwrap().value())
     );
 }
 
