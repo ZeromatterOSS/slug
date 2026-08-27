@@ -7273,3 +7273,21 @@ Its sole child is accepted. Run only
 under 0/650/650, prove its complete imported/struct/provider/function inventory
 and invoke nothing. Zabel remains peer ownership guidance; Bazel 9.2 and
 authenticated rules_cc bytes own compatibility.
+
+### Complete link values accepted; link-build variables selected (2026-08-27)
+
+Commit `955e2204f` freezes all 363 authenticated library-to-link-value lines
+over its actual complete child. It proves all three imported identities, six
+named type mappings, three private provider identities, five function
+types/visibility and exact six-public/twelve-all inventories without
+invocation. All required suites pass at 0 production and 498 proof additions;
+independent review returned `ACCEPT`.
+
+`finalize_link_action.bzl` source order next reaches complete 392-line
+`link/link_build_variables.bzl`, SHA-256
+`bdf030361c5a199f6c0fd1bbe5e3b1ce68d041141626a6b0242639b13eab33f0`.
+Its helper and internal children are accepted. Run only
+`WP-4-7A-rules-cc-link-build-variables-complete-loading-proof` under
+0/700/700, prove its complete imported/struct/dictionary/function inventory
+and invoke nothing. Zabel remains peer ownership guidance; Bazel 9.2 and
+authenticated rules_cc bytes own compatibility.
