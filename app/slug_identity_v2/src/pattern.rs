@@ -11,8 +11,11 @@
 use std::fmt;
 
 use crate::label::ApparentLabel;
+use crate::label::CanonicalLabel;
+use crate::package::PackageIdentifier;
 use crate::package::PackagePath;
 use crate::repo::ApparentRepoName;
+use crate::repo::CanonicalRepoName;
 
 /// Package-wildcard spelling retained until loading resolves a possible
 /// same-named explicit target.
@@ -52,32 +55,111 @@ pub enum TargetPattern {
     },
 }
 
+/// Absolute target-pattern syntax projected into one declaring repository's
+/// canonical context.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CanonicalTargetPattern {
+    Single(CanonicalLabel),
+    PackageWildcard {
+        package: PackageIdentifier,
+        wildcard: TargetPatternWildcard,
+        conflict_target: Option<CanonicalLabel>,
+    },
+    Recursive {
+        package: PackageIdentifier,
+        wildcard: Option<TargetPatternWildcard>,
+    },
+}
+
+enum PatternRepoSpelling {
+    Current,
+    Apparent(ApparentRepoName),
+    Canonical(CanonicalRepoName),
+}
+
+enum ParsedTargetPattern<'a> {
+    Single {
+        repo: PatternRepoSpelling,
+        label: &'a str,
+    },
+    PackageWildcard {
+        repo: PatternRepoSpelling,
+        package: PackagePath,
+        wildcard: TargetPatternWildcard,
+    },
+    Recursive {
+        repo: PatternRepoSpelling,
+        package: PackagePath,
+        wildcard: Option<TargetPatternWildcard>,
+    },
+}
+
 impl TargetPattern {
     pub fn parse(value: &str) -> Result<Self, String> {
-        let (repo, rest) = split_repo(value)?;
-        if let Some((package, wildcard)) = recursive_pattern(rest) {
-            return Ok(Self::Recursive {
-                repo,
-                package: PackagePath::parse(package)?,
-                wildcard,
-            });
-        }
-        let package_part = rest.split_once(':').map_or(rest, |(package, _)| package);
-        if package_part.split('/').any(|component| component == "...") {
-            return Err(format!(
-                "invalid target pattern {value}: '...' can only be used with wildcard targets"
-            ));
-        }
-        for (suffix, wildcard) in wildcard_suffixes() {
-            if let Some(package) = rest.strip_suffix(suffix) {
-                return Ok(Self::PackageWildcard {
-                    repo,
-                    package: PackagePath::parse(package)?,
-                    wildcard: *wildcard,
-                });
+        match parse_absolute_pattern(value)? {
+            ParsedTargetPattern::Single { repo, .. } => {
+                apparent_repo(repo, value)?;
+                ApparentLabel::parse(value).map(Self::Single)
             }
+            ParsedTargetPattern::PackageWildcard {
+                repo,
+                package,
+                wildcard,
+            } => Ok(Self::PackageWildcard {
+                repo: apparent_repo(repo, value)?,
+                package,
+                wildcard,
+            }),
+            ParsedTargetPattern::Recursive {
+                repo,
+                package,
+                wildcard,
+            } => Ok(Self::Recursive {
+                repo: apparent_repo(repo, value)?,
+                package,
+                wildcard,
+            }),
         }
-        ApparentLabel::parse(value).map(Self::Single)
+    }
+}
+
+impl CanonicalTargetPattern {
+    pub fn parse<'a>(
+        value: &str,
+        current_repo: &CanonicalRepoName,
+        mapping_target: impl FnOnce(&ApparentRepoName) -> Option<&'a CanonicalRepoName>,
+    ) -> Result<Self, String> {
+        match parse_absolute_pattern(value)? {
+            ParsedTargetPattern::Single { repo, label } => {
+                let repo = canonical_repo(repo, current_repo, mapping_target)?;
+                canonical_label(&repo, label).map(Self::Single)
+            }
+            ParsedTargetPattern::PackageWildcard {
+                repo,
+                package,
+                wildcard,
+            } => {
+                let repo = canonical_repo(repo, current_repo, mapping_target)?;
+                let conflict_target =
+                    canonical_label(&repo, &format!("{}:{}", package, wildcard.as_str()))?;
+                Ok(Self::PackageWildcard {
+                    package: PackageIdentifier::new(repo, package),
+                    wildcard,
+                    conflict_target: Some(conflict_target),
+                })
+            }
+            ParsedTargetPattern::Recursive {
+                repo,
+                package,
+                wildcard,
+            } => Ok(Self::Recursive {
+                package: PackageIdentifier::new(
+                    canonical_repo(repo, current_repo, mapping_target)?,
+                    package,
+                ),
+                wildcard,
+            }),
+        }
     }
 }
 
@@ -128,13 +210,46 @@ fn recursive_package(value: &str) -> Option<&str> {
         .or_else(|| value.strip_suffix("/..."))
 }
 
-fn split_repo(value: &str) -> Result<(ApparentRepoName, &str), String> {
-    if let Some(rest) = value.strip_prefix('@') {
-        if rest.starts_with('@') {
-            return Err(format!(
-                "target pattern uses apparent repo spelling, not @@: {value}"
-            ));
+fn parse_absolute_pattern(value: &str) -> Result<ParsedTargetPattern<'_>, String> {
+    let (repo, rest) = split_repo_spelling(value)?;
+    if let Some((package, wildcard)) = recursive_pattern(rest) {
+        return Ok(ParsedTargetPattern::Recursive {
+            repo,
+            package: PackagePath::parse(package)?,
+            wildcard,
+        });
+    }
+    let package_part = rest.split_once(':').map_or(rest, |(package, _)| package);
+    if package_part.split('/').any(|component| component == "...") {
+        return Err(format!(
+            "invalid target pattern {value}: '...' can only be used with wildcard targets"
+        ));
+    }
+    for (suffix, wildcard) in wildcard_suffixes() {
+        if let Some(package) = rest.strip_suffix(suffix) {
+            return Ok(ParsedTargetPattern::PackageWildcard {
+                repo,
+                package: PackagePath::parse(package)?,
+                wildcard: *wildcard,
+            });
         }
+    }
+    Ok(ParsedTargetPattern::Single { repo, label: rest })
+}
+
+fn split_repo_spelling(value: &str) -> Result<(PatternRepoSpelling, &str), String> {
+    if let Some(rest) = value.strip_prefix("@@") {
+        let Some((repo, package)) = rest.split_once("//") else {
+            return Err(format!("target pattern must contain //: {value}"));
+        };
+        let repo = if repo.is_empty() {
+            CanonicalRepoName::root()
+        } else {
+            CanonicalRepoName::new(repo)?
+        };
+        return Ok((PatternRepoSpelling::Canonical(repo), package));
+    }
+    if let Some(rest) = value.strip_prefix('@') {
         let Some((repo, package)) = rest.split_once("//") else {
             return Err(format!("target pattern must contain //: {value}"));
         };
@@ -143,14 +258,44 @@ fn split_repo(value: &str) -> Result<(ApparentRepoName, &str), String> {
         } else {
             ApparentRepoName::new(repo)?
         };
-        return Ok((repo, package));
+        return Ok((PatternRepoSpelling::Apparent(repo), package));
     }
     let Some(rest) = value.strip_prefix("//") else {
         return Err(format!(
             "target pattern must start with // or @repo//: {value}"
         ));
     };
-    Ok((ApparentRepoName::root(), rest))
+    Ok((PatternRepoSpelling::Current, rest))
+}
+
+fn apparent_repo(repo: PatternRepoSpelling, value: &str) -> Result<ApparentRepoName, String> {
+    match repo {
+        PatternRepoSpelling::Current => Ok(ApparentRepoName::root()),
+        PatternRepoSpelling::Apparent(repo) => Ok(repo),
+        PatternRepoSpelling::Canonical(_) => Err(format!(
+            "target pattern uses apparent repo spelling, not @@: {value}"
+        )),
+    }
+}
+
+fn canonical_repo<'a>(
+    repo: PatternRepoSpelling,
+    current_repo: &CanonicalRepoName,
+    mapping_target: impl FnOnce(&ApparentRepoName) -> Option<&'a CanonicalRepoName>,
+) -> Result<CanonicalRepoName, String> {
+    match repo {
+        PatternRepoSpelling::Current => Ok(current_repo.clone()),
+        PatternRepoSpelling::Canonical(repo) => Ok(repo),
+        PatternRepoSpelling::Apparent(apparent) => {
+            mapping_target(&apparent).cloned().ok_or_else(|| {
+                format!("target pattern repository '{apparent}' is not visible from {current_repo}")
+            })
+        }
+    }
+}
+
+fn canonical_label(repo: &CanonicalRepoName, label: &str) -> Result<CanonicalLabel, String> {
+    CanonicalLabel::parse(&format!("{repo}//{label}"))
 }
 
 fn write_repo_package(

@@ -2157,9 +2157,34 @@ impl std::error::Error for RepositoryPackageLoadError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct RepositoryPackageLoadKey {
+pub(crate) struct RepositoryPackageInventoryKey {
     route: HostRepositorySourceRoute,
     package: PackagePath,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct RepositoryPackageInventoryObservationKey(RepositoryPackageInventoryKey);
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedRepositoryPackageInventory {
+    result: Arc<Result<LoadedPackage, RepositoryPackageLoadError>>,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)] // Read by the registration expander selected as the next packet.
+impl ObservedRepositoryPackageInventory {
+    pub(crate) fn result(&self) -> &Arc<Result<LoadedPackage, RepositoryPackageLoadError>> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct RepositoryPackageLoadKey {
+    inventory: RepositoryPackageInventoryKey,
 }
 
 #[doc(hidden)]
@@ -2205,8 +2230,10 @@ impl ObservedRepositoryPackageLoad {
 impl RepositoryPackageLoadKey {
     pub fn new(route: RootRepositoryRoute, package: PackagePath) -> Self {
         Self {
-            route: HostRepositorySourceRoute::root(route),
-            package,
+            inventory: RepositoryPackageInventoryKey::new(
+                HostRepositorySourceRoute::root(route),
+                package,
+            ),
         }
     }
 
@@ -2215,13 +2242,28 @@ impl RepositoryPackageLoadKey {
         package: PackagePath,
     ) -> Self {
         Self {
-            route: HostRepositorySourceRoute::canonical(input),
-            package,
+            inventory: RepositoryPackageInventoryKey::new(
+                HostRepositorySourceRoute::canonical(input),
+                package,
+            ),
         }
     }
 }
 
-impl std::hash::Hash for RepositoryPackageLoadKey {
+impl RepositoryPackageInventoryKey {
+    pub(crate) fn new(route: HostRepositorySourceRoute, package: PackagePath) -> Self {
+        Self { route, package }
+    }
+}
+
+#[allow(dead_code)] // Constructed directly by the next registration-expander packet.
+impl RepositoryPackageInventoryObservationKey {
+    pub(crate) fn new(route: HostRepositorySourceRoute, package: PackagePath) -> Self {
+        Self(RepositoryPackageInventoryKey::new(route, package))
+    }
+}
+
+impl std::hash::Hash for RepositoryPackageInventoryKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.route.hash(state);
         self.package.hash(state);
@@ -2233,9 +2275,26 @@ impl fmt::Display for RepositoryPackageLoadKey {
         write!(
             f,
             "repository-package-load:{}//{}",
+            self.inventory.route.canonical_repo(),
+            self.inventory.package
+        )
+    }
+}
+
+impl fmt::Display for RepositoryPackageInventoryKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "repository-package-inventory:{}//{}",
             self.route.canonical_repo(),
             self.package
         )
+    }
+}
+
+impl fmt::Display for RepositoryPackageInventoryObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
     }
 }
 
@@ -5495,26 +5554,26 @@ fn loaded_external_starlark_rule_reason(
 }
 
 #[derive(Clone, Copy)]
-enum RepositoryPackageLoadMode {
+enum RepositoryPackageInventoryMode {
     Legacy,
     Observed,
 }
 
-type RepositoryPackageLoadCarrier = Arc<Result<LoadedPackage, RepositoryPackageLoadError>>;
-type RepositoryPackageLoadDriverOutcome = SourcePreparationOutcome<
-    Result<(RepositoryPackageLoadCarrier, PathObservationEpoch), ObservedPathFrontierError>,
+type RepositoryPackageInventoryCarrier = Arc<Result<LoadedPackage, RepositoryPackageLoadError>>;
+type RepositoryPackageInventoryDriverOutcome = SourcePreparationOutcome<
+    Result<(RepositoryPackageInventoryCarrier, PathObservationEpoch), ObservedPathFrontierError>,
 >;
 
 fn repository_package_driver_complete(
     result: Result<LoadedPackage, RepositoryPackageLoadError>,
     observations: PathObservationEpoch,
-) -> RepositoryPackageLoadDriverOutcome {
+) -> RepositoryPackageInventoryDriverOutcome {
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
 }
 
 fn finish_repository_package_observed_child<T>(
     outcome: SourcePreparationOutcome<Result<T, ObservedPathFrontierError>>,
-) -> ControlFlow<RepositoryPackageLoadDriverOutcome, T> {
+) -> ControlFlow<RepositoryPackageInventoryDriverOutcome, T> {
     match outcome {
         SourcePreparationOutcome::Need(need) => {
             ControlFlow::Break(SourcePreparationOutcome::Need(need))
@@ -5535,14 +5594,16 @@ fn merge_repository_package_observations(
 
 async fn compute_repository_package_source(
     ctx: &mut DiceComputations<'_>,
-    key: &RepositoryPackageLoadKey,
-    mode: RepositoryPackageLoadMode,
-) -> ControlFlow<RepositoryPackageLoadDriverOutcome, (RepositoryPackageSource, PathObservationEpoch)>
-{
+    key: &RepositoryPackageInventoryKey,
+    mode: RepositoryPackageInventoryMode,
+) -> ControlFlow<
+    RepositoryPackageInventoryDriverOutcome,
+    (RepositoryPackageSource, PathObservationEpoch),
+> {
     let package = PackageIdentifier::new(key.route.canonical_repo().clone(), key.package.clone());
     let mut observations = PathObservationEpoch::empty();
     let result = match mode {
-        RepositoryPackageLoadMode::Legacy => {
+        RepositoryPackageInventoryMode::Legacy => {
             let source = match &key.route {
                 HostRepositorySourceRoute::Root(route) => {
                     RepositoryPackageSourceKey::new(route.clone(), package)
@@ -5573,7 +5634,7 @@ async fn compute_repository_package_source(
                 }
             }
         }
-        RepositoryPackageLoadMode::Observed => {
+        RepositoryPackageInventoryMode::Observed => {
             let source = match &key.route {
                 HostRepositorySourceRoute::Root(route) => {
                     RepositoryPackageSourceObservationKey::new(route.clone(), package)
@@ -5623,15 +5684,15 @@ async fn compute_repository_package_source(
 
 async fn compute_repository_package_child(
     ctx: &mut DiceComputations<'_>,
-    mode: RepositoryPackageLoadMode,
+    mode: RepositoryPackageInventoryMode,
     resolved: ResolvedExternalBzlLoad,
     raw_load: &str,
     build_origin: &Arc<str>,
     mut observations: PathObservationEpoch,
-) -> ControlFlow<RepositoryPackageLoadDriverOutcome, (FrozenBzlModule, PathObservationEpoch)> {
+) -> ControlFlow<RepositoryPackageInventoryDriverOutcome, (FrozenBzlModule, PathObservationEpoch)> {
     let canonical_label = resolved.label.canonical_label(&resolved.route);
     let child_result = match mode {
-        RepositoryPackageLoadMode::Legacy => {
+        RepositoryPackageInventoryMode::Legacy => {
             let child = ExternalBzlModuleEvalKey::from_source_route(resolved.route, resolved.label);
             match ctx.compute(&child).await {
                 Ok(SourcePreparationOutcome::Need(need)) => {
@@ -5656,7 +5717,7 @@ async fn compute_repository_package_child(
                 }
             }
         }
-        RepositoryPackageLoadMode::Observed => {
+        RepositoryPackageInventoryMode::Observed => {
             let child =
                 ExternalBzlModuleObservationKey::from_source_route(resolved.route, resolved.label);
             match ctx.compute(&child).await {
@@ -5719,14 +5780,14 @@ enum RepositoryPackageChildLoad {
 
 async fn compute_repository_package_children(
     ctx: &mut DiceComputations<'_>,
-    key: &RepositoryPackageLoadKey,
-    mode: RepositoryPackageLoadMode,
+    key: &RepositoryPackageInventoryKey,
+    mode: RepositoryPackageInventoryMode,
     loads: Vec<RepositoryPackageChildLoad>,
     source_label: CanonicalLabel,
     build_origin: &Arc<str>,
     mut observations: PathObservationEpoch,
 ) -> ControlFlow<
-    RepositoryPackageLoadDriverOutcome,
+    RepositoryPackageInventoryDriverOutcome,
     (Vec<(String, FrozenBzlModule)>, PathObservationEpoch),
 > {
     let mut loaded_modules = Vec::with_capacity(loads.len());
@@ -5737,8 +5798,8 @@ async fn compute_repository_package_children(
             }
             RepositoryPackageChildLoad::Canonical(raw_load) => {
                 let external_mode = match mode {
-                    RepositoryPackageLoadMode::Legacy => ExternalBzlModuleMode::Legacy,
-                    RepositoryPackageLoadMode::Observed => ExternalBzlModuleMode::Observed,
+                    RepositoryPackageInventoryMode::Legacy => ExternalBzlModuleMode::Legacy,
+                    RepositoryPackageInventoryMode::Observed => ExternalBzlModuleMode::Observed,
                 };
                 match resolve_external_bzl_child_route(
                     ctx,
@@ -5788,7 +5849,7 @@ fn project_repository_load_resolution_error(
     build_origin: &Arc<str>,
     raw_load: &str,
     source_label: CanonicalLabel,
-) -> RepositoryPackageLoadDriverOutcome {
+) -> RepositoryPackageInventoryDriverOutcome {
     match outcome {
         SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
         SourcePreparationOutcome::Complete(Err(error)) => {
@@ -5822,17 +5883,16 @@ struct PreparedRepositoryPackageEvaluation {
     logical_package_dir: PathBuf,
     logical_build_file: PathBuf,
     build_label: CanonicalLabel,
-    loads: Vec<String>,
     child_loads: Vec<RepositoryPackageChildLoad>,
     build_origin: Arc<str>,
     observations: PathObservationEpoch,
 }
 
 fn prepare_repository_package_evaluation(
-    key: &RepositoryPackageLoadKey,
+    key: &RepositoryPackageInventoryKey,
     source: RepositoryPackageSource,
     observations: PathObservationEpoch,
-) -> Result<PreparedRepositoryPackageEvaluation, RepositoryPackageLoadDriverOutcome> {
+) -> Result<PreparedRepositoryPackageEvaluation, RepositoryPackageInventoryDriverOutcome> {
     let relative_build_file = PathBuf::from(key.package.as_str()).join(source.build_file_name());
     let source_text = match std::str::from_utf8(source.bytes().as_ref()) {
         Ok(source) => Arc::new(source.to_owned()),
@@ -5915,7 +5975,6 @@ fn prepare_repository_package_evaluation(
         logical_package_dir,
         logical_build_file,
         build_label,
-        loads,
         child_loads,
         build_origin,
         observations,
@@ -5923,11 +5982,11 @@ fn prepare_repository_package_evaluation(
 }
 
 fn prepare_repository_package_child_loads(
-    key: &RepositoryPackageLoadKey,
+    key: &RepositoryPackageInventoryKey,
     loads: &[String],
     canonical_repo: &CompactString,
     observations: &PathObservationEpoch,
-) -> Result<Vec<RepositoryPackageChildLoad>, RepositoryPackageLoadDriverOutcome> {
+) -> Result<Vec<RepositoryPackageChildLoad>, RepositoryPackageInventoryDriverOutcome> {
     let HostRepositorySourceRoute::Root(route) = &key.route else {
         return Ok(loads
             .iter()
@@ -5965,15 +6024,14 @@ fn prepare_repository_package_child_loads(
 }
 
 fn evaluate_repository_package(
-    key: &RepositoryPackageLoadKey,
+    key: &RepositoryPackageInventoryKey,
     prepared: PreparedRepositoryPackageEvaluation,
     loaded_modules: &[(String, FrozenBzlModule)],
     observations: PathObservationEpoch,
     capture_events: bool,
     event_batch: &mut Option<EventBatch>,
-) -> RepositoryPackageLoadDriverOutcome {
+) -> RepositoryPackageInventoryDriverOutcome {
     let canonical_repo = prepared.canonical_repo.clone();
-    let has_loads = !prepared.loads.is_empty();
     let input = HostPackageAttemptInput {
         workspace: key.route.workspace().dupe(),
         logical_package_root: key.route.workspace().dupe(),
@@ -6009,27 +6067,24 @@ fn evaluate_repository_package(
             let result = terminal.result.map_err(|error| {
                 RepositoryPackageLoadError::new(RepositoryPackageLoadErrorInner::Attempt(error))
             });
-            let result = result.and_then(|loaded| {
-                validate_loaded_repository_package(key, &canonical_repo, has_loads, loaded)
-            });
             repository_package_driver_complete(result, observations)
         }
     }
 }
 
 fn validate_loaded_repository_package(
-    key: &RepositoryPackageLoadKey,
-    canonical_repo: &CompactString,
-    has_loads: bool,
-    loaded: LoadedPackage,
-) -> Result<LoadedPackage, RepositoryPackageLoadError> {
-    if !has_loads {
-        return Ok(loaded);
+    key: &RepositoryPackageInventoryKey,
+    loaded: &LoadedPackage,
+) -> Result<(), RepositoryPackageLoadError> {
+    // Package evaluation retains one direct root for every first-seen BUILD
+    // load, so emptiness preserves the former syntactic `has_loads` gate.
+    if loaded.direct_load_roots.is_empty() {
+        return Ok(());
     }
     if let Some((target, reason)) = loaded_external_starlark_rule_reason(&loaded.targets) {
         return Err(RepositoryPackageLoadError::new(
             RepositoryPackageLoadErrorInner::LoadedStarlarkRule {
-                canonical_repo: canonical_repo.clone(),
+                canonical_repo: CompactString::new(key.route.canonical_repo().as_str()),
                 package: key.package.clone(),
                 target: Arc::from(target),
                 reason,
@@ -6043,31 +6098,31 @@ fn validate_loaded_repository_package(
             ..
         }]
     ) {
-        return Ok(loaded);
+        return Ok(());
     }
     if let Some((target, kind)) = loaded.targets.iter().find_map(|target| {
         loaded_external_target_kind(&target.kind).map(|kind| (target.name.as_str(), kind))
     }) {
         return Err(RepositoryPackageLoadError::new(
             RepositoryPackageLoadErrorInner::LoadedTargetKind {
-                canonical_repo: canonical_repo.clone(),
+                canonical_repo: CompactString::new(key.route.canonical_repo().as_str()),
                 package: key.package.clone(),
                 target: Arc::from(target),
                 kind: Arc::from(kind),
             },
         ));
     }
-    Ok(loaded)
+    Ok(())
 }
 
-impl RepositoryPackageLoadKey {
+impl RepositoryPackageInventoryKey {
     async fn compute_mode(
         &self,
         ctx: &mut DiceComputations<'_>,
-        mode: RepositoryPackageLoadMode,
+        mode: RepositoryPackageInventoryMode,
         capture_events: bool,
         event_batch: &mut Option<EventBatch>,
-    ) -> RepositoryPackageLoadDriverOutcome {
+    ) -> RepositoryPackageInventoryDriverOutcome {
         let (source, observations) = match compute_repository_package_source(ctx, self, mode).await
         {
             ControlFlow::Continue(value) => value,
@@ -6103,9 +6158,9 @@ impl RepositoryPackageLoadKey {
     }
 }
 
-fn project_legacy_repository_package_load(
-    value: RepositoryPackageLoadDriverOutcome,
-) -> SourcePreparationOutcome<RepositoryPackageLoadCarrier> {
+fn project_legacy_repository_package_inventory(
+    value: RepositoryPackageInventoryDriverOutcome,
+) -> SourcePreparationOutcome<RepositoryPackageInventoryCarrier> {
     match value {
         SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
         SourcePreparationOutcome::Complete(Ok((result, observations))) => {
@@ -6113,14 +6168,14 @@ fn project_legacy_repository_package_load(
             SourcePreparationOutcome::Complete(result)
         }
         SourcePreparationOutcome::Complete(Err(error)) => {
-            panic!("legacy repository package load produced frontier error: {error}")
+            panic!("legacy repository package inventory produced frontier error: {error}")
         }
     }
 }
 
 #[async_trait]
-impl Key for RepositoryPackageLoadKey {
-    type Value = SourcePreparationOutcome<RepositoryPackageLoadCarrier>;
+impl Key for RepositoryPackageInventoryKey {
+    type Value = SourcePreparationOutcome<RepositoryPackageInventoryCarrier>;
 
     async fn compute(
         &self,
@@ -6136,16 +6191,16 @@ impl Key for RepositoryPackageLoadKey {
         let value = self
             .compute_mode(
                 ctx,
-                RepositoryPackageLoadMode::Legacy,
+                RepositoryPackageInventoryMode::Legacy,
                 capture_events,
                 &mut event_batch,
             )
             .await;
         if capture_events && matches!(value, SourcePreparationOutcome::Complete(Ok(_))) {
             ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
-                .expect("RepositoryPackageLoadKey stores one local Complete event batch");
+                .expect("RepositoryPackageInventoryKey stores one local Complete event batch");
         }
-        project_legacy_repository_package_load(value)
+        project_legacy_repository_package_inventory(value)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -6167,6 +6222,46 @@ impl Key for RepositoryPackageLoadObservationKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        let value = ctx
+            .compute(&RepositoryPackageInventoryObservationKey(
+                self.0.inventory.clone(),
+            ))
+            .await
+            .expect("observed repository package inventory DICE invariant");
+        match value {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok(inventory)) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedRepositoryPackageLoad {
+                    result: project_repository_package_policy(&self.0.inventory, inventory.result),
+                    observations: inventory.observations,
+                }))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for RepositoryPackageInventoryObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedRepositoryPackageInventory, ObservedPathFrontierError>,
+    >;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
         let capture_events = ctx
             .per_transaction_data()
             .data
@@ -6177,7 +6272,7 @@ impl Key for RepositoryPackageLoadObservationKey {
             .0
             .compute_mode(
                 ctx,
-                RepositoryPackageLoadMode::Observed,
+                RepositoryPackageInventoryMode::Observed,
                 capture_events,
                 &mut event_batch,
             )
@@ -6185,7 +6280,7 @@ impl Key for RepositoryPackageLoadObservationKey {
         if capture_events && matches!(value, SourcePreparationOutcome::Complete(Ok(_))) {
             ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
                 .expect(
-                    "RepositoryPackageLoadObservationKey stores one local Complete event batch",
+                    "RepositoryPackageInventoryObservationKey stores one local Complete event batch",
                 );
         }
         match value {
@@ -6194,11 +6289,53 @@ impl Key for RepositoryPackageLoadObservationKey {
                 SourcePreparationOutcome::Complete(Err(error))
             }
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
-                SourcePreparationOutcome::Complete(Ok(ObservedRepositoryPackageLoad {
+                SourcePreparationOutcome::Complete(Ok(ObservedRepositoryPackageInventory {
                     result,
                     observations,
                 }))
             }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+fn project_repository_package_policy(
+    key: &RepositoryPackageInventoryKey,
+    result: RepositoryPackageInventoryCarrier,
+) -> RepositoryPackageInventoryCarrier {
+    let policy_error = result
+        .as_ref()
+        .as_ref()
+        .ok()
+        .and_then(|loaded| validate_loaded_repository_package(key, loaded).err());
+    policy_error.map_or(result, |error| Arc::new(Err(error)))
+}
+
+#[async_trait]
+impl Key for RepositoryPackageLoadKey {
+    type Value = SourcePreparationOutcome<RepositoryPackageInventoryCarrier>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match ctx
+            .compute(&self.inventory)
+            .await
+            .expect("repository package inventory DICE invariant")
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(result) => SourcePreparationOutcome::Complete(
+                project_repository_package_policy(&self.inventory, result),
+            ),
         }
     }
 

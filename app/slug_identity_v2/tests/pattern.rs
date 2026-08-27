@@ -1,3 +1,6 @@
+use slug_identity_v2::ApparentRepoName;
+use slug_identity_v2::CanonicalRepoName;
+use slug_identity_v2::CanonicalTargetPattern;
 use slug_identity_v2::TargetPattern;
 use slug_identity_v2::TargetPatternWildcard;
 
@@ -82,4 +85,62 @@ fn rejects_non_wildcard_recursive_targets() {
 #[test]
 fn rejects_canonical_target_patterns_at_apparent_boundary() {
     assert!(TargetPattern::parse("@@repo//pkg:target").is_err());
+}
+
+#[test]
+fn contextually_projects_current_mapped_and_canonical_patterns() {
+    let current = CanonicalRepoName::new("owner+").unwrap();
+    let mapped = CanonicalRepoName::new("visible+").unwrap();
+    let resolve = |apparent: &ApparentRepoName| (apparent.as_str() == "visible").then_some(&mapped);
+
+    let CanonicalTargetPattern::Single(current_target) =
+        CanonicalTargetPattern::parse("//pkg:target", &current, resolve).unwrap()
+    else {
+        panic!("current-repository target must remain exact")
+    };
+    assert_eq!(current_target.to_string(), "@@owner+//pkg:target");
+
+    let CanonicalTargetPattern::PackageWildcard {
+        package,
+        wildcard,
+        conflict_target,
+    } = CanonicalTargetPattern::parse("@visible//pkg:all", &current, resolve).unwrap()
+    else {
+        panic!("mapped package wildcard must retain its shape")
+    };
+    assert_eq!(package.to_string(), "@@visible+//pkg");
+    assert_eq!(wildcard, TargetPatternWildcard::All);
+    assert_eq!(conflict_target.unwrap().to_string(), "@@visible+//pkg:all");
+
+    let CanonicalTargetPattern::Recursive { package, wildcard } =
+        CanonicalTargetPattern::parse("@@canonical+//deep/...:*", &current, resolve).unwrap()
+    else {
+        panic!("canonical recursive pattern must retain its shape")
+    };
+    assert_eq!(package.to_string(), "@@canonical+//deep");
+    assert_eq!(wildcard, Some(TargetPatternWildcard::Star));
+}
+
+#[test]
+fn explicit_empty_apparent_repo_requires_its_mapping_entry() {
+    let root = CanonicalRepoName::root();
+    let nonroot = CanonicalRepoName::new("owner+").unwrap();
+    let mapped_root = CanonicalRepoName::root();
+
+    let CanonicalTargetPattern::Single(label) =
+        CanonicalTargetPattern::parse("@//pkg:target", &root, |apparent| {
+            apparent.is_root().then_some(&mapped_root)
+        })
+        .unwrap()
+    else {
+        panic!("root empty apparent mapping must produce one exact target")
+    };
+    assert_eq!(label.to_string(), "@@//pkg:target");
+
+    let error = CanonicalTargetPattern::parse("@//pkg:target", &nonroot, |_| None).unwrap_err();
+    assert!(error.contains("repository '@' is not visible from @@owner+"));
+    assert_eq!(
+        CanonicalTargetPattern::parse("//pkg:target", &nonroot, |_| None).unwrap(),
+        CanonicalTargetPattern::parse("@@owner+//pkg:target", &root, |_| None).unwrap()
+    );
 }

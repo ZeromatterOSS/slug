@@ -4757,6 +4757,10 @@ impl<'a> HostSelectedRegistrationPatternView<'a> {
         &self.mapping.context_repo
     }
 
+    pub fn mapping_target(self, apparent: &ApparentRepoName) -> Option<&'a CanonicalRepoName> {
+        self.mapping.entries.get(apparent)
+    }
+
     pub fn mapping(
         self,
     ) -> impl ExactSizeIterator<Item = (&'a ApparentRepoName, &'a CanonicalRepoName)> {
@@ -9075,6 +9079,13 @@ repo(name = "replacement")
         assert_eq!(generated.mapping_context().as_str(), "");
         assert_eq!(
             generated
+                .mapping_target(&ApparentRepoName::new("rust_toolchains").unwrap())
+                .unwrap()
+                .as_str(),
+            "+extension+generated"
+        );
+        assert_eq!(
+            generated
                 .mapping()
                 .find(|(apparent, _)| apparent.as_str() == "rust_toolchains")
                 .unwrap()
@@ -9280,6 +9291,15 @@ repo(name = "replacement")
             rows.iter()
                 .all(|row| row.canonical_repo().as_str() == "dep+")
         );
+        let direct = rows[1];
+        assert_eq!(
+            direct
+                .mapping_target(&ApparentRepoName::new("dep_self").unwrap())
+                .unwrap()
+                .as_str(),
+            "dep+"
+        );
+        assert!(direct.mapping_target(&ApparentRepoName::root()).is_none());
         assert!(Arc::ptr_eq(&value.predecessor, &predecessor));
     }
 

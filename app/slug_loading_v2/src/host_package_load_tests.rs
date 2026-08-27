@@ -24,6 +24,7 @@ use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::HostRepositoryMaterializationDisposition;
 use slug_bzlmod_v2::HostRepositorySourceFileObservationKey;
+use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::RegistryFileUrl;
@@ -102,6 +103,8 @@ use super::HostPackageLoadMode;
 use super::LocalBzlLoader;
 use super::ObservedRootPackageLoad;
 use super::RepositoryBzlLabel;
+use super::RepositoryPackageInventoryKey;
+use super::RepositoryPackageInventoryObservationKey;
 use super::RepositoryPackageLoadError;
 use super::RepositoryPackageLoadErrorInner;
 use super::RepositoryPackageLoadKey;
@@ -117,6 +120,7 @@ use super::resolve_root_package_direct_load;
 use crate::AllowSingleFile;
 use crate::AttributeKind;
 use crate::CoercedAttributeValue;
+use crate::HostCanonicalRepositoryLoadRouteObservationKey;
 use crate::LoadingPreparationOutcome;
 use crate::RootPackageLoadKey;
 use crate::TestRuleKind;
@@ -398,6 +402,8 @@ impl ActivationTracker for EventTracker {
             || name.starts_with("observed-external-bzl-module:")
             || name.starts_with("repository-package-load:")
             || name.starts_with("observed-repository-package-load:")
+            || name.starts_with("repository-package-inventory:")
+            || name.starts_with("observed-repository-package-inventory:")
         {
             self.loading_dependencies
                 .lock()
@@ -411,6 +417,12 @@ impl ActivationTracker for EventTracker {
             || key.downcast_ref::<RepositoryPackageLoadKey>().is_some()
             || key
                 .downcast_ref::<RepositoryPackageLoadObservationKey>()
+                .is_some()
+            || key
+                .downcast_ref::<RepositoryPackageInventoryKey>()
+                .is_some()
+            || key
+                .downcast_ref::<RepositoryPackageInventoryObservationKey>()
                 .is_some()
         {
             self.package_dependencies.lock().unwrap().push(dependencies);
@@ -443,6 +455,8 @@ impl ActivationTracker for EventTracker {
             && !name.starts_with("observed-repository-package-source:")
             && !name.starts_with("repository-package-load:")
             && !name.starts_with("observed-repository-package-load:")
+            && !name.starts_with("repository-package-inventory:")
+            && !name.starts_with("observed-repository-package-inventory:")
         {
             return;
         }
@@ -609,6 +623,13 @@ fn event_texts(batch: &EventBatch) -> Vec<&str> {
             EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
         })
         .collect()
+}
+
+fn batch_with_prefix<'a>(batches: &'a [TrackedBatch], prefix: &str) -> &'a TrackedBatch {
+    batches
+        .iter()
+        .find(|entry| entry.key.starts_with(prefix))
+        .unwrap_or_else(|| panic!("missing activation batch with prefix {prefix}"))
 }
 
 type HostPackageOutcome = <RootPackageLoadKey as Key>::Value;
@@ -830,6 +851,12 @@ fn selected_registry_root_package_epoch() -> (PathObservationEpoch, PathObservat
     epoch.materialized_missing(instance, "/registry-dep/.bazelignore");
     epoch.materialized_file(
         instance,
+        "/registry-dep/BUILD.bazel",
+        "filegroup(name = 'canonical_files')\n",
+        901,
+    );
+    epoch.materialized_file(
+        instance,
         "/registry-dep/defs.bzl",
         "load(':nested.bzl', 'NESTED_NAME', 'current_rust_analyzer_toolchain', 'lint_rule', 'rust_analyzer_detect_sysroot')\nprint('SELECTED_BZL')\nSELECTED_NAME=NESTED_NAME\nCURRENT_RULE=current_rust_analyzer_toolchain\nDETECT_RULE=rust_analyzer_detect_sysroot\nLINT_RULE=lint_rule\n",
         901,
@@ -863,11 +890,12 @@ fn selected_registry_root_package_epoch() -> (PathObservationEpoch, PathObservat
 async fn selected_registry_visibility_transaction(
     epoch: PathObservationEpoch,
     instance: PathObservationInstanceId,
+    tracker: Option<Arc<EventTracker>>,
 ) -> (DiceTransaction, RootRepositoryRoute) {
     let mut builder = Dice::builder();
     install_registry_io(&mut builder, Arc::new(SelectedRegistryIo));
     let dice = Arc::new(builder.build(DetectCycles::Enabled));
-    let transaction = transaction(&dice, epoch, false, None).await;
+    let transaction = transaction(&dice, epoch, false, tracker).await;
     let mut updater = transaction.into_updater();
     inject_registry_request_inputs(
         &mut updater,
@@ -924,7 +952,8 @@ async fn selected_registry_visibility_transaction(
 #[tokio::test]
 async fn external_bzl_visibility_uses_canonical_repo_and_stops_importer_evaluation() {
     let (epoch, instance) = selected_registry_root_package_epoch();
-    let (mut transaction, route) = selected_registry_visibility_transaction(epoch, instance).await;
+    let (mut transaction, route) =
+        selected_registry_visibility_transaction(epoch, instance, None).await;
     let outcome = transaction
         .compute(&external_bzl_key(route, "consumer", "importer.bzl"))
         .await
@@ -1869,6 +1898,7 @@ async fn host_package_retained_graph_replays_all_input_lifecycles() {
 
 type ExternalBzlOutcome = <ExternalBzlModuleEvalKey as Key>::Value;
 type ObservedExternalBzlOutcome = <ExternalBzlModuleObservationKey as Key>::Value;
+type RepositoryPackageInventoryOutcome = <RepositoryPackageInventoryKey as Key>::Value;
 type RepositoryPackageOutcome = <RepositoryPackageLoadKey as Key>::Value;
 type ObservedRepositoryPackageOutcome = <RepositoryPackageLoadObservationKey as Key>::Value;
 
@@ -1918,6 +1948,24 @@ fn repository_package_terminal(outcome: &RepositoryPackageOutcome) -> &crate::Lo
         panic!("complete external source epoch returned Need");
     };
     value.as_ref().as_ref().unwrap()
+}
+
+fn repository_package_inventory_result(
+    outcome: &RepositoryPackageInventoryOutcome,
+) -> &Arc<Result<crate::LoadedPackage, RepositoryPackageLoadError>> {
+    let LoadingPreparationOutcome::Complete(value) = outcome else {
+        panic!("complete external inventory epoch returned Need");
+    };
+    value
+}
+
+fn repository_package_inventory_terminal(
+    outcome: &RepositoryPackageInventoryOutcome,
+) -> &crate::LoadedPackage {
+    repository_package_inventory_result(outcome)
+        .as_ref()
+        .as_ref()
+        .unwrap()
 }
 
 fn repository_package_error(outcome: &RepositoryPackageOutcome) -> String {
@@ -2026,7 +2074,7 @@ fn repository_package_observation_reducer_preserves_outer_union_and_legacy_arc()
             message: Arc::from("held"),
         },
     )));
-    let projected = super::project_legacy_repository_package_load(
+    let projected = super::project_legacy_repository_package_inventory(
         LoadingPreparationOutcome::Complete(Ok((held.dupe(), PathObservationEpoch::empty()))),
     );
     let LoadingPreparationOutcome::Complete(projected) = projected else {
@@ -33730,25 +33778,16 @@ async fn repository_package_load_activates_external_macro_manifest_lifetime_and_
         .unwrap();
     assert_eq!(bzl.kind, ActivationKind::Evaluated);
     assert_eq!(event_texts(bzl.batch.as_ref().unwrap()), ["DEFS_TOP"]);
-    let package = batches
-        .iter()
-        .find(|entry| entry.key.starts_with("repository-package-load:"))
-        .unwrap();
+    let package = batch_with_prefix(&batches, "repository-package-inventory:");
     assert_eq!(package.kind, ActivationKind::Evaluated);
     assert_eq!(
         event_texts(package.batch.as_ref().unwrap()),
         ["BUILD_TOP", "MACRO_BODY"]
     );
-    let selected_source = batches
-        .iter()
-        .find(|entry| entry.key.starts_with("repository-package-source:"))
-        .unwrap();
+    let selected_source = batch_with_prefix(&batches, "repository-package-source:");
     assert_eq!(selected_source.kind, ActivationKind::Evaluated);
     assert!(selected_source.batch.is_none());
-    let route_policy = batches
-        .iter()
-        .find(|entry| entry.key.starts_with("host-route-repo-file:"))
-        .unwrap();
+    let route_policy = batch_with_prefix(&batches, "host-route-repo-file:");
     assert_eq!(route_policy.kind, ActivationKind::Evaluated);
     assert_eq!(
         event_texts(route_policy.batch.as_ref().unwrap()),
@@ -33816,6 +33855,10 @@ async fn observed_repository_package_load_retains_source_child_arcs_and_local_ba
     tracker.take();
     let package = PackagePath::parse("").unwrap();
     let observed_key = RepositoryPackageLoadObservationKey::new(route.clone(), package.clone());
+    let inventory_key = RepositoryPackageInventoryObservationKey::new(
+        HostRepositorySourceRoute::root(route.clone()),
+        package.clone(),
+    );
     let legacy_key = RepositoryPackageLoadKey::new(route.clone(), package.clone());
     let mut observed_tx = tx.dupe();
     let (value, legacy) = tokio::join!(observed_tx.compute(&observed_key), tx.compute(&legacy_key));
@@ -33837,6 +33880,10 @@ async fn observed_repository_package_load_retains_source_child_arcs_and_local_ba
     assert!(RepositoryPackageLoadObservationKey::validity(&value));
     assert_eq!(
         tracker.dependencies(&observed_key.to_string()),
+        [inventory_key.to_string()]
+    );
+    assert_eq!(
+        tracker.dependencies(&inventory_key.to_string()),
         [
             RepositoryPackageSourceObservationKey::new(
                 route.clone(),
@@ -33851,7 +33898,7 @@ async fn observed_repository_package_load_retains_source_child_arcs_and_local_ba
         .compute(
             &RepositoryPackageSourceObservationKey::new(
                 route.clone(),
-                PackageIdentifier::new(route.canonical_repo().clone(), package),
+                PackageIdentifier::new(route.canonical_repo().clone(), package.clone()),
             )
             .unwrap(),
         )
@@ -33870,6 +33917,12 @@ async fn observed_repository_package_load_retains_source_child_arcs_and_local_ba
     )
     .unwrap();
     assert_same_epoch_arcs(carrier.observations(), &expected);
+    let inventory = tx.compute(&inventory_key).await.unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(inventory)) = inventory else {
+        panic!("expected complete observed package inventory")
+    };
+    assert!(Arc::ptr_eq(carrier.result(), inventory.result()));
+    assert_same_epoch_arcs(carrier.observations(), inventory.observations());
     let batches = tracker.take();
     assert_eq!(
         batches
@@ -33883,7 +33936,7 @@ async fn observed_repository_package_load_retains_source_child_arcs_and_local_ba
         [vec!["BZL_OBSERVED"], vec!["BUILD_OBSERVED"]]
     );
     let dependencies = tracker.take_package_dependencies();
-    assert_eq!(dependencies.len(), 2);
+    assert!(dependencies.len() >= 4);
     let families = dependencies
         .iter()
         .map(|row| {
@@ -33898,7 +33951,7 @@ async fn observed_repository_package_load_retains_source_child_arcs_and_local_ba
     assert!(families.contains(&false) && families.contains(&true));
 }
 #[tokio::test]
-async fn observed_repository_package_load_source_and_child_terminals_keep_prefixes() {
+async fn observed_repository_package_load_source_terminals_keep_prefixes() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let package = PackagePath::parse("").unwrap();
     let tracker = Arc::new(EventTracker::default());
@@ -33925,6 +33978,10 @@ async fn observed_repository_package_load_source_and_child_terminals_keep_prefix
     assert!(tracker.take().iter().all(|entry| {
         !entry.key.starts_with("observed-external-bzl-module:")
             && (!entry.key.starts_with("observed-repository-package-load:")
+                || entry.batch.is_none())
+            && (!entry
+                .key
+                .starts_with("observed-repository-package-inventory:")
                 || entry.batch.is_none())
     }));
     let mut missing_source_epoch = EpochBuilder::external_sources(&[], 147);
@@ -33964,14 +34021,23 @@ async fn observed_repository_package_load_source_and_child_terminals_keep_prefix
         source.observations(),
     );
     assert!(tracker.take().iter().any(|entry| {
-        entry.key.starts_with("observed-repository-package-load:")
+        entry
+            .key
+            .starts_with("observed-repository-package-inventory:")
             && entry
                 .batch
                 .as_ref()
                 .is_some_and(|batch| batch.events().is_empty())
     }));
+}
+
+#[tokio::test]
+async fn observed_repository_package_load_child_terminals_keep_prefixes() {
     const BUILD: &[u8] = b"load(\":first.bzl\", \"FIRST\")\nload(\":middle.bzl\", \"MIDDLE\")\nload(\":last.bzl\", \"LAST\")\nfilegroup(name = \"files\")\n";
     const CHILD: &[u8] = b"FIRST = 1\nMIDDLE = 2\nLAST = 3\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let package = PackagePath::parse("").unwrap();
+    let tracker = Arc::new(EventTracker::default());
     let children = ["first.bzl", "middle.bzl", "last.bzl"];
     for (case, semantic) in (0..3).flat_map(|position| [(position, false), (position, true)]) {
         let mut files = vec![("BUILD.bazel", BUILD)];
@@ -34021,7 +34087,9 @@ async fn observed_repository_package_load_source_and_child_terminals_keep_prefix
             batches
                 .iter()
                 .filter(|entry| {
-                    entry.key.starts_with("observed-repository-package-load:")
+                    entry
+                        .key
+                        .starts_with("observed-repository-package-inventory:")
                         && entry
                             .batch
                             .as_ref()
@@ -34149,7 +34217,11 @@ async fn observed_repository_package_load_keeps_terminal_prefixes_and_error_batc
         let package_batch = tracker
             .take()
             .into_iter()
-            .find(|entry| entry.key.starts_with("observed-repository-package-load:"))
+            .find(|entry| {
+                entry
+                    .key
+                    .starts_with("observed-repository-package-inventory:")
+            })
             .unwrap();
         assert_eq!(
             event_texts(package_batch.batch.as_ref().unwrap()),
@@ -34162,7 +34234,7 @@ async fn observed_repository_package_load_keeps_terminal_prefixes_and_error_batc
     }
 }
 #[tokio::test]
-async fn observed_repository_package_load_replays_a_b_a_and_recovers_after_cancel() {
+async fn observed_repository_package_load_replays_a_b_a() {
     const BUILD_A: &[u8] =
         b"load(\":defs.bzl\", \"NAME\")\nprint(\"PACKAGE_A\")\nfilegroup(name = NAME)\n";
     const BUILD_B: &[u8] =
@@ -34185,7 +34257,11 @@ async fn observed_repository_package_load_replays_a_b_a_and_recovers_after_cance
         tracker
             .take()
             .iter()
-            .filter(|entry| entry.key == key.to_string())
+            .filter(|entry| {
+                entry
+                    .key
+                    .starts_with("observed-repository-package-inventory:")
+            })
             .map(|entry| event_texts(entry.batch.as_ref().unwrap()))
             .collect::<Vec<_>>(),
         [vec!["PACKAGE_A"]]
@@ -34197,7 +34273,11 @@ async fn observed_repository_package_load_replays_a_b_a_and_recovers_after_cance
         &warm_value
     ));
     assert!(tracker.take().iter().all(|entry| {
-        !entry.key.starts_with("observed-repository-package-load:") || entry.batch.is_none()
+        (!entry.key.starts_with("observed-repository-package-load:")
+            && !entry
+                .key
+                .starts_with("observed-repository-package-inventory:"))
+            || entry.batch.is_none()
     }));
     for (variant, build, defs, expected) in [
         (161, Some(BUILD_B), Some(B), Some("b")),
@@ -34253,8 +34333,18 @@ async fn observed_repository_package_load_replays_a_b_a_and_recovers_after_cance
         "@@dep+//:defs.bzl"
     );
     assert_eq!(cold_loaded.retained_bzl_module_count(), 1);
-    let cancel_dice = Dice::builder().build(DetectCycles::Enabled);
-    let mut cancelled = transaction(&cancel_dice, epoch_a.dupe(), true, Some(tracker.dupe())).await;
+}
+
+#[tokio::test]
+async fn observed_repository_package_load_recovers_after_cancel() {
+    const BUILD_A: &[u8] =
+        b"load(\":defs.bzl\", \"NAME\")\nprint(\"PACKAGE_A\")\nfilegroup(name = NAME)\n";
+    const A: &[u8] = b"NAME = \"a\"\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(EventTracker::default());
+    let epoch_a =
+        EpochBuilder::external_sources(&[("BUILD.bazel", BUILD_A), ("defs.bzl", A)], 160).build();
+    let mut cancelled = transaction(&dice, epoch_a.dupe(), true, Some(tracker.dupe())).await;
     let route = external_route(&mut cancelled).await;
     tracker.take();
     let key = RepositoryPackageLoadObservationKey::new(route, PackagePath::parse("").unwrap());
@@ -34272,7 +34362,7 @@ async fn observed_repository_package_load_replays_a_b_a_and_recovers_after_cance
             .all(|entry| entry.key != key.to_string() || entry.batch.is_none())
     );
     drop(cancelled);
-    let mut recovered = transaction(&cancel_dice, epoch_a, true, Some(tracker.dupe())).await;
+    let mut recovered = transaction(&dice, epoch_a, true, Some(tracker.dupe())).await;
     let route = external_route(&mut recovered).await;
     recovered
         .compute(&RepositoryPackageLoadObservationKey::new(
@@ -34286,7 +34376,9 @@ async fn observed_repository_package_load_replays_a_b_a_and_recovers_after_cance
             .take()
             .iter()
             .filter(|entry| {
-                entry.key.starts_with("observed-repository-package-load:")
+                entry
+                    .key
+                    .starts_with("observed-repository-package-inventory:")
                     && entry.kind == ActivationKind::Evaluated
             })
             .count(),
@@ -34319,7 +34411,186 @@ async fn repository_package_load_preserves_selected_source_error_display_and_cha
 }
 
 #[tokio::test]
-async fn repository_package_load_accepts_only_dependency_free_public_starlark_rule_shape() {
+async fn canonical_package_policy_adapter_reuses_inventory_result_and_epoch_arcs() {
+    let tracker = Arc::new(EventTracker::default());
+    let (epoch, instance) = selected_registry_root_package_epoch();
+    let (mut tx, _) =
+        selected_registry_visibility_transaction(epoch, instance, Some(tracker.dupe())).await;
+    let route_key = HostCanonicalRepositoryLoadRouteObservationKey::new(
+        workspace(),
+        CanonicalRepoName::new("dep+").unwrap(),
+    );
+    let route = tx.compute(&route_key).await.unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(route)) = route else {
+        panic!("selected local canonical route must complete: {route:?}")
+    };
+    let input = route.result().as_ref().as_ref().unwrap().input().clone();
+    tracker.take();
+    let package = PackagePath::root();
+    let adapter_key =
+        RepositoryPackageLoadObservationKey::new_canonical(input.clone(), package.clone());
+    let inventory_key = RepositoryPackageInventoryObservationKey::new(
+        HostRepositorySourceRoute::canonical(input),
+        package,
+    );
+    let adapter = tx.compute(&adapter_key).await.unwrap();
+    let inventory = tx.compute(&inventory_key).await.unwrap();
+    let adapter = observed_repository_package(&adapter);
+    let LoadingPreparationOutcome::Complete(Ok(inventory)) = inventory else {
+        panic!("canonical package inventory must complete")
+    };
+    assert_eq!(
+        inventory.result().as_ref().as_ref().unwrap().targets[0].name,
+        "canonical_files"
+    );
+    assert!(!inventory.observations().observations().is_empty());
+    assert_eq!(
+        tracker.dependencies(&adapter_key.to_string()),
+        [inventory_key.to_string()]
+    );
+    assert!(Arc::ptr_eq(adapter.result(), inventory.result()));
+    assert_same_epoch_arcs(adapter.observations(), inventory.observations());
+}
+
+#[tokio::test]
+async fn repository_package_policy_projection_shares_success_and_inventory_events() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(EventTracker::default());
+    let accepted: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(\":defs.bzl\", \"VALUE\")\nprint(\"INVENTORY_BUILD\")\ntoolchain_type(name = \"type\")\n",
+        ),
+        ("defs.bzl", b"VALUE = True\n"),
+    ];
+    let mut accepted_tx = transaction(
+        &dice,
+        EpochBuilder::external_sources(accepted, 780).build(),
+        true,
+        Some(tracker.dupe()),
+    )
+    .await;
+    let route = external_route(&mut accepted_tx).await;
+    tracker.take();
+    let package = PackagePath::parse("").unwrap();
+    let inventory_key = RepositoryPackageInventoryKey::new(
+        HostRepositorySourceRoute::root(route.clone()),
+        package.clone(),
+    );
+    let adapter_key = RepositoryPackageLoadKey::new(route, package);
+    let mut inventory_tx = accepted_tx.dupe();
+    let (inventory, adapter) = tokio::join!(
+        inventory_tx.compute(&inventory_key),
+        accepted_tx.compute(&adapter_key)
+    );
+    let inventory = inventory.unwrap();
+    let adapter = adapter.unwrap();
+    assert_eq!(
+        repository_package_inventory_terminal(&inventory).targets[0].name,
+        "type"
+    );
+    let LoadingPreparationOutcome::Complete(adapter_result) = &adapter else {
+        panic!("accepted policy projection must complete")
+    };
+    assert!(Arc::ptr_eq(
+        repository_package_inventory_result(&inventory),
+        adapter_result
+    ));
+    assert_eq!(
+        tracker.dependencies(&adapter_key.to_string()),
+        [inventory_key.to_string()]
+    );
+    let batches = tracker.take();
+    assert_eq!(
+        batches
+            .iter()
+            .filter(|entry| {
+                entry.key.starts_with("repository-package-inventory:")
+                    && entry
+                        .batch
+                        .as_ref()
+                        .is_some_and(|batch| !batch.events().is_empty())
+            })
+            .count(),
+        1
+    );
+    assert!(batches.iter().all(|entry| {
+        !entry.key.starts_with("repository-package-load:") || entry.batch.is_none()
+    }));
+}
+
+#[tokio::test]
+async fn repository_package_inventory_retains_targets_rejected_by_old_policy() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for (variant, files, expected_target, expected_error) in [
+        (
+            781,
+            vec![
+                (
+                    "BUILD.bazel",
+                    b"load(\":defs.bzl\", \"make_alias\")\nmake_alias(name = \"blocked\")\n"
+                        .as_slice(),
+                ),
+                (
+                    "defs.bzl",
+                    b"def make_alias(name):\n    native.alias(name = name, actual = \":missing\")\n"
+                        .as_slice(),
+                ),
+            ],
+            "blocked",
+            "produced unsupported target `blocked` of kind alias",
+        ),
+        (
+            782,
+            vec![
+                (
+                    "BUILD.bazel",
+                    b"load(\":defs.bzl\", \"probe\")\nfilegroup(name = \"dep\")\nprobe(name = \"probe\", dep = \":dep\", visibility = [\"//visibility:public\"])\n"
+                        .as_slice(),
+                ),
+                (
+                    "defs.bzl",
+                    b"def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"dep\": attr.label()})\n"
+                        .as_slice(),
+                ),
+            ],
+            "probe",
+            "ordinary dependencies are deferred",
+        ),
+    ] {
+        let mut tx = transaction(
+            &dice,
+            EpochBuilder::external_sources(&files, variant).build(),
+            false,
+            None,
+        )
+        .await;
+        let route = external_route(&mut tx).await;
+        let package = PackagePath::parse("").unwrap();
+        let inventory_key = RepositoryPackageInventoryKey::new(
+            HostRepositorySourceRoute::root(route.clone()),
+            package.clone(),
+        );
+        let inventory = tx.compute(&inventory_key).await.unwrap();
+        assert!(
+            repository_package_inventory_terminal(&inventory)
+                .targets
+                .iter()
+                .any(|target| target.name == expected_target)
+        );
+        let adapter = tx
+            .compute(&RepositoryPackageLoadKey::new(route, package))
+            .await
+            .unwrap();
+        assert!(
+            repository_package_error(&adapter).contains(expected_error),
+            "{expected_error}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn repository_package_load_accepts_dependency_free_public_starlark_rule_shape() {
     let valid: &[(&str, &[u8])] = &[
         (
             "BUILD.bazel",
@@ -34365,7 +34636,7 @@ async fn repository_package_load_accepts_only_dependency_free_public_starlark_ru
         event_texts(
             batches
                 .iter()
-                .find(|entry| entry.key.starts_with("repository-package-load:"))
+                .find(|entry| entry.key.starts_with("repository-package-inventory:"))
                 .unwrap()
                 .batch
                 .as_ref()
@@ -34391,7 +34662,11 @@ async fn repository_package_load_accepts_only_dependency_free_public_starlark_ru
             .iter()
             .all(|entry| entry.kind == ActivationKind::Reused && entry.batch.is_none())
     );
+}
 
+#[tokio::test]
+async fn repository_package_load_rejects_unadmitted_starlark_rule_attributes() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
     let cases = [
         (
             "probe(name = \"bad\")",
@@ -34445,6 +34720,11 @@ async fn repository_package_load_accepts_only_dependency_free_public_starlark_ru
             "{expected}"
         );
     }
+}
+
+#[tokio::test]
+async fn repository_package_load_rejects_test_and_executable_starlark_rules() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
     for (source, symbol, expected) in [
         (
             b"def _impl(ctx):\n    return [DefaultInfo()]\nprobe_test = rule(implementation = _impl, test = True)\n".as_slice(),

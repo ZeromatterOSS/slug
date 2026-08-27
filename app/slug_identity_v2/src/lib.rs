@@ -23,6 +23,7 @@ pub use label::ResolvedOptionLabel;
 pub use package::PackageIdentifier;
 pub use package::PackagePath;
 pub use package::TargetName;
+pub use pattern::CanonicalTargetPattern;
 pub use pattern::TargetPattern;
 pub use pattern::TargetPatternWildcard;
 pub use repo::ApparentRepoName;
