@@ -5247,6 +5247,30 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Complete C++ semantics accepted; toolchain-config library selected (2026-08-26)
+
+Commit `9cc0d4ace` adds 363 proof lines and no production. It embeds and hashes
+all 234 authenticated semantics lines, freezes both public Booleans, the private
+canonical Windows label, all 30 private functions, the exact 43-field name/value
+mapping, every one of 29 captured-function identities, exact scalars and
+dictionaries, and exact list contents/order. No function or
+`configuration_field` is invoked. A focused correction compares the exact
+field-name set without claiming Bazel's sorted schemaless struct iteration;
+Slug's constructor-order iteration remains explicitly Slug-native. Focused and
+full 250/24/31 tests, locked checks, CLI build, formatting and hygiene pass;
+independent correction rereview returned `ACCEPT`.
+
+The source frontier now compares 666-line `cc_compilation_helper.bzl`, whose
+five children are accepted, with the dependency-free 622-line
+`cc/cc_toolchain_config_lib.bzl` (`f8418490…`) on the live toolchain branch.
+Select the smaller library. Run only
+`WP-4-7A-rules-cc-toolchain-config-lib-complete-loading-proof` under 0/850/850
+caps: prove complete bytes, all 13 public provider-callable identities and all
+14 public plus seven private function types/visibility without invoking an
+exported callable. Clean `../zabel` `0795445f…` guides declaration-owned
+provider/function defining-module freeze only; no Zig code or behavior is
+adopted. Bazel 9.2 and authenticated rules_cc remain exact authority.
+
 ### Configuration-field binding accepted; complete C++ semantics retry selected (2026-08-26)
 
 Commit `fc131d7aa` adds 9 production and 59 proof lines. It exposes
