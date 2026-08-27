@@ -1,117 +1,127 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-registration-target-pattern-syntax`
+Packet: `WP-4-5-7A-loading-root-subtree-package-owner-extraction`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Result: complete the one shared absolute target-pattern syntax vocabulary and
-retain every fact required by later repository mapping, package lookup and
-registration expansion. Add focused Bazel 9.2 oracle evidence. Do not load a
-package or activate a new registration/query/build expansion.
+Result: move the existing root-workspace subtree package-set DICE owner from
+the query crate into loading, and make query consume that same owner with no
+observable behavior change. Do not add external traversal, target-pattern
+expansion or registration activation.
 
 ## Learned facts and decision
 
-Commit `0cd339800` accepts the final raw MODULE registration type and the
-selected canonical-owner/final-mapping projection. The current direct analysis
-adapter intentionally fails package and recursive registrations closed. The
-next shared boundary is `slug_identity_v2::TargetPattern`, already consumed by
-query, build, cquery and aquery.
+Commit `e9947e8ba` completes the shared absolute package and recursive target-
+pattern syntax. Registration expansion now needs one package-enumeration
+primitive that is not query-owned.
 
-That parser currently recognizes only `:all` package wildcards and bare
-`/...` recursion. It stores `:all` under a `PackageAll` shape that cannot
-represent `:*` or `:all-targets`, does not retain the wildcard spelling needed
-for Bazel's explicit-target conflict rule, and cannot distinguish rules-only
-from all-target recursive forms.
+Today `slug_query_v2::graph` owns `RootSubtreePackageSetKey`, its observed key,
+result, traversal and marker probes. The computation depends only on loading,
+bzlmod and Host path/package-boundary inputs. Query adds no semantic input; it
+only converts the loading terminal to `QueryError`, merges the observed epoch
+into its request and loads each discovered package. The accepted
+`typed_recursive_query_unions_package_roots_and_replays_package_lifecycle`
+regression already discriminates Need propagation, multiple package roots,
+root precedence, ignore/package-policy changes and create/edit/delete/restore.
 
-Pinned Bazel 9.2 `TargetPattern.Parser` recognizes package `:all` as rules-only
-and `:*` / `:all-targets` as all-targets. Recursive `...` and `...:all` are
-rules-only; `...:*` and `...:all-targets` include all targets. An absolute
-package wildcard remains a candidate until a loaded package is checked: an
-existing legal target named `all`, `*` or `all-targets` wins over wildcard
-expansion and emits a warning. Parsing itself performs no package lookup.
+Bazel 9.2 `RecursivePkgFunction`, `RecursiveDirectoryTraversalFunction` and
+`RecursivePkgFunctionTest` treat recursive package discovery as a reusable
+Skyframe loading primitive below target-pattern consumers. The natural Slug
+owner is therefore `slug_loading_v2`, not query and not the future registration
+projection.
 
 ## Required implementation
 
-1. Replace the misleading `PackageAll` syntax variant with one package-
-   wildcard candidate carrying apparent repository, package and an explicit
-   three-value suffix enum (`all`, `*`, `all-targets`). Expose only the small
-   syntax/policy accessors later loading needs.
-2. Extend recursive syntax with an optional retained suffix. Bare `...` and
-   `...:all` report rules-only; `...:*` and `...:all-targets` report all-targets.
-   Reject any other target after `...` at parse time.
-3. Preserve exact display spelling for every admitted absolute form, apparent
-   repository identity and existing direct-label normalization. Do not store a
-   wildcard as an `ApparentLabel` or canonical label.
-4. Mechanically update exhaustive query/build consumers. Existing `:all` and
-   bare recursive paths retain their accepted behavior. Newly represented
-   wildcard forms must stop at an explicit existing unsupported boundary; this
-   packet does not inspect packages, resolve ambiguity or expand them.
-5. Add a focused Bazel 9.2 oracle fixture for package and recursive rules-only/
-   all-target spellings plus legal `all` and `all-targets` target conflicts.
-   Unit regressions cite the pinned parser and `TargetPatternTest` source.
-6. Prove parser equality/display, rules-only classification, invalid recursive
-   suffixes and consumer fail-closed exhaustiveness. No DICE key or retained
-   semantic graph value changes in this packet.
+1. Add one cohesive loading module for the existing root subtree package-set
+   result, terminal error, legacy/observed DICE keys and traversal helpers.
+   Preserve semantic key inputs/equality as normalized workspace plus package
+   prefix; the Rust key type necessarily moves to its natural crate owner.
+2. Move the existing computation mechanically. Preserve package-root order,
+   package-marker and ignored-directory policy, non-UTF-8 handling, lexical
+   sort/dedup, Need versus observed-outer versus terminal-error precedence,
+   observation merging, complete-only equality/validity and display text.
+3. Give loading a loading-owned terminal type. Query converts it to the same
+   `QueryError` text only at the consumer boundary and continues to merge the
+   observed epoch before loading packages.
+4. Remove the moved owner and now-unused Host traversal imports from
+   `slug_query_v2::graph`; import the loading-owned keys/value in the loading
+   query environment. The legacy non-root `SubtreePackageSetKey` remains query-
+   local and unchanged.
+5. Preserve the accepted recursive-query lifecycle regression byte-for-byte
+   where practical. Add only small loading owner/API regressions needed to
+   distinguish key construction, display, result/error access and complete-
+   only behavior; do not copy its large query harness.
+6. Compare the moved production body and dependency inventory against the
+   predecessor so this packet proves ownership extraction, not a semantic
+   rewrite.
 
 ## Architecture, compatibility and guidance
 
 Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`,
-`TargetPattern.java`, `TargetPatternTest.java` and the focused oracle are exact
-authority. The syntax enum records unresolved facts; loading later owns
-repository mapping, target-conflict lookup, warning, lexical expansion and
-family policy.
+`RecursivePkgFunction.java`, `RecursiveDirectoryTraversalFunction.java` and
+`RecursivePkgFunctionTest.java` are pinned semantic guidance. No new oracle is
+needed because the accepted recursive-query lifecycle is more discriminating
+for this ownership-only change and public output must remain identical.
 
-Zabel is peer guidance only. Its useful choices are one shared target-pattern
-leaf, a three-value package-wildcard suffix, a separate contextual resolution
-stage and retaining ambiguity until a loaded package exists. Slug does not copy
-its Zig types, borrowed-lifetime model, diagnostics or compatibility claims.
-Unlike Zabel's owner that retains raw text separately, Slug's command parser
-must retain the recursive suffix in the enum so `Display` does not invent a
-different request spelling.
+Zabel is peer guidance only. Its `load/session_recursive_package_discovery.zig`
+keeps recursive package discovery behind a natural loading producer, while
+`query/main_workspace_recursive_deps_command.zig` and toolchain consumers
+demand that producer without owning a second traversal. Slug adopts that
+ownership lesson, not Zabel's Zig types, session store, allocation model,
+diagnostics or behavior authority.
 
-- **Exact:** absolute package/recursive syntax classification, suffix spelling,
-  rules-only versus all-target distinction, invalid recursive-target rejection
-  and the unresolved explicit-target conflict fact.
-- **Slug-native:** Rust enum layout, accessor names and current-consumer
-  unsupported terminals.
-- **Unsupported/deferred:** selected repository mapping, package lookup,
-  wildcard conflict resolution/warnings, package or recursive expansion,
-  stable dedupe, family filters, configured providers/settings, option-based
-  registrations, rule/toolchain implementations and actions.
+This is general Starlark/loading architecture. Bazel 9 BCR Starlark remains the
+source of rule definitions including `cc_internal`; neither `cc_common` nor a
+ruleset owns this traversal.
+
+- **Exact:** the already-admitted root recursive package set, package-root and
+  marker/ignore behavior, lexical result, query output, Need/error precedence
+  and observed lifecycle.
+- **Slug-native:** Rust module/API shape, DICE key/value layout, error wrapper
+  and observation carrier.
+- **Unsupported/deferred:** selected-external subtree ownership, repository
+  mapping, target-pattern conflict lookup or expansion, registration filters,
+  configured provider/settings validation, rule implementations and actions.
+
+The result remains DICE-retained semantic state as one `Arc` slice of compact
+package strings plus the existing observed epoch. Moving its module does not
+change publication, equality cutoff, invalidation, cancellation or release.
+No command scratch is retained and no lock may span a DICE compute. Both
+touched query production files exceed 2,000 lines; extracting this cohesive
+owner reduces mixed responsibility rather than adding another concern there.
 
 ## Allowlist and validation
 
-Base is `0cd339800`. Change only:
+Base is `e9947e8ba`. Change only:
 
-- `app/slug_identity_v2/src/pattern.rs`;
-- `app/slug_identity_v2/src/lib.rs` (public syntax enum export only);
-- `app/slug_identity_v2/tests/pattern.rs`;
-- `app/slug_query_v2/src/loading_environment.rs` (exhaustive fail-closed
-  adapter/proof only);
-- `app/slug_core_v2/src/runtime/dice.rs` (mechanical exhaustive adapters/proof
-  only); and
-- one new focused fixture under
-  `tests/v2_oracle/fixtures/registration-target-pattern-syntax/`.
+- new `app/slug_loading_v2/src/root_subtree_package_set.rs`;
+- `app/slug_loading_v2/src/lib.rs` (module and narrow exports only);
+- `app/slug_query_v2/src/graph.rs` (remove the moved owner/imports only); and
+- `app/slug_query_v2/src/loading_environment.rs` (loading-owned imports and
+  terminal conversion only).
 
-Caps are 240 production, 750 proof and 990 total additions; deletions do not buy
-budget. Each new helper/test is at most 100 lines. Add no dependency, retained
-raw-text copy, interner, DICE key, package read, traversal, expansion, mapping
-copy, configured value or global state.
+Caps are 620 production, 100 proof and 720 total additions; deletions do not
+buy budget. Each new helper/test is at most 100 lines. Add no dependency, new
+DICE key semantics, external route/source input, traversal branch, package
+load, pattern parser, expansion, mapping, registration activation, interner,
+global state or manual lock.
 
-Run the Bazel-only focused oracle against pinned Bazel 9.2, all
-`slug_identity_v2` tests, focused query/core consumer tests, locked core check
-and locked CLI build serially. Run format, diff, scope/cap/helper, archive and
-utility/no-DICE audits. Do not claim Slug oracle parity for deferred expansion.
+Run all `slug_loading_v2` tests, the named recursive-query lifecycle regression,
+all `slug_query_v2` tests, locked query/core checks and locked CLI build
+serially. Run format, diff, scope/cap/helper, archive, moved-body, dependency,
+DICE/no-lock and utility/retained-size audits. Public cross-crate review must
+confirm that query is only a consumer and that no second traversal remains.
 
-STOP and `REPLAN` for a second parser, a canonical label standing in for a
-wildcard, loss of exact suffix spelling, package lookup, repository mapping,
-new query/build expansion, registration activation, a changed accepted `:all`
-or bare-recursive result, allowlist/cap escape or a new retained utility.
+STOP and `REPLAN` for changed result/error/Need ordering, a new filesystem or
+fresh-graph bypass, query-specific policy in loading, an external repository
+owner, mapping or expansion, copied lifecycle harness, new retained utility,
+allowlist/cap escape or any accepted recursive-query result change.
 
 ## Immediate predecessor
 
-Commit `0cd339800` accepts `WP-4-5-7A-selected-registration-pattern-retention-
-owner`; commits `17ea1f751` and `e4cba54aa` record its allowlist and cap replans.
-The canonical subplan supplies the complete declaration/view/parser/expansion
-architecture. This packet implements only sequence step 2.
+Commit `e9947e8ba` accepts `WP-4-5-7A-registration-target-pattern-syntax` at
+147 production and 445 proof lines. It preserves suffix spelling and wildcard
+ambiguity while newly represented all-target forms fail closed before loading.
+This packet implements only bounded registration-architecture sequence step
+3a; the selected-external subtree owner remains the next separate slice.

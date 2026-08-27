@@ -18573,3 +18573,42 @@ in `slug_identity_v2`, backed by Bazel 9.2 source and focused oracle evidence.
 It must mechanically preserve accepted query/build behavior and stop before
 repository mapping, package lookup, conflict resolution, expansion, traversal,
 registration-family filtering or configured semantics.
+
+### Shared registration target-pattern syntax accepted (2026-08-27)
+
+Commit `e9947e8ba` implements sequence step 2. The shared identity parser now
+retains exact `all`, `*` and `all-targets` package-wildcard spelling plus the
+optional recursive suffix. It exposes the rules-only classification without
+turning an unresolved wildcard into a label, inspecting a package or resolving
+a repository mapping. Exact display round-trips root and apparent external
+forms, including root `//...`, and invalid recursive targets fail at syntax.
+
+Existing query/build `:all` and bare-recursive paths retain their accepted
+results. Newly parsed all-target package/recursive forms stop at explicit
+consumer boundaries before package loading; external repository errors remain
+first for external all-target patterns. The eight-row Bazel 9.2 oracle proves
+rules-only/all-target package and recursive membership, legal wildcard-name
+conflicts with warnings and invalid recursive suffix rejection. It makes no
+Slug expansion claim.
+
+Validation passes all 23 identity tests, all 54 query units plus 56 loading-
+query, one observed-query and 11 query integration tests, focused core
+fail-closed and accepted lifecycle regressions, the locked core check and the
+locked CLI build. The full CLI suite passed 50 of 52 before the external-
+precedence correction; that regression's exact focused test now passes. The
+remaining unavailable-root-DICE-node failure reproduces unchanged at exact
+predecessor `0cd339800`. Formatting, diff, scope, helper and archive gates pass
+at 147 production and 445 proof additions; archive status retains only its
+three known archive-only paths.
+
+The representation adds only one small suffix enum field to the existing
+command-local pattern. It adds no raw-text copy, DICE key, retained mapping,
+interner, dependency, global state or utility-ledger row. Zabel's single shared
+leaf and delayed contextual resolution informed the review as peer guidance,
+never source of truth.
+
+Activate only `WP-4-5-7A-loading-root-subtree-package-owner-extraction`.
+Mechanically move the existing root subtree package-set DICE owner from query
+to loading and preserve every accepted query result, Need/error/observation
+order and lifecycle. Stop before selected-external traversal, mapping, target-
+pattern expansion, family filtering or registration activation.
