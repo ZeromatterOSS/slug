@@ -10582,6 +10582,138 @@ def create_linker_input(
         linkstamps = _cc_internal.freeze(linkstamps.to_list()),
     )
 "###;
+const RULES_CC_TARGET_TYPES_SOURCE: &str = r###"# Copyright 2024 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Types of ELF files that can be created by the linker (.a, .so, .lo, executable)."""
+
+load("//cc:action_names.bzl", "ACTION_NAMES")
+load("//cc/common:cc_helper_internal.bzl", artifact_category = "artifact_category_names")
+
+USE_LINKER = "linker"
+USE_ARCHIVER = "archiver"
+
+LINKING_MODE = struct(
+    STATIC = "static",
+    DYNAMIC = "dynamic",
+)
+
+LINK_TARGET_TYPE = struct(
+    # A normal static archive.
+    STATIC_LIBRARY = struct(
+        _name = "STATIC_LIBRARY",
+        linker_or_archiver = USE_ARCHIVER,
+        action_name = ACTION_NAMES.cpp_link_static_library,
+        is_pic = False,
+        linker_output = artifact_category.STATIC_LIBRARY,
+        executable = False,
+    ),
+
+    # An objc fully linked static archive.
+    OBJC_FULLY_LINKED_ARCHIVE = struct(
+        _name = "OBJC_FULLY_LINKED_ARCHIVE",
+        linker_or_archiver = USE_ARCHIVER,
+        action_name = ACTION_NAMES.objc_fully_link,
+        is_pic = False,
+        linker_output = artifact_category.STATIC_LIBRARY,
+        executable = False,
+    ),
+
+    # An objc executable.
+    OBJC_EXECUTABLE = struct(
+        _name = "OBJC_EXECUTABLE",
+        linker_or_archiver = USE_LINKER,
+        action_name = ACTION_NAMES.objc_executable,
+        is_pic = False,
+        linker_output = artifact_category.EXECUTABLE,
+        executable = True,
+    ),
+
+    #A  static archive with .pic.o object files (compiled with -fPIC).
+    PIC_STATIC_LIBRARY = struct(
+        _name = "PIC_STATIC_LIBRARY",
+        linker_or_archiver = USE_ARCHIVER,
+        action_name = ACTION_NAMES.cpp_link_static_library,
+        is_pic = True,
+        linker_output = artifact_category.STATIC_LIBRARY,
+        executable = False,
+    ),
+
+    #  An interface dynamic library.
+    INTERFACE_DYNAMIC_LIBRARY = struct(
+        _name = "INTERFACE_DYNAMIC_LIBRARY",
+        linker_or_archiver = USE_LINKER,
+        action_name = ACTION_NAMES.cpp_link_dynamic_library,
+        is_pic = False,  # Actually PIC but it's not indicated in the file name
+        linker_output = artifact_category.INTERFACE_LIBRARY,
+        executable = False,
+    ),
+
+    # A dynamic library built from cc_library srcs.
+    NODEPS_DYNAMIC_LIBRARY = struct(
+        _name = "NODEPS_DYNAMIC_LIBRARY",
+        linker_or_archiver = USE_LINKER,
+        action_name = ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+        is_pic = False,  #  Actually PIC but it's not indicated in the file name
+        linker_output = artifact_category.DYNAMIC_LIBRARY,
+        executable = False,
+    ),
+
+    # A transitive dynamic library used for distribution.
+    DYNAMIC_LIBRARY = struct(
+        _name = "DYNAMIC_LIBRARY",
+        linker_or_archiver = USE_LINKER,
+        action_name = ACTION_NAMES.cpp_link_dynamic_library,
+        is_pic = False,  #  Actually PIC but it's not indicated in the file name
+        linker_output = artifact_category.DYNAMIC_LIBRARY,
+        executable = False,
+    ),
+
+    # A static archive without removal of unused object files.
+    ALWAYS_LINK_STATIC_LIBRARY = struct(
+        _name = "ALWAYS_LINK_STATIC_LIBRARY",
+        linker_or_archiver = USE_ARCHIVER,
+        action_name = ACTION_NAMES.cpp_link_static_library,
+        is_pic = False,
+        linker_output = artifact_category.ALWAYSLINK_STATIC_LIBRARY,
+        executable = False,
+    ),
+
+    # A PIC static archive without removal of unused object files.
+    ALWAYS_LINK_PIC_STATIC_LIBRARY = struct(
+        _name = "ALWAYS_LINK_PIC_STATIC_LIBRARY",
+        linker_or_archiver = USE_ARCHIVER,
+        action_name = ACTION_NAMES.cpp_link_static_library,
+        is_pic = True,
+        linker_output = artifact_category.ALWAYSLINK_STATIC_LIBRARY,
+        executable = False,
+    ),
+
+    # An executable binary.
+    EXECUTABLE = struct(
+        _name = "EXECUTABLE",
+        linker_or_archiver = USE_LINKER,
+        action_name = ACTION_NAMES.cpp_link_executable,
+        is_pic = False,  #  is_pic is not indicate in the file name
+        linker_output = artifact_category.EXECUTABLE,
+        executable = True,
+    ),
+)
+
+def is_dynamic_library(link_target):
+    """Returns true iff this link type is a dynamic library or transitive dynamic library."""
+    return link_target in [LINK_TARGET_TYPE.NODEPS_DYNAMIC_LIBRARY, LINK_TARGET_TYPE.DYNAMIC_LIBRARY]
+"###;
 const RULES_CC_TOOLCHAIN_CONFIG_LIB_SOURCE: &str = r###"# Copyright 2018 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15160,6 +15292,157 @@ fn exact_rules_cc_create_linker_input_freezes_complete_producer() {
         all,
         ["_LinkerInputInfo", "_cc_internal", "create_linker_input"]
     );
+}
+
+fn complete_rules_cc_target_type_children() -> [(&'static str, BzlModuleIdentity, FrozenModule); 2]
+{
+    let action_owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_cc+//cc:action_names.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_cc/cc/action_names.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let action =
+        eval_bzl_with_identity(RULES_CC_ACTION_NAMES_SOURCE, action_owner.clone()).unwrap();
+    let cc = complete_rules_cc_cc_info_children();
+    [
+        ("//cc:action_names.bzl", action_owner, action),
+        (cc[1].0, cc[1].1.clone(), cc[1].2.dupe()),
+    ]
+}
+
+fn assert_rules_cc_target_type_interfaces(
+    module: &FrozenModule,
+    children: &[(&'static str, BzlModuleIdentity, FrozenModule); 2],
+) {
+    for (name, child, export) in [
+        ("ACTION_NAMES", 0, "ACTION_NAMES"),
+        ("artifact_category", 1, "artifact_category_names"),
+    ] {
+        assert!(
+            module
+                .get(name)
+                .unwrap()
+                .value()
+                .ptr_eq(children[child].2.get(export).unwrap().value())
+        );
+    }
+    assert_eq!(
+        module.get("USE_LINKER").unwrap().unpack_str(),
+        Some("linker")
+    );
+    assert_eq!(
+        module.get("USE_ARCHIVER").unwrap().unpack_str(),
+        Some("archiver")
+    );
+    let mode_binding = module.get("LINKING_MODE").unwrap();
+    let mode = StructRef::from_value(mode_binding.value()).unwrap();
+    let mut modes = mode
+        .iter()
+        .map(|(name, value)| (name.as_str(), value.unpack_str().unwrap()))
+        .collect::<Vec<_>>();
+    modes.sort_unstable();
+    assert_eq!(modes, [("DYNAMIC", "dynamic"), ("STATIC", "static")]);
+    let target_binding = module.get("LINK_TARGET_TYPE").unwrap();
+    let targets = StructRef::from_value(target_binding.value()).unwrap();
+    let action_binding = children[0].2.get("ACTION_NAMES").unwrap();
+    let actions = StructRef::from_value(action_binding.value()).unwrap();
+    let artifact_binding = children[1].2.get("artifact_category_names").unwrap();
+    let artifacts = StructRef::from_value(artifact_binding.value()).unwrap();
+    let rows = "STATIC_LIBRARY|STATIC_LIBRARY|archiver|cpp_link_static_library|false|STATIC_LIBRARY|false
+OBJC_FULLY_LINKED_ARCHIVE|OBJC_FULLY_LINKED_ARCHIVE|archiver|objc_fully_link|false|STATIC_LIBRARY|false
+OBJC_EXECUTABLE|OBJC_EXECUTABLE|linker|objc_executable|false|EXECUTABLE|true
+PIC_STATIC_LIBRARY|PIC_STATIC_LIBRARY|archiver|cpp_link_static_library|true|STATIC_LIBRARY|false
+INTERFACE_DYNAMIC_LIBRARY|INTERFACE_DYNAMIC_LIBRARY|linker|cpp_link_dynamic_library|false|INTERFACE_LIBRARY|false
+NODEPS_DYNAMIC_LIBRARY|NODEPS_DYNAMIC_LIBRARY|linker|cpp_link_nodeps_dynamic_library|false|DYNAMIC_LIBRARY|false
+DYNAMIC_LIBRARY|DYNAMIC_LIBRARY|linker|cpp_link_dynamic_library|false|DYNAMIC_LIBRARY|false
+ALWAYS_LINK_STATIC_LIBRARY|ALWAYS_LINK_STATIC_LIBRARY|archiver|cpp_link_static_library|false|ALWAYSLINK_STATIC_LIBRARY|false
+ALWAYS_LINK_PIC_STATIC_LIBRARY|ALWAYS_LINK_PIC_STATIC_LIBRARY|archiver|cpp_link_static_library|true|ALWAYSLINK_STATIC_LIBRARY|false
+EXECUTABLE|EXECUTABLE|linker|cpp_link_executable|false|EXECUTABLE|true";
+    assert_eq!(targets.iter().count(), 10);
+    for row in rows.lines() {
+        let columns = row.split('|').collect::<Vec<_>>();
+        let target_value = targets
+            .iter()
+            .find_map(|(name, value)| (name.as_str() == columns[0]).then_some(value))
+            .unwrap();
+        let target = StructRef::from_value(target_value).unwrap();
+        assert_eq!(target.iter().count(), 6);
+        macro_rules! field {
+            ($name:expr) => {
+                target
+                    .iter()
+                    .find_map(|(name, value)| (name.as_str() == $name).then_some(value))
+                    .unwrap()
+            };
+        }
+        assert_eq!(field!("_name").unpack_str(), Some(columns[1]));
+        assert_eq!(field!("linker_or_archiver").unpack_str(), Some(columns[2]));
+        let expected_action = actions
+            .iter()
+            .find_map(|(name, value)| (name.as_str() == columns[3]).then_some(value))
+            .unwrap();
+        assert!(field!("action_name").ptr_eq(expected_action));
+        assert_eq!(field!("is_pic").unpack_bool(), columns[4].parse().ok());
+        let expected_artifact = artifacts
+            .iter()
+            .find_map(|(name, value)| (name.as_str() == columns[5]).then_some(value))
+            .unwrap();
+        assert!(field!("linker_output").ptr_eq(expected_artifact));
+        assert_eq!(field!("executable").unpack_bool(), columns[6].parse().ok());
+    }
+    assert_eq!(
+        module.get("is_dynamic_library").unwrap().value().get_type(),
+        "function"
+    );
+    let mut names = module.names().map(|name| name.as_str()).collect::<Vec<_>>();
+    names.sort_unstable();
+    let mut expected = "ACTION_NAMES artifact_category USE_LINKER USE_ARCHIVER LINKING_MODE LINK_TARGET_TYPE is_dynamic_library".split_whitespace().collect::<Vec<_>>();
+    expected.sort_unstable();
+    assert_eq!(names, expected);
+    let mut all = module
+        .names_any_visibility()
+        .map(|name| name.as_str())
+        .collect::<Vec<_>>();
+    all.sort_unstable();
+    assert_eq!(all, expected);
+}
+
+#[test]
+fn exact_rules_cc_target_types_freezes_complete_producer() {
+    assert_eq!(RULES_CC_TARGET_TYPES_SOURCE.lines().count(), 131);
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_CC_TARGET_TYPES_SOURCE.as_bytes())
+        ),
+        "12110c7dce405cd2ba4253d694502f08cc97a95bd0004444054ae8aa689da8fd"
+    );
+    let children = complete_rules_cc_target_type_children();
+    for (child, label) in children.iter().zip([
+        "@@rules_cc+//cc:action_names.bzl",
+        "@@rules_cc+//cc/common:cc_helper_internal.bzl",
+    ]) {
+        assert_eq!(child.1.label, CanonicalLabel::parse(label).unwrap());
+    }
+    assert!(children[0].1.repository_mapping.is_empty());
+    assert_eq!(
+        children[1].1.repository_mapping,
+        Arc::from([(
+            ApparentRepoName::new("bazel_skylib").unwrap(),
+            CanonicalRepoName::new("bazel_skylib+").unwrap(),
+        )])
+    );
+    let module = eval_bzl_with_loaded_children(
+        RULES_CC_TARGET_TYPES_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:target_types.bzl").unwrap(),
+            workspace_path: PathBuf::from("/rules_cc/cc/private/link/target_types.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+        &children,
+    )
+    .unwrap();
+    assert_rules_cc_target_type_interfaces(&module, &children);
 }
 
 #[test]
