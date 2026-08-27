@@ -4634,6 +4634,34 @@ def semver(version):
         str = version,
     )
 "###;
+const RULES_RUST_INCOMPATIBLE_SETTINGS_SOURCE: &str = r###""""This file contains definitions of all current incompatible flags.
+
+See COMPATIBILITY.md for the backwards compatibility policy.
+"""
+
+IncompatibleFlagInfo = provider(
+    doc = "Provider for the current value of an incompatible flag.",
+    fields = {
+        "enabled": "(bool) whether the flag is enabled",
+        "issue": "(string) link to the github issue associated with this flag",
+    },
+)
+
+def _incompatible_flag_impl(ctx):
+    return [IncompatibleFlagInfo(enabled = ctx.build_setting_value, issue = ctx.attr.issue)]
+
+incompatible_flag = rule(
+    doc = "A rule defining an incompatible flag.",
+    implementation = _incompatible_flag_impl,
+    build_setting = config.bool(flag = True),
+    attrs = {
+        "issue": attr.string(
+            doc = "The link to the github issue associated with this flag",
+            mandatory = True,
+        ),
+    },
+)
+"###;
 const RULES_RUST_UTILS_SOURCE: &str = r###"# Copyright 2015 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27955,6 +27983,73 @@ fn exact_rules_rust_semver_freezes_complete_dependency_free_producer() {
             .map(|name| name.as_str())
             .collect::<Vec<_>>(),
         ["semver"]
+    );
+}
+
+#[test]
+fn exact_rules_rust_incompatible_settings_freezes_complete_producer() {
+    assert_eq!(RULES_RUST_INCOMPATIBLE_SETTINGS_SOURCE.lines().count(), 27);
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_RUST_INCOMPATIBLE_SETTINGS_SOURCE.as_bytes())
+        ),
+        "534d5103680dc47634b93ed160f639a88495707fe2c27b551defbb3c6765f040"
+    );
+    let module = eval_bzl_with_loaded_children(
+        RULES_RUST_INCOMPATIBLE_SETTINGS_SOURCE,
+        compile_owner(
+            "@@rules_rust+//rust/settings:incompatible.bzl",
+            "/rules_rust/rust/settings/incompatible.bzl",
+            &[],
+        ),
+        &[],
+    )
+    .unwrap();
+    let provider = module.get("IncompatibleFlagInfo").unwrap();
+    let provider = FrozenUserProviderCallable::from_value(provider.value()).unwrap();
+    assert_eq!(
+        provider.id().to_string(),
+        "@@rules_rust+//rust/settings:incompatible.bzl%IncompatibleFlagInfo"
+    );
+    let implementation = module
+        .get_any_visibility("_incompatible_flag_impl")
+        .unwrap()
+        .0;
+    assert_eq!(implementation.value().get_type(), "function");
+    assert!(module.get("_incompatible_flag_impl").is_err());
+    let rule = module
+        .get("incompatible_flag")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    assert_eq!(rule.capability().rule_class, "incompatible_flag");
+    assert_eq!(
+        rule.build_setting_kind,
+        Some(BuildSettingKind::Boolean { flag: true })
+    );
+    let issue = rule
+        .schema
+        .iter()
+        .find(|schema| schema.name == "issue")
+        .unwrap();
+    assert_eq!(issue.kind, AttributeKind::String);
+    assert!(issue.mandatory);
+    let mut public = module.names().map(|name| name.as_str()).collect::<Vec<_>>();
+    public.sort_unstable();
+    assert_eq!(public, ["IncompatibleFlagInfo", "incompatible_flag"]);
+    let mut all = module
+        .names_any_visibility()
+        .map(|name| name.as_str())
+        .collect::<Vec<_>>();
+    all.sort_unstable();
+    assert_eq!(
+        all,
+        [
+            "IncompatibleFlagInfo",
+            "_incompatible_flag_impl",
+            "incompatible_flag"
+        ]
     );
 }
 
