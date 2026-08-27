@@ -4022,6 +4022,55 @@ const UTILS_EXPAND_DICT_VALUE_LOCATIONS_SOURCE: &str = r###"def expand_dict_valu
     return {k: _expand_location_for_build_script_runner(ctx, v, data, known_variables) for (k, v) in env.items()}
 "###;
 
+const UTILS_CRATE_ROOT_SRC_SOURCE: &str = r###"def crate_root_src(name, crate_name, srcs, crate_type):
+    """Determines the source file for the crate root, should it not be specified in `attr.crate_root`.
+
+    Args:
+        name (str): The name of the target.
+        crate_name (str): The target's `crate_name` attribute.
+        srcs (list): A list of all sources for the target Crate.
+        crate_type (str): The type of this crate ("bin", "lib", "rlib", "cdylib", etc).
+
+    Returns:
+        File: The root File object for a given crate. See the following links for more details:
+            - https://doc.rust-lang.org/cargo/reference/cargo-targets.html#library
+            - https://doc.rust-lang.org/cargo/reference/cargo-targets.html#binaries
+    """
+    default_crate_root_filename = "main.rs" if crate_type == "bin" else "lib.rs"
+
+    if not crate_name:
+        crate_name = name
+
+    crate_root = (
+        (srcs[0] if len(srcs) == 1 else None) or
+        _shortest_src_with_basename(srcs, default_crate_root_filename) or
+        _shortest_src_with_basename(srcs, name + ".rs") or
+        _shortest_src_with_basename(srcs, crate_name + ".rs")
+    )
+    if not crate_root:
+        file_names = [default_crate_root_filename, name + ".rs"]
+        fail("Couldn't find {} among `srcs`, please use `crate_root` to specify the root file.".format(" or ".join(file_names)))
+    return crate_root
+"###;
+
+const UTILS_SHORTEST_SRC_WITH_BASENAME_SOURCE: &str = r###"def _shortest_src_with_basename(srcs, basename):
+    """Finds the shortest among the paths in srcs that match the desired basename.
+
+    Args:
+        srcs (list): A list of File objects
+        basename (str): The target basename to match against.
+
+    Returns:
+        File: The File object with the shortest path that matches `basename`
+    """
+    shortest = None
+    for f in srcs:
+        if f.basename == basename:
+            if not shortest or len(f.dirname) < len(shortest.dirname):
+                shortest = f
+    return shortest
+"###;
+
 const UTILS_FORCE_DISABLE_SOURCE: &str = r###"_FORCE_DISABLE_CC_TOOLCHAIN = False
 "###;
 
@@ -4500,6 +4549,64 @@ fn exact_rules_rust_utils_expand_dict_export_retains_private_helper_and_parent_i
             .unwrap()
             .value()
             .ptr_eq(child.get("expand_dict_value_locations").unwrap().value())
+    );
+}
+
+#[test]
+fn exact_rules_rust_utils_crate_root_export_retains_private_helper_and_parent_identity() {
+    let slices = [
+        (
+            UTILS_CRATE_ROOT_SRC_SOURCE,
+            "crate_root_src",
+            "f5a21bb9e1f694a1baec8c238bb52f4eb70f7ec25014f6d0cf71b09e2670ee41",
+        ),
+        (
+            UTILS_SHORTEST_SRC_WITH_BASENAME_SOURCE,
+            "_shortest_src_with_basename",
+            "7157302d387837bc1d83c2aae3caed49c2cd76a074d58d9d4b6fdc3d6f5f7bdc",
+        ),
+    ];
+    for (source, _, expected) in slices {
+        assert_eq!(format!("{:x}", Sha256::digest(source.as_bytes())), expected);
+    }
+    let owner = |label: &str, path: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(label).unwrap(),
+        workspace_path: PathBuf::from(path),
+        repository_mapping: Arc::from([]),
+    };
+    let child_owner = owner(
+        "@@rules_rust+//rust/private:utils.bzl",
+        "/rules_rust/rust/private/utils.bzl",
+    );
+    let child_source = slices
+        .iter()
+        .map(|(source, _, _)| *source)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let child = eval_bzl_with_identity(&child_source, child_owner.clone()).unwrap();
+    for (_, name, _) in slices {
+        assert_eq!(
+            child.get_any_visibility(name).unwrap().0.value().get_type(),
+            "function"
+        );
+    }
+    assert!(child.get("_shortest_src_with_basename").is_err());
+    let exported = child.get("crate_root_src").unwrap();
+    let parent = eval_bzl_with_loaded_children(
+        "load(\":utils.bzl\", \"crate_root_src\")\nIMPORTED = crate_root_src\n",
+        owner(
+            "@@rules_rust+//rust/private:rust.bzl",
+            "/rules_rust/rust/private/rust.bzl",
+        ),
+        &[(":utils.bzl", child_owner, child.dupe())],
+    )
+    .unwrap();
+    assert!(
+        parent
+            .get("IMPORTED")
+            .unwrap()
+            .value()
+            .ptr_eq(exported.value())
     );
 }
 
