@@ -18919,3 +18919,53 @@ source-preparation consumer and existing observation proof files to the
 allowlist. Commit `5ec7f3c79` freezes the design. Activate only
 `WP-4-5-7A-selected-external-package-boundary-projection-implementation` at
 base `5ec7f3c79` under the manifest's corrected bounds.
+
+### External boundary implementation REPLAN; built-in optional-input projection designed (2026-08-27)
+
+The selected external-boundary implementation reached its declared
+source-disposition STOP before acceptance. A direct catalog-backed
+`@bazel_tools` boundary request did not reach `NoPackage`; the private lookup
+failed while obtaining routed repository-ignore state. The complete
+unaccepted Rust candidate was removed.
+
+The live trace isolates one shared prerequisite. `HostRouteRepoFileKey` and
+`HostRouteRepositoryIgnoreKey` read optional `REPO.bazel` and `.bazelignore`
+through materialized-only source keys. `ExternalRepositoryPackageLookupKey`
+probes BUILD markers through the materialized-only routed path key. Built-in
+source lookup correctly treats an exact path outside its authenticated catalog
+as `UnsupportedCatalog`; globally converting that integrity error to absence
+would be unsound. The accepted routed directory-listing owner is instead the
+natural source-neutral presence fact.
+
+Freeze a built-in-only branch in each existing semantic owner. Routed REPO and
+ignore consume the built-in root listing and map absent optional metadata to
+their existing empty values. External lookup consumes the built-in candidate-
+directory listing and selects only file-valued `BUILD.bazel` then `BUILD`.
+Materialized direct-local, selected-registry and generated routes keep their
+existing followed-path/source dependencies and every symlink, special-file,
+Need, event and observation terminal. No second entry-kind key or source tree
+is added.
+
+The built-in snapshot contains neither root metadata file and contains exact
+`BUILD` files only in the admitted catalog packages. Unexpected future
+built-in metadata content fails closed with a repository-relative typed error;
+it does not obtain a fabricated absolute path. Built-in package source logical
+identity/evaluation remains deferred and is not smuggled into this presence
+correction. After acceptance, resume the already-reviewed external package-
+boundary projection before any traversal or loading claim.
+
+Pinned Bazel 9.2 remains behavior authority. Zabel's
+`session_directory_package_presence.zig` is concept/test guidance for keeping
+authenticated directory membership separate from producer-computed followed-
+symlink package presence; its store, IDs, allocator and diagnostics are not
+adopted. Bazel 9 BCR Starlark continues to define rules including
+`cc_internal`; `cc_common` remains only a generic host-builtin consumer. This
+packet adds no C++ rule or other rule semantics in Rust.
+
+Activate only
+`WP-4-5-7A-builtin-optional-package-input-projection-design`. Require
+independent architecture/DICE review before selecting the bounded four-file
+implementation described by the current manifest. Compatibility is exact for
+the admitted optional-metadata and point-marker behavior, Slug-native for
+route/DICE/error carriers, and unsupported/deferred for built-in package
+evaluation, selected-external traversal, registration and rule/action breadth.

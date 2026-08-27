@@ -1,173 +1,177 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-selected-external-package-boundary-projection-implementation`
+Packet: `WP-4-5-7A-builtin-optional-package-input-projection-design`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `5ec7f3c79`.
+Base: `eb6843ebd`.
 
-Result: implement one public, route-owned external package-boundary projection
-which distinguishes ignore pruning from current-package deletion before any
-selected-external traversal is implemented.
+Result: freeze the smallest generic routed-source correction which lets the
+catalog-backed built-in repository represent absent optional `REPO.bazel`,
+`.bazelignore`, `BUILD.bazel` and `BUILD` inputs without inventing a physical
+root, then select one bounded implementation packet.
 
 ## Learned facts and source basis
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-remains semantic authority. `PackageLookupFunction` validates a package name,
-checks `--deleted_packages`, then for an external repository obtains its
-repository and ignore inputs before probing `BUILD.bazel` then `BUILD`.
-`ProcessPackageDirectory` obtains package existence and the directory listing
-as sibling dependencies. Its child recursion is filtered by the recursive
-key's `IgnoredSubdirectories`; a deleted current package does not remove child
-dependencies. `RecursivePkgKey` structurally includes repository, rooted path
-and excluded paths, and `RecursivePkgFunction` aggregates child package sets.
+remains semantic authority. `PackageLookupFunction` checks deleted-package and
+repository-ignore policy before probing `BUILD.bazel` then `BUILD`; a missing
+optional marker is a normal no-package result. Repository metadata likewise
+permits absent `REPO.bazel` and `.bazelignore`. The accepted built-in
+`@bazel_tools` snapshot contains neither root metadata file and contains exact
+`BUILD` files at `src/conditions` and `tools/test`.
 
-Slug's live `ExternalRepositoryPackageLookupKey` already owns the corresponding
-route, deleted-package, routed-ignore and marker facts, but currently collapses
-deleted policy and ignore policy into one `Deleted` terminal. The accepted
-`HostRepositoryDirectoryListingKey` owns direct entries without package policy.
-`HostRootPackageBoundaryKey` is the root-repository analogue of the missing
-public decision shape.
+Slug's accepted `HostRepositoryDirectoryListingKey` already owns sorted direct
+membership for direct-local, selected-registry, generated and built-in routes.
+The three current consumers do not yet use that source-neutral boundary:
 
-Buck2 DICE guidance in `docs/developers/dice.md` requires immutable complete
-values, semantic dependency ownership, complete-only validity for transient
-Need, no lock across compute and observation release with dependent graph
-versions. No new oracle is needed: this design changes no public command
-behavior and reuses accepted marker-priority, deleted-package, repository-ignore
-and recursive-pattern evidence.
+- routed REPO and ignore owners call the materialized-only
+  `HostRepositorySourceFileKey`, so normal built-in absence becomes a
+  materialization error;
+- external package lookup calls the materialized-only `HostRepositoryPathKey`,
+  so built-in BUILD marker discovery fails before its package terminal; and
+- direct built-in source lookup intentionally reports `UnsupportedCatalog` for
+  a missing exact file and must remain fail-closed rather than reinterpret that
+  integrity boundary globally.
 
-Zabel's authenticated-source recursive discovery is concept/test guidance for
-producer/consumer separation only. Do not copy its session store, source IDs,
-allocator, diagnostics or compatibility claims. Bazel 9.2 is the behavior
-authority.
+The stopped external-boundary implementation therefore produced an opaque
+repository-ignore error for a valid built-in package decision. Its complete
+unaccepted Rust diff was removed; no split terminal or public boundary module
+is retained.
 
-## Decision and non-decisions
+Buck2 DICE guidance in `docs/developers/dice.md` requires each natural owner to
+depend on the accepted listing key, keep Need transient, forward complete
+observations and avoid locks across compute. No new oracle or fixture is
+needed: accepted Bazel package-marker/metadata evidence and the verbatim
+built-in catalog discriminate this correction.
 
-Add a doc-hidden `HostExternalPackageBoundaryKey` and observed sibling in a
-small bzlmod projection module. The key is the complete authenticated
-`RootRepositoryRoute` plus validated root-capable `PackagePath`. It consumes,
-but does not reimplement, the existing private external package lookup.
+Zabel's `session_directory_package_presence.zig` is concept/test guidance. It
+keeps authenticated direct membership and producer-computed package presence
+together while preserving followed-symlink decisions separately. Slug should
+likewise use catalog membership only for the built-in disposition and leave
+the existing materialized path/source producers unchanged. Do not copy
+Zabel's session store, source IDs, allocator model, diagnostics or parity
+claims.
 
-First split that lookup's conflated terminal into its existing `Deleted` policy
-terminal and a new `IgnoredDirectory` terminal at the points where their
-already-owned predecessors decide them. Preserve the private `Deleted` spelling
-to minimize consumer churn. Preserve invalid-name validation, policy/ignore
-ordering, marker priority, Need and observed outer-error precedence. The public
-projection reports exactly:
+## Decision to freeze
 
-- `InvalidPackageName`;
-- `DeletedPackage`, for which traversal may still inspect descendants;
-- `IgnoredDirectory`, which prunes the candidate subtree;
-- `Package`, with only the selected `BUILD.bazel` or `BUILD` spelling; and
-- `NoPackage`.
+Keep the accepted routed directory listing as the sole shared primitive; add
+no second retained entry-kind key or source tree. Each existing semantic owner
+adds only the built-in branch appropriate to the fact it already owns:
 
-This is a projection, not a second lookup. It must not directly compute deleted
-policy, repository ignore, marker paths, directory listings or source files.
-The private lookup remains the natural owner and existing package-source
-consumers continue to use its rich internal result. Public boundary errors are
-repository-relative semantic tags only; their retained state, `Debug`,
-`Display` and `source()` expose no physical path, observation namespace,
-materialization root, compute message or private lookup error.
+- `HostRouteRepoFileKey` obtains the built-in root listing. Absence of
+  `REPO.bazel` yields the existing empty REPO value. Materialized routes keep
+  their current source-file path, evaluation, event and observation behavior.
+- `HostRouteRepositoryIgnoreKey` obtains the same built-in root listing after
+  its REPO predecessor. Absence of `.bazelignore` contributes no additional
+  prefixes. Materialized routes keep their current source-file and parser
+  behavior.
+- `ExternalRepositoryPackageLookupKey` obtains the built-in candidate-package
+  listing and selects exact file entries in `BUILD.bazel`, then `BUILD` order.
+  A missing directory or absent/file-ineligible marker yields `NoBuildFile`.
+  Materialized routes keep the existing followed-path producer, including
+  symlink and special-file behavior.
 
-Do not implement recursive traversal, target-pattern expansion, explicit-name
-conflict resolution, family filtering, registration activation, package
-loading, configured validation, rules or actions. Do not alter BCR source
-authentication or define any BCR rule in Rust. Bazel 9 BCR Starlark remains the
-source of rules including `cc_internal`; `cc_common` is only a later generic
-host-capability consumer.
+Use the legacy or observed listing sibling matching each parent key. Observed
+outer error precedes Need, which precedes the semantic terminal; merge the
+listing epoch exactly. Built-in catalog listings currently contribute an empty
+path epoch because snapshot and manifest identity are structural in the route.
+Do not inspect the catalog directly from any consumer.
 
-## DICE, request and retained-state contract
+Unexpected built-in `REPO.bazel` or `.bazelignore` file content is not silently
+evaluated through a fabricated absolute path. Return a repository-relative,
+typed fail-closed error and `REPLAN` the logical-source identity boundary when
+a future authenticated snapshot actually adds either file. A directory-valued
+`.bazelignore` retains the accepted no-additional-ignore behavior; an
+unexpected wrong-kind REPO entry remains an error. This is an explicit future
+snapshot stop, not a fallback.
 
-The route and package path are the complete semantic key. The route retains
-workspace, apparent/canonical repository, module and full source identity,
-including selected mapping or generated file-effect plan. Never project key
-identity to display repository text or reconstruct a physical root.
+After this correction, resume the already-reviewed external package-boundary
+projection. Built-in package source bytes/evaluation remain a separate generic
+source-identity concern; the resumed boundary packet may report package
+presence but must not claim selected-external package loading or traversal.
 
-Legacy returns `SourcePreparationOutcome<Arc<Result<Value, Error>>>`. Observed
-also carries the exact private lookup `PathObservationEpoch` and admits
-`ObservedPathFrontierError`. Both use complete-only equality and validity.
-Observed outer error precedes Need, which precedes a semantic terminal; no Need
-is cached as complete. Ordinary DICE cancellation applies and no lock spans a
-compute.
+Do not add traversal, package loading, target-pattern expansion, registration
+activation, evaluator changes, language builtins, configured semantics, rules
+or actions. Bazel 9 BCR Starlark remains the source of rule definitions,
+including `cc_internal`; `cc_common` is only one consumer of the generic Rust
+host builtin ABI. No C++ rule implementation belongs in Rust.
 
-The retained public value is one small enum plus the selected marker spelling
-when present. The observed carrier adds one existing immutable epoch and `Arc`
-result. It retains no route/source/mapping copy, package tree, entry slice,
-physical path, evaluator heap, command scratch, global cache or manual
-interner. DICE invalidation and equality cutoff own publication and release;
-there is no service/async-transfer lifetime or fallback.
+## DICE, identity and retained-state contract
 
-The key accepts an already-authenticated route. A later traversal caller must
-merge any predecessor `RootRepositoryRouteObservationKey` epoch before
-publishing a larger observed result. Overlapping requests share only immutable
-DICE values and retain independent injected request revisions.
+The complete authenticated `RootRepositoryRoute` remains in every existing
+parent key. Root or candidate `PackagePath` listing keys retain the same route,
+so selected mapping, source disposition, immutable generation and built-in
+snapshot identity all participate structurally in equality and invalidation.
+No caller projects to display repository text or reconstructs a physical root.
+
+No new retained value, cache, interner, global state or manual lock is added.
+Parents retain only their existing semantic Result plus the existing immutable
+observation epoch. Listing values remain shared `Arc`-backed immutable entry
+slices and release with their DICE graph versions. Overlapping requests share
+only immutable DICE results and retain independent injected request revisions;
+cancellation publishes no partial terminal.
+
+The route was authenticated by an earlier owner. A larger observed caller
+continues to merge its route predecessor epoch; this packet owns only the
+newly consulted listing epoch. There is no historical-filesystem fallback and
+no async transfer or shutdown lifetime.
 
 ## Compatibility
 
-- **Exact:** no new named Bazel surface is activated. Existing external marker
-  priority, deleted-package and repository-ignore semantics remain exact for
-  the already-admitted point lookup.
-- **Slug-native:** the public boundary enum, Rust/DICE key, opaque projected
-  errors and observation carrier.
-- **Unsupported/deferred:** selected-external recursive membership and error
-  aggregation, target-pattern expansion, wildcard-name conflict lookup,
-  family policy/dedupe, registration activation, configured validation,
-  options, rules and actions.
+- **Exact:** within the admitted point-lookup slice, missing built-in optional
+  metadata and marker priority follow Bazel 9.2; the catalog remains verbatim
+  upstream content. Existing materialized-route semantics remain exact.
+- **Slug-native:** DICE keys, route/catalog identity, typed redacted error
+  projection and observation carrier.
+- **Unsupported/deferred:** built-in package-source logical identity and
+  evaluation, selected-external recursion, target-pattern expansion,
+  registration activation, configured validation, language builtin breadth,
+  rules and actions.
 
-## Active allowlist and review
+## Proof, scope and successor
 
-This implementation packet may change only:
+The docs-only design may change only this manifest, the canonical plan, Stage
+6, `.codex/skills/slug-agent-orchestration/references/routing-log.md`, and
+`.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`.
+Require independent architecture/DICE review before selecting implementation.
 
-- `app/slug_bzlmod_v2/src/host_package.rs` only to split the existing private
-  lookup's deleted and ignored terminals and preserve its current consumers;
-- `app/slug_bzlmod_v2/src/host_external_package_boundary/mod.rs` for the new
-  public projection;
-- `app/slug_bzlmod_v2/src/host_external_package_boundary/tests.rs` for direct
-  boundary and lifecycle proof; and
-- `app/slug_bzlmod_v2/src/host_package_observation_tests.rs` to discriminate
-  the private deleted-policy and ignored-directory terminals;
-- `app/slug_bzlmod_v2/src/source_preparation.rs` only to map both split private
-  terminals to the existing direct-include `Deleted` failure;
-- `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs` only for
-  mechanical private-terminal proof updates if the split requires them; and
-- `app/slug_bzlmod_v2/src/lib.rs` for doc-hidden exports and module wiring.
+If accepted, select
+`WP-4-5-7A-builtin-optional-package-input-projection-implementation` at the
+design commit. Its proposed allowlist is:
 
-Caps are 560 production and 900 proof additions, with no
-dependency, fixture or oracle. `host_package.rs` exceeds the complexity trigger
-but remains the cohesive private lookup owner; the new public projection is
-split into its own small module so no new responsibility is added there.
+- `app/slug_bzlmod_v2/src/repo_file.rs` for built-in root REPO absence;
+- `app/slug_bzlmod_v2/src/repository_ignore.rs` for built-in root ignore
+  absence;
+- `app/slug_bzlmod_v2/src/host_package.rs` for built-in marker selection and
+  typed source-disposition/error projection; and
+- `app/slug_bzlmod_v2/src/host_package_observation_tests.rs` only when the
+  existing owner-local tests cannot express the observed cross-owner proof.
 
-Proof must cover all five terminals, exact marker priority, route/package
-key-hash A/B/A, direct-local, immutable/selected-registry, generated and built-
-in routes through the shared private lookup, deleted-versus-ignore descendant
-semantics, path/materialization Need, observed outer precedence, exact epoch
-forwarding, complete-only equality/validity, policy/marker and source/generation
-A/B/A restoration, and public error/debug redaction. A structural regression
-must prove the projection has no direct policy, ignore, marker-path, listing or
-source-file dependency.
+Provisional caps are 220 production and 420 proof additions, no dependency,
+fixture, oracle, source asset or export. All three production files exceed the
+2,000-line complexity trigger, but each change stays in its existing cohesive
+semantic owner; a new central module would duplicate or expose private
+consumer policy. Stop and `REPLAN` if a fifth file is required, a built-in
+metadata file is present, materialized-route dependencies or terminals change,
+a physical path is fabricated/exposed, direct catalog/source internals are
+read by a consumer, or package source/traversal is needed.
 
-Existing repository-package source and direct-local include-horizon consumers
-must continue to treat both private split terminals as their accepted `Deleted`
-failure. The split is observable only through the new projection; it must not
-change point package loading or include-horizon terminal ordering/equality.
-
-Run focused and full bzlmod tests, downstream loading tests/checks, locked core
-check and rebuilt locked CLI, all serially. Formatting, scope, cap, dependency,
-no-lock, archive-baseline and diff gates remain mandatory. Require independent
-DICE/source-boundary review before terminal `ACCEPT`.
-
-STOP and `REPLAN` for another policy computation, a physical root/namespace in
-the public result, a copied package tree or route mapping, a source disposition
-that cannot use the private lookup, cap/allowlist expansion, traversal or
-registration activation, a new exact claim, dependency, global state or lock
-across DICE compute.
+Proof must cover built-in empty REPO, empty additional ignore, root no-package,
+`src/conditions` and `tools/test` BUILD selection, exact marker priority,
+listing failure projection, legacy/observed equality and complete-only
+validity, empty built-in epoch, route/source A/B/A identity, and structural
+dependency separation. Existing direct-local symlink/special-file, selected-
+registry and generated marker/source tests must remain unchanged and green.
+Run focused and full bzlmod tests plus downstream loading checks/tests,
+formatting, diff, scope, cap, dependency, no-lock and archive-baseline gates.
 
 ## Immediate predecessor
 
-Commit `0055c653b` accepts the generic routed repository directory-listing
-owner for direct-local, selected-registry, generated and built-in sources. It
-activates no rule semantics: Bazel 9 BCR Starlark remains the rule source, and
-Zabel remains peer guidance only. Commit `5ec7f3c79` freezes this public
-boundary design after independent review corrected its exhaustive consumer and
-proof allowlist.
+Commit `5ec7f3c79` froze the external package-boundary projection and commit
+`eb6843ebd` selected its implementation. The implementation reached its
+declared source-disposition STOP before acceptance: a valid catalog-backed
+route could not obtain optional metadata or package markers through the
+materialized-only consumers. The candidate was removed completely and the
+reviewed external-boundary design remains the successor after this prerequisite.
