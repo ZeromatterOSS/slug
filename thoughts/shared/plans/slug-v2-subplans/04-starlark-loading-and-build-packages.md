@@ -7346,3 +7346,25 @@ Pinned Bazel 9.2 and authenticated BCR rules_cc bytes remain exact authority.
 Clean `../zabel` commit `0795445f…` is concept-only peer guidance for separating
 the generic evaluator from Bazel host APIs and retaining frozen values with
 their defining module; copy no Zig implementation or claimed behavior.
+
+### Complete LTO indexing action accepted; linking helper selected (2026-08-27)
+
+Commit `99d9289da` freezes all 288 authenticated LTO-indexing-action lines over
+seven actual complete children. It proves all nine imported identities, two
+function types/visibility and exact nine-public/eleven-all inventories without
+invocation. All required suites pass at 0 production and 420 proof additions;
+independent review returned `ACCEPT`.
+
+The direct complete parent is `link/cc_linking_helper.bzl`, 675 lines, SHA-256
+`c45dd243835bd70803a7bb2e0a11167c9ea5ac912b3f02d415841879873b2a03`.
+Its eight source-order children are accepted: skylib paths, helper,
+`cc_internal`, compilation outputs, C++ link action, library-to-link creator,
+LTO indexing action and target types. Run only
+`WP-4-7A-rules-cc-linking-helper-complete-loading-proof` under 0/950/950,
+prove its complete fourteen-import/eight-function and
+twelve-public/twenty-two-all inventories, and invoke nothing.
+
+Pinned Bazel 9.2 and authenticated BCR rules_cc bytes remain exact authority.
+Clean `../zabel` commit `0795445f…` remains concept-only guidance for the
+generic-evaluator/Bazel-host split and producer-owned frozen module lifetime;
+copy no Zig implementation or claimed behavior.
