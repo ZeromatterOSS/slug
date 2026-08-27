@@ -1,81 +1,71 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-cc-private-cc-common-complete-loading-proof`
+Packet: `WP-4-7A-rules-cc-compatibility-symbols-complete-loading-proof`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: freeze the authenticated complete 788-line rules_cc
-`cc/private/cc_common.bzl` module over its 22 accepted direct children. Prove
-all imported identities, eager private sentinels, the complete 56-field
-`cc_common` façade and full name/visibility inventory without invocation.
+Result: freeze the complete Bazel-9 branch of the BCR-authenticated rules_cc
+compatibility `symbols.bzl` producer over its six accepted children. Prove all
+imports and seven exports, including the intentional ObjcInfo alias, without
+invocation.
 
 ## Learned facts and decision
 
-Commit `f52148534` byte-verifies and freezes all 232 authenticated
-`configure_features.bzl` lines over accepted action-names and semantics
-children. It proves both imported identities, all six eager ordered lists,
-public/private function visibility and exact nine-public/ten-all inventories
-without invocation. Focused, all 287 loading-library, 25 invalidation and 32
-BUILD-loading tests, locked analysis/core checks and CLI build, format/diff,
-source and archive-baseline gates pass within 0/406/406; root review returned
-`ACCEPT`.
+Commit `873f07e2d` byte-verifies and freezes all 788 authenticated private
+`cc_common.bzl` lines over 22 accepted direct children. It proves every child
+owner/mapping/path, all 35 imported identities, private eager values, 38
+private functions, exact 56-field façade order/identity and exact
+32-public/78-all inventories without invoking any C++ façade method. Focused,
+all 288 loading-library, 25 invalidation and 32 BUILD-loading tests, locked
+analysis/core checks and CLI build, format/diff/source and archive-baseline
+gates pass within 0/1,236/1,236; root review returned `ACCEPT`.
 
-Rules_cc 0.2.17 `cc/private/cc_common.bzl` is 788 lines, SHA-256
-`5e6ab737945b487759c9f039c77a066dc65bbe15cf590b566fe86029cc610762`.
-Its 22 direct children are now accepted complete defining modules: helper and
-provider modules, compilation outputs/compile/build variables/linkstamp/LTO,
-the complete link producer family, toolchain info, the native compatibility
-proxy, toolchain-config info and configure-features. Top-level evaluation binds
-35 imports, creates the private unique initialized-provider sentinel and
-instance, constructs one private allowlist list and escape dictionary, defines
-38 private functions, and publishes the 56-field `cc_common` struct. Only the
-sentinel provider constructor and `struct` are called eagerly; no C++ façade
-method or imported semantic function is invoked.
+Rules_cc 0.2.17 `cc/extensions.bzl` generates `symbols.bzl` from its Bazel-9
+branch. The authenticated normalized payload is 14 lines, SHA-256
+`31c58bfb31755ad1546cc295885704b69f0365a797d77c26481b4863a62c519c`.
+It loads complete private cc_common, CcInfo, CcSharedLibraryInfo,
+DebugPackageInfo, ObjcInfo and CcToolchainConfigInfo producers, then exports
+seven bindings; `new_objc_provider` intentionally aliases `ObjcInfo`. All six
+defining modules are now accepted complete. No function or provider is called.
 
-Run only `WP-4-7A-rules-cc-private-cc-common-complete-loading-proof`. Add a
-complete defining-module regression. Do not invoke a façade field, inspect
-callable defaults, evaluate the public compatibility proxy, or configure a
-rule, toolchain, feature or action.
+Run only `WP-4-7A-rules-cc-compatibility-symbols-complete-loading-proof`.
+Do not execute the module extension/repository rule, evaluate the public
+wrapper, invoke an export, or configure a C++ rule, toolchain or action.
 
 ## Generic architecture, authorities and compatibility
 
-This is the integration proof for generic BCR Starlark loading/evaluation, not
-a C++ parser or Rust reimplementation of rules_cc. Slug's Buck2-derived Rust
-Starlark parser and general frozen-module/provider/collection infrastructure
-evaluate the complete BCR-owned source at its real canonical owner and retain
-the actual child exports.
+This remains generic BCR Starlark loading/evaluation and generated-repository
+module composition, not a C++ parser or Rust rules implementation. Slug's
+Buck2-derived Rust Starlark parser and frozen-module infrastructure evaluate
+the BCR-authored Bazel-9 payload at its canonical generated-repository owner
+and retain actual child exports.
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-and authenticated rules_cc 0.2.17 bytes are sole exact authority. The complete
-source and already accepted complete children cover every eager binding.
-Configured rules_cc tests are skipped because they invoke C++ host semantics
-from a later unsupported phase. Add no fixture or oracle.
+and authenticated rules_cc 0.2.17 generator bytes are sole exact authority.
+The pinned version selects the new branch. Existing complete child proofs cover
+the semantic closure; add no fixture or oracle.
 
 Clean `../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is
-architectural guidance only. Its generic evaluator/host-capability split,
-producer-owned frozen values and compact façade boundary support the same
-design, but no Zig code, C++ primitive, representation, algorithm or behavior
-is copied and Zabel is not compatibility authority.
+architectural guidance only. Its producer-owned re-export and frozen identity
+patterns guide the boundary, but no Zig code, representation, algorithm or C++
+behavior is copied and Zabel is not compatibility authority.
 
-- **Exact:** complete source bytes/hash/line count; canonical owner and empty
-  mapping; all 22 direct child owners/mappings; all 35 imported bindings
-  pointer-identical to their child exports with exact visibility; sentinel
-  provider/instance, ordered allowlist and escape dictionary eager values; all
-  38 private function bindings; exact 56-field façade order and identity; full
-  public/all name inventories; complete freeze without façade invocation.
-- **Slug-native:** starlark-rust parse/evaluate/freeze, initialized-provider,
-  list/dict/struct and test representations; one defining module retaining all
-  accepted child heaps.
-- **Unsupported/deferred:** every façade/imported/source function invocation
-  and output; provider-instance use beyond sentinel identity; C++ providers,
-  rule contexts, configurations, features, toolchains, actions, ActionKeys and
-  execution; public `cc/common/cc_common.bzl` compatibility proxy.
+- **Exact:** authenticated 14-line generator payload/hash; canonical generated
+  owner and `rules_cc -> rules_cc+` mapping; six exact child owners/mappings;
+  six private imported identities; seven pointer-identical public exports in
+  exact inventory, including `ObjcInfo == new_objc_provider`; complete freeze
+  without invocation.
+- **Slug-native:** starlark-rust parse/evaluate/freeze and test representation;
+  one generated module retaining all six accepted child heaps.
+- **Unsupported/deferred:** extension/repository-rule execution and physical
+  generation; export invocation/provider construction; public
+  `cc/common/cc_common.bzl`; C++ rule, toolchain, configuration, action,
+  ActionKey and execution behavior.
 
-The defining module owns its sentinel, functions, collections and façade.
-Imported fields remain pointer-identical to retained child exports; wrapper
-fields remain pointer-identical to source-defined functions. No evaluator
-borrow or invocation result escapes. Request/revision, DICE, filesystem,
-cache, async and fallback concerns are inapplicable to this test-only proof.
+The generated module is the re-export owner while values remain
+pointer-identical to their defining rules_cc modules. No evaluator borrow or
+invocation result escapes. DICE, request/revision, filesystem generation,
+cache, async and fallback concerns are not exercised by this test-only proof.
 There is no fallback.
 
 ## Allowlist, caps and proof
@@ -83,49 +73,41 @@ There is no fallback.
 Change only `app/slug_loading_v2/src/host_package_load_tests.rs`. Scheduling
 documents may change only after terminal acceptance.
 
-At base `f52148534`, the Rust test authority is 28,198 lines, SHA-256
-`d3f613746cb6f6e67535fbc43e75a48837916fc05092057eb8b358823796a45c`.
-Its final ceiling is 30,048 lines. Each new proof/helper function must remain
-at most 120 physical lines. The oversized test module remains cohesive as the
-sole private loading harness and authenticated rules_cc source-proof ledger;
-add no production responsibility or generic source archive.
+At base `873f07e2d`, the Rust test authority is 29,434 lines, SHA-256
+`e143102b25e4accfec30780719c183f674acf4f5a34e0029bea7035bdd760669`.
+Its final ceiling is 29,934 lines. Each new proof/helper function must remain at
+most 120 physical lines. Keep the existing private loading harness as the sole
+source-proof ledger; add no production responsibility or generic archive.
 
-Caps are 0 production, 1,850 proof and 1,850 total additions; deletions do not
-buy budget. Embed/hash all 788 authenticated lines. Evaluate at exact owner
-`@@rules_cc+//cc/private:cc_common.bzl`, path
-`/rules_cc/cc/private/cc_common.bzl`, with empty owner mapping and its exact 22
-direct loads. Reuse the existing complete child constructors and defining
-modules; do not copy, truncate, synthesize or mock a child.
+Caps are 0 production, 500 proof and 500 total additions; deletions do not buy
+budget. Embed/hash the exact 14 normalized payload lines from authenticated
+`extensions.bzl:95-108`. Evaluate at canonical owner
+`@@rules_cc++compatibility_proxy+cc_compatibility_proxy//:symbols.bzl`, path
+`/rules_cc_compatibility_proxy/symbols.bzl`, mapping
+`rules_cc -> rules_cc+`, with all six real children. Reuse the complete private
+cc_common and provider constructors; do not copy, truncate or mock children.
 
-Prove each direct child canonical owner and mapping, then all 35 loaded values
-pointer-identical to the corresponding actual child export. Prove private
-visibility for the four aliased imports and every source-defined underscore
-binding. Prove the unique initialized-provider callable/instance relationship,
-the exact two-entry allowlist and five-entry escape dictionary. Prove all 38
-private functions are frozen functions. Inspect `cc_common` as a 56-field
-struct in exact source order and prove each field pointer-identical or equal to
-its defining source/child binding, including the native `None` sentinel. Assert
-the exact public and all-visibility inventories. Invoke no façade field,
-imported function, or source-defined function and inspect no callable default.
+Prove each child owner/path/mapping and each private imported binding
+pointer-identical to its child export. Prove exact public seven/all thirteen
+inventories, all public exports pointer-identical to imports, and
+`new_objc_provider` pointer-identical to `ObjcInfo`. Invoke nothing.
 
 Run focused proof, all `slug_loading_v2` library tests, `bzl_invalidation`,
 `build_file_loading`, locked analysis/core checks, locked CLI build, formatting,
-diff and archive hygiene. Measure caps/ceiling/function sizes and perform root
-review of authenticated bytes, complete children/imports/eager values,
-façade/inventories, no-invocation boundary, generic architecture and Zabel's
-peer-guidance role.
+diff and archive hygiene. Measure caps/function sizes and perform root review of
+generator authentication, complete children, identities/inventories,
+no-invocation scope, generic architecture and Zabel's peer-guidance role.
 
-STOP and `REPLAN` for production change, source/hash mismatch, missing parser/
-global/evaluator/provider/collection/struct shape, copied or incomplete child,
-missing import/eager/function/façade/name coverage, invocation/default/output
-inspection, lost identity, evaluator-borrowed value, C++ semantic claim,
-unpinned source, copied Zabel content, dirty authority, allowlist escape, or
-cap/function violation. Stop after this producer and re-audit the public
-`cc/common/cc_common.bzl` compatibility proxy.
+STOP and `REPLAN` for production change, generator/hash mismatch, wrong Bazel
+branch, missing parser/global/evaluator shape, incomplete/copied child, missing
+identity/inventory coverage, invocation/output inspection, evaluator-borrowed
+value, C++ semantic claim, unpinned source, copied Zabel content, dirty
+authority, allowlist escape, or cap/function violation. Stop after symbols and
+re-audit the 18-line public `cc/common/cc_common.bzl` wrapper.
 
 ## Immediate predecessor
 
-Commit `f52148534` accepts only complete `configure_features.bzl`
-defining-module freezing. Commits through `c4d19156d` accept its other direct
-children. None accepts private `cc_common` as a complete producer, any façade
-method behavior, the public compatibility proxy, configured rules or actions.
+Commit `873f07e2d` accepts only the complete private cc_common producer and its
+children. Prior proxy proofs cover only direct-provider and ObjcInfo slices;
+none accepts the complete generated symbols module, public cc_common wrapper,
+configured rules or actions.
