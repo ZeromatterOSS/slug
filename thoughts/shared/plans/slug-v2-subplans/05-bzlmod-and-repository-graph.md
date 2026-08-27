@@ -4153,3 +4153,26 @@ ownership, separation of semantic association from physical path and existing-
 owner publication. Bazel 9.2 remains sole behavior authority. Route next to
 the docs-only Stage 4 keyword-only-arguments audit; M7 remains partial and
 M7A -> M8 -> M7B remains.
+
+### Complete universal-builtin environment selected (2026-08-26)
+
+The exact rules_cc helper stop exposed a shared Stage 4/5/core host-policy gap.
+Root and nonroot/include MODULE evaluators independently use vendored standard
+globals plus `Print`; REPO repeats a 28-name whitelist and replaces `set` with
+an always-disabled shim. Loading and the live core evaluator assemble still
+other variants. Bare vendored standard globals also expose `chr` and `ord`,
+which are absent from Bazel 9.2's 30-name `Starlark.UNIVERSE`.
+
+Run only `WP-4-5-7A-bazel-universal-builtins-environment` under 220/300/520
+caps. A new low-level `slug_starlark_v2` owner filters the process-stable
+standard values through the exact Bazel list, registers `Print` and the existing
+real `SetType` once, and populates distinct immutable context overlays. Migrate
+root/nonroot/include MODULE and REPO together with loading and core; remove the
+REPO shim and keep MODULE/REPO-specific functions in their current owners. No
+DICE key or retained semantic value changes.
+
+Clean `../zabel` `0795445f…` is a peer implementation, not authority. Its
+immutable process-wide universe and separation of shared predeclared values
+from module/evaluator state inform the independently justified Rust ownership
+and allocation design. Bazel 9.2 alone owns names, default set enablement and
+compatibility. Flag-off behavior and unproved callable ABIs remain deferred.

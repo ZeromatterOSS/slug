@@ -30,17 +30,38 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; complete C++ compilation-helper proof selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4b2396f0a` accept bounded loading breadth through direct-provider and ObjcInfo proxy children plus exact empty `depset()`; private CcInfo, following source children, shared action names, configuration-field binding, complete semantics and the dependency-free toolchain library are accepted through `acca5cb68` | the 666-line compile helper is dependency-complete; smaller toolchain consumers re-enter incomplete cc_common/proxy children | run only `WP-4-7A-rules-cc-compilation-helper-complete-loading-proof`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; complete Bazel universal environment selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4b2396f0a` accept bounded loading breadth through direct-provider and ObjcInfo proxy children plus exact empty `depset()`; private CcInfo, following source children, shared action names, configuration-field binding, complete semantics and the dependency-free toolchain library are accepted through `acca5cb68` | the exact helper exposed independently drifting BUILD/Bzl/MODULE/REPO/core universes, including absent default-enabled set, non-Bazel chr/ord and a stale REPO flag-off shim | run only `WP-4-5-7A-bazel-universal-builtins-environment`, then retry the helper; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-rules-cc-compilation-helper-complete-loading-proof](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-bazel-universal-builtins-environment](./slug-v2-subplans/current-packet.md).
 
-Prove exact complete 666-line `cc_compilation_helper.bzl` retains every imported
-identity, private constant/provider, all 12 functions and the public captured
-helper struct. Invoke nothing and add no production.
+Create one process-stable Rust owner for Bazel 9.2's exact 30-name universe and
+migrate every active BUILD, `.bzl`, MODULE, REPO and core evaluator. Enable the
+existing real `SetType`, remove the stale REPO shim and exclude `chr`/`ord`.
+Keep context overlays separate and do not retry the helper in this packet.
+
+### M7 compilation-helper proof REPLAN; complete universal environment selected (2026-08-26)
+
+The exact 666-line `cc_compilation_helper.bzl` candidate stops during global
+resolution at line 251: lazy `_module_map_struct_to_module_map_content`
+references absent `set()`. No function was invoked and the complete +855 proof
+candidate was removed byte-for-byte, returning to clean `1fb05138a`.
+
+The widened audit found separate universes in loading, root/nonroot MODULE,
+REPO and the live core evaluator. Vendored standard globals additionally expose
+non-Bazel `chr`/`ord`, while REPO carries a stale always-disabled `set` shim
+despite Bazel 9.2's default-enabled universal binding. Run only
+`WP-4-5-7A-bazel-universal-builtins-environment` under 220/300/520 caps:
+introduce a low-level process-stable exact 30-name owner, migrate every active
+route, keep context overlays separate and prove the bounded exact set subset
+including non-aliasing copy. Flag plumbing, exhaustive callable parity and
+helper proof remain deferred. Clean `../zabel` `0795445f…` is a peer
+implementation whose immutable-universe/predeclared separation and allocation
+ideas inform the independently justified Rust design; Bazel 9.2 alone owns
+compatibility and no Zig content is adopted.
 
 ### M7 complete toolchain-config library accepted; compilation helper selected (2026-08-26)
 

@@ -5270,6 +5270,29 @@ defining-module import/capture ownership and recursive freeze only; no Zig code
 or behavior is adopted. Bazel 9.2 and authenticated rules_cc remain exact
 authority.
 
+### Compilation-helper proof REPLAN; complete universal environment selected (2026-08-26)
+
+The exact 666-line helper reached line 251 before its first missing global:
+lazy `_module_map_struct_to_module_map_content` contains
+`added_paths = set()`. Slug resolves lazy function globals during compilation,
+so the absent binding stops complete module freeze without invoking the
+function. The entire +855 proof candidate was removed byte-for-byte and the
+checkout returned clean at `1fb05138a`.
+
+The broader environment audit found that loading, root/nonroot MODULE, REPO and
+the live core evaluator all assemble universes independently. Bare vendored
+standard globals leak non-Bazel `chr`/`ord`; REPO's separate shim always
+reports set disabled even though Bazel 9.2 enables the universal constructor by
+default. Run only `WP-4-5-7A-bazel-universal-builtins-environment` under
+220/300/520 caps. Add a low-level exact 30-name, process-stable Rust owner;
+migrate every active evaluator; keep `StructType` in the `.bzl` overlay; and
+prove positional construction, type, deduplication/order, membership, `add`,
+non-aliasing copy, invalid inputs and module freeze. Remaining callable behavior
+stays Slug-native or deferred and the helper proof remains removed. Clean
+`../zabel` `0795445f…` is a peer implementation whose immutable universe and
+predeclared/module separation inform the Rust architecture; Bazel 9.2 remains
+sole compatibility authority and no Zig content is adopted.
+
 ### Complete C++ semantics accepted; toolchain-config library selected (2026-08-26)
 
 Commit `9cc0d4ace` adds 363 proof lines and no production. It embeds and hashes
