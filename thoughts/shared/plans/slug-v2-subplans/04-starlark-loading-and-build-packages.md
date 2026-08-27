@@ -5247,6 +5247,31 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Complete semantics proof REPLAN; configuration-field binding selected (2026-08-26)
+
+The exact complete 234-line `cc/common/semantics.bzl` attempt stopped before
+invocation because Starlark name resolution requires `configuration_field` in
+lazy `_get_coverage_attrs` at line 80. Slug's loading globals do not expose it.
+The worker made no production change and fully removed the uncommitted Rust
+candidate; only the scheduling documents and required routing row are now dirty.
+A test-local substitute or narrowed source would violate the packet.
+
+Pinned Bazel 9.2 declares `configuration_field(fragment, name)` as a `.bzl`
+top-level function with two required named-only strings. Its valid result is a
+late-bound label default after fragment/field validation. Slug does not yet own
+that retained value or its configured resolver, and semantics never invokes the
+binding during loading. Run only
+`WP-4-7A-bazel-configuration-field-loading-binding` under 20/80/100 caps: expose
+the exact `.bzl` callable/ABI, preserve lazy reference/freeze, keep BUILD absence,
+and fail every otherwise valid call closed before allocation. Defer descriptors,
+attribute defaults and configured resolution, then retry complete semantics.
+
+Clean `../zabel` `0795445f…` guides only the architectural split between its
+`.bzl` predeclared binding and separately retained late-bound descriptor/resolver.
+No Zig code, representation, algorithm or diagnostic is copied; Bazel 9.2
+remains sole exact authority. No retained structure changes, so the Buck2
+utility-reuse audit requires no skill/ledger row.
+
 ### Complete action names accepted; C++ semantics selected (2026-08-26)
 
 Commit `9e312f958` adds 328 proof lines and no production. It embeds and

@@ -1,109 +1,110 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-cc-semantics-complete-loading-proof`
+Packet: `WP-4-7A-bazel-configuration-field-loading-binding`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: prove the authenticated complete dependency-free 234-line rules_cc
-`cc/common/semantics.bzl` producer freezes its eager constants/label, all 30
-lazy functions, and the exact 43-field function-capturing `semantics` struct.
-Add no production behavior and invoke nothing.
+Result: install Bazel 9's `.bzl`-only `configuration_field` predeclared binding
+with its exact two named-only string parameters, preserve lazy reference/freeze,
+and fail every invocation closed before constructing a late-bound value. Do not
+retain or resolve a configuration field.
 
 ## Learned facts and decision
 
-Base commit is `9e312f958` (`Prove complete action names freeze`). It adds 328
-proof lines and no production, byte-verifies all 220 action-name lines, and
-exhaustively proves 33 public constants, the 33-field `ACTION_NAMES` mapping,
-seven ordered lists, and all seven pointer-identical `ACTION_NAME_GROUPS` fields.
-Focused proof, 248 library tests, 24 invalidation tests, 31 BUILD-loading tests,
-locked analysis/core checks, CLI build, formatting and hygiene pass. Independent
-review returned `ACCEPT`.
+Base commit is `ed4144030` (`Select complete C++ semantics proof`); the Rust
+authority remains action-names commit `9e312f958`. That accepted proof adds 328
+test lines and no production, byte-verifies all 220 source lines, and proves 33
+constants, the 33-field action struct, seven ordered lists, and seven final
+aliases. All 248 loading-library, 24 invalidation and 31 BUILD-loading tests,
+locked checks, CLI build and hygiene pass. Independent review returned `ACCEPT`.
 
-Private `cc_common.bzl` source order remains in the 2,295-line
-`cc/private/compile/compile.bzl`. After now-complete Skylib paths, action names
-and helper children, the first incomplete child is rules_cc 0.2.17
-`cc/common/semantics.bzl`: 234 lines, SHA-256
-`029254fd58eb8b3bf32a0f772e479b991a51ce21a6f6cc8a5739aadbce3900da`.
-It has no loads. Its eager rows bind two public Booleans, 30 lazy private
-functions, one private canonical `Label`, and one public 43-field struct that
-captures 29 of those functions plus exact strings, Booleans, lists and empty
-dictionaries. Every eager expression uses accepted exact evaluator shapes. The
-alternative toolchain-config branch now reaches the dependency-free 622-line
-`cc_toolchain_config_lib.bzl`, so semantics is the smaller source-ordered
-frontier.
+The attempted exact 234-line `cc/common/semantics.bzl` proof stopped before
+invocation: Starlark name resolution rejects `configuration_field` at line 80
+inside lazy `_get_coverage_attrs`. The worker changed no production and the
+candidate proof was fully removed; only the scheduling documents and required
+routing row are now dirty. A test-local substitute, narrowed source or
+unclassified dummy would violate the exact-complete packet.
 
-Therefore run only
-`WP-4-7A-rules-cc-semantics-complete-loading-proof`. Do not claim function
-invocation, `compile.bzl`, the configuration library, legacy features,
-private/public `cc_common`, generated proxy, action execution, configured C++,
-or toolchain feature semantics.
+Pinned Bazel 9.2 exposes `configuration_field(fragment, name)` only in the
+`.bzl` top-level API. Both parameters are named-only strings. Its implementation
+requires Bzl initialization context, validates the registered fragment/field,
+and creates a late-bound default. Slug has no retained late-bound attribute
+value or configured resolver in this M7A slice. The bounded prerequisite is
+therefore the exact `.bzl` binding/type/ABI and lazy name-resolution surface,
+with a stable Slug-native fail-closed error for every otherwise valid invocation.
+BUILD absence remains exact. After acceptance, retry complete semantics without
+invoking any function.
+
+Therefore run only `WP-4-7A-bazel-configuration-field-loading-binding`. Do not
+construct a descriptor, admit `attr.label(default = configuration_field(...))`,
+validate fragment names/fields, resolve configuration, retry semantics, or claim
+configured C++.
 
 ## Authorities, ownership and compatibility
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-and authenticated rules_cc bytes are sole exact authority. Existing accepted
-Boolean/string/list/dictionary/struct, `.bzl` `Label`, lazy-function and module-
-freeze regressions cover every eager evaluator shape; no fresh oracle is needed.
-Clean `../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a`
-guides only declaration-owned generic aggregates, captured-function defining-
-module ownership and recursive freeze before publication. Copy no Zig code,
+`StarlarkBuildApiGlobals` and `BazelBuildApiGlobals` are the exact authority for
+global placement and ABI. Existing source-backed Starlark ABI/error tests cover
+named-only string binding; no oracle is needed for the explicitly unsupported
+valid call. Clean `../zabel` commit
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only installing
+`configuration_field` as a `.bzl` predeclared binding while keeping its
+declaration-owned late-bound descriptor/resolver separate. Copy no Zig code,
 representation, algorithm, diagnostic or behavior.
 
-- **Exact:** complete source/hash and dependency-free owner; both public Boolean
-  constants; private Windows label value/type/visibility; all 30 private lazy
-  function types/visibility; exact 43-field `semantics` type, scalar/list/dict
-  values and order, and all 29 captured-function pointer identities.
-- **Slug-native:** realization through starlark-rust frozen values and one
-  defining-module heap that owns the struct, aggregate children and captured
-  functions.
-- **Unsupported/deferred:** any function invocation or returned semantics;
-  `compile.bzl`, compile/link actions, configuration-library/legacy-feature
-  construction, private/public `cc_common`, generated proxy, toolchain
-  configuration and configured C++.
+- **Exact:** `configuration_field` exists as a callable only in `.bzl` loading
+  globals; `fragment` and `name` are required named-only strings; lazy functions
+  may reference the binding and freeze; BUILD globals do not expose it.
+- **Slug-native:** an otherwise ABI-valid call returns one stable fail-closed
+  unsupported diagnostic before allocating or retaining a descriptor.
+- **Unsupported/deferred:** every successful invocation; fragment/field
+  validation, late-bound descriptor identity, label-attribute defaults,
+  configuration resolution/invalidation, complete semantics/compile,
+  private/public `cc_common`, toolchain config and configured C++.
 
-The frozen defining-module heap owns every lazy function and every value retained
-by `semantics`; no evaluator borrow or foreign owner escapes. No production,
-DICE, request, cache, async, fixture, oracle, hot-path, fallback or utility-reuse
+The static predeclared function owns no retained semantic value and creates none
+on error. No DICE, request, cache, async, hot-path, fallback or utility-reuse
 decision is introduced.
 
 ## Allowlist, caps and proof
 
 Change only:
 
+- `app/slug_loading_v2/src/package.rs`;
 - `app/slug_loading_v2/src/host_package_load_tests.rs`;
-- the three scheduling documents when rolling the accepted result.
+- the three scheduling documents when rolling the accepted result;
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md` for this
+  material REPLAN row only.
 
-At base `9e312f958` the Rust authority is 12,804 lines, SHA-256
+At base `ed4144030`, `package.rs` is 6,219 lines/SHA-256
+`8818b416e74ab838a65fdc60f148374c51e6ef122bc94addf2cfa9f7ae80e4fe` and the
+test authority is 12,804 lines/SHA-256
 `72c9d73c961bcbcaac256dc7b9daaafb05797ae418b1c6097bd5162199e0bba9`.
-Its final ceiling is 13,354 lines. Each new proof/helper function must remain at
-most 120 physical lines. The oversized test module remains cohesive around its
-private load harness and adjacent authenticated source constants; add no
-production responsibility or generic source archive.
+Final ceilings are 6,239 and 12,884 lines. Each new function must remain at most
+120 physical lines.
 
-Caps are 0 production, 550 proof and 550 total additions; deletions do not buy
-budget. Embed/hash all 234 lines; evaluate dependency-free at exact owner
-`@@rules_cc+//cc/common:semantics.bzl`; prove both public Boolean constants, the
-private `@@platforms+//os:windows` label, all 30 private function types and
-visibility, and the exact 43-field public struct. Prove every captured function
-pointer-identical to its defining binding, exact strings/Booleans, exact three
-list contents/order, exact empty dictionaries, and the complete multiline
-`malloc_docs` bytes. Invoke nothing and add no fixture or oracle.
+Caps are 20 production, 80 proof and 100 total additions; deletions do not buy
+budget. Add one `.bzl`-only predeclared Rust function with required named-only
+`fragment: str` and `name: str`; on a valid call, return a stable unsupported
+error without allocating a result. Prove callable type and BUILD absence; exact
+omitted/positional/duplicate/excess/wrong-type ABI rejection; lazy captured
+reference freeze; stable valid-call error; and no new public retained type. Add
+no fixture or oracle.
 
 Run focused proof, all `slug_loading_v2` library tests, `bzl_invalidation`,
 `build_file_loading`, locked analysis/core checks, locked CLI build, formatting,
 diff and archive hygiene. Measure caps/ceilings and obtain independent review of
-bytes, complete field/function coverage, captured ownership, compatibility
-split, branch selection and Zabel's guidance-only role.
+ABI, placement, no-allocation failure, compatibility split, the failed-source
+evidence and Zabel's guidance-only role.
 
-STOP and `REPLAN` for production change, source/hash mismatch, missing evaluator
-shape, copied/narrowed source, incomplete binding/field coverage, any manual
-invocation, lost captured identity, evaluator-borrowed value, consumer/parent
-claim, unpinned source, copied Zabel content, dirty authority, allowlist escape
-or cap/function violation. Stop after semantics and re-audit `compile.bzl` child
-source order against the toolchain-config branch.
+STOP and `REPLAN` for any retained descriptor/schema change, source-specific
+test substitute, BUILD exposure, successful invocation, fragment registry,
+configured resolution, DICE/cache change, non-stable failure, copied Zabel
+content, dirty authority, allowlist escape or cap/function violation. Stop after
+the binding and reselect the complete semantics proof.
 
 ## Immediate predecessor
 
-Commit `9e312f958` completes action names. It does not complete semantics,
-`compile.bzl`, private `cc_common`, toolchain config, or the generated
-compatibility proxy.
+Commit `9e312f958` completes action names. Scheduling commit `ed4144030` selected
+semantics, but exact source revealed this missing global and triggered REPLAN.
+Neither semantics nor any `configuration_field` invocation is accepted.
