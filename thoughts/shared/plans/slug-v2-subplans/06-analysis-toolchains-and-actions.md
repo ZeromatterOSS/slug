@@ -19641,3 +19641,35 @@ capabilities, never a Rust C++ parser or rule engine. Builtins continue to be
 planned in reusable values, declarations, collections/depsets,
 labels/patterns, actions/artifacts, configuration/toolchains and
 repository/loading categories.
+
+### Shared registration architecture accepted; prerequisite owners active (2026-08-27)
+
+Independent correction review returned `ACCEPT`, and commit `ae46e1cf5`
+freezes the architecture above. Warning facts participate in complete semantic
+equality even when expanded labels do not change, and the old package-policy
+adapter may be deleted only after every command, query and configured-analysis
+consumer migrates with its accepted restriction/error regressions intact.
+
+Activate only `WP-4-5-7A-registration-expansion-prerequisite-owners`. Identity
+factors one absolute grammar into the unchanged command-facing apparent parser
+and a pure contextual canonical projection. The selected registration view
+adds borrowed point lookup only. Loading extracts one crate-private
+Root/Canonical package-inventory key plus observed sibling; the existing public
+package-load keys become thin policy projections sharing the exact inventory
+`Arc`, epochs and child-owned events. The inventory never constructs the old
+loaded-target or loaded-Starlark restriction errors.
+
+Pinned Bazel adds one exact spelling distinction: `//pkg` selects the
+declaring canonical repository, while explicit `@//pkg` performs the empty
+apparent-name mapping lookup. Only the root module mapping contains that empty
+entry, so nonroot `@//pkg` is not visible rather than self. Preserve that
+distinction, command rejection of `@@`, and canonical MODULE acceptance of
+`@@` through the single grammar.
+
+The six-file implementation is capped at 950 production/1,400 proof/2,350
+total net lines. It adds no collection dependency, mapping copy, interner,
+cache, second evaluator, registration key or activation. Require complete
+identity/Bzlmod/loading plus direct query/core dependent validation and
+independent terminal review before selecting the two-family expander. Bazel 9
+BCR Starlark still owns `cc_internal`; `cc_common` remains only a demanding
+client of the generic evaluator and host ABI, and Zabel remains peer guidance.
