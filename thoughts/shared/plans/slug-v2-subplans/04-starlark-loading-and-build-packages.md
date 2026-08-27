@@ -5247,6 +5247,27 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Zero-argument depset accepted; exact ObjcInfo proxy child selected (2026-08-26)
+
+Commit `498e5efc7` admits zero/no-name `depset()` as the existing empty frozen
+value in shared BUILD and `.bzl` globals. It preserves the existing one-list
+validation and order without adding a scratch allocation, rejects deferred
+named zero-position forms, and leaves all broader depset semantics unchanged.
+Focused proof, all 237 loading-library tests, 24 invalidation tests, 31
+BUILD-loading tests, analysis/core checks and the CLI build pass. Independent
+reviews accept 9/50/59 additions and the compatibility boundary.
+
+Exact `cc/private/objc_info.bzl` can now evaluate all five eager `depset()`
+defaults and freeze its initialized provider declaration. Run only
+`WP-4-7A-rules-cc-compatibility-proxy-objc-info-loading-proof`. Embed the
+complete 97-line child and exact generated proxy load/export slices; prove the
+private initializer/raw bindings are functions, public ObjcInfo is a distinct
+provider callable, and proxy `ObjcInfo` plus `new_objc_provider` both
+pointer-alias only the public callable. Invoke nothing and keep omitted proxy
+children plus complete public CcInfo deferred. Clean `../zabel` `0795445f…`
+guides only defining-module ownership/reexport reachability; no Zig code,
+representation or behavior is copied.
+
 ### Direct-provider proxy children accepted; zero-argument depset selected (2026-08-26)
 
 Commit `0699dffe7` freezes exact complete `CcSharedLibraryInfo` and

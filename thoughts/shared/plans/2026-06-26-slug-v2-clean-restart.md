@@ -30,17 +30,36 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; zero-argument depset prerequisite selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `0699dffe7` accept bounded loading breadth through the two dependency-free direct-provider compatibility-proxy children | exact `ObjcInfo` freeze eagerly evaluates five zero-argument `depset()` defaults, while Slug currently requires one positional list | implement only `WP-4-7A-bazel-zero-argument-depset-loading`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; compatibility-proxy ObjcInfo selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `498e5efc7` accept bounded loading breadth through direct-provider proxy children and exact empty `depset()` | complete ObjcInfo plus its two public proxy aliases is now the smallest freezeable child; full public CcInfo still requires the broad remaining children | implement only `WP-4-7A-rules-cc-compatibility-proxy-objc-info-loading-proof`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-7A-bazel-zero-argument-depset-loading](./slug-v2-subplans/current-packet.md).
+[WP-4-7A-rules-cc-compatibility-proxy-objc-info-loading-proof](./slug-v2-subplans/current-packet.md).
 
-Admit only zero-argument `depset()` as an empty frozen loading value while
-preserving the accepted one-list constructor. This is the exact eager-default
-prerequisite for complete `ObjcInfo`; do not add ObjcInfo in the same packet.
+Freeze exact complete `cc/private/objc_info.bzl` and prove generated proxy
+`ObjcInfo` plus `new_objc_provider` both pointer-alias its public initialized
+provider callable rather than the private raw constructor. Invoke nothing and
+claim no complete proxy route.
+
+### M7 zero-argument depset accepted; exact ObjcInfo selected (2026-08-26)
+
+Commit `498e5efc7` adds 9 production and 50 proof lines. Zero/no-name `depset()`
+reuses the existing empty frozen representation in BUILD and `.bzl`; one-list
+validation/order remains unchanged; named zero-position, wrong-type and excess
+positional calls fail closed. All 237 loading-library tests, 24 invalidation
+tests, 31 BUILD-loading tests, analysis/core checks and the CLI build pass. Two
+reviewers accept caps, placement and the allocation-free arity branch.
+
+The exact 97-line ObjcInfo child is now source-complete and freezeable. Run only
+`WP-4-7A-rules-cc-compatibility-proxy-objc-info-loading-proof` under 0/220/220
+caps. Prove the initializer/raw bindings remain private functions, public
+ObjcInfo remains a distinct provider callable, and both exact proxy exports
+pointer-alias only that public callable. Invoke nothing; keep the complete
+proxy/public CcInfo route deferred. Clean `../zabel` `0795445f…` guides only
+defining-module ownership and reexport reachability; Bazel 9.2 and authenticated
+rules sources remain exact authority.
 
 ### M7 direct-provider proxy children accepted; zero-argument depset selected (2026-08-26)
 
