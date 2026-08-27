@@ -1,16 +1,16 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-builtin-optional-package-input-projection-design`
+Packet: `WP-4-5-7A-builtin-optional-package-input-projection-implementation`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `eb6843ebd`.
+Base: `078518b88`.
 
-Result: freeze the smallest generic routed-source correction which lets the
+Result: implement the smallest generic routed-source correction which lets the
 catalog-backed built-in repository represent absent optional `REPO.bazel`,
 `.bazelignore`, `BUILD.bazel` and `BUILD` inputs without inventing a physical
-root, then select one bounded implementation packet.
+root.
 
 ## Learned facts and source basis
 
@@ -54,7 +54,7 @@ the existing materialized path/source producers unchanged. Do not copy
 Zabel's session store, source IDs, allocator model, diagnostics or parity
 claims.
 
-## Decision to freeze
+## Accepted decision
 
 Keep the accepted routed directory listing as the sole shared primitive; add
 no second retained entry-kind key or source tree. Each existing semantic owner
@@ -130,16 +130,9 @@ no async transfer or shutdown lifetime.
   registration activation, configured validation, language builtin breadth,
   rules and actions.
 
-## Proof, scope and successor
+## Proof and implementation scope
 
-The docs-only design may change only this manifest, the canonical plan, Stage
-6, `.codex/skills/slug-agent-orchestration/references/routing-log.md`, and
-`.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`.
-Require independent architecture/DICE review before selecting implementation.
-
-If accepted, select
-`WP-4-5-7A-builtin-optional-package-input-projection-implementation` at the
-design commit. Its proposed allowlist is:
+The active implementation allowlist is:
 
 - `app/slug_bzlmod_v2/src/repo_file.rs` for built-in root REPO absence;
 - `app/slug_bzlmod_v2/src/repository_ignore.rs` for built-in root ignore
@@ -149,7 +142,7 @@ design commit. Its proposed allowlist is:
 - `app/slug_bzlmod_v2/src/host_package_observation_tests.rs` only when the
   existing owner-local tests cannot express the observed cross-owner proof.
 
-Provisional caps are 220 production and 420 proof additions, no dependency,
+Caps are 220 production and 420 proof additions, no dependency,
 fixture, oracle, source asset or export. All three production files exceed the
 2,000-line complexity trigger, but each change stays in its existing cohesive
 semantic owner; a new central module would duplicate or expose private
@@ -175,3 +168,6 @@ declared source-disposition STOP before acceptance: a valid catalog-backed
 route could not obtain optional metadata or package markers through the
 materialized-only consumers. The candidate was removed completely and the
 reviewed external-boundary design remains the successor after this prerequisite.
+Commit `078518b88` freezes this prerequisite design after independent review
+accepted its built-in-only listing branch, fail-closed metadata boundary,
+materialized-route preservation and bounded implementation scope.

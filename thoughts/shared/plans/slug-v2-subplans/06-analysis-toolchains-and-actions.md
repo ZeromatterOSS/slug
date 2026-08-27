@@ -18969,3 +18969,9 @@ implementation described by the current manifest. Compatibility is exact for
 the admitted optional-metadata and point-marker behavior, Slug-native for
 route/DICE/error carriers, and unsupported/deferred for built-in package
 evaluation, selected-external traversal, registration and rule/action breadth.
+
+Independent architecture/DICE review returned `ACCEPT` after the docs scope
+explicitly named both files used by the bounded routing-log compaction. Commit
+`078518b88` freezes the design. Activate only
+`WP-4-5-7A-builtin-optional-package-input-projection-implementation` at that
+base under 220 production and 420 proof additions.
