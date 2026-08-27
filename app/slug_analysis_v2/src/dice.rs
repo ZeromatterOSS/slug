@@ -21,12 +21,14 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use slug_bzlmod_v2::ModuleRegistrationPattern;
 use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
 use slug_bzlmod_v2::RootModuleLoadingAnchorObservationKey;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
+use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::TargetName;
 use slug_loading_v2::AttributeKind;
@@ -1252,25 +1254,32 @@ async fn root_rule_execution_platforms(
         }
         LoadingPreparationOutcome::Complete(Ok(Ok(anchor))) => anchor,
     };
+    let (execution_platforms, mut registration_error) = match direct_root_registrations(
+        anchor.registrations().execution_platforms(),
+        "toolchain topology",
+    ) {
+        Ok(labels) => labels,
+        Err(error) => return analysis_semantic_complete(Err(error)),
+    };
+    let (toolchains, toolchain_error) = match direct_root_registrations(
+        anchor.registrations().toolchains(),
+        "toolchain topology",
+    ) {
+        Ok(labels) => labels,
+        Err(error) => return analysis_semantic_complete(Err(error)),
+    };
+    if registration_error.is_none() {
+        registration_error = toolchain_error;
+    }
     if !has_toolchain_requirement {
-        let registered = anchor.registrations().toolchains().iter().any(|apparent| {
-            apparent.repo().is_root()
-                && CanonicalLabel::parse(&format!("@@{apparent}"))
-                    .is_ok_and(|declaration| local_declarations.contains(&declaration))
-        });
+        let registered = toolchains
+            .iter()
+            .any(|declaration| local_declarations.contains(declaration));
         if !registered {
             return analysis_semantic_complete(Ok(None));
         }
-        if let Some(external) = anchor
-            .registrations()
-            .execution_platforms()
-            .iter()
-            .chain(anchor.registrations().toolchains().iter())
-            .find(|label| !label.repo().is_root())
-        {
-            return analysis_semantic_complete(Err(AnalysisError::new(format!(
-                "external toolchain topology registration is not supported: {external}"
-            ))));
+        if let Some(error) = registration_error {
+            return analysis_semantic_complete(Err(error));
         }
     }
     let Some(structural) = configuration.slug_configuration() else {
@@ -1284,16 +1293,9 @@ async fn root_rule_execution_platforms(
             return analysis_semantic_complete(Err(AnalysisError::new(error.to_string())));
         }
     };
-    let platforms = anchor
-        .registrations()
-        .execution_platforms()
-        .iter()
-        .filter(|label| label.repo().is_root())
-        .map(|label| {
-            let label = CanonicalLabel::parse(&format!("@@{label}"))
-                .expect("accepted direct root registration label canonicalizes");
-            ConfiguredTargetKey::new(label, execution_configuration.clone())
-        })
+    let platforms = execution_platforms
+        .into_iter()
+        .map(|label| ConfiguredTargetKey::new(label, execution_configuration.clone()))
         .collect();
     analysis_semantic_complete(Ok(Some(platforms)))
 }
@@ -1309,6 +1311,50 @@ fn root_apparent_type(label: &CanonicalLabel) -> Result<CompactString, AnalysisE
         .strip_prefix("@@")
         .expect("root canonical labels have the @@ spelling")
         .into())
+}
+
+fn direct_root_registration(
+    pattern: &ModuleRegistrationPattern,
+) -> Result<Option<CanonicalLabel>, AnalysisError> {
+    let raw = pattern.as_str();
+    let target = raw.rsplit_once(':').map(|(_, target)| target);
+    if raw.ends_with("/...") || matches!(target, Some("all" | "all-targets" | "*")) {
+        return Err(AnalysisError::new(format!(
+            "unexpanded registration target pattern is not supported: {raw}"
+        )));
+    }
+    let apparent = ApparentLabel::parse(raw).map_err(|error| {
+        AnalysisError::new(format!(
+            "invalid registration target pattern '{raw}': {error}"
+        ))
+    })?;
+    if !apparent.repo().is_root() {
+        return Ok(None);
+    }
+    CanonicalLabel::parse(&format!("@@{apparent}"))
+        .map(Some)
+        .map_err(AnalysisError::new)
+}
+
+fn direct_root_registrations(
+    patterns: &[ModuleRegistrationPattern],
+    context: &str,
+) -> Result<(Vec<CanonicalLabel>, Option<AnalysisError>), AnalysisError> {
+    let mut labels = Vec::new();
+    let mut external = None;
+    for pattern in patterns {
+        match direct_root_registration(pattern)? {
+            Some(label) => labels.push(label),
+            None => {
+                external.get_or_insert_with(|| {
+                    AnalysisError::new(format!(
+                        "external {context} registration is not supported: {pattern}"
+                    ))
+                });
+            }
+        };
+    }
+    Ok((labels, external))
 }
 
 fn package_target<'a>(
@@ -1959,26 +2005,21 @@ async fn resolve_root_toolchain(
         LoadingPreparationOutcome::Complete(Ok(Ok(anchor))) => anchor,
     };
     let registrations = anchor.registrations();
-    let mut labels = Vec::new();
-    let mut registration_error = None;
-    for apparent in registrations
-        .execution_platforms()
-        .iter()
-        .chain(registrations.toolchains())
-    {
-        if !apparent.repo().is_root() {
-            registration_error.get_or_insert_with(|| {
-                AnalysisError::new(format!(
-                    "external toolchain registration is not supported: {apparent}"
-                ))
-            });
-            continue;
-        }
-        labels.push(
-            CanonicalLabel::parse(&format!("@@{apparent}"))
-                .expect("accepted direct root registration label canonicalizes"),
-        );
+    let (execution_platforms, mut registration_error) =
+        match direct_root_registrations(registrations.execution_platforms(), "toolchain") {
+            Ok(labels) => labels,
+            Err(error) => return toolchain_outcome(Err(error)),
+        };
+    let (toolchain_labels, toolchain_error) =
+        match direct_root_registrations(registrations.toolchains(), "toolchain") {
+            Ok(labels) => labels,
+            Err(error) => return toolchain_outcome(Err(error)),
+        };
+    if registration_error.is_none() {
+        registration_error = toolchain_error;
     }
+    let mut labels = execution_platforms;
+    labels.extend(toolchain_labels.iter().cloned());
     labels.push(required.clone());
     let packages = match load_root_native_packages(ctx, mode, workspace, &mut labels).await {
         LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
@@ -2002,14 +2043,6 @@ async fn resolve_root_toolchain(
     let platform_labels = candidate_execution_platforms
         .iter()
         .map(|platform| platform.label().clone())
-        .collect::<Vec<_>>();
-    let toolchain_labels = registrations
-        .toolchains()
-        .iter()
-        .filter(|label| label.repo().is_root())
-        .map(|label| {
-            CanonicalLabel::parse(&format!("@@{label}")).expect("root registration canonicalizes")
-        })
         .collect::<Vec<_>>();
     for platform_label in &platform_labels {
         let target = match package_target(&packages, platform_label) {
@@ -2078,6 +2111,39 @@ async fn resolve_root_toolchain(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn registration_adapter_accepts_only_direct_root_labels_and_fails_patterns_closed() {
+        let direct = ModuleRegistrationPattern::parse("//pkg:target").unwrap();
+        assert_eq!(
+            direct_root_registration(&direct)
+                .unwrap()
+                .unwrap()
+                .to_string(),
+            "@@//pkg:target"
+        );
+        for raw in [
+            "//...",
+            "@tools//...",
+            "//pkg/...",
+            "//pkg:all",
+            "//pkg:*",
+            "//pkg:all-targets",
+        ] {
+            let pattern = ModuleRegistrationPattern::parse(raw).unwrap();
+            assert_eq!(
+                direct_root_registration(&pattern).unwrap_err().to_string(),
+                format!("unexpanded registration target pattern is not supported: {raw}")
+            );
+        }
+        let external = ModuleRegistrationPattern::parse("@tools//pkg:target").unwrap();
+        assert!(direct_root_registration(&external).unwrap().is_none());
+        let (_, external_error) = direct_root_registrations(&[external], "toolchain").unwrap();
+        assert_eq!(
+            external_error.unwrap().to_string(),
+            "external toolchain registration is not supported: @tools//pkg:target"
+        );
+    }
 
     #[test]
     fn external_native_reference_is_rejected_before_same_root_path_projection() {

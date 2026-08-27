@@ -126,6 +126,7 @@ pub use host_package_boundary::ObservedHostRootPackageBoundary;
 pub use interim_module::EvaluatedNonrootModule;
 pub use interim_module::LogicalModuleFileId;
 pub use interim_module::LogicalSpan;
+pub use interim_module::ModuleRegistrationPattern;
 pub use interim_module::NonrootAttributeInt;
 pub use interim_module::NonrootAttributeKey;
 pub use interim_module::NonrootAttributeValue;
@@ -323,6 +324,22 @@ pub use selected_repo_spec::HostRootRepositoryMappingKey;
 pub use selected_repo_spec::HostRootRepositoryMappingOutcome;
 #[doc(hidden)]
 pub use selected_repo_spec::HostRootRepositoryMappingView;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedRegistrationPatternView;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedRegistrationPatterns;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedRegistrationPatternsError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedRegistrationPatternsKey;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedRegistrationPatternsObservationError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedRegistrationPatternsObservationKey;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedRegistrationPatternsOutcome;
+#[doc(hidden)]
+pub use selected_repo_spec::ObservedHostSelectedRegistrationPatterns;
 #[rustfmt::skip]
 #[doc(hidden)]
 pub use selected_repo_spec::HostRootRepositoryMappingObservationError;

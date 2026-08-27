@@ -596,14 +596,16 @@ async fn root_registrations_preserve_direct_order_policy_and_a_b_a_equality() {
                 "module(name = 'root')\n\
                  {platforms}\n\
                  register_execution_platforms('//pkg:third')\n\
+                 register_execution_platforms('//...', '//pkg/...', '//pkg:*')\n\
                  register_execution_platforms('//:dev_platform', dev_dependency = True)\n\
                  register_toolchains('//:first_toolchain')\n\
                  register_toolchains('@tools//toolchains:second', '//pkg:third_toolchain', '//:literal...toolchain')\n\
+                 register_toolchains('@tools//...', '//pkg:all', '//pkg:all-targets')\n\
                  register_toolchains('//:dev_toolchain', dev_dependency = True)\n"
             ))),
         )])
     };
-    let strings = |labels: &[slug_identity_v2::ApparentLabel]| {
+    let strings = |labels: &[slug_bzlmod_v2::ModuleRegistrationPattern]| {
         labels.iter().map(ToString::to_string).collect::<Vec<_>>()
     };
 
@@ -615,6 +617,9 @@ async fn root_registrations_preserve_direct_order_policy_and_a_b_a_equality() {
             "//:first",
             "@tools//platforms:second",
             "//pkg:third",
+            "//...",
+            "//pkg/...",
+            "//pkg:*",
             "//:dev_platform",
         ]
     );
@@ -625,6 +630,9 @@ async fn root_registrations_preserve_direct_order_policy_and_a_b_a_equality() {
             "@tools//toolchains:second",
             "//pkg:third_toolchain",
             "//:literal...toolchain",
+            "@tools//...",
+            "//pkg:all",
+            "//pkg:all-targets",
             "//:dev_toolchain",
         ]
     );
@@ -639,6 +647,9 @@ async fn root_registrations_preserve_direct_order_policy_and_a_b_a_equality() {
             "@tools//platforms:second",
             "//:first",
             "//pkg:third",
+            "//...",
+            "//pkg/...",
+            "//pkg:*",
             "//:dev_platform",
         ]
     );
@@ -660,7 +671,14 @@ async fn root_registrations_preserve_direct_order_policy_and_a_b_a_equality() {
     let ignored = ignored.as_ref().as_ref().unwrap();
     assert_eq!(
         strings(ignored.module.registrations.execution_platforms()),
-        ["//:first", "@tools//platforms:second", "//pkg:third"]
+        [
+            "//:first",
+            "@tools//platforms:second",
+            "//pkg:third",
+            "//...",
+            "//pkg/...",
+            "//pkg:*",
+        ]
     );
     assert_eq!(
         strings(ignored.module.registrations.toolchains()),
@@ -669,6 +687,9 @@ async fn root_registrations_preserve_direct_order_policy_and_a_b_a_equality() {
             "@tools//toolchains:second",
             "//pkg:third_toolchain",
             "//:literal...toolchain",
+            "@tools//...",
+            "//pkg:all",
+            "//pkg:all-targets",
         ]
     );
 
@@ -677,16 +698,10 @@ async fn root_registrations_preserve_direct_order_policy_and_a_b_a_equality() {
 }
 
 #[tokio::test]
-async fn root_registrations_reject_non_string_relative_and_pattern_arguments() {
+async fn root_registrations_reject_non_string_and_relative_arguments() {
     for registration in [
         "register_execution_platforms(1)",
         "register_toolchains('relative')",
-        "register_execution_platforms('//...')",
-        "register_toolchains('@tools//...')",
-        "register_execution_platforms('//pkg/...')",
-        "register_toolchains('//pkg:all')",
-        "register_execution_platforms('//pkg:*')",
-        "register_toolchains('//pkg:all-targets')",
     ] {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let result = graph(
@@ -701,6 +716,24 @@ async fn root_registrations_reject_non_string_relative_and_pattern_arguments() {
         .await;
         assert!(result.is_err(), "{registration}");
     }
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let ignored = graph_and_module_value(
+        &dice,
+        snapshot([(
+            "MODULE.bazel",
+            WorkspaceFileValue::Present(Arc::new(
+                "module(name='root')\nregister_toolchains(42, dev_dependency=True)\n".to_owned(),
+            )),
+        )]),
+        RequestInputs {
+            command: Some(BzlmodCommandPolicyKey::from_flags(None, true).unwrap()),
+            ..RequestInputs::defaults()
+        },
+    )
+    .await
+    .0;
+    assert!(ignored.as_ref().as_ref().is_ok());
 }
 
 #[tokio::test]

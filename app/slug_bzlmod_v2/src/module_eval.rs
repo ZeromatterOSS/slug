@@ -82,6 +82,7 @@ use crate::EvaluatedNonrootModule;
 use crate::LockfileMode;
 use crate::LogicalModuleFileId;
 use crate::LogicalSpan;
+use crate::ModuleRegistrationPattern;
 use crate::NonrootAttributeKey;
 use crate::NonrootAttributeValue;
 use crate::NonrootDependency;
@@ -906,16 +907,16 @@ impl RootModuleLockfileMode {
 /// complete inline include closure.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe, Default)]
 pub struct RootModuleRegistrations {
-    execution_platforms: Arc<[ApparentLabel]>,
-    toolchains: Arc<[ApparentLabel]>,
+    execution_platforms: Arc<[ModuleRegistrationPattern]>,
+    toolchains: Arc<[ModuleRegistrationPattern]>,
 }
 
 impl RootModuleRegistrations {
-    pub fn execution_platforms(&self) -> &[ApparentLabel] {
+    pub fn execution_platforms(&self) -> &[ModuleRegistrationPattern] {
         &self.execution_platforms
     }
 
-    pub fn toolchains(&self) -> &[ApparentLabel] {
+    pub fn toolchains(&self) -> &[ModuleRegistrationPattern] {
         &self.toolchains
     }
 }
@@ -4031,21 +4032,18 @@ fn nonroot_module_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] dev_dependency: bool,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        let labels =
-            TupleRef::from_value(labels).context("register_execution_platforms expects labels")?;
-        let mut state = nonroot_context(eval)?.state.borrow_mut();
-        state.non_module_called = true;
-        if !dev_dependency {
-            for label in labels.iter() {
-                let label = label
-                    .unpack_str()
-                    .context("registration labels must be strings")?;
-                if !label.starts_with("//") && !label.starts_with('@') {
-                    anyhow::bail!("registration labels must be absolute target patterns");
-                }
-                state.builder.execution_platforms.push(label.into());
-            }
+        let context = nonroot_context(eval)?;
+        context.state.borrow_mut().non_module_called = true;
+        if dev_dependency {
+            return Ok(NoneType);
         }
+        let labels = registration_patterns(labels)?;
+        context
+            .state
+            .borrow_mut()
+            .builder
+            .execution_platforms
+            .extend(labels);
         Ok(NoneType)
     }
 
@@ -4054,20 +4052,13 @@ fn nonroot_module_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] dev_dependency: bool,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        let labels = TupleRef::from_value(labels).context("register_toolchains expects labels")?;
-        let mut state = nonroot_context(eval)?.state.borrow_mut();
-        state.non_module_called = true;
-        if !dev_dependency {
-            for label in labels.iter() {
-                let label = label
-                    .unpack_str()
-                    .context("registration labels must be strings")?;
-                if !label.starts_with("//") && !label.starts_with('@') {
-                    anyhow::bail!("registration labels must be absolute target patterns");
-                }
-                state.builder.toolchains.push(label.into());
-            }
+        let context = nonroot_context(eval)?;
+        context.state.borrow_mut().non_module_called = true;
+        if dev_dependency {
+            return Ok(NoneType);
         }
+        let labels = registration_patterns(labels)?;
+        context.state.borrow_mut().builder.toolchains.extend(labels);
         Ok(NoneType)
     }
 
@@ -5238,6 +5229,7 @@ register_execution_platforms("//:platform_b", "//:platform_a")
 register_execution_platforms("ignored-relative", dev_dependency = True)
 register_toolchains("@tools//:toolchain_b", "//:toolchain_a")
 register_toolchains("ignored-relative", dev_dependency = True)
+register_toolchains(42, dev_dependency = True)
 flag_alias(name = "mode", starlark_flag = "//:mode")
 first = use_extension("//:extension.bzl", "extension")
 first_alias = first
@@ -5292,18 +5284,22 @@ repo_rule(name = "ignored_innate", dev_dependency = True, value = len)
         assert_eq!(evaluated.base.nodep_dependencies.len(), 1);
         assert_eq!(evaluated.base.nodep_dependencies[0].name, "nodep");
         assert_eq!(
-            evaluated.base.execution_platforms.as_ref(),
-            [
-                CompactString::from("//:platform_b"),
-                CompactString::from("//:platform_a")
-            ]
+            evaluated
+                .base
+                .execution_platforms
+                .iter()
+                .map(ModuleRegistrationPattern::as_str)
+                .collect::<Vec<_>>(),
+            ["//:platform_b", "//:platform_a"]
         );
         assert_eq!(
-            evaluated.base.toolchains.as_ref(),
-            [
-                CompactString::from("@tools//:toolchain_b"),
-                CompactString::from("//:toolchain_a")
-            ]
+            evaluated
+                .base
+                .toolchains
+                .iter()
+                .map(ModuleRegistrationPattern::as_str)
+                .collect::<Vec<_>>(),
+            ["@tools//:toolchain_b", "//:toolchain_a"]
         );
         assert_eq!(
             evaluated.base.flag_aliases.get("mode").unwrap(),
@@ -5713,8 +5709,8 @@ struct RecordedRootModule {
     header: Option<RootModuleHeader>,
     non_module_called: bool,
     dependencies: Vec<RootModuleDependency>,
-    execution_platforms: Vec<ApparentLabel>,
-    toolchains: Vec<ApparentLabel>,
+    execution_platforms: Vec<ModuleRegistrationPattern>,
+    toolchains: Vec<ModuleRegistrationPattern>,
     overrides: SmallMap<CompactString, RecordedRootModuleOverride>,
     extensions: ExtensionEvalState,
     ignore_dev_dependency: bool,
@@ -5749,7 +5745,7 @@ fn root_evaluation_context<'a>(
         .context("MODULE.bazel global invoked without root evaluation context")
 }
 
-fn direct_registration_labels<'v>(labels: Value<'v>) -> anyhow::Result<Vec<ApparentLabel>> {
+fn registration_patterns<'v>(labels: Value<'v>) -> anyhow::Result<Vec<ModuleRegistrationPattern>> {
     let labels = TupleRef::from_value(labels).context("registration expects labels")?;
     labels
         .iter()
@@ -5757,12 +5753,7 @@ fn direct_registration_labels<'v>(labels: Value<'v>) -> anyhow::Result<Vec<Appar
             let label = label
                 .unpack_str()
                 .context("registration labels must be strings")?;
-            let target = label.rsplit_once(':').map(|(_, target)| target);
-            let recursive = target.is_none() && label.ends_with("/...");
-            if recursive || matches!(target, Some("all" | "all-targets" | "*")) {
-                anyhow::bail!("registration labels must name direct targets")
-            }
-            ApparentLabel::parse(label).map_err(anyhow::Error::msg)
+            ModuleRegistrationPattern::parse(label).map_err(anyhow::Error::msg)
         })
         .collect()
 }
@@ -5870,12 +5861,20 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] dev_dependency: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        let labels = direct_registration_labels(labels)?;
-        let mut state = root_evaluation_context(eval)?.state.borrow_mut();
-        state.non_module_called = true;
-        if !dev_dependency || !state.ignore_dev_dependency {
-            state.execution_platforms.extend(labels);
+        let context = root_evaluation_context(eval)?;
+        {
+            let mut state = context.state.borrow_mut();
+            state.non_module_called = true;
+            if dev_dependency && state.ignore_dev_dependency {
+                return Ok(NoneType);
+            }
         }
+        let labels = registration_patterns(labels)?;
+        context
+            .state
+            .borrow_mut()
+            .execution_platforms
+            .extend(labels);
         Ok(NoneType)
     }
     fn register_toolchains<'v>(
@@ -5883,12 +5882,16 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] dev_dependency: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        let labels = direct_registration_labels(labels)?;
-        let mut state = root_evaluation_context(eval)?.state.borrow_mut();
-        state.non_module_called = true;
-        if !dev_dependency || !state.ignore_dev_dependency {
-            state.toolchains.extend(labels);
+        let context = root_evaluation_context(eval)?;
+        {
+            let mut state = context.state.borrow_mut();
+            state.non_module_called = true;
+            if dev_dependency && state.ignore_dev_dependency {
+                return Ok(NoneType);
+            }
         }
+        let labels = registration_patterns(labels)?;
+        context.state.borrow_mut().toolchains.extend(labels);
         Ok(NoneType)
     }
     fn use_extension<'v>(

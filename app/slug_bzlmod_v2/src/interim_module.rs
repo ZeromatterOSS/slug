@@ -326,6 +326,31 @@ pub struct NonrootRepoOverride {
     pub location: LogicalSpan,
 }
 
+/// Bazel MODULE registration text retained exactly as declared. Parsing into
+/// labels or target patterns belongs to the later owner/mapping-aware stage.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct ModuleRegistrationPattern(CompactString);
+
+impl ModuleRegistrationPattern {
+    pub fn parse(raw: &str) -> Result<Self, CompactString> {
+        if raw.starts_with("//") || raw.starts_with('@') {
+            Ok(Self(raw.into()))
+        } else {
+            Err("registration labels must be absolute target patterns".into())
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl std::fmt::Display for ModuleRegistrationPattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Module state shared by ordinary and synthetic (innate repo-rule) extension
 /// usages. Synthetic rules are represented in `extension_usages`, not here.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -339,8 +364,8 @@ pub struct NonrootModuleBase {
     pub dependencies: Arc<SmallMap<CompactString, NonrootDependency>>,
     pub original_dependencies: Arc<SmallMap<CompactString, NonrootDependency>>,
     pub nodep_dependencies: Arc<[NonrootDependency]>,
-    pub execution_platforms: Arc<[CompactString]>,
-    pub toolchains: Arc<[CompactString]>,
+    pub execution_platforms: Arc<[ModuleRegistrationPattern]>,
+    pub toolchains: Arc<[ModuleRegistrationPattern]>,
     pub flag_aliases: Arc<SmallMap<CompactString, CompactString>>,
 }
 
@@ -365,8 +390,8 @@ pub struct NonrootModuleBuilder {
     pub bazel_compatibility: Vec<CompactString>,
     pub dependencies: SmallMap<CompactString, NonrootDependency>,
     pub nodep_dependencies: Vec<NonrootDependency>,
-    pub execution_platforms: Vec<CompactString>,
-    pub toolchains: Vec<CompactString>,
+    pub execution_platforms: Vec<ModuleRegistrationPattern>,
+    pub toolchains: Vec<ModuleRegistrationPattern>,
     pub flag_aliases: SmallMap<CompactString, CompactString>,
     pub extension_usages: Vec<NonrootExtensionUsage>,
 }

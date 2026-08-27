@@ -37,6 +37,7 @@ use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 use url::Url;
 
+use crate::ModuleRegistrationPattern;
 use crate::NonrootRepoOverride;
 use crate::OverrideAttributeKey;
 use crate::OverrideAttributeValue;
@@ -4656,8 +4657,319 @@ impl Key for HostSelectedExtensionEvaluationInputRequestsObservationKey {
     }
 }
 
-type RetainedExtensionMappings =
-    Arc<Result<HostSelectedExtensionMappings, HostSelectedExtensionMappingsError>>;
+type RetainedExtensionMappings = ExtensionMappingsResult;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
+enum RegistrationFamily {
+    ExecutionPlatforms,
+    Toolchains,
+}
+
+fn route_registration_patterns(
+    route: &HostSelectedModuleRoute,
+    family: RegistrationFamily,
+) -> &[ModuleRegistrationPattern] {
+    match (&route.entry.source, family) {
+        (HostGraphModuleSource::Root(module), RegistrationFamily::ExecutionPlatforms) => {
+            module.registrations.execution_platforms()
+        }
+        (HostGraphModuleSource::Root(module), RegistrationFamily::Toolchains) => {
+            module.registrations.toolchains()
+        }
+        (HostGraphModuleSource::Discovered(module), RegistrationFamily::ExecutionPlatforms) => {
+            &module.module.base.execution_platforms
+        }
+        (HostGraphModuleSource::Discovered(module), RegistrationFamily::Toolchains) => {
+            &module.module.base.toolchains
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
+struct SelectedRegistrationPatternRef {
+    route_ordinal: u32,
+    pattern_ordinal: u32,
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostSelectedRegistrationPatterns {
+    predecessor: RetainedExtensionMappings,
+    execution_platforms: Arc<[SelectedRegistrationPatternRef]>,
+    toolchains: Arc<[SelectedRegistrationPatternRef]>,
+}
+
+impl HostSelectedRegistrationPatterns {
+    pub fn execution_platforms(
+        &self,
+    ) -> impl ExactSizeIterator<Item = HostSelectedRegistrationPatternView<'_>> {
+        self.iter(RegistrationFamily::ExecutionPlatforms)
+    }
+
+    pub fn toolchains(
+        &self,
+    ) -> impl ExactSizeIterator<Item = HostSelectedRegistrationPatternView<'_>> {
+        self.iter(RegistrationFamily::Toolchains)
+    }
+
+    fn iter(
+        &self,
+        family: RegistrationFamily,
+    ) -> impl ExactSizeIterator<Item = HostSelectedRegistrationPatternView<'_>> {
+        let mappings = self
+            .predecessor
+            .as_ref()
+            .as_ref()
+            .expect("selected registration value retains a successful predecessor");
+        let refs = match family {
+            RegistrationFamily::ExecutionPlatforms => &self.execution_platforms,
+            RegistrationFamily::Toolchains => &self.toolchains,
+        };
+        refs.iter().map(move |reference| {
+            let route_ordinal = reference.route_ordinal as usize;
+            let route = &mappings.routes.entries[route_ordinal];
+            HostSelectedRegistrationPatternView {
+                pattern: &route_registration_patterns(route, family)
+                    [reference.pattern_ordinal as usize],
+                mapping: &mappings.mappings[route_ordinal],
+            }
+        })
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy)]
+pub struct HostSelectedRegistrationPatternView<'a> {
+    pattern: &'a ModuleRegistrationPattern,
+    mapping: &'a HostSelectedRepositoryMapping,
+}
+
+impl<'a> HostSelectedRegistrationPatternView<'a> {
+    pub fn raw_pattern(self) -> &'a str {
+        self.pattern.as_str()
+    }
+
+    pub fn canonical_repo(self) -> &'a CanonicalRepoName {
+        &self.mapping.context_repo
+    }
+
+    pub fn mapping_context(self) -> &'a CanonicalRepoName {
+        &self.mapping.context_repo
+    }
+
+    pub fn mapping(
+        self,
+    ) -> impl ExactSizeIterator<Item = (&'a ApparentRepoName, &'a CanonicalRepoName)> {
+        self.mapping.order.iter().map(|name| {
+            (
+                name,
+                self.mapping.entries.get(name).expect("valid mapping order"),
+            )
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum SelectedRegistrationPatternsInvalid {
+    RouteMappingCount {
+        routes: usize,
+        mappings: usize,
+    },
+    RouteOrdinalOverflow {
+        ordinal: usize,
+    },
+    PatternOrdinalOverflow {
+        family: RegistrationFamily,
+        route_ordinal: usize,
+        pattern_ordinal: usize,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum PrivateSelectedRegistrationPatternsError {
+    Predecessor(RetainedExtensionMappings),
+    Compute(CompactString),
+    Invalid {
+        predecessor: RetainedExtensionMappings,
+        reason: SelectedRegistrationPatternsInvalid,
+    },
+}
+
+fn selected_registration_patterns(
+    predecessor: RetainedExtensionMappings,
+) -> Result<HostSelectedRegistrationPatterns, PrivateSelectedRegistrationPatternsError> {
+    let mappings = predecessor
+        .as_ref()
+        .as_ref()
+        .map_err(|_| PrivateSelectedRegistrationPatternsError::Predecessor(predecessor.dupe()))?;
+    if mappings.routes.entries.len() != mappings.mappings.len() {
+        return Err(PrivateSelectedRegistrationPatternsError::Invalid {
+            predecessor: predecessor.dupe(),
+            reason: SelectedRegistrationPatternsInvalid::RouteMappingCount {
+                routes: mappings.routes.entries.len(),
+                mappings: mappings.mappings.len(),
+            },
+        });
+    }
+    let mut execution_platforms = Vec::new();
+    let mut toolchains = Vec::new();
+    for (route_ordinal, route) in mappings.routes.entries.iter().enumerate() {
+        let compact_route = u32::try_from(route_ordinal).map_err(|_| {
+            PrivateSelectedRegistrationPatternsError::Invalid {
+                predecessor: predecessor.dupe(),
+                reason: SelectedRegistrationPatternsInvalid::RouteOrdinalOverflow {
+                    ordinal: route_ordinal,
+                },
+            }
+        })?;
+        for (family, output) in [
+            (
+                RegistrationFamily::ExecutionPlatforms,
+                &mut execution_platforms,
+            ),
+            (RegistrationFamily::Toolchains, &mut toolchains),
+        ] {
+            for (pattern_ordinal, _) in route_registration_patterns(route, family)
+                .iter()
+                .enumerate()
+            {
+                let compact_pattern = u32::try_from(pattern_ordinal).map_err(|_| {
+                    PrivateSelectedRegistrationPatternsError::Invalid {
+                        predecessor: predecessor.dupe(),
+                        reason: SelectedRegistrationPatternsInvalid::PatternOrdinalOverflow {
+                            family,
+                            route_ordinal,
+                            pattern_ordinal,
+                        },
+                    }
+                })?;
+                output.push(SelectedRegistrationPatternRef {
+                    route_ordinal: compact_route,
+                    pattern_ordinal: compact_pattern,
+                });
+            }
+        }
+    }
+    Ok(HostSelectedRegistrationPatterns {
+        predecessor,
+        execution_platforms: execution_platforms.into(),
+        toolchains: toolchains.into(),
+    })
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostSelectedRegistrationPatternsError {
+    workspace: NormalizedAbsolutePath,
+    inner: PrivateSelectedRegistrationPatternsError,
+}
+
+impl fmt::Display for HostSelectedRegistrationPatternsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.inner)
+    }
+}
+
+impl std::error::Error for HostSelectedRegistrationPatternsError {}
+
+#[doc(hidden)]
+pub type HostSelectedRegistrationPatternsOutcome = SourcePreparationOutcome<
+    Arc<Result<HostSelectedRegistrationPatterns, HostSelectedRegistrationPatternsError>>,
+>;
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostSelectedRegistrationPatternsKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl HostSelectedRegistrationPatternsKey {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for HostSelectedRegistrationPatternsKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "host-selected-registration-patterns:{}", self.workspace)
+    }
+}
+
+type SelectedRegistrationPatternsResult =
+    Arc<Result<HostSelectedRegistrationPatterns, HostSelectedRegistrationPatternsError>>;
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostSelectedRegistrationPatternsObservationKey(HostSelectedRegistrationPatternsKey);
+
+impl HostSelectedRegistrationPatternsObservationKey {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self(HostSelectedRegistrationPatternsKey::new(workspace))
+    }
+}
+
+impl fmt::Display for HostSelectedRegistrationPatternsObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedHostSelectedRegistrationPatterns {
+    result: SelectedRegistrationPatternsResult,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostSelectedRegistrationPatterns {
+    pub fn result(&self) -> &SelectedRegistrationPatternsResult {
+        &self.result
+    }
+
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+enum SelectedRegistrationPatternsObservationError {
+    Mappings(ExtensionMappingsObservationError),
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct HostSelectedRegistrationPatternsObservationError(
+    SelectedRegistrationPatternsObservationError,
+);
+
+impl HostSelectedRegistrationPatternsObservationError {
+    pub fn selected_frontier(&self) -> crate::HostSelectedObservationFrontier {
+        match &self.0 {
+            SelectedRegistrationPatternsObservationError::Mappings(error) => {
+                extension_mappings_observation_frontier(error)
+            }
+        }
+    }
+}
+
+type SelectedRegistrationPatternsDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (SelectedRegistrationPatternsResult, PathObservationEpoch),
+        SelectedRegistrationPatternsObservationError,
+    >,
+>;
+
+fn selected_registration_patterns_complete(
+    key: &HostSelectedRegistrationPatternsKey,
+    result: Result<HostSelectedRegistrationPatterns, PrivateSelectedRegistrationPatternsError>,
+    observations: PathObservationEpoch,
+) -> SelectedRegistrationPatternsDriverOutcome {
+    let result = result.map_err(|inner| HostSelectedRegistrationPatternsError {
+        workspace: key.workspace.dupe(),
+        inner,
+    });
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -4891,7 +5203,7 @@ fn root_mapping_complete(
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
 }
 
-async fn root_repository_mapping_mappings_child(
+async fn selected_extension_mappings_child(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
     mode: RoutesMode,
@@ -4926,6 +5238,117 @@ async fn root_repository_mapping_mappings_child(
                 observations: observed.observations().dupe(),
             },
         },
+    }
+}
+
+fn finish_selected_registration_patterns(
+    key: &HostSelectedRegistrationPatternsKey,
+    child: RepoSpecChild<
+        HostSelectedExtensionMappings,
+        HostSelectedExtensionMappingsError,
+        ExtensionMappingsObservationError,
+    >,
+) -> SelectedRegistrationPatternsDriverOutcome {
+    let (predecessor, observations) = match child {
+        RepoSpecChild::Compute(message) => {
+            return selected_registration_patterns_complete(
+                key,
+                Err(PrivateSelectedRegistrationPatternsError::Compute(message)),
+                PathObservationEpoch::empty(),
+            );
+        }
+        RepoSpecChild::Need(need) => return SourcePreparationOutcome::Need(need),
+        RepoSpecChild::Outer(error) => {
+            return SourcePreparationOutcome::Complete(Err(
+                SelectedRegistrationPatternsObservationError::Mappings(error),
+            ));
+        }
+        RepoSpecChild::Complete {
+            result,
+            observations,
+        } => (result, observations),
+    };
+    selected_registration_patterns_complete(
+        key,
+        selected_registration_patterns(predecessor),
+        observations,
+    )
+}
+
+async fn drive_selected_registration_patterns(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRegistrationPatternsKey,
+    mode: RoutesMode,
+) -> SelectedRegistrationPatternsDriverOutcome {
+    finish_selected_registration_patterns(
+        key,
+        selected_extension_mappings_child(ctx, &key.workspace, mode).await,
+    )
+}
+
+fn project_legacy_selected_registration_patterns(
+    outcome: SelectedRegistrationPatternsDriverOutcome,
+) -> HostSelectedRegistrationPatternsOutcome {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((result, _))) => {
+            SourcePreparationOutcome::Complete(result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy selected registration patterns have no observed frontier")
+        }
+    }
+}
+
+#[async_trait]
+impl Key for HostSelectedRegistrationPatternsKey {
+    type Value = HostSelectedRegistrationPatternsOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        project_legacy_selected_registration_patterns(
+            drive_selected_registration_patterns(ctx, self, RoutesMode::Legacy).await,
+        )
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostSelectedRegistrationPatternsObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostSelectedRegistrationPatterns,
+            HostSelectedRegistrationPatternsObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match drive_selected_registration_patterns(ctx, &self.0, RoutesMode::Observed).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(
+                Err(HostSelectedRegistrationPatternsObservationError(error)),
+            ),
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostSelectedRegistrationPatterns {
+                    result,
+                    observations,
+                }))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
     }
 }
 
@@ -4993,7 +5416,7 @@ async fn drive_root_repository_mapping(
 ) -> RootRepositoryMappingDriverOutcome {
     finish_root_repository_mapping(
         key,
-        root_repository_mapping_mappings_child(ctx, &key.workspace, mode).await,
+        selected_extension_mappings_child(ctx, &key.workspace, mode).await,
     )
 }
 
@@ -6037,6 +6460,39 @@ mod tests {
             .unwrap()
     }
 
+    async fn compute_real_registration_patterns(
+        dice: &Arc<Dice>,
+        root: &str,
+        generation: u64,
+    ) -> crate::HostSelectedRegistrationPatternsOutcome {
+        real_transaction(dice, root, generation, &[], true)
+            .await
+            .compute(&crate::HostSelectedRegistrationPatternsKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap()
+    }
+
+    fn complete_observed_registration_patterns(
+        value: &<HostSelectedRegistrationPatternsObservationKey as Key>::Value,
+    ) -> ObservedHostSelectedRegistrationPatterns {
+        let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+            panic!("observed registration patterns must complete: {value:?}");
+        };
+        observed.dupe()
+    }
+
+    fn registration_patterns_source(first: &str) -> String {
+        format!(
+            "module(name='bazel_tools', repo_name='root_self')\n\
+             register_execution_platforms('//:exec', '//...')\n\
+             register_toolchains('@rust_toolchains//:all', '{first}')\n\
+             p=use_extension('//:ext.bzl','extension')\n\
+             use_repo(p, rust_toolchains='generated')\n"
+        )
+    }
+
     fn complete_observed_root_mapping(
         value: &<HostRootRepositoryMappingObservationKey as Key>::Value,
     ) -> ObservedHostRootRepositoryMapping {
@@ -6133,17 +6589,15 @@ mod tests {
             .next()
             .unwrap();
         assert_eq!(
-            driver
-                .matches("root_repository_mapping_mappings_child")
-                .count(),
+            driver.matches("selected_extension_mappings_child").count(),
             1
         );
         assert!(!driver.contains("merge"));
         let child = source
-            .split("async fn root_repository_mapping_mappings_child")
+            .split("async fn selected_extension_mappings_child")
             .nth(1)
             .unwrap()
-            .split("fn finish_root_repository_mapping")
+            .split("fn finish_selected_registration_patterns")
             .next()
             .unwrap();
         assert_eq!(
@@ -8584,6 +9038,329 @@ repo(name = "replacement")
         let restored = compute_real_extensions(&dice, &source("plain_a"), 3, true).await;
         assert!(HostSelectedExtensionMappingsKey::equality(&a, &restored));
         assert!(io.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn selected_registration_patterns_borrow_final_generated_mapping() {
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, Arc::new(TrackingRegistryIo::new([])));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let key = HostSelectedRegistrationPatternsKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        );
+        let mut transaction = real_transaction(
+            &dice,
+            &registration_patterns_source("//:direct"),
+            1,
+            &[],
+            true,
+        )
+        .await;
+        let a = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(result) = &a else {
+            panic!("selected patterns must complete")
+        };
+        let value = result.as_ref().as_ref().unwrap();
+        assert_eq!(
+            value
+                .execution_platforms()
+                .map(|view| view.raw_pattern())
+                .collect::<Vec<_>>(),
+            ["//:exec", "//..."]
+        );
+        let mut toolchains = value.toolchains();
+        let generated = toolchains.next().unwrap();
+        assert_eq!(generated.raw_pattern(), "@rust_toolchains//:all");
+        assert_eq!(generated.canonical_repo().as_str(), "");
+        assert_eq!(generated.mapping_context().as_str(), "");
+        assert_eq!(
+            generated
+                .mapping()
+                .find(|(apparent, _)| apparent.as_str() == "rust_toolchains")
+                .unwrap()
+                .1
+                .as_str(),
+            "+extension+generated"
+        );
+        assert_eq!(toolchains.next().unwrap().raw_pattern(), "//:direct");
+        assert!(toolchains.next().is_none());
+        let child = transaction
+            .compute(&HostSelectedExtensionMappingsKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(child) = child else {
+            panic!("selected mappings must complete")
+        };
+        assert!(Arc::ptr_eq(&value.predecessor, &child));
+    }
+
+    #[tokio::test]
+    async fn selected_registration_pattern_keys_are_complete_only_warm_and_a_b_a() {
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, Arc::new(TrackingRegistryIo::new([])));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepoSpecTracker::default());
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostSelectedRegistrationPatternsKey::new(workspace.dupe());
+        let mut transaction = real_transaction_with_tracker(
+            &dice,
+            &registration_patterns_source("//:direct"),
+            1,
+            &[],
+            true,
+            Some(tracker.dupe()),
+        )
+        .await;
+        let a = transaction.compute(&key).await.unwrap();
+        let (_, cold_rows) = tracker.take();
+        assert_eq!(
+            repo_spec_row(&cold_rows, &key.to_string()),
+            [HostSelectedExtensionMappingsKey::new(workspace.dupe()).to_string()]
+        );
+        assert!(cold_rows.iter().all(|(owner, deps)| {
+            !owner.contains("root-repository-mapping")
+                && deps
+                    .iter()
+                    .all(|dep| !dep.contains("root-repository-mapping"))
+        }));
+        let warm = transaction.compute(&key).await.unwrap();
+        let (warm_activations, _) = tracker.take();
+        assert!(
+            warm_activations.iter().any(|entry| {
+                entry.key == key.to_string() && entry.kind == ActivationKind::Reused
+            })
+        );
+        assert!(HostSelectedRegistrationPatternsKey::validity(&a));
+        assert!(HostSelectedRegistrationPatternsKey::equality(&a, &warm));
+        let b = compute_real_registration_patterns(
+            &dice,
+            &registration_patterns_source("//:changed"),
+            2,
+        )
+        .await;
+        assert!(!HostSelectedRegistrationPatternsKey::equality(&a, &b));
+        let restored = compute_real_registration_patterns(
+            &dice,
+            &registration_patterns_source("//:direct"),
+            3,
+        )
+        .await;
+        assert!(HostSelectedRegistrationPatternsKey::equality(&a, &restored));
+
+        let observed_key = HostSelectedRegistrationPatternsObservationKey::new(workspace.dupe());
+        let observed = complete_observed_registration_patterns(
+            &transaction.compute(&observed_key).await.unwrap(),
+        );
+        let (_, observed_rows) = tracker.take();
+        assert_eq!(
+            repo_spec_row(&observed_rows, &observed_key.to_string()),
+            [HostSelectedExtensionMappingsObservationKey::new(workspace).to_string()]
+        );
+        let SourcePreparationOutcome::Complete(result) = &a else {
+            unreachable!()
+        };
+        assert_eq!(observed.result(), result);
+        assert!(observed.observations().observations().len() > 0);
+        let observed_warm = complete_observed_registration_patterns(
+            &transaction.compute(&observed_key).await.unwrap(),
+        );
+        assert!(Arc::ptr_eq(observed.result(), observed_warm.result()));
+        let mut changed = real_transaction(
+            &dice,
+            &registration_patterns_source("//:changed"),
+            4,
+            &[],
+            true,
+        )
+        .await;
+        let changed =
+            complete_observed_registration_patterns(&changed.compute(&observed_key).await.unwrap());
+        let mut restored = real_transaction(
+            &dice,
+            &registration_patterns_source("//:direct"),
+            5,
+            &[],
+            true,
+        )
+        .await;
+        let restored = complete_observed_registration_patterns(
+            &restored.compute(&observed_key).await.unwrap(),
+        );
+        assert_ne!(observed.result(), changed.result());
+        assert_eq!(observed.result(), restored.result());
+    }
+
+    #[tokio::test]
+    async fn observed_registration_pattern_cancellation_does_not_publish_parent_state() {
+        let io = Arc::new(CancelOnceRegistryIo {
+            calls: AtomicUsize::new(0),
+        });
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.dupe());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepoSpecTracker::default());
+        let key = HostSelectedRegistrationPatternsObservationKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        );
+        let root = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n";
+        let mut transaction =
+            real_transaction_with_tracker(&dice, root, 1, &[], true, Some(tracker.dupe())).await;
+        tracker.take();
+        let mut future = Box::pin(transaction.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while io.calls.load(Ordering::SeqCst) == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        drop(future);
+        drop(transaction);
+        let (activations, rows) = tracker.take();
+        assert!(rows.iter().all(|(owner, _)| owner != &key.to_string()));
+        assert!(activations.iter().all(|entry| entry.key != key.to_string()));
+
+        let mut recovered =
+            real_transaction_with_tracker(&dice, root, 1, &[], true, Some(tracker.dupe())).await;
+        let observed =
+            complete_observed_registration_patterns(&recovered.compute(&key).await.unwrap());
+        assert!(observed.result().as_ref().is_ok());
+        let legacy = recovered
+            .compute(&HostSelectedRegistrationPatternsKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(legacy) = legacy else {
+            panic!("recovered legacy registration projection must complete")
+        };
+        assert_eq!(observed.result(), &legacy);
+    }
+
+    #[test]
+    fn selected_registration_patterns_include_nonroot_owner_order_without_copying() {
+        let dep_key = route_key("dep", "1");
+        let mut dep = route_module("dep", "1", "dep_self", true);
+        let HostGraphModuleSource::Discovered(discovered) = &dep.source else {
+            unreachable!()
+        };
+        let mut discovered = (**discovered).clone();
+        let mut module = discovered.module.clone();
+        module.base.toolchains = Arc::from([
+            ModuleRegistrationPattern::parse("@visible//:all").unwrap(),
+            ModuleRegistrationPattern::parse("//:direct").unwrap(),
+        ]);
+        discovered.module = module;
+        dep.source = HostGraphModuleSource::Discovered(Arc::new(discovered));
+        let routes = Arc::new(
+            selected_routes(
+                &route_graph([route_root([("dep_alias", dep_key.clone())], None), dep]),
+                &HostSelectedRegistryRepoSpecs {
+                    entries: Arc::from([route_spec(dep_key)]),
+                },
+            )
+            .unwrap(),
+        );
+        let mappings = selected_extension_mappings(routes, Arc::from([])).unwrap();
+        let predecessor = Arc::new(Ok(mappings));
+        let value = selected_registration_patterns(predecessor.dupe()).unwrap();
+        let rows = value.toolchains().collect::<Vec<_>>();
+        assert_eq!(
+            rows.iter().map(|row| row.raw_pattern()).collect::<Vec<_>>(),
+            ["@visible//:all", "//:direct"]
+        );
+        assert!(
+            rows.iter()
+                .all(|row| row.canonical_repo().as_str() == "dep+")
+        );
+        assert!(Arc::ptr_eq(&value.predecessor, &predecessor));
+    }
+
+    #[test]
+    fn selected_registration_pattern_driver_preserves_need_error_epoch_and_typed_invalidity() {
+        let key = HostSelectedRegistrationPatternsKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        );
+        let demand = observation("/registration-patterns", PathObservationOperation::Lstat);
+        let result = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let epoch = PathObservationEpoch::from_shared([(demand.dupe(), result.dupe())]).unwrap();
+        let need = SourcePreparationNeeds::path(
+            slug_workspace_v2::NeedPathObservations::singleton(demand.dupe()),
+        );
+        assert!(matches!(
+            finish_selected_registration_patterns(&key, RepoSpecChild::Need(need.dupe())),
+            SourcePreparationOutcome::Need(_)
+        ));
+        assert!(matches!(
+            finish_selected_registration_patterns(&key, RepoSpecChild::Compute("dice".into())),
+            SourcePreparationOutcome::Complete(Ok((value, observations)))
+                if matches!(value.as_ref(), Err(HostSelectedRegistrationPatternsError {
+                    inner: PrivateSelectedRegistrationPatternsError::Compute(message), ..
+                }) if message == "dice") && observations.observations().is_empty()
+        ));
+        let mismatch = || {
+            ExtensionMappingsObservationError::RootFiles(ObservedPathFrontierError::from(
+                PathObservationEpochError::OperationMismatch {
+                    demand: demand.dupe(),
+                    result_operation: PathObservationOperation::FileBytes,
+                },
+            ))
+        };
+        assert!(matches!(
+            finish_selected_registration_patterns(&key, RepoSpecChild::Outer(mismatch())),
+            SourcePreparationOutcome::Complete(Err(
+                SelectedRegistrationPatternsObservationError::Mappings(_)
+            ))
+        ));
+        let failed = Arc::new(Err(extension_invalid(&module(), "predecessor")));
+        assert!(matches!(
+            selected_registration_patterns(failed.dupe()),
+            Err(PrivateSelectedRegistrationPatternsError::Predecessor(retained))
+                if Arc::ptr_eq(&retained, &failed)
+        ));
+        let routes = Arc::new(
+            selected_routes(
+                &route_graph([route_root([], None)]),
+                &HostSelectedRegistryRepoSpecs {
+                    entries: Arc::from([]),
+                },
+            )
+            .unwrap(),
+        );
+        let mut mappings = selected_extension_mappings(routes, Arc::from([])).unwrap();
+        mappings.mappings = Arc::from([]);
+        let predecessor = Arc::new(Ok(mappings));
+        let completed = finish_selected_registration_patterns(
+            &key,
+            RepoSpecChild::Complete {
+                result: predecessor.dupe(),
+                observations: epoch.dupe(),
+            },
+        );
+        assert!(matches!(
+            completed,
+            SourcePreparationOutcome::Complete(Ok((value, observations)))
+                if matches!(value.as_ref(), Err(HostSelectedRegistrationPatternsError {
+                    inner: PrivateSelectedRegistrationPatternsError::Invalid {
+                        predecessor: retained,
+                        reason: SelectedRegistrationPatternsInvalid::RouteMappingCount { routes: 1, mappings: 0 },
+                    }, ..
+                }) if Arc::ptr_eq(retained, &predecessor)) && observations == epoch
+        ));
+        let need_value = SourcePreparationOutcome::Need(need);
+        assert!(!HostSelectedRegistrationPatternsKey::validity(&need_value));
+        assert!(!HostSelectedRegistrationPatternsKey::equality(
+            &need_value,
+            &need_value
+        ));
+        assert_external_error::<crate::HostSelectedRegistrationPatternsError>();
     }
 
     #[tokio::test]

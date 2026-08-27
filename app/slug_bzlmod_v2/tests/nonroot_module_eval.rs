@@ -3,6 +3,7 @@ use std::sync::Arc;
 use compact_str::CompactString;
 use slug_bzlmod_v2::LogicalModuleFileId;
 use slug_bzlmod_v2::LogicalSpan;
+use slug_bzlmod_v2::ModuleRegistrationPattern;
 use slug_bzlmod_v2::NonrootAttributeKey;
 use slug_bzlmod_v2::NonrootAttributeValue;
 use slug_bzlmod_v2::NonrootDependency;
@@ -128,8 +129,12 @@ fn finalized_nonroot_module_keeps_every_compact_field_and_order() {
         NonrootDependency::new("dep", "2.0"),
     );
     builder.nodep_dependencies = vec![NonrootDependency::new("floor", "3.0")];
-    builder.execution_platforms = vec!["//:exec_one".into(), "//:exec_two".into()];
-    builder.toolchains = vec!["//:toolchain_one".into(), "//:toolchain_two".into()];
+    builder.execution_platforms = ["//:exec_one", "//:exec_two"]
+        .map(|pattern| ModuleRegistrationPattern::parse(pattern).unwrap())
+        .into();
+    builder.toolchains = ["//:toolchain_one", "//:toolchain_two"]
+        .map(|pattern| ModuleRegistrationPattern::parse(pattern).unwrap())
+        .into();
     builder.flag_aliases.insert(
         CompactString::from("compilation_mode"),
         CompactString::from("//:subject_mode"),
@@ -179,11 +184,21 @@ fn finalized_nonroot_module_keeps_every_compact_field_and_order() {
         &module.base.original_dependencies
     ));
     assert_eq!(
-        module.base.execution_platforms.as_ref(),
+        module
+            .base
+            .execution_platforms
+            .iter()
+            .map(ModuleRegistrationPattern::as_str)
+            .collect::<Vec<_>>(),
         ["//:exec_one", "//:exec_two"]
     );
     assert_eq!(
-        module.base.toolchains.as_ref(),
+        module
+            .base
+            .toolchains
+            .iter()
+            .map(ModuleRegistrationPattern::as_str)
+            .collect::<Vec<_>>(),
         ["//:toolchain_one", "//:toolchain_two"]
     );
     assert_eq!(
@@ -223,8 +238,8 @@ fn finalized_nonroot_module_keeps_every_compact_field_and_order() {
 
     let mut reordered = module.clone();
     reordered.base.toolchains = Arc::from([
-        CompactString::from("//:toolchain_two"),
-        "//:toolchain_one".into(),
+        ModuleRegistrationPattern::parse("//:toolchain_two").unwrap(),
+        ModuleRegistrationPattern::parse("//:toolchain_one").unwrap(),
     ]);
     assert_ne!(module, reordered);
     let mut relocated = module.clone();
