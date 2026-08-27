@@ -1,0 +1,2 @@
+filegroup(name = "all")
+filegroup(name = "other")

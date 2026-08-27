@@ -1,0 +1,12 @@
+exports_files(["source.txt"])
+
+filegroup(
+    name = "rule_a",
+    srcs = ["source.txt"],
+)
+
+genrule(
+    name = "rule_b",
+    outs = ["generated.txt"],
+    cmd = "touch $@",
+)

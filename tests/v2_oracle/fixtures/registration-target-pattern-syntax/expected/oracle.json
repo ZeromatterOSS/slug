@@ -1,0 +1,246 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "//plain:all",
+        "--output=label",
+        "--order_output=full"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//plain:all",
+        "--output=label",
+        "--order_output=full"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "package_rules_only",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//plain:rule_b\n//plain:rule_a",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//plain:rule_b\n//plain:rule_a\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//plain:*",
+        "--output=label",
+        "--order_output=full"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//plain:*",
+        "--output=label",
+        "--order_output=full"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "package_star_all_targets",
+      "normalized_stderr": "Loading: 0 packages loaded",
+      "normalized_stdout": "//plain:rule_a\n//plain:source.txt\n//plain:generated.txt\n//plain:rule_b\n//plain:BUILD.bazel",
+      "startup_argv": [],
+      "stderr": "Loading: 0 packages loaded\n",
+      "stdout": "//plain:rule_a\n//plain:source.txt\n//plain:generated.txt\n//plain:rule_b\n//plain:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//plain:all-targets",
+        "--output=label",
+        "--order_output=full"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//plain:all-targets",
+        "--output=label",
+        "--order_output=full"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "package_named_all_targets",
+      "normalized_stderr": "Loading: 0 packages loaded",
+      "normalized_stdout": "//plain:rule_a\n//plain:source.txt\n//plain:generated.txt\n//plain:rule_b\n//plain:BUILD.bazel",
+      "startup_argv": [],
+      "stderr": "Loading: 0 packages loaded\n",
+      "stdout": "//plain:rule_a\n//plain:source.txt\n//plain:generated.txt\n//plain:rule_b\n//plain:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//ambiguous_rule:all",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//ambiguous_rule:all",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "explicit_rule_named_all_wins",
+      "normalized_stderr": "Loading: 0 packages loaded\nWARNING: The target pattern '//ambiguous_rule:all' is ambiguous: ':all' is both a wildcard, and the name of an existing filegroup rule; using the latter interpretation",
+      "normalized_stdout": "//ambiguous_rule:all",
+      "startup_argv": [],
+      "stderr": "Loading: 0 packages loaded\nWARNING: The target pattern '//ambiguous_rule:all' is ambiguous: ':all' is both a wildcard, and the name of an existing filegroup rule; using the latter interpretation\n",
+      "stdout": "//ambiguous_rule:all\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//ambiguous_source:all-targets",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//ambiguous_source:all-targets",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "explicit_source_named_all_targets_wins",
+      "normalized_stderr": "Loading: 0 packages loaded\nWARNING: The target pattern '//ambiguous_source:all-targets' is ambiguous: ':all-targets' is both a wildcard, and the name of an existing source file; using the latter interpretation",
+      "normalized_stdout": "//ambiguous_source:all-targets",
+      "startup_argv": [],
+      "stderr": "Loading: 0 packages loaded\nWARNING: The target pattern '//ambiguous_source:all-targets' is ambiguous: ':all-targets' is both a wildcard, and the name of an existing source file; using the latter interpretation\n",
+      "stdout": "//ambiguous_source:all-targets\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//tree/...:all",
+        "--output=label",
+        "--order_output=full"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//tree/...:all",
+        "--output=label",
+        "--order_output=full"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "recursive_rules_only",
+      "normalized_stderr": "Loading: 0 packages loaded",
+      "normalized_stdout": "//tree/sub:sub_rule\n//tree:root_rule",
+      "startup_argv": [],
+      "stderr": "Loading: 0 packages loaded\n",
+      "stdout": "//tree/sub:sub_rule\n//tree:root_rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//tree/...:all-targets",
+        "--output=label",
+        "--order_output=full"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//tree/...:all-targets",
+        "--output=label",
+        "--order_output=full"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "recursive_all_targets",
+      "normalized_stderr": "Loading: 0 packages loaded",
+      "normalized_stdout": "//tree/sub:sub_rule\n//tree/sub:sub_source.txt\n//tree/sub:BUILD.bazel\n//tree:root_rule\n//tree:root_source.txt\n//tree:BUILD.bazel",
+      "startup_argv": [],
+      "stderr": "Loading: 0 packages loaded\n",
+      "stdout": "//tree/sub:sub_rule\n//tree/sub:sub_source.txt\n//tree/sub:BUILD.bazel\n//tree:root_rule\n//tree:root_source.txt\n//tree:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//tree/...:target",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//tree/...:target",
+        "--output=label"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "invalid_recursive_target",
+      "normalized_stderr": "Loading: 0 packages loaded\nERROR: Invalid target pattern //tree/...:target: '...' can only be used with wildcard targets",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Loading: 0 packages loaded\nERROR: Invalid target pattern //tree/...:target: '...' can only be used with wildcard targets\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "registration-target-pattern-syntax",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

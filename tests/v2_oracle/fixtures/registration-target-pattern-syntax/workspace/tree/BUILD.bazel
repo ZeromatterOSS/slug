@@ -1,0 +1,2 @@
+exports_files(["root_source.txt"])
+filegroup(name = "root_rule", srcs = ["root_source.txt"])

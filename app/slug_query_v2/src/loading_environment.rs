@@ -1126,10 +1126,19 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                 self.resolve_single(label.clone()).await?;
                 Ok(self.real_delivery([label]))
             }
-            TargetPattern::PackageAll { repo, package } => {
+            TargetPattern::PackageWildcard {
+                repo,
+                package,
+                wildcard,
+            } => {
                 if !repo.is_root() {
                     return Err(QueryError::evaluation(format!(
                         "external repository query patterns are deferred: {literal}"
+                    )));
+                }
+                if !wildcard.rules_only() {
+                    return Err(QueryError::evaluation(format!(
+                        "all-target package patterns are deferred: {literal}"
                     )));
                 }
                 let graph = self.package_graph(package.as_str()).await?;
@@ -1142,10 +1151,19 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                 self.record_pattern_graph(&graph, &result);
                 Ok(self.real_delivery(result.iter().cloned()))
             }
-            TargetPattern::Recursive { repo, package } => {
+            TargetPattern::Recursive {
+                repo,
+                package,
+                wildcard,
+            } => {
                 if !repo.is_root() {
                     return Err(QueryError::evaluation(format!(
                         "external repository query patterns are deferred: {literal}"
+                    )));
+                }
+                if wildcard.is_some_and(|wildcard| !wildcard.rules_only()) {
+                    return Err(QueryError::evaluation(format!(
+                        "all-target recursive patterns are deferred: {literal}"
                     )));
                 }
                 let labels = self.resolve_recursive(package.as_str()).await?;
@@ -2164,5 +2182,39 @@ mod tests {
                 .batches()
                 .is_empty()
         );
+    }
+
+    #[tokio::test]
+    async fn all_target_wildcards_fail_closed_before_loading() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut transaction = dice.updater().commit().await;
+        let mut environment = LoadingQueryEnvironment::new_root(
+            &mut transaction,
+            NormalizedAbsolutePath::new("/must-not-be-read").unwrap(),
+            QueryPolicy::default(),
+        );
+        for (raw, expected) in [
+            ("//pkg:*", "all-target package patterns are deferred"),
+            (
+                "//pkg:all-targets",
+                "all-target package patterns are deferred",
+            ),
+            ("//pkg/...:*", "all-target recursive patterns are deferred"),
+            (
+                "//pkg/...:all-targets",
+                "all-target recursive patterns are deferred",
+            ),
+            (
+                "@dep//pkg:*",
+                "external repository query patterns are deferred",
+            ),
+            (
+                "@dep//pkg/...:all-targets",
+                "external repository query patterns are deferred",
+            ),
+        ] {
+            let error = environment.resolve_literal(raw).await.unwrap_err();
+            assert_eq!(error.to_string(), format!("{expected}: {raw}"));
+        }
     }
 }

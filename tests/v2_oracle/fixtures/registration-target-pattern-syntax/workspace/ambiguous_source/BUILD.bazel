@@ -1,0 +1,2 @@
+exports_files(["all-targets"])
+filegroup(name = "other")

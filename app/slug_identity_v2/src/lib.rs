@@ -24,6 +24,7 @@ pub use package::PackageIdentifier;
 pub use package::PackagePath;
 pub use package::TargetName;
 pub use pattern::TargetPattern;
+pub use pattern::TargetPatternWildcard;
 pub use repo::ApparentRepoName;
 pub use repo::CanonicalRepoName;
 pub use repo_mapping::RepositoryMapping;

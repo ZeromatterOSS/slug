@@ -1,0 +1,60 @@
+[fixture]
+name = "registration-target-pattern-syntax"
+description = "Bazel 9.2 source-of-truth matrix for absolute package and recursive target-pattern syntax and wildcard-name conflicts."
+comparison = "message_shape"
+oracle_notes = "Parser/loading evidence only. This fixture does not claim Slug expansion parity or activate MODULE registrations."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/cmdline/TargetPattern.java#Parser.parse",
+  "src/main/java/com/google/devtools/build/lib/cmdline/TargetPattern.java#TargetsInPackage.getWildcardConflict",
+  "src/test/java/com/google/devtools/build/lib/cmdline/TargetPatternTest.java",
+]
+translation_notes = "The query matrix distinguishes rules-only and all-target package/recursive suffixes and proves that legal targets named all or all-targets win over absolute wildcard expansion."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture registration-target-pattern-syntax --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture registration-target-pattern-syntax --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "package_rules_only"
+argv = ["query", "//plain:all", "--output=label", "--order_output=full"]
+expected_exit = 0
+
+[[commands]]
+name = "package_star_all_targets"
+argv = ["query", "//plain:*", "--output=label", "--order_output=full"]
+expected_exit = 0
+
+[[commands]]
+name = "package_named_all_targets"
+argv = ["query", "//plain:all-targets", "--output=label", "--order_output=full"]
+expected_exit = 0
+
+[[commands]]
+name = "explicit_rule_named_all_wins"
+argv = ["query", "//ambiguous_rule:all", "--output=label"]
+expected_exit = 0
+stderr_contains = ["both a wildcard, and the name of an existing filegroup rule", "using the latter interpretation"]
+
+[[commands]]
+name = "explicit_source_named_all_targets_wins"
+argv = ["query", "//ambiguous_source:all-targets", "--output=label"]
+expected_exit = 0
+stderr_contains = ["both a wildcard, and the name of an existing source file", "using the latter interpretation"]
+
+[[commands]]
+name = "recursive_rules_only"
+argv = ["query", "//tree/...:all", "--output=label", "--order_output=full"]
+expected_exit = 0
+
+[[commands]]
+name = "recursive_all_targets"
+argv = ["query", "//tree/...:all-targets", "--output=label", "--order_output=full"]
+expected_exit = 0
+
+[[commands]]
+name = "invalid_recursive_target"
+argv = ["query", "//tree/...:target", "--output=label"]
+expected_exit = 7
+stderr_contains = ["'...' can only be used with wildcard targets"]

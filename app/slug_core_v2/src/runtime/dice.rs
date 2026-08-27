@@ -2768,6 +2768,7 @@ pub enum CqueryCommandError {
 enum BuildCommandRequestError {
     ExternalRepository { pattern: Arc<str> },
     RecursivePattern { pattern: Arc<str> },
+    AllTargetsPattern { pattern: Arc<str> },
 }
 
 #[derive(Clone, Eq, PartialEq, Allocative)]
@@ -2868,6 +2869,9 @@ enum BuildCommandErrorKind {
         pattern: Arc<str>,
     },
     RecursivePattern {
+        pattern: Arc<str>,
+    },
+    AllTargetsPattern {
         pattern: Arc<str>,
     },
     Infrastructure(Arc<str>),
@@ -2984,15 +2988,20 @@ impl BuildCommandRootKey {
             let pattern: Arc<str> = Arc::from(target.to_string());
             let repo = match target {
                 TargetPattern::Single(label) => label.repo(),
-                TargetPattern::PackageAll { repo, .. } | TargetPattern::Recursive { repo, .. } => {
-                    repo
-                }
+                TargetPattern::PackageWildcard { repo, .. }
+                | TargetPattern::Recursive { repo, .. } => repo,
             };
             if !repo.is_root() && !permits_one_external_single {
                 return Err(BuildCommandRequestError::ExternalRepository { pattern });
             }
             if matches!(target, TargetPattern::Recursive { .. }) {
                 return Err(BuildCommandRequestError::RecursivePattern { pattern });
+            }
+            if matches!(
+                target,
+                TargetPattern::PackageWildcard { wildcard, .. } if !wildcard.rules_only()
+            ) {
+                return Err(BuildCommandRequestError::AllTargetsPattern { pattern });
             }
             canonical.push(pattern);
         }
@@ -3026,7 +3035,11 @@ impl BuildCommandRootKey {
             return None;
         };
         match TargetPattern::parse(pattern).ok()? {
-            TargetPattern::PackageAll { repo, package } if repo.is_root() => Some(package),
+            TargetPattern::PackageWildcard {
+                repo,
+                package,
+                wildcard,
+            } if repo.is_root() && wildcard.rules_only() => Some(package),
             _ => None,
         }
     }
@@ -3444,6 +3457,9 @@ impl BuildCommandError {
             BuildCommandRequestError::RecursivePattern { pattern } => {
                 BuildCommandErrorKind::RecursivePattern { pattern }
             }
+            BuildCommandRequestError::AllTargetsPattern { pattern } => {
+                BuildCommandErrorKind::AllTargetsPattern { pattern }
+            }
         };
         Self { kind }
     }
@@ -3527,6 +3543,10 @@ impl fmt::Display for BuildCommandError {
             BuildCommandErrorKind::RecursivePattern { pattern } => write!(
                 f,
                 "recursive target patterns are not supported before Stage 6 analysis: {pattern}"
+            ),
+            BuildCommandErrorKind::AllTargetsPattern { pattern } => write!(
+                f,
+                "all-target package patterns are not supported before shared expansion: {pattern}"
             ),
             BuildCommandErrorKind::Infrastructure(error) => f.write_str(error),
         }
@@ -4057,7 +4077,7 @@ async fn compute_build_branch(
     }
     let package = match &parsed {
         TargetPattern::Single(label) => label.package().clone(),
-        TargetPattern::PackageAll { package, .. } => package.clone(),
+        TargetPattern::PackageWildcard { package, .. } => package.clone(),
         TargetPattern::Recursive { .. } => {
             unreachable!("BuildCommandRootKey rejects recursive patterns")
         }
@@ -4106,7 +4126,7 @@ async fn compute_loaded_build_branch(
     let revision_eligible = key.initializes_request_revision()
         || matches!(analysis_mode, BuildAnalysisMode::Observed) && key.observed_multi_root();
     let (analysis, completion, source_certificate) = match parsed {
-        TargetPattern::PackageAll { .. } => (None, BuildTargetCompletion::LoadedOnly, None),
+        TargetPattern::PackageWildcard { .. } => (None, BuildTargetCompletion::LoadedOnly, None),
         TargetPattern::Single(label) => {
             let Some(target) = package_value
                 .targets
@@ -4310,7 +4330,7 @@ async fn compute_observed_multi_build_branch(
         .expect("BuildCommandRootKey stores validated canonical target patterns");
     let package = match &parsed {
         TargetPattern::Single(label) => label.package().clone(),
-        TargetPattern::PackageAll { package, .. } => package.clone(),
+        TargetPattern::PackageWildcard { package, .. } => package.clone(),
         TargetPattern::Recursive { .. } => {
             unreachable!("BuildCommandRootKey rejects recursive patterns")
         }
@@ -6429,7 +6449,7 @@ impl WorkspaceRuntime {
                             None
                         }
                     }
-                    TargetPattern::PackageAll { .. } | TargetPattern::Recursive { .. } => None,
+                    TargetPattern::PackageWildcard { .. } | TargetPattern::Recursive { .. } => None,
                 };
                 packages.push(RequestedPackageEvaluation {
                     target_pattern: target.to_string(),
@@ -7558,7 +7578,7 @@ pub fn package_path_for_target(
 ) -> anyhow::Result<PathBuf> {
     let (repo, package) = match target {
         TargetPattern::Single(label) => (label.repo(), label.package()),
-        TargetPattern::PackageAll { repo, package } => (repo, package),
+        TargetPattern::PackageWildcard { repo, package, .. } => (repo, package),
         TargetPattern::Recursive { .. } => {
             anyhow::bail!(
                 "recursive target patterns are not supported before Stage 6 analysis: {target}"
@@ -11288,6 +11308,23 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
         assert_eq!(configured[1].label(), configured[2].label());
         assert_ne!(configured[3], configured[4]);
         assert_eq!(configured[3].label(), configured[4].label());
+    }
+
+    #[test]
+    fn build_root_rejects_new_all_target_wildcards_before_dice() {
+        for raw in ["//pkg:*", "//pkg:all-targets"] {
+            let result = BuildCommandRootKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                &[TargetPattern::parse(raw).unwrap()],
+                build_test_configuration("all-target-pattern"),
+            );
+            match result {
+                Err(BuildCommandRequestError::AllTargetsPattern { pattern }) => {
+                    assert_eq!(pattern.as_ref(), raw)
+                }
+                _ => panic!("{raw} must stop before package loading"),
+            }
+        }
     }
 
     #[derive(Default)]
