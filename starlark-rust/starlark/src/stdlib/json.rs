@@ -208,11 +208,121 @@ impl AllocFrozenValue for serde_json::Value {
     }
 }
 
+fn encode_json(x: Value) -> anyhow::Result<String> {
+    let value = x.to_json_value()?;
+    serde_json::to_string(&value).map_err(Into::into)
+}
+
+fn indent_json(s: &str, prefix: &str, indent: &str) -> anyhow::Result<String> {
+    let bytes = s.as_bytes();
+    let mut out = String::new();
+    let mut index = 0;
+    let mut depth = 0usize;
+    let next = |index: &mut usize| -> anyhow::Result<u8> {
+        while *index < bytes.len() && matches!(bytes[*index], b' ' | b'\t' | b'\n' | b'\r') {
+            *index += 1;
+        }
+        bytes
+            .get(*index)
+            .copied()
+            .ok_or_else(|| anyhow::anyhow!("unexpected end of JSON input"))
+    };
+    let newline = |out: &mut String, depth: usize| {
+        out.push('\n');
+        out.push_str(prefix);
+        for _ in 0..depth {
+            out.push_str(indent);
+        }
+    };
+    loop {
+        let token = next(&mut index)?;
+        let start = index;
+        match token {
+            b'"' => {
+                index += 1;
+                loop {
+                    match bytes.get(index).copied() {
+                        Some(b'"') => {
+                            index += 1;
+                            break;
+                        }
+                        Some(b'\\') => {
+                            index += 1;
+                            if bytes.get(index) == Some(&b'u') {
+                                index += 4;
+                            }
+                            index += 1;
+                        }
+                        Some(_) => index += 1,
+                        None => anyhow::bail!("unexpected end of JSON string"),
+                    }
+                }
+                out.push_str(&s[start..index]);
+            }
+            b'n' | b't' | b'f' => {
+                let width = match token {
+                    b'n' => 4,
+                    b't' => 4,
+                    b'f' => 5,
+                    _ => unreachable!(),
+                };
+                index += width;
+                let value = s
+                    .get(start..index)
+                    .ok_or_else(|| anyhow::anyhow!("unexpected end of JSON literal"))?;
+                out.push_str(value);
+            }
+            b',' => {
+                index += 1;
+                out.push(',');
+                newline(&mut out, depth);
+            }
+            b'[' | b'{' => {
+                index += 1;
+                out.push(token as char);
+                let close = next(&mut index)?;
+                if matches!((token, close), (b'[', b']') | (b'{', b'}')) {
+                    index += 1;
+                    out.push(close as char);
+                } else {
+                    depth += 1;
+                    newline(&mut out, depth);
+                }
+            }
+            b']' | b'}' => {
+                index += 1;
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| anyhow::anyhow!("unexpected closing JSON delimiter"))?;
+                newline(&mut out, depth);
+                out.push(token as char);
+            }
+            b':' => {
+                index += 1;
+                out.push_str(": ");
+            }
+            b'-' | b'0'..=b'9' => {
+                index += 1;
+                while index < bytes.len()
+                    && matches!(bytes[index], b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-')
+                {
+                    index += 1;
+                }
+                out.push_str(&s[start..index]);
+            }
+            _ => anyhow::bail!("unexpected character in JSON input"),
+        }
+        if depth == 0 {
+            return Ok(out);
+        }
+    }
+}
+
 pub(crate) fn json(globals: &mut GlobalsBuilder) {
     #[starlark_module]
     fn json_members(globals: &mut GlobalsBuilder) {
         fn encode(#[starlark(require = pos)] x: Value) -> anyhow::Result<String> {
-            x.to_json()
+            encode_json(x)
         }
 
         /// Encodes a value to a JSON string with indentation for readability.
@@ -223,31 +333,12 @@ pub(crate) fn json(globals: &mut GlobalsBuilder) {
             #[starlark(require = named, default = "")] prefix: &str,
             #[starlark(require = named, default = "\t")] indent: &str,
         ) -> anyhow::Result<String> {
-            let compact = x.to_json()?;
-            let parsed: serde_json::Value = serde_json::from_str(&compact)?;
-            let pretty = serde_json::to_string_pretty(&parsed)?;
-            // serde_json uses 2-space indent by default; replace with requested indent
-            let mut result = String::new();
-            for line in pretty.lines() {
-                if !result.is_empty() {
-                    result.push('\n');
-                }
-                let stripped = line.trim_start();
-                let leading_spaces = line.len() - stripped.len();
-                // serde_json uses 2-space indentation levels
-                let depth = leading_spaces / 2;
-                result.push_str(prefix);
-                for _ in 0..depth {
-                    result.push_str(indent);
-                }
-                result.push_str(stripped);
-            }
-            Ok(result)
+            indent_json(&encode_json(x)?, prefix, indent)
         }
 
         fn decode<'v>(
             #[starlark(require = pos)] x: &str,
-            #[starlark(require = named)] default: Option<Value<'v>>,
+            default: Option<Value<'v>>,
             heap: Heap<'v>,
         ) -> anyhow::Result<Value<'v>> {
             match serde_json::from_str::<serde_json::Value>(x) {
@@ -265,25 +356,9 @@ pub(crate) fn json(globals: &mut GlobalsBuilder) {
         fn indent(
             #[starlark(require = pos)] s: &str,
             #[starlark(require = named, default = "")] prefix: &str,
-            #[starlark(require = named, default = "\t")] indent_str: &str,
+            #[starlark(require = named, default = "\t")] indent: &str,
         ) -> anyhow::Result<String> {
-            let parsed: serde_json::Value = serde_json::from_str(s)?;
-            let pretty = serde_json::to_string_pretty(&parsed)?;
-            let mut result = String::new();
-            for line in pretty.lines() {
-                if !result.is_empty() {
-                    result.push('\n');
-                }
-                let stripped = line.trim_start();
-                let leading_spaces = line.len() - stripped.len();
-                let depth = leading_spaces / 2;
-                result.push_str(prefix);
-                for _ in 0..depth {
-                    result.push_str(indent_str);
-                }
-                result.push_str(stripped);
-            }
-            Ok(result)
+            indent_json(s, prefix, indent)
         }
     }
 
@@ -307,6 +382,12 @@ mod tests {
 
         // Test 63-bit integer (largest 63-bit signed integer)
         a.eq("'9223372036854775807'", "json.encode(9223372036854775807)");
+        a.eq("'{\"x\":1,\"y\":2}'", "json.encode(dict(y = 2, x = 1))");
+        a.eq(
+            "'{\"outer\":{\"a\":1,\"z\":2}}'",
+            "json.encode(dict(outer = dict(z = 2, a = 1)))",
+        );
+        a.eq("'{\"x\":1,\"y\":2}'", "json.encode(struct(y = 2, x = 1))");
     }
 
     #[test]
@@ -324,6 +405,7 @@ mod tests {
         );
         a.eq("None", "json.decode('invalid', default = None)");
         a.eq("'fallback'", "json.decode('invalid', default = 'fallback')");
+        a.eq("'fallback'", "json.decode('invalid', 'fallback')");
     }
 
     #[test]
@@ -344,7 +426,14 @@ mod tests {
     fn test_json_indent() {
         let a = Assert::new();
         a.is_true("'\\t1,' in json.indent('[1,2]')");
-        a.is_true("'  1,' in json.indent('[1,2]', indent_str = '  ')");
+        a.is_true("'  1,' in json.indent('[1,2]', indent = '  ')");
+        a.eq(
+            "'''[\n\t\"foo\\\\u1234\"\n]'''",
+            "json.indent('[\"foo\\\\u1234\"]')",
+        );
+        a.fail("json.indent('[]', '>')", "positional");
+        a.fail("json.indent('[]', indent_str = '  ')", "indent_str");
+        a.fail("json.decode('null', None, None)", "positional");
     }
 
     #[test]

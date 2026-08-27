@@ -5890,6 +5890,7 @@ fn complete_loading_globals(bool_config: bool) -> Globals {
     populate_universe(&mut globals);
     package_globals(&mut globals);
     select_globals(&mut globals);
+    LibraryExtension::Json.add(&mut globals);
     globals.set("native", NativeModule);
     globals.set("attr", AttrModule);
     if bool_config {
