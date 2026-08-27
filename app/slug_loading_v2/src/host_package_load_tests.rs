@@ -19485,6 +19485,98 @@ fn exact_rules_cc_find_toolchain_child_freezes_eager_constants_and_functions() {
 }
 
 #[test]
+fn exact_rules_cc_find_toolchain_freezes_complete_recursive_producer() {
+    assert_eq!(FIND_CC_TOOLCHAIN_SOURCE.lines().count(), 131);
+    assert_eq!(
+        format!("{:x}", Sha256::digest(FIND_CC_TOOLCHAIN_SOURCE.as_bytes())),
+        "3f62d3ea99f59674f71dbc669c80dd0dc5ef14637933d727b74f0bd556334655"
+    );
+    let symbols_children = complete_rules_cc_compatibility_symbols_children();
+    let symbols_owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse(
+            "@@rules_cc++compatibility_proxy+cc_compatibility_proxy//:symbols.bzl",
+        )
+        .unwrap(),
+        workspace_path: PathBuf::from("/rules_cc_compatibility_proxy/symbols.bzl"),
+        repository_mapping: Arc::from([(
+            ApparentRepoName::new("rules_cc").unwrap(),
+            CanonicalRepoName::new("rules_cc+").unwrap(),
+        )]),
+    };
+    let symbols = eval_bzl_with_loaded_children(
+        RULES_CC_COMPATIBILITY_SYMBOLS_SOURCE,
+        symbols_owner.clone(),
+        &symbols_children,
+    )
+    .unwrap();
+    let public_owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_cc+//cc/common:cc_common.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_cc/cc/common/cc_common.bzl"),
+        repository_mapping: Arc::from([(
+            ApparentRepoName::new("cc_compatibility_proxy").unwrap(),
+            CanonicalRepoName::new("rules_cc++compatibility_proxy+cc_compatibility_proxy").unwrap(),
+        )]),
+    };
+    let public = eval_bzl_with_loaded_children(
+        RULES_CC_PUBLIC_CC_COMMON_SOURCE,
+        public_owner.clone(),
+        &[(
+            "@cc_compatibility_proxy//:symbols.bzl",
+            symbols_owner,
+            symbols,
+        )],
+    )
+    .unwrap();
+    let module = eval_bzl_with_loaded_children(
+        FIND_CC_TOOLCHAIN_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_cc+//cc:find_cc_toolchain.bzl").unwrap(),
+            workspace_path: PathBuf::from("/rules_cc/cc/find_cc_toolchain.bzl"),
+            repository_mapping: Arc::from([
+                (
+                    ApparentRepoName::new("bazel_tools").unwrap(),
+                    CanonicalRepoName::new("bazel_tools+").unwrap(),
+                ),
+                (
+                    ApparentRepoName::new("rules_cc").unwrap(),
+                    CanonicalRepoName::new("rules_cc+").unwrap(),
+                ),
+            ]),
+        },
+        &[("//cc/common:cc_common.bzl", public_owner, public.dupe())],
+    )
+    .unwrap();
+    assert!(
+        module
+            .get("cc_common")
+            .unwrap()
+            .value()
+            .ptr_eq(public.get("cc_common").unwrap().value())
+    );
+    for (name, expected_type) in [
+        ("CC_TOOLCHAIN_ATTRS", "dict"),
+        ("CC_TOOLCHAIN_TYPE", "Label"),
+        ("find_cc_toolchain", "function"),
+        ("find_cpp_toolchain", "function"),
+        ("use_cc_toolchain", "function"),
+    ] {
+        assert_eq!(module.get(name).unwrap().value().get_type(), expected_type);
+    }
+    let mut public_names = module.names().map(|name| name.as_str()).collect::<Vec<_>>();
+    public_names.sort_unstable();
+    let expected = "CC_TOOLCHAIN_ATTRS CC_TOOLCHAIN_TYPE cc_common find_cc_toolchain find_cpp_toolchain use_cc_toolchain"
+        .split_whitespace()
+        .collect::<Vec<_>>();
+    assert_eq!(public_names, expected);
+    let mut all = module
+        .names_any_visibility()
+        .map(|name| name.as_str())
+        .collect::<Vec<_>>();
+    all.sort_unstable();
+    assert_eq!(all, expected);
+}
+
+#[test]
 #[rustfmt::skip]
 fn exact_rules_rust_utils_eager_values_freeze_without_invocation() {
     for (source, expected) in [
