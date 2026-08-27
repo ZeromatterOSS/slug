@@ -1,68 +1,66 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-cc-private-compilation-outputs-complete-loading-proof`
+Packet: `WP-4-7A-rules-cc-action-names-complete-loading-proof`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: prove the authenticated complete 226-line rules_cc
-`cc/private/compile/cc_compilation_outputs.bzl` producer loads its three
-accepted-complete children, evaluates its provider/sentinel/empty-output rows,
-and freezes every lazy binding. Add no production behavior and manually invoke
-no binding.
+Result: prove the authenticated complete dependency-free 220-line rules_cc
+`cc/action_names.bzl` producer freezes its 33 string constants, exact
+`ACTION_NAMES` struct, seven ordered action-name lists, and exact
+`ACTION_NAME_GROUPS` struct. Add no production behavior and invoke nothing.
 
 ## Learned facts and decision
 
-Base commit is `974b9e981` (`Prove complete LTO context freeze`). It adds 207
-proof lines and no production, embeds/hash-checks all 97 LTO-context lines,
-rebuilds the helper/internal closure, proves both imported identities, two
-provider identities, three lazy types and the exact empty context. Focused
-proof, 246 library tests, 24 invalidation tests, 31 BUILD-loading tests, locked
-analysis/core checks, CLI build, formatting and hygiene pass. Independent
-review accepts caps and compatibility boundaries.
+Base commit is `63d4bda76` (`Prove complete compilation outputs freeze`). It
+adds exactly 450 proof lines and no production, embeds/hash-checks all 226
+compilation-output lines, reconstructs the complete helper/internal/LTO closure,
+and proves five imported pointers, sentinel/output providers, all lazy types and
+the exact source-owned empty output without manual invocation. Focused proof,
+247 library tests, 24 invalidation tests, 31 BUILD-loading tests, locked
+analysis/core checks, CLI build, formatting and hygiene pass. Independent review
+returned `ACCEPT`, including captured-helper closure ownership.
 
-Private `cc_common.bzl` source order now reaches rules_cc 0.2.17
-`cc/private/compile/cc_compilation_outputs.bzl`: 226 lines, SHA-256
-`294e3da16da4444122e7dee058ec1e06b30cec93d64a32f217cf9e1e3e4bfb44`.
-Its helper, `cc_internal`, and LTO-context children are complete. Eager source
-rows declare a private unbound-sentinel provider/instance and public
-`CcCompilationOutputsInfo`, then source-invoke
-`create_compilation_outputs_internal()` once to construct exact empty outputs.
-That call uses only accepted empty list freeze, empty depset, imported wrapper,
-and empty LTO shapes. Existing source-shaped loading proof covers this exact
-eager sequence. Every later function body is lazy; no unsupported eager
-expression remains. Toolchain config is still the broader later proxy branch.
+Private `cc_common.bzl` source order next enters the 2,295-line
+`cc/private/compile/compile.bzl`. Its accepted Skylib-paths first child is
+complete; the first incomplete child is rules_cc 0.2.17
+`cc/action_names.bzl`: 220 lines, SHA-256
+`e52d16474bd3ad3a0e0a4cd0cb1ad60b968ac5b0b2bcb0b1cffe85aedf80ed9d`.
+It has no loads or functions. Its eager rows bind 33 public string constants,
+one 33-field struct, seven ordered lists (including one list concatenation), and
+one seven-field struct. Every expression uses already accepted exact evaluator
+shapes. The deferred toolchain-config branch's 1,387-line `legacy_features.bzl`
+also loads this producer first, so this is the smallest source-ordered frontier
+shared by both audited branches.
 
 Therefore run only
-`WP-4-7A-rules-cc-private-compilation-outputs-complete-loading-proof`. Do not
-claim manual/lazy function behavior, compile actions, private/public `cc_common`,
-generated proxy, toolchain config, or configured C++.
+`WP-4-7A-rules-cc-action-names-complete-loading-proof`. Do not claim
+`compile.bzl`, legacy features, toolchain-config constructors, private/public
+`cc_common`, generated proxy, action execution, configured C++, or toolchain
+feature semantics.
 
 ## Authorities, ownership and compatibility
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
 and authenticated rules_cc bytes are sole exact authority. Existing accepted
-provider, empty-depset/list-freeze, wrapper and recursive-load regressions cover
-the evaluator shapes; no fresh oracle is needed. Clean `../zabel` commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only defining-module
-ownership, retained child/captured-function identity and recursive freeze before
-reexport. Copy no Zig code, representation or behavior.
+string, list, list-addition, struct and module-freeze regressions cover every
+evaluator shape; no fresh oracle is needed. Clean `../zabel` commit
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only declaration-owned
+generic structs/lists and defining-module recursive freeze. Copy no Zig code,
+representation, algorithm, diagnostic or behavior.
 
-- **Exact:** complete source/hash and three-load source order/canonical owners;
-  all imported pointer identities; sentinel/output provider identities,
-  visibility and types; exact source-owned empty-output declaration sequence,
-  provider identity, empty list/None/LTO shapes and wrapped-function type; all
-  lazy binding types/visibility.
-- **Slug-native:** composition through accepted child builders and Slug frozen
-  heaps, including the helper-defined closure retained by the parent output.
-- **Unsupported/deferred:** manual invocation beyond the exact source-owned
-  empty construction; create/merge/validation semantics; complete compile/action
-  modules, private/public `cc_common`, generated proxy, toolchain config,
-  configured C++ semantics or actions.
+- **Exact:** complete source/hash and dependency-free owner; all 33 exported
+  constant names/string values; the exact `ACTION_NAMES` field/value mapping;
+  all seven exported list contents/order; the exact `ACTION_NAME_GROUPS`
+  field/list mapping and retained aggregate identities.
+- **Slug-native:** realization through starlark-rust frozen strings, lists and
+  structs owned by the defining module's frozen heap.
+- **Unsupported/deferred:** any consumer behavior; `compile.bzl`, compile or
+  link actions, legacy-feature/config-library construction, private/public
+  `cc_common`, generated proxy, toolchain configuration and configured C++.
 
-Frozen child/parent heaps own every callable, sentinel, provider and empty
-output; the captured wrapper result retains its defining helper and no evaluator
-borrow escapes. No production, DICE, request, cache, async, fixture, oracle,
-hot-path, fallback or utility-reuse decision is introduced.
+The frozen defining-module heap owns both structs and every list; no evaluator
+borrow or foreign owner escapes. No production, DICE, request, cache, async,
+fixture, oracle, hot-path, fallback or utility-reuse decision is introduced.
 
 ## Allowlist, caps and proof
 
@@ -71,38 +69,36 @@ Change only:
 - `app/slug_loading_v2/src/host_package_load_tests.rs`;
 - the three scheduling documents when rolling the accepted result.
 
-At base `974b9e981` the Rust authority is 12,026 lines, SHA-256
-`7bc061a5d18c8fc11dccc602d46a328d8c521ad8af4b39841d9e9b7349dbaf99`.
-Its final ceiling is 12,476 lines. Each new proof/helper function must remain at
+At base `63d4bda76` the Rust authority is 12,476 lines, SHA-256
+`ed691b14328bf8cc7dede1195b5ee2bf2d5a50470ead804a9541b52377a4e5c4`.
+Its final ceiling is 12,926 lines. Each new proof/helper function must remain at
 most 120 physical lines. The oversized test module remains cohesive around its
 private load harness and adjacent authenticated source constants; add no
 production responsibility or generic source archive.
 
 Caps are 0 production, 450 proof and 450 total additions; deletions do not buy
-budget. Embed/hash all 226 lines; reuse accepted complete helper/internal/LTO
-closures; evaluate at exact owner
-`@@rules_cc+//cc/private/compile:cc_compilation_outputs.bzl`; prove all five
-imported pointer identities, exact distinct sentinel/output provider identities,
-private sentinel provider/instance visibility, all public/private lazy function
-types, and exact `EMPTY_COMPILATION_OUTPUTS` provider ID. Prove its ten empty
-list fields, two None fields, helper-owned `temps` function type, and pointer-
-identical empty LTO context. Manually invoke no binding; add no fixture or oracle.
+budget. Embed/hash all 220 lines; evaluate dependency-free at exact owner
+`@@rules_cc+//cc:action_names.bzl`; prove all 33 public constants and exact
+values, all 33 `ACTION_NAMES` fields, all seven list contents/order, all seven
+`ACTION_NAME_GROUPS` fields and their pointer-identical exported lists. Prove
+the two aggregate types and public visibility. Invoke nothing and add no fixture
+or oracle.
 
 Run focused proof, all `slug_loading_v2` library tests, `bzl_invalidation`,
 `build_file_loading`, locked analysis/core checks, locked CLI build, formatting,
 diff and archive hygiene. Measure caps/ceilings and obtain independent review of
-bytes, recursive/captured identities, eager/lazy boundary, compatibility split,
-and Zabel's guidance-only role.
+bytes, complete mappings/order, defining-module ownership, compatibility split,
+the shared-branch selection and Zabel's guidance-only role.
 
 STOP and `REPLAN` for production change, source/hash mismatch, missing evaluator
-shape, manual invocation, copied/narrowed source, lost child/captured identity,
-evaluator-borrowed value, parent/proxy claim, unpinned source, copied Zabel
-content, dirty authority, allowlist escape or cap/function violation. Stop after
-compilation outputs and re-audit private `cc_common` source order against the
-toolchain-config branch.
+shape, copied/narrowed source, incomplete constant/field/list coverage, lost
+aggregate identity, evaluator-borrowed value, consumer/parent claim, unpinned
+source, copied Zabel content, dirty authority, allowlist escape or cap/function
+violation. Stop after action names and re-audit `compile.bzl` child source order
+against the toolchain-config branch.
 
 ## Immediate predecessor
 
-Commit `974b9e981` completes the LTO compilation context. It does not complete
-compilation outputs, any compile action, private `cc_common`, or the generated
+Commit `63d4bda76` completes compilation outputs. It does not complete action
+names, `compile.bzl`, private `cc_common`, toolchain config, or the generated
 compatibility proxy.

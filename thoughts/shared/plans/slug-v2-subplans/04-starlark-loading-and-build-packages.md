@@ -5247,6 +5247,35 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Complete compilation outputs accepted; action names selected (2026-08-26)
+
+Commit `63d4bda76` adds exactly 450 proof lines and no production. It embeds and
+byte-verifies the complete 226-line compilation-output producer, reconstructs
+the accepted helper/internal/LTO children, preserves all five imported pointers,
+and proves the sentinel/output provider identities, private visibility, every
+lazy binding type and exact source-owned empty output. Focused proof, 247 loading
+units, 24 invalidation tests, 31 BUILD-loading tests, locked checks, CLI build
+and hygiene pass. Independent review returned `ACCEPT`, including transitive
+ownership of the captured helper-created closure without invoking it.
+
+Private `cc_common.bzl` source order next enters 2,295-line
+`cc/private/compile/compile.bzl`. Its first child, Skylib paths, is complete; its
+first incomplete child is dependency-free 220-line `cc/action_names.bzl`
+(SHA-256 `e52d1647…`). It eagerly defines 33 strings, one exact 33-field struct,
+seven ordered lists and one exact seven-field struct using accepted evaluator
+shapes. The alternative toolchain-config branch's 1,387-line
+`legacy_features.bzl` also loads action names first, so this is the minimum
+source-ordered successor shared by both branches.
+
+Run only `WP-4-7A-rules-cc-action-names-complete-loading-proof` under
+0/450/450 caps. Prove complete source/hash, every constant and struct mapping,
+every list's exact order and the final struct's retained list identities. Add no
+production or consumer behavior and invoke nothing. Defer compile, legacy
+features, toolchain config, private/public `cc_common`, generated proxy and
+configured C++. Clean `../zabel` `0795445f…` guides declaration-owned generic
+aggregate and defining-module recursive-freeze architecture only; Bazel 9.2 and
+authenticated rules_cc remain exact authority.
+
 ### Complete LTO context accepted; compilation outputs selected (2026-08-26)
 
 Commit `974b9e981` adds 207 proof lines and no production. It embeds and
