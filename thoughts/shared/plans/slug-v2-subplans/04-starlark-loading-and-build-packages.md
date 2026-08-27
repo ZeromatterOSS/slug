@@ -5247,6 +5247,24 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Public CcInfo audit selects direct-provider proxy children (2026-08-26)
+
+Audit `242325974` authenticates the public -> generated proxy -> private CcInfo
+route. Generated `symbols.bzl` eagerly loads six children, so accepted
+source-shaped CcInfo declaration behavior cannot substitute for complete proxy
+freeze. Private CcInfo also retains four children and eager contexts before its
+provider publication.
+
+Run only
+`WP-4-7A-rules-cc-compatibility-proxy-direct-provider-children-loading-proof`.
+Freeze exact full `cc_shared_library_info.bzl` (27 lines, `5b7dcd1f…`) and
+`debug_package_info.bzl` (26, `b22666c6…`), then prove exact provider types and
+pointer identities through a narrowed proxy harness under 0/160/160 caps.
+Classify that harness as Slug-native and keep the omitted proxy children plus
+complete public CcInfo route deferred. Architecture review accepts this bounded
+prerequisite. Clean `../zabel` `0795445f…` guides definition/reexport
+reachability only; Bazel 9.2 and authenticated rules sources remain exact.
+
 ### Exact compute-crate-name accepted; public CcInfo route audit selected (2026-08-26)
 
 Commit `7d45bee02` adds 230 proof lines and verifies all five new crate-name

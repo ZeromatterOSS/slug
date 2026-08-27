@@ -1,18 +1,18 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-cc-cc-info-public-route-frontier-audit`
+Packet: `WP-4-7A-rules-cc-compatibility-proxy-direct-provider-children-loading-proof`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: authenticate the smallest honest exact public `CcInfo` load route for
-the two remaining utils exports, reconcile it with accepted provider
-primitives, and select one bounded successor or record `REPLAN`. Change no Rust
-or proof.
+Result: freeze the exact complete `CcSharedLibraryInfo` and `DebugPackageInfo`
+child modules and prove pointer-preserving reexports through a narrowed
+Slug-native proxy harness. Invoke neither provider and claim no complete proxy
+route.
 
 ## Accepted base and completed frontier audit
 
-Base is `7d45bee02` (`Prove exact utils compute crate name export`). The proof
-owner is 9,464 lines at SHA-256
+Base scheduling commit is `242325974` (`Select public CcInfo route frontier
+audit`). The unchanged proof owner is 9,464 lines at SHA-256
 `8c41414a329f70c7d39c0672ecb4ed14afd35ddedccb238afea1b4c28b031df6`.
 Exact loading proofs now cover every utils import except `transform_deps` and
 `transform_link_deps`. The accepted crate-name closure retains five new and
@@ -50,9 +50,20 @@ its provider at 260-269
 retains the initializer and eager contexts. Do not replace this source-complete
 edge with a stub.
 
-The remaining pair shares exact `CcInfo`. Do not select either implementation
-until this packet authenticates the complete public route or records why no
-bounded source-complete route exists.
+The completed route audit classifies the generated proxy:
+
+| Proxy child | Full source | Status |
+|---|---|---|
+| `cc_common` | 788 lines, `5e6ab737945b487759c9f039c77a066dc65bbe15cf590b566fe86029cc610762` | source-shaped wrapper behavior accepted; complete module still broad |
+| `CcInfo` | 656 lines, `4424bb876c3f8234d7cfce20652e7ab1a7b2fc34cc2c637b1cb4313590d9f1bc` | declaration/eager primitives accepted; complete module not proved |
+| `CcSharedLibraryInfo` | 27 lines, `5b7dcd1f20611891bbe14d77c81fb47bf564f982e238d0ed2bc78d316efdb2f1` | selected complete dependency-free child |
+| `DebugPackageInfo` | 26 lines, `b22666c62cafcb12b3e1cc01d5d3ecfcd48f530cf5b915fbdcfea4abcf8d19f8` | selected complete dependency-free child |
+| `ObjcInfo` | 97 lines, `675fffb06e4731d2f0f4b7c9f2d38596fff042321dec5e581f73b5e44f8fde8a` | initialized-provider child; later bounded breadth |
+| `CcToolchainConfigInfo` | 143 lines, `8c522773214e202b426ae43589f59a8bdbf3af19d2e595ba8ec7ac125fef5d39` | further legacy-feature loads; later breadth |
+
+All six loads are eager in exact generated `symbols.bzl`. The selected pair is
+the smallest coherent missing family; accepting it reduces the unavoidable
+proxy closure without claiming that the full proxy freezes.
 
 ## Authorities and decision
 
@@ -66,79 +77,77 @@ freeze, as illustrated by its defining-module value-graph tests. Copy no Zig
 code, representation, owner pointer, traversal/order algorithm, diagnostic,
 identity or behavior.
 
-Accepted commits `9c51999f9fd4cf22bc8c86d4eda325082e4db316` and
-`152caa6fec67a2f330bed446bf7938c896df4958` prove initialized-provider and
-documented-map declaration behavior, including source-shaped `CcInfo`. They do
-not prove that the complete public/proxy/private module route freezes, nor may
-their narrowed source-shaped proof replace that route.
+Embed each selected child's complete exact file, not only its declaration
+slice. Evaluate both under their exact `@@rules_cc+//cc/private:...` producers.
+Then evaluate only exact proxy load lines 4-5 and export lines 11 and 15 under
+the generated compatibility-proxy producer with the actual `rules_cc` mapping.
+This narrowed proxy harness is proof composition, not the exact full module.
 
-Audit in exact load order:
-
-1. authenticate the full 18-line public module and its
-   `@cc_compatibility_proxy//:symbols.bzl` edge;
-2. authenticate all six generated proxy loads and seven exports, classifying
-   every child as accepted, bounded missing, or unbounded;
-3. audit the private child from its four loads through provider declarations,
-   eager empty contexts, initializer 247-258 and `CcInfo` 260-269, recursively
-   classifying every evaluated child/value required before publication;
-4. distinguish exact full-module feasibility from a Slug-native narrowed proof;
-5. select exactly one bounded prerequisite or public-route successor, or record
-   `REPLAN` with the first irreducible boundary.
+The exact declaration slices are `cc_shared_library_info.bzl:16-27`, SHA-256
+`74a2eea6f19b2ed262b2b6537b8aab209c27c52aefa6b895c2a87e1cb6a9840f`,
+and `debug_package_info.bzl:16-26`, SHA-256
+`bcab9fad2a29981dba4e635e9fdb8aa41143c9a43fc9c667f69b41a40a19123a`.
+Proxy loads 4-5 hash to `1706f8413c5fff47df27ed55dab5c6d4b6a6d8afaf6abe8d3831ecaa5ac27007`;
+exports 11 and 15 hash to
+`f7d16f06aec82de1f61b38a05fbea7e0818d388bb382460011b0624bd44718ac`
+and `18858e0f3e25b8ca1ff522ae5e4518124901635e09218f6353afc0e0772a52d7`.
 
 ## Compatibility
 
-- **Exact:** authenticated source bytes/hashes, complete load/export edges,
-  recursive evaluated-value reachability, and accepted-versus-missing facts.
-- **Slug-native:** audit decomposition, packet sizing and any future proof-only
-  concatenation proposal; none is accepted by this audit alone.
-- **Unsupported/deferred:** a narrowed proxy/private module as an exact route;
-  either remaining utils function; all invocation, configured C++ behavior,
-  diagnostics, actions and analysis.
+- **Exact:** both complete child files/hashes and producers; provider-callable
+  types/definition identities; proxy slice bytes/load/export spellings; and
+  pointer-preserving reexports.
+- **Slug-native:** the narrowed four-line proxy composition and starlark-rust
+  frozen representation.
+- **Unsupported/deferred:** complete generated proxy/public CcInfo loading,
+  omitted proxy children, provider construction/invocation, both remaining
+  utils functions, configured C++ behavior, diagnostics, actions and analysis.
 
 No production, DICE, identity, retained-memory, async, fixture, oracle, hot-path
 or Buck2-derived utility change is involved.
 
-## Allowlist, caps and deliverable
+## Allowlist, caps and proof
 
-Only these planning files may change:
+Only `app/slug_loading_v2/src/host_package_load_tests.rs` may change. Its base
+is SHA-256 `8c41414a329f70c7d39c0672ecb4ed14afd35ddedccb238afea1b4c28b031df6`
+at 9,464 lines; final ceiling is 9,624.
 
-| File | Base SHA-256 | Base lines |
-|---|---|---:|
-| `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md` | `70cbb5f10044ab19c1871241e9c813231eba317af50033d57a575c90cf79fd38` | 4,283 |
-| `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md` | `5795ef5d4862ff3745b19ead318c20aa5b8bf44e0773b8121e5c1ae36f35b81a` | 6,661 |
-| `thoughts/shared/plans/slug-v2-subplans/current-packet.md` | `10c70442a02150e366b08140b81deab4f24e8d69a35a0e457d62872a34778460` | 134 |
+Caps are 0 production, 160 proof and 160 total additions; deletions do not buy
+budget. Keep the test function at or below 100 lines; exact constants are
+exempt. The large proof owner remains cohesive because this is the same exact
+external-Bzl freeze/reexport family; no production complexity trigger applies.
 
-Caps are 0 production, 0 proof and 220 planning additions; deletions do not buy
-addition budget. No Rust, fixture, oracle capture, Cargo command or function
-invocation is authorized. Request/revision, retained-memory, async, DICE,
-fallback, performance and production-file complexity concerns are inapplicable
-because this is a read-only source/plan audit.
+Required proof:
 
-Required deliverable:
+1. Embed and hash-verify both complete exact child files and their declaration
+   slices.
+2. Freeze each child under its exact producer; prove exported values have
+   `provider_callable` type without constructing them.
+3. Evaluate the exact two-load/two-export proxy slices with actual load spelling
+   and apparent-to-canonical rules_cc mapping; prove both pointer identities.
+4. Preserve every accepted loading proof and assert no omitted proxy export.
 
-- a complete public -> proxy -> private closure table with exact full-file and
-  newly discriminating range hashes;
-- accepted/missing status for every proxy child and every private eager child;
-- explicit proof whether the accepted provider abstraction is sufficient or
-  insufficient for full-route exactness;
-- exactly one bounded successor with compatibility classes, allowlist/base,
-  caps, validation and STOP conditions, or a concrete `REPLAN` boundary.
+No new oracle or fixture is needed; authenticated complete sources and accepted
+provider declaration semantics discriminate the selected closure.
 
-## Validation and STOP
+## Serial validation and STOP
 
-Verify the rules_cc archive, generated proxy, pinned Bazel and Zabel authorities;
-run `git diff --check`, exact three-file scope, the 220-line planning cap and
-`scripts/v2_archive_status.sh` with only its three known archive-only misses.
-Independent review must verify closure completeness, accepted-evidence use,
-the no-stub rule, selection/`REPLAN`, and Zabel guidance-only use.
+Use `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target` and
+`CARGO_BUILD_JOBS=1`: focused proof; loading lib; `bzl_invalidation`;
+`build_file_loading`; locked analysis/core check; locked CLI build; format,
+diff, exact scope and archive status (only the known three misses).
 
-STOP for dirty/missing authority; an unclassified proxy/private child; more
-than one implementation successor; Rust/test/fixture/oracle change; function
-invocation; a narrowed exact-route claim; Java/JVM work; copied Zabel content;
-or cap violation.
+Independent review must verify full-file/range hashes, producers/mapping,
+provider types, proxy pointer identities, nonconstruction, caps, preserved
+proofs, exact/Slug-native/deferred boundaries and Zabel guidance-only use.
+
+STOP and `REPLAN` for production change; provider construction/invocation;
+another proxy child/export; complete-proxy or public-CcInfo claim; configured
+behavior; identity/registry/DICE work; Java/JVM work; copied Zabel content;
+dirty authority; or cap violation.
 
 ## Immediate predecessor
 
-`7d45bee02` accepted the compute-crate-name closure with 235 unit, 24
-invalidation and 31 BUILD-loading tests green. Independent review verified
-exact bytes/order, visibility, eager/public identities, nonexecution and caps.
+Audit `242325974` proves that complete public CcInfo loading requires all six
+eager proxy children and selects this smallest coherent missing family.
+Architecture review accepts exact children plus Slug-native narrowed harness.
