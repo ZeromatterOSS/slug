@@ -3938,6 +3938,90 @@ const UTILS_GET_EDITION_SOURCE: &str = r###"def get_edition(attr, toolchain, lab
         return toolchain.default_edition
 "###;
 
+const UTILS_EXPAND_LOCATION_HELPER_SOURCE: &str = r###"def _expand_location_for_build_script_runner(ctx, v, data, known_variables):
+    """A trivial helper for `expand_dict_value_locations` and `expand_list_element_locations`
+
+    Args:
+        ctx (ctx): The rule's context object
+        v (str): The value possibly containing location macros to expand.
+        data (sequence of Targets): See one of the parent functions.
+        known_variables (dict): Make variables (probably from toolchains) to substitute in when doing make variable expansion.
+
+    Returns:
+        string: The location-macro expanded version of the string.
+    """
+
+    # Fast-path - both location expansions and make vars have a `$` so we can short-circuit everything.
+    if "$" not in v:
+        return v
+
+    for directive in ("$(execpath ", "$(location "):
+        if directive in v:
+            # build script runner will expand pwd to execroot for us
+            v = v.replace(directive, "$${pwd}/" + directive)
+
+    for directive in ("$(execpaths ", "$(locations "):
+        if directive in v:
+            # Plural forms expand to multiple space-separated paths, so we must
+            # expand each macro individually and prefix every resulting path.
+            # Split on the opening directive; each subsequent part begins with
+            # "label)rest", letting us reconstruct and expand one macro at a time.
+            parts = v.split(directive)
+            result = parts[0]
+            for part in parts[1:]:
+                end = part.find(")")
+                if end == -1:
+                    result += directive + part
+                    continue
+                macro = directive + part[:end] + ")"
+                expanded = ctx.expand_location(macro, data)
+                prefixed = " ".join(["$${pwd}/" + p for p in expanded.split(" ")])
+                result += prefixed + part[end + 1:]
+            v = result
+
+    return ctx.expand_make_variables(
+        v,
+        ctx.expand_location(v, data),
+        known_variables,
+    )
+"###;
+
+const UTILS_EXPAND_DICT_VALUE_LOCATIONS_SOURCE: &str = r###"def expand_dict_value_locations(ctx, env, data, known_variables):
+    """Performs location-macro expansion on string values.
+
+    $(execpath ...), $(execpaths ...), $(location ...) and $(locations ...) are
+    prefixed with ${pwd}, which process_wrapper and build_script_runner will
+    expand at run time to the absolute path.
+    This is necessary because include_str!() is relative to the currently
+    compiled file, and build scripts run relative to the manifest dir, so we
+    can not use execroot-relative paths.
+    Plural forms (execpaths/locations) expand to multiple space-separated paths;
+    each path receives its own ${pwd}/ prefix.
+
+    $(rootpath ...) is unmodified, and is useful for passing in paths via
+    rustc_env that are encoded in the binary with env!(), but utilized at
+    runtime, such as in tests. The absolute paths are not usable in this case,
+    as compilation happens in a separate sandbox folder, so when it comes time
+    to read the file at runtime, the path is no longer valid.
+
+    For detailed documentation, see:
+    - [`expand_location`](https://bazel.build/rules/lib/ctx#expand_location)
+    - [`expand_make_variables`](https://bazel.build/rules/lib/ctx#expand_make_variables)
+
+    Args:
+        ctx (ctx): The rule's context object
+        env (dict): A dict whose values we iterate over
+        data (sequence of Targets): The targets which may be referenced by
+            location macros. This is expected to be the `data` attribute of
+            the target, though may have other targets or attributes mixed in.
+        known_variables (dict): Make variables (probably from toolchains) to substitute in when doing make variable expansion.
+
+    Returns:
+        dict: A dict of environment variables with expanded location macros
+    """
+    return {k: _expand_location_for_build_script_runner(ctx, v, data, known_variables) for (k, v) in env.items()}
+"###;
+
 const UTILS_FORCE_DISABLE_SOURCE: &str = r###"_FORCE_DISABLE_CC_TOOLCHAIN = False
 "###;
 
@@ -4356,6 +4440,67 @@ IMPORTED_LEAVES = [can_use_metadata_for_pipelining, dedent, deduplicate, determi
     for (value, name) in imported.iter().zip(names) {
         assert!(value.to_value().ptr_eq(child.get(name).unwrap().value()));
     }
+}
+
+#[test]
+fn exact_rules_rust_utils_expand_dict_export_retains_private_helper_and_parent_identity() {
+    let slices = [
+        (
+            UTILS_EXPAND_LOCATION_HELPER_SOURCE,
+            "_expand_location_for_build_script_runner",
+            "73cd67a0bf9e2b370f7d287cefe1fa73efa20552a8f99f7cdb45ecf14c24d64d",
+        ),
+        (
+            UTILS_EXPAND_DICT_VALUE_LOCATIONS_SOURCE,
+            "expand_dict_value_locations",
+            "0c8ce89317f00a453998d33aa2236824bff20eb6cdb0092dc5077604033e10bd",
+        ),
+    ];
+    for (source, _, expected) in slices {
+        assert_eq!(format!("{:x}", Sha256::digest(source.as_bytes())), expected);
+    }
+    let owner = |label: &str, path: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(label).unwrap(),
+        workspace_path: PathBuf::from(path),
+        repository_mapping: Arc::from([]),
+    };
+    let child_owner = owner(
+        "@@rules_rust+//rust/private:utils.bzl",
+        "/rules_rust/rust/private/utils.bzl",
+    );
+    let child_source = slices
+        .iter()
+        .map(|(source, _, _)| *source)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let child = eval_bzl_with_identity(&child_source, child_owner.clone()).unwrap();
+    for (_, name, _) in slices {
+        assert_eq!(
+            child.get_any_visibility(name).unwrap().0.value().get_type(),
+            "function"
+        );
+    }
+    assert!(
+        child
+            .get("_expand_location_for_build_script_runner")
+            .is_err()
+    );
+    let parent = eval_bzl_with_loaded_children(
+        "load(\":utils.bzl\", \"expand_dict_value_locations\")\nIMPORTED = expand_dict_value_locations\n",
+        owner(
+            "@@rules_rust+//rust/private:rust.bzl",
+            "/rules_rust/rust/private/rust.bzl",
+        ),
+        &[(":utils.bzl", child_owner, child.dupe())],
+    )
+    .unwrap();
+    assert!(
+        parent
+            .get("IMPORTED")
+            .unwrap()
+            .value()
+            .ptr_eq(child.get("expand_dict_value_locations").unwrap().value())
+    );
 }
 
 #[test]
