@@ -13,6 +13,7 @@ pub mod bzl_module;
 mod bzl_visibility;
 mod cc_common;
 mod cycle_detector;
+mod external_subtree_package_set;
 pub mod file_discovery;
 pub mod glob;
 pub mod globals;
@@ -63,6 +64,18 @@ pub use bzl_module::RootPackageLoadKey;
 pub use bzl_module::RootPackageLoadObservationKey;
 pub use bzl_module::discover_build_file_companion;
 pub use cycle_detector::bzl_load_cycle_detector;
+#[doc(hidden)]
+pub use external_subtree_package_set::ExternalSubtreePackageSet;
+#[doc(hidden)]
+pub use external_subtree_package_set::ExternalSubtreePackageSetError;
+#[doc(hidden)]
+pub use external_subtree_package_set::ExternalSubtreePackageSetErrorKind;
+#[doc(hidden)]
+pub use external_subtree_package_set::ExternalSubtreePackageSetKey;
+#[doc(hidden)]
+pub use external_subtree_package_set::ExternalSubtreePackageSetObservationKey;
+#[doc(hidden)]
+pub use external_subtree_package_set::ObservedExternalSubtreePackageSet;
 pub use glob::GlobSpec;
 pub use glob::PackageListing;
 #[doc(hidden)]
