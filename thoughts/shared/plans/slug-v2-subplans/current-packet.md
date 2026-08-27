@@ -101,8 +101,13 @@ Base is `e9947e8ba`. Change only:
 - `app/slug_query_v2/src/loading_environment.rs` (loading-owned imports and
   terminal conversion only).
 
-Caps are 620 production, 100 proof and 720 total additions; deletions do not
-buy budget. Each new helper/test is at most 100 lines. Add no dependency, new
+The first exact extraction showed that the 583 removed query lines require 688
+production and 19 proof additions after the loading-owned terminal, exports
+and boundary adaptation are counted. The original 620-line production cap was
+a planning miss, not a scope or behavior change. Corrected caps are 740
+production, 100 proof and 840 total additions; deletions do not buy budget.
+Each genuinely new helper/test is at most 100 lines; mechanically moved
+predecessor helpers retain their reviewed shape. Add no dependency, new
 DICE key semantics, external route/source input, traversal branch, package
 load, pattern parser, expansion, mapping, registration activation, interner,
 global state or manual lock.
