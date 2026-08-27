@@ -843,6 +843,58 @@ async fn observed_host_source_covers_path_need_route_error_and_reverse_isolation
 }
 
 #[tokio::test]
+async fn shared_source_observation_builtin_is_zero_copy_and_epoch_free() {
+    let route = RootRepositoryRoute::builtin_for_test(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    let input = host_repository_source_input(route.source_capability()).unwrap();
+    let relative = host_repository_relative_path(PathBuf::from("MODULE.bazel")).unwrap();
+    let legacy_key = HostRepositorySourceObservationKey::new(input.clone(), relative.clone());
+    let observed_key = HostRepositorySourceObservationEpochKey::new(input, relative);
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = dice.updater().commit().await;
+
+    let SourcePreparationOutcome::Complete(legacy) =
+        transaction.compute(&legacy_key).await.unwrap()
+    else {
+        panic!("built-in legacy observation must complete")
+    };
+    let SourcePreparationOutcome::Complete(Ok(observed)) =
+        transaction.compute(&observed_key).await.unwrap()
+    else {
+        panic!("built-in observed source must complete")
+    };
+    let HostRepositorySourceObservationView::Builtin(legacy) =
+        legacy.as_ref().as_ref().unwrap().view()
+    else {
+        panic!("built-in legacy result changed variant")
+    };
+    let HostRepositorySourceObservationView::Builtin(current) =
+        observed.result().as_ref().as_ref().unwrap().view()
+    else {
+        panic!("built-in observed result changed variant")
+    };
+    assert_eq!(current.bytes().as_ptr(), legacy.bytes().as_ptr());
+    assert_eq!(current.path(), legacy.path());
+    assert_eq!(current.sha256(), legacy.sha256());
+    assert_eq!(current.executable(), legacy.executable());
+    assert!(observed.observations().observations().is_empty());
+    let complete = SourcePreparationOutcome::Complete(Ok(observed.clone()));
+    assert!(HostRepositorySourceObservationEpochKey::validity(&complete));
+    let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+        NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/workspace/MODULE.bazel").unwrap(),
+            PathObservationOperation::FileBytes,
+        )),
+    ));
+    assert!(!HostRepositorySourceObservationEpochKey::validity(&need));
+    assert!(!HostRepositorySourceObservationEpochKey::equality(
+        &need, &need
+    ));
+}
+
+#[tokio::test]
 async fn observed_host_source_preserves_immutable_and_file_error_prefixes() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let instance = PathObservationInstanceId::new(73);

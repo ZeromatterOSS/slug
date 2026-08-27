@@ -35,8 +35,11 @@ mod tests {
     use slug_bzlmod_v2::HostRepositorySourceFileObservationKey;
     use slug_bzlmod_v2::HostRepositorySourceFileValue;
     use slug_bzlmod_v2::HostRepositorySourceInputDispositionView;
+    use slug_bzlmod_v2::HostRepositorySourceObservationEpochKey;
+    use slug_bzlmod_v2::HostRepositorySourceObservationInput;
     use slug_bzlmod_v2::HostRepositorySourceObservationView;
     use slug_bzlmod_v2::HostRootRepositoryMappingKey;
+    use slug_bzlmod_v2::ObservedHostRepositorySourceObservation;
     use slug_bzlmod_v2::RegistryFileUrl;
     use slug_bzlmod_v2::RegistryIo;
     use slug_bzlmod_v2::RegistryIoOutcome;
@@ -153,6 +156,16 @@ mod tests {
 
     fn assert_no_activation(tracker: &DependencyTrace, prefix: &str) {
         assert!(!tracker.all_keys().iter().any(|key| key.starts_with(prefix)));
+    }
+
+    fn shared_source_key(
+        input: &HostCanonicalRepositorySourceInput,
+        path: &str,
+    ) -> HostRepositorySourceObservationEpochKey {
+        HostRepositorySourceObservationEpochKey::new_canonical(
+            input.clone(),
+            host_repository_relative_path(PathBuf::from(path)).unwrap(),
+        )
     }
 
     fn registry_io(leaf_module: &'static [u8], leaf_source: &'static [u8]) -> StaticRegistryIo {
@@ -544,6 +557,7 @@ mod tests {
             route.input().clone(),
             host_repository_relative_path(PathBuf::from("MODULE.bazel")).unwrap(),
         );
+        let shared_source = shared_source_key(route.input(), "MODULE.bazel");
         let listing_key = HostCanonicalRepositoryDirectoryListingObservationKey::new(
             route.input().clone(),
             PackagePath::root(),
@@ -565,6 +579,10 @@ mod tests {
         assert!(listing.observations().observations().is_empty());
         assert_eq!(
             tracker.dependencies(&source_key.to_string()),
+            [shared_source.to_string()]
+        );
+        assert_eq!(
+            tracker.dependencies(&shared_source.to_string()),
             ["builtin-bazel-tools-source-file:MODULE.bazel"]
         );
         assert_eq!(
@@ -638,9 +656,14 @@ mod tests {
             input.clone(),
             host_repository_relative_path(PathBuf::from("BUILD.bazel")).unwrap(),
         );
+        let shared_source = shared_source_key(&input, "BUILD.bazel");
         let listing_key =
             HostCanonicalRepositoryDirectoryListingObservationKey::new(input, PackagePath::root());
-        let source_deps = tracker.dependencies(&source_key.to_string());
+        assert_eq!(
+            tracker.dependencies(&source_key.to_string()),
+            [shared_source.to_string()]
+        );
+        let source_deps = tracker.dependencies(&shared_source.to_string());
         let listing_deps = tracker.dependencies(&listing_key.to_string());
         assert!(
             source_deps
@@ -657,10 +680,12 @@ mod tests {
                 .iter()
                 .any(|dep| dep.starts_with("observed-path-directory-listing:Host:"))
         );
-        assert!(!tracker.all_keys().iter().any(|key| {
-            key.starts_with("host-repository-source-observation:")
-                || key.starts_with("host-selected-repository-file-effect:")
-        }));
+        assert!(
+            !tracker
+                .all_keys()
+                .iter()
+                .any(|key| key.starts_with("host-selected-repository-file-effect:"))
+        );
     }
 
     #[tokio::test]
@@ -689,11 +714,16 @@ mod tests {
             input.clone(),
             host_repository_relative_path(PathBuf::from("BUILD.bazel")).unwrap(),
         );
+        let shared_source = shared_source_key(&input, "BUILD.bazel");
         let listing_key =
             HostCanonicalRepositoryDirectoryListingObservationKey::new(input, PackagePath::root());
+        assert_eq!(
+            tracker.dependencies(&source_key.to_string()),
+            [shared_source.to_string()]
+        );
         assert!(
             tracker
-                .dependencies(&source_key.to_string())
+                .dependencies(&shared_source.to_string())
                 .iter()
                 .any(|dep| dep == "repository-materialization-result:@@parent+")
         );
@@ -759,6 +789,7 @@ ext=module_extension(implementation=impl)
             input.clone(),
             host_repository_relative_path(PathBuf::from("BUILD.bazel")).unwrap(),
         );
+        let shared_source = shared_source_key(&input, "BUILD.bazel");
         let listing_key =
             HostCanonicalRepositoryDirectoryListingObservationKey::new(input, PackagePath::root());
         let source = tx.compute(&source_key).await.unwrap();
@@ -780,9 +811,13 @@ ext=module_extension(implementation=impl)
             listing.result().as_ref(),
             Ok(PathDirectoryListing::Present(_))
         ));
+        assert_eq!(
+            tracker.dependencies(&source_key.to_string()),
+            [shared_source.to_string()]
+        );
         assert!(
             tracker
-                .dependencies(&source_key.to_string())
+                .dependencies(&shared_source.to_string())
                 .iter()
                 .any(|dep| dep == &format!("repository-materialization-result:{canonical}"))
         );
@@ -793,10 +828,10 @@ ext=module_extension(implementation=impl)
                 .any(|dep| dep.starts_with("observed-path-directory-listing:"))
         );
         assert!(
-            !tracker
+            tracker
                 .all_keys()
                 .iter()
-                .any(|key| key.starts_with("host-repository-source-observation:"))
+                .any(|key| key == &shared_source.to_string())
         );
         for forbidden in [
             "host-external-package-boundary:",
@@ -875,6 +910,7 @@ ext=module_extension(implementation=impl)
             input.clone(),
             host_repository_relative_path(PathBuf::from("BUILD.bazel")).unwrap(),
         );
+        let shared_source = shared_source_key(&input, "BUILD.bazel");
         let listing_key =
             HostCanonicalRepositoryDirectoryListingObservationKey::new(input, PackagePath::root());
         let source = tx.compute(&source_key).await.unwrap();
@@ -903,7 +939,11 @@ ext=module_extension(implementation=impl)
                 .collect::<Vec<_>>(),
             ["BUILD.bazel", "leaf.txt"]
         );
-        let source_deps = tracker.dependencies(&source_key.to_string());
+        assert_eq!(
+            tracker.dependencies(&source_key.to_string()),
+            [shared_source.to_string()]
+        );
+        let source_deps = tracker.dependencies(&shared_source.to_string());
         assert!(
             source_deps
                 .iter()
@@ -926,10 +966,10 @@ ext=module_extension(implementation=impl)
                 .any(|dep| dep.starts_with("observed-path-directory-listing:"))
         );
         assert!(
-            !tracker
+            tracker
                 .all_keys()
                 .iter()
-                .any(|key| key.starts_with("host-repository-source-observation:"))
+                .any(|key| key == &shared_source.to_string())
         );
     }
 
@@ -967,6 +1007,25 @@ ext=module_extension(implementation=impl)
         assert_ne!(hash(&first), hash(&spec_changed));
         assert_ne!(first, mapping_changed);
         assert_ne!(hash(&first), hash(&mapping_changed));
+        let relative = host_repository_relative_path(PathBuf::from("BUILD.bazel")).unwrap();
+        let first_key =
+            HostRepositorySourceObservationEpochKey::new_canonical(first.clone(), relative.clone());
+        let spec_key = HostRepositorySourceObservationEpochKey::new_canonical(
+            spec_changed.clone(),
+            relative.clone(),
+        );
+        let mapping_key = HostRepositorySourceObservationEpochKey::new_canonical(
+            mapping_changed.clone(),
+            relative.clone(),
+        );
+        let restored_key =
+            HostRepositorySourceObservationEpochKey::new_canonical(restored.clone(), relative);
+        assert_eq!(first_key, restored_key);
+        assert_eq!(hash(&first_key), hash(&restored_key));
+        assert_ne!(first_key, spec_key);
+        assert_ne!(hash(&first_key), hash(&spec_key));
+        assert_ne!(first_key, mapping_key);
+        assert_ne!(hash(&first_key), hash(&mapping_key));
         assert_eq!(
             first
                 .view()
@@ -1309,6 +1368,9 @@ ext=module_extension(implementation=impl)
         );
         assert!(std::mem::size_of::<HostCanonicalRepositorySourceInput>() <= 128);
         assert!(std::mem::size_of::<HostCanonicalRepositoryLoadRoute>() <= 128);
+        assert!(std::mem::size_of::<HostRepositorySourceObservationInput>() <= 192);
+        assert!(std::mem::size_of::<HostRepositorySourceObservationEpochKey>() <= 224);
+        assert!(std::mem::size_of::<ObservedHostRepositorySourceObservation>() <= 48);
         let source = include_str!(
             "../../slug_bzlmod_v2/src/source_preparation/canonical_repository_source.rs"
         );
@@ -1323,7 +1385,8 @@ ext=module_extension(implementation=impl)
         ] {
             assert!(!source.contains(forbidden));
         }
-        assert!(!source.contains("HostRepositorySourceObservationKey::new"));
+        assert!(!source.contains("HostRepositorySourceObservationKey::new("));
+        assert!(source.contains("HostRepositorySourceObservationKey::new_canonical("));
         assert!(route.contains("compute_route_predecessor(ctx, key, mode)"));
         assert!(route.contains("compute_generated_effect("));
         for forbidden in ["RootRepositoryRouteKey", "Mutex", "RwLock", "OnceLock"] {

@@ -483,7 +483,13 @@ pub use source_preparation::HostRepositorySourceInputView;
 #[doc(hidden)]
 pub use source_preparation::HostRepositorySourceObservation;
 #[doc(hidden)]
+pub use source_preparation::HostRepositorySourceObservationEpochKey;
+#[doc(hidden)]
 pub use source_preparation::HostRepositorySourceObservationError;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceObservationInput;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceObservationInputView;
 #[doc(hidden)]
 pub use source_preparation::HostRepositorySourceObservationKey;
 #[doc(hidden)]
@@ -503,6 +509,8 @@ pub use source_preparation::ObservedHostCanonicalRepositorySourceFile;
 pub use source_preparation::ObservedHostRepositoryDirectoryListing;
 #[doc(hidden)]
 pub use source_preparation::ObservedHostRepositorySourceFile;
+#[doc(hidden)]
+pub use source_preparation::ObservedHostRepositorySourceObservation;
 pub use source_preparation::RegistryModuleFileAttempt;
 pub use source_preparation::RepositoryIo;
 pub use source_preparation::RepositoryIoOutcome;

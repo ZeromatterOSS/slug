@@ -58,7 +58,6 @@ use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 use slug_workspace_v2::PathOutcome;
 use slug_workspace_v2::PathResolutionError;
-use slug_workspace_v2::PathResult;
 use slug_workspace_v2::ResolvedPath;
 use slug_workspace_v2::ResolvedPathKey;
 use slug_workspace_v2::ResolvedPathObservationKey;
@@ -125,6 +124,10 @@ use crate::repository_ignore::RepositoryIgnoreMatcher;
 
 mod canonical_repository_source;
 pub use canonical_repository_source::*;
+mod repository_source_observation;
+#[cfg(test)]
+use repository_source_observation::HostRepositorySourceObservationErrorKind;
+pub use repository_source_observation::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct RepositoryMaterializationKey {
@@ -164,13 +167,6 @@ impl<T> SourcePreparationOutcome<T> {
             Self::Complete(value) => SourcePreparationOutcome::Complete(f(value)),
             Self::Need(need) => SourcePreparationOutcome::Need(need),
         }
-    }
-}
-
-fn source_outcome_from_path<T>(outcome: PathOutcome<T>) -> SourcePreparationOutcome<T> {
-    match outcome {
-        PathOutcome::Complete(value) => SourcePreparationOutcome::Complete(value),
-        PathOutcome::Need(need) => SourcePreparationOutcome::path_need(need),
     }
 }
 
@@ -5097,205 +5093,6 @@ pub fn host_repository_source_input(
     })
 }
 
-#[doc(hidden)]
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub enum HostRepositorySourceObservation {
-    Builtin(BuiltinBazelToolsSourceFileValue),
-    Request(HostRepositorySourceFileValue),
-}
-
-#[doc(hidden)]
-#[derive(Debug, Clone, Copy)]
-pub enum HostRepositorySourceObservationView<'a> {
-    Builtin(&'a BuiltinBazelToolsSourceFileValue),
-    Request(&'a HostRepositorySourceFileValue),
-}
-
-impl HostRepositorySourceObservation {
-    #[doc(hidden)]
-    pub fn view(&self) -> HostRepositorySourceObservationView<'_> {
-        match self {
-            Self::Builtin(value) => HostRepositorySourceObservationView::Builtin(value),
-            Self::Request(value) => HostRepositorySourceObservationView::Request(value),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum HostRepositorySourceObservationErrorKind {
-    BuiltinPath,
-    Builtin(BuiltinBazelToolsSourceFileError),
-    BuiltinCompute(Arc<str>),
-    Request(RepositorySourceFileError),
-    RequestCompute(Arc<str>),
-}
-
-#[doc(hidden)]
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct HostRepositorySourceObservationError {
-    input: HostRepositorySourceInput,
-    relative_path: HostRepositoryRelativePath,
-    kind: HostRepositorySourceObservationErrorKind,
-}
-
-impl HostRepositorySourceObservationError {
-    #[doc(hidden)]
-    pub fn input(&self) -> &HostRepositorySourceInput {
-        &self.input
-    }
-
-    #[doc(hidden)]
-    pub fn relative_path(&self) -> &HostRepositoryRelativePath {
-        &self.relative_path
-    }
-}
-
-impl fmt::Display for HostRepositorySourceObservationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
-}
-
-impl std::error::Error for HostRepositorySourceObservationError {}
-
-#[doc(hidden)]
-pub type HostRepositorySourceObservationResult =
-    Result<HostRepositorySourceObservation, HostRepositorySourceObservationError>;
-#[doc(hidden)]
-pub type HostRepositorySourceObservationOutcome =
-    SourcePreparationOutcome<Arc<HostRepositorySourceObservationResult>>;
-
-#[doc(hidden)]
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct HostRepositorySourceObservationKey {
-    input: HostRepositorySourceInput,
-    relative_path: HostRepositoryRelativePath,
-}
-
-impl HostRepositorySourceObservationKey {
-    #[doc(hidden)]
-    pub fn new(
-        input: HostRepositorySourceInput,
-        relative_path: HostRepositoryRelativePath,
-    ) -> Self {
-        Self {
-            input,
-            relative_path,
-        }
-    }
-}
-
-impl Hash for HostRepositorySourceObservationKey {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.input.capability.hash(state);
-        std::mem::discriminant(&self.input.disposition).hash(state);
-        if let HostRepositoryMaterializationDisposition::Request(request) = &self.input.disposition
-        {
-            request.id.hash(state);
-        }
-        self.relative_path.path_arc().hash(state);
-    }
-}
-
-impl fmt::Display for HostRepositorySourceObservationKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "host-repository-source-observation:{}:{}",
-            self.input.capability.canonical_repo(),
-            self.relative_path.as_path().display()
-        )
-    }
-}
-
-fn source_observation_complete(
-    value: HostRepositorySourceObservationResult,
-) -> HostRepositorySourceObservationOutcome {
-    SourcePreparationOutcome::Complete(Arc::new(value))
-}
-
-#[async_trait]
-impl Key for HostRepositorySourceObservationKey {
-    type Value = HostRepositorySourceObservationOutcome;
-
-    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let terminal = |kind| {
-            source_observation_complete(Err(HostRepositorySourceObservationError {
-                input: self.input.clone(),
-                relative_path: self.relative_path.clone(),
-                kind,
-            }))
-        };
-        match self.input.view().disposition() {
-            HostRepositorySourceInputDispositionView::Builtin(identity) => {
-                let Some(path) = self.relative_path.as_path().to_str() else {
-                    return terminal(HostRepositorySourceObservationErrorKind::BuiltinPath);
-                };
-                match ctx
-                    .compute(&BuiltinBazelToolsSourceFileKey::new(
-                        identity.snapshot(),
-                        path,
-                    ))
-                    .await
-                {
-                    Ok(value) => match value.as_ref() {
-                        Ok(value) => source_observation_complete(Ok(
-                            HostRepositorySourceObservation::Builtin(value.clone()),
-                        )),
-                        Err(error) => terminal(HostRepositorySourceObservationErrorKind::Builtin(
-                            error.clone(),
-                        )),
-                    },
-                    Err(error) => {
-                        terminal(HostRepositorySourceObservationErrorKind::BuiltinCompute(
-                            error.to_string().into(),
-                        ))
-                    }
-                }
-            }
-            HostRepositorySourceInputDispositionView::Request(request) => {
-                let materialization = match ctx
-                    .compute(&RepositoryMaterializationResultKey {
-                        request: request.clone(),
-                    })
-                    .await
-                {
-                    Ok(value) => value,
-                    Err(error) => {
-                        return terminal(HostRepositorySourceObservationErrorKind::RequestCompute(
-                            error.to_string().into(),
-                        ));
-                    }
-                };
-                let outcome = observed_repository_source_file_from_materialization(
-                    ctx,
-                    materialization,
-                    self.relative_path.as_path(),
-                    self.relative_path.path_arc().clone(),
-                )
-                .await;
-                match host_repository_source_file_value(outcome) {
-                    SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-                    SourcePreparationOutcome::Complete(Ok(value)) => source_observation_complete(
-                        Ok(HostRepositorySourceObservation::Request(value)),
-                    ),
-                    SourcePreparationOutcome::Complete(Err(error)) => {
-                        terminal(HostRepositorySourceObservationErrorKind::Request(error))
-                    }
-                }
-            }
-        }
-    }
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        x.complete_eq(y)
-    }
-
-    fn validity(value: &Self::Value) -> bool {
-        value.is_complete()
-    }
-}
-
 fn root_repository_materialization_request(
     route: &RootRepositoryRoute,
 ) -> Result<Arc<RepositoryMaterializationRequest>, RepositoryMaterializationError> {
@@ -5657,120 +5454,6 @@ fn project_resolution_error(
         }
         PathResolutionError::InfiniteExpansion { .. } => {
             RepositorySourceFileError::InfiniteExpansion { repo_relative_path }
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-enum ObservedRepositorySourceFile {
-    Present {
-        bytes: Arc<[u8]>,
-        logical_path: NormalizedAbsolutePath,
-    },
-    Absent,
-}
-
-async fn observed_repository_source_file(
-    ctx: &mut DiceComputations<'_>,
-    namespace: PathObservationNamespace,
-    materialized_root: &Path,
-    relative: &Path,
-    repo_relative_path: Arc<PathBuf>,
-) -> PathResult<ObservedRepositorySourceFile, RepositorySourceFileError> {
-    let logical_path = match NormalizedAbsolutePath::new(materialized_root.join(relative)) {
-        Ok(path) => path,
-        Err(_) => {
-            return PathOutcome::Complete(Err(
-                RepositorySourceFileError::InvalidMaterializedPath { repo_relative_path },
-            ));
-        }
-    };
-    let resolved = match ctx
-        .compute(&ResolvedPathKey::new(namespace, logical_path.dupe()))
-        .await
-    {
-        Ok(PathOutcome::Need(need)) => return PathOutcome::Need(need),
-        Ok(PathOutcome::Complete(Err(error))) => {
-            return PathOutcome::Complete(Err(project_resolution_error(repo_relative_path, error)));
-        }
-        Ok(PathOutcome::Complete(Ok(resolved))) => resolved,
-        Err(error) => {
-            return PathOutcome::Complete(Err(RepositorySourceFileError::ResolutionCompute {
-                repo_relative_path,
-                message: Arc::from(error.to_string()),
-            }));
-        }
-    };
-    observed_repository_source_file_from_resolved(ctx, resolved, repo_relative_path).await
-}
-
-async fn observed_repository_source_file_from_resolved(
-    ctx: &mut DiceComputations<'_>,
-    resolved: ResolvedPath,
-    repo_relative_path: Arc<PathBuf>,
-) -> PathResult<ObservedRepositorySourceFile, RepositorySourceFileError> {
-    let lstat = match resolved.state() {
-        ResolvedPathState::Missing => {
-            return PathOutcome::Complete(Ok(ObservedRepositorySourceFile::Absent));
-        }
-        ResolvedPathState::Present(lstat)
-            if matches!(
-                lstat.kind(),
-                PathNodeKind::RegularFile | PathNodeKind::SpecialFile
-            ) =>
-        {
-            lstat
-        }
-        ResolvedPathState::Present(lstat) => {
-            return PathOutcome::Complete(Err(RepositorySourceFileError::WrongKind {
-                repo_relative_path,
-                actual: lstat.kind(),
-            }));
-        }
-    };
-    let demand = PathObservationDemand::new(
-        resolved.namespace(),
-        resolved.real_path().dupe(),
-        PathObservationOperation::FileBytes,
-    );
-    let observed = match ctx.compute(&PathObservationKey::new(demand)).await {
-        Ok(PathOutcome::Need(need)) => return PathOutcome::Need(need),
-        Ok(PathOutcome::Complete(result)) => result,
-        Err(error) => {
-            return PathOutcome::Complete(Err(RepositorySourceFileError::FileCompute {
-                repo_relative_path,
-                message: Arc::from(error.to_string()),
-            }));
-        }
-    };
-    match observed.as_ref() {
-        PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) => {
-            PathOutcome::Complete(Ok(ObservedRepositorySourceFile::Present {
-                bytes: bytes.dupe(),
-                logical_path: resolved.requested_path().dupe(),
-            }))
-        }
-        PathObservationResult::FileBytes(PathOperationResult::Missing) => {
-            PathOutcome::Complete(Err(RepositorySourceFileError::InconsistentState {
-                repo_relative_path,
-                operation: PathObservationOperation::FileBytes,
-                before: Some(lstat),
-                after: None,
-            }))
-        }
-        PathObservationResult::FileBytes(PathOperationResult::Error(error)) => {
-            PathOutcome::Complete(Err(RepositorySourceFileError::Observation {
-                repo_relative_path,
-                operation: PathObservationOperation::FileBytes,
-                error: *error,
-            }))
-        }
-        PathObservationResult::Lstat(_)
-        | PathObservationResult::ReadLink(_)
-        | PathObservationResult::DirectoryEntries(_)
-        | PathObservationResult::WindowsLongPath(_)
-        | PathObservationResult::WindowsOptionPathLongName(_) => {
-            unreachable!("FileBytes demand must return a FileBytes observation")
         }
     }
 }
@@ -6158,74 +5841,6 @@ async fn drive_repository_directory_listing_from_disposition(
             ),
         },
     }
-}
-
-async fn observed_repository_source_file_from_materialization(
-    ctx: &mut DiceComputations<'_>,
-    materialization: SourcePreparationOutcome<
-        Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>,
-    >,
-    relative: &Path,
-    repo_relative_path: Arc<PathBuf>,
-) -> SourcePreparationResult<ObservedRepositorySourceFile, RepositorySourceFileError> {
-    let materialization = match materialization {
-        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
-        SourcePreparationOutcome::Complete(value) => value,
-    };
-    let materialization = match materialization.as_ref() {
-        Ok(value) => value,
-        Err(error) => {
-            return SourcePreparationOutcome::Complete(Err(
-                RepositorySourceFileError::Materialization {
-                    repo_relative_path,
-                    error: Arc::new(error.clone()),
-                },
-            ));
-        }
-    };
-    match materialization {
-        RepositoryMaterialization::Local { source_root, .. } => source_outcome_from_path(
-            observed_repository_source_file(
-                ctx,
-                PathObservationNamespace::Host,
-                source_root,
-                relative,
-                repo_relative_path,
-            )
-            .await,
-        ),
-        RepositoryMaterialization::Immutable {
-            generation_root,
-            observation_instance,
-            ..
-        } => source_outcome_from_path(
-            observed_repository_source_file(
-                ctx,
-                PathObservationNamespace::Materialization(*observation_instance),
-                generation_root,
-                relative,
-                repo_relative_path,
-            )
-            .await,
-        ),
-    }
-}
-
-fn host_repository_source_file_value(
-    outcome: SourcePreparationResult<ObservedRepositorySourceFile, RepositorySourceFileError>,
-) -> SourcePreparationResult<HostRepositorySourceFileValue, RepositorySourceFileError> {
-    outcome.map(|result| {
-        result.map(|observed| match observed {
-            ObservedRepositorySourceFile::Present {
-                bytes,
-                logical_path,
-            } => HostRepositorySourceFileValue::Present {
-                bytes,
-                logical_path,
-            },
-            ObservedRepositorySourceFile::Absent => HostRepositorySourceFileValue::Absent,
-        })
-    })
 }
 
 fn append_host_repository_source_observation(
@@ -9875,6 +9490,10 @@ mod tests {
         };
         let error = error.as_ref().as_ref().unwrap_err();
         assert_eq!(error.input(), &input);
+        assert!(matches!(
+            error.source_observation_input(),
+            HostRepositorySourceObservationInput::Root(actual) if actual == &input
+        ));
         assert_eq!(error.relative_path().as_path(), Path::new("not/in/catalog"));
         assert!(matches!(
             error.kind,
@@ -10079,7 +9698,10 @@ mod tests {
         #[rustfmt::skip]
         let same_path = Arc::ptr_eq(request_observation.relative_path().path_arc(), baseline.relative_path.path_arc());
         assert!(same_path);
-        assert_eq!(request_observation.input(), &baseline.input);
+        assert_eq!(
+            request_observation.source_observation_input(),
+            &baseline.input
+        );
     }
 
     async fn observation_transaction(
@@ -10170,6 +9792,10 @@ mod tests {
         };
         let error = error.as_ref().as_ref().unwrap_err();
         assert_eq!(error.input(), &input);
+        assert!(matches!(
+            error.source_observation_input(),
+            HostRepositorySourceObservationInput::Root(actual) if actual == &input
+        ));
         assert!(Arc::ptr_eq(
             error.relative_path().path_arc(),
             key.relative_path.path_arc()
@@ -10248,15 +9874,7 @@ mod tests {
 
     #[test]
     fn source_observation_production_has_no_legacy_or_second_result_owner() {
-        let source = include_str!("source_preparation.rs");
-        let start = source
-            .find("pub struct HostRepositorySourceObservationKey")
-            .unwrap();
-        let end = source[start..]
-            .find("fn root_repository_materialization_request")
-            .unwrap()
-            + start;
-        let production = &source[start..end];
+        let production = include_str!("source_preparation/repository_source_observation.rs");
         assert_eq!(
             production
                 .matches("RepositoryMaterializationResultKey")
@@ -10657,42 +10275,6 @@ mod tests {
             &same,
             &different_bytes
         ));
-    }
-
-    #[test]
-    fn host_repository_source_value_need_and_error_have_no_logical_path() {
-        let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::repository(
-            RepositoryMaterializationRequest {
-                id: RepositoryMaterializationRequestId {
-                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
-                    canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
-                },
-                repo_spec: local_route().repo_spec().clone(),
-                kind: RepositoryMaterializationKind::Local {
-                    logical_root: NormalizedAbsolutePath::new("/workspace/dep").unwrap(),
-                },
-            },
-        ));
-        let error = RepositorySourceFileError::InvalidRepoRelativePath {
-            requested_path: Arc::new(PathBuf::from("../BUILD.bazel")),
-        };
-
-        assert!(matches!(
-            host_repository_source_file_value(need),
-            SourcePreparationOutcome::Need(_),
-        ));
-        assert!(matches!(
-            host_repository_source_file_value(SourcePreparationOutcome::Complete(Ok(
-                ObservedRepositorySourceFile::Absent,
-            ))),
-            SourcePreparationOutcome::Complete(Ok(HostRepositorySourceFileValue::Absent)),
-        ));
-        let SourcePreparationOutcome::Complete(Err(actual)) = host_repository_source_file_value(
-            SourcePreparationOutcome::Complete(Err(error.clone())),
-        ) else {
-            panic!("a source error must remain path-free and complete");
-        };
-        assert_eq!(actual, error);
     }
 
     #[test]

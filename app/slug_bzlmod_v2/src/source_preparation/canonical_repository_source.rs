@@ -167,9 +167,6 @@ impl std::error::Error for HostCanonicalRepositorySourceFileError {}
 
 type CanonicalSourceFileResult =
     Arc<Result<HostRepositorySourceObservation, HostCanonicalRepositorySourceFileError>>;
-type CanonicalSourceFileDriverOutcome = SourcePreparationOutcome<
-    Result<(CanonicalSourceFileResult, PathObservationEpoch), ObservedPathFrontierError>,
->;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct HostCanonicalRepositorySourceFileKey {
@@ -196,6 +193,43 @@ impl HostCanonicalRepositorySourceFileKey {
             relative_path,
         }
     }
+
+    fn shared_key(&self) -> HostRepositorySourceObservationKey {
+        HostRepositorySourceObservationKey::new_canonical(
+            self.input.clone(),
+            self.relative_path.clone(),
+        )
+    }
+}
+
+fn project_shared_source_result(
+    key: &HostCanonicalRepositorySourceFileKey,
+    result: &Arc<HostRepositorySourceObservationResult>,
+) -> CanonicalSourceFileResult {
+    Arc::new(match result.as_ref() {
+        Ok(value) => Ok(value.clone()),
+        Err(error) => Err(HostCanonicalRepositorySourceFileError {
+            input: key.input.clone(),
+            relative_path: key.relative_path.clone(),
+            kind: match &error.kind {
+                HostRepositorySourceObservationErrorKind::BuiltinPath => {
+                    HostCanonicalRepositorySourceFileErrorKind::InvalidPath
+                }
+                HostRepositorySourceObservationErrorKind::Builtin(error) => {
+                    HostCanonicalRepositorySourceFileErrorKind::Builtin(error.clone())
+                }
+                HostRepositorySourceObservationErrorKind::BuiltinCompute(error) => {
+                    HostCanonicalRepositorySourceFileErrorKind::BuiltinCompute(error.clone())
+                }
+                HostRepositorySourceObservationErrorKind::Request(error) => {
+                    HostCanonicalRepositorySourceFileErrorKind::Request(error.clone())
+                }
+                HostRepositorySourceObservationErrorKind::RequestCompute(error) => {
+                    HostCanonicalRepositorySourceFileErrorKind::RequestCompute(error.clone())
+                }
+            },
+        }),
+    })
 }
 
 impl Hash for HostCanonicalRepositorySourceFileKey {
@@ -244,252 +278,16 @@ impl fmt::Display for HostCanonicalRepositorySourceFileObservationKey {
     }
 }
 
-fn canonical_source_file_complete(
-    key: &HostCanonicalRepositorySourceFileKey,
-    result: Result<HostRepositorySourceObservation, HostCanonicalRepositorySourceFileErrorKind>,
-    observations: PathObservationEpoch,
-) -> CanonicalSourceFileDriverOutcome {
-    SourcePreparationOutcome::Complete(Ok((
-        Arc::new(
-            result.map_err(|kind| HostCanonicalRepositorySourceFileError {
-                input: key.input.clone(),
-                relative_path: key.relative_path.clone(),
-                kind,
-            }),
-        ),
-        observations,
-    )))
-}
-
-async fn resolve_canonical_source_path(
-    ctx: &mut DiceComputations<'_>,
-    key: &HostCanonicalRepositorySourceFileKey,
-    namespace: PathObservationNamespace,
-    requested_path: NormalizedAbsolutePath,
-    repo_relative_path: Arc<PathBuf>,
-    mode: HostRepositoryObservationMode,
-) -> ControlFlow<CanonicalSourceFileDriverOutcome, (ResolvedPath, PathObservationEpoch)> {
-    match mode {
-        HostRepositoryObservationMode::Legacy => match ctx
-            .compute(&ResolvedPathKey::new(namespace, requested_path))
-            .await
-        {
-            Ok(PathOutcome::Need(need)) => {
-                ControlFlow::Break(SourcePreparationOutcome::path_need(need))
-            }
-            Ok(PathOutcome::Complete(Ok(value))) => {
-                ControlFlow::Continue((value, PathObservationEpoch::empty()))
-            }
-            Ok(PathOutcome::Complete(Err(error))) => {
-                ControlFlow::Break(canonical_source_file_complete(
-                    key,
-                    Err(HostCanonicalRepositorySourceFileErrorKind::Request(
-                        project_resolution_error(repo_relative_path, error),
-                    )),
-                    PathObservationEpoch::empty(),
-                ))
-            }
-            Err(error) => ControlFlow::Break(canonical_source_file_complete(
-                key,
-                Err(HostCanonicalRepositorySourceFileErrorKind::RequestCompute(
-                    error.to_string().into(),
-                )),
-                PathObservationEpoch::empty(),
-            )),
-        },
-        HostRepositoryObservationMode::Observed => match ctx
-            .compute(&ResolvedPathObservationKey::new(namespace, requested_path))
-            .await
-        {
-            Ok(PathOutcome::Need(need)) => {
-                ControlFlow::Break(SourcePreparationOutcome::path_need(need))
-            }
-            Ok(PathOutcome::Complete(Err(error))) => {
-                ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)))
-            }
-            Ok(PathOutcome::Complete(Ok(value))) => match value.result() {
-                Ok(resolved) => {
-                    ControlFlow::Continue((resolved.clone(), value.observations().dupe()))
-                }
-                Err(error) => ControlFlow::Break(canonical_source_file_complete(
-                    key,
-                    Err(HostCanonicalRepositorySourceFileErrorKind::Request(
-                        project_resolution_error(repo_relative_path, error.clone()),
-                    )),
-                    value.observations().dupe(),
-                )),
-            },
-            Err(error) => ControlFlow::Break(canonical_source_file_complete(
-                key,
-                Err(HostCanonicalRepositorySourceFileErrorKind::RequestCompute(
-                    error.to_string().into(),
-                )),
-                PathObservationEpoch::empty(),
-            )),
-        },
-    }
-}
-
-async fn drive_request_source_file(
-    ctx: &mut DiceComputations<'_>,
-    key: &HostCanonicalRepositorySourceFileKey,
-    request: Arc<RepositoryMaterializationRequest>,
-    mode: HostRepositoryObservationMode,
-) -> CanonicalSourceFileDriverOutcome {
-    let repo_relative_path = key.relative_path.path_arc().clone();
-    let materialization = match ctx
-        .compute(&RepositoryMaterializationResultKey { request })
-        .await
-    {
-        Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
-        Ok(SourcePreparationOutcome::Complete(value)) => value,
-        Err(error) => {
-            return canonical_source_file_complete(
-                key,
-                Err(HostCanonicalRepositorySourceFileErrorKind::RequestCompute(
-                    error.to_string().into(),
-                )),
-                PathObservationEpoch::empty(),
-            );
-        }
-    };
-    let materialization = match materialization.as_ref() {
-        Ok(value) => value,
-        Err(error) => {
-            return canonical_source_file_complete(
-                key,
-                Err(HostCanonicalRepositorySourceFileErrorKind::Request(
-                    RepositorySourceFileError::Materialization {
-                        repo_relative_path,
-                        error: Arc::new(error.clone()),
-                    },
-                )),
-                PathObservationEpoch::empty(),
-            );
-        }
-    };
-    let (namespace, root) = match materialization {
-        RepositoryMaterialization::Local { source_root, .. } => {
-            (PathObservationNamespace::Host, source_root)
-        }
-        RepositoryMaterialization::Immutable {
-            generation_root,
-            observation_instance,
-            ..
-        } => (
-            PathObservationNamespace::Materialization(*observation_instance),
-            generation_root,
-        ),
-    };
-    let requested_path = match NormalizedAbsolutePath::new(root.join(key.relative_path.as_path())) {
-        Ok(value) => value,
-        Err(_) => {
-            return canonical_source_file_complete(
-                key,
-                Err(HostCanonicalRepositorySourceFileErrorKind::Request(
-                    RepositorySourceFileError::InvalidMaterializedPath { repo_relative_path },
-                )),
-                PathObservationEpoch::empty(),
-            );
-        }
-    };
-    let (resolved, observations) = match resolve_canonical_source_path(
-        ctx,
-        key,
-        namespace,
-        requested_path,
-        repo_relative_path.clone(),
-        mode,
-    )
-    .await
-    {
-        ControlFlow::Continue(value) => value,
-        ControlFlow::Break(outcome) => return outcome,
-    };
-    match drive_host_repository_source_from_resolved(
-        ctx,
-        resolved,
-        repo_relative_path,
-        mode,
-        observations,
-    )
-    .await
-    {
-        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-        SourcePreparationOutcome::Complete(Err(error)) => {
-            SourcePreparationOutcome::Complete(Err(error))
-        }
-        SourcePreparationOutcome::Complete(Ok((result, observations))) => {
-            canonical_source_file_complete(
-                key,
-                result
-                    .map(HostRepositorySourceObservation::Request)
-                    .map_err(HostCanonicalRepositorySourceFileErrorKind::Request),
-                observations,
-            )
-        }
-    }
-}
-
-async fn drive_canonical_source_file(
-    ctx: &mut DiceComputations<'_>,
-    key: &HostCanonicalRepositorySourceFileKey,
-    mode: HostRepositoryObservationMode,
-) -> CanonicalSourceFileDriverOutcome {
-    match key.input.view().disposition() {
-        HostRepositorySourceInputDispositionView::Builtin(identity) => {
-            let Some(path) = key.relative_path.as_path().to_str() else {
-                return canonical_source_file_complete(
-                    key,
-                    Err(HostCanonicalRepositorySourceFileErrorKind::InvalidPath),
-                    PathObservationEpoch::empty(),
-                );
-            };
-            match ctx
-                .compute(&BuiltinBazelToolsSourceFileKey::new(
-                    identity.snapshot(),
-                    path,
-                ))
-                .await
-            {
-                Ok(value) => canonical_source_file_complete(
-                    key,
-                    value
-                        .as_ref()
-                        .clone()
-                        .map(HostRepositorySourceObservation::Builtin)
-                        .map_err(HostCanonicalRepositorySourceFileErrorKind::Builtin),
-                    PathObservationEpoch::empty(),
-                ),
-                Err(error) => canonical_source_file_complete(
-                    key,
-                    Err(HostCanonicalRepositorySourceFileErrorKind::BuiltinCompute(
-                        error.to_string().into(),
-                    )),
-                    PathObservationEpoch::empty(),
-                ),
-            }
-        }
-        HostRepositorySourceInputDispositionView::Request(request) => {
-            drive_request_source_file(ctx, key, request.clone(), mode).await
-        }
-    }
-}
-
 #[async_trait]
 impl Key for HostCanonicalRepositorySourceFileKey {
     type Value = SourcePreparationOutcome<CanonicalSourceFileResult>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        match drive_canonical_source_file(ctx, self, HostRepositoryObservationMode::Legacy).await {
-            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
-                debug_assert!(observations.observations().is_empty());
-                SourcePreparationOutcome::Complete(result)
-            }
-            SourcePreparationOutcome::Complete(Err(_)) => {
-                unreachable!("legacy canonical source file has no observed outer")
-            }
+        let key = self.shared_key();
+        match ctx.compute(&key).await {
+            Ok(value) => value.map(|result| project_shared_source_result(self, &result)),
+            Err(error) => source_observation_compute_error(&key, error.to_string().into())
+                .map(|result| project_shared_source_result(self, &result)),
         }
     }
 
@@ -509,16 +307,26 @@ impl Key for HostCanonicalRepositorySourceFileObservationKey {
     >;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        drive_canonical_source_file(ctx, &self.0, HostRepositoryObservationMode::Observed)
-            .await
-            .map(|value| {
-                value.map(
-                    |(result, observations)| ObservedHostCanonicalRepositorySourceFile {
-                        result,
-                        observations,
-                    },
-                )
-            })
+        let key = self.0.shared_key();
+        let observed = HostRepositorySourceObservationEpochKey::new_canonical(
+            self.0.input.clone(),
+            self.0.relative_path.clone(),
+        );
+        match ctx.compute(&observed).await {
+            Ok(value) => value.map(|value| {
+                value.map(|observed| ObservedHostCanonicalRepositorySourceFile {
+                    result: project_shared_source_result(&self.0, observed.result()),
+                    observations: observed.observations().dupe(),
+                })
+            }),
+            Err(error) => source_observation_epoch_compute_error(&key, error.to_string().into())
+                .map(|value| {
+                    value.map(|observed| ObservedHostCanonicalRepositorySourceFile {
+                        result: project_shared_source_result(&self.0, observed.result()),
+                        observations: observed.observations().dupe(),
+                    })
+                }),
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
