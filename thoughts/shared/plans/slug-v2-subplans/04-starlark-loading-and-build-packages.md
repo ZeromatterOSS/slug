@@ -5247,6 +5247,23 @@ Zig code, configured behavior or algorithm is adopted. The Buck2 utility audit
 selects the current Copy enum and `Allocative`; no utility or ledger change is
 needed. Bazel 9.2 remains sole behavior authority.
 
+### Configuration-field named-only candidate REPLAN; dual ABI retry selected (2026-08-26)
+
+The first binding implementation added 12 production and 58 proof lines, passed
+all 249 loading, 24 invalidation and 31 BUILD-loading tests plus downstream
+checks, and retained no value. Independent review nevertheless rejected it:
+pinned Bazel's `@Param(named = true)` leaves `positional = true` by default, so
+the Rust `#[starlark(require = named)]` parameters silently narrowed valid
+two-positional and positional-then-named calls. The entire candidate was removed
+and both Rust files match base hashes.
+
+Run only `WP-4-7A-bazel-configuration-field-loading-binding-r2` under unchanged
+20/80/100 caps. Both required strings accept positional or named binding; prove
+two-positional, positional-then-named, two-named and reverse-named forms reach
+the identical Slug-native fail-closed diagnostic. Preserve BUILD absence, lazy
+freeze and every descriptor/configured deferral. Clean `../zabel` `0795445f…`
+remains guidance only for binding/descriptor separation; Bazel 9.2 owns the ABI.
+
 ### Complete semantics proof REPLAN; configuration-field binding selected (2026-08-26)
 
 The exact complete 234-line `cc/common/semantics.bzl` attempt stopped before
@@ -5257,11 +5274,11 @@ candidate; only the scheduling documents and required routing row are now dirty.
 A test-local substitute or narrowed source would violate the packet.
 
 Pinned Bazel 9.2 declares `configuration_field(fragment, name)` as a `.bzl`
-top-level function with two required named-only strings. Its valid result is a
+top-level function with two required positional-or-named strings. Its valid result is a
 late-bound label default after fragment/field validation. Slug does not yet own
 that retained value or its configured resolver, and semantics never invokes the
 binding during loading. Run only
-`WP-4-7A-bazel-configuration-field-loading-binding` under 20/80/100 caps: expose
+`WP-4-7A-bazel-configuration-field-loading-binding-r2` under 20/80/100 caps: expose
 the exact `.bzl` callable/ABI, preserve lazy reference/freeze, keep BUILD absence,
 and fail every otherwise valid call closed before allocation. Defer descriptors,
 attribute defaults and configured resolution, then retry complete semantics.
