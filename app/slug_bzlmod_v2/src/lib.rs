@@ -9,6 +9,7 @@
  */
 
 mod builtin_repository;
+mod canonical_repository_route;
 pub mod dice;
 mod generated_repository_file_effect;
 mod host_external_package_boundary;
@@ -46,6 +47,14 @@ pub use builtin_repository::BuiltinBazelToolsSourceFileError;
 pub use builtin_repository::BuiltinBazelToolsSourceFileKey;
 pub use builtin_repository::BuiltinBazelToolsSourceFileValue;
 pub use builtin_repository::BuiltinBazelToolsSourceKind;
+#[doc(hidden)]
+pub use canonical_repository_route::HostCanonicalRepositoryRoute;
+#[doc(hidden)]
+pub use canonical_repository_route::HostCanonicalRepositoryRouteKind;
+#[doc(hidden)]
+pub use canonical_repository_route::HostCanonicalRepositoryRouteView;
+#[doc(hidden)]
+pub use canonical_repository_route::HostGeneratedRepositoryEffectSeed;
 pub use dice::BzlmodCommandPolicyKey;
 pub use dice::BzlmodDiceInputs;
 pub use dice::BzlmodEnvironmentPolicyKey;

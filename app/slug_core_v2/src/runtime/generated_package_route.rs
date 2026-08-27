@@ -15,10 +15,14 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use slug_bzlmod_v2::HostGeneratedRepositoryEffectSeed;
 use slug_bzlmod_v2::RootRepositoryRoute;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalRepoName;
+use slug_loading_v2::HostCanonicalRepositoryApparentMappingErrorDisposition;
+use slug_loading_v2::HostCanonicalRepositoryApparentMappingKey;
+use slug_loading_v2::HostCanonicalRepositoryApparentMappingObservationKey;
 use slug_loading_v2::HostSelectedRepositoryFileEffectError;
 use slug_loading_v2::HostSelectedRepositoryFileEffectKey;
 use slug_loading_v2::HostSelectedRepositoryFileEffectObservationKey;
@@ -26,9 +30,6 @@ use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathObservationEpoch;
 
-use super::generated_repository_definition::HostCanonicalRepositoryApparentMappingErrorDisposition;
-use super::generated_repository_definition::HostCanonicalRepositoryApparentMappingKey;
-use super::generated_repository_definition::HostCanonicalRepositoryApparentMappingObservationKey;
 use super::root_apparent_repository_definition::HostRootApparentRepositoryDefinitionKey;
 use super::root_apparent_repository_definition::HostRootApparentRepositoryDefinitionKind;
 use super::root_apparent_repository_definition::HostRootApparentRepositoryDefinitionObservationKey;
@@ -215,7 +216,7 @@ fn definition_key(key: &GeneratedPackageRouteKey) -> HostRootApparentRepositoryD
 
 fn effect_key(
     key: &GeneratedPackageRouteKey,
-    seed: super::generated_repository_definition::HostGeneratedRepositoryEffectSeed<'_>,
+    seed: HostGeneratedRepositoryEffectSeed<'_>,
 ) -> HostSelectedRepositoryFileEffectKey {
     HostSelectedRepositoryFileEffectKey::new(
         key.workspace.dupe(),
@@ -531,13 +532,13 @@ mod tests {
     use slug_events_v2::EventBatch;
     use slug_identity_v2::ApparentRepoName;
     use slug_identity_v2::CanonicalRepoName;
+    use slug_loading_v2::HostCanonicalRepositoryApparentMappingErrorDisposition;
+    use slug_loading_v2::HostCanonicalRepositoryApparentMappingObservationKey;
     use slug_loading_v2::HostSelectedRepositoryFileEffectObservationKey;
     use slug_workspace_v2::NormalizedAbsolutePath;
     use slug_workspace_v2::PathObservationEpoch;
     use slug_workspace_v2::PathObservationEpochKey;
 
-    use super::super::generated_repository_definition::HostCanonicalRepositoryApparentMappingErrorDisposition;
-    use super::super::generated_repository_definition::HostCanonicalRepositoryApparentMappingObservationKey;
     use super::super::generated_repository_definition::tests::EXTENSION_A;
     use super::super::generated_repository_definition::tests::MODULE;
     use super::super::generated_repository_definition::tests::WORKSPACE;

@@ -11,10 +11,15 @@
 pub mod attrs;
 pub mod bzl_module;
 mod bzl_visibility;
+mod canonical_repository_mapping;
+mod canonical_repository_route;
+#[cfg(test)]
+mod canonical_repository_route_tests;
 mod cc_common;
 mod cycle_detector;
 mod external_subtree_package_set;
 pub mod file_discovery;
+mod generated_repository_definition;
 pub mod glob;
 pub mod globals;
 mod host_glob;
@@ -63,6 +68,32 @@ pub use bzl_module::RootPackageLoadKey;
 #[doc(hidden)]
 pub use bzl_module::RootPackageLoadObservationKey;
 pub use bzl_module::discover_build_file_companion;
+#[doc(hidden)]
+pub use canonical_repository_mapping::HostCanonicalRepositoryApparentMapping;
+#[doc(hidden)]
+pub use canonical_repository_mapping::HostCanonicalRepositoryApparentMappingError;
+#[doc(hidden)]
+pub use canonical_repository_mapping::HostCanonicalRepositoryApparentMappingErrorDisposition;
+#[doc(hidden)]
+pub use canonical_repository_mapping::HostCanonicalRepositoryApparentMappingKey;
+#[doc(hidden)]
+pub use canonical_repository_mapping::HostCanonicalRepositoryApparentMappingObservationError;
+#[doc(hidden)]
+pub use canonical_repository_mapping::HostCanonicalRepositoryApparentMappingObservationKey;
+#[doc(hidden)]
+pub use canonical_repository_mapping::ObservedHostCanonicalRepositoryApparentMapping;
+#[doc(hidden)]
+pub use canonical_repository_route::HostCanonicalRepositoryRouteError;
+#[doc(hidden)]
+pub use canonical_repository_route::HostCanonicalRepositoryRouteKey;
+#[doc(hidden)]
+pub use canonical_repository_route::HostCanonicalRepositoryRouteObservationError;
+#[doc(hidden)]
+pub use canonical_repository_route::HostCanonicalRepositoryRouteObservationKey;
+#[doc(hidden)]
+pub use canonical_repository_route::HostCanonicalRepositoryRouteOutcome;
+#[doc(hidden)]
+pub use canonical_repository_route::ObservedHostCanonicalRepositoryRoute;
 pub use cycle_detector::bzl_load_cycle_detector;
 #[doc(hidden)]
 pub use external_subtree_package_set::ExternalSubtreePackageSet;
