@@ -1,66 +1,67 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-rules-cc-extra-link-library-complete-loading-proof`
+Packet: `WP-4-7A-rules-cc-private-cc-info-complete-loading-proof`
 
 Milestone: M7A command/ruleset bootstrap closure.
 
-Result: prove the authenticated complete 192-line rules_cc
-`cc/private/link/create_extra_link_time_library.bzl` producer loads its two
-accepted-complete children, evaluates its provider declarations/empty instance,
-and freezes all bindings without invoking a lazy helper. Add no production.
+Result: prove the authenticated complete 656-line rules_cc
+`cc/private/cc_info.bzl` producer loads four accepted-complete children,
+evaluates its provider/empty-context rows, and freezes all lazy bindings. Add no
+production behavior and invoke no lazy helper.
 
 ## Learned facts and decision
 
-Base commit is `bb6b7356a` (`Prove complete rules_cc helper freeze`). It adds
-exactly 480 proof lines and no production, embeds/hashes all 383 helper lines,
-loads three exact-complete children with the actual Skylib mapping, retains
-their pointer identities, evaluates exactly 22 source-owned initializer calls,
-and freezes the complete helper. Focused proof, 241 library tests, 24
+Base commit is `30ec1de4f` (`Prove complete extra link library freeze`). It adds
+316 proof lines and no production, embeds/hashes all 192 source lines, rebuilds
+the exact recursive helper/internal closure, retains both loaded identities,
+proves four distinct provider callables and private visibility, and verifies
+the exact `_EMPTY` provider ID/list. Focused proof, 242 library tests, 24
 invalidation tests, 31 BUILD-loading tests, locked analysis/core checks, CLI
-build, formatting and hygiene pass. Independent review accepts bytes, caps,
-eager/lazy boundary and compatibility classes.
+build, formatting and hygiene pass. Independent review accepts caps and bounds.
 
-Source order now reaches private `cc_info.bzl`'s fourth load,
-`cc/private/link/create_extra_link_time_library.bzl`: 192 lines, SHA-256
-`522312ac48567566725f0768a6961fcaa78577fa24ac8007d5b1b8ca19698e82`.
-Its two loads are now exact complete:
+All four loads of rules_cc 0.2.17 `cc/private/cc_info.bzl` are now complete in
+source order:
 
-1. `cc/common/cc_helper_internal.bzl` (383, `793ab429...`);
-2. `cc/private/cc_internal.bzl` (17, `8241ced5...`).
+1. Skylib `lib/paths.bzl` (320 lines, `96cce438...`);
+2. rules_cc `cc/common/cc_helper_internal.bzl` (383, `793ab429...`);
+3. rules_cc `cc/private/cc_internal.bzl` (17, `8241ced5...`);
+4. rules_cc extra-link library (192, `522312ac...`).
 
-The producer eagerly declares free-field `ExtraLinkTimeLibraryInfo` and
-`ExtraLibraryInfo`, private three-field `_KeyInfo`, and documented one-field
-`ExtraLinkTimeLibrariesInfo`, then makes the single `_EMPTY` instance at lines
-87-89. Lines 45-78 and 91-192 are lazy function bodies. Existing source-shaped
-proof accepts these exact provider schemas, optional fields and empty instance,
-but does not own the complete producer or loaded identities. No unsupported
-eager expression remains.
+The parent is 656 lines, SHA-256
+`4424bb876c3f8234d7cfce20652e7ab1a7b2fc34cc2c637b1cb4313590d9f1bc`.
+Lines 23-153 eagerly declare five ordinary providers and construct three empty
+contexts. `EMPTY_COMPILATION_CONTEXT` uses accepted zero-argument `depset()` and
+the admitted `cc_internal.create_header_info()` projection; the other two rows
+use empty depsets. Lines 247-269 declare initialized `CcInfo` plus private raw
+constructor. Every other `def` body is lazy. Existing tests accept all evaluator
+and provider/context slices, but no proof owns the complete producer and loaded
+identities. No further unsupported eager expression remains.
 
 Therefore run only
-`WP-4-7A-rules-cc-extra-link-library-complete-loading-proof`. Do not claim
-private CcInfo, `cc_common`, the generated proxy, or any lazy operation.
+`WP-4-7A-rules-cc-private-cc-info-complete-loading-proof`. Do not claim
+`cc_common`, toolchain config, public generated proxy, or configured C++.
 
 ## Authorities, ownership and compatibility
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-and authenticated rules_cc bytes are sole exact authority. Clean `../zabel`
-commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only the
-architecture that defining child modules own loaded functions/tokens, the
-parent retains those identities, and recursive freeze closes before CcInfo
-imports the producer. Copy no Zig code, representation, traversal or behavior.
+and authenticated rules_cc/Skylib bytes are sole exact authority. Clean
+`../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` guides only
+defining-module loaded-value ownership, retained child identity and recursive
+freeze before proxy reexport. Copy no Zig code, representation or behavior.
 
-- **Exact:** all 192 source lines/hash, load order/canonical owners and child
-  pointer identity; four provider callable identities/schemas; private
-  visibility; exact source-owned `_EMPTY` call, value and frozen bindings.
-- **Slug-native:** only proof composition in Slug's frozen module heaps.
-- **Unsupported/deferred:** manual or lazy provider/helper/internal invocation;
-  create/merge/build behavior; complete private CcInfo, `cc_common`, toolchain
-  config or proxy; configured C++ semantics, actions and analysis.
+- **Exact:** complete source/hash and load order/canonical owners; imported
+  pointer identities; provider callable/schema/visibility identities; exact
+  source-owned empty-context and initialized-provider declaration sequence;
+  frozen public/private binding types.
+- **Slug-native:** the already admitted narrow `cc_internal` bridge/header-info
+  backing and proof composition in Slug's frozen heaps.
+- **Unsupported/deferred:** manual/lazy/internal/provider invocation beyond the
+  exact source-owned eager rows; context create/merge behavior; complete
+  `cc_common`, toolchain config or proxy; configured C++ semantics/actions.
 
-The three frozen heaps own all loaded functions, provider callables, `_EMPTY`
-and lazy closures with no evaluator borrow. No production, DICE, request,
-cache, async, fixture, oracle, hot-path, fallback or utility-reuse decision is
-introduced.
+Frozen child/parent heaps own all callables, contexts, depsets and closures; no
+evaluator borrow escapes. No production, DICE, request, cache, async, fixture,
+oracle, hot-path, fallback or utility-reuse decision is introduced.
 
 ## Allowlist, caps and proof
 
@@ -69,36 +70,37 @@ Change only:
 - `app/slug_loading_v2/src/host_package_load_tests.rs`;
 - the three scheduling documents when rolling the accepted result.
 
-At base `bb6b7356a` the Rust authority is 10,443 lines, SHA-256
-`9afb6a9e696890816b38014b7482f64c521133c66ab8d04566a6cb0f7d7837e0`.
-Its final ceiling is 10,763 lines. The new test function must remain at most
-120 physical lines; a file-scope exact-source constant is exempt from that
-function ceiling but counts against the packet cap. The oversized test module
-remains cohesive around its private evaluator/load harness and adjacent exact
-rules-source constants; add no production responsibility or generic archive.
+At base `30ec1de4f` the Rust authority is 10,759 lines, SHA-256
+`894e59abcae6cb977567c5f9037fec8cf6cb460dba9acd9793a4d62f307168b0`.
+Its final ceiling is 11,659 lines. A recursive closure builder and the new proof
+function must each remain at most 120 physical lines; the file-scope exact-source
+constant is exempt from function ceilings but counts against the packet cap.
+The oversized test module stays cohesive around its private load harness and
+adjacent authenticated source constants; add no production responsibility or
+generic source archive.
 
-Caps are 0 production, 320 proof and 320 total additions; deletions do not buy
-budget. Embed/hash all 192 lines; build the exact frozen helper/internal child
-closure; evaluate at owner
-`@@rules_cc+//cc/private/link:create_extra_link_time_library.bzl`; prove both
-loaded binding identities, public/private callable types/visibility, four
-distinct provider identities, `_EMPTY`'s matching provider identity and empty
-libraries list, and lazy exported function types. Permit only the exact
-source-owned `_EMPTY` provider call. Add no fixture or fresh oracle.
+Caps are 0 production, 900 proof and 900 total additions; deletions do not buy
+budget. Embed/hash all 656 lines; build the four exact frozen children and
+actual Skylib mapping; evaluate at exact owner
+`@@rules_cc+//cc/private:cc_info.bzl`; prove all four imported pointer identities,
+six provider callable identities/types/visibility, the three empty-context
+provider IDs and distinguishing field/list/depset shapes, initialized
+`CcInfo`/raw types and lazy exported/private function types. Permit only exact
+source-owned eager calls. Add no fixture or fresh oracle.
 
 Run focused proof, all `slug_loading_v2` library tests, `bzl_invalidation`,
 `build_file_loading`, locked analysis/core checks, locked CLI build, formatting,
 diff and archive hygiene. Measure caps/ceilings and obtain independent review
-of exact bytes, child/provider identities, eager/lazy boundary, ownership,
+of bytes, recursive identities, eager/lazy boundary, exact/Slug-native split,
 Zabel's guidance-only role and compatibility classes.
 
 STOP and `REPLAN` for production change, source/hash mismatch, missing evaluator
-shape, manual/lazy/internal invocation, copied/narrowed source, lost identity,
-evaluator-borrowed frozen value, parent/proxy claim, unpinned source, copied
-Zabel content, dirty authority, allowlist escape or cap violation. Stop after
-this producer and re-audit private CcInfo's own eager expressions.
+shape, manual/lazy invocation, copied/narrowed source, lost identity,
+evaluator-borrowed value, parent/proxy claim, unpinned source, copied Zabel
+content, dirty authority, allowlist escape or cap/function violation. Stop after
+private CcInfo and re-audit `cc_common` plus toolchain-config source order.
 
 ## Immediate predecessor
 
-Commit `bb6b7356a` completes the first `cc_common` child and the third load of
-private CcInfo. It does not complete private CcInfo or any remaining proxy root.
+Commit `30ec1de4f` completes private CcInfo's final loaded child. It does not
+complete private CcInfo or any remaining generated-proxy root.
