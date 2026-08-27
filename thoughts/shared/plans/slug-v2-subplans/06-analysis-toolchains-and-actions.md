@@ -19146,3 +19146,24 @@ actions/artifacts, configuration/toolchains and repository/loading services—
 so rules_cc needs discriminate shared gaps instead of creating C++-specific
 Rust semantics. Pinned Bazel 9.2 remains behavior authority. Clean
 `../zabel` commit `0795445f…` remains peer design/optimization guidance only.
+
+Independent review required selected-nonregistry/direct-local as a fifth
+first-class route disposition, including its source policy, mapping,
+legacy/observed behavior and A/B/A proof. The focused correction was accepted;
+commit `6b9dfd790` freezes the decision.
+
+Activate only
+`WP-4-5-7A-loading-canonical-repository-route-owner-implementation`. Add one
+apparent-free bzlmod carrier, split the existing core-private production owner
+into generated-definition, canonical-route and contextual-mapping modules in
+loading, and reduce the core module to test fixture support. Root-apparent
+callers remain adapters. Preserve the sole semantic keys and existing tests;
+add only built-in direct-route and five-disposition carrier gaps. Stop before
+target-pattern expansion, registration, rules or actions.
+
+The generated carrier retains only its owner/ordinal effect seed. Canonical
+route and contextual mapping owners do not compute
+`HostSelectedRepositoryFileEffectKey`; otherwise mapping would activate source
+effects and a dropped plan could defeat equality cutoff. The existing later
+source adapter remains the sole effect-key consumer and structurally retains
+the resulting plan.
