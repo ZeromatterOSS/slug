@@ -19031,3 +19031,69 @@ the shared private lookup. Stop before recursive traversal, target-pattern
 expansion, registration, loading or rules. Bazel 9 BCR Starlark remains the
 rule source, including `cc_internal`; `cc_common` is only a generic host-ABI
 consumer. Zabel remains peer guidance, never semantic authority.
+
+### External package boundary accepted; external subtree producer designed (2026-08-27)
+
+Commit `ee20d5c7c` completes the route-owned boundary prerequisite. The private
+point lookup now preserves `Deleted` for deleted-package policy and reports
+`IgnoredDirectory` only at the existing routed-ignore decision. Existing
+repository-package source and direct-local include-horizon consumers map both
+back to their accepted `Deleted` failure, so no point-loading behavior changes.
+
+`HostExternalPackageBoundaryKey` retains the complete authenticated route plus
+package path and consumes only that private lookup. It projects invalid,
+deleted, ignored, package-with-marker and no-package terminals; public errors
+are payload-free tags. Its observed sibling forwards the private epoch exactly
+and preserves outer-before-Need-before-terminal order. No policy, listing,
+path, source, materialization, cache, interner, mapping copy or lock crosses the
+new boundary.
+
+Nine focused projection tests cover all terminals and marker spellings, real
+built-in policy/ignore/listing/marker composition, key and marker A/B/A,
+complete-only validity, exact observed epoch sharing, outer forwarding,
+redaction and the sole-dependency guard. Full bzlmod passes 575 units after the
+known mixed-horizon ordering flake passed isolated and on immediate full
+rerun. Full loading, locked loading/core checks and rebuilt locked CLI pass.
+Formatting, diff, scope, dependency, no-lock and archive-baseline gates pass at
+363 production and 408 proof additions; the archive checker reports only its
+three known retained thoughts paths. Independent DICE/source-boundary review
+returned `ACCEPT` and confirmed that existing four-disposition private-owner
+coverage composes with the branch-free projection.
+
+#### External subtree package-set owner decision
+
+The loading successor is now bounded. Add one key over the complete
+`RootRepositoryRoute` plus root-capable package prefix. At each candidate it
+consumes `HostExternalPackageBoundaryKey` first. An ignored terminal prunes
+before any listing dependency; every other successful terminal then consumes
+`HostRepositoryDirectoryListingKey`. The observed form uses the matching
+siblings and merges epochs boundary first, then listing. Each dependency keeps
+outer before Need before semantic-terminal precedence, and boundary failure
+precedes listing work.
+
+Only `IgnoredDirectory` prunes descendants. Deleted, invalid and no-package
+states suppress the current package but retain child traversal; Package records
+the current package and also traverses children. Missing listing has no
+children, and a package terminal paired with a missing directory fails closed.
+Directory entries are enqueued and files are skipped. Symlink and unknown
+entries fail closed until followed-route/cycle semantics are designed; Bazel
+normally follows symlinks, so silent omission is forbidden. Non-Unicode names
+return a typed redacted parent-only error. Reverse lexical push plus final
+lexical sort/dedup yields one retained `Arc<[CompactString]>` package set; that
+order is Slug-native because Bazel stable-order nested sets do not promise
+lexical order.
+
+This is a loading producer, not a query expansion or second filesystem walk.
+The route stays intact in DICE identity and neither bzlmod dependency exposes a
+physical root, namespace or source tree. DFS stacks, batches and temporary
+vectors are compute scratch. Existing `CompactString`, immutable slices,
+`Dupe` and `Allocative` are sufficient; no Buck2 utility import, dependency,
+interner, global cache or Stage 9 ledger row is needed. Zabel's authenticated-
+source producer and sorted-child split informs the architecture only.
+
+Activate only `WP-4-5-7A-external-subtree-package-set-owner-design-r2` at zero
+Rust. Require independent DICE/retained-representation review before selecting
+the manifest's bounded three-file implementation. Stop before target-pattern
+expansion, family filtering, registration, package loading, configured
+semantics, rules or actions. Bazel 9 BCR Starlark remains the rule source,
+including `cc_internal`; `cc_common` is only a generic host-ABI consumer.
