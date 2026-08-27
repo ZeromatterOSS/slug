@@ -1,79 +1,124 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-7A-complete-json-builtin-and-rules-rust-toolchain-loading`
+Packet: `WP-4-6-7A-complete-module-registration-pattern-category-design`
 
-Milestone: M7A command/ruleset bootstrap closure.
+Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
+10.3 analysis.
 
-Result: admit Bazel's complete four-method shared `json` module by reusing and
-correcting the adopted starlark-rust implementation, then retry the complete
-authenticated rules_rust toolchain parent without invocation.
+Result: freeze one complete architecture for MODULE
+`register_toolchains` and `register_execution_platforms` target patterns before
+any more Rust. The design must cover declaration, selected-module ownership,
+parsing, expansion, kind filtering and configured validation as distinct
+layers shared by both builtins.
 
 ## Learned facts and decision
 
-Commit `4a2022764` admits the complete shared rule/aspect target-fragment
-declaration category. The 1,002-line rules_rust toolchain then stops during
-compilation at `json.decode`: Bazel predeclares `json` across BUILD, `.bzl`
-and cquery environments, while Slug did not install starlark-rust's existing
-`LibraryExtension::Json`.
+Commit `0a799e522` accepts the complete shared JSON category and recursively
+freezes authenticated rules_rust `rust/private/toolchain.bzl`. The first normal
+`slug query '//...'` replay now fails at root `MODULE.bazel` line 21 because
+Slug's root evaluator rejects `@rust_toolchains//:all` as not being a direct
+label.
 
-Starlark-rust already owns `decode`, `encode`, `encode_indent` and
-`indent`, but its current ABI and output differ from Bazel 9.2: decode's
-default is incorrectly keyword-only, indent exposes `indent_str`, dictionaries
-encode in insertion order instead of lexical key order, and formatting
-round-trips through serde instead of preserving JSON token spelling. Correct
-the reusable library once and install it in both BUILD and `.bzl` globals.
-Prove the complete method category, not only the toolchain's decode reference.
+Bazel 9.2 does not parse registrations as labels during MODULE evaluation.
+`ModuleFileGlobals` checks only absolute pattern spelling after dev-dependency
+suppression and retains raw strings. `RegisteredToolchainsFunction` and
+`RegisteredExecutionPlatformsFunction` later parse each selected module's
+patterns with that module's canonical repository and full mapping, expand them,
+deduplicate in stable order, apply different wildcard-kind filters, then
+validate configured providers/settings. Patterns expanding to multiple targets
+are lexical by target name; direct, `:all`, `:*`, `:all-targets` and recursive
+forms belong to one category, including explicit-target/wildcard ambiguity.
 
-Then freeze authenticated `rust/private/toolchain.bzl` over its ten complete
-real children. Prove source/hash, fourteen imported pointer identities,
-`_DIGITS`, ten private functions, two rules, fragment/toolchain declarations
-and exact inventories. Invoke nothing. STOP and replan at any next eager gap.
+Do not patch only `:all`, store a wildcard as a fake label, or expand patterns
+inside MODULE evaluation. That would lose owner mapping, selected-module order,
+ambiguity and the shared expansion boundary and would force churn when the
+second builtin or recursive patterns arrive.
+
+## Required design
+
+Record one reviewed design in
+`thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
+and update the canonical/current manifests. It must specify:
+
+1. A compact immutable declaration row retaining raw absolute pattern text and
+   its declaring selected-module owner. Owner context must be sufficient to
+   recover the canonical repository and complete repository mapping; physical
+   repository paths are not semantic identity.
+2. One parsed target-pattern vocabulary shared with ordinary query/build
+   patterns while preserving wildcard spelling and absolute-target ambiguity.
+   Parsing must not perform package lookup.
+3. One DICE-owned expansion projection used by both registration families.
+   It loads package targets through existing loading owners, preserves selected
+   module and declaration order, gives each multi-target expansion Bazel lexical
+   order, deduplicates stably and participates structurally in invalidation.
+4. Separate policies after expansion: wildcard toolchain patterns select
+   toolchain-rule candidates; wildcard execution-platform patterns select
+   platform candidates; explicit targets survive loading filters and fail later
+   if their configured provider is wrong. Target-setting checks remain a
+   configured-analysis concern.
+5. Root and selected nonroot registrations, dev-dependency suppression,
+   apparent repository mapping, direct/package/recursive patterns, empty and
+   duplicate expansions, invalid patterns, missing packages/targets and
+   A/B/A/cancellation/warm behavior. Both builtins must be handled together.
+6. A bounded implementation sequence with exact allowlists, line/function
+   caps, oracle/pinned-source evidence and one first packet. Slices may follow
+   ownership boundaries, but no slice may invent a representation that the
+   complete category later replaces.
+
+Configuration-option registrations may feed the same future expansion owner,
+but are not silently claimed by this MODULE category. Rule implementations,
+toolchain resolution, action creation, input trees and bootstrap execution stay
+downstream.
 
 ## Architecture, compatibility and guidance
 
-Bazel 9.2 `Json.java`, `json.star`,
-`StarlarkRuleClassFunctionsTest` and authenticated rules_rust bytes are exact
-authority. Reuse the adopted starlark-rust JSON module rather than creating a
-package-specific host. Zabel is concept/test guidance only: its shared,
-context-free, pure JSON predeclared reinforces that JSON owns no package,
-mapping, filesystem or DICE authority; no Zig code or diagnostics are copied.
+Bazel 9.2 `ModuleFileGlobals`, `InterimModule`, `TargetPattern`,
+`TargetPatternUtil`, `RegisteredToolchainsFunction`,
+`RegisteredExecutionPlatformsFunction` and their focused tests are exact
+authority. Generate a focused Bazel 9.2 oracle only where pinned source/tests do
+not discriminate retained order, ambiguity, filtering or error timing.
 
-- **Exact:** shared BUILD/`.bzl` availability; four-method inventory and
-  argument ABI; supported value encoding, lexical object-key ordering, compact
-  encoding, default behavior, valid decoding and token-preserving indentation;
-  complete parent source graph and declarations without invocation.
-- **Slug-native:** Rust valid-Unicode and serde-backed numeric/parse internals,
-  with diagnostics not claimed exact where they differ from Bazel.
-- **Unsupported/deferred:** invalid UTF-16 edge parity, exact parse diagnostics,
-  configured toolchain/function/rule behavior and every filesystem/action read.
+Zabel is peer guidance only. Its useful separation is raw registration text +
+declaring canonical owner, followed by a context-aware parser, later expansion
+and policy-specific filtering. Its packed storage, Zig types, diagnostics and
+compatibility claims are not copied. Reuse existing Buck2-derived compact
+strings, small collections, immutable slices and DICE patterns in Slug; the
+design must include a utility-reuse audit and memory-accounting impact.
 
-JSON values are evaluator scratch and frozen module globals are shared
-predeclareds; JSON has no retained semantic side store, host capability or
-fallback. No DICE key, request, revision, cache or async ownership changes.
+- **Exact:** MODULE ABI and dev filtering; selected-module/declaration order;
+  owner-relative mapping; accepted pattern vocabulary; lexical expansion,
+  stable deduplication and family-specific filtering/error timing admitted by
+  the eventual implementation.
+- **Slug-native:** Rust retained representation, compact allocation, DICE keys,
+  cancellation carriers and memory accounting.
+- **Unsupported/deferred:** configuration-option registration inputs unless
+  explicitly selected, configured provider/settings validation not already
+  owned, rule/toolchain implementation behavior, actions/input trees, exact
+  configuration/output identity and invalid diagnostics not oracle-proved.
 
-## Allowlist, caps and validation
+## Allowlist and validation
 
-Change only `starlark-rust/starlark/src/stdlib/json.rs`,
-`app/slug_loading_v2/src/package.rs` and
-`app/slug_loading_v2/src/host_package_load_tests.rs`. At base `4a2022764`,
-production is 6,310 lines and test authority is 33,437 lines, with a final test
-ceiling of 34,837. Caps are 250 production, 1,400 proof and 1,650 total
-additions; deletions do not buy budget. Each new helper/proof function remains
-at most 120 lines. Embed/hash all 1,002 parent lines.
+This is docs/design only. Change only:
 
-Run starlark-rust JSON tests, focused parent proof, all loading-library tests,
-BUILD loading, Bzl invalidation, locked analysis/core checks and locked CLI
-build. Run formatting, diff, caps/function-size and archive hygiene, then root
-review for Bazel authority, full method/ABI coverage, shared pure ownership,
-parent completeness, no invocation and Zabel's peer-guidance role.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
+- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`.
 
-STOP and `REPLAN` for another eager global/shape, unbounded JSON rewrite,
-new host/I/O authority, source/hash mismatch, copied Zabel content, incomplete
-method category or parent, exact invalid-diagnostic claim, allowlist/cap escape
-or failing baseline.
+Run no Rust mutation and make no live network or credential access. Read the
+live checkout, Bazel 9.2 authority and the relevant Zabel peer implementation.
+Validate plan/current agreement, exact source citations, one bounded successor,
+`git diff --check`, scope and archive hygiene. Root review must reject an
+`:all` special case, direct-label storage, root-only semantic claims, merged
+declaration/expansion/configured phases, a parallel target-pattern parser,
+package loading outside DICE, or copied Zabel authority.
+
+STOP and `REPLAN` if the complete category cannot be bounded, owner mapping is
+unavailable, existing target-pattern/loading owners cannot be reused safely, a
+new lock would cross DICE compute, exact ordering/filter behavior lacks source
+or oracle evidence, or the design would enter downstream toolchain/action work.
 
 ## Immediate predecessor
 
-Commit `4a2022764` accepts shared fragment declarations; the parent attempt
-stopped without retaining its source proof when the missing JSON global was
-identified.
+Commit `0a799e522` accepts the shared JSON category and complete authenticated
+rules_rust toolchain parent without invocation. The ordinary bootstrap replay
+now exposes wildcard registration representation as the next real boundary.
