@@ -18644,3 +18644,174 @@ Freeze the selected-external route/source, DICE identity, observation and
 lifecycle contract at zero Rust before implementing sequence step 3b. Stop for
 any source kind without a lawful observed directory owner; do not reconstruct
 paths, add a second traversal, expand patterns or activate registrations.
+
+### Selected-external subtree owner design REPLAN: route-owned directory listing prerequisite (2026-08-27)
+
+**Status: REPLAN before Rust; no traversal, registration or target-pattern
+surface is activated.** The live ownership trace found no lawful repository-
+routed directory-listing producer. `PathDirectoryListingKey` owns workspace or
+materialization-namespace path observation, while `RootRepositoryRoute` and
+the bzlmod source-preparation chain own repository source identity and the
+private physical root. Loading cannot construct the former from the latter
+without either exposing a materialization root or reconstructing one. Both
+would violate the accepted source boundary.
+
+The missing primitive is smaller than selected-external recursive package
+discovery: one bzlmod-owned listing of the direct entries below a validated
+repository-relative directory. It is general Starlark/loading infrastructure,
+not C++ policy. Bazel 9 BCR Starlark remains the source of `cc_internal` and
+the other rule definitions; `cc_common` is only one later host-capability
+consumer.
+
+#### Live owner and predecessor trace
+
+- `RootRepositoryRoute` is the semantic request owner. Its equality and hash
+  retain workspace, apparent and canonical repository, module, and complete
+  `RootRepositorySource`; selected-registry source also retains its final
+  mapping. A listing key must retain this route intact rather than projecting
+  a display path or a canonical repository name alone.
+- `host_repository_materialization_request` classifies direct-local,
+  selected-registry and generated routes. `RepositoryMaterializationResultKey`
+  supplies either the Host namespace plus local logical root or an immutable
+  materialization namespace plus generation root. Those roots remain private
+  to source preparation. The routed listing driver may use them internally and
+  must return no namespace, resolved path, real path or generation root.
+- `BuiltinBazelTools` deliberately has no materialization request. Its
+  authenticated `BuiltinBazelToolsSnapshot` plus manifest digest and catalog
+  are the source owner. The same routed listing key therefore needs a catalog
+projection for this disposition, not a fake filesystem root.
+- `ExternalRepositoryPackageLookupKey` already consumes deleted-package
+  policy, repository ignore policy and `BUILD.bazel` before `BUILD` marker
+  lookup, but its `Deleted` result intentionally does not say which policy
+  matched. That is sufficient for point package loading and insufficient for
+  recursive traversal: a repository-ignore match prunes the subtree, whereas
+  `--deleted_packages` suppresses only the current package and still traverses
+  descendants. The later subtree packet must add one typed bzlmod boundary
+  projection, analogous to `HostRootPackageBoundaryKey`, or expose the routed
+  ignore result through that projection. It must not guess from `Deleted`.
+- `RepositoryPackageSourceKey` and loading's `RepositoryPackageLoadKey` remain
+  the natural package source and evaluation owners after discovery. Query and
+  registration consumers must never load files or walk directories directly.
+
+#### Frozen prerequisite contract
+
+Implement one doc-hidden `HostRepositoryDirectoryListingKey` and observed
+sibling in bzlmod source preparation. The semantic key is the complete
+`RootRepositoryRoute` plus one validated `PackagePath`; `PackagePath::root()`
+names the repository root. This reuses the same accepted root-capable prefix
+identity as `RootSubtreePackageSetKey` and rejects invalid package spelling
+before DICE publication. Do not weaken the source-file-only
+`HostRepositoryRelativePath`, whose constructor correctly rejects empty paths.
+
+The semantic value distinguishes `Present(PathDirectoryEntries)` from
+`Missing`. Reuse workspace's already sorted, immutable `Arc`-backed
+`PathDirectoryEntries`, `PathDirectoryEntry`, name and kind types for both
+materialized and built-in projections. Do not add a second row representation,
+interner, global cache or source tree. The route remains in the key; the value
+contains neither mapping nor source identity copies.
+
+The materialized projection consumes `RepositoryMaterializationResultKey`,
+then `PathDirectoryListingKey` or `PathDirectoryListingObservationKey` in the
+owned namespace. It translates path errors to a typed repository-relative
+error before crossing the bzlmod boundary. The built-in projection consumes a
+snapshot-keyed catalog directory-listing key which validates the manifest,
+derives sorted **unique** direct children from catalog paths, coalesces repeated
+directory prefixes such as `tools`, returns `Missing` for an absent prefix, and
+reports wrong-kind for a catalog file. `PathDirectoryEntries::new` sorts but
+does not deduplicate, so the catalog projection must deduplicate explicitly
+before construction. It has no filesystem observation epoch because catalog
+identity is already structural in the route.
+
+The legacy result is `SourcePreparationOutcome<Result<Value, Error>>`. The
+observed result additionally carries `PathObservationEpoch` and admits
+`ObservedPathFrontierError`. Both keys use complete-only equality and validity.
+The driver preserves observed outer error before Need before terminal
+precedence; a materialization Need or path Need is never cached as complete.
+No lock may span a DICE compute. DICE cancellation propagates normally; the
+immutable result and observation epoch release with their dependent graph
+versions.
+
+As with the existing routed path/source owners, the key accepts an already
+authenticated route. Its observed epoch owns directory-resolution and listing
+facts only. The caller that obtains the route through
+`RootRepositoryRouteObservationKey` must merge that predecessor's epoch before
+publishing a larger observed result. Built-in catalog listings add no path
+observation; their snapshot and manifest identity remain structural in the
+route.
+
+The public view exposes only repository-relative entries, `Present`/`Missing`,
+typed semantic errors and observations. It exposes no materialization request,
+filesystem root, namespace, resolver chain or built-in catalog internals.
+Direct-local, selected-registry, generated and built-in routes therefore share
+one downstream contract while preserving their distinct source owners.
+
+This prerequisite deliberately stops below package policy. After it is
+accepted, the selected-external subtree packet must pair the listing owner with
+one bzlmod-owned external package-boundary projection that separately reports
+ignored-subtree, deleted-current-package, package marker, no marker and invalid
+package name. Loading may then recurse on directories, pruning only the first
+state and suppressing only the second. That projection should reuse the live
+policy and marker predecessors rather than create a second lookup.
+
+#### Bazel and Zabel evidence
+
+Pinned Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` remains the semantic authority.
+`RecursivePkgKey` structurally includes repository, rooted path and ignored
+subdirectories. `RecursiveDirectoryTraversalFunction` first obtains package
+existence and child dependencies for that repository-scoped directory, then
+aggregates child recursive values. `--deleted_packages` changes current-package
+existence without suppressing those child dependencies, while ignored
+subdirectories are excluded from traversal. This supports retaining repository
+identity and keeping package/ignore policy above raw directory observation. The
+prerequisite activates no recursive membership behavior, so the accepted
+recursive-pattern and root-subtree oracle evidence is sufficient; a new Bazel
+oracle is required only when the selected-external subtree producer is added.
+
+Zabel's `load/session_recursive_package_discovery.zig` usefully demonstrates a
+natural loading producer keyed by authenticated source plus directory and
+separate query/toolchain consumers. Its retained direct package bit and sorted
+child names support keeping consumers thin. Slug does not copy Zabel's session
+store, source identifiers, allocators, diagnostics or compatibility claims;
+the routed DICE/source-preparation ownership above is Slug's design.
+
+#### Successor implementation packet
+
+Select `WP-4-5-7A-routed-repository-directory-listing-owner-implementation`.
+It may change only:
+
+- `app/slug_bzlmod_v2/src/builtin_repository.rs` for the snapshot-keyed catalog
+  directory projection;
+- `app/slug_bzlmod_v2/src/source_preparation.rs` for the routed legacy and
+  observed owner adjacent to the private materialization chain;
+- `app/slug_bzlmod_v2/src/lib.rs` for doc-hidden consumer exports; and
+- `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs` for the
+  routed observed lifecycle matrix when the production files' local tests
+  cannot express it.
+
+Caps are 560 production and 700 proof additions, no dependency or fixture.
+The large source-preparation file remains the cohesive location because the
+materialization result and physical-root projection must stay private; moving
+the driver to a new module would widen those internals. Stop and REPLAN if the
+implementation exceeds those caps, needs a third representation, exposes a
+root/namespace, changes package policy, adds traversal, or requires another
+production file.
+
+Direct proof must cover key/hash A/B/A discrimination, root and nested
+present/missing/wrong-kind listings, lexical direct-child
+ordering, exact unique built-in root/nested child sets including repeated
+prefix coalescing, built-in manifest/catalog identity, and direct-local
+create/delete/recreate plus symlink retarget observation. It must also cover immutable
+generation/source identity, generated effects, all four route dispositions,
+Need replay, observed outer errors, complete-only equality/validity and route
+A/B/A. Run focused bzlmod tests, the full bzlmod crate, downstream loading
+checks/tests, locked core checks and the rebuilt locked CLI. Archive, scope,
+cap, dependency, helper, no-lock and diff gates remain mandatory.
+
+Compatibility classification is explicit: this prerequisite activates no new
+named Bazel surface and makes no recursive-package parity claim. Repository
+content/catalog integrity remains exact for Slug's actual graph. The DICE key,
+observation carrier, error projection and materialization namespaces are
+Slug-native. Selected-external subtree membership, target-pattern expansion,
+family filtering, registration activation, configured validation, rules and
+actions remain unsupported/deferred until their later packets.

@@ -30,13 +30,46 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; selected-external subtree-owner design selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4b2396f0a` accept bounded loading breadth through direct-provider and ObjcInfo proxy children plus exact empty `depset()`; private CcInfo, following source children, shared action names, configuration-field binding, complete semantics and the dependency-free toolchain library are accepted through `acca5cb68`; `cb71a302d` accepts the exact shared Bazel universe and bounded default-enabled set subset; `5c3b4492f` restores the archive app-path gate; commits through `879d879f5` accept the complete compile and first link-family producer chain through the complete link producer; commits through `b9736cb47` accept generic `.bzl` visibility, the complete public rules_cc facade chain, complete rules_rust platform/provider/common/utility/LTO/allocator/semver/incompatible/toolchain loading, Skylib common settings, shared advertised-provider and fragment declarations, the complete shared JSON builtin category, raw selected registration ownership with final repository mappings, complete shared target-pattern syntax, and the loading-owned root subtree package producer | no selected-external recursive package producer exists yet | design only `WP-4-5-7A-selected-external-subtree-package-owner-design`; preserve M7A -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; routed repository directory-listing prerequisite selected** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4b2396f0a` accept bounded loading breadth through direct-provider and ObjcInfo proxy children plus exact empty `depset()`; private CcInfo, following source children, shared action names, configuration-field binding, complete semantics and the dependency-free toolchain library are accepted through `acca5cb68`; `cb71a302d` accepts the exact shared Bazel universe and bounded default-enabled set subset; `5c3b4492f` restores the archive app-path gate; commits through `879d879f5` accept the complete compile and first link-family producer chain through the complete link producer; commits through `b9736cb47` accept generic `.bzl` visibility, the complete public rules_cc facade chain, complete rules_rust platform/provider/common/utility/LTO/allocator/semver/incompatible/toolchain loading, Skylib common settings, shared advertised-provider and fragment declarations, the complete shared JSON builtin category, raw selected registration ownership with final repository mappings, complete shared target-pattern syntax, and the loading-owned root subtree package producer | no route-owned direct directory-listing primitive or selected-external recursive package producer exists yet | implement only `WP-4-5-7A-routed-repository-directory-listing-owner-implementation`; preserve M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
 [WP-4-5-7A-selected-external-subtree-package-owner-design](./slug-v2-subplans/current-packet.md).
+
+### M7 selected-external subtree design REPLAN; routed listing prerequisite selected (2026-08-27)
+
+The selected-external design audit stopped before Rust because bzlmod has no
+repository-routed directory-listing owner. Workspace `PathDirectoryListingKey`
+requires an observation namespace and physical logical path, while route and
+materialization owners intentionally keep those details private. Loading
+cannot lawfully reconstruct or expose them.
+
+The bounded prerequisite is one bzlmod key over the complete
+`RootRepositoryRoute` and validated root-capable `PackagePath`, with
+legacy and observed forms. Materialized direct-local, selected-registry and
+generated sources project privately through the existing materialization
+result into the workspace listing owner. Built-in `@bazel_tools` projects its
+authenticated immutable catalog instead of inventing a filesystem root. Both
+return the same sorted immutable direct-entry value and expose no physical
+path, namespace or catalog internals.
+
+Package deletion, repository ignore and BUILD-marker policy remain in bzlmod.
+The current point lookup collapses deleted-current-package and ignored-subtree
+to one `Deleted` result, so the later subtree packet must project those states
+separately: only repository ignore prunes descendants. Recursive package
+discovery remains a later loading owner. This prerequisite activates no
+traversal, pattern, registration or Bazel compatibility surface. Its carrier
+and error projection are Slug-native; repository content/catalog integrity
+remains exact for Slug's actual graph. Zabel's authenticated-source loading
+ownership and thin consumer split informed the design only as peer guidance.
+
+Next, implement only the routed directory-listing prerequisite for all four
+admitted source dispositions. Stop before selected-external subtree discovery,
+target-pattern expansion, family filtering, registration activation or rule
+semantics. Bazel 9 BCR Starlark remains the source of `cc_internal` and other
+rules; `cc_common` is only a later host-capability consumer.
 
 ### M7 root subtree loading owner accepted; selected-external owner design selected (2026-08-27)
 

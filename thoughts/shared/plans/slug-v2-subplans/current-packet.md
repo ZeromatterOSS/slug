@@ -10,6 +10,13 @@ producer needed by shared target-pattern expansion. Freeze its route/source,
 DICE identity, observation, error and lifecycle contract. Make no Rust change
 and activate no traversal or registration.
 
+Terminal status: `REPLAN` before Rust. The live audit found no repository-
+routed directory-listing DICE owner, and built-in `@bazel_tools` intentionally
+has an authenticated catalog rather than a materialization root. The accepted
+design and bounded successor are recorded in
+`06-analysis-toolchains-and-actions.md`; direct subtree implementation is not
+authorized from this packet.
+
 ## Learned facts and design question
 
 Commit `b9736cb47` moves root subtree package discovery from query into loading
@@ -91,7 +98,9 @@ Base is `b9736cb47`. This is docs-only. Change only:
 - `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`;
 - `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
 - `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md` for terminal
-  scheduling state.
+  scheduling state; and
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md` for the
+  required terminal REPLAN row.
 
 Caps are 0 Rust and 900 documentation additions. Read-only probes may compile
 or run existing focused tests but add no fixture. Run source-anchor, structure,
