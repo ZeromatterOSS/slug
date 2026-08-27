@@ -7291,3 +7291,20 @@ Its helper and internal children are accepted. Run only
 0/700/700, prove its complete imported/struct/dictionary/function inventory
 and invoke nothing. Zabel remains peer ownership guidance; Bazel 9.2 and
 authenticated rules_cc bytes own compatibility.
+
+### Complete link-build variables accepted; finalizer selected (2026-08-27)
+
+Commit `3b82f098c` freezes all 392 authenticated link-build-variable lines over
+two actual complete children. It proves four imported identities, all 24 named
+struct mappings, all four named dictionary mappings, five function
+types/visibility and exact eight-public/eleven-all inventories without
+invocation. All required suites pass at 0 production and 530 proof additions;
+independent review returned `ACCEPT`.
+
+All eight children of `link/finalize_link_action.bzl`, 469 lines, SHA-256
+`adc6ea3b355d0c5e5fbf1b1e9eaa7d7dd7c0c095234a0cff7fdb4fc72eb167c9`,
+are accepted. Run only
+`WP-4-7A-rules-cc-finalize-link-action-complete-loading-proof` under
+0/800/800, prove its complete fourteen-import/six-function inventory and invoke
+nothing. Zabel remains peer ownership guidance; Bazel 9.2 and authenticated
+rules_cc bytes own compatibility.
