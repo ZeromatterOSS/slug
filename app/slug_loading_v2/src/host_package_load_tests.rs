@@ -4402,6 +4402,200 @@ def root_relative_path(file):
     return short_path[short_path.index("/", 3) + 1:]
 "###;
 
+const RULES_CC_EXTRA_LINK_LIBRARY_SOURCE: &str = r###"# Copyright 2025 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+Extra link-time library functionality.
+
+CcInfo maintains a list of extra libraries to include in a link. These are non-C++ libraries that
+are built from inputs gathered from all the dependencies. The dependencies have no way to
+coordinate, so each one will add an ExtraLinkTimeLibrary to its CcLinkingContextInfo.
+"""
+
+load("//cc/common:cc_helper_internal.bzl", "check_private_api")
+load("//cc/private:cc_internal.bzl", _cc_internal = "cc_internal")
+
+# An implementation of ExtraLinkTimeLibrary that uses functions and data passed in from Starlark.
+
+# Fields are intentionally not specified as they may be defined by users.
+# Common fields are:
+#  "build_library_func": "Starlark function to create the output library.",
+#  "_key": """Key object used to determine the "class" of the library implementation.
+#               The equals method is used to determine equality.""",
+# User defined fields may be anything. Depsets are be combined when merging libraries.
+# buildifier: disable=provider-params
+ExtraLinkTimeLibraryInfo = provider("ExtraLinkTimeLibraryInfo")
+
+# Fields are intentionally not specified as they may be defined by users.
+# Common fields are:
+#  "transitive_linker_inputs": "depset[LinkerInput]. Linker inputs created.",
+#  "transitive_runtime_libraries": "depset[File]. Runtime libraries created.",
+# buildifier: disable=provider-params
+ExtraLibraryInfo = provider("The result of building extra link-time libraries.")
+
+_KeyInfo = provider("_KeyInfo", fields = ["build_library_func", "constant_fields", "depset_fields"])
+
+def create_extra_link_time_library(*, build_library_func, **kwargs):
+    """An extra library to include in a link. The actual library is built at link time.
+
+    Exposed as cc_common.create_extra_link_time_library.
+
+    This can be used for non-C++ inputs to a C++ link. A class that implements this interface will
+    support transitively gathering all inputs from link dependencies, and then combine them all
+    ogether into a set of C++ libraries.
+
+    Any implementations must be immutable (and therefore thread-safe), because this is passed
+    between rules and accessed in a multi-threaded context.
+
+    Args:
+      build_library_func: A function that takes a rule context, static_mode, for_dynamic_library,
+        and kwargs, and returns a tuple of (linker_input, runtime_library): `tuple[LinkerInputInfo,
+        File]`.
+      **kwargs: Additional fields to pass to the build function.
+
+    Returns:
+      ExtraLinkTimeLibraryInfo.
+    """
+    _cc_internal.check_toplevel(build_library_func)
+    return ExtraLinkTimeLibraryInfo(
+        build_library_func = build_library_func,
+        # Key to identify the "class" of a StarlarkDefinedLinkTimeLibrary. Uses the build function and
+        # the split between depset and non-depset parameters to determine equality.
+        _key = _KeyInfo(
+            build_library_func = build_library_func,
+            # _KeyInfo is used in a dict, so all of its fields must be frozen/hashable.
+            constant_fields = _cc_internal.freeze([k for k, v in kwargs.items() if type(v) != "depset"]),
+            depset_fields = _cc_internal.freeze([k for k, v in kwargs.items() if type(v) == "depset"]),
+        ),
+        **kwargs
+    )
+
+ExtraLinkTimeLibrariesInfo = provider(
+    "ExtraLinkTimeLibrariesInfo",
+    fields = {
+        "libraries": "A list of (ExtraLinkTimeLibraryInfo) extra libraries.",
+    },
+)
+
+_EMPTY = ExtraLinkTimeLibrariesInfo(
+    libraries = [],
+)
+
+def create_extra_link_time_libraries(library):
+    """Creates ExtraLinkTimeLibrariesInfo.
+
+    Args:
+      library: A single ExtraLinkTimeLibraryInfo (or None).
+
+    Returns:
+      ExtraLinkTimeLibrariesInfo.
+    """
+    if library == None:
+        return _EMPTY
+    libraries = _cc_internal.freeze([library])
+    return ExtraLinkTimeLibrariesInfo(
+        libraries = libraries,
+    )
+
+def _merge_values(values):
+    if not values:
+        return None
+    first_value = values[0]
+    if type(first_value) == "depset":
+        return depset(transitive = values, order = "topological")
+    else:
+        # All the constant values should be the same,
+        # but this wasn't always enforced and they aren't :(.
+        return first_value
+
+def merge_extra_link_time_libraries(libraries):
+    """Merges a list of ExtraLinkTimeLibraryInfos.
+
+    Args:
+      libraries: A list of ExtraLinkTimeLibraryInfos.
+
+    Returns:
+      ExtraLinkTimeLibrariesInfo.
+    """
+    if not libraries:
+        return _EMPTY
+
+    merged_libraries = {}
+    for extra_library in libraries:
+        for library in extra_library.libraries:
+            key = library._key
+            if key not in merged_libraries:
+                merged_libraries[key] = []
+            merged_libraries[key].append(library)
+
+    result = []
+    for key, libs_to_merge in merged_libraries.items():
+        if len(libs_to_merge) == 1:
+            result.append(libs_to_merge[0])
+            continue
+
+        merged_fields = {"build_library_func": key.build_library_func, "_key": key}
+
+        all_keys = key.constant_fields + key.depset_fields
+
+        for field in all_keys:
+            merged_fields[field] = _merge_values([getattr(lib, field) for lib in libs_to_merge])
+
+        result.append(ExtraLinkTimeLibraryInfo(**merged_fields))
+    return ExtraLinkTimeLibrariesInfo(
+        libraries = _cc_internal.freeze(result),
+    )
+
+def build_libraries(extra_libraries, ctx, static_mode, for_dynamic_library):
+    """Builds the extra link-time libraries.
+
+    Args:
+      extra_libraries: A list of ExtraLinkTimeLibraryInfo objects.
+      ctx: The rule context.
+      static_mode: Whether the link is static.
+      for_dynamic_library: Whether the link is for a dynamic library.
+
+    Returns:
+      ExtraLibraryInfo.
+    """
+    check_private_api()
+    transitive_linker_inputs = []
+    transitive_runtime_libraries = []
+    additional_stamp_infos = []
+    for library in extra_libraries:
+        kwargs = {}
+        for key in dir(library):
+            if key not in ["build_library_func", "_key"]:
+                kwargs[key] = getattr(library, key)
+        ret = library.build_library_func(
+            ctx,
+            static_mode,
+            for_dynamic_library,
+            **kwargs
+        )
+        transitive_linker_inputs.append(ret.linker_input)
+        transitive_runtime_libraries.append(ret.runtime_library)
+        if hasattr(ret, "additional_stamp_info"):
+            additional_stamp_infos.append(ret.additional_stamp_info)
+
+    return ExtraLibraryInfo(
+        transitive_linker_inputs = depset(transitive = transitive_linker_inputs),
+        transitive_runtime_libraries = depset(transitive = transitive_runtime_libraries),
+        additional_stamp_infos = additional_stamp_infos,
+    )
+"###;
+
 const RULES_CC_OBJC_INFO_SOURCE: &str = r###"# Copyright 2024 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -6102,6 +6296,128 @@ fn exact_rules_cc_helper_internal_freezes_complete_recursive_producer() {
         assert_eq!(loading_provider_id(category.to_value()), provider_id);
     }
     assert!(helper.get("_ArtifactCategoryInfo").is_err());
+}
+
+#[test]
+fn exact_rules_cc_extra_link_library_freezes_complete_recursive_producer() {
+    assert_eq!(RULES_CC_EXTRA_LINK_LIBRARY_SOURCE.lines().count(), 192);
+    let hash = format!(
+        "{:x}",
+        Sha256::digest(RULES_CC_EXTRA_LINK_LIBRARY_SOURCE.as_bytes())
+    );
+    assert_eq!(
+        hash,
+        "522312ac48567566725f0768a6961fcaa78577fa24ac8007d5b1b8ca19698e82"
+    );
+    let owner = |label: &str, path: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(label).unwrap(),
+        workspace_path: PathBuf::from(path),
+        repository_mapping: Arc::from([]),
+    };
+    let skylib_owner = owner(
+        "@@bazel_skylib+//lib:paths.bzl",
+        "/bazel_skylib/lib/paths.bzl",
+    );
+    let internal_owner = owner(
+        "@@rules_cc+//cc/private:cc_internal.bzl",
+        "/rules_cc/cc/private/cc_internal.bzl",
+    );
+    let private_paths_owner = owner(
+        "@@rules_cc+//cc/private:paths.bzl",
+        "/rules_cc/cc/private/paths.bzl",
+    );
+    let helper_owner = owner(
+        "@@rules_cc+//cc/common:cc_helper_internal.bzl",
+        "/rules_cc/cc/common/cc_helper_internal.bzl",
+    );
+    let skylib = eval_bzl_with_identity(PATHS_SOURCE, skylib_owner.clone()).unwrap();
+    let internal =
+        eval_bzl_with_identity(RULES_CC_INTERNAL_SOURCE, internal_owner.clone()).unwrap();
+    let private_paths =
+        eval_bzl_with_identity(RULES_CC_PRIVATE_PATHS_SOURCE, private_paths_owner.clone()).unwrap();
+    let internal_load = "//cc/private:cc_internal.bzl";
+    let helper_load = "//cc/common:cc_helper_internal.bzl";
+    let helper = eval_bzl_with_loaded_children(
+        RULES_CC_HELPER_INTERNAL_SOURCE,
+        BzlModuleIdentity {
+            repository_mapping: Arc::from([(
+                ApparentRepoName::new("bazel_skylib").unwrap(),
+                CanonicalRepoName::new("bazel_skylib+").unwrap(),
+            )]),
+            ..helper_owner.clone()
+        },
+        &[
+            ("@bazel_skylib//lib:paths.bzl", skylib_owner, skylib),
+            (internal_load, internal_owner.clone(), internal.dupe()),
+            ("//cc/private:paths.bzl", private_paths_owner, private_paths),
+        ],
+    )
+    .unwrap();
+    let extra = eval_bzl_with_loaded_children(
+        RULES_CC_EXTRA_LINK_LIBRARY_SOURCE,
+        owner(
+            "@@rules_cc+//cc/private/link:create_extra_link_time_library.bzl",
+            "/rules_cc/cc/private/link/create_extra_link_time_library.bzl",
+        ),
+        &[
+            (helper_load, helper_owner, helper.dupe()),
+            (internal_load, internal_owner, internal.dupe()),
+        ],
+    )
+    .unwrap();
+    let public = |name| extra.get(name).unwrap();
+    let private = |name| extra.get_any_visibility(name).unwrap().0;
+    assert!(
+        public("check_private_api")
+            .value()
+            .ptr_eq(helper.get("check_private_api").unwrap().value())
+    );
+    assert!(
+        private("_cc_internal")
+            .value()
+            .ptr_eq(internal.get("cc_internal").unwrap().value())
+    );
+    let providers = [
+        public("ExtraLinkTimeLibraryInfo"),
+        public("ExtraLibraryInfo"),
+        private("_KeyInfo"),
+        public("ExtraLinkTimeLibrariesInfo"),
+    ];
+    for provider in &providers {
+        assert_eq!(provider.value().get_type(), "provider_callable");
+    }
+    for (index, left) in providers.iter().enumerate() {
+        for right in &providers[index + 1..] {
+            assert!(!left.value().ptr_eq(right.value()));
+        }
+    }
+    assert!(extra.get("_KeyInfo").is_err());
+    let empty = private("_EMPTY");
+    assert_eq!(empty.value().get_type(), "provider");
+    let empty_id = loading_provider_id(empty.value()).unwrap();
+    assert_eq!(
+        empty_id.source_label(),
+        "@@rules_cc+//cc/private/link:create_extra_link_time_library.bzl"
+    );
+    assert_eq!(empty_id.exported_name(), "ExtraLinkTimeLibrariesInfo");
+    let scratch = Module::new();
+    let libraries = empty
+        .value()
+        .to_value()
+        .get_attr("libraries", scratch.heap())
+        .unwrap()
+        .unwrap();
+    assert_eq!(FrozenListRef::from_value(libraries).unwrap().len(), 0);
+    for name in [
+        "create_extra_link_time_library",
+        "create_extra_link_time_libraries",
+        "merge_extra_link_time_libraries",
+        "build_libraries",
+    ] {
+        assert_eq!(public(name).value().get_type(), "function");
+    }
+    assert_eq!(private("_merge_values").value().get_type(), "function");
+    assert!(extra.get("_merge_values").is_err());
 }
 
 #[test]
