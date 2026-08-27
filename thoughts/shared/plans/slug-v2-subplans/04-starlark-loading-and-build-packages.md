@@ -7108,3 +7108,22 @@ callable/provider. Zabel `0795445f…` is peer guidance for defining-module-owne
 global/default freezing and separation from invocation values only; no Zig
 content or behavior is adopted. Bazel 9.2 and authenticated rules_cc own exact
 compatibility. Re-audit action-template/compile source order after acceptance.
+
+### Complete compile variables accepted; action templates selected (2026-08-26)
+
+Commit `97faa6e71` freezes the exact native wrapper and 644-line compile-variable
+producer over its complete children. The proof retains the wrapper's actual
+predeclared pointer, exact child mappings, imports, 25-field struct, private
+provider/sentinel, ordered 22-element set, 13 functions and complete visible and
+private inventories. All required suites pass at 0 production and 875 net proof
+additions; independent review returned `ACCEPT`.
+
+Recursive source order now reaches complete 266-line
+`compile_action_templates.bzl` (`10a43c512a85458f45a0223a7ddc7c1b56f8072872b765b1744d336ff91ec794`).
+All six children are accepted. Its eager surface is exactly ten imported aliases
+and five lazy functions, so no global, builtin, provider, native method or
+configured semantic change is required. Run only
+`WP-4-7A-rules-cc-compile-action-templates-complete-loading-proof` under
+0/600/600 caps, prove complete identity/visibility and invoke nothing. Zabel is
+peer defining-module/import guidance only; Bazel 9.2 and authenticated rules_cc
+bytes own compatibility. Re-audit the complete `compile.bzl` parent afterward.

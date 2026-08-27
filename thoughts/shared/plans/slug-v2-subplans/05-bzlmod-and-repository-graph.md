@@ -4199,3 +4199,12 @@ leaf because compile, action-template and proxy/toolchain consumers share that
 frontier. The accepted universal owner already supplies every required common
 builtin, including `set`; no additional MODULE/REPO/core overlay or builtin is
 selected. Zabel remains peer ownership guidance and Bazel 9.2 remains authority.
+
+### Compile-variable acceptance and Stage 4 continuation (2026-08-26)
+
+Commit `97faa6e71` accepts the complete compile-variable producer with no Stage 5
+production or retained-state change. Stage 4 next selects its complete
+compile-action-template parent because all six children are accepted. The
+shared universal owner already supplies every common builtin required by both
+sources; no MODULE/REPO/core overlay or additional builtin is selected. Zabel
+remains peer ownership guidance and Bazel 9.2 remains sole authority.
