@@ -1,165 +1,174 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-repository-source-observation-owner-convergence`
+Packet: `WP-4-5-7A-canonical-source-policy-convergence-implementation-r2`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `fdd13400d`.
+Base: `9764f8a4f`.
 
-Result: implement one shared Root/Canonical repository source-observation
-owner and its observed sibling without changing the existing zero-copy result,
-legacy root source-file keys, loading/core consumers, or package policy.
+Result: converge the Bzlmod repository source/policy chain over one compact
+Root/Canonical carrier, preserve every root constructor and behavior, migrate
+alias-free canonical policy callers, and delete the four temporary canonical
+source/listing wrappers.
 
-## Accepted design
+## Accepted basis and learned facts
 
-Commit `85593f300` accepts apparent-free canonical source/listing wrappers and
-the loading-owned canonical load route. Commit `9d55b7157` splits later package
-adaptation into Bzlmod policy convergence followed by loading adaptation.
-Stage A preflight in `495edfe4f` found that a DICE key cannot vary its fixed
-value between root `HostRepositorySourceFileValue` and canonical
-`HostRepositorySourceObservation`.
+Commit `9d55b7157` accepts the two-stage architecture: Bzlmod source/policy
+convergence precedes loading/package adaptation. The first Stage A preflight
+stopped because root source keys and canonical wrapper keys have different
+fixed DICE values. Commit `9764f8a4f` supplies the bounded prerequisite instead:
+one zero-copy `HostRepositorySourceObservation` owner accepts Root or Canonical
+input, its observed sibling retains the exact path epoch, and all legacy root
+keys and loading/core consumers remain unchanged.
 
-Commit `fdd13400d` and independent review accept the bounded correction:
-`HostRepositorySourceObservation::{Builtin, Request}` is already the required
-zero-copy result. Generalize only that observation owner over Root/Canonical
-input and add its observed sibling. Leave `HostRepositorySourceFileKey`, its
-observed key, and all loading/core exhaustive consumers unchanged.
+The remaining policy chain is REPO, repository ignore, private package lookup,
+public external package boundary, selected BUILD source, direct path lookup and
+directory listing. Each still stores `RootRepositoryRoute`; canonical callers
+must not fabricate an apparent alias. Existing accepted Bazel 9.2 regressions
+already establish deletion-before-policy, REPO-before-ignore, BUILD marker
+priority, selected mapping, and source-observation behavior. Add structural
+canonical regressions only; no new oracle fixture is needed.
 
-This is generic BCR Starlark loading architecture. Bazel 9 owns all rule
-definitions and control flow including `cc_internal`; `cc_common` is only a
-demanding consumer of the generic host-builtin ABI. Zabel is peer guidance for
-ownership and compact retained representation, while Bazel 9.2 remains
-behavioral authority.
+Pinned Bazel 9.2 remains the behavioral authority. Buck2 DICE guidance in
+`docs/developers/dice.md` requires one semantic owner, complete-only equality,
+ordered observation composition and no lock across compute. Zabel is
+concept/test-only guidance for authenticated-source/policy separation and
+compact retained carriers; copy no behavior or implementation.
+
+This is generic BCR Starlark loading architecture. Bazel 9 BCR Starlark owns
+all rule definitions and control flow, including `cc_internal`; `cc_common` is
+only a demanding consumer of the generic host-builtin ABI. Builtins remain
+organized by reusable capability category.
+
+## Decision and non-decisions
+
+Add one retained `HostRepositorySourceRoute` with exactly:
+
+- `Root(RootRepositoryRoute)`, preserving the complete existing apparent route;
+- `Canonical(HostCanonicalRepositorySourceInput)`, preserving the accepted
+  source-complete apparent-free route and materialization disposition.
+
+Generalize the existing path/listing and policy keys over this carrier. Keep
+their current `new(RootRepositoryRoute, ...)` constructors as exact Root
+adapters and add explicit canonical constructors. Root computations continue
+to use the accepted root source/path children; canonical computations use the
+shared observation owner and the same materialization/path/listing owners.
+After all canonical callers migrate, delete both canonical source-file keys,
+both canonical listing keys, their observed values/errors and projections.
+Retain `HostCanonicalRepositorySourceInput` and its constructor as the
+canonical carrier input.
+
+Do not retype `RootRepositoryRoute`, make its apparent name optional, migrate
+legacy loading/core source-file consumers, bypass REPO/ignore policy, infer a
+physical root, add direct IO, or activate Stage B. Registration, target-pattern
+expansion, external `.bzl`/package loading, configured semantics, rules and
+actions remain deferred.
+
+## Natural owners, identity and lifetime
+
+The source-route carrier is DICE-retained semantic state and contains only
+existing retained values. Generalized keys retain it plus their package/path
+identity. The shared source-observation key remains the sole canonical byte
+owner; the existing materialization result, resolved path, file observation
+and directory-listing keys remain the sole lower owners. Policy results keep
+their existing `Arc`/compact representations and complete-only equality.
+
+Hash workspace, root or canonical route, disposition, selected specification,
+final mapping, generated plan and path structurally. Never hash or copy source
+bytes. Add one crate-private built-in byte-`Arc` accessor only so canonical
+package-source projection can retain the catalog payload without copying it.
+No interner, global cache, side table, manual eviction, dependency or command
+scratch is admitted. Need and cancellation publish no complete value;
+overlapping requests share only immutable DICE state.
+
+Observed order remains REPO source/listing, repository ignore, package marker,
+then selected BUILD source. Outer infrastructure error precedes Need, which
+precedes semantic terminal. Merge child epochs in that order. Root key outputs,
+errors, display identity and child dependency order remain exact.
 
 ## Exact allowlist and caps
 
 Allow exactly:
 
-- new `app/slug_bzlmod_v2/src/source_preparation/repository_source_observation.rs`;
-- `app/slug_bzlmod_v2/src/source_preparation.rs`;
+- `app/slug_bzlmod_v2/src/builtin_repository.rs`;
 - `app/slug_bzlmod_v2/src/source_preparation/canonical_repository_source.rs`;
+- `app/slug_bzlmod_v2/src/source_preparation.rs`;
 - `app/slug_bzlmod_v2/src/lib.rs`;
-- `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`; and
+- `app/slug_bzlmod_v2/src/repo_file.rs`;
+- `app/slug_bzlmod_v2/src/repository_ignore.rs`;
+- `app/slug_bzlmod_v2/src/host_package.rs`;
+- `app/slug_bzlmod_v2/src/host_package_observation_tests.rs`;
+- `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`;
+- `app/slug_bzlmod_v2/src/host_external_package_boundary/mod.rs`;
+- `app/slug_bzlmod_v2/src/host_external_package_boundary/tests.rs`; and
 - `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs`.
 
-Cap production additions at 800, proof additions at 1,000 and aggregate
-additions at 1,800 lines. Keep the new owner below 700 lines, every function at
-120 lines, and additions to the already oversized `source_preparation.rs` at
-80 mechanical lines. Deletions count separately and buy no unrelated scope.
+Cap production additions at 1,200, proof additions at 1,600 and aggregate
+additions at 2,800 lines; deletions count separately and buy no unrelated
+scope. Keep functions at 120 lines. `source_preparation.rs` and
+`host_package.rs` exceed the complexity trigger: permit only carrier plumbing,
+bounded helper extraction and the existing path/listing/package-source drivers;
+perform no unrelated cleanup. Keep the built-in accessor below six lines.
 
-Add no dependency, fixture, oracle, core, query, builtin-repository or package-
-policy edit. Do not edit DICE ownership or locking outside these files.
-
-## Required owner and API
-
-Add one compact structural input enum:
-
-- `Root(HostRepositorySourceInput)` preserves the existing apparent-bearing
-  route exactly; and
-- `Canonical(HostCanonicalRepositorySourceInput)` preserves the accepted
-  apparent-free canonical route and materialization disposition.
-
-Move the cohesive observation owner into the new module. Preserve
-`HostRepositorySourceObservationKey::new(root, path)` as the exact root
-constructor and add a canonical constructor accepting only the complete
-canonical source input and repository-relative path. Its fixed DICE value stays
-`HostRepositorySourceObservation` with the existing variants and accessors.
-
-Add an observed sibling returning one retained result `Arc` plus
-`PathObservationEpoch`. It uses one shared legacy/observed driver:
-
-- built-in input requests only the existing built-in catalog source child and
-  returns an empty path epoch;
-- materialized input requests the existing materialization-result owner;
-- observed materialized input then requests path resolution and file bytes in
-  their accepted order and merges their epoch;
-- outer infrastructure error precedes Need, which precedes semantic terminal;
-  no complete value is published on Need or cancellation.
-
-The doc-hidden observation error must retain enough Root/Canonical input for
-diagnostics without fabricating an apparent name. Replace its root-only
-`input()` exposure with an enumerated view or distinct root/canonical accessors;
-there is no live caller to preserve.
-
-Make only the two canonical source-file wrappers delegate to this shared owner.
-Keep all four canonical source/listing legacy/observed wrappers and their public
-behavior through this packet. Corrected Stage A later migrates policy callers
-and `canonical_repository_load_route_tests.rs`, then deletes the four wrappers.
-
-## DICE, identity and retained representation
-
-Follow `docs/developers/dice.md`. Keys retain complete semantic source inputs,
-not command scratch. Equality and hashing include workspace, canonical or root
-route, disposition, selected specification, final mapping and generated plan.
-Do not hash result values or source bytes. Complete-only value equality and
-validity remain unchanged, and no lock may span a DICE compute.
-
-Preserve the exact built-in catalog value and its `Arc` payload, logical path,
-SHA-256 and executable bit. Preserve the existing request value and its shared
-`Arc` bytes/logical path. Add no byte buffer, mapping/specification copy,
-interner, global cache, side table, manual eviction or new dependency. Derive
-`Allocative` and retain explicit size guards for the input, key and observed
-carrier.
+Add no fixture, oracle, dependency, core, query, loading production, builtin
+catalog content, module-extension, registration, evaluator, configured, rule
+or action edit.
 
 ## Required proof
 
-Add discriminating proof for:
+Prove:
 
-- root/canonical parity across admitted built-in, local, immutable-registry and
-  generated successes and errors;
-- a selected transitive registry repository absent from the root mapping;
-- pointer, logical-path, SHA and executable preservation without payload copy;
-- exact dependency logs: Builtin versus Request, materialization/path owners,
-  and absence of legacy/canonical wrapper recursion;
-- legacy behavior with no epoch; observed built-in empty epoch; observed
-  materialized resolution-before-file epoch;
-- outer-error, Need and terminal ordering; cancellation; complete-only
-  equality and validity;
+- all existing Root constructors, outputs, errors and child dependency order
+  remain unchanged for built-in, local, immutable-registry and generated routes;
+- a root-unmapped selected-registry canonical input reaches REPO, ignore,
+  package boundary and selected BUILD source without an apparent alias;
+- built-in canonical policy uses catalog listing/source owners and retains the
+  exact source-byte `Arc` when package source is selected;
+- canonical local, immutable and generated source/path/listing dependencies
+  terminate at the accepted materialization/path owners with no wrapper;
+- exact REPO -> ignore -> marker -> BUILD-source observation ordering, outer
+  error/Need/terminal polarity, cancellation and complete-only validity;
 - independent workspace, canonical name, disposition, selected specification,
-  final mapping and generated-plan A/B/A key equality/hash restoration;
-- retained-size bounds and `Allocative` coverage;
-- unchanged old root constructors and direct root observation behavior; and
-- parity of all four temporary canonical source/listing wrappers.
+  final mapping, generated plan and package/path A/B/A key/hash restoration;
+- carrier/key/observed retained-size bounds and `Allocative` coverage;
+- no production reference or export remains for any
+  `HostCanonicalRepositorySourceFile*` or
+  `HostCanonicalRepositoryDirectoryListing*` wrapper; and
+- source bytes, logical path, SHA/executable metadata and lower owner identity
+  are retained without copying.
 
-Tests may use existing test-only constructors and dependency instrumentation,
-but may not invent a root alias for canonical selected-registry success.
+Tests may reuse existing constructors and dependency instrumentation. They may
+not invent a root alias for a canonical success or replace owner assertions
+with value-only parity.
 
 ## Compatibility
 
-- **Exact:** existing root observation results/errors/dependency order and all
-  accepted canonical wrapper behavior; canonical source selection follows
-  Bazel 9.2 semantics.
-- **Slug-native:** Root/Canonical enum layout, key names, structural hashes,
-  observed carrier and retained-memory accounting.
-- **Unsupported/deferred:** Bzlmod package-policy convergence, external package
-  loading and `.bzl` adaptation, target-pattern expansion, registration,
-  configured semantics, rules, actions and exact output identity.
+- **Exact:** existing root results, diagnostics, policy/dependency order,
+  package-marker selection and observations; canonical selection/mapping follows
+  Bazel 9.2 semantics; built-in catalog bytes remain exact.
+- **Slug-native:** carrier layout, key names, structural hashes, observed
+  carriers and retained-memory accounting.
+- **Unsupported/deferred:** Stage B subtree/`.bzl`/package-load adaptation,
+  target-pattern expansion, registration, configured semantics, rule/action
+  execution and exact output identity.
 
-## Validation
+## Validation and stops
 
-Run focused observation-owner and canonical load-route tests first. Then run
-the full `slug_bzlmod_v2` and `slug_loading_v2` suites, named core/query/loading
-dependents, and a locked `cargo build -p slug_cli_v2` serially. Run formatting,
-`git diff --check`, allowlist/cap/function-size/duplicate-owner/no-lock guards
-and `scripts/v2_archive_status.sh`; only the three accepted thoughts-path rows
-may remain in the archive-checker baseline. Clean stale `slugd` before and
-after daemon-sensitive tests. Require independent DICE/public-boundary/
-retained-representation terminal review.
+Run focused source/listing, REPO, ignore, package and public-boundary tests,
+then full `slug_bzlmod_v2` and `slug_loading_v2`, named core/query dependents and
+locked `slug_cli_v2` serially. Run formatting, `git diff --check`, exact
+allowlist/cap/function-size/duplicate-owner/no-lock/direct-IO guards and
+`scripts/v2_archive_status.sh`; only its three accepted thoughts rows may
+remain. Require independent DICE/public-boundary/retained-representation review.
 
-## Stops and successor
+STOP and `REPLAN` for a fabricated apparent alias; changed root output/error or
+dependency order; copied source bytes; a second materialization/path/listing
+owner; loading-layer/catalog IO; bypassed REPO/ignore policy; missing epoch
+order; lock across compute; dependency, allowlist or cap expansion; a surviving
+temporary canonical wrapper; or activation of loading/registration/configured/
+rule/action behavior.
 
-STOP and `REPLAN` for hashing or copying source bytes; changing the shared
-success variants; changing old root key values, constructors or consumers;
-deleting any canonical wrapper; adding duplicate source/materialization/path
-ownership; fabricating an apparent alias; direct IO; changing package policy;
-missing epoch order; lock across compute; dependency, allowlist or cap
-expansion; or activating loading/package/registration/configured/rule/action
-behavior.
-
-On acceptance, select corrected
-`WP-4-5-7A-canonical-source-policy-convergence-implementation`, adding
-`canonical_repository_load_route_tests.rs` to its proof allowlist so it can
-migrate callers and delete all four temporary wrappers. Stage B loading/package
-adaptation follows only after corrected Stage A; the shared registration
-expander follows only after Stage B.
+On acceptance, select only
+`WP-4-5-7A-canonical-loading-package-adapter-implementation` from the accepted
+two-stage design. The shared registration expander follows only after Stage B.

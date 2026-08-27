@@ -19440,3 +19440,19 @@ six-file contract. Activate only
 800-production/1,000-proof/1,800-total caps. All root keys/consumers and all
 four canonical wrappers remain; package-policy and loading adaptation stay
 read-only.
+
+Commit `9764f8a4f` accepts the shared Root/Canonical observation owner after
+full serial and independent terminal review. It retains the existing zero-copy
+result, adds the observed sibling, preserves every legacy root key/consumer and
+makes only the temporary source wrappers delegate.
+
+Activate corrected
+`WP-4-5-7A-canonical-source-policy-convergence-implementation-r2`. One compact
+source-route carrier now generalizes Bzlmod path/listing, REPO, ignore, package
+lookup/boundary and selected BUILD source; root constructors and dependency
+order remain exact. Migrate canonical policy proof, delete all four temporary
+wrappers and stop before Stage B loading/package adaptation. The carrier and
+structural hashes are Slug-native; Bazel 9.2 policy/mapping behavior and catalog
+bytes remain exact. Bazel BCR Starlark owns rules including `cc_internal`,
+`cc_common` remains a generic host-builtin consumer, and Zabel is peer
+architecture/optimization guidance only.

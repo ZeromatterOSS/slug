@@ -7533,3 +7533,14 @@ corrected Bzlmod policy stage migrates its callers and tests. This prerequisite
 does not parse or implement C++ rules: Bazel 9 BCR Starlark, including
 `cc_internal`, remains the rule layer; `cc_common` exercises the generic host
 ABI. Zabel informs ownership and compact-retention choices only.
+
+Commit `9764f8a4f` accepts that prerequisite with zero-copy catalog/materialized
+payloads, exact root compatibility and the observed resolution-before-file
+epoch. Corrected Stage A is now active under the current manifest. It retains
+one Root/Canonical source-route carrier across path/listing, REPO, ignore,
+package boundary and selected BUILD source, then deletes all four temporary
+canonical wrappers. Root constructors keep their accepted children and order;
+canonical policy uses the shared observation owner without an apparent alias.
+Stage B external subtree/`.bzl`/package loading remains read-only until this
+packet is accepted. Bazel 9 BCR Starlark still owns `cc_internal`; `cc_common`
+remains a generic host-ABI consumer and Zabel remains peer guidance only.
