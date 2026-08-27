@@ -14,7 +14,6 @@ use std::cell::RefCell;
 use std::fmt;
 use std::ops::ControlFlow;
 use std::sync::Arc;
-use std::sync::OnceLock;
 
 use allocative::Allocative;
 use async_trait::async_trait;
@@ -28,6 +27,7 @@ use slug_events_v2::EvaluationDiagnosticLevel;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
+use slug_starlark_v2::populate_universe;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathObservationEpoch;
@@ -38,7 +38,6 @@ use starlark::any::ProvidesStaticType;
 use starlark::codemap::Span;
 use starlark::environment::Globals;
 use starlark::environment::GlobalsBuilder;
-use starlark::environment::LibraryExtension;
 use starlark::environment::Module;
 use starlark::eval::Arguments;
 use starlark::eval::Evaluator;
@@ -383,92 +382,11 @@ fn repo_file_globals(builder: &mut GlobalsBuilder) {
         state.ignored_directories = patterns;
         Ok(NoneType)
     }
-
-    fn set<'v>(
-        args: &Arguments<'v, '_>,
-        eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<NoneType> {
-        let positional = args.positions(eval.heap())?.collect::<Vec<_>>();
-        let ensure_iterable = |value: starlark::values::Value<'v>| {
-            value.iterate(eval.heap()).map(|_| ()).map_err(|_| {
-                custom_error(format!(
-                    "in call to set(), parameter 'elements' got value of type '{}', want 'iterable'",
-                    value.get_type()
-                ))
-            })
-        };
-        let mut elements = positional.first().copied();
-        if let Some(value) = elements {
-            ensure_iterable(value)?;
-        }
-        for (name, value) in args.names_map()? {
-            if name.as_str() != "elements" {
-                return Err(custom_error(format!(
-                    "set() got unexpected keyword argument '{}'{}",
-                    name.as_str(),
-                    spelling_suggestion(name.as_str(), "elements")
-                )));
-            }
-            ensure_iterable(value)?;
-            if elements.is_some() {
-                return Err(custom_error(
-                    "set() got multiple values for argument 'elements'",
-                ));
-            }
-            elements = Some(value);
-        }
-        if positional.len() > 1 {
-            return Err(custom_error(format!(
-                "set() accepts no more than 1 positional argument but got {}",
-                positional.len()
-            )));
-        }
-        Err(custom_error(
-            "Use of set() requires --experimental_enable_starlark_set",
-        ))
-    }
 }
 
 fn repo_globals() -> Globals {
-    static STANDARD: OnceLock<Globals> = OnceLock::new();
-    const STANDARD_NAMES: &[&str] = &[
-        "False",
-        "True",
-        "None",
-        "min",
-        "max",
-        "abs",
-        "all",
-        "any",
-        "sorted",
-        "reversed",
-        "tuple",
-        "list",
-        "len",
-        "str",
-        "repr",
-        "bool",
-        "float",
-        "int",
-        "dict",
-        "enumerate",
-        "hash",
-        "range",
-        "hasattr",
-        "getattr",
-        "dir",
-        "fail",
-        "type",
-        "zip",
-    ];
-    let standard = STANDARD.get_or_init(Globals::standard);
     let mut builder = GlobalsBuilder::new();
-    for (name, value) in standard.iter() {
-        if STANDARD_NAMES.contains(&name) {
-            builder.set(name, value);
-        }
-    }
-    LibraryExtension::Print.add(&mut builder);
+    populate_universe(&mut builder);
     repo_file_globals(&mut builder);
     builder.build()
 }
@@ -2034,6 +1952,22 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn repo_uses_the_shared_set_builtin() {
+        let (value, events) = evaluate(
+            b"ignore_directories(sorted(set(['b', 'a', 'b'])))",
+            RootRepoFileUtf8Mode::Warning,
+        );
+        assert_eq!(value.unwrap().ignored_directories(), ["a", "b"]);
+        assert!(events.is_empty());
+        for source in [b"set(elements = [])".as_slice(), b"set([], [])"] {
+            assert!(matches!(
+                evaluate(source, RootRepoFileUtf8Mode::Warning).0,
+                Err(HostRepoFileError::Evaluation { .. })
+            ));
+        }
+    }
+
+    #[test]
     fn restricted_syntax_is_source_ordered_and_prunes_rejected_children() {
         let (value, events) = evaluate(
             b"load('//:x.bzl', 'x')\ndef f():\n  repo(**value)\nif True:\n  f(*xs)\nrepo(**value)\n",
@@ -2207,10 +2141,6 @@ pub(crate) mod tests {
                 "'ignored_directories()' can only be called once",
             ),
             (
-                "set()",
-                "Use of set() requires --experimental_enable_starlark_set",
-            ),
-            (
                 "ignore_directories('bad')",
                 "in call to ignore_directories(), parameter 'dirs' got value of type 'string', want 'sequence'",
             ),
@@ -2257,34 +2187,6 @@ pub(crate) mod tests {
             (
                 "ignore_directories(dixx = [])",
                 "ignore_directories() got unexpected keyword argument 'dixx'",
-            ),
-            (
-                "set(1, 2)",
-                "in call to set(), parameter 'elements' got value of type 'int', want 'iterable'",
-            ),
-            (
-                "set(bad = 1)",
-                "set() got unexpected keyword argument 'bad'",
-            ),
-            (
-                "set(element = [])",
-                "set() got unexpected keyword argument 'element' (did you mean 'elements'?)",
-            ),
-            (
-                "set('bad')",
-                "in call to set(), parameter 'elements' got value of type 'string', want 'iterable'",
-            ),
-            (
-                "set([], elements = 1)",
-                "in call to set(), parameter 'elements' got value of type 'int', want 'iterable'",
-            ),
-            (
-                "set([], elements = [])",
-                "set() got multiple values for argument 'elements'",
-            ),
-            (
-                "set([], [])",
-                "set() accepts no more than 1 positional argument but got 2",
             ),
         ] {
             let (value, _) = evaluate(source.as_bytes(), RootRepoFileUtf8Mode::Warning);

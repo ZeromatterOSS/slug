@@ -84,6 +84,7 @@ use starlark::syntax::Dialect;
 use starlark::values::ValueLike;
 use starlark::values::dict::DictRef;
 use starlark::values::list::FrozenListRef;
+use starlark::values::set::SetMut;
 use starlark::values::structs::StructRef;
 use starlark::values::tuple::TupleRef;
 use starlark_map::small_map::SmallMap;
@@ -12120,6 +12121,64 @@ fn bazel_zero_argument_depset_freezes_empty_in_bzl_and_build_globals() {
         "X = depset([], [])",
     ] {
         assert!(eval_global(rejected, &globals).is_err(), "{rejected}");
+    }
+}
+
+#[test]
+fn bazel_set_is_shared_by_bzl_and_build_without_overlay_leaks() {
+    let bzl_globals = loading_globals();
+    let build_globals = build_file_loading_globals();
+    assert!(bzl_globals.names().any(|name| name.as_str() == "struct"));
+    assert!(!build_globals.names().any(|name| name.as_str() == "struct"));
+    for globals in [&bzl_globals, &build_globals] {
+        let names = globals
+            .names()
+            .map(|name| name.as_str())
+            .collect::<Vec<_>>();
+        assert!(names.contains(&"set"));
+        assert!(!names.contains(&"chr"));
+        assert!(!names.contains(&"ord"));
+        let frozen = eval_global(
+            "ORIGINAL=set([3,1,3,2])\nCOPY=set(ORIGINAL)\nCOPY.add(4)\nCOPY.add(1)\nORIGINAL_VALUES=list(ORIGINAL)\nCOPY_VALUES=list(COPY)\nEMPTY_VALUES=list(set())\nHAS_ONE=1 in COPY\nKIND=type(COPY)\ndef deferred(value):\n    paths=set()\n    if value not in paths:\n        paths.add(value)\n    return paths\n",
+            globals,
+        )
+        .unwrap();
+        let ints = |name| {
+            FrozenListRef::from_value(frozen.get(name).unwrap().value())
+                .unwrap()
+                .iter()
+                .map(|value| value.unpack_i32().unwrap())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(ints("ORIGINAL_VALUES"), [3, 1, 2]);
+        assert_eq!(ints("COPY_VALUES"), [3, 1, 2, 4]);
+        assert!(ints("EMPTY_VALUES").is_empty());
+        assert_eq!(
+            frozen.get("HAS_ONE").unwrap().value().unpack_bool(),
+            Some(true)
+        );
+        assert_eq!(
+            frozen.get("KIND").unwrap().value().unpack_str(),
+            Some("set")
+        );
+        assert_eq!(frozen.get("ORIGINAL").unwrap().value().get_type(), "set");
+        assert_eq!(frozen.get("COPY").unwrap().value().get_type(), "set");
+        assert!(
+            SetMut::from_value(frozen.get("COPY").unwrap().value().to_value()).is_err(),
+            "an exported frozen set must reject mutation"
+        );
+        assert_eq!(
+            frozen.get("deferred").unwrap().value().get_type(),
+            "function"
+        );
+        for rejected in [
+            "X=set(elements=[])",
+            "X=set([], [])",
+            "X=set(1)",
+            "X=set([[1]])",
+        ] {
+            assert!(eval_global(rejected, globals).is_err(), "{rejected}");
+        }
     }
 }
 

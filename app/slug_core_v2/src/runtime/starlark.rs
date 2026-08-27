@@ -10,7 +10,7 @@
 
 use std::path::Path;
 
-use starlark::environment::Globals;
+use slug_starlark_v2::populate_universe;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
@@ -53,11 +53,12 @@ pub(crate) fn evaluate_file(path: &Path, source: &str, is_module: bool) -> anyho
     };
     let ast = AstModule::parse(&path.display().to_string(), source.to_owned(), dialect)
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-    let globals = if is_module {
-        GlobalsBuilder::standard().with(module_file_globals).build()
-    } else {
-        Globals::standard()
-    };
+    let mut globals = GlobalsBuilder::new();
+    populate_universe(&mut globals);
+    if is_module {
+        module_file_globals(&mut globals);
+    }
+    let globals = globals.build();
     let module = Module::new();
     Evaluator::new(&module)
         .eval_module(ast, &globals)
@@ -101,5 +102,26 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.to_string().contains("not allowed in this dialect"));
+    }
+
+    #[test]
+    fn build_and_module_branches_share_bazel_universal_builtins() {
+        for (path, is_module) in [
+            (Path::new("BUILD.bazel"), false),
+            (Path::new("MODULE.bazel"), true),
+        ] {
+            evaluate_file(
+                path,
+                "S = set([1, 1])\nS.add(2)\nRESULT = list(S) == [1, 2]\n",
+                is_module,
+            )
+            .unwrap();
+            for rejected in ["X = chr(65)", "X = ord('A')", "X = struct()"] {
+                assert!(
+                    evaluate_file(path, rejected, is_module).is_err(),
+                    "{rejected}"
+                );
+            }
+        }
     }
 }

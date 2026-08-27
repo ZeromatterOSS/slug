@@ -19,6 +19,7 @@ slug_build_api_v2 = { workspace = true }
 slug_bzlmod_v2 = { workspace = true }
 slug_events_v2 = { workspace = true }
 slug_identity_v2 = { workspace = true }
+slug_starlark_v2 = { workspace = true }
 slug_workspace_v2 = { workspace = true }
 sha2 = { workspace = true }
 starlark = { workspace = true }

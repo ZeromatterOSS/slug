@@ -3426,6 +3426,7 @@ dependencies = [
  "sha2",
  "slug_events_v2",
  "slug_identity_v2",
+ "slug_starlark_v2",
  "slug_workspace_v2",
  "starlark",
  "starlark_map",
@@ -3503,6 +3504,7 @@ dependencies = [
  "slug_identity_v2",
  "slug_loading_v2",
  "slug_query_v2",
+ "slug_starlark_v2",
  "slug_workspace_v2",
  "starlark",
  "starlark_map",
@@ -3546,6 +3548,7 @@ dependencies = [
  "slug_bzlmod_v2",
  "slug_events_v2",
  "slug_identity_v2",
+ "slug_starlark_v2",
  "slug_workspace_v2",
  "starlark",
  "starlark_map",
@@ -3607,6 +3610,13 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "slug_starlark_v2"
+version = "0.1.0"
+dependencies = [
+ "starlark",
 ]
 
 [[package]]

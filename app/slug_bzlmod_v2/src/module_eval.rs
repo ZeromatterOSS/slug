@@ -30,6 +30,7 @@ use slug_identity_v2::PackagePath;
 use slug_identity_v2::RepositoryMapping;
 use slug_identity_v2::RepositoryMappingId;
 use slug_identity_v2::TargetName;
+use slug_starlark_v2::populate_universe;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathObservationEpoch;
@@ -44,7 +45,6 @@ use starlark::any::ProvidesStaticType;
 use starlark::codemap::Span;
 use starlark::environment::Globals;
 use starlark::environment::GlobalsBuilder;
-use starlark::environment::LibraryExtension;
 use starlark::environment::Module;
 use starlark::eval::Arguments;
 use starlark::eval::Evaluator;
@@ -4530,9 +4530,7 @@ fn evaluate_nonroot_module_closure(
         include_indices,
         file_ids,
     };
-    let globals = GlobalsBuilder::extended_by(&[LibraryExtension::Print])
-        .with(nonroot_module_globals)
-        .build();
+    let globals = nonroot_module_environment();
     let module = Module::new();
     let included_modules: Vec<_> = supplied.iter().map(|_| Box::new(Module::new())).collect();
     let programs = (|| {
@@ -4847,6 +4845,25 @@ fn validate_root_repo_overrides(state: &ExtensionEvalState) -> anyhow::Result<()
 #[cfg(test)]
 mod nonroot_directive_evaluator_tests {
     use super::*;
+
+    #[test]
+    fn module_environments_share_the_exact_universe_without_bzl_overlays() {
+        let root = root_module_globals();
+        let nonroot = nonroot_module_environment();
+        for globals in [&root, &nonroot] {
+            let names = globals
+                .names()
+                .map(|name| name.as_str())
+                .collect::<Vec<_>>();
+            assert!(names.contains(&"set"));
+            assert!(names.contains(&"print"));
+            assert!(!names.contains(&"chr"));
+            assert!(!names.contains(&"ord"));
+            assert!(!names.contains(&"struct"));
+        }
+        assert!(root.names().any(|name| name.as_str() == "module"));
+        assert!(nonroot.names().any(|name| name.as_str() == "module"));
+    }
 
     fn evaluate(source: &str) -> anyhow::Result<EvaluatedNonrootModule> {
         evaluate_nonroot_module_file(
@@ -6072,9 +6089,17 @@ fn module_globals(builder: &mut GlobalsBuilder) {
 }
 
 fn root_module_globals() -> Globals {
-    GlobalsBuilder::extended_by(&[LibraryExtension::Print])
-        .with(module_globals)
-        .build()
+    let mut globals = GlobalsBuilder::new();
+    populate_universe(&mut globals);
+    module_globals(&mut globals);
+    globals.build()
+}
+
+fn nonroot_module_environment() -> Globals {
+    let mut globals = GlobalsBuilder::new();
+    populate_universe(&mut globals);
+    nonroot_module_globals(&mut globals);
+    globals.build()
 }
 
 #[cfg(test)]

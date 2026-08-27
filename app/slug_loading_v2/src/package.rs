@@ -24,6 +24,7 @@ use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackageIdentifier;
+use slug_starlark_v2::populate_universe;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Globals;
 use starlark::environment::GlobalsBuilder;
@@ -5803,13 +5804,15 @@ fn bzl_only_globals(builder: &mut GlobalsBuilder) {
     }
 }
 
-fn complete_loading_globals(extensions: &[LibraryExtension], bool_config: bool) -> Globals {
-    let mut globals = GlobalsBuilder::extended_by(extensions)
-        .with(package_globals)
-        .with(select_globals);
+fn complete_loading_globals(bool_config: bool) -> Globals {
+    let mut globals = GlobalsBuilder::new();
+    populate_universe(&mut globals);
+    package_globals(&mut globals);
+    select_globals(&mut globals);
     globals.set("native", NativeModule);
     globals.set("attr", AttrModule);
     if bool_config {
+        LibraryExtension::StructType.add(&mut globals);
         bzl_only_globals(&mut globals);
         globals.set("config", ConfigModule);
         globals.set("config_common", ConfigCommonModule);
@@ -5828,14 +5831,11 @@ fn complete_loading_globals(extensions: &[LibraryExtension], bool_config: bool) 
 }
 
 pub(crate) fn loading_globals() -> Globals {
-    complete_loading_globals(
-        &[LibraryExtension::Print, LibraryExtension::StructType],
-        true,
-    )
+    complete_loading_globals(true)
 }
 
 pub(crate) fn build_file_loading_globals() -> Globals {
-    complete_loading_globals(&[LibraryExtension::Print], false)
+    complete_loading_globals(false)
 }
 
 #[cfg(test)]

@@ -13,6 +13,7 @@ rust_library(
         "//allocative/allocative",
         "//app/slug_events_v2",
         "//app/slug_identity_v2",
+        "//app/slug_starlark_v2",
         "//app/slug_workspace_v2",
         "//dice/dice",
         "//dice/dice_futures",

@@ -32,8 +32,9 @@ slug_bzlmod_v2 = { workspace = true }
 slug_configuration_v2 = { workspace = true }
 slug_events_v2 = { workspace = true }
 slug_loading_v2 = { workspace = true }
-slug_workspace_v2 = { workspace = true }
 slug_query_v2 = { workspace = true }
+slug_starlark_v2 = { workspace = true }
+slug_workspace_v2 = { workspace = true }
 sha2 = { workspace = true }
 starlark = { workspace = true }
 starlark_map = { workspace = true }

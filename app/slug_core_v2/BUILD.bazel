@@ -17,6 +17,7 @@ rust_library(
         "//app/slug_identity_v2",
         "//app/slug_loading_v2",
         "//app/slug_query_v2",
+        "//app/slug_starlark_v2",
         "//app/slug_workspace_v2",
         "//dice/dice",
         "//dice/dice_futures",
