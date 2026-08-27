@@ -4120,6 +4120,25 @@ ObjcInfo = _ObjcInfo
 new_objc_provider = _ObjcInfo
 CcSharedLibraryInfo = _CcSharedLibraryInfo
 "###;
+const RULES_CC_PUBLIC_CC_COMMON_SOURCE: &str = r###"# Copyright 2024 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""cc_common module"""
+
+load("@cc_compatibility_proxy//:symbols.bzl", _cc_common = "cc_common")
+
+cc_common = _cc_common
+"###;
 const RULES_CC_INTERNAL_SOURCE: &str = r###"# Copyright 2025 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25086,6 +25105,70 @@ fn exact_rules_cc_compatibility_symbols_freezes_complete_recursive_producer() {
     )
     .unwrap();
     assert_rules_cc_compatibility_symbols_interfaces(&module, &children);
+}
+
+#[test]
+fn exact_rules_cc_public_cc_common_freezes_complete_recursive_producer() {
+    assert_eq!(RULES_CC_PUBLIC_CC_COMMON_SOURCE.lines().count(), 18);
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(RULES_CC_PUBLIC_CC_COMMON_SOURCE.as_bytes())
+        ),
+        "65e91cf0fa7ebb1c8efc84bbf6b1c4ec4db46f5e5ed4606759aa4a45a23b4063"
+    );
+    let symbols_children = complete_rules_cc_compatibility_symbols_children();
+    let symbols_owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse(
+            "@@rules_cc++compatibility_proxy+cc_compatibility_proxy//:symbols.bzl",
+        )
+        .unwrap(),
+        workspace_path: PathBuf::from("/rules_cc_compatibility_proxy/symbols.bzl"),
+        repository_mapping: Arc::from([(
+            ApparentRepoName::new("rules_cc").unwrap(),
+            CanonicalRepoName::new("rules_cc+").unwrap(),
+        )]),
+    };
+    let symbols = eval_bzl_with_loaded_children(
+        RULES_CC_COMPATIBILITY_SYMBOLS_SOURCE,
+        symbols_owner.clone(),
+        &symbols_children,
+    )
+    .unwrap();
+    let module = eval_bzl_with_loaded_children(
+        RULES_CC_PUBLIC_CC_COMMON_SOURCE,
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_cc+//cc/common:cc_common.bzl").unwrap(),
+            workspace_path: PathBuf::from("/rules_cc/cc/common/cc_common.bzl"),
+            repository_mapping: Arc::from([(
+                ApparentRepoName::new("cc_compatibility_proxy").unwrap(),
+                CanonicalRepoName::new("rules_cc++compatibility_proxy+cc_compatibility_proxy")
+                    .unwrap(),
+            )]),
+        },
+        &[(
+            "@cc_compatibility_proxy//:symbols.bzl",
+            symbols_owner,
+            symbols.dupe(),
+        )],
+    )
+    .unwrap();
+    let imported = module.get_any_visibility("_cc_common").unwrap().0;
+    let exported = module.get("cc_common").unwrap();
+    let child = symbols.get("cc_common").unwrap();
+    assert!(imported.value().ptr_eq(child.value()));
+    assert!(exported.value().ptr_eq(imported.value()));
+    assert!(module.get("_cc_common").is_err());
+    assert_eq!(
+        module.names().map(|name| name.as_str()).collect::<Vec<_>>(),
+        ["cc_common"]
+    );
+    let mut all = module
+        .names_any_visibility()
+        .map(|name| name.as_str())
+        .collect::<Vec<_>>();
+    all.sort_unstable();
+    assert_eq!(all, ["_cc_common", "cc_common"]);
 }
 
 #[test]
