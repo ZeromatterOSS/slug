@@ -4612,8 +4612,8 @@ async fn external_restricted_visibility_rejections_precede_competing_synthesis_f
             "cross-package group",
         ),
         (
-            "filegroup(name = \"restricted\", srcs = [\"//other:source\"], visibility = [\"@dep//:group\"])\n",
-            "external repository dependency labels are not supported",
+            "filegroup(name = \"restricted\", srcs = [\"//other:source\"], visibility = [\"@@other+//:group\"])\n",
+            "external repository visibility named-repository group is deferred",
         ),
         (
             "filegroup(name = \"restricted\", srcs = [\"//other:source\"], visibility = [\":missing\"])\n",

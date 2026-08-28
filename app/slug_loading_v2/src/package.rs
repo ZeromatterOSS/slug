@@ -25,6 +25,7 @@ use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackageIdentifier;
+use slug_identity_v2::PackagePath;
 use slug_starlark_v2::populate_universe;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Globals;
@@ -678,29 +679,41 @@ impl std::error::Error for HostGlobControlTransfer {}
 pub(crate) struct PackageRecorder {
     glob_source: PackageGlobSource,
     package: CompactString,
+    package_identifier: PackageIdentifier,
+    repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
     state: RefCell<PackageState>,
 }
 
 #[allow(dead_code)] // The Host attempt methods are exercised privately before activation.
 impl PackageRecorder {
     pub(crate) fn new(listing: PackageListing, package: impl Into<CompactString>) -> Self {
+        let package = package.into();
         Self {
             glob_source: PackageGlobSource::Listing(listing),
-            package: package.into(),
+            package_identifier: PackageIdentifier::new(
+                CanonicalRepoName::root(),
+                PackagePath::parse(&package).expect("validated BUILD package path"),
+            ),
+            package,
+            repository_mapping: Arc::from([]),
             state: RefCell::new(PackageState::default()),
         }
     }
 
     pub(crate) fn new_host(
         prepared: Arc<SmallMap<HostGlobLoadingRequest, HostGlobPrepared>>,
-        package: impl Into<CompactString>,
+        package_identifier: PackageIdentifier,
+        repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
     ) -> Self {
+        let package = CompactString::new(package_identifier.package().as_str());
         Self {
             glob_source: PackageGlobSource::Host(HostGlobAttemptState {
                 prepared,
                 control: RefCell::new(None),
             }),
-            package: package.into(),
+            package,
+            package_identifier,
+            repository_mapping,
             state: RefCell::new(PackageState::default()),
         }
     }
@@ -1020,7 +1033,24 @@ impl PackageRecorder {
     }
 
     fn dependency_label(&self, value: &str) -> anyhow::Result<CanonicalLabel> {
-        package_context_label(&self.package, value)
+        if self.package_identifier.repo().is_root() {
+            return package_context_label(&self.package, value);
+        }
+        package_context_label_with_repository(
+            &self.package_identifier,
+            &self.repository_mapping,
+            value,
+        )
+    }
+
+    fn output_label(&self, value: &str) -> anyhow::Result<CanonicalLabel> {
+        let label = self.dependency_label(value).map_err(|_| {
+            anyhow::anyhow!("output label must name a valid target in this package: {value}")
+        })?;
+        if label.package() != &self.package_identifier {
+            anyhow::bail!("output label must name a valid target in this package: {value}");
+        }
+        Ok(label)
     }
 
     fn parse_visibility(&self, values: Vec<String>) -> anyhow::Result<RuleVisibility> {
@@ -1323,8 +1353,12 @@ impl PackageRecorder {
                 PackageTargetKind::StarlarkRule(rule) if rule.is_test() => {
                     target.kind.test_metadata().map(|metadata| {
                         (
-                            package_context_label(&self.package, name)
-                                .expect("recorded target names are valid package-context labels"),
+                            package_context_label_with_repository(
+                                &self.package_identifier,
+                                &self.repository_mapping,
+                                name,
+                            )
+                            .expect("recorded target names are valid package-context labels"),
                             metadata,
                         )
                     })
@@ -1793,6 +1827,63 @@ pub(crate) fn package_context_label(
     CanonicalLabel::parse(&canonical).map_err(anyhow::Error::msg)
 }
 
+pub(crate) fn package_context_label_with_repository(
+    package: &PackageIdentifier,
+    mapping: &[(ApparentRepoName, CanonicalRepoName)],
+    raw: &str,
+) -> anyhow::Result<CanonicalLabel> {
+    let direct = |label: CanonicalLabel| {
+        let label_package = label.package().package().as_str();
+        if label_package == "..." || label_package.ends_with("/...") {
+            anyhow::bail!("invalid label '{raw}': package name cannot contain '...'");
+        }
+        Ok(label)
+    };
+    if raw.starts_with("@@") {
+        return direct(CanonicalLabel::parse(raw).map_err(anyhow::Error::msg)?);
+    }
+    if raw.starts_with('@') {
+        let apparent = ApparentLabel::parse(raw).map_err(anyhow::Error::msg)?;
+        let repository = if apparent.repo().is_root() {
+            CanonicalRepoName::root()
+        } else {
+            mapping
+                .iter()
+                .find_map(|(name, repository)| {
+                    (name == apparent.repo()).then_some(repository.clone())
+                })
+                .ok_or_else(|| {
+                    anyhow::anyhow!("no repository visible as '@{}'", apparent.repo().as_str())
+                })?
+        };
+        let canonical = if repository.is_root() {
+            format!("@@//{}:{}", apparent.package(), apparent.target())
+        } else {
+            format!(
+                "@@{}//{}:{}",
+                repository.as_str(),
+                apparent.package(),
+                apparent.target()
+            )
+        };
+        return direct(CanonicalLabel::parse(&canonical).map_err(anyhow::Error::msg)?);
+    }
+
+    let provisional = package_context_label(package.package().as_str(), raw)?;
+    let absolute_main = raw.starts_with("//")
+        && matches!(
+            provisional.package().package().as_str(),
+            "conditions" | "visibility"
+        );
+    if package.repo().is_root() || absolute_main {
+        Ok(provisional)
+    } else {
+        provisional
+            .rebind_provisional_root_repository(package.repo())
+            .map_err(anyhow::Error::msg)
+    }
+}
+
 fn package_output_label(base_package: &str, raw: &str) -> anyhow::Result<CanonicalLabel> {
     let label = package_context_label(base_package, raw).map_err(|_| {
         anyhow::anyhow!("output label must name a valid target in this package: {raw}")
@@ -2122,7 +2213,7 @@ fn coerce_native_overrides<'v>(
                     )
                 }
                 kind => coerce_raw_value(
-                    &recorder.package,
+                    RawLabelContext::Package(recorder),
                     kind,
                     &raw_attribute_value(value)?,
                 )?,
@@ -2203,28 +2294,44 @@ fn intrinsic_default(kind: AttributeKind) -> CoercedAttributeValue {
     }
 }
 
+#[derive(Clone, Copy)]
+enum RawLabelContext<'a> {
+    Root(&'a str),
+    Package(&'a PackageRecorder),
+}
+
+impl RawLabelContext<'_> {
+    fn label(self, value: &RawAttributeValue, context: &str) -> anyhow::Result<CanonicalLabel> {
+        match self {
+            Self::Root(package) => raw_label(package, value, context),
+            Self::Package(recorder) => recorder.dependency_label(&raw_string(value, context)?),
+        }
+    }
+
+    fn output(self, value: &RawAttributeValue, context: &str) -> anyhow::Result<CanonicalLabel> {
+        match self {
+            Self::Root(package) => raw_output(package, value, context),
+            Self::Package(recorder) => recorder.output_label(&raw_string(value, context)?),
+        }
+    }
+}
+
 fn coerce_raw_value(
-    base_package: &str,
+    context: RawLabelContext<'_>,
     kind: AttributeKind,
     raw: &RawAttributeValue,
 ) -> anyhow::Result<CoercedAttributeValue> {
-    let labels = |values: &[RawAttributeValue], context| {
+    let labels = |values: &[RawAttributeValue], label_context| {
         values
             .iter()
-            .map(|value| raw_label(base_package, value, context))
+            .map(|value| context.label(value, label_context))
             .collect::<anyhow::Result<Vec<_>>>()
     };
     match kind {
-        AttributeKind::Label => Ok(CoercedAttributeValue::Label(raw_label(
-            base_package,
-            raw,
-            "label",
-        )?)),
-        AttributeKind::Output => Ok(CoercedAttributeValue::Output(raw_output(
-            base_package,
-            raw,
-            "output",
-        )?)),
+        AttributeKind::Label => Ok(CoercedAttributeValue::Label(context.label(raw, "label")?)),
+        AttributeKind::Output => Ok(CoercedAttributeValue::Output(
+            context.output(raw, "output")?,
+        )),
         AttributeKind::String => Ok(CoercedAttributeValue::String(raw_string(raw, "string")?)),
         AttributeKind::Boolean => match raw {
             RawAttributeValue::Boolean(value) => Ok(CoercedAttributeValue::Boolean(*value)),
@@ -2294,7 +2401,7 @@ fn coerce_raw_value(
             } else {
                 values
                     .iter()
-                    .map(|value| raw_output(base_package, value, "output list"))
+                    .map(|value| context.output(value, "output list"))
                     .collect::<anyhow::Result<Vec<_>>>()?
             };
             Ok(if kind == AttributeKind::LabelList {
@@ -2313,7 +2420,7 @@ fn coerce_raw_value(
                     .map(|(key, value)| {
                         Ok((
                             raw_string(key, "dictionary key")?,
-                            raw_label(base_package, value, "dictionary value")?,
+                            context.label(value, "dictionary value")?,
                         ))
                     })
                     .collect::<anyhow::Result<Vec<_>>>()?
@@ -2329,7 +2436,7 @@ fn coerce_raw_value(
                     .iter()
                     .map(|(key, value)| {
                         Ok((
-                            raw_label(base_package, key, "dictionary key")?,
+                            context.label(key, "dictionary key")?,
                             raw_string(value, "dictionary value")?,
                         ))
                     })
@@ -2468,7 +2575,7 @@ fn coerce_starlark_value(
     let raw = raw_attribute_value(value).map_err(|_| {
         anyhow::anyhow!("attribute `{attribute_name}` must contain only string labels")
     })?;
-    coerce_raw_value(&recorder.package, kind, &raw)
+    coerce_raw_value(RawLabelContext::Package(recorder), kind, &raw)
 }
 
 /// The callable returned by Bazel's `rule()` global during package loading.
@@ -4137,7 +4244,11 @@ fn attribute_definition<'v>(
             }
             let raw = raw_attribute_value(value)?;
             let source = context.source_label_for_call(eval)?;
-            coerce_raw_value(source.package().package().as_str(), kind, &raw)
+            coerce_raw_value(
+                RawLabelContext::Root(source.package().package().as_str()),
+                kind,
+                &raw,
+            )
         })
         .transpose()?;
     let mut exec_configuration = false;
@@ -4191,7 +4302,7 @@ fn coerce_label_default(
     let raw = raw_attribute_value(value)?;
     let RawAttributeValue::String(raw) = &raw else {
         return coerce_raw_value(
-            source.label.package().package().as_str(),
+            RawLabelContext::Root(source.label.package().package().as_str()),
             AttributeKind::Label,
             &raw,
         );

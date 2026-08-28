@@ -95,9 +95,13 @@ impl RuleVisibility {
             return Ok(self.clone());
         };
         let project = |label: &CanonicalLabel| {
-            label
-                .rebind_provisional_root_repository(repo)
-                .map_err(anyhow::Error::msg)
+            if label.package().repo() == repo {
+                Ok(label.clone())
+            } else {
+                label
+                    .rebind_provisional_root_repository(repo)
+                    .map_err(anyhow::Error::msg)
+            }
         };
         Ok(Self::Restricted(Arc::new(RestrictedVisibility {
             declared_labels: value
@@ -255,13 +259,16 @@ impl PackageGroupContents {
             anyhow::bail!("package specification destination repository must be nonroot");
         }
         let project = |package: &PackageIdentifier| {
-            if !package.repo().is_root() {
-                anyhow::bail!("package specification is not provisional-root: {package}");
+            if package.repo() == repo {
+                return Ok(package.clone());
             }
-            Ok(PackageIdentifier::new(
-                repo.clone(),
-                package.package().clone(),
-            ))
+            if package.repo().is_root() {
+                return Ok(PackageIdentifier::new(
+                    repo.clone(),
+                    package.package().clone(),
+                ));
+            }
+            anyhow::bail!("package specification is not in repository {repo}: {package}");
         };
         Ok(Self {
             exact_positive: self
@@ -427,6 +434,7 @@ mod tests {
             projected.raw_declared_labels(),
             projected.dependency_labels()
         );
+        assert_eq!(projected.in_repository_context(&repo).unwrap(), projected);
         assert_eq!(
             RuleVisibility::Public.in_repository_context(&repo).unwrap(),
             RuleVisibility::Public
@@ -472,6 +480,7 @@ mod tests {
         assert_eq!(contents.exact_negative().len(), 1);
         assert_eq!(contents.subtree_positive().len(), 1);
         assert_eq!(contents.subtree_negative().len(), 1);
+        assert_eq!(contents.in_repository_context(&repo).unwrap(), contents);
 
         let public = PackageGroupContents::from_package_specs(&["public".to_owned()])
             .unwrap()

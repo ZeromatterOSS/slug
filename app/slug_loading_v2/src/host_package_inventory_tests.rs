@@ -47,6 +47,7 @@ use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EventBatch;
+use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackageIdentifier;
@@ -82,6 +83,9 @@ use crate::HostPackageInventoryObservationKey;
 use crate::RootPackageLoadObservationKey;
 use crate::bzl_module::RepositoryPackageInventoryObservationKey;
 use crate::cycle_detector::bzl_load_cycle_detector;
+use crate::package::NativeToolchainTarget;
+use crate::package::PackageTargetKind;
+use crate::package::package_context_label_with_repository;
 
 const ROOT_MODULE: &str = concat!(
     "module(name = 'bazel_tools')\n",
@@ -104,6 +108,51 @@ fn package(repo: &str, path: &str) -> PackageIdentifier {
         },
         PackagePath::parse(path).unwrap(),
     )
+}
+
+#[test]
+fn canonical_package_context_resolves_repository_aware_label_matrix() {
+    let context = package("dep+", "pkg");
+    let mapping = [(
+        ApparentRepoName::new("alias").unwrap(),
+        CanonicalRepoName::new("mapped+").unwrap(),
+    )];
+    for (raw, expected) in [
+        (":local", "@@dep+//pkg:local"),
+        ("bare", "@@dep+//pkg:bare"),
+        ("//same:target", "@@dep+//same:target"),
+        ("@@//root:target", "@@//root:target"),
+        ("@@other+//other:target", "@@other+//other:target"),
+        ("@alias//mapped:target", "@@mapped+//mapped:target"),
+        ("//conditions:default", "@@//conditions:default"),
+        ("//visibility:public", "@@//visibility:public"),
+    ] {
+        assert_eq!(
+            package_context_label_with_repository(&context, &mapping, raw).unwrap(),
+            CanonicalLabel::parse(expected).unwrap(),
+            "{raw}"
+        );
+    }
+
+    let missing = package_context_label_with_repository(&context, &mapping, "@missing//:target")
+        .unwrap_err()
+        .to_string();
+    assert!(missing.contains("no repository visible as '@missing'"));
+    for raw in ["@@other+//tree/...:all", "@alias//tree/...:all"] {
+        assert!(
+            package_context_label_with_repository(&context, &mapping, raw)
+                .unwrap_err()
+                .to_string()
+                .contains("package name cannot contain '...'")
+        );
+    }
+    assert!(
+        package_context_label_with_repository(&package("", "pkg"), &[], "@alias//:target").is_err()
+    );
+    assert_ne!(
+        package_context_label_with_repository(&package("dep_a+", "pkg"), &[], ":same").unwrap(),
+        package_context_label_with_repository(&package("dep_b+", "pkg"), &[], ":same").unwrap(),
+    );
 }
 
 #[derive(Debug)]
@@ -421,6 +470,110 @@ fn key_identity_includes_repository_and_package() {
     fn assert_allocative<T: allocative::Allocative>() {}
     assert_allocative::<HostPackageInventory>();
     assert_allocative::<HostPackageInventoryKey>();
+}
+
+#[tokio::test]
+async fn canonical_inventory_retains_final_native_label_identities() {
+    let build = concat!(
+        "constraint_setting(name = 'setting')\n",
+        "constraint_value(name = 'value', constraint_setting = '@dep//:setting')\n",
+        "platform(name = 'platform', constraint_values = ['//:value'])\n",
+        "toolchain_type(name = 'type')\n",
+        "filegroup(name = 'impl')\n",
+        "toolchain(\n",
+        "    name = 'toolchain',\n",
+        "    toolchain_type = '@@//:root_type',\n",
+        "    toolchain = 'impl',\n",
+        "    exec_compatible_with = [':value'],\n",
+        ")\n",
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut tx = transaction_on(
+        &dice,
+        ROOT_MODULE,
+        EpochBuilder::canonical(ROOT_MODULE, build, 15),
+        None,
+    )
+    .await;
+    let value = tx
+        .compute(&HostPackageInventoryKey::new(
+            workspace(),
+            package("dep+", ""),
+        ))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(inventory) = value else {
+        panic!("canonical inventory did not complete: {value:?}")
+    };
+    let loaded = inventory.loaded().unwrap();
+    let native = |name: &str| {
+        let target = loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap();
+        let PackageTargetKind::NativeToolchain(native) = &target.kind else {
+            panic!("{name} was not retained as a native toolchain target")
+        };
+        native
+    };
+
+    let NativeToolchainTarget::ConstraintValue { constraint_setting } = native("value") else {
+        panic!("value has the wrong native kind")
+    };
+    assert_eq!(constraint_setting.to_string(), "@@dep+//:setting");
+    let NativeToolchainTarget::Platform { constraint_values } = native("platform") else {
+        panic!("platform has the wrong native kind")
+    };
+    assert_eq!(constraint_values[0].to_string(), "@@dep+//:value");
+    let NativeToolchainTarget::Toolchain {
+        toolchain_type,
+        implementation,
+        exec_compatible_with,
+    } = native("toolchain")
+    else {
+        panic!("toolchain has the wrong native kind")
+    };
+    assert_eq!(toolchain_type.to_string(), "@@//:root_type");
+    assert_eq!(implementation.to_string(), "@@dep+//:impl");
+    assert_eq!(exec_compatible_with[0].to_string(), "@@dep+//:value");
+}
+
+#[tokio::test]
+async fn canonical_inventory_rejects_unmapped_apparent_label_before_publication() {
+    let build = concat!(
+        "constraint_setting(name = 'setting')\n",
+        "constraint_value(\n",
+        "    name = 'value',\n",
+        "    constraint_setting = '@missing//:setting',\n",
+        ")\n",
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut tx = transaction_on(
+        &dice,
+        ROOT_MODULE,
+        EpochBuilder::canonical(ROOT_MODULE, build, 16),
+        None,
+    )
+    .await;
+    let value = tx
+        .compute(&HostPackageInventoryKey::new(
+            workspace(),
+            package("dep+", ""),
+        ))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(inventory) = value else {
+        panic!("canonical inventory did not complete: {value:?}")
+    };
+    let HostPackageInventoryErrorRef::Canonical(error) = inventory.loaded().unwrap_err() else {
+        panic!("unmapped canonical label produced the wrong inventory error")
+    };
+    let error = error.to_string();
+    assert!(
+        error.contains("no repository visible as '@missing'"),
+        "{error}"
+    );
 }
 
 #[tokio::test]

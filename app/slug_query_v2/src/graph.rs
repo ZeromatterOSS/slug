@@ -30,6 +30,7 @@ use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
+use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::AttributeQueryValue;
@@ -1175,12 +1176,12 @@ fn external_package_graph_from_targets(
     // source synthesis below. A test_suite may name only another loaded native
     // test_suite in this external slice, so it never causes a source node to
     // appear or admits an unsupported `Other` member to `tests()`.
-    validate_external_test_suite_memberships(package, targets)?;
+    validate_external_test_suite_memberships(canonical_repo, package, targets)?;
     // Package-group includes are the only retained external group traversal.
     // Validate them before generic source synthesis so an include can neither
     // discover a source nor take a permissive edge fallback.
-    validate_external_package_group_includes(package, targets)?;
-    validate_external_restricted_visibility(package, default_visibility, targets)?;
+    validate_external_package_group_includes(canonical_repo, package, targets)?;
+    validate_external_restricted_visibility(canonical_repo, package, default_visibility, targets)?;
 
     for (target_index, target) in targets.iter().enumerate() {
         let native_attributes = native_attributes.and_then(|attributes| {
@@ -1504,7 +1505,10 @@ fn external_package_graph_from_targets(
         .flat_map(|node| node.edges.iter())
         .filter(|edge| edge.kind == QueryEdgeKind::Ordinary)
         .map(|edge| &edge.target)
-        .filter(|label| !label.is_root_repository() && label.package() == package.as_str())
+        .filter(|label| {
+            external_package_deferred_kind(label.canonical.package(), canonical_repo, package)
+                .is_none()
+        })
         .filter(|label| nodes.get(*label).is_none())
         .map(QueryLabel::dupe)
         .collect::<SmallSet<_>>();
@@ -1623,7 +1627,22 @@ fn validate_external_starlark_rule(
     Ok(())
 }
 
+fn external_package_deferred_kind(
+    candidate: &PackageIdentifier,
+    canonical_repo: &CanonicalRepoName,
+    package: &PackagePath,
+) -> Option<&'static str> {
+    if candidate.repo() != canonical_repo {
+        Some("named-repository")
+    } else if candidate.package() != package {
+        Some("cross-package")
+    } else {
+        None
+    }
+}
+
 fn validate_external_package_group_includes(
+    canonical_repo: &CanonicalRepoName,
     package: &PackagePath,
     targets: &[slug_loading_v2::PackageTarget],
 ) -> Result<(), QueryError> {
@@ -1633,12 +1652,9 @@ fn validate_external_package_group_includes(
         };
         for include in includes.iter() {
             let include_package = include.package();
-            if !include_package.repo().is_root() || include_package.package() != package {
-                let deferred = if include_package.repo().is_root() {
-                    "cross-package"
-                } else {
-                    "named-repository"
-                };
+            if let Some(deferred) =
+                external_package_deferred_kind(include_package, canonical_repo, package)
+            {
                 return Err(QueryError::evaluation(format!(
                     "external repository package_group {deferred} include is deferred: {include}"
                 )));
@@ -1670,6 +1686,7 @@ fn validate_external_package_group_includes(
 }
 
 fn validate_external_restricted_visibility(
+    canonical_repo: &CanonicalRepoName,
     package: &PackagePath,
     default_visibility: &RuleVisibility,
     targets: &[slug_loading_v2::PackageTarget],
@@ -1706,12 +1723,9 @@ fn validate_external_restricted_visibility(
         }
         for group in visibility.package_groups() {
             let group_package = group.package();
-            if !group_package.repo().is_root() || group_package.package() != package {
-                let deferred = if group_package.repo().is_root() {
-                    "cross-package"
-                } else {
-                    "named-repository"
-                };
+            if let Some(deferred) =
+                external_package_deferred_kind(group_package, canonical_repo, package)
+            {
                 return Err(QueryError::evaluation(format!(
                     "external repository visibility {deferred} group is deferred: {group}"
                 )));
@@ -1749,7 +1763,7 @@ fn external_package_group_include_label(
     include: &CanonicalLabel,
 ) -> Result<QueryLabel, QueryError> {
     let include_package = include.package();
-    if include_package.repo().is_root() && include_package.package() == package {
+    if external_package_deferred_kind(include_package, canonical_repo, package).is_none() {
         return QueryLabel::in_external_package(
             canonical_repo,
             apparent_repo,
@@ -1763,6 +1777,7 @@ fn external_package_group_include_label(
 }
 
 fn validate_external_test_suite_memberships(
+    canonical_repo: &CanonicalRepoName,
     package: &PackagePath,
     targets: &[slug_loading_v2::PackageTarget],
 ) -> Result<(), QueryError> {
@@ -1778,12 +1793,9 @@ fn validate_external_test_suite_memberships(
         }
         for member in membership.tests() {
             let member_package = member.package();
-            if !member_package.repo().is_root() || member_package.package() != package {
-                let deferred = if member_package.repo().is_root() {
-                    "cross-package"
-                } else {
-                    "named-repository"
-                };
+            if let Some(deferred) =
+                external_package_deferred_kind(member_package, canonical_repo, package)
+            {
                 return Err(QueryError::evaluation(format!(
                     "external repository test_suite {deferred} member is deferred: {member}"
                 )));
@@ -1813,7 +1825,7 @@ fn external_test_suite_member_label(
     member: &CanonicalLabel,
 ) -> Result<QueryLabel, QueryError> {
     let member_package = member.package();
-    if member_package.repo().is_root() && member_package.package() == package {
+    if external_package_deferred_kind(member_package, canonical_repo, package).is_none() {
         return QueryLabel::in_external_package(
             canonical_repo,
             apparent_repo,
@@ -1833,7 +1845,7 @@ fn external_filegroup_source_label(
     source: &CanonicalLabel,
 ) -> Result<QueryLabel, QueryError> {
     let source_package = source.package();
-    if source_package.repo().is_root() && source_package.package() == package {
+    if external_package_deferred_kind(source_package, canonical_repo, package).is_none() {
         return QueryLabel::in_external_package(
             canonical_repo,
             apparent_repo,
@@ -1841,11 +1853,8 @@ fn external_filegroup_source_label(
             source.target().as_str(),
         );
     }
-    let deferred = if source_package.repo().is_root() {
-        "cross-package"
-    } else {
-        "named-repository"
-    };
+    let deferred = external_package_deferred_kind(source_package, canonical_repo, package)
+        .expect("nonmatching external filegroup source has a deferred class");
     Err(QueryError::evaluation(format!(
         "external repository filegroup {deferred} srcs are deferred: {source}"
     )))
@@ -1858,7 +1867,7 @@ fn external_alias_actual_label(
     actual: &CanonicalLabel,
 ) -> Result<QueryLabel, QueryError> {
     let actual_package = actual.package();
-    if actual_package.repo().is_root() && actual_package.package() == package {
+    if external_package_deferred_kind(actual_package, canonical_repo, package).is_none() {
         return QueryLabel::in_external_package(
             canonical_repo,
             apparent_repo,
@@ -1866,11 +1875,8 @@ fn external_alias_actual_label(
             actual.target().as_str(),
         );
     }
-    let deferred = if actual_package.repo().is_root() {
-        "cross-package"
-    } else {
-        "named-repository"
-    };
+    let deferred = external_package_deferred_kind(actual_package, canonical_repo, package)
+        .expect("nonmatching external alias actual has a deferred class");
     Err(QueryError::evaluation(format!(
         "external repository alias {deferred} actual is deferred: {actual}"
     )))
@@ -2266,7 +2272,7 @@ mod graph_tests {
         let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
         let apparent_repo = ApparentRepoName::new("dep").unwrap();
         let package = PackagePath::parse("").unwrap();
-        let source = |target| CanonicalLabel::parse(&format!("@@//:{target}")).unwrap();
+        let source = |target| CanonicalLabel::parse(&format!("@@dep+//:{target}")).unwrap();
         let targets = vec![
             PackageTarget {
                 name: "existing.txt".to_owned(),
@@ -2451,7 +2457,7 @@ mod graph_tests {
         let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
         let apparent_repo = ApparentRepoName::new("dep").unwrap();
         let package = PackagePath::parse("").unwrap();
-        let source = |target| CanonicalLabel::parse(&format!("@@//:{target}")).unwrap();
+        let source = |target| CanonicalLabel::parse(&format!("@@dep+//:{target}")).unwrap();
         let suite = |name: &str, membership, tags: &[&str], visibility| PackageTarget {
             name: name.to_owned(),
             kind: PackageTargetKind::TestSuite {
@@ -2623,21 +2629,24 @@ mod graph_tests {
             )
         };
         let non_suite =
-            project(source("@@//:member"), PackageTargetKind::ExportedFile).unwrap_err();
+            project(source("@@dep+//:member"), PackageTargetKind::ExportedFile).unwrap_err();
         assert!(
             non_suite
                 .to_string()
                 .contains("test_suite non-suite member is deferred")
         );
         let unresolved =
-            project(source("@@//:missing"), PackageTargetKind::ExportedFile).unwrap_err();
+            project(source("@@dep+//:missing"), PackageTargetKind::ExportedFile).unwrap_err();
         assert!(
             unresolved
                 .to_string()
                 .contains("test_suite unresolved member is deferred")
         );
-        let cross_package =
-            project(source("@@//other:member"), PackageTargetKind::ExportedFile).unwrap_err();
+        let cross_package = project(
+            source("@@dep+//other:member"),
+            PackageTargetKind::ExportedFile,
+        )
+        .unwrap_err();
         assert!(
             cross_package
                 .to_string()
@@ -2660,7 +2669,7 @@ mod graph_tests {
                 name: "implicit".to_owned(),
                 kind: PackageTargetKind::TestSuite {
                     membership: TestSuiteMembership::Implicit {
-                        members: Arc::from([source("@@//:member")]),
+                        members: Arc::from([source("@@dep+//:member")]),
                         tests_explicit: false,
                     },
                     tags: Arc::from([]),
@@ -2682,7 +2691,7 @@ mod graph_tests {
         let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
         let apparent_repo = ApparentRepoName::new("dep").unwrap();
         let package = PackagePath::parse("").unwrap();
-        let source = |target| CanonicalLabel::parse(&format!("@@//:{target}")).unwrap();
+        let source = |target| CanonicalLabel::parse(&format!("@@dep+//:{target}")).unwrap();
         let contents = Arc::new(slug_loading_v2::PackageGroupContents::default());
         let group = |name: &str, includes: Vec<CanonicalLabel>| PackageTarget {
             name: name.to_owned(),
@@ -2798,23 +2807,24 @@ mod graph_tests {
                 None,
             )
         };
-        let missing = project(source("@@//:missing"), PackageTargetKind::ExportedFile).unwrap_err();
+        let missing =
+            project(source("@@dep+//:missing"), PackageTargetKind::ExportedFile).unwrap_err();
         assert!(
             missing
                 .to_string()
                 .contains("package_group missing include is deferred")
         );
         let non_group =
-            project(source("@@//:member"), PackageTargetKind::ExportedFile).unwrap_err();
+            project(source("@@dep+//:member"), PackageTargetKind::ExportedFile).unwrap_err();
         assert!(
             non_group
                 .to_string()
                 .contains("package_group non-package-group include is deferred")
         );
         let alias = project(
-            source("@@//:member"),
+            source("@@dep+//:member"),
             PackageTargetKind::Alias {
-                actual: source("@@//:source.txt"),
+                actual: source("@@dep+//:source.txt"),
             },
         )
         .unwrap_err();
@@ -2823,8 +2833,11 @@ mod graph_tests {
                 .to_string()
                 .contains("package_group alias include is deferred")
         );
-        let cross_package =
-            project(source("@@//other:member"), PackageTargetKind::ExportedFile).unwrap_err();
+        let cross_package = project(
+            source("@@dep+//other:member"),
+            PackageTargetKind::ExportedFile,
+        )
+        .unwrap_err();
         assert!(
             cross_package
                 .to_string()
@@ -2846,7 +2859,7 @@ mod graph_tests {
             &[PackageTarget {
                 name: "generated.txt".to_owned(),
                 kind: PackageTargetKind::GeneratedFile {
-                    label: source("@@//:generated.txt"),
+                    label: source("@@dep+//:generated.txt"),
                     generating_rule: "producer".into(),
                 },
                 visibility: VisibilitySource::PackageDefault,
@@ -3025,7 +3038,7 @@ mod graph_tests {
         let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
         let apparent_repo = ApparentRepoName::new("dep").unwrap();
         let package = PackagePath::parse("").unwrap();
-        let source = |target| CanonicalLabel::parse(&format!("@@//:{target}")).unwrap();
+        let source = |target| CanonicalLabel::parse(&format!("@@dep+//:{target}")).unwrap();
         let project = |targets: Vec<PackageTarget>| {
             external_package_graph_from_targets(
                 &canonical_repo,

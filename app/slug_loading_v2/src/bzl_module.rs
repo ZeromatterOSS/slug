@@ -706,6 +706,7 @@ fn host_package_attempt_source_name(input: &HostPackageAttemptInput<'_>) -> Stri
 fn evaluate_host_package_attempt(
     input: &HostPackageAttemptInput<'_>,
     prepared: Arc<SmallMap<HostGlobLoadingRequest, HostGlobPrepared>>,
+    repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
 ) -> HostPackageAttemptStep {
     let source_name = host_package_attempt_source_name(input);
     let ast = match AstModule::parse_with_string_encoding(
@@ -734,7 +735,11 @@ fn evaluate_host_package_attempt(
             EventBatch::empty(),
         );
     }
-    let recorder = PackageRecorder::new_host(prepared, input.package_label.clone());
+    let recorder = PackageRecorder::new_host(
+        prepared,
+        input.package_identifier.clone(),
+        repository_mapping,
+    );
     let module = Module::new();
     let loader = LocalBzlLoader {
         modules: input
@@ -823,13 +828,14 @@ async fn evaluate_host_package_attempts_driver(
     ctx: &mut DiceComputations<'_>,
     input: HostPackageAttemptInput<'_>,
     mode: HostPackageLoadMode,
+    repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
 ) -> HostPackageAttemptDriverOutcome {
     let mut prepared = Arc::new(SmallMap::new());
     let mut observations = PathObservationEpoch::empty();
     loop {
         // The synchronous attempt returns only compact terminal state or one
         // request, so no evaluator/module/recorder borrow can cross this await.
-        match evaluate_host_package_attempt(&input, prepared.dupe()) {
+        match evaluate_host_package_attempt(&input, prepared.dupe(), repository_mapping.dupe()) {
             HostPackageAttemptStep::Terminal(terminal) => {
                 return SourcePreparationOutcome::Complete(Ok((Arc::new(terminal), observations)));
             }
@@ -887,7 +893,14 @@ async fn evaluate_host_package_attempts(
     ctx: &mut DiceComputations<'_>,
     input: HostPackageAttemptInput<'_>,
 ) -> HostPackageAttemptOutcome {
-    match evaluate_host_package_attempts_driver(ctx, input, HostPackageLoadMode::Legacy).await {
+    match evaluate_host_package_attempts_driver(
+        ctx,
+        input,
+        HostPackageLoadMode::Legacy,
+        Arc::from([]),
+    )
+    .await
+    {
         SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
         SourcePreparationOutcome::Complete(Ok((terminal, observations))) => {
             debug_assert!(observations.observations().is_empty());
@@ -5351,6 +5364,7 @@ async fn compute_root_package(
             capture_events,
         },
         mode,
+        Arc::from([]),
     )
     .await;
     let (terminal, incoming) = match attempts {
@@ -6045,7 +6059,11 @@ fn evaluate_repository_package(
         loaded_modules,
         capture_events,
     };
-    match evaluate_host_package_attempt(&input, Arc::new(SmallMap::new())) {
+    match evaluate_host_package_attempt(
+        &input,
+        Arc::new(SmallMap::new()),
+        external_repository_mapping(&key.route),
+    ) {
         HostPackageAttemptStep::Pending {
             event_batch: batch, ..
         } => {
