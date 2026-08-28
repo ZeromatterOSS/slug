@@ -20359,3 +20359,40 @@ configured target-platform constraint truth and broader toolchain choice remain
 deferred. Buck2-derived Rust owns generic syntax/evaluation, BCR Starlark owns
 rule flow including `cc_internal`, and `cc_common` remains a generic host-ABI
 client. Zabel is peer guidance only; pinned Bazel 9.2 is behavior authority.
+
+### Batched selector resolution accepted; contextual command overlays active (2026-08-28)
+
+Commit `3b8a353ef` completes all five category-2 packets. One loading-owned
+concatenation primitive and one analysis-owned recursive resolver cover every
+admitted typed attribute shape. The sole configured-condition key is batched
+per configured owner, only selected branches produce dependency/transition/
+provider/action work, generic `ctx.attr` and `ctx.outputs` replace the marker
+shortcut, and native toolchain `target_settings` uses the same two-phase path.
+
+Root/canonical lifecycle, specialization, ambiguity, ordinary
+`LabelKeyedStringDict` dependency objects, selected transitions, Need/error
+ordering, cancellation/recovery and retained-memory proofs pass with full
+loading/analysis suites, locked consumers, hygiene/caps and the unchanged
+archive baseline. Independent terminal review returns `ACCEPT`. The bounded
+Host canonical-label replan changes only the existing repository-aware loading
+carrier; wider external configured Starlark graphs remain fail closed.
+
+Activate only the zero-Rust
+`WP-4-5-7A-contextual-command-overlays-architecture` review, category 3 in the
+frozen sequence. Freeze one shared compact raw occurrence projection across
+build/cquery one-shot and daemon paths; one post-Bzlmod DICE boundary that
+resolves direct Starlark flags with the final root mapping and writes typed
+native/Starlark structural configuration; and one shared loading walker for
+signed command registration patterns merged before positive MODULE rows.
+
+Plan the complete category together, then implement it as the two bounded
+packets named in the current manifest. Delete the singular `@@//:setting`
+bridge in the first no-shim cutover. Do not add another argv, setting,
+configuration or target-pattern parser; raw command rows to a MODULE key;
+configured eligibility/provider payload breadth; or a ruleset-specific path.
+
+Pinned Bazel 9.2 remains behavior authority. Clean Zabel `0795445f…` supplies
+peer request-projection, typed-final-option and compact normalization guidance
+only. Buck2-derived Rust owns generic Starlark syntax/evaluation;
+BCR-delivered Starlark owns every rule definition and control path including
+`cc_internal`; `cc_common` remains only a future generic host-ABI client.
