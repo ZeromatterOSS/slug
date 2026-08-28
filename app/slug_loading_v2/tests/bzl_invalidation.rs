@@ -1499,6 +1499,78 @@ fn same_dice_config_setting_values_are_package_semantics() {
 }
 
 #[test]
+fn same_dice_native_toolchain_declaration_semantics_invalidate_and_restore() {
+    let workspace = scratch("native-toolchain-declaration-semantics");
+    let package = workspace.join("pkg");
+    let build = package.join("BUILD.bazel");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    let declaration = |target: &str,
+                       platform_flag: Option<bool>,
+                       condition: &str,
+                       setting: &str| {
+        let platform_flag = platform_flag
+            .map(|value| {
+                format!(
+                    "    use_target_platform_constraints = {},\n",
+                    if value { "True" } else { "False" }
+                )
+            })
+            .unwrap_or_default();
+        format!(
+            concat!(
+                "constraint_setting(name = \"constraint\")\n",
+                "constraint_value(name = \"target_a\", constraint_setting = \":constraint\")\n",
+                "constraint_value(name = \"target_b\", constraint_setting = \":constraint\")\n",
+                "config_setting(name = \"condition_a\", values = {{\"cpu\": \"k8\"}})\n",
+                "config_setting(name = \"condition_b\", values = {{\"cpu\": \"arm\"}})\n",
+                "config_setting(name = \"setting_a\", values = {{\"compilation_mode\": \"opt\"}})\n",
+                "config_setting(name = \"setting_b\", values = {{\"compilation_mode\": \"dbg\"}})\n",
+                "toolchain_type(name = \"type\")\n",
+                "filegroup(name = \"impl\")\n",
+                "toolchain(\n",
+                "    name = \"chain\",\n",
+                "    toolchain_type = \":type\",\n",
+                "    toolchain = \":impl\",\n",
+                "    exec_compatible_with = [],\n",
+                "    target_compatible_with = [\":{target}\"],\n",
+                "{platform_flag}",
+                "    target_settings = [\":setting_a\"] + select({{\n",
+                "        \":{condition}\": [\":{setting}\"],\n",
+                "        \"//conditions:default\": [],\n",
+                "    }}),\n",
+                ")\n",
+            ),
+            target = target,
+            platform_flag = platform_flag,
+            condition = condition,
+            setting = setting,
+        )
+    };
+    let source_a = declaration("target_a", Some(false), "condition_a", "setting_b");
+    write(&build, &source_a);
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let load = || load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
+
+    let initial = load();
+    assert_eq!(initial, load());
+    for changed_source in [
+        declaration("target_b", Some(false), "condition_a", "setting_b"),
+        declaration("target_a", None, "condition_a", "setting_b"),
+        declaration("target_a", Some(true), "condition_a", "setting_b"),
+        declaration("target_a", Some(false), "condition_b", "setting_a"),
+    ] {
+        write(&build, &changed_source);
+        assert_ne!(initial, load());
+        write(&build, &source_a);
+        assert_eq!(initial, load());
+    }
+}
+
+#[test]
 fn same_dice_visibility_and_package_groups_are_semantic_and_recreate_cleanly() {
     let workspace = scratch("visibility-package-group-transitions");
     let package = workspace.join("pkg");

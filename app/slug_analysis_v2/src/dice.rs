@@ -1474,21 +1474,7 @@ fn constraint_value_setting(
 
 fn native_references(target: &slug_loading_v2::PackageTarget) -> Vec<CanonicalLabel> {
     match &target.kind {
-        PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintValue {
-            constraint_setting,
-        }) => vec![constraint_setting.clone()],
-        PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform {
-            constraint_values,
-        }) => constraint_values.to_vec(),
-        PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
-            toolchain_type,
-            implementation,
-            exec_compatible_with,
-        }) => std::iter::once(toolchain_type)
-            .chain(std::iter::once(implementation))
-            .chain(exec_compatible_with.iter())
-            .cloned()
-            .collect(),
+        PackageTargetKind::NativeToolchain(native) => native.semantic_references(),
         _ => Vec::new(),
     }
 }
@@ -1867,19 +1853,33 @@ fn validate_marker_toolchain(
         toolchain_type,
         implementation,
         exec_compatible_with,
+        target_compatible_with,
+        use_target_platform_constraints,
+        target_settings,
     }) = &target.kind
     else {
         return Err(AnalysisError::new(format!(
             "registered toolchain is not toolchain: {label}"
         )));
     };
+    if !target_compatible_with.value().is_empty()
+        || *use_target_platform_constraints.value()
+        || !matches!(
+            target_settings.value(),
+            CoercedAttributeValue::LabelList(values) if values.is_empty()
+        )
+    {
+        return Err(AnalysisError::new(format!(
+            "registered toolchain uses unsupported target compatibility or settings: {label}"
+        )));
+    }
     if !matches!(package_target(packages, toolchain_type), Ok(target) if matches!(target.kind, PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)))
     {
         return Err(AnalysisError::new(format!(
             "toolchain references a non-toolchain type: {label}"
         )));
     }
-    validate_constraint_settings(packages, exec_compatible_with, || {
+    validate_constraint_settings(packages, exec_compatible_with.value(), || {
         AnalysisError::new(format!(
             "toolchain has duplicate execution constraint setting: {label}"
         ))
@@ -1918,12 +1918,14 @@ fn select_root_toolchain(
                 toolchain_type,
                 implementation,
                 exec_compatible_with,
+                ..
             }) = &toolchain.kind
             else {
                 unreachable!("registered toolchains were prevalidated")
             };
             if toolchain_type == required
                 && exec_compatible_with
+                    .value()
                     .iter()
                     .all(|value| constraint_values.contains(value))
             {

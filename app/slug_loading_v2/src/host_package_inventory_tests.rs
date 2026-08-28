@@ -75,6 +75,7 @@ use slug_workspace_v2::WorkspaceSnapshotKey;
 use starlark_map::small_map::SmallMap;
 use starlark_map::sorted_map::SortedMap;
 
+use crate::CoercedAttributeValue;
 use crate::HostCanonicalRepositoryLoadRouteObservationKey;
 use crate::HostPackageInventory;
 use crate::HostPackageInventoryErrorRef;
@@ -479,12 +480,19 @@ async fn canonical_inventory_retains_final_native_label_identities() {
         "constraint_value(name = 'value', constraint_setting = '@dep//:setting')\n",
         "platform(name = 'platform', constraint_values = ['//:value'])\n",
         "toolchain_type(name = 'type')\n",
+        "config_setting(name = 'condition', values = {'cpu': 'k8'})\n",
         "filegroup(name = 'impl')\n",
         "toolchain(\n",
         "    name = 'toolchain',\n",
         "    toolchain_type = '@@//:root_type',\n",
         "    toolchain = 'impl',\n",
         "    exec_compatible_with = [':value'],\n",
+        "    target_compatible_with = ['//:value'],\n",
+        "    use_target_platform_constraints = True,\n",
+        "    target_settings = ['//:setting'] + select({\n",
+        "        ':condition': ['@@//:root_setting'],\n",
+        "        '//conditions:default': ['@dep//:fallback'],\n",
+        "    }),\n",
         ")\n",
     );
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -530,13 +538,45 @@ async fn canonical_inventory_retains_final_native_label_identities() {
         toolchain_type,
         implementation,
         exec_compatible_with,
+        target_compatible_with,
+        use_target_platform_constraints,
+        target_settings,
     } = native("toolchain")
     else {
         panic!("toolchain has the wrong native kind")
     };
     assert_eq!(toolchain_type.to_string(), "@@//:root_type");
     assert_eq!(implementation.to_string(), "@@dep+//:impl");
-    assert_eq!(exec_compatible_with[0].to_string(), "@@dep+//:value");
+    assert_eq!(
+        exec_compatible_with.value()[0].to_string(),
+        "@@dep+//:value"
+    );
+    assert_eq!(
+        target_compatible_with.value()[0].to_string(),
+        "@@dep+//:value"
+    );
+    assert!(*use_target_platform_constraints.value());
+    assert!(matches!(
+        target_settings.value(),
+        CoercedAttributeValue::Concatenation(_, _)
+    ));
+    assert_eq!(
+        native("toolchain")
+            .semantic_references()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        [
+            "@@//:root_type",
+            "@@dep+//:impl",
+            "@@dep+//:value",
+            "@@dep+//:value",
+            "@@dep+//:setting",
+            "@@//:root_setting",
+            "@@dep+//:fallback",
+            "@@dep+//:condition",
+        ]
+    );
 }
 
 #[tokio::test]

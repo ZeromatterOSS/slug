@@ -419,9 +419,41 @@ impl PackageTargetKind {
     }
 }
 
-/// Loading-owned representation of the exact native target classes needed by
-/// the accepted first-compatible toolchain fixture. Resolution remains a
-/// later analysis-stage owner.
+/// A typed declaration value whose Bazel-visible default/explicit provenance
+/// participates in loading equality and invalidation.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct NativeToolchainAttribute<T> {
+    value: T,
+    provenance: AttributeProvenance,
+}
+
+impl<T> NativeToolchainAttribute<T> {
+    fn from_optional(value: Option<T>, default: T) -> Self {
+        match value {
+            Some(value) => Self {
+                value,
+                provenance: AttributeProvenance::Explicit,
+            },
+            None => Self {
+                value: default,
+                provenance: AttributeProvenance::Default,
+            },
+        }
+    }
+
+    pub fn value(&self) -> &T {
+        &self.value
+    }
+
+    pub fn provenance(&self) -> AttributeProvenance {
+        self.provenance
+    }
+}
+
+/// Loading-owned representation of the exact Bazel 9.2 native declaration
+/// inputs needed by toolchain analysis. Configured selection remains owned by
+/// later packets; the current Slug-native marker resolver fails closed when a
+/// retained input is outside its admitted default-only surface.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum NativeToolchainTarget {
     ConstraintSetting,
@@ -435,7 +467,10 @@ pub enum NativeToolchainTarget {
     Toolchain {
         toolchain_type: CanonicalLabel,
         implementation: CanonicalLabel,
-        exec_compatible_with: Arc<[CanonicalLabel]>,
+        exec_compatible_with: NativeToolchainAttribute<Arc<[CanonicalLabel]>>,
+        target_compatible_with: NativeToolchainAttribute<Arc<[CanonicalLabel]>>,
+        use_target_platform_constraints: NativeToolchainAttribute<bool>,
+        target_settings: NativeToolchainAttribute<CoercedAttributeValue>,
     },
 }
 
@@ -457,6 +492,31 @@ impl NativeToolchainTarget {
             Self::Platform { .. } => &PLATFORM_RULE_CAPABILITY,
             Self::ToolchainType => &TOOLCHAIN_TYPE_RULE_CAPABILITY,
             Self::Toolchain { .. } => &TOOLCHAIN_RULE_CAPABILITY,
+        }
+    }
+
+    pub fn semantic_references(&self) -> Vec<CanonicalLabel> {
+        match self {
+            Self::ConstraintSetting | Self::ToolchainType => Vec::new(),
+            Self::ConstraintValue { constraint_setting } => vec![constraint_setting.clone()],
+            Self::Platform { constraint_values } => constraint_values.to_vec(),
+            Self::Toolchain {
+                toolchain_type,
+                implementation,
+                exec_compatible_with,
+                target_compatible_with,
+                target_settings,
+                ..
+            } => {
+                let mut references = Vec::new();
+                references.push(toolchain_type.clone());
+                references.push(implementation.clone());
+                references.extend(exec_compatible_with.value().iter().cloned());
+                references.extend(target_compatible_with.value().iter().cloned());
+                target_settings.value().labels(&mut references);
+                references.extend(selector_key_labels(target_settings.value()));
+                references
+            }
         }
     }
 }
@@ -961,6 +1021,54 @@ impl PackageRecorder {
             .map(|value| self.native_toolchain_label(value))
             .collect::<anyhow::Result<Vec<_>>>()
             .map(Arc::from)
+    }
+
+    fn native_toolchain_declaration<'v>(
+        &self,
+        toolchain: &str,
+        toolchain_type: &str,
+        exec_compatible_with: Option<UnpackList<&str>>,
+        target_compatible_with: Option<UnpackList<&str>>,
+        use_target_platform_constraints: Option<bool>,
+        target_settings: Option<Value<'v>>,
+    ) -> anyhow::Result<NativeToolchainTarget> {
+        let exec_compatible_with = exec_compatible_with
+            .map(|values| self.native_toolchain_labels(&values.items))
+            .transpose()?;
+        let target_compatible_with = target_compatible_with
+            .map(|values| self.native_toolchain_labels(&values.items))
+            .transpose()?;
+        let target_settings = target_settings
+            .map(|value| {
+                coerce_starlark_value(
+                    self,
+                    AttributeKind::LabelList,
+                    "target_settings",
+                    true,
+                    value,
+                )
+            })
+            .transpose()?;
+        Ok(NativeToolchainTarget::Toolchain {
+            toolchain_type: self.native_toolchain_label(toolchain_type)?,
+            implementation: self.native_toolchain_label(toolchain)?,
+            exec_compatible_with: NativeToolchainAttribute::from_optional(
+                exec_compatible_with,
+                Arc::from([]),
+            ),
+            target_compatible_with: NativeToolchainAttribute::from_optional(
+                target_compatible_with,
+                Arc::from([]),
+            ),
+            use_target_platform_constraints: NativeToolchainAttribute::from_optional(
+                use_target_platform_constraints,
+                false,
+            ),
+            target_settings: NativeToolchainAttribute::from_optional(
+                target_settings,
+                empty_labels(),
+            ),
+        })
     }
 
     fn package_group(
@@ -1718,6 +1826,9 @@ fn native_rule_attributes(
                     toolchain_type,
                     implementation,
                     exec_compatible_with,
+                    target_compatible_with,
+                    use_target_platform_constraints,
+                    target_settings,
                 } => {
                     set_native_value(
                         class,
@@ -1737,9 +1848,40 @@ fn native_rule_attributes(
                         class,
                         &mut values,
                         "exec_compatible_with",
-                        AttributeProvenance::Explicit,
-                        CoercedAttributeValue::LabelList(exec_compatible_with.clone()),
+                        exec_compatible_with.provenance(),
+                        CoercedAttributeValue::LabelList(exec_compatible_with.value().clone()),
                     );
+                    set_native_value(
+                        class,
+                        &mut values,
+                        "target_compatible_with",
+                        target_compatible_with.provenance(),
+                        CoercedAttributeValue::LabelList(target_compatible_with.value().clone()),
+                    );
+                    set_native_value(
+                        class,
+                        &mut values,
+                        "use_target_platform_constraints",
+                        use_target_platform_constraints.provenance(),
+                        CoercedAttributeValue::Boolean(*use_target_platform_constraints.value()),
+                    );
+                    set_native_value(
+                        class,
+                        &mut values,
+                        "target_settings",
+                        target_settings.provenance(),
+                        target_settings.value().clone(),
+                    );
+                    let config_dependencies = selector_key_labels(target_settings.value());
+                    if !config_dependencies.is_empty() {
+                        set_native_value(
+                            class,
+                            &mut values,
+                            "$config_dependencies",
+                            AttributeProvenance::Implicit,
+                            CoercedAttributeValue::LabelList(config_dependencies.into()),
+                        );
+                    }
                 }
             }
         }
@@ -5505,7 +5647,10 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         name: &str,
         toolchain: &str,
         toolchain_type: &str,
-        #[starlark(default = UnpackList::default())] exec_compatible_with: UnpackList<&str>,
+        #[starlark(require = named)] exec_compatible_with: Option<UnpackList<&str>>,
+        #[starlark(require = named)] target_compatible_with: Option<UnpackList<&str>>,
+        #[starlark(require = named)] use_target_platform_constraints: Option<bool>,
+        #[starlark(require = named)] target_settings: Option<Value<'v>>,
         visibility: Option<UnpackListOrTuple<&str>>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -5513,12 +5658,14 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         let recorder = PackageRecorder::from_evaluator(eval)?;
         recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
-            NativeToolchainTarget::Toolchain {
-                toolchain_type: recorder.native_toolchain_label(toolchain_type)?,
-                implementation: recorder.native_toolchain_label(toolchain)?,
-                exec_compatible_with: recorder
-                    .native_toolchain_labels(&exec_compatible_with.items)?,
-            },
+            recorder.native_toolchain_declaration(
+                toolchain,
+                toolchain_type,
+                exec_compatible_with,
+                target_compatible_with,
+                use_target_platform_constraints,
+                target_settings,
+            )?,
             visibility.map(list),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
@@ -5926,7 +6073,10 @@ fn native_methods(builder: &mut MethodsBuilder) {
         name: &str,
         toolchain: &str,
         toolchain_type: &str,
-        #[starlark(default = UnpackList::default())] exec_compatible_with: UnpackList<&str>,
+        #[starlark(require = named)] exec_compatible_with: Option<UnpackList<&str>>,
+        #[starlark(require = named)] target_compatible_with: Option<UnpackList<&str>>,
+        #[starlark(require = named)] use_target_platform_constraints: Option<bool>,
+        #[starlark(require = named)] target_settings: Option<Value<'v>>,
         visibility: Option<UnpackListOrTuple<&str>>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -5934,12 +6084,14 @@ fn native_methods(builder: &mut MethodsBuilder) {
         let recorder = PackageRecorder::from_evaluator(eval)?;
         recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
-            NativeToolchainTarget::Toolchain {
-                toolchain_type: recorder.native_toolchain_label(toolchain_type)?,
-                implementation: recorder.native_toolchain_label(toolchain)?,
-                exec_compatible_with: recorder
-                    .native_toolchain_labels(&exec_compatible_with.items)?,
-            },
+            recorder.native_toolchain_declaration(
+                toolchain,
+                toolchain_type,
+                exec_compatible_with,
+                target_compatible_with,
+                use_target_platform_constraints,
+                target_settings,
+            )?,
             visibility.map(list),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;

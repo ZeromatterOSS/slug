@@ -1626,6 +1626,75 @@ async fn root_toolchain_resolution_rejects_every_native_reference_and_selection_
 }
 
 #[tokio::test]
+async fn root_toolchain_resolution_fails_closed_on_unimplemented_declaration_semantics() {
+    let cases = [
+        (
+            "target compatibility",
+            TOOLCHAIN_BUILD.replacen(
+                "exec_compatible_with = [\":linux\"])",
+                "exec_compatible_with = [\":linux\"], target_compatible_with = [\":linux\"])",
+                1,
+            ),
+        ),
+        (
+            "target platform constraints",
+            TOOLCHAIN_BUILD.replacen(
+                "exec_compatible_with = [\":linux\"])",
+                "exec_compatible_with = [\":linux\"], use_target_platform_constraints = True)",
+                1,
+            ),
+        ),
+        (
+            "target settings",
+            format!(
+                "config_setting(name = \"target_setting\", values = {{\"cpu\": \"k8\"}})\n{}",
+                TOOLCHAIN_BUILD.replacen(
+                    "exec_compatible_with = [\":linux\"])",
+                    "exec_compatible_with = [\":linux\"], target_settings = [\":target_setting\"])",
+                    1,
+                )
+            ),
+        ),
+    ];
+    for (name, build) in cases {
+        let workspace = scratch();
+        fs::write(workspace.join("MODULE.bazel"), TOOLCHAIN_MODULE).unwrap();
+        fs::write(workspace.join("defs.bzl"), TOOLCHAIN_DEFS).unwrap();
+        fs::write(workspace.join("BUILD.bazel"), build).unwrap();
+        for observed in [false, true] {
+            let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let error = if observed {
+                observed_root_target_request_with_inputs(
+                    &dice,
+                    &workspace,
+                    "@@//:request",
+                    test_configuration(),
+                    Arc::new(RootActivationTracker::default()),
+                    root_epoch(&workspace),
+                    &[],
+                )
+                .await
+            } else {
+                root_target_request(
+                    &dice,
+                    &workspace,
+                    "@@//:request",
+                    Arc::new(RootActivationTracker::default()),
+                )
+                .await
+            }
+            .unwrap_err();
+            assert!(
+                error.contains(
+                    "registered toolchain uses unsupported target compatibility or settings"
+                ),
+                "{name} observed={observed}: {error}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
 async fn root_toolchain_resolution_rejects_leaf_provider_callable_and_context_escapes() {
     let first_module =
         TOOLCHAIN_MODULE.replace("\"//:second\", \"//:first\"", "\"//:first\", \"//:second\"");

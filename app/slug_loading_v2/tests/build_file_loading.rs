@@ -930,12 +930,22 @@ toolchain(
             toolchain_type,
             implementation,
             exec_compatible_with,
+            target_compatible_with,
+            use_target_platform_constraints,
+            target_settings,
         }) if toolchain_type == &CanonicalLabel::parse("@@//pkg:demo_type").unwrap()
             && implementation == &CanonicalLabel::parse("@@//pkg:implementation").unwrap()
-            && exec_compatible_with.as_ref() == [
+            && exec_compatible_with.value().as_ref() == [
                 CanonicalLabel::parse("@@//pkg:first").unwrap(),
                 CanonicalLabel::parse("@@//pkg:second").unwrap(),
             ]
+            && exec_compatible_with.provenance() == AttributeProvenance::Explicit
+            && target_compatible_with.value().is_empty()
+            && target_compatible_with.provenance() == AttributeProvenance::Default
+            && !use_target_platform_constraints.value()
+            && use_target_platform_constraints.provenance() == AttributeProvenance::Default
+            && matches!(target_settings.value(), CoercedAttributeValue::LabelList(values) if values.is_empty())
+            && target_settings.provenance() == AttributeProvenance::Default
     ));
     assert_eq!(
         loaded
@@ -958,6 +968,114 @@ toolchain(
             && !capability.executable
             && capability.test_kind.is_none()
     }));
+}
+
+#[test]
+fn native_toolchain_target_retains_complete_configurable_declaration_semantics() {
+    let workspace = scratch("native-toolchain-complete-semantics");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        r#"
+constraint_setting(name = "target_setting")
+constraint_value(name = "target_value", constraint_setting = ":target_setting")
+config_setting(name = "condition", values = {"cpu": "k8"})
+toolchain_type(name = "demo_type")
+toolchain(
+    name = "demo_toolchain",
+    toolchain = ":implementation",
+    toolchain_type = ":demo_type",
+    exec_compatible_with = [],
+    target_compatible_with = [":target_value"],
+    use_target_platform_constraints = True,
+    target_settings = [":always"] + select({
+        ":condition": [":selected"],
+        "//conditions:default": [":fallback"],
+    }),
+)
+"#,
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let target = loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "demo_toolchain")
+        .unwrap();
+    let PackageTargetKind::NativeToolchain(native) = &target.kind else {
+        panic!("demo_toolchain was not retained as a native toolchain")
+    };
+    let NativeToolchainTarget::Toolchain {
+        toolchain_type,
+        implementation,
+        exec_compatible_with,
+        target_compatible_with,
+        use_target_platform_constraints,
+        target_settings,
+    } = native
+    else {
+        panic!("demo_toolchain has the wrong native kind")
+    };
+    assert_eq!(toolchain_type.to_string(), "@@//pkg:demo_type");
+    assert_eq!(implementation.to_string(), "@@//pkg:implementation");
+    assert!(exec_compatible_with.value().is_empty());
+    assert_eq!(
+        exec_compatible_with.provenance(),
+        AttributeProvenance::Explicit
+    );
+    assert_eq!(
+        target_compatible_with.value().as_ref(),
+        [CanonicalLabel::parse("@@//pkg:target_value").unwrap()]
+    );
+    assert_eq!(
+        target_compatible_with.provenance(),
+        AttributeProvenance::Explicit
+    );
+    assert!(*use_target_platform_constraints.value());
+    assert_eq!(
+        use_target_platform_constraints.provenance(),
+        AttributeProvenance::Explicit
+    );
+    assert!(matches!(
+        target_settings.value(),
+        CoercedAttributeValue::Concatenation(_, _)
+    ));
+    assert_eq!(target_settings.provenance(), AttributeProvenance::Explicit);
+    assert_eq!(
+        native.semantic_references(),
+        [
+            "@@//pkg:demo_type",
+            "@@//pkg:implementation",
+            "@@//pkg:target_value",
+            "@@//pkg:always",
+            "@@//pkg:selected",
+            "@@//pkg:fallback",
+            "@@//pkg:condition",
+        ]
+        .map(|label| CanonicalLabel::parse(label).unwrap())
+    );
+
+    let attributes = loaded.native_attributes("demo_toolchain").unwrap();
+    assert!(matches!(
+        &attributes.get("target_settings").unwrap().1.value,
+        CoercedAttributeValue::Concatenation(_, _)
+    ));
+    assert_eq!(
+        attributes.get("target_settings").unwrap().1.provenance,
+        AttributeProvenance::Explicit
+    );
+    assert!(matches!(
+        &attributes.get("$config_dependencies").unwrap().1.value,
+        CoercedAttributeValue::LabelList(values)
+            if values.as_ref() == [CanonicalLabel::parse("@@//pkg:condition").unwrap()]
+    ));
+    assert_eq!(
+        attributes.get("$config_dependencies").unwrap().1.provenance,
+        AttributeProvenance::Implicit
+    );
 }
 
 #[test]
@@ -1098,6 +1216,22 @@ fn native_toolchain_targets_fail_closed_for_wrong_shapes_and_name_collisions() {
         (
             "toolchain(name = 'bad', exec_compatible_with = ['//pkg:*'], toolchain = ':impl', toolchain_type = ':type')",
             "direct target labels",
+        ),
+        (
+            "toolchain(name = 'bad', target_compatible_with = ':one', toolchain = ':impl', toolchain_type = ':type')",
+            "target_compatible_with",
+        ),
+        (
+            "toolchain(name = 'bad', target_compatible_with = ['//pkg/...'], toolchain = ':impl', toolchain_type = ':type')",
+            "direct target labels",
+        ),
+        (
+            "toolchain(name = 'bad', use_target_platform_constraints = 'yes', toolchain = ':impl', toolchain_type = ':type')",
+            "use_target_platform_constraints",
+        ),
+        (
+            "toolchain(name = 'bad', target_settings = ':setting', toolchain = ':impl', toolchain_type = ':type')",
+            "target_settings",
         ),
         (
             "toolchain(name = 'bad', exec_compatible_with = [], toolchain = '@repo//:impl', toolchain_type = ':type')",
