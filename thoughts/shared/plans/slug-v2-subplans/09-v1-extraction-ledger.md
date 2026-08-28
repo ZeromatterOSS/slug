@@ -1845,3 +1845,19 @@ behavior is anchored in pinned Bazel 9.2 `RegisteredToolchainsFunction`,
 `RegisteredExecutionPlatformsFunction`, `SignedTargetPattern` and
 `TargetPatternUtil`; focused ordering, structural equality, observation and
 lifecycle tests are the acceptance evidence.
+
+### Stage 6 configured platform/toolchain utility decision (2026-08-28)
+
+Source inspected: current V2 structural configuration, configured node,
+platform, condition, registration and marker owners; Buck2 execution-platform
+immutable values and ordered scratch maps; V1 toolchain resolution; clean
+Zabel `0795445f…` target-platform and requested/actual type separation.
+
+Decision: retain configured platforms and resolution rows in immutable
+`Arc` slices with canonical configured keys, `Dupe` and `Allocative`; use
+compact ordered maps/sets only as compute scratch. Reject V1 string labels,
+host-as-target fallback, standard hash collections and selector ownership;
+reject Buck2/Zabel semantic ownership, IDs, stores and schedulers. Add no
+cache, interner, retained standard collection or provider-shaped placeholder.
+Pinned Bazel 9.2 alone fixes selection behavior; retained-size, unchanged-Arc,
+invalidation, cancellation and repair checks are required implementation proof.

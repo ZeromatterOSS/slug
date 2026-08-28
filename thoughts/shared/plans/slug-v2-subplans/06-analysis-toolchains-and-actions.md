@@ -20479,3 +20479,70 @@ or move implementation/provider analysis into category 4. Clean Zabel
 guidance only. Bazel 9.2 and authenticated sources remain authority; BCR
 Starlark owns rule/control flow including `cc_internal`, and `cc_common`
 remains a later generic host/provider-ABI client.
+
+#### Configured selection architecture accepted; target-platform prerequisite next (2026-08-28)
+
+Independent reserved-architecture correction review returns `ACCEPT`. The
+correction rejects converged registered execution-platform aliases at Bazel's
+pre-selection duplicate-key boundary, distinguishes no-common-platform from a
+mandatory type absent everywhere, and verifies Packet 1's exact twelve-file
+baseline plus two pinned upstream assets.
+
+The audit finds a real prerequisite. Typed `platforms` and `host_platform` are
+already structural configuration rows, but there is no canonical-label
+projection; `to_exec()` does not install the selected platform; and the builtin
+`@bazel_tools` tree lacks pinned upstream `tools/BUILD.tools`, whose
+`host_platform` aliases BCR `@platforms//host`. More importantly, the sole
+configured-condition key needs target-platform constraints while toolchain
+selection needs that key for `target_settings`. Target-platform ownership
+inside the selector would form a semantic/DICE cycle.
+
+Freeze two implementation packets. First add typed configuration
+`target_platform_label()` and `to_exec_for_platform()` projections over the
+existing native rows, port only required pinned `@bazel_tools` content
+verbatim, and add `ConfiguredPlatformKey` plus a
+`ConfiguredTargetPlatformKey` reusable for any structural configuration. The
+platform key uses the existing configured
+alias recursion, validates actual platform/value/setting kinds and duplicate
+settings, and publishes one immutable ordered constraint slice. The condition
+key consumes the target-platform key for its existing constraint category.
+Constraint-setting defaults are retained only so this admitted no-default
+slice can reject them.
+
+Then add one `ConfiguredToolchainResolutionKey` over workspace, structural
+target configuration and the ordered loading-owned requirement slice. It
+consumes accepted registrations, resolves execution-platform, declaration and
+type aliases through a general actual-target projection on the existing
+configured node result, batches every target setting through the sole
+condition key, and runs one pure provider-independent selector. Distinct
+requested aliases converging on one actual type form one selection group with
+mandatory `OR`, first occurrence order and a published row for every request.
+Registered execution-platform alias chains are exact only while their actual
+terminals remain distinct: pinned `RegisteredExecutionPlatformsFunction`
+builds an immutable map with throwing duplicate keys, so convergence fails
+closed rather than acquiring invented first-wins behavior.
+For each actual type, registration order chooses the first compatible
+declaration per candidate. After every mandatory type is present, the first
+candidate resolving the greatest number of distinct requested actual types
+wins. A mandatory type absent everywhere and the separate no-common-platform
+case are distinct semantic failures. Optional absence is an explicit `None`
+row.
+
+The resolution retains target platform, selected actual execution platform
+under a platform-specific derived exec configuration, and requested/actual
+type-to-declaration identities only. It contains no provider or evaluator
+value and performs no implementation analysis. Existing no-requirement bypass
+and platform-only contexts remain. The old singular marker path becomes an
+explicit post-selection bridge for exactly one mandatory/no-optional request;
+it cannot influence eligibility and category 6 deletes it when real provider
+analysis under the derived exec configuration lands.
+
+Pinned Bazel 9.2 supplies semantics. Zabel supports only the producer-owned
+target-platform and requested/actual identity separation; no Zig layout,
+store, scheduler or claim is copied. Buck/V1 audit authorizes existing
+`Arc`/`Dupe`/`Allocative`/canonical-label and scratch compact collections, not
+V1 string labels, host fallback, hash collections or selector ownership. The
+current packet contains the complete keys, values, pseudocode, compatibility,
+exact Packet-1 file/blob/line allowlist, verbatim builtin hashes, caps, proofs
+and stop conditions for independent reserved-architecture review. Packet 2's
+exact allowlist is deliberately materialized only after Packet 1 lands.
