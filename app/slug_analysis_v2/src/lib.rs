@@ -9,6 +9,7 @@
  */
 
 mod build_setting;
+mod configured_attribute;
 pub mod configured_target;
 pub mod dice;
 pub mod key;

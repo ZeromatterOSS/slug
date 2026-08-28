@@ -1353,7 +1353,9 @@ impl PackageRecorder {
     }
 
     fn dependency_label(&self, value: &str) -> anyhow::Result<CanonicalLabel> {
-        if self.package_identifier.repo().is_root() {
+        if self.package_identifier.repo().is_root()
+            && matches!(&self.glob_source, PackageGlobSource::Listing(_))
+        {
             return package_context_label(&self.package, value);
         }
         package_context_label_with_repository(

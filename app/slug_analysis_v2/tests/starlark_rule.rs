@@ -77,7 +77,10 @@ use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
+use slug_identity_v2::PackageIdentifier;
+use slug_identity_v2::PackagePath;
 use slug_loading_v2::HostPackageInventoryKey;
+use slug_loading_v2::HostPackageInventoryObservationError;
 use slug_loading_v2::HostPackageInventoryObservationKey;
 use slug_loading_v2::ModuleRegistrationExpansionKey;
 use slug_loading_v2::ModuleRegistrationExpansionObservationError;
@@ -1774,7 +1777,7 @@ async fn root_toolchain_resolution_rejects_every_native_reference_and_selection_
 }
 
 #[tokio::test]
-async fn root_toolchain_resolution_fails_closed_on_unimplemented_declaration_semantics() {
+async fn root_toolchain_resolution_fails_closed_on_unimplemented_target_compatibility() {
     let cases = [
         (
             "target compatibility",
@@ -1790,17 +1793,6 @@ async fn root_toolchain_resolution_fails_closed_on_unimplemented_declaration_sem
                 "exec_compatible_with = [\":linux\"])",
                 "exec_compatible_with = [\":linux\"], use_target_platform_constraints = True)",
                 1,
-            ),
-        ),
-        (
-            "target settings",
-            format!(
-                "config_setting(name = \"target_setting\", values = {{\"cpu\": \"k8\"}})\n{}",
-                TOOLCHAIN_BUILD.replacen(
-                    "exec_compatible_with = [\":linux\"])",
-                    "exec_compatible_with = [\":linux\"], target_settings = [\":target_setting\"])",
-                    1,
-                )
             ),
         ),
     ];
@@ -1833,12 +1825,40 @@ async fn root_toolchain_resolution_fails_closed_on_unimplemented_declaration_sem
             }
             .unwrap_err();
             assert!(
-                error.contains(
-                    "registered toolchain uses unsupported target compatibility or settings"
-                ),
+                error.contains("registered toolchain uses unsupported target compatibility"),
                 "{name} observed={observed}: {error}"
             );
         }
+    }
+}
+
+#[tokio::test]
+async fn configurable_toolchain_target_settings_use_distinct_selector_and_selected_conditions() {
+    let module =
+        TOOLCHAIN_MODULE.replace("\"//:second\", \"//:first\"", "\"//:first\", \"//:second\"");
+    for (selected_mode, expected) in [("fastbuild", "@@//:first"), ("opt", "@@//:second")] {
+        let build = format!(
+            "config_setting(name = \"choose_settings\", values = {{\"compilation_mode\": \"fastbuild\"}})\n\
+             config_setting(name = \"selected_setting\", values = {{\"compilation_mode\": \"{selected_mode}\"}})\n{}",
+            TOOLCHAIN_BUILD.replacen(
+                "exec_compatible_with = [\":linux\"])",
+                "exec_compatible_with = [\":linux\"], target_settings = select({\":choose_settings\": [\":selected_setting\"], \"//conditions:default\": [\":unselected_missing\"]}))",
+                1,
+            )
+        );
+        let result = toolchain_case(&module, TOOLCHAIN_DEFS, &build)
+            .await
+            .unwrap();
+        assert_eq!(
+            result
+                .toolchain_topology()
+                .unwrap()
+                .selection()
+                .unwrap()
+                .declaration()
+                .to_string(),
+            expected
+        );
     }
 }
 
@@ -3177,6 +3197,190 @@ async fn canonical_external_condition_and_flag_packages_invalidate_and_restore()
     );
 }
 
+#[tokio::test]
+async fn canonical_external_selector_declaration_and_selected_branch_restore_parent_identity() {
+    let workspace = scratch();
+    for package in ["dep/flags", "dep/conditions", "dep/leaf"] {
+        fs::create_dir_all(workspace.join(package)).unwrap();
+    }
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"bazel_tools\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"ParentInfo = provider(fields = {"value": ""})
+def _local(ctx): return []
+def _parent(ctx): return [ParentInfo(value = str(ctx.attr.dep.label))]
+local = rule(implementation = _local)
+parent = rule(implementation = _parent, attrs = {"dep": attr.label(mandatory = True)})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "local", "parent")
+local(name = "local")
+parent(name = "parent", dep = select({
+    "@@dep+//conditions:match": "@@dep+//leaf:selected",
+    "@@dep+//leaf:preload": "@@dep+//leaf:selected",
+    "//conditions:default": ":local",
+}))
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("dep/MODULE.bazel"),
+        "module(name = \"dep\", version = \"1.0.0\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.join("dep/REPO.bazel"), "").unwrap();
+    fs::write(workspace.join("dep/.bazelignore"), "").unwrap();
+    fs::write(
+        workspace.join("dep/marker.bzl"),
+        r#"MarkerInfo = provider(fields = {"value": ""})
+def _marker(ctx): return [MarkerInfo(value = ctx.attr.marker)]
+marker = rule(implementation = _marker, attrs = {"marker": attr.string(mandatory = True)})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("dep/flags/defs.bzl"),
+        "def _empty(ctx): return []\nsetting = rule(implementation = _empty, build_setting = config.string(flag = True))\n",
+    )
+    .unwrap();
+    let flag_source = "load(\":defs.bzl\", \"setting\")\nsetting(name = \"mode\", build_setting_default = \"selected\")\n";
+    fs::write(workspace.join("dep/flags/BUILD.bazel"), flag_source).unwrap();
+    let condition_source =
+        "config_setting(name = \"match\", flag_values = {\"//flags:mode\": \"selected\"})\n";
+    fs::write(
+        workspace.join("dep/conditions/BUILD.bazel"),
+        condition_source,
+    )
+    .unwrap();
+    let leaf_source = "load(\"//:marker.bzl\", \"marker\")\nconfig_setting(name = \"preload\", values = {\"compilation_mode\": \"opt\"})\nmarker(name = \"selected\", marker = \"branch-a\")\n";
+    fs::write(workspace.join("dep/leaf/BUILD.bazel"), leaf_source).unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let repositories = [("dep+", "dep")];
+    let parent = ProviderId::new("//:defs.bzl", "ParentInfo").unwrap();
+    let request = |tracker| {
+        root_target_request_with_inputs(
+            &dice,
+            &workspace,
+            "@@//:parent",
+            test_configuration(),
+            tracker,
+            root_epoch(&workspace),
+            &repositories,
+        )
+    };
+
+    let initial_tracker = Arc::new(RootActivationTracker::with_loading());
+    let initial = request(initial_tracker.clone()).await.unwrap();
+    assert_eq!(provider_value(&initial, &parent), "@@dep+//leaf:selected");
+    assert_eq!(
+        initial
+            .configured_dependencies()
+            .map(|key| key.label().to_string())
+            .collect::<Vec<_>>(),
+        ["@@dep+//leaf:selected"]
+    );
+
+    fs::write(
+        workspace.join("dep/leaf/BUILD.bazel"),
+        leaf_source.replace("branch-a", "branch-b"),
+    )
+    .unwrap();
+    let changed_leaf_tracker = Arc::new(RootActivationTracker::with_loading());
+    let changed_leaf = request(changed_leaf_tracker.clone()).await.unwrap();
+    assert_eq!(
+        provider_value(&changed_leaf, &parent),
+        "@@dep+//leaf:selected"
+    );
+    let changed_leaf_activations = changed_leaf_tracker.take().0;
+    assert!(changed_leaf_activations.iter().any(|(identity, kind)| {
+        identity == "resolved/@@dep+//leaf:selected=<default>" && *kind == ActivationKind::Evaluated
+    }));
+    assert!(changed_leaf_activations.iter().any(|(identity, kind)| {
+        identity == "resolved/@@//:parent=<default>" && *kind == ActivationKind::Evaluated
+    }));
+    fs::write(workspace.join("dep/leaf/BUILD.bazel"), leaf_source).unwrap();
+    assert_eq!(
+        provider_value(
+            &request(Arc::new(RootActivationTracker::default()))
+                .await
+                .unwrap(),
+            &parent,
+        ),
+        "@@dep+//leaf:selected"
+    );
+
+    fs::write(
+        workspace.join("dep/conditions/BUILD.bazel"),
+        condition_source.replace("selected", "other"),
+    )
+    .unwrap();
+    assert_eq!(
+        provider_value(
+            &request(Arc::new(RootActivationTracker::default()))
+                .await
+                .unwrap(),
+            &parent,
+        ),
+        "@@//:local"
+    );
+    fs::write(
+        workspace.join("dep/conditions/BUILD.bazel"),
+        condition_source,
+    )
+    .unwrap();
+
+    fs::write(
+        workspace.join("dep/flags/BUILD.bazel"),
+        flag_source.replace("selected", "other"),
+    )
+    .unwrap();
+    assert_eq!(
+        provider_value(
+            &request(Arc::new(RootActivationTracker::default()))
+                .await
+                .unwrap(),
+            &parent,
+        ),
+        "@@//:local"
+    );
+    fs::write(workspace.join("dep/flags/BUILD.bazel"), flag_source).unwrap();
+    let restored_tracker = Arc::new(RootActivationTracker::with_loading());
+    let restored = request(restored_tracker.clone()).await.unwrap();
+    assert_eq!(provider_value(&restored, &parent), "@@dep+//leaf:selected");
+
+    let parent_identity = "resolved/@@//:parent=<default>";
+    let node = |tracker: &Arc<RootActivationTracker>| {
+        tracker
+            .nodes
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(identity, _, _)| identity == parent_identity)
+            .map(|(_, node, _)| *node)
+            .unwrap()
+    };
+    assert_eq!(node(&initial_tracker), node(&restored_tracker));
+    for package in ["@@dep+//conditions", "@@dep+//flags", "@@dep+//leaf"] {
+        assert!(
+            initial_tracker
+                .activations
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|(identity, _)| identity.starts_with("package/") && identity.contains(package)),
+            "missing canonical package activation for {package}"
+        );
+    }
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn configured_condition_need_error_and_cancellation_recover_without_partial_result() {
     let workspace = scratch();
@@ -3287,6 +3491,285 @@ config_setting(name = "precedence", values = {"not_a_native_option": "x"}, flag_
             .count(),
         1,
         "recovery must publish exactly one configured-condition result"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn selector_batch_terminal_precedence_and_parent_cancellation_recover_selected_closure() {
+    let workspace = scratch();
+    for package in ["outer", "semantic_a", "semantic_b", "leaf"] {
+        fs::create_dir_all(workspace.join(package)).unwrap();
+    }
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"LeafInfo = provider(fields = {"value": ""})
+ParentInfo = provider(fields = {"value": ""})
+def _leaf(ctx): return [LeafInfo(value = ctx.label.name)]
+def _parent(ctx):
+    ctx.actions.write(ctx.outputs.out, ctx.attr.dep[LeafInfo].value)
+    return [ParentInfo(value = ctx.attr.dep[LeafInfo].value)]
+leaf = rule(implementation = _leaf)
+parent = rule(implementation = _parent, attrs = {"dep": attr.label(), "out": attr.output()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("outer/BUILD.bazel"),
+        "config_setting(name = \"match\", values = {\"compilation_mode\": \"fastbuild\"})\n",
+    )
+    .unwrap();
+    for package in ["semantic_a", "semantic_b"] {
+        fs::write(
+            workspace.join(package).join("BUILD.bazel"),
+            format!(
+                "config_setting(name = \"match\", values = {{\"not_a_native_option_{package}\": \"x\"}})\n"
+            ),
+        )
+        .unwrap();
+    }
+    fs::write(
+        workspace.join("leaf/BUILD.bazel"),
+        "load(\"//:defs.bzl\", \"leaf\")\nleaf(name = \"selected\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "parent")
+parent(
+    name = "parent",
+    dep = select({
+        "//outer:match": "//leaf:selected",
+        "//need:match": "//leaf:selected",
+        "//semantic_a:match": "//leaf:selected",
+        "//semantic_b:match": "//leaf:selected",
+    }),
+    out = "parent.txt",
+)
+"#,
+    )
+    .unwrap();
+
+    let root = NormalizedAbsolutePath::new(workspace.clone()).unwrap();
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new(workspace.join("selector-terminal")).unwrap(),
+        PathObservationOperation::Lstat,
+    );
+    let outer =
+        ObservedPathFrontierError::from(PathObservationEpochError::DuplicateDemand(demand.dupe()));
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let first_tracker = Arc::new(RootActivationTracker::with_loading());
+    let mut data = UserComputationData {
+        activation_tracker: Some(first_tracker.clone()),
+        ..Default::default()
+    };
+    data.data.set(CaptureEvaluationEvents);
+    let mut updater = dice.updater_with_data(data);
+    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
+    let outer_value: <HostPackageInventoryObservationKey as Key>::Value =
+        AnalysisPreparationOutcome::Complete(Err(HostPackageInventoryObservationError::Frontier(
+            outer.clone(),
+        )));
+    updater
+        .changed_to(vec![(
+            HostPackageInventoryObservationKey::new(
+                root.clone(),
+                PackageIdentifier::new(
+                    CanonicalRepoName::root(),
+                    PackagePath::parse("outer").unwrap(),
+                ),
+            ),
+            outer_value,
+        )])
+        .unwrap();
+    let key = ConfiguredNodeAnalysisObservationKey::new(
+        root.clone(),
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:parent").unwrap(),
+            test_configuration(),
+        ),
+    )
+    .unwrap();
+    let outcome = updater.commit().await.compute(&key).await.unwrap();
+    assert!(
+        matches!(&outcome, AnalysisPreparationOutcome::Complete(Err(error)) if error == &outer),
+        "{outcome:#?}"
+    );
+    assert!(first_tracker.take().1.is_empty());
+
+    let need = observed_root_target_request_with_inputs(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        "@@//:parent",
+        test_configuration(),
+        Arc::new(RootActivationTracker::with_loading()),
+        root_epoch(&workspace),
+        &[],
+    )
+    .await
+    .unwrap_err();
+    assert!(need.contains("Needs"), "{need}");
+
+    fs::create_dir(workspace.join("need")).unwrap();
+    fs::write(
+        workspace.join("need/BUILD.bazel"),
+        "config_setting(name = \"match\", values = {\"compilation_mode\": \"fastbuild\"})\n",
+    )
+    .unwrap();
+    let semantic_dice = Dice::builder().build(DetectCycles::Enabled);
+    let semantic_tracker = Arc::new(RootActivationTracker::with_loading());
+    let semantic = observed_root_target_request_with_inputs(
+        &semantic_dice,
+        &workspace,
+        "@@//:parent",
+        test_configuration(),
+        semantic_tracker.clone(),
+        root_epoch(&workspace),
+        &[],
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        semantic.contains("not_a_native_option_semantic_a"),
+        "{semantic}"
+    );
+    let (activations, batches, _) = semantic_tracker.take();
+    assert!(batches.iter().all(|(_, batch)| batch.events().is_empty()));
+    for package in ["//semantic_a", "//semantic_b"] {
+        assert!(activations.iter().any(|(identity, _)| {
+            identity.starts_with("package/") && identity.contains(package)
+        }));
+    }
+    assert!(
+        activations
+            .iter()
+            .all(|(identity, _)| !identity.contains("//leaf:selected")),
+        "unresolved selector published its branch child: {activations:#?}"
+    );
+
+    for package in ["semantic_a", "semantic_b"] {
+        fs::write(
+            workspace.join(package).join("BUILD.bazel"),
+            "config_setting(name = \"match\", values = {\"compilation_mode\": \"fastbuild\"})\n",
+        )
+        .unwrap();
+    }
+    let recovery_tracker = Arc::new(RootActivationTracker::with_loading());
+    let result = observed_root_target_request_with_inputs(
+        &semantic_dice,
+        &workspace,
+        "@@//:parent",
+        test_configuration(),
+        recovery_tracker.clone(),
+        root_epoch(&workspace),
+        &[],
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        result
+            .configured_dependencies()
+            .map(|key| key.label().to_string())
+            .collect::<Vec<_>>(),
+        ["@@//leaf:selected"]
+    );
+    assert_eq!(result.actions().len(), 1);
+    assert_eq!(
+        provider_value(
+            &result,
+            &ProviderId::new("//:defs.bzl", "ParentInfo").unwrap()
+        ),
+        "selected"
+    );
+    assert_eq!(
+        recovery_tracker
+            .take()
+            .0
+            .iter()
+            .filter(|(identity, kind)| {
+                identity == "observed/resolved/@@//:parent=<default>"
+                    && *kind == ActivationKind::Evaluated
+            })
+            .count(),
+        1
+    );
+
+    let cancel_dice = Dice::builder().build(DetectCycles::Enabled);
+    let (reached_sender, reached_receiver) = std::sync::mpsc::sync_channel(0);
+    let (release_sender, release_receiver) = std::sync::mpsc::sync_channel(0);
+    let cancel_tracker = Arc::new(RootActivationTracker::with_loading_gate(
+        "semantic_a",
+        reached_sender,
+        release_receiver,
+    ));
+    let mut data = UserComputationData {
+        activation_tracker: Some(cancel_tracker.clone()),
+        ..Default::default()
+    };
+    data.data.set(CaptureEvaluationEvents);
+    let mut updater = cancel_dice.updater_with_data(data);
+    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
+    let key = ConfiguredNodeAnalysisObservationKey::new(
+        root,
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:parent").unwrap(),
+            test_configuration(),
+        ),
+    )
+    .unwrap();
+    let mut cancelled = updater.commit().await;
+    cancel_tracker.take();
+    let computation = tokio::spawn(async move { cancelled.compute(&key).await });
+    tokio::task::spawn_blocking(move || reached_receiver.recv().unwrap())
+        .await
+        .unwrap();
+    let (activations, batches, _) = cancel_tracker.take();
+    assert!(batches.is_empty());
+    assert!(
+        activations.iter().all(|(identity, _)| {
+            !identity.starts_with("resolved/") && !identity.starts_with("observed/resolved/")
+        }),
+        "cancelled selector batch published analysis: {activations:#?}"
+    );
+    computation.abort();
+    release_sender.send(()).unwrap();
+    assert!(computation.await.unwrap_err().is_cancelled());
+
+    let recovered_tracker = Arc::new(RootActivationTracker::with_loading());
+    let recovered = observed_root_target_request_with_inputs(
+        &cancel_dice,
+        &workspace,
+        "@@//:parent",
+        test_configuration(),
+        recovered_tracker.clone(),
+        root_epoch(&workspace),
+        &[],
+    )
+    .await
+    .unwrap();
+    assert_eq!(recovered.actions().len(), 1);
+    assert_eq!(recovered.configured_dependencies().count(), 1);
+    let activations = recovered_tracker.take().0;
+    assert_eq!(
+        activations
+            .iter()
+            .filter(|(identity, kind)| {
+                identity == "observed/resolved/@@//:parent=<default>"
+                    && *kind == ActivationKind::Evaluated
+            })
+            .count(),
+        1
+    );
+    assert_eq!(
+        activations
+            .iter()
+            .filter(|(identity, kind)| {
+                identity == "observed/resolved/@@//leaf:selected=<default>"
+                    && *kind == ActivationKind::Evaluated
+            })
+            .count(),
+        1
     );
 }
 
@@ -4806,6 +5289,207 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     );
     assert_eq!(leaf.actions().len(), 1);
     assert_eq!(leaf.actions()[0].outputs()[0].path(), "leaf/second.txt");
+}
+
+#[tokio::test]
+async fn configured_attributes_select_specialize_allocate_dicts_and_predeclare_outputs() {
+    let workspace = scratch();
+    for package in ["rules", "leaf", "parent"] {
+        fs::create_dir_all(workspace.join(package)).unwrap();
+    }
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(workspace.join("rules/BUILD.bazel"), "").unwrap();
+    fs::write(
+        workspace.join("rules/defs.bzl"),
+        r#"LeafInfo = provider(fields = {"value": ""})
+ParentInfo = provider(fields = {"value": ""})
+def _leaf(ctx):
+    return [LeafInfo(value = ctx.label.name)]
+
+def _parent(ctx):
+    value = "|".join([
+        ctx.attr.text,
+        ctx.attr.words[1],
+        ctx.attr.dep[LeafInfo].value,
+        ctx.attr.mapped["key"][LeafInfo].value,
+        ctx.attr.reverse[ctx.attr.dep],
+        str(ctx.attr.dep in ctx.attr.reverse),
+        ctx.attr.grouped["group"][0][LeafInfo].value,
+        ctx.outputs.out.path,
+        ctx.outputs.outs[0].path,
+    ])
+    ctx.actions.write(ctx.outputs.out, value)
+    return [ParentInfo(value = value), DefaultInfo(files = depset([ctx.outputs.out]))]
+
+leaf = rule(implementation = _leaf)
+parent = rule(
+    implementation = _parent,
+    attrs = {
+        "text": attr.string(mandatory = True),
+        "words": attr.string_list(mandatory = True),
+        "dep": attr.label(mandatory = True),
+        "mapped": attr.string_keyed_label_dict(mandatory = True),
+        "reverse": attr.label_keyed_string_dict(mandatory = True),
+        "grouped": attr.label_list_dict(mandatory = True),
+        "out": attr.output(mandatory = True),
+        "outs": attr.output_list(mandatory = True),
+    },
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("leaf/BUILD.bazel"),
+        "load(\"//rules:defs.bzl\", \"leaf\")\nleaf(name = \"selected\")\nleaf(name = \"mapped\")\nleaf(name = \"grouped\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("parent/BUILD.bazel"),
+        r#"load("//rules:defs.bzl", "parent")
+config_setting(name = "base", values = {"compilation_mode": "fastbuild"})
+config_setting(name = "specific", values = {"compilation_mode": "fastbuild", "stamp": "false"})
+config_setting(name = "equal_a", values = {"compilation_mode": "fastbuild"})
+config_setting(name = "equal_b", values = {"stamp": "false"})
+parent(
+    name = "parent",
+    text = select({":base": "base", ":specific": "specific"}),
+    words = select({":equal_a": select({":base": ["same"]}), ":equal_b": ["same"]}) + ["tail"],
+    dep = select({":base": "//leaf:selected", "//conditions:default": "//leaf:unselected_missing"}),
+    mapped = {"key": "//leaf:mapped"},
+    reverse = {"//leaf:selected": "reverse"},
+    grouped = {"group": ["//leaf:grouped"]},
+    out = "result.txt",
+    outs = ["extra.txt"],
+)
+"#,
+    )
+    .unwrap();
+
+    let result = root_target_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        "@@//parent:parent",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    let parent_id = ProviderId::new("//rules:defs.bzl", "ParentInfo").unwrap();
+    assert_eq!(
+        result.providers().user(&parent_id).unwrap().field("value"),
+        Some(
+            "specific|tail|selected|mapped|reverse|True|grouped|parent/result.txt|parent/extra.txt"
+        )
+    );
+    assert_eq!(
+        result
+            .configured_dependencies()
+            .map(|key| key.label().to_string())
+            .collect::<Vec<_>>(),
+        [
+            "@@//leaf:selected",
+            "@@//leaf:mapped",
+            "@@//leaf:selected",
+            "@@//leaf:grouped",
+        ]
+    );
+    assert_eq!(result.declared_outputs(), ["parent/result.txt"]);
+}
+
+#[tokio::test]
+async fn configured_attribute_no_match_and_ambiguity_fail_before_rule_evaluation() {
+    for (name, conditions, selection, expected) in [
+        (
+            "no_default",
+            "config_setting(name = \"opt\", values = {\"compilation_mode\": \"opt\"})",
+            "select({\":opt\": \"value\"})",
+            "no matching condition and no default",
+        ),
+        (
+            "ambiguous",
+            "config_setting(name = \"mode\", values = {\"compilation_mode\": \"fastbuild\"})\nconfig_setting(name = \"stamp\", values = {\"stamp\": \"false\"})",
+            "select({\":mode\": \"one\", \":stamp\": \"two\"})",
+            "ambiguous matching conditions",
+        ),
+    ] {
+        let workspace = scratch();
+        fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+        fs::write(
+            workspace.join("defs.bzl"),
+            "def _impl(ctx):\n    fail(\"RULE_EVALUATED\")\nprobe = rule(implementation = _impl, attrs = {\"value\": attr.string()})\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.join("BUILD.bazel"),
+            format!(
+                "load(\":defs.bzl\", \"probe\")\n{conditions}\nprobe(name = \"probe\", value = {selection})\n"
+            ),
+        )
+        .unwrap();
+        let error = root_target_request(
+            &Dice::builder().build(DetectCycles::Enabled),
+            &workspace,
+            "@@//:probe",
+            Arc::new(RootActivationTracker::default()),
+        )
+        .await
+        .unwrap_err();
+        assert!(error.contains(expected), "{name}: {error}");
+        assert!(!error.contains("RULE_EVALUATED"), "{name}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn selected_configurable_transition_ignores_unselected_branch_and_authenticates_output() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _empty(ctx): return []
+setting = rule(implementation = _empty, build_setting = config.string(flag = True))
+leaf = rule(implementation = _empty)
+def _transition(settings, attr): return {"//:setting": "changed"}
+configured = transition(implementation = _transition, inputs = [], outputs = ["//:setting"])
+parent = rule(implementation = _empty, attrs = {"dep": attr.label(cfg = configured)})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "leaf", "parent", "setting")
+setting(name = "setting", build_setting_default = "default")
+leaf(name = "selected")
+config_setting(name = "choose", values = {"compilation_mode": "fastbuild"})
+parent(name = "parent", dep = select({":choose": ":selected", "//conditions:default": ":unselected_missing"}))
+"#,
+    )
+    .unwrap();
+
+    let result = root_target_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        "@@//:parent",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    let dependency = result.configured_dependencies().next().unwrap();
+    assert_eq!(dependency.label().to_string(), "@@//:selected");
+    assert_eq!(
+        dependency
+            .configuration()
+            .starlark_option(&CanonicalLabel::parse("@@//:setting").unwrap())
+            .and_then(|option| option.value().as_str()),
+        Some("changed")
+    );
+    assert_eq!(result.configured_dependencies().count(), 1);
+    assert!(matches!(
+        result.edges()[0].kind(),
+        slug_analysis_v2::ConfiguredEdgeKind::TransitionedAttribute {
+            attribute,
+            index: 0,
+            output,
+        } if attribute == "dep" && output == &CanonicalLabel::parse("@@//:setting").unwrap()
+    ));
 }
 
 #[tokio::test]

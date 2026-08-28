@@ -9,6 +9,7 @@
  */
 
 use std::fmt;
+use std::hash::Hash;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -16,10 +17,13 @@ use allocative::Allocative;
 use compact_str::CompactString;
 use dupe::Dupe;
 use slug_build_api_v2::ActionOutput;
+use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::CtxActions;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::UserProvider;
+use slug_loading_v2::AttributeKind;
+use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::provider::FrozenUserProviderCallable;
@@ -30,6 +34,7 @@ use slug_loading_v2::provider::StarlarkUserProvider;
 use slug_loading_v2::provider::ToolchainInfoAnalysisContext;
 use starlark::PrintHandler;
 use starlark::any::ProvidesStaticType;
+use starlark::collections::StarlarkHasher;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
@@ -48,11 +53,13 @@ use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
 use starlark::values::ValueLike;
+use starlark::values::dict::AllocDict;
 use starlark::values::list::ListRef;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 
 use crate::build_setting;
+use crate::configured_attribute::ResolvedRuleAttribute;
 use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
 use crate::result::ConfiguredActionOwnerContext;
@@ -93,8 +100,8 @@ struct AnalysisContextGen<V> {
     target_name: String,
     package_path: String,
     dependencies: Arc<[PreparedDependency]>,
+    resolved_attributes: Arc<[ResolvedRuleAttribute]>,
     build_setting_value: Option<V>,
-    marker: Option<CompactString>,
     toolchain: Option<PreparedToolchain>,
 }
 
@@ -111,11 +118,11 @@ impl<'v> Freeze for AnalysisContext<'v> {
             target_name: self.target_name,
             package_path: self.package_path,
             dependencies: self.dependencies,
+            resolved_attributes: self.resolved_attributes,
             build_setting_value: self
                 .build_setting_value
                 .map(|value| value.freeze(freezer))
                 .transpose()?,
-            marker: self.marker,
             toolchain: self.toolchain,
         })
     }
@@ -143,7 +150,11 @@ where
             })),
             "attr" => Some(heap.alloc_simple(AnalysisAttributes {
                 dependencies: self.dependencies.clone(),
-                marker: self.marker.clone(),
+                attributes: self.resolved_attributes.clone(),
+            })),
+            "outputs" => Some(heap.alloc_simple(AnalysisOutputs {
+                attributes: self.resolved_attributes.clone(),
+                package_path: self.package_path.clone(),
             })),
             "toolchains" => self
                 .toolchain
@@ -160,7 +171,6 @@ pub(crate) struct PreparedDependency {
     pub(crate) key: ConfiguredNodeKey,
     pub(crate) providers: ProviderCollection,
     pub(crate) attribute: CompactString,
-    pub(crate) sequence: bool,
 }
 
 #[derive(Debug, Clone, Allocative)]
@@ -172,7 +182,7 @@ pub(crate) struct PreparedToolchain {
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct AnalysisAttributes {
     dependencies: Arc<[PreparedDependency]>,
-    marker: Option<CompactString>,
+    attributes: Arc<[ResolvedRuleAttribute]>,
 }
 
 impl fmt::Display for AnalysisAttributes {
@@ -186,27 +196,182 @@ starlark::starlark_simple_value!(AnalysisAttributes);
 #[starlark_value(type = "analysis_attrs")]
 impl<'v> StarlarkValue<'v> for AnalysisAttributes {
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        if attribute == "marker" {
-            return self
-                .marker
-                .as_ref()
-                .map(|marker| heap.alloc_str(marker).to_value());
-        }
-        let dependencies = self
-            .dependencies
+        let value = self
+            .attributes
             .iter()
-            .filter(|dependency| attribute == "deps" || dependency.attribute == attribute)
-            .cloned()
-            .map(AnalysisDependency)
-            .collect::<Vec<_>>();
-        (!dependencies.is_empty()).then(|| {
-            if attribute != "deps" && !dependencies[0].0.sequence {
-                heap.alloc_simple(dependencies.into_iter().next().expect("nonempty"))
-            } else {
-                heap.alloc(dependencies)
-            }
+            .find(|candidate| candidate.declaration_name == attribute)?;
+        (!matches!(
+            value.kind,
+            AttributeKind::Output | AttributeKind::OutputList
+        ))
+        .then(|| {
+            allocate_analysis_attribute(value, &self.dependencies, heap)
+                .expect("resolved attribute shape matches its loading declaration")
         })
     }
+}
+
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct AnalysisOutputs {
+    attributes: Arc<[ResolvedRuleAttribute]>,
+    package_path: String,
+}
+
+impl fmt::Display for AnalysisOutputs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<ctx.outputs>")
+    }
+}
+
+starlark::starlark_simple_value!(AnalysisOutputs);
+
+#[starlark_value(type = "analysis_outputs")]
+impl<'v> StarlarkValue<'v> for AnalysisOutputs {
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        let attribute = self
+            .attributes
+            .iter()
+            .find(|candidate| candidate.declaration_name == attribute)?;
+        match &attribute.value {
+            CoercedAttributeValue::None if attribute.kind == AttributeKind::Output => {
+                Some(Value::new_none())
+            }
+            CoercedAttributeValue::Output(label) if attribute.kind == AttributeKind::Output => {
+                Some(heap.alloc_simple(predeclared_file(label, &self.package_path)))
+            }
+            CoercedAttributeValue::OutputList(labels)
+                if attribute.kind == AttributeKind::OutputList =>
+            {
+                Some(
+                    heap.alloc(
+                        labels
+                            .iter()
+                            .map(|label| predeclared_file(label, &self.package_path))
+                            .collect::<Vec<_>>(),
+                    ),
+                )
+            }
+            _ => None,
+        }
+    }
+}
+
+fn predeclared_file(label: &slug_identity_v2::CanonicalLabel, package_path: &str) -> DeclaredFile {
+    let target = label.target().as_str();
+    let path = if package_path.is_empty() {
+        target.to_owned()
+    } else {
+        format!("{package_path}/{target}")
+    };
+    DeclaredFile {
+        output: ActionOutput::new(path, ActionOutputKind::File),
+    }
+}
+
+fn allocate_analysis_attribute<'v>(
+    attribute: &ResolvedRuleAttribute,
+    dependencies: &[PreparedDependency],
+    heap: Heap<'v>,
+) -> Result<Value<'v>, String> {
+    let mut dependencies = dependencies
+        .iter()
+        .filter(|dependency| dependency.attribute == attribute.declaration_name);
+    let mut dependency = || {
+        dependencies
+            .next()
+            .cloned()
+            .map(|dependency| heap.alloc_simple(AnalysisDependency(dependency)))
+            .ok_or_else(|| {
+                format!(
+                    "resolved attribute `{}` is missing a prepared dependency",
+                    attribute.declaration_name
+                )
+            })
+    };
+    Ok(match &attribute.value {
+        CoercedAttributeValue::None => Value::new_none(),
+        CoercedAttributeValue::Label(_) if attribute.sequence => heap.alloc(vec![dependency()?]),
+        CoercedAttributeValue::Label(_) => dependency()?,
+        CoercedAttributeValue::LabelList(labels) => heap.alloc(
+            labels
+                .iter()
+                .map(|_| dependency())
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
+        CoercedAttributeValue::String(value) => heap.alloc_str(value).to_value(),
+        CoercedAttributeValue::StringList(values) => heap.alloc(
+            values
+                .iter()
+                .map(|value| heap.alloc_str(value).to_value())
+                .collect::<Vec<_>>(),
+        ),
+        CoercedAttributeValue::StringListDict(values) => heap.alloc(AllocDict(
+            values
+                .iter()
+                .map(|(key, values)| {
+                    (
+                        heap.alloc_str(key).to_value(),
+                        heap.alloc(
+                            values
+                                .iter()
+                                .map(|value| heap.alloc_str(value).to_value())
+                                .collect::<Vec<_>>(),
+                        ),
+                    )
+                })
+                .collect::<Vec<_>>(),
+        )),
+        CoercedAttributeValue::Boolean(value) => Value::new_bool(*value),
+        CoercedAttributeValue::Integer(value) => heap.alloc(*value),
+        CoercedAttributeValue::StringDict(values) => heap.alloc(AllocDict(
+            values
+                .iter()
+                .map(|(key, value)| {
+                    (
+                        heap.alloc_str(key).to_value(),
+                        heap.alloc_str(value).to_value(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+        )),
+        CoercedAttributeValue::StringKeyedLabelDict(values) => heap.alloc(AllocDict(
+            values
+                .iter()
+                .map(|(key, _)| Ok((heap.alloc_str(key).to_value(), dependency()?)))
+                .collect::<Result<Vec<_>, String>>()?,
+        )),
+        CoercedAttributeValue::LabelKeyedStringDict(values) => heap.alloc(AllocDict(
+            values
+                .iter()
+                .map(|(_, value)| Ok((dependency()?, heap.alloc_str(value).to_value())))
+                .collect::<Result<Vec<_>, String>>()?,
+        )),
+        CoercedAttributeValue::LabelListDict(values) => heap.alloc(AllocDict(
+            values
+                .iter()
+                .map(|(key, labels)| {
+                    Ok((
+                        heap.alloc_str(key).to_value(),
+                        heap.alloc(
+                            labels
+                                .iter()
+                                .map(|_| dependency())
+                                .collect::<Result<Vec<_>, String>>()?,
+                        ),
+                    ))
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        )),
+        CoercedAttributeValue::Output(_)
+        | CoercedAttributeValue::OutputList(_)
+        | CoercedAttributeValue::Selector { .. }
+        | CoercedAttributeValue::Concatenation(_, _) => {
+            return Err(format!(
+                "attribute `{}` reached ctx.attr with an unresolved or output-only value",
+                attribute.declaration_name
+            ));
+        }
+    })
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
@@ -273,6 +438,15 @@ starlark::starlark_simple_value!(AnalysisDependency);
 
 #[starlark_value(type = "configured_target")]
 impl<'v> StarlarkValue<'v> for AnalysisDependency {
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.0.key.hash(hasher);
+        Ok(())
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(Self::from_value(other).is_some_and(|other| self.0.key == other.0.key))
+    }
+
     fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let callable = FrozenUserProviderCallable::from_value(index).ok_or_else(|| {
             starlark::Error::new_other(anyhow::anyhow!(
@@ -454,7 +628,7 @@ pub(crate) fn evaluate_loaded_rule(
     key: ConfiguredTargetKey,
     package_path: &str,
     dependencies: Vec<PreparedDependency>,
-    marker: Option<CompactString>,
+    resolved_attributes: Vec<ResolvedRuleAttribute>,
     action_context: Arc<ConfiguredActionOwnerContext>,
     toolchain: Option<PreparedToolchain>,
     print_handler: Option<&dyn PrintHandler>,
@@ -503,8 +677,8 @@ pub(crate) fn evaluate_loaded_rule(
             target_name: target.name.clone(),
             package_path: package_path.to_owned(),
             dependencies: dependencies.into(),
+            resolved_attributes: resolved_attributes.into(),
             build_setting_value,
-            marker,
             toolchain,
         });
         let result =

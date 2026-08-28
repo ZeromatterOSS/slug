@@ -43,6 +43,7 @@ use slug_loading_v2::ModuleRegistrationExpansionKey;
 use slug_loading_v2::ModuleRegistrationExpansionObservationError;
 use slug_loading_v2::ModuleRegistrationExpansionObservationKey;
 use slug_loading_v2::PackageTargetKind;
+use slug_loading_v2::attrs::TransitionDefinition;
 use slug_loading_v2::package::BuildSettingDeclaration;
 use slug_loading_v2::package::NativeToolchainTarget;
 use slug_loading_v2::package::StarlarkRuleImplementation;
@@ -66,6 +67,9 @@ use starlark_map::small_set::SmallSet;
 use crate::build_setting::matches_expected_text;
 use crate::build_setting::resolve_candidate;
 use crate::build_setting::unpack_transition_value;
+use crate::configured_attribute::ConfiguredAttributeCondition;
+use crate::configured_attribute::ResolvedRuleAttribute;
+use crate::configured_attribute::resolve_configured_attribute;
 use crate::key::ConfigurationKey;
 use crate::key::ConfigurationKind;
 use crate::key::ConfiguredNodeKey;
@@ -816,19 +820,269 @@ fn starlark_rule_implementation<'a>(
     Ok(implementation)
 }
 
+async fn prepare_configured_attribute_conditions(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    configuration: &ConfigurationKey,
+    selector_labels: Vec<CanonicalLabel>,
+) -> AnalysisSemanticOutcome<Vec<ConfiguredAttributeCondition>> {
+    if selector_labels.is_empty() {
+        return analysis_semantic_complete(Ok(Vec::new()));
+    }
+
+    let condition_configuration = configuration.clone();
+    let condition_workspace = workspace.dupe();
+    let condition_outcomes = ctx
+        .compute_join(selector_labels.iter().cloned(), |ctx, label| {
+            let key = ConfiguredConditionKey::new(
+                condition_workspace.dupe(),
+                ConfiguredTargetKey::new(label.clone(), condition_configuration.clone()),
+            )
+            .expect("configured rule carries a structural configuration");
+            Box::pin(async move { (label, ctx.compute(&key).await) })
+        })
+        .await;
+    let mut all_need: Option<LoadingPreparationNeeds> = None;
+    let mut first_outer = None;
+    let mut first_error = None;
+    let mut truth = SmallMap::with_capacity(condition_outcomes.len());
+    for (label, outcome) in condition_outcomes {
+        match outcome {
+            Err(error) => {
+                if first_error.is_none() {
+                    first_error = Some(AnalysisError::message(format!(
+                        "computing configured selector condition {label}: {error}"
+                    )));
+                }
+            }
+            Ok(LoadingPreparationOutcome::Need(need)) => {
+                all_need = Some(match all_need {
+                    Some(current) => current.try_union(&need).unwrap_or_else(|error| {
+                        panic!(
+                            "configured selector Needs must be structurally compatible: {error:?}"
+                        )
+                    }),
+                    None => need,
+                });
+            }
+            Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
+                if first_outer.is_none() {
+                    first_outer = Some(error);
+                }
+            }
+            Ok(LoadingPreparationOutcome::Complete(Ok(result))) => match result.as_ref() {
+                Ok(result) => {
+                    truth.insert(label, *result == ConfiguredConditionMatch::Match);
+                }
+                Err(error) => {
+                    if first_error.is_none() {
+                        first_error = Some(error.clone());
+                    }
+                }
+            },
+        }
+    }
+    if let Some(error) = first_outer {
+        return LoadingPreparationOutcome::Complete(Err(error));
+    }
+    if let Some(need) = all_need {
+        return LoadingPreparationOutcome::Need(need);
+    }
+    if let Some(error) = first_error {
+        return analysis_semantic_complete(Err(error));
+    }
+
+    load_configured_condition_declarations(ctx, mode, workspace, selector_labels, &truth).await
+}
+
+async fn load_configured_condition_declarations(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    labels: Vec<CanonicalLabel>,
+    truth: &SmallMap<CanonicalLabel, bool>,
+) -> AnalysisSemanticOutcome<Vec<ConfiguredAttributeCondition>> {
+    let packages = labels
+        .iter()
+        .map(|label| label.package().clone())
+        .collect::<SmallSet<_>>();
+    let outcomes = ctx
+        .compute_join(packages, |ctx, package| {
+            Box::pin(async move {
+                let outcome = compute_configured_package_input(
+                    ctx,
+                    mode,
+                    workspace.dupe(),
+                    package.clone(),
+                    "loading configured selector declaration through DICE",
+                )
+                .await;
+                (package, outcome)
+            })
+        })
+        .await;
+    let mut all_need: Option<LoadingPreparationNeeds> = None;
+    let mut first_outer = None;
+    let mut first_error = None;
+    let mut loaded_packages = Vec::with_capacity(outcomes.len());
+    for (package, outcome) in outcomes {
+        match outcome {
+            LoadingPreparationOutcome::Need(need) => {
+                all_need = Some(match all_need {
+                    Some(current) => current.try_union(&need).unwrap_or_else(|error| {
+                        panic!(
+                            "selector declaration Needs must be structurally compatible: {error:?}"
+                        )
+                    }),
+                    None => need,
+                });
+            }
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                if first_outer.is_none() {
+                    first_outer = Some(error);
+                }
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                if first_error.is_none() {
+                    first_error = Some(error);
+                }
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(value))) => {
+                loaded_packages.push((package, value))
+            }
+        }
+    }
+    if let Some(error) = first_outer {
+        return LoadingPreparationOutcome::Complete(Err(error));
+    }
+    if let Some(need) = all_need {
+        return LoadingPreparationOutcome::Need(need);
+    }
+    if let Some(error) = first_error {
+        return analysis_semantic_complete(Err(error));
+    }
+
+    let mut conditions = Vec::with_capacity(labels.len());
+    for label in labels {
+        let Some((_, inventory)) = loaded_packages
+            .iter()
+            .find(|(package, _)| package == label.package())
+        else {
+            unreachable!("every selector package completed")
+        };
+        let loaded = match inventory.loaded() {
+            Ok(loaded) => loaded,
+            Err(error) => return analysis_semantic_complete(Err(package_inventory_error(error))),
+        };
+        let Some(target) = loaded
+            .targets
+            .iter()
+            .find(|target| target.name == label.target().as_str())
+        else {
+            return analysis_semantic_complete(Err(AnalysisError::target_not_found(
+                label,
+                loaded.build_file.clone(),
+            )));
+        };
+        let PackageTargetKind::ConfigSetting { declaration } = &target.kind else {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "target {label} is not a config_setting"
+            ))));
+        };
+        conditions.push(ConfiguredAttributeCondition {
+            matches: *truth
+                .get(&label)
+                .expect("every completed condition stores truth"),
+            label,
+            declaration: declaration.clone(),
+        });
+    }
+
+    analysis_semantic_complete(Ok(conditions))
+}
+
+async fn prepare_configured_rule_attributes(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    package: &LoadedPackage,
+    configured_target: &ConfiguredTargetKey,
+) -> AnalysisSemanticOutcome<Vec<ResolvedRuleAttribute>> {
+    let implementation = match starlark_rule_implementation(package, configured_target) {
+        Ok(implementation) => implementation,
+        Err(error) => return analysis_semantic_complete(Err(error)),
+    };
+    let mut selector_labels = Vec::new();
+    if let Some(config_dependencies) = implementation
+        .values()
+        .iter()
+        .find(|value| value.declaration_name == "$config_dependencies")
+    {
+        config_dependencies.value.labels(&mut selector_labels);
+    }
+    let selector_labels = selector_labels
+        .into_iter()
+        .collect::<SmallSet<_>>()
+        .into_iter()
+        .collect();
+    let conditions = match prepare_configured_attribute_conditions(
+        ctx,
+        mode,
+        workspace,
+        configured_target.configuration(),
+        selector_labels,
+    )
+    .await
+    {
+        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Complete(Err(error)) => {
+            return LoadingPreparationOutcome::Complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+            return analysis_semantic_complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Ok(conditions))) => conditions,
+    };
+
+    let resolved = implementation
+        .values()
+        .iter()
+        .zip(implementation.schema())
+        .map(|(attribute, schema)| {
+            resolve_configured_attribute(attribute.value.as_ref(), &conditions)
+                .map(|value| ResolvedRuleAttribute {
+                    declaration_name: attribute.declaration_name.clone(),
+                    kind: schema.kind(),
+                    sequence: schema.transition().is_some()
+                        || matches!(schema.kind(), AttributeKind::LabelList),
+                    value,
+                })
+                .map_err(|error| {
+                    AnalysisError::message(format!(
+                        "resolving configured attribute `{}`: {error}",
+                        attribute.declaration_name
+                    ))
+                })
+        })
+        .collect::<Result<Vec<_>, _>>();
+    analysis_semantic_complete(resolved)
+}
+
 async fn root_declared_dependency_keys(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
     package: &LoadedPackage,
     configured_target: &ConfiguredTargetKey,
+    resolved_attributes: &[ResolvedRuleAttribute],
 ) -> AnalysisSemanticOutcome<Vec<DeclaredDependencyKey>> {
     let implementation = match starlark_rule_implementation(package, configured_target) {
         Ok(implementation) => implementation,
         Err(error) => return analysis_semantic_complete(Err(error)),
     };
     let mut dependencies = Vec::new();
-    for value in implementation.values() {
+    for value in resolved_attributes {
         let Some(schema) = implementation
             .schema()
             .iter()
@@ -839,80 +1093,36 @@ async fn root_declared_dependency_keys(
         if !schema.ordinary_dependency() {
             continue;
         }
+        if schema.declaration_name() == "$config_dependencies" {
+            continue;
+        }
         // Retain the Bazel tools allowlist in loading/query topology, but the
         // current Rust-native analysis subset has no permission-check action
         // and cannot configure external repositories yet.
         if schema.declaration_name() == "$allowlist_function_transition" {
             continue;
         }
-        let labels: Vec<&CanonicalLabel> = match value.value.as_ref() {
-            CoercedAttributeValue::Label(label) => vec![label],
-            CoercedAttributeValue::LabelList(labels) => labels.iter().collect(),
-            _ => continue,
-        };
-        let (configuration, transition_output) = if let Some(transition) = schema.transition() {
-            let output_label = match CanonicalLabel::parse(&format!("@@{}", transition.output())) {
-                Ok(label) => label,
-                Err(error) => return analysis_semantic_complete(Err(AnalysisError::new(error))),
-            };
-            let declaration =
-                match build_setting_declaration(ctx, mode, workspace, &output_label).await {
-                    LoadingPreparationOutcome::Need(need) => {
-                        return LoadingPreparationOutcome::Need(need);
-                    }
-                    LoadingPreparationOutcome::Complete(Err(error)) => {
-                        return LoadingPreparationOutcome::Complete(Err(error));
-                    }
-                    LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-                        return analysis_semantic_complete(Err(error));
-                    }
-                    LoadingPreparationOutcome::Complete(Ok(Ok(declaration))) => declaration,
-                };
-            let resolved = (|| -> Result<_, AnalysisError> {
-                let module = Module::new();
-                let returned = Evaluator::new(&module)
-                    .eval_function(
-                        transition.implementation().to_value(),
-                        &[Value::new_none(), Value::new_none()],
-                        &[],
-                    )
-                    .map_err(|error| AnalysisError::new(error.to_string()))?;
-                let entries = DictRef::from_value(returned)
-                    .ok_or_else(|| AnalysisError::new("transition must return a dictionary"))?
-                    .iter()
-                    .collect::<Vec<_>>();
-                let [(output, setting)] = entries.as_slice() else {
-                    return Err(AnalysisError::new(
-                        "transition must return exactly one declared output",
-                    ));
-                };
-                if output.unpack_str() != Some(transition.output()) {
-                    return Err(AnalysisError::new(format!(
-                        "transition output must be exactly {}",
-                        transition.output()
-                    )));
-                }
-                let candidate =
-                    unpack_transition_value(&output_label, &declaration, *setting, module.heap())
-                        .map_err(AnalysisError::new)?;
-                let resolved = resolve_candidate(output_label.clone(), &declaration, candidate)
-                    .map_err(AnalysisError::new)?;
-                Ok(match resolved {
-                    Some(resolved) => configured_target
-                        .configuration()
-                        .with_starlark_option(resolved),
-                    None => {
-                        without_starlark_option(configured_target.configuration(), &output_label)
-                    }
-                })
-            })();
-            let configuration = match resolved {
-                Ok(configuration) => configuration,
-                Err(error) => return analysis_semantic_complete(Err(error)),
-            };
-            (configuration, Some(output_label))
-        } else {
-            (configured_target.configuration().clone(), None)
+        let mut labels = Vec::new();
+        value.value.labels(&mut labels);
+        let (configuration, transition_output) = match configured_dependency_configuration(
+            ctx,
+            mode,
+            workspace,
+            configured_target.configuration(),
+            schema.transition(),
+        )
+        .await
+        {
+            LoadingPreparationOutcome::Need(need) => {
+                return LoadingPreparationOutcome::Need(need);
+            }
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return analysis_semantic_complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(configuration))) => configuration,
         };
         for (attribute_index, label) in labels.into_iter().enumerate() {
             let node = if label.package() == configured_target.label().package()
@@ -922,10 +1132,10 @@ async fn root_declared_dependency_keys(
                     .find(|target| target.name == label.target().as_str())
                     .is_none()
             {
-                ConfiguredNodeKey::null(label.clone())
+                ConfiguredNodeKey::null(label)
             } else {
                 ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
-                    label.clone(),
+                    label,
                     configuration.clone(),
                 ))
             };
@@ -933,8 +1143,6 @@ async fn root_declared_dependency_keys(
                 attribute: CompactString::from(value.declaration_name.as_str()),
                 attribute_index: u32::try_from(attribute_index)
                     .expect("attribute dependency index fits u32"),
-                sequence: schema.transition().is_some()
-                    || matches!(schema.kind(), slug_loading_v2::AttributeKind::LabelList),
                 node,
                 transition_output: transition_output.clone(),
             });
@@ -942,11 +1150,71 @@ async fn root_declared_dependency_keys(
     }
     analysis_semantic_complete(Ok(dependencies))
 }
+
+async fn configured_dependency_configuration(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    configuration: &ConfigurationKey,
+    transition: Option<&TransitionDefinition>,
+) -> AnalysisSemanticOutcome<(ConfigurationKey, Option<CanonicalLabel>)> {
+    let Some(transition) = transition else {
+        return analysis_semantic_complete(Ok((configuration.clone(), None)));
+    };
+    let output_label = match CanonicalLabel::parse(&format!("@@{}", transition.output())) {
+        Ok(label) => label,
+        Err(error) => return analysis_semantic_complete(Err(AnalysisError::new(error))),
+    };
+    let declaration = match build_setting_declaration(ctx, mode, workspace, &output_label).await {
+        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Complete(Err(error)) => {
+            return LoadingPreparationOutcome::Complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+            return analysis_semantic_complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Ok(declaration))) => declaration,
+    };
+    let resolved = (|| -> Result<_, AnalysisError> {
+        let module = Module::new();
+        let returned = Evaluator::new(&module)
+            .eval_function(
+                transition.implementation().to_value(),
+                &[Value::new_none(), Value::new_none()],
+                &[],
+            )
+            .map_err(|error| AnalysisError::new(error.to_string()))?;
+        let entries = DictRef::from_value(returned)
+            .ok_or_else(|| AnalysisError::new("transition must return a dictionary"))?
+            .iter()
+            .collect::<Vec<_>>();
+        let [(output, setting)] = entries.as_slice() else {
+            return Err(AnalysisError::new(
+                "transition must return exactly one declared output",
+            ));
+        };
+        if output.unpack_str() != Some(transition.output()) {
+            return Err(AnalysisError::new(format!(
+                "transition output must be exactly {}",
+                transition.output()
+            )));
+        }
+        let candidate =
+            unpack_transition_value(&output_label, &declaration, *setting, module.heap())
+                .map_err(AnalysisError::new)?;
+        let resolved = resolve_candidate(output_label.clone(), &declaration, candidate)
+            .map_err(AnalysisError::new)?;
+        Ok(match resolved {
+            Some(resolved) => configuration.with_starlark_option(resolved),
+            None => without_starlark_option(configuration, &output_label),
+        })
+    })();
+    analysis_semantic_complete(resolved.map(|configuration| (configuration, Some(output_label))))
+}
 #[derive(Debug, Clone)]
 struct DeclaredDependencyKey {
     attribute: CompactString,
     attribute_index: u32,
-    sequence: bool,
     node: ConfiguredNodeKey,
     transition_output: Option<CanonicalLabel>,
 }
@@ -970,9 +1238,9 @@ impl ComputedAnalysis for Arc<ConfiguredNodeResult> {
 fn finish_analysis<T>(
     package: &LoadedPackage,
     configured_target: &ConfiguredTargetKey,
+    resolved_attributes: Vec<ResolvedRuleAttribute>,
     declared_dependency_keys: &[DeclaredDependencyKey],
     computed: &SmallMap<ConfiguredNodeKey, T>,
-    marker: Option<CompactString>,
     candidate_execution_platforms: Option<Vec<ConfiguredTargetKey>>,
     action_context: Arc<ConfiguredActionOwnerContext>,
     toolchain: Option<PreparedToolchain>,
@@ -1023,7 +1291,6 @@ where
             key: result.result().key().clone(),
             providers: result.result().providers().clone(),
             attribute: dependency.attribute.clone(),
-            sequence: dependency.sequence,
         });
         edges.push(crate::configured_target::ConfiguredEdge::new(
             result.result().key().clone(),
@@ -1083,7 +1350,7 @@ where
         configured_target.clone(),
         label.package().package().as_str(),
         dependencies,
-        marker,
+        resolved_attributes,
         action_context,
         toolchain,
         print_capture
@@ -1659,6 +1926,20 @@ fn constraint_value_setting(
 
 fn native_references(target: &slug_loading_v2::PackageTarget) -> Vec<CanonicalLabel> {
     match &target.kind {
+        PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+            toolchain_type,
+            implementation,
+            exec_compatible_with,
+            target_compatible_with,
+            target_settings,
+            ..
+        }) => {
+            let mut references = vec![toolchain_type.clone(), implementation.clone()];
+            references.extend(exec_compatible_with.value().iter().cloned());
+            references.extend(target_compatible_with.value().iter().cloned());
+            references.extend(target_settings.value().selector_key_labels());
+            references
+        }
         PackageTargetKind::NativeToolchain(native) => native.semantic_references(),
         _ => Vec::new(),
     }
@@ -2040,22 +2321,16 @@ fn validate_marker_toolchain(
         exec_compatible_with,
         target_compatible_with,
         use_target_platform_constraints,
-        target_settings,
+        target_settings: _,
     }) = &target.kind
     else {
         return Err(AnalysisError::new(format!(
             "registered toolchain is not toolchain: {label}"
         )));
     };
-    if !target_compatible_with.value().is_empty()
-        || *use_target_platform_constraints.value()
-        || !matches!(
-            target_settings.value(),
-            CoercedAttributeValue::LabelList(values) if values.is_empty()
-        )
-    {
+    if !target_compatible_with.value().is_empty() || *use_target_platform_constraints.value() {
         return Err(AnalysisError::new(format!(
-            "registered toolchain uses unsupported target compatibility or settings: {label}"
+            "registered toolchain uses unsupported target compatibility: {label}"
         )));
     }
     if !matches!(package_target(packages, toolchain_type), Ok(target) if matches!(target.kind, PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)))
@@ -2083,11 +2358,127 @@ fn validate_marker_toolchain(
     Ok(())
 }
 
+async fn prepare_toolchain_target_settings(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    configuration: &ConfigurationKey,
+    packages: &ConfiguredPackages,
+    toolchains: &[CanonicalLabel],
+) -> AnalysisSemanticOutcome<SmallMap<CanonicalLabel, bool>> {
+    let selector_labels = toolchains
+        .iter()
+        .filter_map(|label| package_target(packages, label).ok())
+        .filter_map(|target| match &target.kind {
+            PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+                target_settings,
+                ..
+            }) => Some(target_settings.value()),
+            _ => None,
+        })
+        .flat_map(CoercedAttributeValue::selector_key_labels)
+        .collect::<SmallSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let selector_conditions = match prepare_configured_attribute_conditions(
+        ctx,
+        mode,
+        workspace,
+        configuration,
+        selector_labels,
+    )
+    .await
+    {
+        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Complete(Err(error)) => {
+            return LoadingPreparationOutcome::Complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+            return analysis_semantic_complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Ok(conditions))) => conditions,
+    };
+
+    let mut resolved = Vec::with_capacity(toolchains.len());
+    let mut selected_labels = SmallSet::new();
+    for label in toolchains {
+        let target = match package_target(packages, label) {
+            Ok(target) => target,
+            Err(error) => return analysis_semantic_complete(Err(error)),
+        };
+        let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+            target_settings,
+            ..
+        }) = &target.kind
+        else {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "registered toolchain is not toolchain: {label}"
+            ))));
+        };
+        let value =
+            match resolve_configured_attribute(target_settings.value(), &selector_conditions) {
+                Ok(value) => value,
+                Err(error) => {
+                    return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                        "resolving target_settings for {label}: {error}"
+                    ))));
+                }
+            };
+        let CoercedAttributeValue::LabelList(settings) = value else {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "toolchain target_settings did not resolve to a label list: {label}"
+            ))));
+        };
+        selected_labels.extend(settings.iter().cloned());
+        resolved.push((label.clone(), settings));
+    }
+
+    let selected_conditions = match prepare_configured_attribute_conditions(
+        ctx,
+        mode,
+        workspace,
+        configuration,
+        selected_labels
+            .into_iter()
+            .filter(|label| {
+                !selector_conditions
+                    .iter()
+                    .any(|condition| &condition.label == label)
+            })
+            .collect(),
+    )
+    .await
+    {
+        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Complete(Err(error)) => {
+            return LoadingPreparationOutcome::Complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+            return analysis_semantic_complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Ok(conditions))) => conditions,
+    };
+    analysis_semantic_complete(Ok(resolved
+        .into_iter()
+        .map(|(label, settings)| {
+            let eligible = settings.iter().all(|setting| {
+                selector_conditions
+                    .iter()
+                    .chain(&selected_conditions)
+                    .find(|condition| &condition.label == setting)
+                    .is_some_and(|condition| condition.matches)
+            });
+            (label, eligible)
+        })
+        .collect()))
+}
+
 fn select_root_toolchain(
     packages: &ConfiguredPackages,
     required: &CanonicalLabel,
     platforms: &[CanonicalLabel],
     toolchains: &[CanonicalLabel],
+    target_settings: &SmallMap<CanonicalLabel, bool>,
 ) -> Result<(CanonicalLabel, CanonicalLabel, CanonicalLabel), AnalysisError> {
     for platform_label in platforms {
         let platform = package_target(packages, platform_label)?;
@@ -2108,7 +2499,8 @@ fn select_root_toolchain(
             else {
                 unreachable!("registered toolchains were prevalidated")
             };
-            if toolchain_type == required
+            if target_settings.get(declaration) == Some(&true)
+                && toolchain_type == required
                 && exec_compatible_with
                     .value()
                     .iter()
@@ -2293,11 +2685,35 @@ async fn resolve_root_toolchain(
             return toolchain_outcome(Err(error));
         }
     }
-    let (selected_platform, declaration, implementation) =
-        match select_root_toolchain(&packages, required, &platform_labels, &toolchain_labels) {
-            Ok(selected) => selected,
-            Err(error) => return toolchain_outcome(Err(error)),
-        };
+    let target_settings = match prepare_toolchain_target_settings(
+        ctx,
+        mode,
+        workspace,
+        owner.configuration(),
+        &packages,
+        toolchain_labels,
+    )
+    .await
+    {
+        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Complete(Err(error)) => {
+            return LoadingPreparationOutcome::Complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+            return toolchain_outcome(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Ok(settings))) => settings,
+    };
+    let (selected_platform, declaration, implementation) = match select_root_toolchain(
+        &packages,
+        required,
+        &platform_labels,
+        &toolchain_labels,
+        &target_settings,
+    ) {
+        Ok(selected) => selected,
+        Err(error) => return toolchain_outcome(Err(error)),
+    };
     let selected_platform_key = candidate_execution_platforms
         .iter()
         .find(|platform| platform.label() == &selected_platform)
@@ -2926,7 +3342,27 @@ impl ConfiguredNodeAnalysisKey {
             .node
             .configured_target()
             .expect("Starlark rule nodes retain structural configuration");
-        let (requirement, marker) = {
+        let resolved_attributes = match prepare_configured_rule_attributes(
+            ctx,
+            mode,
+            &self.workspace,
+            package,
+            configured_target,
+        )
+        .await
+        {
+            LoadingPreparationOutcome::Need(need) => {
+                return LoadingPreparationOutcome::Need(need);
+            }
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return root_analysis_driver_complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(values))) => values,
+        };
+        let requirement = {
             let rule = match starlark_rule_implementation(package, configured_target) {
                 Ok(rule) => rule,
                 Err(error) => return root_analysis_driver_complete(Err(error)),
@@ -2936,20 +3372,9 @@ impl ConfiguredNodeAnalysisKey {
                     "toolchain resolution supports exactly zero or one required type",
                 )));
             }
-            let marker = rule
-                .values()
-                .iter()
-                .find(|value| value.declaration_name == "marker")
-                .and_then(|value| match value.value.as_ref() {
-                    CoercedAttributeValue::String(value) => Some(value.clone()),
-                    _ => None,
-                });
-            (
-                rule.required_toolchains()
-                    .first()
-                    .map(|requirement| requirement.label().clone()),
-                marker,
-            )
+            rule.required_toolchains()
+                .first()
+                .map(|requirement| requirement.label().clone())
         };
         let local_declarations = local_toolchain_declarations(package, configured_target.label());
         let registrations = match prepare_module_registrations(
@@ -3043,6 +3468,7 @@ impl ConfiguredNodeAnalysisKey {
             &self.workspace,
             package,
             configured_target,
+            &resolved_attributes,
         )
         .await
         {
@@ -3205,9 +3631,9 @@ impl ConfiguredNodeAnalysisKey {
         root_analysis_driver_complete(finish_analysis(
             package,
             configured_target,
+            resolved_attributes,
             &declared_dependency_keys,
             &computed,
-            marker,
             candidate_execution_platforms,
             action_context,
             prepared_toolchain,

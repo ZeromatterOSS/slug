@@ -237,16 +237,26 @@ algorithm, diagnostics or identity policy.
 Production:
 
 1. `app/slug_loading_v2/src/attrs.rs`;
-2. `app/slug_analysis_v2/src/configured_attribute.rs`;
-3. `app/slug_analysis_v2/src/dice.rs`;
-4. `app/slug_analysis_v2/src/starlark_rule.rs`;
-5. `app/slug_analysis_v2/src/lib.rs`.
+2. `app/slug_loading_v2/src/package.rs`;
+3. `app/slug_analysis_v2/src/configured_attribute.rs`;
+4. `app/slug_analysis_v2/src/dice.rs`;
+5. `app/slug_analysis_v2/src/starlark_rule.rs`;
+6. `app/slug_analysis_v2/src/lib.rs`.
 
 Proof:
 
-6. `app/slug_analysis_v2/tests/starlark_rule.rs`;
-7. `app/slug_analysis_v2/tests/configured_target.rs`;
-8. loading-local tests inside `app/slug_loading_v2/src/attrs.rs`.
+7. `app/slug_analysis_v2/tests/starlark_rule.rs`;
+8. `app/slug_analysis_v2/tests/configured_target.rs`;
+9. loading-local tests inside `app/slug_loading_v2/src/attrs.rs`.
+
+The canonical-external lifecycle proof exposed one bounded manifest
+omission: Host root-package rule attributes still selected the pre-Bzlmod
+label coercion path for canonical-external labels. This replan admits only
+`package.rs` so the Host carrier reuses the existing repository-aware
+canonicalizer. The legacy listing loader and unmapped apparent labels remain
+fail closed, and analysis's existing canonical configured-target gate
+continues to reject every external shape beyond the admitted native toolchain
+and dependency-free marker leaf.
 
 Completion docs remain the canonical plan, this manifest and Stage 6 owner
 plan. Caps: 1,450 production Rust lines, 1,650 proof Rust lines, 3,100 total

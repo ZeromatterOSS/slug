@@ -651,6 +651,120 @@ impl fmt::Display for AttrCandidateError {
 impl std::error::Error for AttrCandidateError {}
 
 impl CoercedAttributeValue {
+    /// Returns the selector condition labels reachable from this retained
+    /// expression, in first-seen order. Selector keys are configuration
+    /// dependencies, not ordinary labels from branch values.
+    pub fn selector_key_labels(&self) -> Vec<CanonicalLabel> {
+        fn collect(value: &CoercedAttributeValue, labels: &mut Vec<CanonicalLabel>) {
+            match value {
+                CoercedAttributeValue::Selector { branches, default } => {
+                    for (condition, branch) in branches.iter() {
+                        if !labels.contains(condition) {
+                            labels.push(condition.clone());
+                        }
+                        collect(branch, labels);
+                    }
+                    if let Some(default) = default {
+                        collect(default, labels);
+                    }
+                }
+                CoercedAttributeValue::Concatenation(left, right) => {
+                    collect(left, labels);
+                    collect(right, labels);
+                }
+                _ => {}
+            }
+        }
+
+        let mut labels = Vec::new();
+        collect(self, &mut labels);
+        labels
+    }
+
+    /// Concatenates two already-resolved values using the retained attribute
+    /// type as the single owner of Bazel's typed `+` behavior.
+    pub fn concatenate_resolved(&self, right: &Self) -> Result<Self, AttrCandidateError> {
+        fn merged<K: Clone + PartialEq, V: Clone>(
+            left: &[(K, V)],
+            right: &[(K, V)],
+        ) -> Arc<[(K, V)]> {
+            let mut result = left.to_vec();
+            for (key, value) in right {
+                if let Some((_, existing)) = result.iter_mut().find(|(existing, _)| existing == key)
+                {
+                    *existing = value.clone();
+                } else {
+                    result.push((key.clone(), value.clone()));
+                }
+            }
+            result.into()
+        }
+
+        let shape = |value: &Self| match value {
+            Self::String(_) => "string",
+            Self::LabelList(_) | Self::StringList(_) | Self::OutputList(_) => "list",
+            Self::StringListDict(_)
+            | Self::StringDict(_)
+            | Self::StringKeyedLabelDict(_)
+            | Self::LabelKeyedStringDict(_)
+            | Self::LabelListDict(_) => "dictionary",
+            Self::None => "None",
+            Self::Label(_) | Self::Output(_) => "label",
+            Self::Boolean(_) => "boolean",
+            Self::Integer(_) => "integer",
+            Self::Selector { .. } => "selector",
+            Self::Concatenation(_, _) => "concatenation",
+        };
+        let mismatch = || AttrCandidateError {
+            left: shape(self),
+            right: shape(right),
+        };
+        Ok(match (self, right) {
+            (Self::String(left), Self::String(right)) => {
+                let mut value = left.clone();
+                value.push_str(right);
+                Self::String(value)
+            }
+            (Self::LabelList(left), Self::LabelList(right)) => Self::LabelList(
+                left.iter()
+                    .chain(right.iter())
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .into(),
+            ),
+            (Self::StringList(left), Self::StringList(right)) => Self::StringList(
+                left.iter()
+                    .chain(right.iter())
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .into(),
+            ),
+            (Self::OutputList(left), Self::OutputList(right)) => Self::OutputList(
+                left.iter()
+                    .chain(right.iter())
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .into(),
+            ),
+            (Self::StringListDict(left), Self::StringListDict(right)) => {
+                Self::StringListDict(merged(left, right))
+            }
+            (Self::StringDict(left), Self::StringDict(right)) => {
+                Self::StringDict(merged(left, right))
+            }
+            (Self::StringKeyedLabelDict(left), Self::StringKeyedLabelDict(right)) => {
+                Self::StringKeyedLabelDict(merged(left, right))
+            }
+            (Self::LabelKeyedStringDict(left), Self::LabelKeyedStringDict(right)) => {
+                Self::LabelKeyedStringDict(merged(left, right))
+            }
+            (Self::LabelListDict(left), Self::LabelListDict(right)) => {
+                Self::LabelListDict(merged(left, right))
+            }
+            _ => return Err(mismatch()),
+        })
+    }
+
     /// Rebind labels parsed in a repository package's provisional root context.
     pub fn rebind_provisional_root_labels(
         &self,
@@ -1495,6 +1609,62 @@ mod tests {
                 .attr_visible_candidates(render_bazel_label)
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn configured_helpers_collect_nested_keys_and_concatenate_typed_values() {
+        let first = label("@@//conditions:first");
+        let second = label("@@//conditions:second");
+        let expression = CoercedAttributeValue::Concatenation(
+            Arc::new(CoercedAttributeValue::Selector {
+                branches: Arc::from([(
+                    first.clone(),
+                    Arc::new(CoercedAttributeValue::StringList(Arc::from([
+                        CompactString::new("left"),
+                    ]))),
+                )]),
+                default: Some(Arc::new(CoercedAttributeValue::Selector {
+                    branches: Arc::from([(
+                        second.clone(),
+                        Arc::new(CoercedAttributeValue::StringList(Arc::from([]))),
+                    )]),
+                    default: None,
+                })),
+            }),
+            Arc::new(CoercedAttributeValue::StringList(Arc::from([
+                CompactString::new("right"),
+            ]))),
+        );
+        assert_eq!(expression.selector_key_labels(), [first, second]);
+        assert_eq!(
+            CoercedAttributeValue::StringList(Arc::from([CompactString::new("left")]))
+                .concatenate_resolved(&CoercedAttributeValue::StringList(Arc::from([
+                    CompactString::new("right"),
+                ])))
+                .unwrap(),
+            CoercedAttributeValue::StringList(Arc::from([
+                CompactString::new("left"),
+                CompactString::new("right"),
+            ]))
+        );
+
+        let merged = CoercedAttributeValue::StringDict(Arc::from([
+            (CompactString::new("first"), CompactString::new("old")),
+            (CompactString::new("kept"), CompactString::new("value")),
+        ]))
+        .concatenate_resolved(&CoercedAttributeValue::StringDict(Arc::from([
+            (CompactString::new("first"), CompactString::new("new")),
+            (CompactString::new("last"), CompactString::new("value")),
+        ])))
+        .unwrap();
+        assert_eq!(
+            merged,
+            CoercedAttributeValue::StringDict(Arc::from([
+                (CompactString::new("first"), CompactString::new("new")),
+                (CompactString::new("kept"), CompactString::new("value")),
+                (CompactString::new("last"), CompactString::new("value")),
+            ]))
         );
     }
 }

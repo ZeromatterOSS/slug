@@ -68,6 +68,13 @@ peer ownership/optimization guidance only. Buck2-derived Rust owns syntax and
 generic evaluation; BCR Starlark owns rule flow including `cc_internal`, and
 `cc_common` remains a generic host-ABI consumer.
 
+The canonical lifecycle proof records one bounded `REPLAN`: Host
+root-package rule attributes must use loading's existing repository-aware
+canonicalizer for canonical-external labels. The allowlist therefore includes
+only `package.rs` for that routing correction; the legacy listing loader,
+unmapped apparent labels and analysis's narrow canonical configured-target
+admission remain fail closed.
+
 ### M7 typed build-setting value resolution accepted; direct condition matching active (2026-08-27)
 
 Commit `aaf23abcc` deletes the copied-default string bridge and installs one
