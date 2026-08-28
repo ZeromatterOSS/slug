@@ -20444,3 +20444,38 @@ Pinned Bazel 9.2 `RegisteredToolchainsFunction`,
 remain authority. Zabel is peer ownership/optimization guidance only;
 BCR Starlark continues to own all rules and control flow including
 `cc_internal`, and `cc_common` remains a generic host-ABI client.
+
+### Command registration overlays accepted; configured selection architecture active (2026-08-28)
+
+Commit `e1d0723ea` completes category 3B. One configuration-keyed command
+expansion family reads only typed native registration lists and reuses the sole
+loading contextual parser/package/subtree walker. Signed command rows preserve
+toolchain reversal, execution-platform order, remove/reinsert behavior and
+mapped-external identity. The configured consumer independently observes all
+four command/MODULE family inputs, applies outer/Need/semantic precedence, and
+merges command labels first through compact ordered scratch. MODULE keys remain
+workspace-only and positive.
+
+The accepted result retains the existing immutable canonical-label and
+ambiguity slices; mapping, signs, worklists and ordered sets remain compute
+scratch. Full loading and analysis suites, direct core configuration
+restoration, mapped-external recursive expansion, lifecycle/frontier scans,
+caps and independent review pass. No cache, interner, second parser, retained
+standard collection, rule engine or provider behavior was added.
+
+Activate only the zero-Rust
+`WP-4-5-7A-configured-toolchain-selection-architecture` review. Reconcile
+pinned Bazel registered-target alias resolution, requested/post-alias type
+identity, target-setting filtering, target and execution constraints,
+`use_target_platform_constraints`, mandatory/optional multi-type selection,
+candidate order and exec-configuration derivation with the current V2
+configuration, condition, alias, registration, platform and marker owners.
+
+The review must either freeze one bounded implementation or name a real target-
+platform/cross-crate identity prerequisite. It may not substitute an execution
+platform for the target platform, preserve a one-required-type architecture,
+or move implementation/provider analysis into category 4. Clean Zabel
+`0795445f…` supplies peer producer-ownership and requested/post-alias identity
+guidance only. Bazel 9.2 and authenticated sources remain authority; BCR
+Starlark owns rule/control flow including `cc_internal`, and `cc_common`
+remains a later generic host/provider-ABI client.
