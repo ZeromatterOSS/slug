@@ -30,15 +30,83 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; configured selection R2 implementation active** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4b2396f0a` accept bounded loading breadth through direct-provider and ObjcInfo proxy children plus exact empty `depset()`; private CcInfo, following source children, shared action names, configuration-field binding, complete semantics and the dependency-free toolchain library are accepted through `acca5cb68`; `cb71a302d` accepts the exact shared Bazel universe and bounded default-enabled set subset; `5c3b4492f` restores the archive app-path gate; commits through `879d879f5` accept the complete compile and first link-family producer chain through the complete link producer; commits through `0055c653b` accept generic `.bzl` visibility, the complete public rules_cc facade chain, complete rules_rust platform/provider/common/utility/LTO/allocator/semver/incompatible/toolchain loading, Skylib common settings, shared advertised-provider and fragment declarations, the complete shared JSON builtin category, raw selected registration ownership with final repository mappings, complete shared target-pattern syntax, the loading-owned root subtree package producer, and the generic routed repository directory-listing owner; `5ec7f3c79` freezes the external package-boundary design and commits `18cd8f35b` and `ee20d5c7c` accept built-in optional metadata/markers plus the external package boundary; `4fabef5e0` accepts the external subtree package-set owner; `6b9dfd790` freezes canonical route ownership, `496168758` implements its apparent-free loading owner, `85593f300` accepts canonical source/listing and load-route ownership, `9d55b7157` freezes the two-stage package-adapter design, `9764f8a4f` accepts the shared Root/Canonical zero-copy source-observation owner, `fa896aca4` accepts canonical Bzlmod source/policy convergence, `e47d5d4c8` freezes the canonical loading source-address design, `79a36c580` accepts its implementation, `ae46e1cf5` freezes the independently reviewed shared registration-expander architecture, `aa79d7736` accepts its contextual-parser and general-package-inventory prerequisite owners, `3c6779966` accepts both independently keyed loading expansion families, and `104291321` freezes their configured-consumer architecture; `00f1453ef` accepts the full-identity Root/Canonical package carrier, `58d0d0357` accepts configured package identity convergence, and `97f2bfeeb` accepts loading-owned canonical package-context labels plus their full external-query consumer conversion; `1f0b396cd` accepts the expanded-registration consumer cutover with canonical package identity and no raw MODULE adapter; `d9df71392` accepts complete loading-owned native toolchain declaration semantics with fail-closed configured consumption; `b949ce8da` accepts the typed build-setting/configured-condition architecture; `57b1e8a1f` accepts all five typed loading declarations plus complete native config-setting predicates and query dependencies; `84bda1971` accepts the sole typed scoped-option map, versioned projection and full no-shim consumer cutover; `aaf23abcc` accepts declaration-authenticated typed effective values, default elision and generic context/transition shapes; `21ad43d24` accepts direct native/define/typed-flag condition matching and the sole configured-condition DICE owner; `3b8a353ef` accepts generic batched selector resolution, complete admitted `ctx.attr`/`ctx.outputs`, selected-only dependencies and native toolchain `target_settings`; `d5362b099` accepts the contextual command-overlay architecture; `f76576ccd` accepts the immutable overlay, typed contextual preparation owner and build/cquery one-shot plus daemon cutover; `e1d0723ea` accepts signed command registration expansion and command-before-MODULE configured consumption; `ce38f0373` freezes the configured platform/toolchain selection architecture; `c8064b106` accepts its target-platform, alias/constraint and complete builtin-mapping prerequisite | provider-independent configured toolchain selection, general provider payloads and selected implementation analysis remain | `WP-4-5-7A-provider-independent-configured-toolchain-selection-r2`; then categories 5-6 -> M8 -> M7B |
+| M7: command/ruleset breadth | **partial; configured selection R4 direct-dependent fixture review active** | selected-registry source/root-load and exact rules_rust root realization are accepted through `2f373248`; commits through `68e458b4` accept bounded keyword-only syntax, exact live `.bzl` `struct` placement/operations, provider/rule docs and typed string/bool/list definitions with structural repeatability; `840d28e7` accepts the first fixed aspect-definition subset; `84ddb6a3` accepts bounded `.bzl` `Label` construction; `eda81a4d`, `61cb0ad0`, and `129ff448` accept the rust-analyzer rule closure; `2cbdb148`, `d4d4d6dc`, `275e0b24`, `50205fb3`, and `88304c2f` accept lint/rustfmt declarations; commits through `4b2396f0a` accept bounded loading breadth through direct-provider and ObjcInfo proxy children plus exact empty `depset()`; private CcInfo, following source children, shared action names, configuration-field binding, complete semantics and the dependency-free toolchain library are accepted through `acca5cb68`; `cb71a302d` accepts the exact shared Bazel universe and bounded default-enabled set subset; `5c3b4492f` restores the archive app-path gate; commits through `879d879f5` accept the complete compile and first link-family producer chain through the complete link producer; commits through `0055c653b` accept generic `.bzl` visibility, the complete public rules_cc facade chain, complete rules_rust platform/provider/common/utility/LTO/allocator/semver/incompatible/toolchain loading, Skylib common settings, shared advertised-provider and fragment declarations, the complete shared JSON builtin category, raw selected registration ownership with final repository mappings, complete shared target-pattern syntax, the loading-owned root subtree package producer, and the generic routed repository directory-listing owner; `5ec7f3c79` freezes the external package-boundary design and commits `18cd8f35b` and `ee20d5c7c` accept built-in optional metadata/markers plus the external package boundary; `4fabef5e0` accepts the external subtree package-set owner; `6b9dfd790` freezes canonical route ownership, `496168758` implements its apparent-free loading owner, `85593f300` accepts canonical source/listing and load-route ownership, `9d55b7157` freezes the two-stage package-adapter design, `9764f8a4f` accepts the shared Root/Canonical zero-copy source-observation owner, `fa896aca4` accepts canonical Bzlmod source/policy convergence, `e47d5d4c8` freezes the canonical loading source-address design, `79a36c580` accepts its implementation, `ae46e1cf5` freezes the independently reviewed shared registration-expander architecture, `aa79d7736` accepts its contextual-parser and general-package-inventory prerequisite owners, `3c6779966` accepts both independently keyed loading expansion families, and `104291321` freezes their configured-consumer architecture; `00f1453ef` accepts the full-identity Root/Canonical package carrier, `58d0d0357` accepts configured package identity convergence, and `97f2bfeeb` accepts loading-owned canonical package-context labels plus their full external-query consumer conversion; `1f0b396cd` accepts the expanded-registration consumer cutover with canonical package identity and no raw MODULE adapter; `d9df71392` accepts complete loading-owned native toolchain declaration semantics with fail-closed configured consumption; `b949ce8da` accepts the typed build-setting/configured-condition architecture; `57b1e8a1f` accepts all five typed loading declarations plus complete native config-setting predicates and query dependencies; `84bda1971` accepts the sole typed scoped-option map, versioned projection and full no-shim consumer cutover; `aaf23abcc` accepts declaration-authenticated typed effective values, default elision and generic context/transition shapes; `21ad43d24` accepts direct native/define/typed-flag condition matching and the sole configured-condition DICE owner; `3b8a353ef` accepts generic batched selector resolution, complete admitted `ctx.attr`/`ctx.outputs`, selected-only dependencies and native toolchain `target_settings`; `d5362b099` accepts the contextual command-overlay architecture; `f76576ccd` accepts the immutable overlay, typed contextual preparation owner and build/cquery one-shot plus daemon cutover; `e1d0723ea` accepts signed command registration expansion and command-before-MODULE configured consumption; `ce38f0373` freezes the configured platform/toolchain selection architecture; `c8064b106` accepts its target-platform, alias/constraint and complete builtin-mapping prerequisite | provider-independent configured toolchain selection, general provider payloads and selected implementation analysis remain | `WP-4-5-7A-provider-independent-configured-toolchain-selection-r4`; then categories 5-6 -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-5-7A-provider-independent-configured-toolchain-selection-r2](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-provider-independent-configured-toolchain-selection-r5](./slug-v2-subplans/current-packet.md).
+
+The M7 status-table row's active-packet suffix is superseded by this R5 link.
+R5 is terminally accepted; categories 5-6 remain next before M8.
+
+### M7 configured-selection server projection-proof REPLAN (2026-08-28)
+
+The accepted R4 helper closes all 14 missing-`platforms` failures. Full server
+validation then reaches 49 passes and two previously unreachable assertions.
+The C0/C1 marker proof lawfully observes four structural projections—target
+and selected execution for each command configuration—rather than its old two
+target-only projections. R5 permits only that count/message correction in the
+same proof file, with no production or identity behavior change.
+
+The other result is the exact inherited stale external-package event-replay
+family already documented by full core: `DEP_BUILD_EVENT` precedes the
+otherwise exact zero-invalidation exported-source terminal on the final
+remote-mode request. R5 leaves that assertion unchanged and admits only this
+single server manifestation as a separately reported baseline; all other 50
+server tests must pass. Any other event, terminal, invalidation count or
+failure stops the packet. Independent Sol design and terminal implementation
+reviews return `ACCEPT`. Full server reports exactly 50 passes plus that
+unchanged inherited assertion; the same test passes in isolation. All focused
+owners/direct dependents, the CLI rebuild, structural/cap gates and archive
+audit satisfy R5. The packet is complete.
+
+### M7 configured-selection server-fixture REPLAN (2026-08-28)
+
+The formatted R3 candidate closes every selection-related core regression and
+passes all configuration/loading/analysis/query/Bzlmod/command gates. The full
+server direct-dependent suite then reports 14 configured build/cquery failures:
+each reaches the exact host-platform graph but its workspace lacks the local
+`platforms` dependency already required by the accepted core harness. The
+server harness cannot materialize the upstream `http_archive` shape.
+
+Activate only
+`WP-4-5-7A-provider-independent-configured-toolchain-selection-r4`. Add the
+single proof file `app/slug_server_v2/src/tests.rs` at blob
+`fe3596b4b4953c1565f72b173bd921cc571a1060` under +120 test lines and zero
+production. One helper may install the same minimal local `platforms` module
+and append its root dependency/override only for the 14 named configured
+daemon fixtures. Do not alter ordinary loading/query/Bzlmod/wire-only
+fixtures, command policy, production builtin, repository semantics or daemon
+behavior. Full server validation must pass. Independent Sol design review
+returns `ACCEPT`; implementation may resume only within R4.
+
+### M7 configured-selection repository-sidecar authority REPLAN (2026-08-28)
+
+Live R2 proof closes configured-platform discovery but exposes one narrower
+general core contract gap. A public observed multi-build selecting the
+hermetic local platform repository reaches a lawful selected repository
+request, while `SelectedDependencySuperset` rejects every repository request
+before applying its exact observed-path superset checks. This is native-demand
+closure integrity, not a C++ or ruleset-specific surface.
+
+Activate only
+`WP-4-5-7A-provider-independent-configured-toolchain-selection-r3`. Permit at
+most ten core production lines in the existing terminal-association validator:
+strict path-only continues rejecting repository sidecars; selected dependency
+superset admits closure-owned request/validation sidecars and retains exact
+demand/value/Arc checks; closure-repository mode retains exact path equality.
+In-memory proof uses the minimal command-overridden `bazel_tools` and direct
+root host platform. Filesystem configured proof keeps the verbatim builtin and
+locally supplies only its minimal `platforms` dependency. No public API,
+repository owner, selection owner or compatibility claim changes. Independent
+Sol design review returns `ACCEPT`; R3 implementation may resume.
 
 ### M7 configured-selection downstream-proof authority REPLAN (2026-08-28)
+
+Superseded for active work by the R3 repository-sidecar correction above; the
+R2 proof authority otherwise remains intact.
 
 The original nine-file category-4 candidate reaches exact zero-type execution-
 platform selection, but full core validation reports 30 failures versus the
@@ -48,7 +116,7 @@ core test fixture and topology/event expectation changes required by its own
 direct-dependent gate. Weakening zero-type selection is not an admissible fix.
 
 Activate only
-`WP-4-5-7A-provider-independent-configured-toolchain-selection-r2`. Preserve
+`WP-4-5-7A-provider-independent-configured-toolchain-selection-r3`. Preserve
 the generic provider-free resolution owner and all compatibility boundaries.
 Add only the three audited core proof surfaces at their exact `c8064b106`
 blobs: the `runtime/dice.rs` `#[cfg(test)]` harness, build-command expectations

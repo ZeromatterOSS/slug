@@ -3,9 +3,10 @@ use super::*;
 #[test]
 fn cquery_executables_deps_filters_complete_closure_and_induces_edges() {
     let workspace = tempfile::tempdir().unwrap();
+    let command_policy = configured_test_command_policy(workspace.path());
     fs::write(
         workspace.path().join("MODULE.bazel"),
-        "module(name = \"executable_deps\")\n",
+        configured_test_module("module(name = \"executable_deps\")\n"),
     )
     .unwrap();
     fs::write(
@@ -48,7 +49,7 @@ executable_rule(
                 expression,
                 false,
                 true,
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -454,9 +455,10 @@ async fn cquery_rdeps_universe_need_precedes_seed_validation() {
 #[test]
 fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
     let workspace = tempfile::tempdir().unwrap();
+    let command_policy = configured_test_command_policy(workspace.path());
     fs::write(
         workspace.path().join("MODULE.bazel"),
-        "module(name = \"sets\")\n",
+        "module(name = \"sets\")\nbazel_dep(name = \"platforms\", version = \"1.0.0\")\nlocal_path_override(module_name = \"platforms\", path = \".slug_test_builtin/platforms\")\n",
     )
     .unwrap();
     fs::create_dir(workspace.path().join("pkg")).unwrap();
@@ -480,7 +482,7 @@ fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
                 expression,
                 true,
                 true,
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -501,7 +503,7 @@ fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
             "some(//pkg:missing, 2147483648)",
             true,
             true,
-            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            command_policy.clone(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             &[],
@@ -521,7 +523,7 @@ fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
                 expression,
                 true,
                 true,
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -673,9 +675,10 @@ fn cquery_restores_structural_configuration_and_display_projection() {
         .join("../../target/slug-cquery-restores-structural-configuration");
     fs::create_dir_all(&stable_parent).unwrap();
     let workspace = tempfile::tempdir_in(stable_parent).unwrap();
+    let command_policy = configured_test_command_policy(workspace.path());
     fs::write(
         workspace.path().join("MODULE.bazel"),
-        "module(name = \"cquery_configuration\")\n",
+        configured_test_module("module(name = \"cquery_configuration\")\n"),
     )
     .unwrap();
     fs::write(
@@ -709,7 +712,7 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
             target,
             true,
             true,
-            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            command_policy.clone(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             &[],
@@ -898,9 +901,10 @@ fn cquery_uses_only_observed_families_and_replays_child_events_once() {
         .join("../../target/slug-cquery-observed-family-events");
     fs::create_dir_all(&stable_parent).unwrap();
     let workspace = tempfile::tempdir_in(stable_parent).unwrap();
+    let command_policy = configured_test_command_policy(workspace.path());
     fs::write(
         workspace.path().join("MODULE.bazel"),
-        "print(\"MODULE_EVENT\")\nmodule(name = \"observed_cquery\")\n",
+        configured_test_module("print(\"MODULE_EVENT\")\nmodule(name = \"observed_cquery\")\n"),
     )
     .unwrap();
     fs::write(
@@ -922,6 +926,7 @@ root = rule(implementation = _root, attrs = {"child": attr.label()})
             "print(\"BUILD_EVENT\")\nload(\":defs.bzl\", \"leaf\", \"root\")\nleaf(name = \"leaf\")\nroot(name = \"root\", child = \":leaf\")\n",
         )
         .unwrap();
+    fs::create_dir(workspace.path().join("bazel-out")).unwrap();
     let audit = Arc::new(ExternalQueryActivationAudit::default());
     let runtime = test_runtime(workspace.path())
         .unwrap()
@@ -932,9 +937,9 @@ root = rule(implementation = _root, attrs = {"child": attr.label()})
                 expression,
                 false,
                 true,
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-                LockfileMode::Update,
+                LockfileMode::Off,
                 &[],
                 root_setting_overlay(None),
             )
@@ -969,15 +974,15 @@ root = rule(implementation = _root, attrs = {"child": attr.label()})
         .zip(warm_snapshot.path_observations.observations().iter())
     {
         assert_eq!(cold_demand, warm_demand);
-        assert_eq!(cold_result, warm_result);
+        assert_eq!(cold_result, warm_result, "{cold_demand:?}");
         assert!(Arc::ptr_eq(cold_result, warm_result));
     }
 
     let mut prior = audit.cquery_family_counts();
-    for expression in [
-        "//:root",
-        "//:root union //:leaf",
-        "rdeps(//:root, //:leaf)",
+    for (expression, observes_seed_package) in [
+        ("//:root", false),
+        ("//:root union //:leaf", false),
+        ("rdeps(//:root, //:leaf)", true),
     ] {
         let accepted = run(expression);
         assert!(
@@ -987,13 +992,14 @@ root = rule(implementation = _root, attrs = {"child": attr.label()})
         let counts = audit.cquery_family_counts();
         assert_eq!(counts.0, 0, "legacy package activation: {expression}");
         assert_eq!(counts.2, 0, "legacy analysis activation: {expression}");
-        assert!(
+        assert_eq!(
             counts.1 > prior.1,
-            "observed package activation: {expression}"
+            observes_seed_package,
+            "observed seed-package activation: {expression}; prior={prior:?}, current={counts:?}"
         );
         assert!(
             counts.3 > prior.3,
-            "observed analysis activation: {expression}"
+            "observed analysis activation: {expression}; prior={prior:?}, current={counts:?}"
         );
         prior = counts;
     }

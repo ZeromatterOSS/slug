@@ -103,16 +103,24 @@ mod command_configuration_tests {
             target.target_platform_label().unwrap().to_string(),
             "@@bazel_tools//tools:host_platform"
         );
+        assert_eq!(
+            target.host_platform_label().unwrap().to_string(),
+            "@@bazel_tools//tools:host_platform"
+        );
 
         let linux = CanonicalLabel::parse("@@platforms//host:host").unwrap();
         let remote = CanonicalLabel::parse("@@platforms//host:remote").unwrap();
+        let overridden = target.with_host_platform_label(&linux);
+        assert_eq!(overridden.host_platform_label().unwrap(), linux);
+        assert_eq!(overridden.target_platform_label().unwrap(), linux);
         let exec = target.to_exec_for_platform(&linux).unwrap();
         let other = target.to_exec_for_platform(&remote).unwrap();
         assert_eq!(exec.target_platform_label().unwrap(), linux);
+        assert_eq!(exec.host_platform_label(), target.host_platform_label());
         assert_ne!(exec.projection(), target.projection());
         assert_ne!(exec.projection(), other.projection());
         assert_eq!(exec, target.to_exec_for_platform(&linux).unwrap());
-        assert!(exec.to_exec_for_platform(&linux).is_err());
+        assert_eq!(exec.to_exec_for_platform(&remote).unwrap(), other);
     }
 }
 

@@ -159,6 +159,83 @@ pub struct ConfiguredPlatform {
     constraints: Arc<[ConfiguredActionPlatformConstraint]>,
 }
 
+/// Provider-free selection result for one requested toolchain type.  Requested
+/// aliases deliberately remain visible while selection groups use `actual`.
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct ConfiguredToolchainResolutionRow {
+    requested: ConfiguredTargetKey,
+    actual: ConfiguredTargetKey,
+    mandatory: bool,
+    declaration: Option<CanonicalLabel>,
+}
+
+impl ConfiguredToolchainResolutionRow {
+    pub(crate) fn new(
+        requested: ConfiguredTargetKey,
+        actual: ConfiguredTargetKey,
+        mandatory: bool,
+        declaration: Option<CanonicalLabel>,
+    ) -> Self {
+        Self {
+            requested,
+            actual,
+            mandatory,
+            declaration,
+        }
+    }
+
+    pub fn requested(&self) -> &ConfiguredTargetKey {
+        &self.requested
+    }
+
+    pub fn actual(&self) -> &ConfiguredTargetKey {
+        &self.actual
+    }
+
+    pub fn mandatory(&self) -> bool {
+        self.mandatory
+    }
+
+    pub fn declaration(&self) -> Option<&CanonicalLabel> {
+        self.declaration.as_ref()
+    }
+}
+
+/// Immutable configured toolchain eligibility and selection facts.  This is
+/// intentionally independent of implementation analysis and Starlark values.
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct ConfiguredToolchainResolution {
+    target_platform: Arc<ConfiguredPlatform>,
+    execution_platform: Arc<ConfiguredPlatform>,
+    rows: Arc<[ConfiguredToolchainResolutionRow]>,
+}
+
+impl ConfiguredToolchainResolution {
+    pub(crate) fn new(
+        target_platform: Arc<ConfiguredPlatform>,
+        execution_platform: Arc<ConfiguredPlatform>,
+        rows: Arc<[ConfiguredToolchainResolutionRow]>,
+    ) -> Self {
+        Self {
+            target_platform,
+            execution_platform,
+            rows,
+        }
+    }
+
+    pub fn target_platform(&self) -> &Arc<ConfiguredPlatform> {
+        &self.target_platform
+    }
+
+    pub fn execution_platform(&self) -> &Arc<ConfiguredPlatform> {
+        &self.execution_platform
+    }
+
+    pub fn rows(&self) -> &[ConfiguredToolchainResolutionRow] {
+        &self.rows
+    }
+}
+
 impl ConfiguredPlatform {
     pub(crate) fn new(
         requested: ConfiguredTargetKey,

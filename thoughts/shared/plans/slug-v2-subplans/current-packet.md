@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-provider-independent-configured-toolchain-selection-r2`
+Packet: `WP-4-5-7A-provider-independent-configured-toolchain-selection-r5`
 
 Milestone: M7A provider-independent configured eligibility and selection,
 feeding ordinary M8 Stage 10.3 analysis.
@@ -8,13 +8,146 @@ feeding ordinary M8 Stage 10.3 analysis.
 Base: `c8064b106`; commits through `76980a0b3` changed plans only.
 
 Design: commit `a2dbdb553` froze the original nine-file packet. Downstream
-validation forced the bounded R2 authority correction below; independent Sol
-design review returns `ACCEPT` and implementation may resume within R2.
+validation forced the bounded R2 authority correction below. Live R2 proof then
+exposed the narrower repository-sidecar authority correction recorded as R3.
+Independent Sol design review returns `ACCEPT`; implementation resumed within
+R4 and exposed the narrower proof correction recorded as R5 below.
 
 Result: implement category 4 of the frozen M7A toolchain sequence as one
 provider-free configured-selection owner, then cut the configured rule path
 over to its selected execution platform while retaining the old marker payload
 only as a post-selection single-type bridge.
+
+## R5 server projection proof and inherited event baseline correction
+
+The accepted R4 helper closes all 14 missing-`platforms` failures and the full
+server suite reaches 49 passing tests. Two assertions now expose previously
+unreachable state. First, the retained C0/C1 build proof finds four stable
+configuration projections, not two: category 4 lawfully owns one target and
+one selected-execution projection for each command configuration. R5 changes
+only that assertion from two to four and names both projection domains in its
+message. The already accepted core and cquery identity proofs discriminate the
+four structural values and A/B/A restoration; no marker production or identity
+behavior changes.
+
+Second, the final remote-disabled/remote-enabled request in
+`retained_daemon_build_observes_direct_external_exported_sources` reproduces
+the independently documented inherited stale external-package event-replay
+failure: `DEP_BUILD_EVENT` precedes the otherwise exact successful exported-
+source terminal with zero invalidations. R5 does not change, ignore or weaken
+that assertion and authorizes no event-owner correction. Record this single
+server failure separately as the same inherited event-replay family already
+reported by full core; the other 50 server tests must pass. A different event,
+terminal, invalidation count or server failure is not admitted.
+
+R5 retains R4's exact one-file, zero-production, +120-line authority and all
+compatibility boundaries. The assertion correction is **Slug-native** proof of
+Slug's structural target/exec configuration identity; it makes no exact Bazel
+path/checksum claim. Pinned Bazel 9.2 remains behavior authority. Clean Zabel
+remains peer architecture/optimization guidance only. BCR-delivered Starlark
+continues to own all rule logic including `cc_internal`; `cc_common` remains a
+generic host-ABI client, not a parser or rules engine.
+
+Independent Sol design and terminal implementation reviews return `ACCEPT`.
+The formatted candidate passes every focused owner and direct-dependent gate;
+full server reports exactly 50 passes plus the unchanged inherited
+`DEP_BUILD_EVENT` replay assertion, while the same test passes in isolation.
+The CLI rebuild, allowlist/blob/line/cap audit, diff hygiene and archive audit
+all satisfy this manifest. R5 is complete.
+
+## R4 server direct-dependent fixture correction
+
+The formatted R3 candidate closes every selection-related core regression:
+full `slug_core_v2` reports 291 passed, one ignored and only the independently
+documented stale external-query event-replay baseline. All configuration,
+loading, analysis, query, Bzlmod and command suites pass. The required server
+direct-dependent gate then reports 14 configured build/cquery failures. Each
+reaches the verbatim builtin `bazel_tools` graph and requests
+`@platforms//host:constraints.bzl`; the server test workspaces provide neither
+the local `platforms` dependency used by the accepted core fixture nor a
+registry/materializer capable of the upstream `http_archive` shape.
+
+This is the same test-only hermetic provenance gap as R2, not a semantic or
+production defect. R4 adds exactly one proof file:
+`app/slug_server_v2/src/tests.rs`. Add one local helper that writes the minimal
+`platforms` 1.0.0 module, `host/BUILD.bazel` platform and empty
+`HOST_CONSTRAINTS`, and writes a supplied root MODULE body followed by its
+`bazel_dep` and `local_path_override`. Use it only in the 14 failing configured
+build/cquery fixtures named by the server failure inventory:
+`cquery_wire_requires_a_known_output_mode_before_dispatch` (only its configured
+workspace tail), `retained_cquery_executables_observes_capability_edits_warm_and_restoration`,
+`retained_cquery_formats_modes_and_restores_root_setting_projection`,
+`retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state`,
+`retained_cquery_loading_files_are_post_analysis_terminals`,
+`retained_cquery_missing_executable_recovers_after_rule_edit`,
+`retained_cquery_missing_recovers_without_new_invalidations`,
+`retained_cquery_selection_errors_use_evaluation_exit_and_preserve_invalidation`,
+`retained_cquery_siblings_is_an_exact_post_analysis_terminal`,
+`retained_cquery_starlark_formats_ordered_sets`,
+`retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty`,
+`retained_daemon_build_observes_direct_external_exported_sources`,
+`retained_daemon_build_publishes_cold_and_changed_events_without_warm_replay`,
+and
+`retained_daemon_restores_c0_after_root_setting_c1_without_source_invalidation`.
+Ordinary loading
+query, Bzlmod request-locality, wire-only validation and unrelated daemon
+fixtures retain their existing MODULE sources and policies. The helper changes
+no command policy, production builtin, registry source, daemon request, DICE
+key, retained value, invalidation rule or overlapping-request behavior.
+
+Classify R4 as **Slug-native** test harness plumbing. It adds no exact behavior
+claim and changes no unsupported/deferred boundary. The minimal local module
+is hermetic test setup, not a BCR or Bazel source fixture; the accepted Bazel
+9.2 selection evidence remains unchanged. It is created before daemon
+construction, is observed through the existing workspace/source owners and
+has no retained memory beyond those ordinary test inputs. Delete it when the
+server harness can hermetically materialize the complete verbatim builtin/BCR
+dependency graph; category 4 owns that deletion condition and the full server
+suite prevents the bridge from becoming invisible.
+
+The server test file is 2,948 lines at baseline but is proof-only; one shared
+helper reduces repetition and a production/test split would widen no semantic
+owner. No hot-path or retained-representation measurement applies. Clean
+Zabel remains peer architecture guidance only and contributes no R4 behavior
+or fixture bytes. Pinned Bazel 9.2 remains the sole behavior authority, and
+BCR-delivered Starlark still owns every rule/control path including
+`cc_internal`; `cc_common` remains only a future generic host-ABI client.
+
+Independent Sol design review returns `ACCEPT`; implementation may resume only
+within the exact R4 server proof scope.
+
+## R3 repository-sidecar authority correction
+
+The R2 in-memory fixture closes discovery and reaches the intended candidate-
+platform topology. A retained-runtime public multi-build with a hermetic local
+`platforms` dependency then stops at
+`ObservedTerminalMismatch::RepositoryRequests`: configured platform selection
+lawfully adds the platform repository request to the selected analysis closure,
+while the pre-category-4 `SelectedDependencySuperset` validator rejects every
+repository request and validation before checking its exact path superset.
+
+This is a general native-demand/analysis-closure contract defect, not a
+ruleset-specific exception. R3 adds one bounded core production correction:
+`SelectedDependencySuperset` admits selected closure repository request and
+validation sidecars, while retaining exact demand/value/Arc checks for every
+terminal-observed path. `StrictPathOnly` continues to reject all repository
+sidecars, and `ClosureRepositories` retains its exact path-epoch comparison.
+Repository session validation, request identity, source association and
+selection remain unchanged. Add a direct regression proving the three modes
+remain distinct.
+
+R3 also corrects the fixture description to the implementation seam actually
+supported by core. In-memory DICE fixtures use the command-overridden minimal
+`bazel_tools` plus a direct root host platform. Filesystem retained-runtime
+configured fixtures keep the verbatim builtin `bazel_tools` and locally supply
+only its minimal `platforms` dependency and `//host:host` target. This is
+test-only hermetic provenance; it does not replace any production builtin or
+BCR-delivered rule graph.
+
+Classify the validator correction as **Slug-native** closure-integrity
+plumbing required to carry the exact selected platform graph. Exact Bazel
+selection semantics, unsupported provider surfaces and every generic
+configured-selection boundary below remain unchanged.
 
 ## R2 downstream-proof authority correction
 
@@ -32,9 +165,8 @@ direct-dependent gate. R2 preserves every semantic owner, compatibility class,
 production cap and generic implementation boundary of the original packet. It
 adds only:
 
-- the `#[cfg(test)]` harness in core `runtime/dice.rs`, to install a hermetic
-  minimal command-overridden `bazel_tools` containing a direct host platform
-  for configured build/cquery fixtures without changing production's verbatim
+- the `#[cfg(test)]` harness in core `runtime/dice.rs`, to install hermetic
+  configured build/cquery fixtures without changing production's verbatim
   builtin or default host label;
 - build and cquery proof expectations for the newly visible candidate-platform
   nodes/edges and child-owned MODULE/platform events; and
@@ -47,7 +179,8 @@ adds only:
   flags are removed. Correct the existing configuration projection/regression
   only; add no owner or representation.
 
-Do not edit core production behavior. The test-only override is fixture
+Apart from the R3 validator correction above, do not edit core production
+behavior. The test-only override/local dependency is fixture
 provenance, not a semantic fallback: it exists because these unit tests provide
 no registry/materializer capability for the real `@platforms` dependency. Its
 deletion condition is a core harness that supplies the complete verbatim
@@ -248,12 +381,13 @@ All baselines are the live `c8064b106` blobs:
 | `app/slug_analysis_v2/src/lib.rs` | `9a8e4bacb9c99d3a430602fa3282cf7a8249d02e` / 83 | +20 |
 | `app/slug_analysis_v2/tests/starlark_rule.rs` | `e53ead56097cd882c1ccc48f6a6a7afaef7275f9` / 6,602 | +900 |
 | `app/slug_analysis_v2/tests/root_analysis.rs` | `afab443f8ae51a78a38926cfdcfdea3796f4f797` / 1,204 | +300 |
-| `app/slug_core_v2/src/runtime/dice.rs` | `6ad6f61973f51dd3cbf94a9c0c01e257c231b1a0` / 12,010 | +300, test-only |
+| `app/slug_core_v2/src/runtime/dice.rs` | `6ad6f61973f51dd3cbf94a9c0c01e257c231b1a0` / 12,010 | +325, at most +10 production |
 | `app/slug_core_v2/src/runtime/tests/build_command_tests.rs` | `8f6eb8444539fd2a6b3efb5ff8233e5444e40ba8` / 4,056 | +250 |
 | `app/slug_core_v2/src/runtime/tests/cquery_command_tests.rs` | `749b1703c5ce6b8c8af909104f7b88495ebf5cb3` / 1,082 | +300 |
+| `app/slug_server_v2/src/tests.rs` | `fe3596b4b4953c1565f72b173bd921cc571a1060` / 2,948 | +120 |
 
-Production additions remain capped at 1,650 physical Rust lines, proof
-additions are capped at 2,105, and total additions at 3,755. No new non-plan
+Production additions are capped at 1,660 physical Rust lines, proof additions
+are capped at 2,240, and total additions at 3,900. No new non-plan
 file is allowed. The
 existing large `dice.rs` remains cohesive because the new key reuses its
 private configured-package, condition, platform, alias and rule-driver
@@ -261,10 +395,12 @@ helpers; exporting those internals into a new module would widen the ownership
 surface and cause more churn.
 
 No file beyond this table and writable plans/ledgers may change. Core
-`runtime/dice.rs` authority is confined to its `#[cfg(test)]` module; no core
-production owner or public API may change. No Cargo/BUILD, CLI/server,
-registration-expansion, Bzlmod/repository, fixture/asset, lockfile, oracle or
-generated-file change is authorized.
+`runtime/dice.rs` production authority is confined to the existing terminal-
+association validator and may add no public API. All other core authority is
+confined to its `#[cfg(test)]` module. No Cargo/BUILD, CLI, server production or
+server file other than the exact R5 proof file, registration-expansion,
+Bzlmod/repository, fixture/asset, lockfile, oracle or generated-file change is
+authorized.
 
 ## Proof matrix
 
@@ -289,20 +425,27 @@ Use the existing local generic fixtures and add only discriminating gaps:
    platform-only local-declaration context and exact single-mandatory marker
    bridge isolation; and
 9. optional invocation loading acceptance while malformed/duplicate
-   requirements remain fail closed.
+   requirements remain fail closed; and
+10. terminal-association separation: strict path-only rejects repository
+    sidecars, selected dependency supersets admit closure-owned repository
+    request/validation sidecars while retaining exact observed path Arcs, and
+    closure-repository mode retains exact path-epoch comparison.
 
 ## Validation and stops
 
 Run focused loading/analysis proofs; full `slug_loading_v2` and
 `slug_analysis_v2` suites serially; configuration/query/Bzlmod and core direct
-dependents; rebuild `slug_cli_v2`; rustfmt; `git diff --check`; source/blob/
+dependents; the full `slug_server_v2` suite; rebuild `slug_cli_v2`; rustfmt;
+`git diff --check`; source/blob/
 line/cap and packet/canonical audits; and `scripts/v2_archive_status.sh`.
 Full core may reproduce only its two independently documented inherited
 failures—workspace-directory Lstat drift after lockfile publication and the
 stale external-query event replay expectation—with every selection-related
 regression closed.
-Report those two core baselines and the three tracked-thoughts archive baseline
-distinctly. Completion requires independent Sol terminal review returning
+The full server suite may reproduce only the exact inherited external-package
+event replay described by R5; its other 50 tests must pass. Report the core and
+server manifestations separately from the three tracked-thoughts archive
+baseline. Completion requires independent Sol terminal review returning
 `ACCEPT`.
 
 STOP and `REPLAN` for provider/evaluator data in the resolution value;
@@ -314,8 +457,22 @@ observations; ruleset/`cc_common` specialization; Zabel authority; an
 unallowlisted file; cap breach; or any material implementation correction not
 already bounded above.
 
-R2 additionally stops on any production core edit, a test helper that changes
-ordinary command policy outside configured build/cquery fixtures, replacement
+R3 additionally stops on any production core edit beyond the bounded existing
+association validator, a test helper that changes ordinary command policy
+outside configured build/cquery fixtures, replacement
 of the verbatim builtin in production, suppression of candidate-platform
 topology/events merely to restore old expectations, or a third newly failing
 core baseline.
+
+R4 additionally stops on any server production edit; any helper applied to an
+ordinary loading/query/Bzlmod or wire-only fixture; a changed command policy;
+replacement of the verbatim builtin; a server failure with a cause other than
+the missing local `platforms` dependency, except only the exact R5 inherited
+`DEP_BUILD_EVENT`/zero-invalidation manifestation; more than +120 server proof
+lines; or any new production, semantic, compatibility or memory owner.
+
+R5 additionally stops on any assertion change beyond the exact two-to-four
+projection count/message correction; suppressing, ignoring or accepting the
+stale event bytes; a server result other than 50 passes plus that exact inherited
+event-replay assertion; or any widened baseline, production owner or
+compatibility claim.

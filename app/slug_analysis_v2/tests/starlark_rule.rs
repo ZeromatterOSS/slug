@@ -50,6 +50,8 @@ use slug_analysis_v2::ConfiguredPlatformKey;
 use slug_analysis_v2::ConfiguredPlatformOutcome;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::ConfiguredTargetPlatformKey;
+use slug_analysis_v2::ConfiguredToolchainResolutionKey;
+use slug_analysis_v2::ConfiguredToolchainResolutionObservationKey;
 use slug_analysis_v2::analysis_cycle_detector;
 use slug_analysis_v2::key::StarlarkOption;
 use slug_analysis_v2::key::StarlarkOptionScope;
@@ -104,6 +106,7 @@ use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
+use slug_loading_v2::package::ToolchainTypeRequirement;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathDirectoryEntries;
@@ -308,6 +311,7 @@ fn directory_snapshot(root: &std::path::Path) -> WorkspaceDirectorySnapshot {
 }
 
 fn workspace_snapshot(root: &std::path::Path) -> WorkspaceSnapshot {
+    ensure_host_platform_fixture(root);
     let mut pending = vec![root.to_path_buf()];
     let mut files = Vec::new();
     while let Some(directory) = pending.pop() {
@@ -368,9 +372,14 @@ fn local_repository_materializations(
 ) -> RepositoryMaterializationResultEpoch {
     let entries = repositories.iter().map(|(canonical_repo, path)| {
         let mut attributes = SmallMap::new();
+        let materialization_path = if *canonical_repo == "bazel_tools+" {
+            workspace.as_path().join(path).display().to_string().into()
+        } else {
+            (*path).into()
+        };
         attributes.insert(
             "path".into(),
-            OverrideAttributeValue::String((*path).into()),
+            OverrideAttributeValue::String(materialization_path),
         );
         RepositoryMaterializationEpochEntry {
             request: Arc::new(RepositoryMaterializationRequest {
@@ -399,6 +408,22 @@ fn local_repository_materializations(
         }
     });
     RepositoryMaterializationResultEpoch::new(workspace.dupe(), entries).unwrap()
+}
+
+const HOST_PLATFORM_REPOSITORIES: &[(&str, &str)] =
+    &[("bazel_tools+", ".slug_builtin/bazel_tools")];
+
+fn ensure_host_platform_fixture(root: &std::path::Path) {
+    let bazel_tools = root.join(".slug_builtin/bazel_tools");
+    fs::create_dir_all(&bazel_tools).unwrap();
+    fs::write(
+        bazel_tools.join("MODULE.bazel"),
+        "module(name = 'bazel_tools')\n",
+    )
+    .unwrap();
+    let host = root.join(".slug_test_host");
+    fs::create_dir_all(&host).unwrap();
+    fs::write(host.join("BUILD.bazel"), "platform(name = \"host\")\n").unwrap();
 }
 
 fn root_epoch(root: &std::path::Path) -> PathObservationEpoch {
@@ -449,6 +474,7 @@ fn root_epoch_with_missing(
     root: &std::path::Path,
     missing: impl IntoIterator<Item = PathBuf>,
 ) -> PathObservationEpoch {
+    ensure_host_platform_fixture(root);
     let mut entries = SmallMap::new();
     let snapshot = workspace_snapshot(root);
     let mut directories = BTreeSet::from([root.to_path_buf()]);
@@ -654,19 +680,24 @@ fn root_string_option(value: impl Into<compact_str::CompactString>) -> StarlarkO
     string_option("@@//:setting", value)
 }
 
-fn test_configuration() -> ConfigurationKey {
-    ConfigurationKey::from_slug(
-        SlugConfiguration::default_target(
-            &HostConversionInputs::new(
-                Some(AutoCpuToken::K8),
-                Some(HostPathFlavor::Unix),
-                None,
-                Arc::from([]),
-                Arc::from([]),
-            )
-            .unwrap(),
+fn default_test_configuration() -> SlugConfiguration {
+    SlugConfiguration::default_target(
+        &HostConversionInputs::new(
+            Some(AutoCpuToken::K8),
+            Some(HostPathFlavor::Unix),
+            None,
+            Arc::from([]),
+            Arc::from([]),
         )
         .unwrap(),
+    )
+    .unwrap()
+}
+
+fn test_configuration() -> ConfigurationKey {
+    ConfigurationKey::from_slug(
+        default_test_configuration()
+            .with_host_platform_label(&CanonicalLabel::parse("@@//.slug_test_host:host").unwrap()),
     )
 }
 
@@ -1013,6 +1044,16 @@ fn inject_root_target_inputs(
     epoch: PathObservationEpoch,
     repositories: &[(&str, &str)],
 ) {
+    inject_root_target_inputs_with_policy(updater, workspace, epoch, repositories, true);
+}
+
+fn inject_root_target_inputs_with_policy(
+    updater: &mut DiceTransactionUpdater,
+    workspace: &std::path::Path,
+    epoch: PathObservationEpoch,
+    repositories: &[(&str, &str)],
+    override_bazel_tools: bool,
+) {
     let text = Arc::new(workspace_snapshot(workspace));
     let raw = raw_snapshot_from_text(&text);
     updater
@@ -1042,17 +1083,33 @@ fn inject_root_target_inputs(
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
+    inject_test_bzlmod_inputs(updater, workspace, repositories, override_bazel_tools);
+}
+
+fn inject_test_bzlmod_inputs(
+    updater: &mut DiceTransactionUpdater,
+    workspace: &std::path::Path,
+    repositories: &[(&str, &str)],
+    override_bazel_tools: bool,
+) {
     let root = NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap();
-    if !repositories.is_empty() {
-        updater
-            .changed_to(vec![(
-                RepositoryMaterializationResultEpochKey {
-                    workspace: root.dupe(),
-                },
-                local_repository_materializations(&root, repositories),
-            )])
-            .unwrap();
+    let mut all_repositories = repositories.to_vec();
+    for repository in HOST_PLATFORM_REPOSITORIES {
+        if !all_repositories
+            .iter()
+            .any(|(canonical, _)| canonical == &repository.0)
+        {
+            all_repositories.push(*repository);
+        }
     }
+    updater
+        .changed_to(vec![(
+            RepositoryMaterializationResultEpochKey {
+                workspace: root.dupe(),
+            },
+            local_repository_materializations(&root, &all_repositories),
+        )])
+        .unwrap();
     inject_root_package_policy_inputs(
         updater,
         RootPackagePolicyInputs::new(
@@ -1065,10 +1122,25 @@ fn inject_root_target_inputs(
         .unwrap(),
     )
     .unwrap();
+    let command_policy = if override_bazel_tools {
+        let value = format!(
+            "bazel_tools={}",
+            workspace.join(".slug_builtin/bazel_tools").display()
+        );
+        BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+            None,
+            false,
+            workspace,
+            [value.as_str()],
+        )
+        .unwrap()
+    } else {
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap()
+    };
     inject_root_module_request_inputs(
         updater,
         workspace,
-        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        command_policy,
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
         LockfileMode::Update,
     )
@@ -1111,6 +1183,7 @@ async fn root_target_request_with_explicit_inputs(
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
     let mut user_data = UserComputationData {
         activation_tracker: Some(tracker),
+        cycle_detector: Some(analysis_cycle_detector()),
         ..Default::default()
     };
     user_data.data.set(CaptureEvaluationEvents);
@@ -1151,6 +1224,7 @@ async fn observed_root_target_request_with_inputs(
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
     let mut data = UserComputationData {
         activation_tracker: Some(tracker),
+        cycle_detector: Some(analysis_cycle_detector()),
         ..Default::default()
     };
     data.data.set(CaptureEvaluationEvents);
@@ -1203,7 +1277,7 @@ fn root_setting_value(key: &ConfiguredTargetKey) -> Option<&str> {
         .and_then(|option| option.value().as_str())
 }
 
-const TOOLCHAIN_MODULE: &str = "module(name = \"bazel_tools\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:second\", \"//:first\")\n";
+const TOOLCHAIN_MODULE: &str = "module(name = \"root\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:second\", \"//:first\")\n";
 const TOOLCHAIN_DEFS: &str = r#"ConsumerInfo = provider(fields = {"value": ""})
 def _first(ctx):
     print("FIRST_LOCAL")
@@ -1221,7 +1295,7 @@ second_impl = rule(implementation = _second, attrs = {"marker": attr.string(mand
 request = rule(implementation = _request, toolchains = ["//:type"])
 "#;
 const TOOLCHAIN_BUILD: &str = "load(\":defs.bzl\", \"first_impl\", \"request\", \"second_impl\")\nconstraint_setting(name = \"setting\")\nconstraint_value(name = \"linux\", constraint_setting = \":setting\")\nconstraint_value(name = \"other\", constraint_setting = \":setting\")\nplatform(name = \"platform\", constraint_values = [\":linux\"])\ntoolchain_type(name = \"type\")\nfirst_impl(name = \"first_impl\", marker = \"first\")\nsecond_impl(name = \"second_impl\", marker = \"second\")\ntoolchain(name = \"first\", toolchain_type = \":type\", toolchain = \":first_impl\", exec_compatible_with = [\":linux\"])\ntoolchain(name = \"second\", toolchain_type = \":type\", toolchain = \":second_impl\", exec_compatible_with = [\":linux\"])\nrequest(name = \"request\")\n";
-const TOPOLOGY_MODULE: &str = "module(name = \"bazel_tools\")\nregister_execution_platforms(\"//:first_platform\", \"//:second_platform\")\nregister_toolchains(\"//:first_toolchain\", \"//:second_toolchain\")\n";
+const TOPOLOGY_MODULE: &str = "module(name = \"root\")\nregister_execution_platforms(\"//:first_platform\", \"//:second_platform\")\nregister_toolchains(\"//:first_toolchain\", \"//:second_toolchain\")\n";
 const TOPOLOGY_BUILD: &str = "load(\":defs.bzl\", \"first_impl\", \"request\", \"second_impl\")\nconstraint_setting(name = \"selection\")\nconstraint_value(name = \"first\", constraint_setting = \":selection\")\nconstraint_value(name = \"second\", constraint_setting = \":selection\")\nplatform(name = \"first_platform\", constraint_values = [\":first\"], exec_properties = {\"z\": \"last\", \"a\": \"first\"})\nplatform(name = \"second_platform\", constraint_values = [\":second\"])\ntoolchain_type(name = \"type\")\nfirst_impl(name = \"first_impl\", marker = \"first\")\nsecond_impl(name = \"second_impl\", marker = \"second\")\nfirst_impl(name = \"orphan\", marker = \"orphan\")\ntoolchain(name = \"first_toolchain\", toolchain_type = \":type\", toolchain = \":first_impl\", exec_compatible_with = [\":first\"])\ntoolchain(name = \"second_toolchain\", toolchain_type = \":type\", toolchain = \":second_impl\", exec_compatible_with = [\":second\"])\nrequest(name = \"request\")\n";
 
 async fn toolchain_case(
@@ -1240,6 +1314,34 @@ async fn toolchain_case(
         Arc::new(RootActivationTracker::default()),
     )
     .await
+}
+
+async fn toolchain_case_error(workspace: &PathBuf, observed: bool, case: &str) -> String {
+    let tracker = Arc::new(RootActivationTracker::default());
+    if observed {
+        observed_root_target_request_with_inputs(
+            &Dice::builder().build(DetectCycles::Enabled),
+            workspace,
+            "@@//:request",
+            test_configuration(),
+            tracker,
+            root_epoch(workspace),
+            &[],
+        )
+        .await
+        .err()
+        .unwrap_or_else(|| panic!("{case} unexpectedly succeeded in observed mode"))
+    } else {
+        root_target_request(
+            &Dice::builder().build(DetectCycles::Enabled),
+            workspace,
+            "@@//:request",
+            tracker,
+        )
+        .await
+        .err()
+        .unwrap_or_else(|| panic!("{case} unexpectedly succeeded in legacy mode"))
+    }
 }
 
 async fn topology_platform(
@@ -1277,7 +1379,10 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
     assert_eq!(first.actions().len(), 1);
     assert_eq!(first.declared_outputs(), &["request.out"]);
     assert!(first.diagnostics().is_empty());
-    assert_eq!(candidate_labels(&first), vec!["@@//:platform"]);
+    assert_eq!(
+        candidate_labels(&first),
+        vec!["@@//:platform", "@@//.slug_test_host:host"]
+    );
     let selection = first.toolchain_topology().unwrap().selection().unwrap();
     assert_eq!(
         selection.execution_platform().label().to_string(),
@@ -1310,6 +1415,7 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
             &ConfiguredEdgeKind::ToolchainRequirement,
             &ConfiguredEdgeKind::SelectedToolchainImplementation,
             &ConfiguredEdgeKind::CandidateExecutionPlatform { index: 0 },
+            &ConfiguredEdgeKind::CandidateExecutionPlatform { index: 1 },
         ]
     );
     assert!(
@@ -1485,7 +1591,11 @@ async fn command_registrations_precede_module_and_empty_overlay_restores_module_
     assert_eq!(provider_value(&first, &consumer), "first");
     assert_eq!(
         candidate_labels(&first),
-        ["@@//:command_platform", "@@//:platform"]
+        [
+            "@@//:command_platform",
+            "@@//:platform",
+            "@@//.slug_test_host:host",
+        ]
     );
     assert_eq!(
         first
@@ -1508,7 +1618,10 @@ async fn command_registrations_precede_module_and_empty_overlay_restores_module_
     .await
     .unwrap();
     assert_eq!(provider_value(&module_only, &consumer), "second");
-    assert_eq!(candidate_labels(&module_only), ["@@//:platform"]);
+    assert_eq!(
+        candidate_labels(&module_only),
+        ["@@//:platform", "@@//.slug_test_host:host"]
+    );
 
     let restored = command_configuration_request_result(
         &dice,
@@ -1545,12 +1658,17 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
             .collect::<Vec<_>>(),
         [
             "registration/legacy/execution-platforms",
+            "registration/legacy/execution-platforms",
             "registration/legacy/toolchains",
         ]
     );
     assert_eq!(
         candidate_labels(&direct_impl),
-        vec!["@@//:first_platform", "@@//:second_platform"]
+        vec![
+            "@@//:first_platform",
+            "@@//:second_platform",
+            "@@//.slug_test_host:host",
+        ]
     );
     assert!(
         direct_impl
@@ -1568,6 +1686,7 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
         vec![
             &ConfiguredEdgeKind::CandidateExecutionPlatform { index: 0 },
             &ConfiguredEdgeKind::CandidateExecutionPlatform { index: 1 },
+            &ConfiguredEdgeKind::CandidateExecutionPlatform { index: 2 },
         ]
     );
     assert!(direct_impl.edges().iter().all(|edge| {
@@ -1758,8 +1877,15 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
     let orphan = root_target_request(&dice, &workspace, "@@//:orphan", orphan_tracker.clone())
         .await
         .unwrap();
-    assert!(orphan.toolchain_topology().is_none());
-    assert!(orphan.edges().is_empty());
+    assert_eq!(
+        candidate_labels(&orphan),
+        [
+            "@@//:first_platform",
+            "@@//:second_platform",
+            "@@//.slug_test_host:host",
+        ]
+    );
+    assert_eq!(orphan.edges().len(), 3);
     assert!(
         orphan_tracker
             .take()
@@ -1813,7 +1939,7 @@ async fn root_toolchain_resolution_rejects_every_native_reference_and_selection_
             TOOLCHAIN_MODULE.replace("//:platform", "//:type"),
             TOOLCHAIN_DEFS.to_owned(),
             TOOLCHAIN_BUILD.to_owned(),
-            "not platform",
+            "incompatible with exec configuration",
         ),
         (
             "toolchain kind",
@@ -1831,7 +1957,7 @@ async fn root_toolchain_resolution_rejects_every_native_reference_and_selection_
                 "constraint_setting = \":type\"",
                 1,
             ),
-            "non-constraint setting",
+            "incompatible with exec configuration",
         ),
         (
             "type reference",
@@ -1848,7 +1974,7 @@ async fn root_toolchain_resolution_rejects_every_native_reference_and_selection_
             "implementation reference",
             TOOLCHAIN_MODULE.to_owned(),
             TOOLCHAIN_DEFS.to_owned(),
-            TOOLCHAIN_BUILD.replacen("toolchain = \":first_impl\"", "toolchain = \":type\"", 1),
+            TOOLCHAIN_BUILD.replacen("toolchain = \":second_impl\"", "toolchain = \":type\"", 1),
             "not a Starlark rule",
         ),
         (
@@ -1860,7 +1986,7 @@ async fn root_toolchain_resolution_rejects_every_native_reference_and_selection_
                 "exec_compatible_with = [\":type\"]",
                 1,
             ),
-            "expected constraint_value",
+            "configured constraint value",
         ),
         (
             "platform duplicate",
@@ -1884,6 +2010,17 @@ async fn root_toolchain_resolution_rejects_every_native_reference_and_selection_
             "duplicate execution constraint setting",
         ),
         (
+            "target-to-exec with explicit constraint",
+            TOOLCHAIN_MODULE.to_owned(),
+            TOOLCHAIN_DEFS.to_owned(),
+            TOOLCHAIN_BUILD.replacen(
+                "exec_compatible_with = [\":linux\"])",
+                "exec_compatible_with = [\":linux\"], use_target_platform_constraints = True)",
+                1,
+            ),
+            "cannot combine use_target_platform_constraints",
+        ),
+        (
             "no pair",
             TOOLCHAIN_MODULE.to_owned(),
             TOOLCHAIN_DEFS.to_owned(),
@@ -1895,13 +2032,18 @@ async fn root_toolchain_resolution_rejects_every_native_reference_and_selection_
         ),
     ];
     for (name, module, defs, build, expected) in cases {
-        let error = toolchain_case(&module, &defs, &build).await.unwrap_err();
+        let error = match toolchain_case(&module, &defs, &build).await {
+            Err(error) => error,
+            Ok(_) => panic!("{name}: unexpectedly succeeded"),
+        };
         assert!(error.contains(expected), "{name}: {error}");
     }
 }
 
 #[tokio::test]
-async fn root_toolchain_resolution_fails_closed_on_unimplemented_target_compatibility() {
+async fn root_toolchain_resolution_filters_target_compatibility_and_target_to_exec_constraints() {
+    let module =
+        TOOLCHAIN_MODULE.replace("\"//:second\", \"//:first\"", "\"//:first\", \"//:second\"");
     let cases = [
         (
             "target compatibility",
@@ -1910,47 +2052,70 @@ async fn root_toolchain_resolution_fails_closed_on_unimplemented_target_compatib
                 "exec_compatible_with = [\":linux\"], target_compatible_with = [\":linux\"])",
                 1,
             ),
+            "@@//:second",
+            "@@//:platform",
         ),
         (
-            "target platform constraints",
-            TOOLCHAIN_BUILD.replacen(
-                "exec_compatible_with = [\":linux\"])",
-                "exec_compatible_with = [\":linux\"], use_target_platform_constraints = True)",
-                1,
-            ),
+            "target-to-exec constraints",
+            TOOLCHAIN_BUILD
+                .replacen(
+                    "exec_compatible_with = [\":linux\"])",
+                    "use_target_platform_constraints = True)",
+                    1,
+                )
+                .replacen(
+                    "exec_compatible_with = [\":linux\"])",
+                    "exec_compatible_with = [\":other\"])",
+                    1,
+                ),
+            "@@//:first",
+            "@@//:target_platform",
         ),
     ];
-    for (name, build) in cases {
+    for (name, mut build, expected_declaration, expected_platform) in cases {
         let workspace = scratch();
-        fs::write(workspace.join("MODULE.bazel"), TOOLCHAIN_MODULE).unwrap();
+        build.push_str("platform(name = \"target_platform\", constraint_values = [\":other\"])\n");
+        fs::write(workspace.join("MODULE.bazel"), &module).unwrap();
         fs::write(workspace.join("defs.bzl"), TOOLCHAIN_DEFS).unwrap();
         fs::write(workspace.join("BUILD.bazel"), build).unwrap();
+        let configuration = ConfigurationKey::from_slug(
+            default_test_configuration()
+                .with_host_platform_label(&CanonicalLabel::parse("@@//:target_platform").unwrap()),
+        );
         for observed in [false, true] {
             let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-            let error = if observed {
+            let result = if observed {
                 observed_root_target_request_with_inputs(
                     &dice,
                     &workspace,
                     "@@//:request",
-                    test_configuration(),
+                    configuration.clone(),
                     Arc::new(RootActivationTracker::default()),
                     root_epoch(&workspace),
                     &[],
                 )
                 .await
             } else {
-                root_target_request(
+                root_target_request_with_configuration(
                     &dice,
                     &workspace,
                     "@@//:request",
+                    configuration.clone(),
                     Arc::new(RootActivationTracker::default()),
                 )
                 .await
             }
-            .unwrap_err();
-            assert!(
-                error.contains("registered toolchain uses unsupported target compatibility"),
-                "{name} observed={observed}: {error}"
+            .unwrap_or_else(|error| panic!("{name} observed={observed}: {error}"));
+            let selection = result.toolchain_topology().unwrap().selection().unwrap();
+            assert_eq!(
+                selection.declaration().to_string(),
+                expected_declaration,
+                "{name} observed={observed}"
+            );
+            assert_eq!(
+                selection.execution_platform().label().to_string(),
+                expected_platform,
+                "{name} observed={observed}"
             );
         }
     }
@@ -2191,7 +2356,7 @@ async fn selected_platform_terminals_suppress_implementation_and_rule_evaluation
 }
 
 #[tokio::test]
-async fn zero_toolchain_requirement_bypasses_registration_resolution() {
+async fn zero_toolchain_requirement_selects_host_without_toolchain_registration() {
     let workspace = scratch();
     fs::write(
         workspace.join("MODULE.bazel"),
@@ -2218,13 +2383,20 @@ async fn zero_toolchain_requirement_bypasses_registration_resolution() {
         ),
         "zero"
     );
-    assert!(result.configured_dependencies().next().is_none());
+    assert_eq!(
+        result
+            .configured_dependencies()
+            .map(|key| key.label().to_string())
+            .collect::<Vec<_>>(),
+        ["@@//.slug_test_host:host"]
+    );
     assert_eq!(result.actions().len(), 1);
     assert_eq!(
         result.actions()[0].context().execution_state(),
-        ActionExecutionState::UnresolvedDefault
+        ActionExecutionState::SelectedPlatformOnly
     );
-    assert!(result.configured_file_write_actions().is_err());
+    assert_eq!(result.configured_file_write_actions().unwrap().len(), 1);
+    assert_eq!(candidate_labels(&result), ["@@//.slug_test_host:host"]);
     fs::write(
         workspace.join("defs.bzl"),
         defs.replace("\"zero\")", "\"edited\")"),
@@ -2249,10 +2421,16 @@ async fn zero_toolchain_requirement_bypasses_registration_resolution() {
             .iter()
             .any(|(identity, _)| identity.starts_with("package/"))
     );
-    assert!(
+    assert_eq!(
         activations
             .iter()
-            .all(|(identity, _)| !identity.starts_with("registration/"))
+            .filter(|(identity, _)| identity.starts_with("registration/legacy/"))
+            .map(|(identity, _)| identity.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "registration/legacy/execution-platforms",
+            "registration/legacy/execution-platforms",
+        ]
     );
     let request = nodes
         .iter()
@@ -2266,12 +2444,251 @@ async fn zero_toolchain_requirement_bypasses_registration_resolution() {
 }
 
 #[tokio::test]
+async fn multi_optional_alias_resolution_maximizes_coverage_without_provider_analysis() {
+    let workspace = scratch();
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = 'root')\nregister_execution_platforms('//:p_a', '//:p_b', '//:p_both')\nregister_toolchains('//:a_first', '//:a_second', '//:b_first')\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _impl(ctx):
+    return [platform_common.ToolchainInfo(marker = "unused")]
+impl = rule(implementation = _impl)
+def _request(ctx):
+    out = ctx.actions.declare_file("multi.txt")
+    ctx.actions.write(out, "multi")
+    return [DefaultInfo(files = depset([out]))]
+request = rule(
+    implementation = _request,
+    toolchains = [
+        config_common.toolchain_type("//:a_alias", mandatory = False),
+        "//:a",
+        config_common.toolchain_type("//:b", mandatory = False),
+        config_common.toolchain_type("//:missing", mandatory = False),
+    ],
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "impl", "request")
+constraint_setting(name = "a_setting")
+constraint_value(name = "a_value", constraint_setting = ":a_setting")
+constraint_setting(name = "b_setting")
+constraint_value(name = "b_value", constraint_setting = ":b_setting")
+platform(name = "p_a", constraint_values = [":a_value"])
+platform(name = "p_b", constraint_values = [":b_value"])
+platform(name = "p_both", constraint_values = [":a_value", ":b_value"])
+toolchain_type(name = "a")
+alias(name = "a_alias", actual = ":a")
+toolchain_type(name = "b")
+toolchain_type(name = "missing")
+impl(name = "impl")
+toolchain(name = "a_first", toolchain_type = ":a", toolchain = ":impl", exec_compatible_with = [":a_value"])
+toolchain(name = "a_second", toolchain_type = ":a_alias", toolchain = ":impl", exec_compatible_with = [":a_value", ":b_value"])
+toolchain(name = "b_first", toolchain_type = ":b", toolchain = ":impl", exec_compatible_with = [":b_value"])
+request(name = "request")
+"#,
+    )
+    .unwrap();
+
+    let configuration = test_configuration();
+    let workspace_key = NormalizedAbsolutePath::new(workspace.clone()).unwrap();
+    let requirements: Arc<[ToolchainTypeRequirement]> = Arc::from([
+        ToolchainTypeRequirement::new(CanonicalLabel::parse("@@//:a_alias").unwrap(), false),
+        ToolchainTypeRequirement::new(CanonicalLabel::parse("@@//:a").unwrap(), true),
+        ToolchainTypeRequirement::new(CanonicalLabel::parse("@@//:b").unwrap(), false),
+        ToolchainTypeRequirement::new(CanonicalLabel::parse("@@//:missing").unwrap(), false),
+    ]);
+    let key = ConfiguredToolchainResolutionKey::new(
+        workspace_key.dupe(),
+        configuration.clone(),
+        requirements.dupe(),
+    )
+    .unwrap();
+    let observed_key = ConfiguredToolchainResolutionObservationKey::new(
+        workspace_key,
+        configuration,
+        requirements,
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut updater = dice.updater_with_data(UserComputationData {
+        cycle_detector: Some(analysis_cycle_detector()),
+        ..Default::default()
+    });
+    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
+    let mut transaction = updater.commit().await;
+    let AnalysisPreparationOutcome::Complete(first) = transaction.compute(&key).await.unwrap()
+    else {
+        panic!("legacy resolution returned Needs")
+    };
+    let resolution = first.as_ref().as_ref().unwrap();
+    assert_eq!(
+        resolution.execution_platform().actual().label().to_string(),
+        "@@//:p_both"
+    );
+    assert_eq!(
+        resolution.target_platform().actual().label().to_string(),
+        "@@//.slug_test_host:host"
+    );
+    assert_eq!(resolution.rows().len(), 4);
+    assert_eq!(resolution.rows()[0].actual(), resolution.rows()[1].actual());
+    assert!(!resolution.rows()[0].mandatory());
+    assert!(resolution.rows()[1].mandatory());
+    assert_eq!(
+        resolution.rows()[0].declaration().unwrap().to_string(),
+        "@@//:a_first"
+    );
+    assert_eq!(
+        resolution.rows()[1].declaration(),
+        resolution.rows()[0].declaration()
+    );
+    assert_eq!(
+        resolution.rows()[2].declaration().unwrap().to_string(),
+        "@@//:b_first"
+    );
+    assert!(resolution.rows()[3].declaration().is_none());
+    let AnalysisPreparationOutcome::Complete(Ok(observed)) =
+        transaction.compute(&observed_key).await.unwrap()
+    else {
+        panic!("observed resolution did not complete")
+    };
+    assert_eq!(observed.as_ref().as_ref().unwrap(), resolution);
+    let AnalysisPreparationOutcome::Complete(warm) = transaction.compute(&key).await.unwrap()
+    else {
+        unreachable!()
+    };
+    assert!(Arc::ptr_eq(warm.as_ref().as_ref().unwrap(), resolution));
+
+    let result = root_target_request(
+        &dice,
+        &workspace,
+        "@@//:request",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.actions().len(), 1);
+    assert_eq!(
+        result.actions()[0].context().execution_state(),
+        ActionExecutionState::SelectedPlatformOnly
+    );
+    assert_eq!(
+        result.actions()[0]
+            .context()
+            .execution_platform()
+            .unwrap()
+            .label()
+            .to_string(),
+        "@@//:p_both"
+    );
+    assert!(result.toolchain_topology().unwrap().selection().is_none());
+}
+
+#[tokio::test]
+async fn toolchain_resolution_distinguishes_terminal_failures_and_platform_alias_convergence() {
+    const DEFS: &str = r#"def _empty(ctx): return []
+impl = rule(implementation = _empty)
+request = rule(implementation = _empty, toolchains = ["//:a", "//:b"])
+"#;
+    const ABSENT: &str = r#"load(":defs.bzl", "impl", "request")
+constraint_setting(name = "s")
+constraint_value(name = "ca", constraint_setting = ":s")
+platform(name = "p", constraint_values = [":ca"])
+toolchain_type(name = "a")
+toolchain_type(name = "b")
+impl(name = "impl")
+toolchain(name = "a_tc", toolchain_type = ":a", toolchain = ":impl", exec_compatible_with = [":ca"])
+request(name = "request")
+"#;
+    const NO_COMMON: &str = r#"load(":defs.bzl", "impl", "request")
+constraint_setting(name = "s")
+constraint_value(name = "ca", constraint_setting = ":s")
+constraint_value(name = "cb", constraint_setting = ":s")
+platform(name = "pa", constraint_values = [":ca"])
+platform(name = "pb", constraint_values = [":cb"])
+toolchain_type(name = "a")
+toolchain_type(name = "b")
+impl(name = "impl")
+toolchain(name = "a_tc", toolchain_type = ":a", toolchain = ":impl", exec_compatible_with = [":ca"])
+toolchain(name = "b_tc", toolchain_type = ":b", toolchain = ":impl", exec_compatible_with = [":cb"])
+request(name = "request")
+"#;
+    for (case, module, build, expected) in [
+        (
+            "mandatory absent",
+            "module(name = 'root')\nregister_execution_platforms('//:p')\nregister_toolchains('//:a_tc')\n",
+            ABSENT,
+            "no compatible toolchain was registered for",
+        ),
+        (
+            "no common platform",
+            "module(name = 'root')\nregister_execution_platforms('//:pa', '//:pb')\nregister_toolchains('//:a_tc', '//:b_tc')\n",
+            NO_COMMON,
+            "no common execution platform satisfies mandatory toolchain types",
+        ),
+    ] {
+        let workspace = scratch();
+        fs::write(workspace.join("MODULE.bazel"), module).unwrap();
+        fs::write(workspace.join("defs.bzl"), DEFS).unwrap();
+        fs::write(workspace.join("BUILD.bazel"), build).unwrap();
+        for observed in [false, true] {
+            let error = toolchain_case_error(&workspace, observed, case).await;
+            assert!(error.contains(expected), "observed={observed}: {error}");
+        }
+    }
+
+    let workspace = scratch();
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"root\")\nregister_execution_platforms(\"//:outer\", \"//:p\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        "def _empty(ctx): return []\nrequest = rule(implementation = _empty)\n",
+    )
+    .unwrap();
+    fs::write(workspace.join("BUILD.bazel"), "load(':defs.bzl', 'request')\nplatform(name = 'p')\nalias(name = 'inner', actual = ':p')\nalias(name = 'outer', actual = ':inner')\nrequest(name = 'request')\n").unwrap();
+    for observed in [false, true] {
+        let error = toolchain_case_error(&workspace, observed, "platform convergence").await;
+        assert!(
+            error.contains("resolve to the same actual platform"),
+            "observed={observed}: {error}"
+        );
+    }
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"root\")\nregister_execution_platforms(\"//:host_alias\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(':defs.bzl', 'request')\nalias(name = 'host_alias', actual = '//.slug_test_host:host')\nrequest(name = 'request')\n",
+    )
+    .unwrap();
+    let legacy = root_target_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        "@@//:request",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(candidate_labels(&legacy), ["@@//.slug_test_host:host"]);
+}
+
+#[tokio::test]
 async fn root_toolchain_resolution_loads_reachable_cross_package_references() {
     let workspace = scratch();
     for package in ["platforms", "tools", "constraints", "impl", "rules"] {
         fs::create_dir_all(workspace.join(package)).unwrap();
     }
-    fs::write(workspace.join("MODULE.bazel"), "module(name = \"bazel_tools\")\nregister_execution_platforms(\"//platforms:p\")\nregister_toolchains(\"//tools:tc\")\n").unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\nregister_execution_platforms(\"//platforms:p\")\nregister_toolchains(\"//tools:tc\")\n").unwrap();
     fs::write(workspace.join("defs.bzl"), "ConsumerInfo = provider(fields = {\"value\": \"\"})\ndef _request(ctx): return [ConsumerInfo(value = ctx.toolchains[\"//tools:type\"].marker)]\nrequest = rule(implementation = _request, toolchains = [\"//tools:type\"])\n").unwrap();
     fs::write(
         workspace.join("BUILD.bazel"),
@@ -2324,7 +2741,7 @@ async fn selected_nonroot_registrations_preserve_canonical_repository_identity()
     }
     fs::write(
         workspace.join("MODULE.bazel"),
-        "module(name = \"bazel_tools\")\nbazel_dep(name = \"dep_a\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep_a\", path = \"dep_a\")\nbazel_dep(name = \"dep_b\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep_b\", path = \"dep_b\")\nregister_toolchains(\"@dep_b//shared:selected\")\n",
+        "module(name = \"root\")\nbazel_dep(name = \"dep_a\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep_a\", path = \"dep_a\")\nbazel_dep(name = \"dep_b\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep_b\", path = \"dep_b\")\nregister_toolchains(\"@dep_b//shared:selected\")\n",
     )
     .unwrap();
     fs::write(
@@ -2387,7 +2804,11 @@ async fn selected_nonroot_registrations_preserve_canonical_repository_identity()
     assert_eq!(provider_value(&legacy, &consumer), "b");
     assert_eq!(
         candidate_labels(&legacy),
-        ["@@dep_a+//shared:platform", "@@dep_b+//shared:platform",]
+        [
+            "@@dep_a+//shared:platform",
+            "@@dep_b+//shared:platform",
+            "@@//.slug_test_host:host",
+        ]
     );
     let selection = legacy.toolchain_topology().unwrap().selection().unwrap();
     assert_eq!(
@@ -2419,7 +2840,7 @@ async fn selected_nonroot_registrations_preserve_canonical_repository_identity()
 
 #[tokio::test]
 async fn registration_family_need_precedes_earlier_semantic_error() {
-    let module = "module(name = \"bazel_tools\")\nregister_execution_platforms(\"@external//:p\")\nregister_toolchains(\"//missing:tc\")\n";
+    let module = "module(name = \"root\")\nregister_execution_platforms(\"@external//:p\")\nregister_toolchains(\"//missing:tc\")\n";
     let need = toolchain_case(module, TOOLCHAIN_DEFS, TOOLCHAIN_BUILD)
         .await
         .unwrap_err();
@@ -2447,7 +2868,7 @@ async fn registration_family_outer_precedes_earlier_semantic_error() {
     let workspace = scratch();
     fs::write(
         workspace.join("MODULE.bazel"),
-        "module(name = \"bazel_tools\")\nregister_execution_platforms(\"@external//:p\")\nregister_toolchains(\"//:second\")\n",
+        "module(name = \"root\")\nregister_execution_platforms(\"@external//:p\")\nregister_toolchains(\"//:second\")\n",
     )
     .unwrap();
     fs::write(workspace.join("defs.bzl"), TOOLCHAIN_DEFS).unwrap();
@@ -2509,7 +2930,7 @@ async fn registration_family_outer_precedes_earlier_semantic_error() {
 }
 
 #[tokio::test]
-async fn later_reference_round_need_yields_to_root_semantic_error() {
+async fn later_reference_round_need_yields_to_resolution_semantic_error() {
     let workspace = scratch();
     fs::write(workspace.join("MODULE.bazel"), TOOLCHAIN_MODULE).unwrap();
     fs::write(workspace.join("defs.bzl"), TOOLCHAIN_DEFS).unwrap();
@@ -2537,7 +2958,9 @@ async fn later_reference_round_need_yields_to_root_semantic_error() {
     fs::write(workspace.join("missing/BUILD.bazel"), "constraint_setting(name = \"setting\")\nconstraint_value(name = \"value\", constraint_setting = \":setting\")\n").unwrap();
     let semantic = request().await.unwrap_err();
     assert!(
-        semantic.contains("expected constraint_value at @@//:type"),
+        semantic.contains(
+            "native toolchain_type target @@//:type is incompatible with exec configuration"
+        ),
         "{semantic}"
     );
 }
@@ -2657,7 +3080,7 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
         .configured_dependencies()
         .cloned()
         .collect::<Vec<_>>();
-    assert_eq!(parent_deps.len(), 2);
+    assert_eq!(parent_deps.len(), 3);
     assert_eq!(parent_deps[0].label(), parent_deps[1].label());
     assert_ne!(
         parent_deps[0].configuration(),
@@ -2666,9 +3089,14 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     assert_eq!(
         parent_deps
             .iter()
+            .take(2)
             .map(root_setting_value)
             .collect::<Vec<_>>(),
         [Some("left"), Some("right")]
+    );
+    assert_eq!(
+        parent_deps[2].label().to_string(),
+        "@@//.slug_test_host:host"
     );
     fs::write(&defs, defs_source.replacen("\"left\"", "\"changed\"", 1)).unwrap();
     let edited_parent =
@@ -2723,8 +3151,12 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     );
 
     let (activations, _, _) = tracker.take();
+    let lifecycle_activations = activations
+        .into_iter()
+        .filter(|(identity, _)| !identity.contains("//.slug_test_host:host"))
+        .collect::<Vec<_>>();
     assert_eq!(
-        activation_codes(&activations),
+        activation_codes(&lifecycle_activations),
         r#"resolved/@@//:consumer=<default>:E resolved/@@//:consumer=<default>:E resolved/@@//:consumer=<default>:E
 resolved/@@//:consumer=<default>:R resolved/@@//:consumer=<default>:R resolved/@@//:consumer=changed:E
 resolved/@@//:consumer=command:E resolved/@@//:consumer=left:E resolved/@@//:consumer=right:E resolved/@@//:consumer=right:E
@@ -3495,18 +3927,19 @@ async fn default_host_platform_reaches_bcr_platform_through_exact_builtin_alias(
         ("abseil-cpp+", "abseil-cpp"),
     ];
     let workspace_key = NormalizedAbsolutePath::new(workspace.clone()).unwrap();
-    let configuration = test_configuration();
+    let configuration = ConfigurationKey::from_slug(default_test_configuration());
     let key = ConfiguredTargetPlatformKey::new(workspace_key, configuration).unwrap();
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut updater = dice.updater_with_data(UserComputationData {
         cycle_detector: Some(analysis_cycle_detector()),
         ..Default::default()
     });
-    inject_root_target_inputs(
+    inject_root_target_inputs_with_policy(
         &mut updater,
         &workspace,
         root_epoch(&workspace),
         &repositories,
+        false,
     );
     let platform =
         configured_platform_result(updater.commit().await.compute(&key).await.unwrap()).unwrap();
@@ -3535,7 +3968,7 @@ async fn canonical_external_condition_and_flag_packages_invalidate_and_restore()
     fs::create_dir_all(workspace.join("dep/conditions")).unwrap();
     fs::write(
         workspace.join("MODULE.bazel"),
-        "module(name = \"bazel_tools\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+        "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
     )
     .unwrap();
     fs::write(
@@ -3739,7 +4172,7 @@ async fn canonical_external_selector_declaration_and_selected_branch_restore_par
     }
     fs::write(
         workspace.join("MODULE.bazel"),
-        "module(name = \"bazel_tools\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+        "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
     )
     .unwrap();
     fs::write(
@@ -3819,7 +4252,7 @@ marker = rule(implementation = _marker, attrs = {"marker": attr.string(mandatory
             .configured_dependencies()
             .map(|key| key.label().to_string())
             .collect::<Vec<_>>(),
-        ["@@dep+//leaf:selected"]
+        ["@@dep+//leaf:selected", "@@//.slug_test_host:host"]
     );
 
     fs::write(
@@ -4206,7 +4639,7 @@ parent(
             .configured_dependencies()
             .map(|key| key.label().to_string())
             .collect::<Vec<_>>(),
-        ["@@//leaf:selected"]
+        ["@@//leaf:selected", "@@//.slug_test_host:host"]
     );
     assert_eq!(result.actions().len(), 1);
     assert_eq!(
@@ -4283,7 +4716,7 @@ parent(
     .await
     .unwrap();
     assert_eq!(recovered.actions().len(), 1);
-    assert_eq!(recovered.configured_dependencies().count(), 1);
+    assert_eq!(recovered.configured_dependencies().count(), 2);
     let activations = recovered_tracker.take().0;
     assert_eq!(
         activations
@@ -4475,7 +4908,7 @@ async fn mixed_root_and_external_overlay_demands_root_package_before_mapping_nee
     let workspace = scratch();
     fs::write(
         workspace.join("MODULE.bazel"),
-        "module(name = \"bazel_tools\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+        "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
     )
     .unwrap();
     fs::create_dir(workspace.join("dep")).unwrap();
@@ -4636,8 +5069,8 @@ async fn explicit_external_setting_uses_its_canonical_package_declaration() {
     let workspace = scratch();
     fs::create_dir_all(workspace.join("dep/flags")).unwrap();
     fs::create_dir_all(workspace.join("other/flags")).unwrap();
-    let module_a = "module(name = \"bazel_tools\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n";
-    let module_b = "module(name = \"bazel_tools\")\nbazel_dep(name = \"other\", version = \"1.0.0\", repo_name = \"dep\")\nlocal_path_override(module_name = \"other\", path = \"other\")\n";
+    let module_a = "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n";
+    let module_b = "module(name = \"root\")\nbazel_dep(name = \"other\", version = \"1.0.0\", repo_name = \"dep\")\nlocal_path_override(module_name = \"other\", path = \"other\")\n";
     fs::write(workspace.join("MODULE.bazel"), module_a).unwrap();
     fs::write(
         workspace.join("defs.bzl"),
@@ -4906,7 +5339,7 @@ parent = rule(implementation = _empty, attrs = {"dep": attr.label(cfg = t)})
     .await
     .unwrap();
     let dependencies = recovered.configured_dependencies().collect::<Vec<_>>();
-    assert_eq!(dependencies.len(), 1);
+    assert_eq!(dependencies.len(), 2);
     assert_eq!(dependencies[0].label().to_string(), "@@//:child");
     assert_eq!(
         dependencies[0]
@@ -4915,6 +5348,10 @@ parent = rule(implementation = _empty, attrs = {"dep": attr.label(cfg = t)})
             .unwrap()
             .value(),
         &StarlarkOptionValue::string_list(["a", "b"])
+    );
+    assert_eq!(
+        dependencies[1].label().to_string(),
+        "@@//.slug_test_host:host"
     );
     assert_eq!(
         recovery_tracker
@@ -4961,7 +5398,7 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = first)
     )
     .await
     .unwrap();
-    assert_eq!(result.edges().len(), 2);
+    assert_eq!(result.edges().len(), 3);
     assert_eq!(result.edges()[0].target(), result.edges()[1].target());
     assert_ne!(result.edges()[0].kind(), result.edges()[1].kind());
     assert!(matches!(
@@ -4973,6 +5410,10 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = first)
         result.edges()[1].kind(),
         slug_analysis_v2::ConfiguredEdgeKind::TransitionedAttribute { attribute, index: 0, .. }
         if attribute == "right"
+    ));
+    assert!(matches!(
+        result.edges()[2].kind(),
+        slug_analysis_v2::ConfiguredEdgeKind::CandidateExecutionPlatform { index: 0 }
     ));
 }
 
@@ -5033,7 +5474,7 @@ ordinary_rule(
         root.providers().user(&seen).unwrap().field("value"),
         Some("@@//:source.txt")
     );
-    assert_eq!(root.edges().len(), 5);
+    assert_eq!(root.edges().len(), 6);
     assert!(matches!(
         root.edges()[0].kind(),
         ConfiguredEdgeKind::OrdinaryAttribute { attribute, index: 0 }
@@ -5073,6 +5514,14 @@ ordinary_rule(
     assert_eq!(
         root.edges()[4].target(),
         &ConfiguredNodeKey::null(CanonicalLabel::parse("@@//:vis_top").unwrap())
+    );
+    assert!(matches!(
+        root.edges()[5].kind(),
+        ConfiguredEdgeKind::CandidateExecutionPlatform { index: 0 }
+    ));
+    assert_eq!(
+        root.edges()[5].target().label().to_string(),
+        "@@//.slug_test_host:host"
     );
 
     let outer = analyze_request(
@@ -5393,6 +5842,7 @@ async fn analyze_node_request_typed_with_epoch(
     let raw = raw_snapshot_from_text(&text);
     let mut user_data = UserComputationData {
         activation_tracker: tracker,
+        cycle_detector: Some(analysis_cycle_detector()),
         ..Default::default()
     };
     if capture_events {
@@ -5426,27 +5876,7 @@ async fn analyze_node_request_typed_with_epoch(
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
-    let root = NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap();
-    inject_root_package_policy_inputs(
-        &mut updater,
-        RootPackagePolicyInputs::new(
-            root.clone(),
-            [root],
-            std::iter::empty::<&str>(),
-            None,
-            Some("warning"),
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    inject_root_module_request_inputs(
-        &mut updater,
-        workspace,
-        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
-        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-        LockfileMode::Update,
-    )
-    .unwrap();
+    inject_test_bzlmod_inputs(&mut updater, workspace, &[], true);
     let mut transaction = updater.commit().await;
     let workspace_identity = NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap();
     let analysis_key = match &node {
@@ -5528,27 +5958,7 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
     )
     .unwrap();
 
-    let files = [
-        workspace.join("MODULE.bazel"),
-        package.join("BUILD.bazel"),
-        package.join("BUILD"),
-        package.join("defs.bzl"),
-    ]
-    .into_iter()
-    .map(|path| {
-        let value = match fs::read_to_string(&path) {
-            Ok(source) => WorkspaceFileValue::Present(Arc::new(source)),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                WorkspaceFileValue::Absent
-            }
-            Err(error) => WorkspaceFileValue::ReadError(Arc::new(error.to_string())),
-        };
-        (path, value)
-    })
-    .collect();
-    let text = Arc::new(WorkspaceSnapshot {
-        files: Arc::new(files),
-    });
+    let text = Arc::new(workspace_snapshot(&workspace));
     let raw = raw_snapshot_from_text(&text);
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let key = ConfiguredTargetKey::new(
@@ -5558,7 +5968,10 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
     let result = tokio::runtime::Runtime::new()
         .unwrap()
         .block_on(async move {
-            let mut updater = dice.updater();
+            let mut updater = dice.updater_with_data(UserComputationData {
+                cycle_detector: Some(analysis_cycle_detector()),
+                ..Default::default()
+            });
             updater
                 .changed_to(vec![(
                     (WorkspaceSnapshotKey {
@@ -5586,27 +5999,7 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
             updater
                 .changed_to(vec![(PathObservationEpochKey, root_epoch(&workspace))])
                 .unwrap();
-            let root = NormalizedAbsolutePath::new(workspace.clone()).unwrap();
-            inject_root_package_policy_inputs(
-                &mut updater,
-                RootPackagePolicyInputs::new(
-                    root.clone(),
-                    [root],
-                    std::iter::empty::<&str>(),
-                    None,
-                    Some("warning"),
-                )
-                .unwrap(),
-            )
-            .unwrap();
-            inject_root_module_request_inputs(
-                &mut updater,
-                &workspace,
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
-                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-                LockfileMode::Update,
-            )
-            .unwrap();
+            inject_test_bzlmod_inputs(&mut updater, &workspace, &[], true);
             let mut transaction = updater.commit().await;
             let outcome = transaction
                 .compute(
@@ -5895,7 +6288,10 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let text = Arc::new(workspace_snapshot(&workspace));
     let raw = raw_snapshot_from_text(&text);
-    let mut updater = dice.updater();
+    let mut updater = dice.updater_with_data(UserComputationData {
+        cycle_detector: Some(analysis_cycle_detector()),
+        ..Default::default()
+    });
     updater
         .changed_to(vec![(
             WorkspaceSnapshotKey {
@@ -5923,27 +6319,7 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     updater
         .changed_to(vec![(PathObservationEpochKey, root_epoch(&workspace))])
         .unwrap();
-    let root = NormalizedAbsolutePath::new(workspace.clone()).unwrap();
-    inject_root_package_policy_inputs(
-        &mut updater,
-        RootPackagePolicyInputs::new(
-            root.clone(),
-            [root],
-            std::iter::empty::<&str>(),
-            None,
-            Some("warning"),
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    inject_root_module_request_inputs(
-        &mut updater,
-        &workspace,
-        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
-        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-        LockfileMode::Update,
-    )
-    .unwrap();
+    inject_test_bzlmod_inputs(&mut updater, &workspace, &[], true);
     let mut transaction = updater.commit().await;
     let configuration = test_configuration();
     let outcome = transaction
@@ -5964,12 +6340,13 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     };
     let result = result.as_ref().as_ref().unwrap();
 
+    let dependencies = result
+        .configured_dependencies()
+        .cloned()
+        .collect::<Vec<_>>();
     assert_eq!(
-        result
-            .configured_dependencies()
-            .cloned()
-            .collect::<Vec<_>>(),
-        [
+        &dependencies[..2],
+        &[
             ConfiguredTargetKey::new(
                 CanonicalLabel::parse("@@//leaf:second").unwrap(),
                 configuration.clone(),
@@ -5979,6 +6356,10 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
                 configuration.clone(),
             ),
         ]
+    );
+    assert_eq!(
+        dependencies[2].label().to_string(),
+        "@@//.slug_test_host:host"
     );
     assert!(matches!(
         result.edges()[0].kind(),
@@ -6139,6 +6520,7 @@ parent(
             "@@//leaf:mapped",
             "@@//leaf:selected",
             "@@//leaf:grouped",
+            "@@//.slug_test_host:host",
         ]
     );
     assert_eq!(result.declared_outputs(), ["parent/result.txt"]);
@@ -6230,7 +6612,7 @@ parent(name = "parent", dep = select({":choose": ":selected", "//conditions:defa
             .and_then(|option| option.value().as_str()),
         Some("changed")
     );
-    assert_eq!(result.configured_dependencies().count(), 1);
+    assert_eq!(result.configured_dependencies().count(), 2);
     assert!(matches!(
         result.edges()[0].kind(),
         slug_analysis_v2::ConfiguredEdgeKind::TransitionedAttribute {
@@ -6238,6 +6620,10 @@ parent(name = "parent", dep = select({":choose": ":selected", "//conditions:defa
             index: 0,
             output,
         } if attribute == "dep" && output == &CanonicalLabel::parse("@@//:setting").unwrap()
+    ));
+    assert!(matches!(
+        result.edges()[1].kind(),
+        slug_analysis_v2::ConfiguredEdgeKind::CandidateExecutionPlatform { index: 0 }
     ));
 }
 

@@ -32715,20 +32715,27 @@ R = rule(implementation = impl, toolchains = [":plain", Label("//tools:label"), 
 }
 
 #[tokio::test]
-async fn repository_package_rejects_optional_toolchain_before_recording() {
+async fn repository_package_records_optional_toolchain_requirement() {
     let files: &[(&str, &[u8])] = &[
-        ("BUILD.bazel", b"load(':defs.bzl','probe')\nprobe(name='blocked')\n"),
+        (
+            "BUILD.bazel",
+            b"load(':defs.bzl','probe')\nprobe(name='optional', visibility=['//visibility:public'])\n",
+        ),
         (
             "defs.bzl",
             b"def impl(ctx): return []\nprobe=rule(implementation=impl, toolchains=[config_common.toolchain_type('//tools:type', mandatory=False)])\n",
         ),
     ];
     let outcome = load_repository_package_fixture(files, 427).await;
-    let error = repository_package_error(&outcome);
-    assert!(
-        error.contains("optional rule toolchain requirements"),
-        "{error}"
-    );
+    let package = repository_package_terminal(&outcome);
+    let crate::package::PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+        panic!("probe did not retain its Starlark rule")
+    };
+    let [requirement] = rule.required_toolchains() else {
+        panic!("probe did not retain its toolchain requirement")
+    };
+    assert_eq!(requirement.label().to_string(), "@@dep+//tools:type");
+    assert!(!requirement.mandatory());
 }
 
 #[tokio::test]

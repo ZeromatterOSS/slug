@@ -49,6 +49,7 @@ use slug_loading_v2::attrs::TransitionDefinition;
 use slug_loading_v2::package::BuildSettingDeclaration;
 use slug_loading_v2::package::NativeToolchainTarget;
 use slug_loading_v2::package::StarlarkRuleImplementation;
+use slug_loading_v2::package::ToolchainTypeRequirement;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathNodeKind;
@@ -87,6 +88,8 @@ use crate::result::ConfiguredActionToolchainContext;
 use crate::result::ConfiguredNodeKind;
 use crate::result::ConfiguredNodeResult;
 use crate::result::ConfiguredPlatform;
+use crate::result::ConfiguredToolchainResolution;
+use crate::result::ConfiguredToolchainResolutionRow;
 use crate::result::PlatformSemanticFact;
 use crate::result::ToolchainSelection;
 use crate::result::ToolchainTopology;
@@ -216,6 +219,18 @@ pub struct ConfiguredPlatformKey(NormalizedAbsolutePath, ConfiguredTargetKey);
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
 pub struct ConfiguredTargetPlatformKey(NormalizedAbsolutePath, ConfigurationKey);
 
+/// Provider-free, structural identity for configured toolchain selection.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+pub struct ConfiguredToolchainResolutionKey {
+    workspace: NormalizedAbsolutePath,
+    configuration: ConfigurationKey,
+    requirements: Arc<[ToolchainTypeRequirement]>,
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+pub struct ConfiguredToolchainResolutionObservationKey(ConfiguredToolchainResolutionKey);
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative)]
 pub enum ConfiguredConditionMatch {
     Match,
@@ -229,6 +244,12 @@ pub type ConfiguredConditionOutcome = LoadingPreparationOutcome<
 pub type ConfiguredPlatformOutcome = LoadingPreparationOutcome<
     Result<Arc<Result<Arc<ConfiguredPlatform>, AnalysisError>>, ObservedPathFrontierError>,
 >;
+
+pub type ConfiguredToolchainResolutionOutcome =
+    LoadingPreparationOutcome<Arc<Result<Arc<ConfiguredToolchainResolution>, AnalysisError>>>;
+#[doc(hidden)]
+pub type ObservedConfiguredToolchainResolutionOutcome =
+    AnalysisDriverOutcome<Arc<Result<Arc<ConfiguredToolchainResolution>, AnalysisError>>>;
 
 impl ConfiguredConditionKey {
     pub fn new(
@@ -277,6 +298,62 @@ impl ConfiguredTargetPlatformKey {
             ));
         }
         Ok(Self(workspace, configuration))
+    }
+}
+
+impl ConfiguredToolchainResolutionKey {
+    pub fn new(
+        workspace: NormalizedAbsolutePath,
+        configuration: ConfigurationKey,
+        requirements: Arc<[ToolchainTypeRequirement]>,
+    ) -> Result<Self, AnalysisError> {
+        if configuration.kind() != ConfigurationKind::Target
+            || configuration.slug_configuration().is_none()
+        {
+            return Err(AnalysisError::message(
+                "configured toolchain resolution requires a structural target configuration",
+            ));
+        }
+        Ok(Self {
+            workspace,
+            configuration,
+            requirements,
+        })
+    }
+
+    pub fn workspace(&self) -> &NormalizedAbsolutePath {
+        &self.workspace
+    }
+
+    pub fn configuration(&self) -> &ConfigurationKey {
+        &self.configuration
+    }
+
+    pub fn requirements(&self) -> &[ToolchainTypeRequirement] {
+        &self.requirements
+    }
+}
+
+impl ConfiguredToolchainResolutionObservationKey {
+    #[doc(hidden)]
+    pub fn new(
+        workspace: NormalizedAbsolutePath,
+        configuration: ConfigurationKey,
+        requirements: Arc<[ToolchainTypeRequirement]>,
+    ) -> Result<Self, AnalysisError> {
+        ConfiguredToolchainResolutionKey::new(workspace, configuration, requirements).map(Self)
+    }
+
+    pub fn workspace(&self) -> &NormalizedAbsolutePath {
+        self.0.workspace()
+    }
+
+    pub fn configuration(&self) -> &ConfigurationKey {
+        self.0.configuration()
+    }
+
+    pub fn requirements(&self) -> &[ToolchainTypeRequirement] {
+        self.0.requirements()
     }
 }
 
@@ -907,8 +984,10 @@ async fn compute_configured_condition(
                 LoadingPreparationOutcome::Complete(Ok(Ok(constraint))) => {
                     constraint_match &= platform.as_ref().is_some_and(|platform| {
                         platform.constraints().iter().any(|candidate| {
-                            candidate.constraint_setting() == constraint.constraint_setting()
-                                && candidate.constraint_value() == constraint.constraint_value()
+                            candidate.constraint_setting().label()
+                                == constraint.constraint_setting().label()
+                                && candidate.constraint_value().label()
+                                    == constraint.constraint_value().label()
                         })
                     });
                 }
@@ -1909,6 +1988,32 @@ async fn compute_configured_platform(
     let requested_result = analysis_value!(observed_configured_result(ctx, &key.0, &key.1).await);
     let (actual, platform) =
         analysis_value!(observed_actual_result(ctx, &key.0, requested_result).await);
+    if key.1.configuration().kind() == ConfigurationKind::Exec {
+        let structural = key
+            .1
+            .configuration()
+            .slug_configuration()
+            .expect("exec platform configuration remains structural");
+        let normalized = match structural.to_exec_for_platform(actual.label()) {
+            Ok(configuration) => ConfiguredTargetKey::new(
+                actual.label().clone(),
+                ConfigurationKey::from_slug(configuration),
+            ),
+            Err(error) => {
+                return analysis_semantic_complete(Err(AnalysisError::message(error.to_string())));
+            }
+        };
+        if normalized != actual {
+            let platform =
+                analysis_value!(resolution_platform(ctx, key.0.dupe(), normalized).await);
+            return analysis_semantic_complete(Ok(Arc::new(ConfiguredPlatform::new(
+                key.1.clone(),
+                platform.actual().clone(),
+                platform.fact().clone(),
+                platform.constraints().to_vec().into(),
+            ))));
+        }
+    }
     if platform.kind() != &ConfiguredNodeKind::Platform || !platform.diagnostics().is_empty() {
         return analysis_semantic_complete(Err(AnalysisError::message(format!(
             "configured platform {} has invalid semantic shape",
@@ -2009,16 +2114,6 @@ type ConfiguredPackages = Vec<(PackageIdentifier, ConfiguredPackageValue)>;
 struct PreparedRegistrations {
     execution_platforms: Arc<[CanonicalLabel]>,
     toolchains: Arc<[CanonicalLabel]>,
-}
-
-impl PreparedRegistrations {
-    fn execution_platforms(&self) -> &[CanonicalLabel] {
-        &self.execution_platforms
-    }
-
-    fn toolchains(&self) -> &[CanonicalLabel] {
-        &self.toolchains
-    }
 }
 
 fn toolchain_outcome(result: Result<PreparedToolchain, AnalysisError>) -> PreparedToolchainOutcome {
@@ -2325,46 +2420,6 @@ fn local_toolchain_declarations(
         .collect()
 }
 
-fn rule_execution_platforms(
-    configuration: &ConfigurationKey,
-    registrations: Option<&PreparedRegistrations>,
-    local_declarations: &SmallSet<CanonicalLabel>,
-    has_toolchain_requirement: bool,
-) -> Result<Option<Vec<ConfiguredTargetKey>>, AnalysisError> {
-    let Some(registrations) = registrations else {
-        debug_assert!(!has_toolchain_requirement && local_declarations.is_empty());
-        return Ok(None);
-    };
-    let toolchains = registrations.toolchains();
-    if !has_toolchain_requirement {
-        let registered = toolchains
-            .iter()
-            .any(|declaration| local_declarations.contains(declaration));
-        if !registered {
-            return Ok(None);
-        }
-    }
-    let Some(structural) = configuration.slug_configuration() else {
-        return Err(AnalysisError::new(
-            "execution-platform topology requires a structural Slug configuration",
-        ));
-    };
-    let platforms = registrations
-        .execution_platforms()
-        .iter()
-        .cloned()
-        .map(|label| {
-            structural
-                .to_exec_for_platform(&label)
-                .map(|configuration| {
-                    ConfiguredTargetKey::new(label, ConfigurationKey::from_slug(configuration))
-                })
-                .map_err(|error| AnalysisError::new(error.to_string()))
-        })
-        .collect::<Result<_, _>>()?;
-    Ok(Some(platforms))
-}
-
 fn root_apparent_type(label: &CanonicalLabel) -> Result<CompactString, AnalysisError> {
     if !label.package().repo().is_root() {
         return Err(AnalysisError::new(format!(
@@ -2490,38 +2545,6 @@ struct PreparedExecutionPlatform {
     constraints: Vec<ConfiguredActionPlatformConstraint>,
 }
 
-type PreparedExecutionPlatformOutcome = AnalysisSemanticOutcome<PreparedExecutionPlatform>;
-
-async fn prepare_execution_platform(
-    ctx: &mut DiceComputations<'_>,
-    _mode: ConfiguredAnalysisMode,
-    workspace: &NormalizedAbsolutePath,
-    key: ConfiguredTargetKey,
-) -> PreparedExecutionPlatformOutcome {
-    let platform_key = ConfiguredPlatformKey::new(workspace.dupe(), key)
-        .expect("execution platform inherits structural exec configuration");
-    let platform = match ctx.compute(&platform_key).await {
-        Ok(LoadingPreparationOutcome::Need(need)) => return LoadingPreparationOutcome::Need(need),
-        Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
-            return LoadingPreparationOutcome::Complete(Err(error));
-        }
-        Ok(LoadingPreparationOutcome::Complete(Ok(result))) => match result.as_ref() {
-            Ok(platform) => platform.dupe(),
-            Err(error) => return analysis_semantic_complete(Err(error.clone())),
-        },
-        Err(error) => {
-            return analysis_semantic_complete(Err(AnalysisError::message(format!(
-                "computing selected execution platform through DICE: {error}"
-            ))));
-        }
-    };
-    analysis_semantic_complete(Ok(PreparedExecutionPlatform {
-        key: platform.actual().clone(),
-        fact: platform.fact().clone(),
-        constraints: platform.constraints().to_vec(),
-    }))
-}
-
 async fn load_configured_native_packages(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
@@ -2603,48 +2626,6 @@ async fn load_configured_native_packages(
             return analysis_semantic_complete(Err(error));
         }
     }
-}
-
-async fn prepare_default_action_context(
-    ctx: &mut DiceComputations<'_>,
-    mode: ConfiguredAnalysisMode,
-    workspace: &NormalizedAbsolutePath,
-    owner: &ConfiguredTargetKey,
-    candidates: Option<&[ConfiguredTargetKey]>,
-) -> AnalysisSemanticOutcome<Arc<ConfiguredActionOwnerContext>> {
-    let Some([platform_key]) = candidates else {
-        return analysis_semantic_complete(
-            ConfiguredActionOwnerContext::unresolved_default(owner.clone())
-                .map(Arc::new)
-                .map_err(AnalysisError::new),
-        );
-    };
-    let platform =
-        match prepare_execution_platform(ctx, mode, workspace, platform_key.clone()).await {
-            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
-            LoadingPreparationOutcome::Complete(Err(error)) => {
-                return LoadingPreparationOutcome::Complete(Err(error));
-            }
-            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-                return analysis_semantic_complete(Err(error));
-            }
-            LoadingPreparationOutcome::Complete(Ok(Ok(platform))) => platform,
-        };
-    analysis_semantic_complete(
-        ConfiguredActionOwnerContext::new(
-            owner.clone(),
-            ConfiguredActionExecGroup::Default,
-            platform.key,
-            platform.fact,
-            &BTreeMap::new(),
-            &BTreeMap::new(),
-            platform.constraints,
-            None,
-            ConfiguredActionAspectProvenance::Absent,
-        )
-        .map(Arc::new)
-        .map_err(AnalysisError::new),
-    )
 }
 
 fn validate_constraint_settings(
@@ -2750,20 +2731,13 @@ fn validate_marker_toolchain(
         toolchain_type,
         implementation,
         exec_compatible_with,
-        target_compatible_with,
-        use_target_platform_constraints,
-        target_settings: _,
+        ..
     }) = &target.kind
     else {
         return Err(AnalysisError::new(format!(
             "registered toolchain is not toolchain: {label}"
         )));
     };
-    if !target_compatible_with.value().is_empty() || *use_target_platform_constraints.value() {
-        return Err(AnalysisError::new(format!(
-            "registered toolchain uses unsupported target compatibility: {label}"
-        )));
-    }
     if !matches!(package_target(packages, toolchain_type), Ok(target) if matches!(target.kind, PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)))
     {
         return Err(AnalysisError::new(format!(
@@ -2904,52 +2878,6 @@ async fn prepare_toolchain_target_settings(
         .collect()))
 }
 
-fn select_root_toolchain(
-    packages: &ConfiguredPackages,
-    required: &CanonicalLabel,
-    platforms: &[CanonicalLabel],
-    toolchains: &[CanonicalLabel],
-    target_settings: &SmallMap<CanonicalLabel, bool>,
-) -> Result<(CanonicalLabel, CanonicalLabel, CanonicalLabel), AnalysisError> {
-    for platform_label in platforms {
-        let platform = package_target(packages, platform_label)?;
-        let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform {
-            constraint_values,
-        }) = &platform.kind
-        else {
-            unreachable!("registered platforms were prevalidated")
-        };
-        for declaration in toolchains {
-            let toolchain = package_target(packages, declaration)?;
-            let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
-                toolchain_type,
-                implementation,
-                exec_compatible_with,
-                ..
-            }) = &toolchain.kind
-            else {
-                unreachable!("registered toolchains were prevalidated")
-            };
-            if target_settings.get(declaration) == Some(&true)
-                && toolchain_type == required
-                && exec_compatible_with
-                    .value()
-                    .iter()
-                    .all(|value| constraint_values.contains(value))
-            {
-                return Ok((
-                    platform_label.clone(),
-                    declaration.clone(),
-                    implementation.clone(),
-                ));
-            }
-        }
-    }
-    Err(AnalysisError::new(format!(
-        "no compatible toolchain was registered for {required}"
-    )))
-}
-
 #[allow(clippy::too_many_arguments)]
 async fn prepare_selected_toolchain(
     ctx: &mut DiceComputations<'_>,
@@ -2986,24 +2914,20 @@ async fn prepare_selected_toolchain(
             Err(error) => return toolchain_outcome(Err(error.clone())),
         },
     };
-    let topology_is_exact = if declaration.package() == implementation.package() {
-        result.edges().len() == candidates.len()
-            && result
-                .edges()
-                .iter()
-                .zip(candidates)
-                .enumerate()
-                .all(|(index, (edge, platform))| {
-                    edge.target() == &ConfiguredNodeKey::configured(platform.clone())
-                        && matches!(edge.kind(), crate::configured_target::ConfiguredEdgeKind::CandidateExecutionPlatform { index: edge_index } if *edge_index == u32::try_from(index).expect("candidate index fits u32"))
-                })
-            && result.toolchain_topology().is_some_and(|topology| {
-                topology.candidate_execution_platforms() == candidates
-                    && topology.selection().is_none()
+    let topology_is_exact = result.edges().len() == candidates.len()
+        && result
+            .edges()
+            .iter()
+            .zip(candidates)
+            .enumerate()
+            .all(|(index, (edge, platform))| {
+                edge.target() == &ConfiguredNodeKey::configured(platform.clone())
+                    && matches!(edge.kind(), crate::configured_target::ConfiguredEdgeKind::CandidateExecutionPlatform { index: edge_index } if *edge_index == u32::try_from(index).expect("candidate index fits u32"))
             })
-    } else {
-        result.edges().is_empty() && result.toolchain_topology().is_none()
-    };
+        && result.toolchain_topology().is_some_and(|topology| {
+            topology.candidate_execution_platforms() == candidates
+                && topology.selection().is_none()
+        });
     if !topology_is_exact
         || !result.diagnostics().is_empty()
         || result.providers().len() != 2
@@ -3047,79 +2971,513 @@ async fn prepare_selected_toolchain(
     }))
 }
 
-async fn resolve_root_toolchain(
+fn resolution_success_eq(
+    left: &ConfiguredToolchainResolutionOutcome,
+    right: &ConfiguredToolchainResolutionOutcome,
+) -> bool {
+    matches!(
+        (left, right),
+        (
+            LoadingPreparationOutcome::Complete(left),
+            LoadingPreparationOutcome::Complete(right),
+        ) if matches!((left.as_ref(), right.as_ref()), (Ok(left), Ok(right)) if left == right)
+    )
+}
+
+fn resolution_is_success(value: &ConfiguredToolchainResolutionOutcome) -> bool {
+    matches!(value, LoadingPreparationOutcome::Complete(value) if value.as_ref().is_ok())
+}
+
+async fn resolution_platform(
+    ctx: &mut DiceComputations<'_>,
+    workspace: NormalizedAbsolutePath,
+    key: ConfiguredTargetKey,
+) -> AnalysisSemanticOutcome<Arc<ConfiguredPlatform>> {
+    let key = match ConfiguredPlatformKey::new(workspace, key) {
+        Ok(key) => key,
+        Err(error) => return analysis_semantic_complete(Err(error)),
+    };
+    match ctx.compute(&key).await {
+        Ok(LoadingPreparationOutcome::Need(need)) => LoadingPreparationOutcome::Need(need),
+        Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
+            LoadingPreparationOutcome::Complete(Err(error))
+        }
+        Ok(LoadingPreparationOutcome::Complete(Ok(value))) => analysis_semantic_complete(
+            value
+                .as_ref()
+                .as_ref()
+                .map(|value| value.dupe())
+                .map_err(|error| error.clone()),
+        ),
+        Err(error) => analysis_semantic_complete(Err(AnalysisError::message(format!(
+            "computing configured execution platform through DICE: {error}"
+        )))),
+    }
+}
+
+async fn prepare_execution_platform_registrations(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
-    required: &CanonicalLabel,
-    owner: &ConfiguredTargetKey,
-    candidate_execution_platforms: &[ConfiguredTargetKey],
-    registrations: &PreparedRegistrations,
-) -> PreparedToolchainOutcome {
-    let required_type = match root_apparent_type(required) {
-        Ok(required_type) => required_type,
-        Err(error) => return toolchain_outcome(Err(error)),
+    configuration: &ConfigurationKey,
+) -> AnalysisSemanticOutcome<Arc<[CanonicalLabel]>> {
+    let Some(structural) = configuration.slug_configuration() else {
+        return analysis_semantic_complete(Err(AnalysisError::message(
+            "execution-platform registration requires a structural Slug configuration",
+        )));
     };
-    let toolchain_labels = registrations.toolchains();
-    let mut labels = candidate_execution_platforms
-        .iter()
-        .map(|candidate| candidate.label().clone())
-        .collect::<Vec<_>>();
-    labels.extend(toolchain_labels.iter().cloned());
-    labels.push(required.clone());
-    let packages = match load_configured_native_packages(ctx, mode, workspace, &mut labels).await {
-        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
-        LoadingPreparationOutcome::Complete(Err(error)) => {
+    let command = compute_registration_expansion_input(
+        ctx,
+        mode,
+        workspace.dupe(),
+        structural,
+        RegistrationExpansionSource::Command,
+        true,
+        "loading command execution-platform registrations through DICE",
+    )
+    .await;
+    let module = compute_registration_expansion_input(
+        ctx,
+        mode,
+        workspace.dupe(),
+        structural,
+        RegistrationExpansionSource::Module,
+        true,
+        "loading MODULE execution-platform registrations through DICE",
+    )
+    .await;
+    let mut need = None;
+    let mut outer = None;
+    let mut outer_message = None;
+    let mut semantic = None;
+    let mut values = [None, None];
+    for (index, value) in [command, module].into_iter().enumerate() {
+        match value {
+            RegistrationExpansionInput::Need(value) => {
+                need = Some(
+                    need.map_or(value.clone(), |current: LoadingPreparationNeeds| {
+                        current.try_union(&value).expect("registration Needs agree")
+                    }),
+                );
+            }
+            RegistrationExpansionInput::OuterPath(error) if outer.is_none() => outer = Some(error),
+            RegistrationExpansionInput::OuterMessage(error) if outer_message.is_none() => {
+                outer_message = Some(error)
+            }
+            RegistrationExpansionInput::Semantic(error) if semantic.is_none() => {
+                semantic = Some(error)
+            }
+            RegistrationExpansionInput::Value(value) => match value.labels() {
+                Ok(_) => values[index] = Some(value),
+                Err(error) if semantic.is_none() => {
+                    semantic = Some(AnalysisError::message(error.to_string()))
+                }
+                Err(_) => {}
+            },
+            _ => {}
+        }
+    }
+    if let Some(error) = outer {
+        return LoadingPreparationOutcome::Complete(Err(error));
+    }
+    if let Some(error) = outer_message {
+        return analysis_semantic_complete(Err(error));
+    }
+    if let Some(need) = need {
+        return LoadingPreparationOutcome::Need(need);
+    }
+    if let Some(error) = semantic {
+        return analysis_semantic_complete(Err(error));
+    }
+    let [Some(command), Some(module)] = values else {
+        unreachable!("complete execution-platform registration retains both sources")
+    };
+    analysis_semantic_complete(merge_registration_labels(&command, &module))
+}
+
+async fn configured_candidate_execution_platforms(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    configuration: &ConfigurationKey,
+    has_requirements: bool,
+    has_local_declarations: bool,
+) -> AnalysisSemanticOutcome<Vec<ConfiguredTargetKey>> {
+    let labels = if has_requirements || has_local_declarations {
+        match prepare_registrations(
+            ctx,
+            mode,
+            workspace,
+            configuration,
+            has_requirements,
+            has_local_declarations,
+        )
+        .await
+        {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return analysis_semantic_complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(Some(value)))) => value.execution_platforms,
+            LoadingPreparationOutcome::Complete(Ok(Ok(None))) => Arc::from([]),
+        }
+    } else {
+        match prepare_execution_platform_registrations(ctx, mode, workspace, configuration).await {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return analysis_semantic_complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
+        }
+    };
+    let structural = configuration
+        .slug_configuration()
+        .expect("candidate preparation validates structural configuration");
+    let mut labels = labels.to_vec();
+    labels.push(match structural.host_platform_label() {
+        Some(label) => label,
+        None => {
+            return analysis_semantic_complete(Err(AnalysisError::message(
+                "configuration has no canonical host platform",
+            )));
+        }
+    });
+    let mut candidates = Vec::with_capacity(labels.len());
+    let mut seen = SmallSet::with_capacity(labels.len());
+    for (index, label) in labels.iter().enumerate() {
+        let exec = match structural.to_exec_for_platform(label) {
+            Ok(value) => ConfigurationKey::from_slug(value),
+            Err(error) => {
+                return analysis_semantic_complete(Err(AnalysisError::message(error.to_string())));
+            }
+        };
+        let platform = analysis_value!(
+            resolution_platform(
+                ctx,
+                workspace.dupe(),
+                ConfiguredTargetKey::new(label.clone(), exec)
+            )
+            .await
+        );
+        if !seen.insert(platform.actual().clone()) {
+            if index + 1 == labels.len() {
+                continue;
+            }
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "registered execution platforms converge on actual platform {}",
+                platform.actual()
+            ))));
+        }
+        candidates.push(platform.actual().clone());
+    }
+    analysis_semantic_complete(Ok(candidates))
+}
+
+async fn actual_toolchain_target(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    requested: ConfiguredTargetKey,
+) -> AnalysisSemanticOutcome<(ConfiguredTargetKey, Arc<ConfiguredNodeResult>)> {
+    let requested_result =
+        analysis_value!(observed_configured_result(ctx, workspace, &requested).await);
+    observed_actual_result(ctx, workspace, requested_result).await
+}
+
+fn platform_has_actual_constraint(
+    platform: &ConfiguredPlatform,
+    constraint: &(CanonicalLabel, CanonicalLabel),
+) -> bool {
+    platform.constraints().iter().any(|candidate| {
+        candidate.constraint_setting().label() == &constraint.0
+            && candidate.constraint_value().label() == &constraint.1
+    })
+}
+
+fn platform_satisfies_platform_constraints(
+    platform: &ConfiguredPlatform,
+    required: &ConfiguredPlatform,
+) -> bool {
+    required.constraints().iter().all(|constraint| {
+        platform.constraints().iter().any(|candidate| {
+            candidate.constraint_setting().label() == constraint.constraint_setting().label()
+                && candidate.constraint_value().label() == constraint.constraint_value().label()
+        })
+    })
+}
+
+async fn prepared_toolchain_constraints(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    configuration: &ConfigurationKey,
+    labels: SmallSet<CanonicalLabel>,
+) -> AnalysisSemanticOutcome<SmallMap<CanonicalLabel, (CanonicalLabel, CanonicalLabel)>> {
+    let mut resolved = SmallMap::with_capacity(labels.len());
+    for label in labels {
+        let requested = ConfiguredTargetKey::new(label.clone(), configuration.clone());
+        let value =
+            analysis_value!(compute_configured_constraint(ctx, workspace, &requested).await);
+        resolved.insert(
+            label,
+            (
+                value.constraint_setting().label().clone(),
+                value.constraint_value().label().clone(),
+            ),
+        );
+    }
+    analysis_semantic_complete(Ok(resolved))
+}
+
+async fn compute_configured_toolchain_resolution(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    key: &ConfiguredToolchainResolutionKey,
+) -> AnalysisSemanticOutcome<Arc<ConfiguredToolchainResolution>> {
+    let target_platform_key =
+        ConfiguredTargetPlatformKey::new(key.workspace.dupe(), key.configuration.clone())
+            .expect("resolution key validates a structural target configuration");
+    let target_platform = match ctx.compute(&target_platform_key).await {
+        Ok(LoadingPreparationOutcome::Need(need)) => return LoadingPreparationOutcome::Need(need),
+        Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
             return LoadingPreparationOutcome::Complete(Err(error));
         }
-        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-            return toolchain_outcome(Err(error));
+        Ok(LoadingPreparationOutcome::Complete(Ok(value))) => match value.as_ref() {
+            Ok(value) => value.dupe(),
+            Err(error) => return analysis_semantic_complete(Err(error.clone())),
+        },
+        Err(error) => {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "computing configured target platform through DICE: {error}"
+            ))));
         }
-        LoadingPreparationOutcome::Complete(Ok(Ok(packages))) => packages,
     };
-    if !matches!(package_target(&packages, required), Ok(target) if matches!(target.kind, PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)))
-    {
-        return toolchain_outcome(Err(AnalysisError::new(format!(
-            "required toolchain type is not toolchain_type: {required}"
+
+    let registrations = if key.requirements.is_empty() {
+        match prepare_execution_platform_registrations(
+            ctx,
+            mode,
+            &key.workspace,
+            &key.configuration,
+        )
+        .await
+        {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return analysis_semantic_complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(labels))) => (labels, Arc::from([])),
+        }
+    } else {
+        match prepare_registrations(ctx, mode, &key.workspace, &key.configuration, true, false)
+            .await
+        {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return analysis_semantic_complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(Some(value)))) => {
+                (value.execution_platforms, value.toolchains)
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(None))) => {
+                unreachable!("required resolution prepares registrations")
+            }
+        }
+    };
+    let structural = key
+        .configuration
+        .slug_configuration()
+        .expect("resolution key validates structural configuration");
+    let host = match structural.host_platform_label() {
+        Some(label) => label,
+        None => {
+            return analysis_semantic_complete(Err(AnalysisError::message(
+                "configuration has no canonical host platform",
+            )));
+        }
+    };
+    let mut candidate_labels = registrations.0.to_vec();
+    candidate_labels.push(host);
+    let candidate_outcomes = ctx
+        .compute_join(candidate_labels.iter().cloned(), |ctx, label| {
+            let configuration = structural
+                .to_exec_for_platform(&label)
+                .map(ConfigurationKey::from_slug)
+                .map_err(|error| AnalysisError::message(error.to_string()));
+            let workspace = key.workspace.dupe();
+            Box::pin(async move {
+                let value = match configuration {
+                    Ok(configuration) => {
+                        resolution_platform(
+                            ctx,
+                            workspace,
+                            ConfiguredTargetKey::new(label.clone(), configuration),
+                        )
+                        .await
+                    }
+                    Err(error) => analysis_semantic_complete(Err(error)),
+                };
+                (label, value)
+            })
+        })
+        .await;
+    let mut platforms = Vec::with_capacity(candidate_outcomes.len());
+    let mut seen = SmallMap::with_capacity(candidate_outcomes.len());
+    let mut need = None;
+    let mut outer = None;
+    let mut semantic = None;
+    for (index, (label, value)) in candidate_outcomes.into_iter().enumerate() {
+        match value {
+            LoadingPreparationOutcome::Need(value) => {
+                need = Some(
+                    need.map_or(value.clone(), |current: LoadingPreparationNeeds| {
+                        current.try_union(&value).expect("platform Needs agree")
+                    }),
+                )
+            }
+            LoadingPreparationOutcome::Complete(Err(error)) if outer.is_none() => {
+                outer = Some(error)
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) if semantic.is_none() => {
+                semantic = Some(error)
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(platform))) => {
+                if let Some(previous) = seen.get(platform.actual()) {
+                    if index + 1 == candidate_labels.len() {
+                        continue;
+                    }
+                    if semantic.is_none() {
+                        semantic = Some(AnalysisError::message(format!(
+                            "registered execution platforms {previous} and {label} resolve to the same actual platform {}",
+                            platform.actual()
+                        )));
+                    }
+                    continue;
+                }
+                seen.insert(platform.actual().clone(), label);
+                platforms.push(platform);
+            }
+            _ => {}
+        }
+    }
+    if let Some(error) = outer {
+        return LoadingPreparationOutcome::Complete(Err(error));
+    }
+    if let Some(need) = need {
+        return LoadingPreparationOutcome::Need(need);
+    }
+    if let Some(error) = semantic {
+        return analysis_semantic_complete(Err(error));
+    }
+    let selected_empty = platforms
+        .first()
+        .cloned()
+        .expect("host platform is always a candidate");
+    if key.requirements.is_empty() {
+        return analysis_semantic_complete(Ok(Arc::new(ConfiguredToolchainResolution::new(
+            target_platform,
+            selected_empty,
+            Arc::from([]),
         ))));
     }
-    let platform_labels = candidate_execution_platforms
-        .iter()
-        .map(|platform| platform.label().clone())
-        .collect::<Vec<_>>();
-    for platform_label in &platform_labels {
-        let target = match package_target(&packages, platform_label) {
-            Ok(target) => target,
-            Err(error) => return toolchain_outcome(Err(error)),
+
+    let mut labels = registrations.1.to_vec();
+    labels.extend(
+        key.requirements
+            .iter()
+            .map(|requirement| requirement.label().clone()),
+    );
+    let _packages =
+        match load_configured_native_packages(ctx, mode, &key.workspace, &mut labels).await {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return analysis_semantic_complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
         };
-        let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform {
-            constraint_values,
+    let mut actual_requirements = Vec::with_capacity(key.requirements.len());
+    for requirement in key.requirements.iter() {
+        let requested =
+            ConfiguredTargetKey::new(requirement.label().clone(), key.configuration.clone());
+        let (actual, value) =
+            analysis_value!(actual_toolchain_target(ctx, &key.workspace, requested.clone()).await);
+        if value.kind() != &ConfiguredNodeKind::ToolchainType {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "required toolchain type is not toolchain_type: {}",
+                requirement.label()
+            ))));
+        }
+        actual_requirements.push((requested, actual, requirement.mandatory()));
+    }
+    let mut declarations = Vec::with_capacity(registrations.1.len());
+    for declaration in registrations.1.iter() {
+        let requested = ConfiguredTargetKey::new(declaration.clone(), key.configuration.clone());
+        let (actual, value) =
+            analysis_value!(actual_toolchain_target(ctx, &key.workspace, requested).await);
+        if value.kind() != &ConfiguredNodeKind::ToolchainDeclaration {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "registered toolchain is not toolchain: {declaration}"
+            ))));
+        }
+        declarations.push(actual.label().clone());
+    }
+    let mut declaration_labels = declarations.clone();
+    let packages =
+        match load_configured_native_packages(ctx, mode, &key.workspace, &mut declaration_labels)
+            .await
+        {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return analysis_semantic_complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
+        };
+    let mut declaration_types = SmallMap::with_capacity(declarations.len());
+    for declaration in &declarations {
+        let target = match package_target(&packages, declaration) {
+            Ok(target) => target,
+            Err(error) => return analysis_semantic_complete(Err(error)),
+        };
+        let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+            toolchain_type,
+            ..
         }) = &target.kind
         else {
-            return toolchain_outcome(Err(AnalysisError::new(format!(
-                "registered execution platform is not platform: {platform_label}"
-            ))));
+            unreachable!("checked declaration remains native toolchain");
         };
-        if let Err(error) = validate_constraint_settings(&packages, constraint_values, || {
-            AnalysisError::new(format!(
-                "execution platform has duplicate constraint setting: {platform_label}"
-            ))
-        }) {
-            return toolchain_outcome(Err(error));
+        let type_key = ConfiguredTargetKey::new(toolchain_type.clone(), key.configuration.clone());
+        let (actual_type, value) =
+            analysis_value!(actual_toolchain_target(ctx, &key.workspace, type_key).await);
+        if value.kind() != &ConfiguredNodeKind::ToolchainType {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "registered toolchain has non-toolchain type: {declaration}"
+            ))));
         }
-    }
-    for toolchain_label in toolchain_labels {
-        if let Err(error) = validate_marker_toolchain(&packages, toolchain_label) {
-            return toolchain_outcome(Err(error));
-        }
+        declaration_types.insert(declaration.clone(), actual_type);
     }
     let target_settings = match prepare_toolchain_target_settings(
         ctx,
         mode,
-        workspace,
-        owner.configuration(),
+        &key.workspace,
+        &key.configuration,
         &packages,
-        toolchain_labels,
+        &declarations,
     )
     .await
     {
@@ -3128,27 +3486,225 @@ async fn resolve_root_toolchain(
             return LoadingPreparationOutcome::Complete(Err(error));
         }
         LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-            return toolchain_outcome(Err(error));
+            return analysis_semantic_complete(Err(error));
         }
-        LoadingPreparationOutcome::Complete(Ok(Ok(settings))) => settings,
+        LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
     };
-    let (selected_platform, declaration, implementation) = match select_root_toolchain(
-        &packages,
-        required,
-        &platform_labels,
-        &toolchain_labels,
-        &target_settings,
-    ) {
-        Ok(selected) => selected,
-        Err(error) => return toolchain_outcome(Err(error)),
+    let mut constraint_labels = SmallSet::new();
+    for declaration in &declarations {
+        let target = match package_target(&packages, declaration) {
+            Ok(target) => target,
+            Err(error) => return analysis_semantic_complete(Err(error)),
+        };
+        let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+            exec_compatible_with,
+            target_compatible_with,
+            ..
+        }) = &target.kind
+        else {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "registered toolchain is not toolchain: {declaration}"
+            ))));
+        };
+        constraint_labels.extend(exec_compatible_with.value().iter().cloned());
+        constraint_labels.extend(target_compatible_with.value().iter().cloned());
+    }
+    let constraints = match prepared_toolchain_constraints(
+        ctx,
+        &key.workspace,
+        &key.configuration,
+        constraint_labels,
+    )
+    .await
+    {
+        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Complete(Err(error)) => {
+            return LoadingPreparationOutcome::Complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+            return analysis_semantic_complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
     };
-    let selected_platform_key = candidate_execution_platforms
-        .iter()
-        .find(|platform| platform.label() == &selected_platform)
-        .expect("selected root platform retains its configured candidate identity")
-        .clone();
-    let platform = prepare_execution_platform(ctx, mode, workspace, selected_platform_key).await;
-    let platform = match platform {
+    for declaration in &declarations {
+        let target = match package_target(&packages, declaration) {
+            Ok(target) => target,
+            Err(error) => return analysis_semantic_complete(Err(error)),
+        };
+        let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+            exec_compatible_with,
+            target_compatible_with,
+            use_target_platform_constraints,
+            ..
+        }) = &target.kind
+        else {
+            unreachable!("checked declaration remains native toolchain");
+        };
+        if *use_target_platform_constraints.value()
+            && (!exec_compatible_with.value().is_empty()
+                || !target_compatible_with.value().is_empty())
+        {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "toolchain cannot combine use_target_platform_constraints with explicit execution or target constraints: {declaration}"
+            ))));
+        }
+        for (name, values) in [
+            ("execution", exec_compatible_with.value()),
+            ("target", target_compatible_with.value()),
+        ] {
+            let mut settings = SmallSet::with_capacity(values.len());
+            for value in values.iter() {
+                let setting = constraints
+                    .get(value)
+                    .expect("all declaration constraints were prepared")
+                    .0
+                    .clone();
+                if !settings.insert(setting) {
+                    return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                        "toolchain has duplicate {name} constraint setting: {declaration}"
+                    ))));
+                }
+            }
+        }
+    }
+    let mut groups: SmallMap<ConfiguredTargetKey, (bool, Option<CanonicalLabel>)> = SmallMap::new();
+    for (_, actual, mandatory) in &actual_requirements {
+        let group = groups.entry(actual.clone()).or_insert((false, None));
+        group.0 |= *mandatory;
+    }
+    let mut eligible = groups
+        .keys()
+        .cloned()
+        .map(|actual| (actual, false))
+        .collect::<SmallMap<_, _>>();
+    let mut selected = None;
+    for platform in &platforms {
+        let mut selected_groups = groups.clone();
+        let mut coverage = 0usize;
+        for (actual_type, group) in selected_groups.iter_mut() {
+            for declaration in &declarations {
+                let target = match package_target(&packages, declaration) {
+                    Ok(target) => target,
+                    Err(error) => return analysis_semantic_complete(Err(error)),
+                };
+                let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+                    exec_compatible_with,
+                    target_compatible_with,
+                    use_target_platform_constraints,
+                    ..
+                }) = &target.kind
+                else {
+                    continue;
+                };
+                if declaration_types.get(declaration) != Some(actual_type)
+                    || target_settings.get(declaration) != Some(&true)
+                {
+                    continue;
+                }
+                let execution_matches = if *use_target_platform_constraints.value() {
+                    platform_satisfies_platform_constraints(platform, &target_platform)
+                } else {
+                    exec_compatible_with.value().iter().all(|value| {
+                        platform_has_actual_constraint(
+                            platform,
+                            constraints
+                                .get(value)
+                                .expect("all declaration constraints were prepared"),
+                        )
+                    })
+                };
+                if !execution_matches {
+                    continue;
+                }
+                if !*use_target_platform_constraints.value()
+                    && !target_compatible_with.value().iter().all(|value| {
+                        platform_has_actual_constraint(
+                            target_platform.as_ref(),
+                            constraints
+                                .get(value)
+                                .expect("all declaration constraints were prepared"),
+                        )
+                    })
+                {
+                    continue;
+                }
+                *eligible
+                    .get_mut(actual_type)
+                    .expect("selected group remains eligible map key") = true;
+                group.1 = Some(declaration.clone());
+                coverage += 1;
+                break;
+            }
+        }
+        if selected_groups
+            .values()
+            .any(|(mandatory, declaration)| *mandatory && declaration.is_none())
+        {
+            continue;
+        }
+        if selected
+            .as_ref()
+            .is_none_or(|(_, best, _)| coverage > *best)
+        {
+            selected = Some((platform.clone(), coverage, selected_groups));
+        }
+    }
+    for (actual, (mandatory, _)) in groups.iter() {
+        if *mandatory && !eligible.get(actual).copied().unwrap_or(false) {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "no compatible toolchain was registered for {actual}"
+            ))));
+        }
+    }
+    let Some((execution_platform, _, selections)) = selected else {
+        return analysis_semantic_complete(Err(AnalysisError::message(
+            "no common execution platform satisfies mandatory toolchain types",
+        )));
+    };
+    let rows = actual_requirements
+        .into_iter()
+        .map(|(requested, actual, mandatory)| {
+            let declaration = selections
+                .get(&actual)
+                .expect("every requirement has a group")
+                .1
+                .clone();
+            ConfiguredToolchainResolutionRow::new(requested, actual, mandatory, declaration)
+        })
+        .collect::<Vec<_>>()
+        .into();
+    analysis_semantic_complete(Ok(Arc::new(ConfiguredToolchainResolution::new(
+        target_platform,
+        execution_platform,
+        rows,
+    ))))
+}
+
+/// The old marker-only implementation path remains a post-selection bridge.
+/// It is intentionally unavailable to multi-type and optional resolutions.
+async fn prepare_marker_toolchain_bridge(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    owner: &ConfiguredTargetKey,
+    resolution: &ConfiguredToolchainResolution,
+    candidates: &[ConfiguredTargetKey],
+) -> PreparedToolchainOutcome {
+    let [row] = resolution.rows() else {
+        return toolchain_outcome(Err(AnalysisError::message("marker bridge is unavailable")));
+    };
+    let Some(declaration) = row.declaration().cloned() else {
+        return toolchain_outcome(Err(AnalysisError::message(
+            "marker bridge requires a selected declaration",
+        )));
+    };
+    if !row.mandatory() {
+        return toolchain_outcome(Err(AnalysisError::message(
+            "marker bridge requires a mandatory type",
+        )));
+    }
+    let mut labels = vec![declaration.clone()];
+    let packages = match load_configured_native_packages(ctx, mode, workspace, &mut labels).await {
         LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
         LoadingPreparationOutcome::Complete(Err(error)) => {
             return LoadingPreparationOutcome::Complete(Err(error));
@@ -3158,20 +3714,134 @@ async fn resolve_root_toolchain(
         }
         LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
     };
-
+    if let Err(error) = validate_marker_toolchain(&packages, &declaration) {
+        return toolchain_outcome(Err(error));
+    }
+    let implementation = match package_target(&packages, &declaration) {
+        Ok(slug_loading_v2::PackageTarget {
+            kind:
+                PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+                    implementation,
+                    ..
+                }),
+            ..
+        }) => implementation.clone(),
+        Ok(_) => unreachable!("validated marker declaration remains toolchain"),
+        Err(error) => return toolchain_outcome(Err(error)),
+    };
+    let required_type = match root_apparent_type(row.requested().label()) {
+        Ok(value) => value,
+        Err(error) => return toolchain_outcome(Err(error)),
+    };
+    let platform = PreparedExecutionPlatform {
+        key: resolution.execution_platform().actual().clone(),
+        fact: resolution.execution_platform().fact().clone(),
+        constraints: resolution.execution_platform().constraints().to_vec(),
+    };
     prepare_selected_toolchain(
         ctx,
         mode,
         workspace,
         owner,
-        required,
+        row.requested().label(),
         required_type,
-        candidate_execution_platforms,
+        candidates,
         declaration,
         implementation,
         platform,
     )
     .await
+}
+
+#[async_trait]
+impl Key for ConfiguredToolchainResolutionKey {
+    type Value = ConfiguredToolchainResolutionOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match compute_configured_toolchain_resolution(ctx, ConfiguredAnalysisMode::Legacy, self)
+            .await
+        {
+            LoadingPreparationOutcome::Need(need) => LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                panic!("legacy configured toolchain resolution produced frontier error: {error}")
+            }
+            LoadingPreparationOutcome::Complete(Ok(value)) => {
+                LoadingPreparationOutcome::Complete(Arc::new(value))
+            }
+        }
+    }
+
+    fn equality(left: &Self::Value, right: &Self::Value) -> bool {
+        resolution_success_eq(left, right)
+    }
+    fn validity(value: &Self::Value) -> bool {
+        resolution_is_success(value)
+    }
+}
+
+#[async_trait]
+impl Key for ConfiguredToolchainResolutionObservationKey {
+    type Value = ObservedConfiguredToolchainResolutionOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match compute_configured_toolchain_resolution(
+            ctx,
+            ConfiguredAnalysisMode::Observed,
+            &self.0,
+        )
+        .await
+        {
+            LoadingPreparationOutcome::Need(need) => LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                LoadingPreparationOutcome::Complete(Err(error))
+            }
+            LoadingPreparationOutcome::Complete(Ok(value)) => {
+                LoadingPreparationOutcome::Complete(Ok(Arc::new(value)))
+            }
+        }
+    }
+
+    fn equality(left: &Self::Value, right: &Self::Value) -> bool {
+        match (left, right) {
+            (
+                LoadingPreparationOutcome::Complete(Err(left)),
+                LoadingPreparationOutcome::Complete(Err(right)),
+            ) => left == right,
+            (
+                LoadingPreparationOutcome::Complete(Ok(left)),
+                LoadingPreparationOutcome::Complete(Ok(right)),
+            ) => matches!((left.as_ref(), right.as_ref()), (Ok(left), Ok(right)) if left == right),
+            _ => false,
+        }
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        match value {
+            LoadingPreparationOutcome::Complete(Err(_)) => true,
+            LoadingPreparationOutcome::Complete(Ok(value)) => value.as_ref().is_ok(),
+            LoadingPreparationOutcome::Need(_) => false,
+        }
+    }
+}
+
+impl fmt::Display for ConfiguredToolchainResolutionKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "configured-toolchain-resolution:{}", self.configuration)
+    }
+}
+
+impl fmt::Display for ConfiguredToolchainResolutionObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
 }
 
 #[cfg(test)]
@@ -3783,107 +4453,6 @@ impl ConfiguredNodeAnalysisKey {
             }
             LoadingPreparationOutcome::Complete(Ok(Ok(values))) => values,
         };
-        let requirement = {
-            let rule = match starlark_rule_implementation(package, configured_target) {
-                Ok(rule) => rule,
-                Err(error) => return root_analysis_driver_complete(Err(error)),
-            };
-            if rule.required_toolchains().len() > 1 {
-                return root_analysis_driver_complete(Err(AnalysisError::new(
-                    "toolchain resolution supports exactly zero or one required type",
-                )));
-            }
-            rule.required_toolchains()
-                .first()
-                .map(|requirement| requirement.label().clone())
-        };
-        let local_declarations = local_toolchain_declarations(package, configured_target.label());
-        let registrations = match prepare_registrations(
-            ctx,
-            mode,
-            &self.workspace,
-            configured_target.configuration(),
-            requirement.is_some(),
-            !local_declarations.is_empty(),
-        )
-        .await
-        {
-            LoadingPreparationOutcome::Need(need) => {
-                return LoadingPreparationOutcome::Need(need);
-            }
-            LoadingPreparationOutcome::Complete(Err(error)) => {
-                return LoadingPreparationOutcome::Complete(Err(error));
-            }
-            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-                return root_analysis_driver_complete(Err(error));
-            }
-            LoadingPreparationOutcome::Complete(Ok(Ok(registrations))) => registrations,
-        };
-        let candidate_execution_platforms = match rule_execution_platforms(
-            configured_target.configuration(),
-            registrations.as_ref(),
-            &local_declarations,
-            requirement.is_some(),
-        ) {
-            Ok(platforms) => platforms,
-            Err(error) => return root_analysis_driver_complete(Err(error)),
-        };
-        let prepared_toolchain = if let Some(requirement) = requirement {
-            let candidates = candidate_execution_platforms
-                .as_ref()
-                .expect("a toolchain requirement prepares candidate execution platforms");
-            let registrations = registrations
-                .as_ref()
-                .expect("a toolchain requirement prepares module registrations");
-            match resolve_root_toolchain(
-                ctx,
-                mode,
-                &self.workspace,
-                &requirement,
-                configured_target,
-                candidates,
-                registrations,
-            )
-            .await
-            {
-                LoadingPreparationOutcome::Need(need) => {
-                    return LoadingPreparationOutcome::Need(need);
-                }
-                LoadingPreparationOutcome::Complete(Err(error)) => {
-                    return LoadingPreparationOutcome::Complete(Err(error));
-                }
-                LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-                    return root_analysis_driver_complete(Err(error));
-                }
-                LoadingPreparationOutcome::Complete(Ok(Ok(value))) => Some(value),
-            }
-        } else {
-            None
-        };
-        let action_context = if let Some(toolchain) = &prepared_toolchain {
-            toolchain.action_context.clone()
-        } else {
-            match prepare_default_action_context(
-                ctx,
-                mode,
-                &self.workspace,
-                configured_target,
-                candidate_execution_platforms.as_deref(),
-            )
-            .await
-            {
-                LoadingPreparationOutcome::Need(need) => {
-                    return LoadingPreparationOutcome::Need(need);
-                }
-                LoadingPreparationOutcome::Complete(Err(error)) => {
-                    return LoadingPreparationOutcome::Complete(Err(error));
-                }
-                LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-                    return root_analysis_driver_complete(Err(error));
-                }
-                LoadingPreparationOutcome::Complete(Ok(Ok(context))) => context,
-            }
-        };
         let declared_dependency_keys = match root_declared_dependency_keys(
             ctx,
             mode,
@@ -3975,7 +4544,122 @@ impl ConfiguredNodeAnalysisKey {
         if let Some(error) = first_error {
             return root_analysis_driver_complete(Err(error));
         }
-
+        let requirements = match starlark_rule_implementation(package, configured_target) {
+            Ok(rule) => Arc::from(rule.required_toolchains()),
+            Err(error) => return root_analysis_driver_complete(Err(error)),
+        };
+        let resolution_key = match ConfiguredToolchainResolutionKey::new(
+            self.workspace.dupe(),
+            configured_target.configuration().clone(),
+            requirements,
+        ) {
+            Ok(key) => key,
+            Err(error) => return root_analysis_driver_complete(Err(error)),
+        };
+        let resolution = match mode {
+            ConfiguredAnalysisMode::Legacy => match ctx.compute(&resolution_key).await {
+                Ok(LoadingPreparationOutcome::Need(need)) => {
+                    return LoadingPreparationOutcome::Need(need);
+                }
+                Ok(LoadingPreparationOutcome::Complete(value)) => match value.as_ref() {
+                    Ok(value) => value.dupe(),
+                    Err(error) => return root_analysis_driver_complete(Err(error.clone())),
+                },
+                Err(error) => {
+                    return root_analysis_driver_complete(Err(AnalysisError::message(format!(
+                        "computing configured toolchain resolution through DICE: {error}"
+                    ))));
+                }
+            },
+            ConfiguredAnalysisMode::Observed => match ctx
+                .compute(&ConfiguredToolchainResolutionObservationKey(resolution_key))
+                .await
+            {
+                Ok(LoadingPreparationOutcome::Need(need)) => {
+                    return LoadingPreparationOutcome::Need(need);
+                }
+                Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
+                    return LoadingPreparationOutcome::Complete(Err(error));
+                }
+                Ok(LoadingPreparationOutcome::Complete(Ok(value))) => match value.as_ref() {
+                    Ok(value) => value.dupe(),
+                    Err(error) => return root_analysis_driver_complete(Err(error.clone())),
+                },
+                Err(error) => {
+                    return root_analysis_driver_complete(Err(AnalysisError::message(format!(
+                        "computing observed configured toolchain resolution through DICE: {error}"
+                    ))));
+                }
+            },
+        };
+        let local_declarations = local_toolchain_declarations(package, configured_target.label());
+        let candidate_execution_platforms = match configured_candidate_execution_platforms(
+            ctx,
+            mode,
+            &self.workspace,
+            configured_target.configuration(),
+            !resolution.rows().is_empty(),
+            !local_declarations.is_empty(),
+        )
+        .await
+        {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return root_analysis_driver_complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
+        };
+        let prepared_toolchain = if matches!(resolution.rows(), [row] if row.mandatory() && row.declaration().is_some())
+        {
+            match prepare_marker_toolchain_bridge(
+                ctx,
+                mode,
+                &self.workspace,
+                configured_target,
+                &resolution,
+                &candidate_execution_platforms,
+            )
+            .await
+            {
+                LoadingPreparationOutcome::Need(need) => {
+                    return LoadingPreparationOutcome::Need(need);
+                }
+                LoadingPreparationOutcome::Complete(Err(error)) => {
+                    return LoadingPreparationOutcome::Complete(Err(error));
+                }
+                LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                    return root_analysis_driver_complete(Err(error));
+                }
+                LoadingPreparationOutcome::Complete(Ok(Ok(value))) => Some(value),
+            }
+        } else {
+            None
+        };
+        let selected_platform = resolution.execution_platform();
+        let action_context = if let Some(toolchain) = &prepared_toolchain {
+            toolchain.action_context.clone()
+        } else {
+            match ConfiguredActionOwnerContext::new(
+                configured_target.clone(),
+                ConfiguredActionExecGroup::Default,
+                selected_platform.actual().clone(),
+                selected_platform.fact().clone(),
+                &BTreeMap::new(),
+                &BTreeMap::new(),
+                selected_platform.constraints().to_vec(),
+                None,
+                ConfiguredActionAspectProvenance::Absent,
+            ) {
+                Ok(context) => Arc::new(context),
+                Err(error) => {
+                    return root_analysis_driver_complete(Err(AnalysisError::message(error)));
+                }
+            }
+        };
+        let candidate_execution_platforms = Some(candidate_execution_platforms);
         let outcomes = ctx
             .compute_join(prepared, |ctx, (node, key)| {
                 Box::pin(async move {

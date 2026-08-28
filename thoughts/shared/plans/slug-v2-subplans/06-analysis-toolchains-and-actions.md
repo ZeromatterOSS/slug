@@ -20660,6 +20660,9 @@ accept the bookkeeping correction before implementation acceptance.
 
 #### Configured-selection downstream-proof authority REPLAN (2026-08-28)
 
+Superseded for active work by the R3 correction below; the R2 fixture and
+topology authority otherwise remains intact.
+
 The provider-independent category-4 candidate reaches the frozen exact zero-
 type behavior: every structurally configured rule selects the first registered
 actual execution platform or appended host fallback, uses that actual platform
@@ -20696,3 +20699,73 @@ configuration projection and its focused regression; this is an exact current
 semantic delta, not a retroactive claim about `84bda1971`. It creates no new
 configuration owner or representation and remains inside the original
 configuration file/cap authority.
+
+#### Configured-selection repository-sidecar authority REPLAN (2026-08-28)
+
+Live R2 proof demonstrates a narrower general integration gap after hermetic
+platform discovery succeeds. Observed multi-build analysis lawfully selects a
+local platform repository request, but the pre-category-4
+`SelectedDependencySuperset` validator rejects all selected repository
+requests and validations before enforcing its exact path superset. Hiding the
+request or reverting zero-type selection would violate closure integrity.
+
+Activate only
+`WP-4-5-7A-provider-independent-configured-toolchain-selection-r3`. Permit a
+maximum ten production lines in core's existing terminal-association validator
+so strict path-only still rejects repository sidecars, selected dependency
+superset admits closure-owned repository sidecars while preserving exact
+observed demand/value/Arc comparisons, and closure-repository mode retains
+exact path equality. Add a direct three-mode regression. In-memory fixtures
+use the command-overridden minimal `bazel_tools` and direct root host;
+filesystem configured fixtures preserve the verbatim builtin and locally
+supply only its minimal `platforms` dependency. This correction is Slug-native
+native-demand integrity supporting the unchanged exact Bazel selection graph.
+It adds no public API, repository owner, selector, provider surface or
+ruleset-specific path. Independent Sol design review returns `ACCEPT`;
+implementation may resume within R3.
+
+#### Configured-selection server direct-dependent fixture REPLAN (2026-08-28)
+
+The formatted R3 candidate passes every owner suite and closes every new core
+failure; full core retains only the independently documented stale external-
+query event baseline. The required server direct-dependent gate exposes 14
+configured build/cquery fixtures that reach the verbatim builtin host-platform
+graph without a registry/materializer for the upstream `platforms`
+`http_archive` or the local dependency already installed by the accepted core
+harness.
+
+Activate only
+`WP-4-5-7A-provider-independent-configured-toolchain-selection-r4`. Permit one
+proof-only server test file under +120 lines and zero production. A shared
+helper installs the minimal local `platforms` module and appends its dependency
+and local override only to the 14 named configured daemon workspaces. It must
+not affect ordinary loading query, Bzlmod, request-locality or wire-only
+fixtures, command policy, daemon behavior, DICE identity or repository
+semantics. The helper is Slug-native hermetic test plumbing and is deleted when
+the server harness can materialize the complete verbatim builtin/BCR graph.
+Pinned Bazel 9.2 remains behavior authority; clean Zabel remains peer guidance
+only; BCR Starlark owns all rule logic including `cc_internal`, with
+`cc_common` only a generic host-ABI client. Independent Sol design review
+returns `ACCEPT`; implementation may resume only within R4.
+
+#### Configured-selection server projection-proof REPLAN (2026-08-28)
+
+R4 closes all 14 missing-`platforms` failures and reaches 49 passing server
+tests. The retained C0/C1 build proof now observes the category-4 architecture
+it could not previously reach: target and selected-execution projections for
+both configurations, four stable markers rather than two. R5 permits only that
+proof count/message correction and no configuration identity behavior change.
+
+The remaining failure is `DEP_BUILD_EVENT` replay before the otherwise exact
+zero-invalidation exported-source terminal on the final remote-mode request.
+Treat it only as the separately reported server manifestation of the inherited
+stale external-package event-replay family already documented by full core;
+do not change, ignore or weaken its assertion. The other 50 server tests must
+pass. Pinned Bazel 9.2 remains behavior authority; clean Zabel remains peer
+guidance only; BCR Starlark still owns `cc_internal`, and `cc_common` remains a
+generic host-ABI client. Independent Sol design and terminal implementation
+reviews return `ACCEPT`. The formatted candidate closes every configured
+server regression, full server reports exactly 50 passes plus the unchanged
+inherited replay assertion, and the same test passes in isolation. All owner,
+direct-dependent, CLI, structural, cap and archive gates satisfy R5; the packet
+is complete.

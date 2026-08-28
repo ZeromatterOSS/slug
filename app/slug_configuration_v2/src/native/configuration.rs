@@ -231,13 +231,12 @@ impl StarlarkOptions {
         let mut entries = Vec::with_capacity(self.0.len());
         for entry in self.iter() {
             match entry.scope {
-                StarlarkOptionScope::Default | StarlarkOptionScope::Universal => {
+                StarlarkOptionScope::Default
+                | StarlarkOptionScope::Universal
+                | StarlarkOptionScope::Project => {
                     entries.push(entry.clone());
                 }
                 StarlarkOptionScope::Target => {}
-                StarlarkOptionScope::Project => {
-                    return Err(SlugConfigurationError::ProjectStarlarkOptionInExecProjection);
-                }
             }
         }
         Ok(Self(Arc::from(entries)))
@@ -307,7 +306,6 @@ pub enum SlugConfigurationError {
     DescriptorOrdinalOverflow,
     ExecProjectionRequiresTarget { actual: SlugConfigurationKind },
     DuplicateStarlarkOption,
-    ProjectStarlarkOptionInExecProjection,
     UnknownNativeOption,
     InvalidCommandNativeOption { option: &'static str },
     UnexpectedNativeStringList { option: &'static str },
@@ -361,8 +359,6 @@ impl fmt::Display for SlugConfigurationError {
             Self::DuplicateStarlarkOption => {
                 formatter.write_str("duplicate canonical Starlark option label")
             }
-            Self::ProjectStarlarkOptionInExecProjection => formatter
-                .write_str("project-scoped Starlark option cannot enter an exec configuration"),
             Self::UnknownNativeOption => formatter.write_str("unknown native configuration option"),
             Self::InvalidCommandNativeOption { option } => {
                 write!(
@@ -544,15 +540,36 @@ impl SlugConfiguration {
             })
     }
 
+    pub fn host_platform_label(&self) -> Option<CanonicalLabel> {
+        let LabelValue::Label(label) = self.native_label_value(HOST_PLATFORM).ok()? else {
+            return None;
+        };
+        label.canonical()
+    }
+
+    pub fn with_host_platform_label(&self, platform: &CanonicalLabel) -> Self {
+        let mut options = self.0.options.to_vec();
+        let record = options
+            .iter_mut()
+            .find(|record| {
+                record.class_name == PLATFORM_OPTIONS && record.canonical_name == HOST_PLATFORM
+            })
+            .expect("host platform descriptor exists");
+        record.value = OptionValue::Label(Some(LabelValue::Label(
+            ResolvedOptionLabel::from_canonical(platform),
+        )));
+        finish_configuration(self.0.kind, options.into(), self.0.starlark_options.dupe())
+    }
+
     pub fn to_exec_for_platform(
         &self,
         platform: &CanonicalLabel,
     ) -> Result<Self, SlugConfigurationError> {
-        if self.0.kind != SlugConfigurationKind::Target {
-            return Err(SlugConfigurationError::ExecProjectionRequiresTarget {
-                actual: self.0.kind,
-            });
-        }
+        let starlark_options = match self.0.kind {
+            SlugConfigurationKind::Target => self.0.starlark_options.to_exec()?,
+            SlugConfigurationKind::Exec => self.0.starlark_options.dupe(),
+            actual => return Err(SlugConfigurationError::ExecProjectionRequiresTarget { actual }),
+        };
         let mut options = self.0.options.to_vec();
         let record = options
             .iter_mut()
@@ -566,7 +583,7 @@ impl SlugConfiguration {
         Ok(finish_configuration(
             SlugConfigurationKind::Exec,
             options.into(),
-            self.0.starlark_options.to_exec()?,
+            starlark_options,
         ))
     }
 
@@ -1541,13 +1558,17 @@ mod tests {
                 .is_none()
         );
         let project = base.with_starlark_option(StarlarkOption::string(
-            label,
+            label.clone(),
             "value",
             StarlarkOptionScope::Project,
         ));
-        assert_eq!(
-            project.to_exec(),
-            Err(SlugConfigurationError::ProjectStarlarkOptionInExecProjection)
+        assert!(
+            project
+                .to_exec()
+                .unwrap()
+                .starlark_options()
+                .get(&label)
+                .is_some()
         );
     }
 

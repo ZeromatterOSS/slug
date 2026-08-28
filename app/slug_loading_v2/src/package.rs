@@ -640,13 +640,17 @@ impl BuildSettingDeclaration {
 }
 
 /// One rule/aspect toolchain type requirement detached from its Starlark value.
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct ToolchainTypeRequirement {
     label: CanonicalLabel,
     mandatory: bool,
 }
 
 impl ToolchainTypeRequirement {
+    pub fn new(label: CanonicalLabel, mandatory: bool) -> Self {
+        Self { label, mandatory }
+    }
+
     pub fn label(&self) -> &CanonicalLabel {
         &self.label
     }
@@ -3071,13 +3075,6 @@ impl FrozenRuleDefinition {
             anyhow::bail!(
                 "target invocation for rules requiring configuration fragments is not supported"
             );
-        }
-        if self
-            .required_toolchains
-            .iter()
-            .any(|requirement| !requirement.mandatory)
-        {
-            anyhow::bail!("optional rule toolchain requirements are not supported at invocation");
         }
         if let Some(attribute) = self
             .schema

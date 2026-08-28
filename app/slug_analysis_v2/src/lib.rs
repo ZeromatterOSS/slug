@@ -39,6 +39,9 @@ pub use dice::ConfiguredNodeAnalysisObservationKey;
 pub use dice::ConfiguredPlatformKey;
 pub use dice::ConfiguredPlatformOutcome;
 pub use dice::ConfiguredTargetPlatformKey;
+pub use dice::ConfiguredToolchainResolutionKey;
+#[doc(hidden)]
+pub use dice::ConfiguredToolchainResolutionObservationKey;
 #[doc(hidden)]
 pub use dice::ObservedConfiguredNodeAnalysisPreparationOutcome;
 pub use dice::prepare_configured_node_analysis;
@@ -61,6 +64,8 @@ pub use result::ConfiguredActionView;
 pub use result::ConfiguredNodeKind;
 pub use result::ConfiguredNodeResult;
 pub use result::ConfiguredPlatform;
+pub use result::ConfiguredToolchainResolution;
+pub use result::ConfiguredToolchainResolutionRow;
 pub use result::DiagnosticSeverity;
 pub use result::PlatformSemanticFact;
 pub use result::ToolchainSelection;

@@ -61,6 +61,28 @@ fn write(path: &Path, content: &str) {
     fs::write(path, content).unwrap();
 }
 
+fn write_configured_module(workspace: &Path, source: &str) {
+    let platforms = workspace.join(".slug_test_builtin/platforms");
+    write(
+        &platforms.join("MODULE.bazel"),
+        "module(name = \"platforms\", version = \"1.0.0\")\n",
+    );
+    write(
+        &platforms.join("host/BUILD.bazel"),
+        "exports_files([\"constraints.bzl\"])\nplatform(name = \"host\")\n",
+    );
+    write(
+        &platforms.join("host/constraints.bzl"),
+        "HOST_CONSTRAINTS = []\n",
+    );
+    write(
+        &workspace.join("MODULE.bazel"),
+        &format!(
+            "{source}bazel_dep(name = \"platforms\", version = \"1.0.0\")\nlocal_path_override(module_name = \"platforms\", path = \".slug_test_builtin/platforms\")\n"
+        ),
+    );
+}
+
 fn remote_disabled() -> RemoteConfig {
     RemoteConfig {
         executor: None,
@@ -247,7 +269,7 @@ fn first_build_invalidates_zero_files() {
 #[test]
 fn retained_daemon_restores_c0_after_root_setting_c1_without_source_invalidation() {
     let workspace = scratch("configuration-c0-c1-c0");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
     write(
         &workspace.join("settings.bzl"),
         "def _setting(ctx): return []\nstring_setting = rule(implementation = _setting, build_setting = config.string(flag = True))\n",
@@ -290,8 +312,8 @@ fn retained_daemon_restores_c0_after_root_setting_c1_without_source_invalidation
     markers.dedup();
     assert_eq!(
         markers.len(),
-        2,
-        "C0 and C1 must own two stable projections"
+        4,
+        "C0 and C1 must each own stable target and selected-execution projections"
     );
 }
 
@@ -397,8 +419,8 @@ fn third_build_after_no_edit_invalidates_zero() {
 fn retained_daemon_build_publishes_cold_and_changed_events_without_warm_replay() {
     let workspace = scratch("build-selected-events");
     let package = workspace.join("pkg");
-    write(
-        &workspace.join("MODULE.bazel"),
+    write_configured_module(
+        &workspace,
         "print(\"MODULE_EVENT\")\nmodule(name = \"demo\")\n",
     );
     write(
@@ -989,7 +1011,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     assert!(defaults.include_tool);
 
     let workspace = scratch("cquery-malformed-mode");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
     write(
         &workspace.join("pkg/defs.bzl"),
         "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n",
@@ -1224,7 +1246,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
 #[test]
 fn retained_cquery_missing_recovers_without_new_invalidations() {
     let workspace = scratch("cquery-recovery");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
     write(
         &workspace.join("pkg/defs.bzl"),
         "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
@@ -1264,7 +1286,7 @@ fn retained_cquery_missing_recovers_without_new_invalidations() {
 #[test]
 fn retained_cquery_executables_observes_capability_edits_warm_and_restoration() {
     let workspace = scratch("cquery-executables-capability-lifecycle");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
     let definitions = workspace.join("pkg/defs.bzl");
     let nonexec =
         "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n";
@@ -1318,7 +1340,7 @@ fn retained_cquery_executables_observes_capability_edits_warm_and_restoration() 
 #[test]
 fn retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state() {
     let workspace = scratch("cquery-kind-rule-class-lifecycle");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
     let definitions = workspace.join("pkg/defs.bzl");
     let definition = |probe_class: &str| {
         format!(
@@ -1464,7 +1486,7 @@ fn retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state() 
 #[test]
 fn retained_cquery_siblings_is_an_exact_post_analysis_terminal() {
     let workspace = scratch("cquery-siblings-post-analysis-terminal");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
     let definitions = workspace.join("pkg/defs.bzl");
     let nonexecutable =
         "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n";
@@ -1572,7 +1594,7 @@ fn retained_cquery_siblings_is_an_exact_post_analysis_terminal() {
 #[test]
 fn retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty() {
     let workspace = scratch("cquery-visible-vacuous-post-analysis");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
     let definitions = workspace.join("pkg/defs.bzl");
     let nonexecutable = "def _impl(ctx):\n    return [DefaultInfo()]\ncaller = rule(implementation = _impl)\ntarget = rule(implementation = _impl)\n";
     let executable = "def _impl(ctx):\n    return [DefaultInfo()]\ndef _caller_impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name)\n    ctx.actions.write(out, \"tool\\n\")\n    return [DefaultInfo(executable = out)]\ncaller = rule(implementation = _caller_impl, executable = True)\ntarget = rule(implementation = _impl)\n";
@@ -1689,7 +1711,7 @@ fn retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty() {
 #[test]
 fn retained_cquery_loading_files_are_post_analysis_terminals() {
     let workspace = scratch("cquery-loading-files-post-analysis-terminal");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
     write(
         &workspace.join("pkg/defs.bzl"),
         "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n",
@@ -1796,7 +1818,7 @@ fn retained_cquery_loading_files_are_post_analysis_terminals() {
 #[test]
 fn retained_cquery_missing_executable_recovers_after_rule_edit() {
     let workspace = scratch("cquery-missing-executable-recovery");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
     let definitions = workspace.join("pkg/defs.bzl");
     write(
         &definitions,
@@ -1846,7 +1868,7 @@ fn retained_cquery_missing_executable_recovers_after_rule_edit() {
 #[test]
 fn retained_cquery_starlark_formats_ordered_sets() {
     let workspace = scratch("cquery-starlark-sets");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
     write(
         &workspace.join("pkg/defs.bzl"),
         "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
@@ -1892,10 +1914,7 @@ fn retained_cquery_starlark_formats_ordered_sets() {
 #[test]
 fn retained_cquery_selection_errors_use_evaluation_exit_and_preserve_invalidation() {
     let workspace = scratch("cquery-selection-evaluation-terminal");
-    write(
-        &workspace.join("MODULE.bazel"),
-        "module(name = \"cquery_selection\")\n",
-    );
+    write_configured_module(&workspace, "module(name = \"cquery_selection\")\n");
     write(
         &workspace.join("pkg/defs.bzl"),
         "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
@@ -1951,7 +1970,7 @@ fn retained_cquery_selection_errors_use_evaluation_exit_and_preserve_invalidatio
 #[test]
 fn retained_cquery_formats_modes_and_restores_root_setting_projection() {
     let workspace = scratch("cquery-configuration-c0-c1-c0");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
     write(
         &workspace.join("settings.bzl"),
         "def _setting(ctx): return []\nstring_setting = rule(implementation = _setting, build_setting = config.string(flag = True))\n",
@@ -2300,8 +2319,8 @@ fn retained_daemon_direct_external_query_replays_only_changed_external_build() {
 #[test]
 fn retained_daemon_build_observes_direct_external_exported_sources() {
     let workspace = scratch("external-build-source");
-    write(
-        &workspace.join("MODULE.bazel"),
+    write_configured_module(
+        &workspace,
         "print(\"ROOT_EVENT\")\nmodule(name = \"demo\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
     );
     write(

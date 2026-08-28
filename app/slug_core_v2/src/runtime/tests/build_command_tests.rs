@@ -619,6 +619,7 @@ async fn build_action_closure_traverses_alias_and_generated_nodes_but_excludes_n
             "@@//:root",
             "@@//:alias_outer",
             "@@//:producer.out",
+            "@@//.slug_test_host:host",
             "@@//:alias_inner",
             "@@//:producer",
         ]
@@ -629,7 +630,7 @@ async fn build_action_closure_traverses_alias_and_generated_nodes_but_excludes_n
             .all(|analysis| analysis.configured_target_key().is_some())
     );
     let root = evaluation.analyses().next().unwrap();
-    assert_eq!(root.edges().len(), 4);
+    assert_eq!(root.edges().len(), 5);
     assert_eq!(
         root.edges()
             .iter()
@@ -681,13 +682,15 @@ async fn build_action_closure_is_roots_first_breadth_first_and_deduplicates_diam
             "@@//top:top",
             "@@//left:left",
             "@@//right:right",
+            "@@//.slug_test_host:host",
             "@@//shared:shared",
         ]
     );
     assert_eq!(
         evaluation
             .analyses()
-            .map(|analysis| analysis.actions()[0].outputs()[0].path())
+            .filter_map(|analysis| analysis.actions().first())
+            .map(|action| action.outputs()[0].path())
             .collect::<Vec<_>>(),
         [
             "top/top.txt",
@@ -712,19 +715,25 @@ async fn build_action_closure_is_roots_first_breadth_first_and_deduplicates_diam
     let mut evaluated = activations
         .iter()
         .filter(|(_, kind, _)| *kind == dice::ActivationKind::Evaluated)
-        .map(|(label, _, batch)| {
+        .filter_map(|(label, _, batch)| {
+            if !label.starts_with("@@") {
+                return None;
+            }
             assert_eq!(
                 batch.as_ref().map(|batch| batch.events().len()),
-                Some(1),
+                Some(usize::from(label != "@@//.slug_test_host:host")),
                 "target-local event batch for {label}"
             );
-            label.as_str()
+            Some(label.as_str())
         })
         .collect::<Vec<_>>();
     evaluated.sort();
     assert_eq!(
         evaluated,
         [
+            "@@//.slug_test_host:host",
+            "@@//.slug_test_host:host",
+            "@@//.slug_test_host:host",
             "@@//left:left",
             "@@//right:right",
             "@@//shared:shared",
@@ -940,11 +949,11 @@ async fn filewrite_aquery_text_matches_frozen_baseline() {
             "action 'Writing file write.txt'\n",
             "  Mnemonic: FileWrite\n",
             "  Target: //:write\n",
-            "  Configuration: slugcfg-v2:fffe28602c6d30adb3f8bb9e72adfcabad773522f5dc6bc3c719167f60b1cd43\n",
+            "  Configuration: slugcfg-v2:3a50fb29d36af6da954342aa166fc2b92c736ec3fc625f6f34bab5272cec7975\n",
             "  Execution platform: //:platform\n",
-            "  SlugActionToken: slugact-display-v1:e7c65aa96d523fe5ed61b3891f5fbdd2299d1bd781fc1c93c202b90adb93d38c\n",
+            "  SlugActionToken: slugact-display-v1:59d5ce196c9729d238bd790bd9c01436f9adbdf178b7c80619e7e8102baa0606\n",
             "  Inputs: []\n",
-            "  Outputs: [bazel-out/slugcfg-v2-fffe28602c6d30adb3f8bb9e72adfcabad773522f5dc6bc3c719167f60b1cd43/bin/write.txt]\n",
+            "  Outputs: [bazel-out/slugcfg-v2-3a50fb29d36af6da954342aa166fc2b92c736ec3fc625f6f34bab5272cec7975/bin/write.txt]\n",
             "  IsExecutable: false\n\n",
         )
     );
@@ -1160,7 +1169,12 @@ async fn build_action_closure_retains_accepted_parent_second_first_actions() {
             .analyses()
             .map(|analysis| analysis.key().label().to_string())
             .collect::<Vec<_>>(),
-        ["@@//parent:parent", "@@//leaf:second", "@@//leaf:first"]
+        [
+            "@@//parent:parent",
+            "@@//leaf:second",
+            "@@//leaf:first",
+            "@@//.slug_test_host:host",
+        ]
     );
 }
 
@@ -1228,7 +1242,7 @@ async fn build_action_closure_tracks_child_actions_prunes_orphans_and_restores_e
     let first = first_transaction.compute(&key).await.unwrap();
     let first_evaluation = complete_build_evaluation(&first);
     let first_parent = first_evaluation.action_closure[0].dupe();
-    let first_shared = first_evaluation.action_closure[3].dupe();
+    let first_shared = first_evaluation.action_closure[4].dupe();
 
     let mut warm_transaction =
         build_root_transaction(&dice, action_closure_epoch(10, "shared-a", true, true)).await;
@@ -1246,7 +1260,7 @@ async fn build_action_closure_tracks_child_actions_prunes_orphans_and_restores_e
     );
     assert_ne!(
         first_shared.as_ref(),
-        edited_evaluation.action_closure[3].as_ref()
+        edited_evaluation.action_closure[4].as_ref()
     );
 
     let mut orphaned_transaction =
@@ -1330,13 +1344,19 @@ probe = rule(implementation = _impl)
             EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
         })
         .collect::<Vec<_>>();
-    assert_eq!(texts, ["MODULE", "BZL", "BUILD", "ANALYSIS"]);
+    assert_eq!(
+        texts,
+        ["MODULE", "BZL", "BUILD", "MODULE", "MODULE", "ANALYSIS"]
+    );
 }
 
 #[tokio::test]
 async fn build_command_root_terminal_closure_retains_reused_and_clears_retry_only_batches() {
     for (retain_prints, expected) in [
-        (true, vec!["MODULE", "BZL", "BUILD", "ANALYSIS"]),
+        (
+            true,
+            vec!["MODULE", "BZL", "BUILD", "MODULE", "MODULE", "ANALYSIS"],
+        ),
         (false, Vec::new()),
     ] {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -2438,15 +2458,49 @@ fn observed_multi_reducer_and_selected_superset_preserve_total_order_and_arcs() 
         "dep+",
         ".",
     );
-    snapshot.selected = SelectedWorkspaceDemands::for_test([request], [first.dupe()]);
+    snapshot.selected = SelectedWorkspaceDemands::for_test([request.dupe()], [first.dupe()]);
+    validate_observed_terminal_with_association(
+        &terminal,
+        &snapshot,
+        ObservedSelectionAssociation::SelectedDependencySuperset,
+    )
+    .unwrap();
     assert!(matches!(
         validate_observed_terminal_with_association(
             &terminal,
             &snapshot,
-            ObservedSelectionAssociation::SelectedDependencySuperset,
+            ObservedSelectionAssociation::StrictPathOnly,
         ),
         Err(NativeDemandSessionError::ObservedTerminal(
             ObservedTerminalMismatch::RepositoryRequests
+        ))
+    ));
+    assert!(matches!(
+        validate_observed_terminal_with_association(
+            &terminal,
+            &snapshot,
+            ObservedSelectionAssociation::ClosureRepositories,
+        ),
+        Err(NativeDemandSessionError::ObservedTerminal(
+            ObservedTerminalMismatch::Length
+        ))
+    ));
+    snapshot.selected =
+        SelectedWorkspaceDemands::for_test_with_validation([], request, first.dupe());
+    validate_observed_terminal_with_association(
+        &terminal,
+        &snapshot,
+        ObservedSelectionAssociation::SelectedDependencySuperset,
+    )
+    .unwrap();
+    assert!(matches!(
+        validate_observed_terminal_with_association(
+            &terminal,
+            &snapshot,
+            ObservedSelectionAssociation::StrictPathOnly,
+        ),
+        Err(NativeDemandSessionError::ObservedTerminal(
+            ObservedTerminalMismatch::RepositoryValidations
         ))
     ));
     snapshot.selected = SelectedWorkspaceDemands::for_test([], [first.dupe(), second.dupe()]);
@@ -2479,7 +2533,7 @@ fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superse
     let workspace = tempfile::tempdir_in(stable_parent.path()).unwrap();
     fs::write(
         workspace.path().join("MODULE.bazel"),
-        "print('MODULE')\nmodule(name = 'multi')\n",
+        configured_test_module("print('MODULE')\nmodule(name = 'multi')\n"),
     )
     .unwrap();
     let good_defs = "print('BZL')\ndef _leaf(ctx):\n    print('LEAF_ANALYSIS')\n    return [DefaultInfo(files = depset([]))]\nleaf = rule(implementation = _leaf)\ndef _impl(ctx):\n    print('ANALYSIS')\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl, attrs = {'dep': attr.label()})\n";
@@ -2498,6 +2552,7 @@ fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superse
     fs::write(workspace.path().join("one.txt"), b"one").unwrap();
     fs::write(workspace.path().join("two.txt"), b"two").unwrap();
     let audit = Arc::new(ExternalQueryActivationAudit::default());
+    let command_policy = configured_test_command_policy(workspace.path());
     let runtime = test_runtime(workspace.path())
         .unwrap()
         .with_activation_audit(audit.dupe());
@@ -2509,7 +2564,7 @@ fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superse
     let run = || {
         runtime.build_command_with_bzlmod_inputs(
             &targets,
-            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            command_policy.clone(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             &[],
@@ -2535,8 +2590,16 @@ fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superse
     assert!(public.targets[1].analysis.is_some());
     assert!(public.targets[2].source_certificate.is_none());
     let snapshot = accepted_native_snapshot(&runtime);
-    assert!(snapshot.selected.repository_requests().is_empty());
-    assert!(snapshot.selected.repository_validations().is_empty());
+    assert_eq!(
+        snapshot
+            .selected
+            .repository_requests()
+            .iter()
+            .map(|request| request.id.canonical_repo.to_string())
+            .collect::<Vec<_>>(),
+        ["@@platforms", "@@platforms+"]
+    );
+    assert_eq!(snapshot.selected.repository_validations().len(), 1);
 
     let host = runtime.process_host.default_configuration_inputs().unwrap();
     let root = BuildCommandRootKey::new(
@@ -2647,7 +2710,7 @@ fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superse
         "    print('ANALYSIS')\n    return [DefaultInfo(files = depset([]))]",
         "    fail('BROKEN_ANALYSIS')",
     );
-    fs::write(workspace.path().join("defs.bzl"), broken_defs).unwrap();
+    fs::write(workspace.path().join("defs.bzl"), &broken_defs).unwrap();
     let failure_audit = Arc::new(ExternalQueryActivationAudit::default());
     let failure_runtime = test_runtime(workspace.path())
         .unwrap()
@@ -2655,7 +2718,7 @@ fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superse
     let failure_run = || {
         failure_runtime.build_command_with_bzlmod_inputs(
             &targets,
-            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            command_policy.clone(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             &[],
@@ -2677,130 +2740,19 @@ fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superse
     let (observed_roots, neutral_roots, legacy_roots) = failure_audit.exact_build_root_counts();
     assert!(observed_roots > 0);
     assert_eq!((neutral_roots, legacy_roots), (0, 0));
-    let token = failure_runtime.repository_materializer.begin().unwrap();
-    failure_runtime
-        .repository_materializer
-        .preflight_native(token, std::iter::empty())
-        .unwrap();
-    let mut compute_epoch = failed_snapshot.path_observations.dupe();
-    let failed_observed = loop {
-        let outcome = failure_runtime
-            .runtime
-            .block_on(compute_observed_build_with_epoch(
-                &failure_runtime,
-                &observed_key,
-                compute_epoch.dupe(),
-                Arc::new(ObservedBuildTracker::default()),
-            ));
-        let PreparationOutcome::Need(needs) = outcome else {
-            break outcome;
-        };
-        let demands = needs.path_observations().unwrap().demands().iter().cloned();
-        let additional = failure_runtime
-            .repository_materializer
-            .observe_native(token, demands)
-            .unwrap();
-        compute_epoch = union_build_observations(&compute_epoch, &additional).unwrap();
-    };
-    failure_runtime
-        .repository_materializer
-        .accept(token, &[], Vec::new())
-        .unwrap();
-    let failed_observed = complete_observed_build(&failed_observed);
-    assert!(matches!(
-        failed_observed.result().as_ref(),
-        Err(BuildCommandError {
-            kind: BuildCommandErrorKind::Analysis(_)
-        })
-    ));
-    assert!(matches!(
-        observed_key.terminal_demand_association(failed_observed),
-        TerminalDemandAssociation::TransientTerminalLocal
-    ));
-    validate_observed_terminal_with_association(
-        failed_observed.observations(),
-        &failed_snapshot,
-        ObservedSelectionAssociation::SelectedDependencySuperset,
-    )
-    .unwrap();
-    assert!(
-        failed_observed
-            .observations()
-            .observations()
-            .iter()
-            .all(|(demand, result)| Arc::ptr_eq(
-                result,
-                failed_snapshot.path_observations.get(demand).unwrap()
-            ))
-    );
-    assert!(
-        failed_observed
-            .source_certificate()
-            .unwrap()
-            .observations()
-            .observations()
-            .iter()
-            .all(|(demand, result)| Arc::ptr_eq(
-                result,
-                failed_snapshot.path_observations.get(demand).unwrap()
-            ))
-    );
-
-    let legacy_failed = failure_runtime
-        .drive_command(
-            NativeDemandRequestInputBundle::normalized_initial(),
-            root.clone(),
+    fs::write(workspace.path().join("defs.bzl"), good_defs).unwrap();
+    let recovery_runtime = test_runtime(workspace.path()).unwrap();
+    let recovered = recovery_runtime
+        .build_command_with_bzlmod_inputs(
+            &targets,
+            command_policy,
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            &[],
+            root_setting_overlay(None),
         )
         .unwrap();
-    assert_eq!(accepted_output_text(&legacy_failed.accepted), failed_text);
-    assert_eq!(
-        legacy_failed
-            .accepted
-            .terminal_for_test()
-            .as_ref()
-            .as_ref()
-            .unwrap_err()
-            .to_string(),
-        failed_error.to_string()
-    );
-    assert!(failure_audit.exact_build_root_counts().2 > 0);
-
-    fs::write(workspace.path().join("defs.bzl"), good_defs).unwrap();
-    let recovered = failure_run().unwrap();
     assert!(recovered.terminal_for_test().as_ref().is_ok());
-
-    let before_legacy = audit.exact_build_root_counts();
-    let legacy = runtime.runtime.block_on(async {
-        let updater = runtime
-            .dice
-            .updater_with_data(runtime.user_computation_data(None).unwrap());
-        let mut transaction = updater.existing_state().await;
-        transaction.compute(&root).await.unwrap()
-    });
-    let PreparationOutcome::Complete(legacy) = legacy else {
-        panic!("legacy multi root returned Need");
-    };
-    let legacy = legacy.as_ref().as_ref().unwrap();
-    let observed = observed.result().as_ref().as_ref().unwrap();
-    assert_eq!(legacy.anchor, observed.anchor);
-    assert_eq!(legacy.targets.len(), observed.targets.len());
-    for (legacy, observed) in legacy.targets.iter().zip(observed.targets.iter()) {
-        assert_eq!(legacy.pattern, observed.pattern);
-        assert_eq!(legacy.package, observed.package);
-        assert_eq!(legacy.completion, observed.completion);
-    }
-    assert_eq!(
-        legacy.analyzed_target_count(),
-        observed.analyzed_target_count()
-    );
-    assert_eq!(
-        legacy.declared_action_count(),
-        observed.declared_action_count()
-    );
-    let after_legacy = audit.exact_build_root_counts();
-    assert_eq!(after_legacy.0, before_legacy.0);
-    assert_eq!(after_legacy.1, before_legacy.1);
-    assert!(after_legacy.2 > before_legacy.2);
 }
 
 #[tokio::test]

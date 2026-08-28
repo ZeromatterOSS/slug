@@ -30,6 +30,17 @@ use slug_build_api_v2::ProviderId;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::OverrideAttributeValue;
+use slug_bzlmod_v2::RepoRuleId;
+use slug_bzlmod_v2::RepoSpec;
+use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
+use slug_bzlmod_v2::RepositoryMaterializationKind;
+use slug_bzlmod_v2::RepositoryMaterializationRequest;
+use slug_bzlmod_v2::RepositoryMaterializationRequestId;
+use slug_bzlmod_v2::RepositoryMaterializationResult;
+use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
+use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
+use slug_bzlmod_v2::RepositoryMaterializationSuccess;
 use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
 use slug_bzlmod_v2::RootModuleLoadingAnchorObservationKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
@@ -43,6 +54,7 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
 use slug_loading_v2::CommandRegistrationExpansionKey;
 use slug_loading_v2::CommandRegistrationExpansionObservationKey;
 use slug_loading_v2::HostPackageInventoryKey;
@@ -64,6 +76,12 @@ use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 use slug_workspace_v2::ResolvedPathKey;
 use slug_workspace_v2::ResolvedPathObservationKey;
+use slug_workspace_v2::WorkspaceFileValue;
+use slug_workspace_v2::WorkspaceRawFileValue;
+use slug_workspace_v2::WorkspaceRawSnapshot;
+use slug_workspace_v2::WorkspaceRawSnapshotKey;
+use slug_workspace_v2::WorkspaceSnapshot;
+use slug_workspace_v2::WorkspaceSnapshotKey;
 use starlark_map::small_map::SmallMap;
 
 fn workspace() -> NormalizedAbsolutePath {
@@ -172,6 +190,14 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
         builder.package("rules", "", variant);
         builder.file("/workspace/rules/defs.bzl", definitions, variant);
         builder.package("parent", &parent_build, variant);
+        builder.package(".slug_test_host", "platform(name = \"host\")\n", variant);
+        builder.directory("/workspace/.slug_builtin", variant);
+        builder.directory("/workspace/.slug_builtin/bazel_tools", variant);
+        builder.file(
+            "/workspace/.slug_builtin/bazel_tools/MODULE.bazel",
+            "module(name = \"bazel_tools\")\n",
+            variant,
+        );
         builder
     }
 
@@ -197,6 +223,47 @@ fn package_policy() -> RootPackagePolicyInputs {
         Some("warning"),
     )
     .unwrap()
+}
+
+fn workspace_snapshots(
+    epoch: &PathObservationEpoch,
+) -> (Arc<WorkspaceSnapshot>, Arc<WorkspaceRawSnapshot>) {
+    let mut text = Vec::new();
+    let mut raw = Vec::new();
+    for (demand, result) in epoch.observations() {
+        let PathObservationResult::FileBytes(result) = result.as_ref() else {
+            continue;
+        };
+        let path = demand.path().as_path().to_path_buf();
+        match result {
+            PathOperationResult::Present(bytes) => {
+                raw.push((path.clone(), WorkspaceRawFileValue::Present(bytes.dupe())));
+                text.push((
+                    path,
+                    WorkspaceFileValue::Present(Arc::new(
+                        String::from_utf8(bytes.to_vec()).expect("test source is UTF-8"),
+                    )),
+                ));
+            }
+            PathOperationResult::Missing => {
+                raw.push((path.clone(), WorkspaceRawFileValue::Absent));
+                text.push((path, WorkspaceFileValue::Absent));
+            }
+            PathOperationResult::Error(error) => {
+                let error = Arc::new(format!("{error:?}"));
+                raw.push((path.clone(), WorkspaceRawFileValue::ReadError(error.dupe())));
+                text.push((path, WorkspaceFileValue::ReadError(error)));
+            }
+        }
+    }
+    (
+        Arc::new(WorkspaceSnapshot {
+            files: Arc::new(text.into_iter().collect()),
+        }),
+        Arc::new(WorkspaceRawSnapshot {
+            files: Arc::new(raw.into_iter().collect()),
+        }),
+    )
 }
 
 #[derive(Debug, Clone)]
@@ -341,21 +408,21 @@ impl ActivationTracker for AnalysisTracker {
 }
 
 fn configured(label: &str) -> ConfiguredTargetKey {
+    let configuration = SlugConfiguration::default_target(
+        &HostConversionInputs::new(
+            Some(AutoCpuToken::K8),
+            Some(HostPathFlavor::Unix),
+            None,
+            Arc::from([]),
+            Arc::from([]),
+        )
+        .unwrap(),
+    )
+    .unwrap()
+    .with_host_platform_label(&CanonicalLabel::parse("@@//.slug_test_host:host").unwrap());
     ConfiguredTargetKey::new(
         CanonicalLabel::parse(label).unwrap(),
-        ConfigurationKey::from_slug(
-            SlugConfiguration::default_target(
-                &HostConversionInputs::new(
-                    Some(AutoCpuToken::K8),
-                    Some(HostPathFlavor::Unix),
-                    None,
-                    Arc::from([]),
-                    Arc::from([]),
-                )
-                .unwrap(),
-            )
-            .unwrap(),
-        ),
+        ConfigurationKey::from_slug(configuration),
     )
 }
 
@@ -375,14 +442,77 @@ async fn transaction(
     };
     user_data.data.set(CaptureEvaluationEvents);
     let mut updater = dice.updater_with_data(user_data);
+    let (text, raw) = workspace_snapshots(&epoch);
+    updater
+        .changed_to(vec![(
+            WorkspaceSnapshotKey {
+                workspace: "/workspace".into(),
+            },
+            text,
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: "/workspace".into(),
+            },
+            raw,
+        )])
+        .unwrap();
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
+        .unwrap();
+    let mut attributes = SmallMap::new();
+    attributes.insert(
+        "path".into(),
+        OverrideAttributeValue::String("/workspace/.slug_builtin/bazel_tools".into()),
+    );
+    let request = Arc::new(RepositoryMaterializationRequest {
+        id: RepositoryMaterializationRequestId {
+            workspace: workspace(),
+            canonical_repo: CanonicalRepoName::new("bazel_tools+").unwrap(),
+        },
+        repo_spec: RepoSpec {
+            rule_id: RepoRuleId {
+                bzl_file: CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:local.bzl")
+                    .unwrap(),
+                rule_name: "local_repository".into(),
+            },
+            attributes: Arc::new(attributes),
+        },
+        kind: RepositoryMaterializationKind::Local {
+            logical_root: NormalizedAbsolutePath::new("/workspace/.slug_builtin/bazel_tools")
+                .unwrap(),
+        },
+    });
+    updater
+        .changed_to(vec![(
+            RepositoryMaterializationResultEpochKey {
+                workspace: workspace(),
+            },
+            RepositoryMaterializationResultEpoch::new(
+                workspace(),
+                [RepositoryMaterializationEpochEntry {
+                    request,
+                    result: RepositoryMaterializationResult::Success(
+                        RepositoryMaterializationSuccess::Local,
+                    ),
+                }],
+            )
+            .unwrap(),
+        )])
         .unwrap();
     inject_root_package_policy_inputs(&mut updater, package_policy()).unwrap();
     inject_root_module_request_inputs(
         &mut updater,
         workspace().as_path(),
-        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+            None,
+            false,
+            workspace().as_path(),
+            ["bazel_tools=/workspace/.slug_builtin/bazel_tools"],
+        )
+        .unwrap(),
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
         LockfileMode::Update,
     )
@@ -584,7 +714,14 @@ async fn root_analysis_unions_needs_and_replays_build_bzl_dependency_lifecycle()
         .configured_dependencies()
         .map(|key| key.label().to_string())
         .collect::<Vec<_>>();
-    assert_eq!(dependencies, ["@@//right:right", "@@//left:left"]);
+    assert_eq!(
+        dependencies,
+        [
+            "@@//right:right",
+            "@@//left:left",
+            "@@//.slug_test_host:host"
+        ]
+    );
     let complete_events = tracker.take();
     assert_eq!(
         analysis_batch(&complete_events, "@@//left:left").map(event_texts),
@@ -670,7 +807,11 @@ async fn observed_analysis_is_family_isolated_recursive_and_arc_stable() {
             .configured_dependencies()
             .map(|key| key.label().to_string())
             .collect::<Vec<_>>(),
-        ["@@//right:right", "@@//left:left"]
+        [
+            "@@//right:right",
+            "@@//left:left",
+            "@@//.slug_test_host:host"
+        ]
     );
 
     let events = tracker.take();
@@ -737,7 +878,12 @@ async fn observed_analysis_is_family_isolated_recursive_and_arc_stable() {
     assert!(
         families
             .iter()
-            .all(|family| !family.starts_with("registration/"))
+            .any(|family| family == "registration/observed")
+    );
+    assert!(
+        families
+            .iter()
+            .any(|family| family == "registration/command-observed")
     );
 
     let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -762,11 +908,16 @@ async fn observed_analysis_is_family_isolated_recursive_and_arc_stable() {
             .iter()
             .all(|dependency| !dependency.starts_with("host-package-load:"))
     );
+    let legacy_families = legacy_tracker.take_families();
     assert!(
-        legacy_tracker
-            .take_families()
+        legacy_families
             .iter()
-            .all(|family| !family.starts_with("registration/"))
+            .any(|family| family == "registration/legacy")
+    );
+    assert!(
+        legacy_families
+            .iter()
+            .any(|family| family == "registration/command-legacy")
     );
 }
 
@@ -802,7 +953,7 @@ parent(name = "declares", deps = [":data.txt"])
     );
 }
 
-const OBSERVED_TOOLCHAIN_MODULE: &str = r#"module(name = "bazel_tools")
+const OBSERVED_TOOLCHAIN_MODULE: &str = r#"module(name = "root")
 register_execution_platforms("//:platform")
 register_toolchains("//:toolchain")
 "#;

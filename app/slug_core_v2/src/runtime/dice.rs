@@ -7144,10 +7144,7 @@ fn validate_observed_terminal_with_association(
     selected: &AcceptedNativeDemandSnapshot,
     association: ObservedSelectionAssociation,
 ) -> Result<(), NativeDemandSessionError> {
-    if !matches!(
-        association,
-        ObservedSelectionAssociation::ClosureRepositories
-    ) {
+    if matches!(association, ObservedSelectionAssociation::StrictPathOnly) {
         if !selected.selected.repository_requests().is_empty() {
             return Err(NativeDemandSessionError::ObservedTerminal(
                 ObservedTerminalMismatch::RepositoryRequests,
@@ -7916,6 +7913,33 @@ mod tests {
         WorkspaceRuntime::new(workspace, ProcessHostOwner::native())
     }
 
+    fn configured_test_command_policy(workspace: &Path) -> BzlmodCommandPolicyKey {
+        let platforms = workspace.join(".slug_test_builtin/platforms");
+        fs::create_dir_all(platforms.join("host")).unwrap();
+        fs::write(
+            platforms.join("MODULE.bazel"),
+            "module(name = \"platforms\", version = \"1.0.0\")\n",
+        )
+        .unwrap();
+        fs::write(
+            platforms.join("host/BUILD.bazel"),
+            "exports_files([\"constraints.bzl\"])\nplatform(name = \"host\")\n",
+        )
+        .unwrap();
+        fs::write(
+            platforms.join("host/constraints.bzl"),
+            "HOST_CONSTRAINTS = []\n",
+        )
+        .unwrap();
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap()
+    }
+
+    fn configured_test_module(source: &str) -> String {
+        format!(
+            "{source}bazel_dep(name = \"platforms\", version = \"1.0.0\")\nlocal_path_override(module_name = \"platforms\", path = \".slug_test_builtin/platforms\")\n"
+        )
+    }
+
     #[test]
     fn runtime_keeps_the_explicit_process_host_arc() {
         let workspace = tempfile::tempdir().unwrap();
@@ -8119,9 +8143,10 @@ mod tests {
     #[test]
     fn cquery_only_typed_missing_executable_analysis_uses_exit_one() {
         let workspace = tempfile::tempdir().unwrap();
+        let command_policy = configured_test_command_policy(workspace.path());
         fs::write(
             workspace.path().join("MODULE.bazel"),
-            "module(name = \"typed\")\n",
+            configured_test_module("module(name = \"typed\")\n"),
         )
         .unwrap();
         fs::create_dir(workspace.path().join("pkg")).unwrap();
@@ -8142,7 +8167,7 @@ mod tests {
                     expression,
                     true,
                     true,
-                    BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                    command_policy.clone(),
                     BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                     LockfileMode::Update,
                     &[],
@@ -8436,9 +8461,10 @@ mod tests {
             .canonicalize()
             .unwrap();
         let workspace = tempfile::tempdir_in(stable_parent).unwrap();
+        let command_policy = configured_test_command_policy(workspace.path());
         fs::write(
             workspace.path().join("MODULE.bazel"),
-            "print(\"MODULE_EVENT\")\nmodule(name = \"driver\")\n",
+            configured_test_module("print(\"MODULE_EVENT\")\nmodule(name = \"driver\")\n"),
         )
         .unwrap();
         fs::write(
@@ -8463,7 +8489,7 @@ mod tests {
             |runtime: &WorkspaceRuntime, targets: &[TargetPattern], setting: Option<&str>| {
                 runtime.build_command_with_bzlmod_inputs(
                     targets,
-                    BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                    command_policy.clone(),
                     BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                     LockfileMode::Update,
                     &[],
@@ -8568,9 +8594,10 @@ mod tests {
     #[test]
     fn real_build_analysis_error_publishes_and_recovers_without_validating_the_error_node() {
         let workspace = tempfile::tempdir().unwrap();
+        let command_policy = configured_test_command_policy(workspace.path());
         fs::write(
             workspace.path().join("MODULE.bazel"),
-            "module(name = \"driver\")\n",
+            configured_test_module("module(name = \"driver\")\n"),
         )
         .unwrap();
         fs::write(
@@ -8588,7 +8615,7 @@ mod tests {
         let build = |runtime: &WorkspaceRuntime| {
             runtime.build_command_with_bzlmod_inputs(
                 std::slice::from_ref(&target),
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -8623,9 +8650,12 @@ mod tests {
             .canonicalize()
             .unwrap();
         let workspace = tempfile::tempdir_in(stable_parent).unwrap();
+        let command_policy = configured_test_command_policy(workspace.path());
         fs::write(
             workspace.path().join("MODULE.bazel"),
-            "print(\"MODULE_EVENT\")\nmodule(name = \"configuration_driver\")\n",
+            configured_test_module(
+                "print(\"MODULE_EVENT\")\nmodule(name = \"configuration_driver\")\n",
+            ),
         )
         .unwrap();
         fs::write(
@@ -8668,7 +8698,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let build = |runtime: &WorkspaceRuntime, setting: Option<&str>| {
             runtime.build_command_with_bzlmod_inputs(
                 std::slice::from_ref(&target),
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -8761,7 +8791,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let transitive_c0 = transitive_runtime
             .build_command_with_bzlmod_inputs(
                 std::slice::from_ref(&top),
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -8779,7 +8809,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let transitive_c1 = transitive_runtime
             .build_command_with_bzlmod_inputs(
                 std::slice::from_ref(&top),
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -8795,7 +8825,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let setting_build = setting_runtime
             .build_command_with_bzlmod_inputs(
                 std::slice::from_ref(&setting_target),
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -8812,11 +8842,12 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
     }
 
     #[test]
-    fn cquery_drives_the_existing_root_analysis_once() {
+    fn cquery_drives_only_the_requested_root_across_platform_retries() {
         let workspace = tempfile::tempdir().unwrap();
+        let command_policy = configured_test_command_policy(workspace.path());
         fs::write(
             workspace.path().join("MODULE.bazel"),
-            "module(name = \"driver\")\n",
+            configured_test_module("module(name = \"driver\")\n"),
         )
         .unwrap();
         fs::create_dir(workspace.path().join("pkg")).unwrap();
@@ -8839,19 +8870,19 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 target,
                 true,
                 true,
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
                 root_setting_overlay(None),
             )
         };
-        let assert_roots = |label: &str, expected_count| {
+        let assert_roots = |phase: &str, label: &str, expected_count| {
             let roots = activation_audit.take_configured_roots();
             assert_eq!(
                 roots.len(),
                 expected_count,
-                "cquery analysis root activation count"
+                "{phase} cquery requested analysis root activation count"
             );
             for root in roots {
                 let serialized = root.stable_serialize();
@@ -8872,12 +8903,12 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .is_empty()
         );
         assert!(accepted_output_text(&cold).is_empty());
-        assert_roots("@@//pkg:probe", 1);
+        assert_roots("cold", "@@//pkg:probe", 15);
 
         let warm = run(target).unwrap();
         assert!(warm.terminal_for_test().as_ref().is_ok());
         assert!(accepted_output_text(&warm).is_empty());
-        assert_roots("@@//pkg:probe", 1);
+        assert_roots("warm", "@@//pkg:probe", 1);
 
         let missing = "//pkg:missing";
         let missing_result = run(missing).unwrap();
@@ -8888,7 +8919,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             .unwrap_err();
         assert_eq!(error.missing_stderr().unwrap().lines().count(), 3);
         assert!(accepted_output_text(&missing_result).is_empty());
-        assert_roots("@@//pkg:missing", 0);
+        assert_roots("missing", "@@//pkg:missing", 0);
 
         let recovered = run(target).unwrap();
         assert_eq!(
@@ -8901,7 +8932,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             "@@//pkg:probe\n"
         );
         assert!(accepted_output_text(&recovered).is_empty());
-        assert_roots("@@//pkg:probe", 1);
+        assert_roots("recovered", "@@//pkg:probe", 15);
 
         fs::write(
             workspace.path().join("pkg/BUILD.bazel"),
@@ -8911,7 +8942,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let build_edit = run(target).unwrap();
         assert!(build_edit.terminal_for_test().as_ref().is_ok());
         assert!(accepted_output_text(&build_edit).is_empty());
-        assert_roots("@@//pkg:probe", 1);
+        assert_roots("BUILD edit", "@@//pkg:probe", 1);
 
         fs::write(
             workspace.path().join("pkg/defs.bzl"),
@@ -8921,15 +8952,16 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let bzl_edit = run(target).unwrap();
         assert!(bzl_edit.terminal_for_test().as_ref().is_ok());
         assert!(accepted_output_text(&bzl_edit).is_empty());
-        assert_roots("@@//pkg:probe", 1);
+        assert_roots("bzl edit", "@@//pkg:probe", 1);
     }
 
     #[test]
     fn cquery_analysis_error_retains_sidecars_from_successful_sibling_roots() {
         let workspace = tempfile::tempdir().unwrap();
+        let command_policy = configured_test_command_policy(workspace.path());
         fs::write(
             workspace.path().join("MODULE.bazel"),
-            "module(name = \"driver\")\n",
+            configured_test_module("module(name = \"driver\")\n"),
         )
         .unwrap();
         fs::create_dir(workspace.path().join("pkg")).unwrap();
@@ -8949,7 +8981,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 "//pkg:ok + //pkg:native",
                 true,
                 true,
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                command_policy,
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -8972,9 +9004,10 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
     #[test]
     fn cquery_deps_uses_the_retained_noimplicit_graph_with_null_sources() {
         let workspace = tempfile::tempdir().unwrap();
+        let command_policy = configured_test_command_policy(workspace.path());
         fs::write(
             workspace.path().join("MODULE.bazel"),
-            "module(name = \"deps\")\n",
+            configured_test_module("module(name = \"deps\")\n"),
         )
         .unwrap();
         fs::write(workspace.path().join("defs.bzl"), CQUERY_DELEGATING_DEFS).unwrap();
@@ -8991,7 +9024,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 expression,
                 include_implicit,
                 include_tool,
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -11413,7 +11446,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 )
                 .unwrap(),
             )
-            .unwrap(),
+            .unwrap()
+            .with_host_platform_label(&CanonicalLabel::parse("@@//.slug_test_host:host").unwrap()),
         )
     }
 
@@ -11467,8 +11501,25 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             epoch.node("/", PathNodeKind::Directory, variant);
             epoch.node("/workspace", PathNodeKind::Directory, variant);
             epoch.file("/workspace/MODULE.bazel", "", variant);
+            epoch.missing("/workspace/MODULE.bazel.lock");
             epoch.missing("/workspace/REPO.bazel");
             epoch.missing("/workspace/.bazelignore");
+            epoch.node(
+                "/workspace/.slug_test_builtin",
+                PathNodeKind::Directory,
+                variant,
+            );
+            epoch.node(
+                "/workspace/.slug_test_builtin/bazel_tools",
+                PathNodeKind::Directory,
+                variant,
+            );
+            epoch.file(
+                "/workspace/.slug_test_builtin/bazel_tools/MODULE.bazel",
+                "module(name = \"bazel_tools\")\n",
+                variant,
+            );
+            epoch.package(".slug_test_host", "platform(name = \"host\")\n", variant);
             epoch
         }
 
@@ -11560,6 +11611,53 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         updater
             .changed_to(vec![(PathObservationEpochKey, epoch)])
             .unwrap();
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let mut attributes = SmallMap::new();
+        attributes.insert(
+            "path".into(),
+            slug_bzlmod_v2::OverrideAttributeValue::String(
+                "/workspace/.slug_test_builtin/bazel_tools".into(),
+            ),
+        );
+        let request = Arc::new(RepositoryMaterializationRequest {
+            id: RepositoryMaterializationRequestId {
+                workspace: workspace.clone(),
+                canonical_repo: slug_identity_v2::CanonicalRepoName::new("bazel_tools+").unwrap(),
+            },
+            repo_spec: slug_bzlmod_v2::RepoSpec {
+                rule_id: slug_bzlmod_v2::RepoRuleId {
+                    bzl_file: CanonicalLabel::parse(
+                        "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                    )
+                    .unwrap(),
+                    rule_name: "local_repository".into(),
+                },
+                attributes: Arc::new(attributes),
+            },
+            kind: slug_bzlmod_v2::RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new(
+                    "/workspace/.slug_test_builtin/bazel_tools",
+                )
+                .unwrap(),
+            },
+        });
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.clone(),
+                },
+                RepositoryMaterializationResultEpoch::new(
+                    workspace,
+                    [slug_bzlmod_v2::RepositoryMaterializationEpochEntry {
+                        request,
+                        result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
+                            slug_bzlmod_v2::RepositoryMaterializationSuccess::Local,
+                        ),
+                    }],
+                )
+                .unwrap(),
+            )])
+            .unwrap();
         slug_bzlmod_v2::inject_root_package_policy_inputs(
             &mut updater,
             slug_bzlmod_v2::RootPackagePolicyInputs::new(
@@ -11575,7 +11673,13 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         inject_root_module_request_inputs(
             &mut updater,
             Path::new("/workspace"),
-            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+                None,
+                false,
+                Path::new("/workspace"),
+                ["bazel_tools=/workspace/.slug_test_builtin/bazel_tools"],
+            )
+            .unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
         )
@@ -11632,8 +11736,11 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
                 "@@//:parent",
                 "@@//:consumer",
                 "@@//:consumer",
+                "@@//.slug_test_host:host",
                 "@@//:setting",
+                "@@//.slug_test_host:host",
                 "@@//:setting",
+                "@@//.slug_test_host:host",
             ]
         );
         let configured = evaluation
@@ -11642,8 +11749,8 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
             .collect::<Vec<_>>();
         assert_ne!(configured[1], configured[2]);
         assert_eq!(configured[1].label(), configured[2].label());
-        assert_ne!(configured[3], configured[4]);
-        assert_eq!(configured[3].label(), configured[4].label());
+        assert_ne!(configured[4], configured[6]);
+        assert_eq!(configured[4].label(), configured[6].label());
     }
 
     #[test]
@@ -11730,16 +11837,17 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
             _deps: &mut dyn Iterator<Item = &DynKey>,
             _activation: ActivationData,
         ) {
+            let key_text = key.to_string();
+            if key_text.contains(".slug_test_host")
+                || key_text == "workspace-file:/workspace/MODULE.bazel"
+                || key_text == "workspace-raw-file:/workspace/MODULE.bazel.lock"
+            {
+                return;
+            }
             if key.downcast_ref::<RootModuleGraphKey>().is_some()
                 || key.downcast_ref::<WorkspaceEvaluationKey>().is_some()
                 || key
                     .downcast_ref::<slug_loading_v2::keys::PackageLoadKey>()
-                    .is_some()
-                || key
-                    .downcast_ref::<slug_workspace_v2::WorkspaceSnapshotKey>()
-                    .is_some()
-                || key
-                    .downcast_ref::<slug_workspace_v2::WorkspaceRawSnapshotKey>()
                     .is_some()
                 || key
                     .downcast_ref::<slug_loading_v2::keys::WorkspaceDirectorySnapshotKey>()
@@ -11874,7 +11982,7 @@ empty_write = rule(implementation = _empty_write, toolchains = ["//:type"])
         replacements: &[(&str, &str)],
     ) -> PathObservationEpoch {
         let mut epoch = BuildRootEpoch::base(variant);
-        let mut module = "module(name = \"bazel_tools\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:toolchain\")\n".to_owned();
+        let mut module = "module(name = \"root\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:toolchain\")\n".to_owned();
         let mut defs = RESOLVED_WRITE_DEFS.to_owned();
         let mut build = format!(
             "load(\":defs.bzl\", \"empty_write\", \"ordered_write\", \"toolchain_impl\", \"write\")\nconstraint_setting(name = \"setting_a\")\nconstraint_setting(name = \"setting_b\")\nconstraint_value(name = \"value\", constraint_setting = \":{setting}\")\nplatform(name = \"platform\", constraint_values = [\":value\"], exec_properties = {{\"z\": \"last\", \"a\": \"first\"}})\nplatform(name = \"platform_alt\", constraint_values = [\":value\"], exec_properties = {{\"z\": \"last\", \"a\": \"first\"}})\ntoolchain_type(name = \"type\")\ntoolchain_impl(name = \"implementation\", marker = \"toolchain\")\ntoolchain(name = \"toolchain\", toolchain_type = \":type\", toolchain = \":implementation\")\nwrite(name = \"write\")\nwrite(name = \"other\")\nordered_write(name = \"ordered\", deps = [\":other\"])\nempty_write(name = \"empty\")\n"
