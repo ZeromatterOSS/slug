@@ -19839,3 +19839,21 @@ lowering responsible for mapping and canonical identity; Bazel 9.2
 `Label.parseWithPackageContext`, `LabelConverter`, `BuildType.LabelType` and
 their tests remain sole compatibility authority. This is generic Starlark
 loading, not a Rust C++ parser or rule implementation.
+
+### Canonical package context R2; external query consumers included (2026-08-27)
+
+The loading implementation passes its owner suite and produces the intended
+final canonical identities. Required direct-dependent validation then exposed
+that the existing external-query projection still classified same-package
+references by provisional main-repository labels. Restricted visibility is
+the first observed failure, but filegroup, alias, test-suite and package-group
+consumers share the same stale assumption.
+
+Run `WP-4-5-7A-canonical-package-label-context-prerequisite-r2` under its
+revised allowlist. Keep loading as the sole identity producer; adapt the whole
+existing external-query consumer category to require matching canonical
+repository and package identity, and make visibility context conversion
+idempotent only for an already-matching canonical repository. Different
+repositories, equal paths, root mapping breadth and general external graph
+admission remain deferred. No mapping, route lookup or source discovery moves
+into query.

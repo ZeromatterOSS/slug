@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-4-5-7A-canonical-package-label-context-prerequisite](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-canonical-package-label-context-prerequisite-r2](./slug-v2-subplans/current-packet.md).
 
 ### M7 registration cutover REPLAN; canonical package context prerequisite active (2026-08-27)
 
@@ -46,13 +46,20 @@ package/repository context before string-label conversion. Internal native
 references therefore remain provisional root labels, and explicit canonical
 references are rejected before configured analysis can consume them.
 
-Activate only `WP-4-5-7A-canonical-package-label-context-prerequisite`. Keep
+Activate only `WP-4-5-7A-canonical-package-label-context-prerequisite-r2`. Keep
 package-context canonicalization in the loading evaluator, using the existing
 canonical route's selected mapping, and retain only final canonical labels in
 `LoadedPackage`. The registration-consumer implementation remains parked and
 resumes after this prerequisite. Bazel 9.2 remains authority; Zabel supplies
 peer ownership guidance only. BCR Starlark continues to own every rule,
 including `cc_internal`, while `cc_common` remains a generic host-ABI client.
+
+The first implementation passed loading validation, then the required query
+dependent exposed its old provisional-root assumption for same-package
+external labels. R2 converts the complete existing external-query consumer
+category—visibility, filegroup, alias, test-suite and package-group—to compare
+full canonical repository plus package identity. It must not accept both
+representations or repair final labels back to root.
 
 ### M7 configured package identity accepted; registration cutover active (2026-08-27)
 
