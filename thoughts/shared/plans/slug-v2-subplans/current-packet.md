@@ -1,22 +1,22 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-builtin-bazel-tools-selected-mapping-design-r2`
+Packet: `WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r5`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `959cbd889`.
+Base: `c2ec8481e`.
 
-Result: freeze one bounded Bzlmod-owned selected-repository-mapping projection
-for builtin `bazel_tools`, then materialize a corrected implementation packet
-that may retain the uncommitted target-platform candidate. This packet changes
-plans only. It does not authorize Rust edits or acceptance of the candidate.
+Result: retain the independently reviewed R4 target-platform candidate, add
+the accepted graph-only Bzlmod selected-mapping owner and builtin projection,
+make the generic canonical route consume that mapping, and prove the default
+host platform end to end. Do not implement toolchain selection.
 
-Independent Sol review: `ACCEPT`. The corrected graph-only owner is acyclic,
+Design commit `c2ec8481e` and independent Sol review: `ACCEPT`. The corrected graph-only owner is acyclic,
 keeps RepoSpec/source metadata out of mapping publication, and retains only the
 compact mapping carrier at the builtin boundary.
 
-## Why R4 and the first design replanned
+## R4 and design replan record
 
 Independent terminal review returned `REPLAN`. The R4 candidate embeds exact
 Bazel 9.2 `tools/BUILD` and `tools/build_defs.bzl`, but
@@ -29,9 +29,9 @@ bytes separately; they did not prove their required composition. The failed
 Slug smoke confirmed the missing mapping boundary. The pinned Bazel oracle
 proves Bazel behavior, not Slug realization.
 
-R4 stops on any further material correction. Do not commit its Rust candidate
-or silently narrow an exact claim. Retain it only as uncommitted input while
-this design is reviewed.
+R4 stopped on any further material correction, so none of its Rust is accepted
+under that packet. R5 explicitly retains the validated candidate under this
+corrected owner/proof contract; do not silently narrow the exact claim.
 
 The first design proposed projecting the builtin mapping from
 `HostSelectedModuleRoutesKey`. Independent pre-review returned `REPLAN` because
@@ -166,36 +166,116 @@ The implementation packet must prove the composition, not its parts:
 5. Existing selected, generated and root mapping suites remain unchanged;
    exact builtin hashes/modes and all R4 platform/cycle/action proofs remain.
 
+Retained R4 proofs include visible/non-visible option projection; first
+platform/fallback and Target/Exec shape checks; per-platform exec identity and
+equal-input `Arc` reuse; direct/multi-hop aliases for platform/value/setting;
+wrong kinds, cycles, defaults and duplicate settings; Target/Exec platform
+facts and A/B/A/cancellation repair; constraint match/no-match/extra-setting
+and competing outer/Need/semantic errors; exact `.bzl` detector diagnostics;
+and locked scans for one alias recursion, one condition owner, no package read
+in platform consumers, no retained standard collection/cache/interner, no
+toolchain/provider/ruleset specialization and no lock across DICE.
+
 Reuse the existing Bazel oracle and the provenance-pinned local `platforms`
 module fixture; add no oracle fixture unless the implementation audit proves a
 real evidence gap. The local fixture authenticates Slug composition but does
 not support a claim of live network BCR materialization.
 
-## Implementation packet to materialize after review
+## Retained R4 implementation contract
 
-After independent Sol `ACCEPT`, replace this manifest with
-`WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r5`. R5 may
-retain the current uncommitted R4 candidate and add only the natural mapping
-producer, route consumption and composition proofs above. Before editing,
-record exact blobs/line counts and caps for:
+The retained candidate must remain exactly within these owners:
 
-- `app/slug_bzlmod_v2/src/selected_repo_spec.rs` and `src/lib.rs`;
-- `app/slug_bzlmod_v2/src/canonical_repository_route.rs`;
-- `app/slug_loading_v2/src/canonical_repository_route.rs` and its focused
-  route/load tests; and
-- only the minimum existing analysis test/harness files needed for the final
-  configured composition proof.
+1. Project visible `ResolvedOptionLabel` values to canonical labels without
+   stringification; select the first native `platforms` entry or
+   `host_platform` fallback; and derive exec configurations by installing the
+   selected actual platform in the existing native row before the existing
+   Starlark exec projection.
+2. Keep the two pinned upstream builtin files byte-for-byte and `100644`, with
+   catalog/listing/snapshot identity updated. Retain
+   `constraint_setting.default_constraint_value` only to reject defaults at
+   this admitted slice.
+3. Publish terminal `actual_configured_target` identity from the existing
+   configured alias recursion; direct nodes publish self, aliases preserve the
+   requested node and `AliasActual` edge, and null nodes publish none. Admit
+   direct native toolchain declarations only as provider-empty terminal nodes.
+4. Analyze native platform, constraint value and setting nodes in Target and
+   Exec configurations. Resolve value/setting aliases through terminal actual
+   identity, preserve original ordered edges, reject wrong kinds, defaults and
+   duplicate actual settings.
+5. `ConfiguredPlatformKey` consumes only configured nodes/edges and publishes
+   requested/actual keys, the existing platform fact and an immutable actual
+   value/setting constraint slice. `ConfiguredTargetPlatformKey` consumes only
+   structural configuration selection plus that platform key.
+6. The sole `ConfiguredConditionKey` matches every requested actual constraint
+   value by actual setting/value identity on the target platform while
+   preserving native/define/flag behavior and outer-before-Need-before-semantic
+   precedence.
+7. The request-scoped configured-analysis cycle detector guards only the
+   existing alias-child await and composes losslessly with the `.bzl` detector.
+   Preserve concrete `.bzl` guards/downcasts, finish events, cancellation and
+   same-graph recovery; retain no cycle state in DICE values and hold no lock
+   across a computation.
 
-Preserve every R4 allowlist entry and cap exactly. Do not authorize a new
-fixture, Cargo/lockfile change, CLI/core production change, registry
-materialization change or second mapping owner. Set separate production and
-proof caps only after measuring the live owners; the new production addition
-must remain below 500 physical Rust lines and the new proof addition below 500.
+Exact behavior is the admitted target-platform/constraint/alias surface above.
+Rust structural configuration bytes, DICE layout and diagnostic wording are
+Slug-native. Command platform flags/mappings/default-constraint semantics,
+converged registered execution-platform aliases, toolchain selection,
+providers and implementation analysis remain unsupported/deferred.
+
+## Exact allowlist and caps
+
+Every retained R4 baseline remains `cf91fe8de`; `ce38f0373`, `959cbd889` and
+`c2ec8481e` changed plans only.
+
+| Path | Baseline blob / lines | Maximum physical growth |
+|---|---:|---:|
+| `app/slug_identity_v2/src/label.rs` | `081bbb5b49238d361a83c437dbebd29b543334f4` / 537 | +30 |
+| `app/slug_configuration_v2/src/native/configuration.rs` | `12b7e78d753633a42f0a5fc1ebdb4be0fdfe2536` / 1,540 | +90 |
+| `app/slug_configuration_v2/src/native/tests.rs` | `4f9b01a779a6ebd5518c46728954348512987c8c` / 3,529 | +90 |
+| `app/slug_bzlmod_v2/src/builtin_repository.rs` | `28819e3b37b6be21f1d855bbf68d9de6a37f4d44` / 889 | +20 |
+| `app/slug_bzlmod_v2/src/host_module.rs` | `28c78c310ab6804da7824829efcc2c06f9d5bca8` / 5,349 | +4 |
+| `app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs` | `3002f00320df7540b4c4905610f11e42534b4f7b` / 149 | +35 |
+| `app/slug_loading_v2/src/package.rs` | `bfc62b265d336a57a612e2f50def2ce3da587a2e` / 6,852 | +50 |
+| `app/slug_loading_v2/tests/build_file_loading.rs` | `fa35fbbedc839f49b701ffc98810554349d28629` / 3,559 | +55 |
+| `app/slug_loading_v2/src/external_subtree_package_set_tests.rs` | `d8e7477ae4f33c13e83c7edbadceaa85d6d0cbed` / 838 | +0; replace two rows |
+| `app/slug_analysis_v2/src/dice.rs` | `08711874e49e37b297b8a7eb989ba7a1c60d70e1` / 3,748 | +340 |
+| `app/slug_analysis_v2/src/result.rs` | `2d5fb57083c522ea5229610e1c033371065ad790` / 668 | +100 |
+| `app/slug_analysis_v2/src/lib.rs` | `777f01622c2051a3b54c2a697173e136072ac792` / 77 | +15 |
+| `app/slug_analysis_v2/tests/starlark_rule.rs` | `5fba7dd923011f724073ac8b6674b1ce4d283db9` / 6,304 | +450 |
+| `app/slug_analysis_v2/tests/root_analysis.rs` | `b2fd28f8fda584b50ec597eb21018a24461b8167` / 1,123 | +100 |
+| `app/slug_core_v2/src/runtime/dice.rs` | `e0bf2cb329b63089ca51c039e82881c3188c8655` / 12,008 | +20 |
+| `app/slug_core_v2/src/runtime/tests/build_command_tests.rs` | `fd3f417977f417a0098decd36c34097d1d50d391` / 4,056 | +0; replace one token |
+| `app/slug_analysis_v2/Cargo.toml` | `36cd3ffd8e681d998d6f1bcd47f493e2496484e6` / 31 | +0; move Tokio row |
+
+R5 adds only these `c2ec8481e` mapping-owner baselines:
+
+| Path | Baseline blob / lines | Maximum physical growth |
+|---|---:|---:|
+| `app/slug_bzlmod_v2/src/selected_repo_spec.rs` | `286d9e1042f76fef1ca6f50c8c6df92c516f4352` / 14,538 | +350 |
+| `app/slug_bzlmod_v2/src/lib.rs` | `279b4d8d98a8c534eca9a7112a57788e2c3f8326` / 539 | +20 |
+| `app/slug_bzlmod_v2/src/canonical_repository_route.rs` | `9aa6bc6ad89b754c23e5d0897a15011a07d3ffcd` / 415 | +80 |
+| `app/slug_loading_v2/src/canonical_repository_route.rs` | `86cd5e194fe4ce37fe5677a2ef7190472a081c68` / 326 | +160 |
+| `app/slug_loading_v2/src/canonical_repository_route_tests.rs` | `90c8c212ac33dfd6755fb907054d4bd413916b64` / 3,047 | +250 |
+| `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs` | `81a0d1ef364f40ecdb9da5c5a150361c5fe876a0` / 2,668 | +250 |
+
+The only new non-plan files remain the exact 50-line builtin `tools/BUILD`,
+the exact 106-line `tools/build_defs.bzl`, and the at-most-350-line configured
+cycle detector. R4 caps remain 950 production, 700 proof and 1,750 total added
+Rust lines. Mapping-owner additions have separate caps of 500 production, 500
+proof and 1,000 total; combined R5 caps are 1,450/1,200/2,750. The large
+`selected_repo_spec.rs` owner remains cohesive because R5 extracts an existing
+mapping calculation beside its selected-graph/route keys; splitting would
+expose private graph internals without separating semantic responsibility.
+
+No files beyond both tables, the three named new files and writable plans may
+change. No new fixture, lockfile, sync script, CLI/core production,
+registry-materialization or Cargo change beyond the retained Tokio move is
+allowed.
 
 ## Validation and stops
 
-The design closes only after independent Sol review returns `ACCEPT`. The R5
-implementation must run focused Bzlmod route, loading and analysis suites;
+The implementation closes only after independent Sol review returns `ACCEPT`.
+Run focused identity/configuration, Bzlmod route, loading and analysis suites;
 full affected crate suites serially; direct dependents; rustfmt;
 `git diff --check`; source/hash/mode and cap audits; packet/canonical matching;
 and `scripts/v2_archive_status.sh`. Rebuild `slug_cli_v2` before any smoke and

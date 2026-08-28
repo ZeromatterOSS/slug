@@ -20604,3 +20604,10 @@ graph-only mapping owner, the builtin projection feeds the canonical route,
 and ordinary selected routes separately join mappings with RepoSpecs. The
 compact builtin carrier retains no graph predecessor. Materialize corrected
 R5 only after recording exact live baselines and caps.
+
+Commit `c2ec8481e` records that accepted design. Activate only
+`WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r5` at its
+exact live allowlist/caps: retain the reviewed target-platform candidate, add
+the graph-only mapping owner and builtin projection, consume it through the
+generic canonical route, and prove default host-platform composition. Do not
+begin toolchain selection or widen live registry materialization.

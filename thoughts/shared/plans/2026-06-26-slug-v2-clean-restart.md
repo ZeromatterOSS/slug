@@ -36,9 +36,9 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-4-5-7A-builtin-bazel-tools-selected-mapping-design-r2](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r5](./slug-v2-subplans/current-packet.md).
 
-### Builtin bazel_tools selected-mapping design active (2026-08-28)
+### Corrected target-platform prerequisite R5 active (2026-08-28)
 
 Commit `ce38f0373` accepts the independently corrected category-4 architecture.
 It freezes reusable configured target-platform and platform facts, the sole
@@ -56,12 +56,13 @@ and compose one configured-analysis detector at the shared request owner.
 Terminal R4 review found that its exact builtin files cannot realize the
 default host alias: the canonical builtin route discards the selected
 `bazel_tools` module mapping before the eager `@platforms` load. R4 is not
-accepted. Activate only the zero-Rust
-`WP-4-5-7A-builtin-bazel-tools-selected-mapping-design-r2`: extract the
-graph-only selected-mapping owner below RepoSpec/source metadata, project its
-full builtin mapping into the generic canonical route, freeze the composition
-proof, then materialize corrected R5. Toolchain selection and
-provider/implementation analysis remain later packets.
+accepted. Commit `c2ec8481e` accepts the corrected graph-only mapping design.
+Activate only
+`WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r5`: retain the
+reviewed platform/cycle candidate, extract mapping ownership below
+RepoSpec/source metadata, project the full builtin mapping into the generic
+canonical route, and prove the default host alias through configured analysis.
+Toolchain selection and provider/implementation analysis remain later packets.
 
 Pinned Bazel 9.2 remains behavior authority. Clean Zabel `0795445f…` remains
 peer architecture/optimization guidance only. Buck2-derived Rust owns generic
