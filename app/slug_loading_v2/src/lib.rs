@@ -36,6 +36,9 @@ mod module_extension_repository_validation;
 pub mod package;
 #[doc(hidden)]
 pub mod provider;
+mod registration_expansion;
+#[cfg(test)]
+mod registration_expansion_tests;
 mod root_subtree_package_set;
 mod starlark_label;
 pub mod visibility;
@@ -176,6 +179,18 @@ pub use package::RuleCapability;
 pub use package::TestMetadata;
 pub use package::TestRuleKind;
 pub use package::TestSuiteMembership;
+pub use registration_expansion::ModuleRegistrationAmbiguity;
+pub use registration_expansion::ModuleRegistrationExpansion;
+pub use registration_expansion::ModuleRegistrationExpansionError;
+pub use registration_expansion::ModuleRegistrationExpansionErrorKind;
+pub use registration_expansion::ModuleRegistrationExpansionKey;
+#[doc(hidden)]
+pub use registration_expansion::ModuleRegistrationExpansionObservationError;
+#[doc(hidden)]
+pub use registration_expansion::ModuleRegistrationExpansionObservationKey;
+pub use registration_expansion::ModuleRegistrationFamily;
+#[doc(hidden)]
+pub use registration_expansion::ObservedModuleRegistrationExpansion;
 #[doc(hidden)]
 pub use root_subtree_package_set::ObservedRootSubtreePackageSet;
 #[doc(hidden)]
