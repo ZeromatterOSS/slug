@@ -20295,3 +20295,31 @@ omit/remove default-equal rows, and allocate the effective typed value only at
 `ctx.build_setting_value`. Preserve the current singular command adapter as a
 bounded category-3 bridge. Command text/occurrences, condition/selector
 matching, providers, platforms and toolchain choice remain deferred.
+
+### Typed build-setting value resolution accepted; direct condition matching active (2026-08-27)
+
+Commit `aaf23abcc` completes category-2 packet three with one analysis-owned
+declaration/value resolver. Explicit inputs and the admitted one-output
+transition authenticate canonical loading declarations, preserve arbitrary-
+precision integers and every collection shape, derive declaration scope, omit
+or remove default-equal rows and preserve unrelated overrides. Build-setting
+rules now allocate the effective integer, Boolean, string, list or set only as
+ephemeral evaluator data for `ctx.build_setting_value`.
+
+Canonical-external declaration lookup uses the selected repository package.
+Need and semantic failures publish no row or child; deterministic cold
+cancellation at the declaration dependency publishes no child and same-graph
+recovery produces exactly one. Default A/B/A, set list/set convergence,
+allow-multiple singleton fallback and retained-map identity are discriminated.
+Independent conversion/DICE/lifetime review returns `ACCEPT`.
+
+Activate only `WP-4-5-7A-direct-config-setting-matching`. Add one borrowed
+native `values`/`define_values` matching boundary, one typed build-setting
+expected-text matcher for the complete admitted kind category, and the sole
+configured-condition DICE owner. Nonempty `constraint_values` fails closed
+until category 4 owns the configured target-platform fact. The next packet
+batches these results for selector resolution. Command occurrences, providers,
+platforms and toolchain choice remain deferred. Buck2-derived Rust owns generic
+syntax/evaluation, BCR Starlark owns rule flow including `cc_internal`, and
+`cc_common` remains a generic host-ABI client. Zabel is peer guidance only;
+pinned Bazel 9.2 is behavior authority.

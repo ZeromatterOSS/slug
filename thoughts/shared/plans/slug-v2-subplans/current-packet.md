@@ -1,227 +1,238 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-typed-build-setting-value-resolution`
+Packet: `WP-4-5-7A-direct-config-setting-matching`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `84bda1971`.
+Base: `aaf23abcc`.
 
-Result: delete the temporary copied-default string bridge. Authenticate every
-admitted configured input and transition output against its loading-owned
-build-setting declaration, resolve all five typed values and declaration scope,
-retain only nondefault overrides, and expose the effective typed value through
-`ctx.build_setting_value`. This packet completes category-2 value resolution;
-it does not parse real command occurrences or match configured conditions.
+Result: add the sole configured-condition DICE owner and exact direct matching
+for native `values`, `define_values`, and typed Starlark `flag_values` across
+the complete admitted build-setting category. Keep `constraint_values`
+fail-closed until the configured target-platform fact exists. This packet owns
+condition truth, not selector resolution or command occurrence parsing.
 
 ## Accepted predecessor and boundaries
 
-Commits `b949ce8da`, `57b1e8a1f`, and `84bda1971` accept the full-category
-architecture, all five loading declarations, and the sole typed scoped-option
-map. The map is immutable, canonical-label sorted, kind/scope preserving, and
-already owns target-to-exec projection. Its migration deliberately preserved
-one default-equal string row pending this packet.
+Commits `b949ce8da`, `57b1e8a1f`, `84bda1971`, and `aaf23abcc` accept the
+category architecture, four-field loading predicate, sole typed scoped-option
+map, declaration-authenticated effective-value resolver, and generic typed
+`ctx.build_setting_value`. Configuration contains only normalized nondefault
+overrides; declarations remain loading-owned and defaults are read in place.
 
 Buck2-derived Rust remains the sole syntax/evaluator owner. BCR Starlark owns
 every rule and control path including `cc_internal`; `cc_common` is a demanding
 client of the generic evaluator/provider/host ABI, never a Rust C++ parser or
 rule engine. Pinned Bazel 9.2 at
 `8220c6198837d5c13d53fea211cf3282aa12408a` is behavior authority. Clean Zabel
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` supplies peer ownership and compact-
-publication guidance only.
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` supplies peer ownership and compact
+matching guidance only.
 
 ## Live preflight
 
-- Analysis still discovers one legacy required string label, copies its loaded
-  default into configuration, and assumes `Default` scope. The explicit bridge
-  arrives as one already typed string entry but is not authenticated against
-  the declaration's kind, default or scope.
-- Transition execution accepts exactly one declared output but requires a
-  string and inserts it with `Default` scope. It cannot produce integer,
-  Boolean, string-list or string-set values and cannot elide a default.
-- `AnalysisContext` retains `Option<CompactString>` and exposes only string
-  `ctx.build_setting_value`. The loading target already owns a complete
-  `BuildSettingDeclaration`; no new declaration store is needed.
-- The accepted option map can represent the full category. The missing owner is
-  one declaration-authenticated resolver shared by explicit and transition
-  paths plus one evaluator allocation boundary for context access.
+- Loading already publishes one `ConfigSettingTarget` with canonical normalized
+  `values`, `define_values`, `flag_values`, ordered `constraint_values`,
+  provenance, and semantic label dependencies. All-empty declarations load so
+  the configured owner can issue the Bazel-shaped semantic failure.
+- `SlugConfiguration` owns the complete typed native option vector and the sole
+  typed Starlark override map, but exposes no matching API. Native converters,
+  defaults, descriptor metadata, repeatability, list and map occurrences are
+  private to `slug_configuration_v2`; analysis must not reconstruct them.
+- `build_setting.rs` already converts loading declarations to effective typed
+  values. It lacks only the `flag_values` string converter/matcher. No new
+  retained build-setting representation is needed.
+- Analysis has no configured-condition key or match result. Existing configured
+  package DICE routing already distinguishes root and canonical repositories
+  and is the required declaration dependency owner.
+- No configured target-platform fact exists for constraint membership. A
+  nonempty `constraint_values` predicate therefore cannot be truthfully
+  evaluated in this packet.
 
 ## Implementation contract
 
-### One declaration-authenticated value resolver
+### One native matching boundary
 
-Add one analysis-owned module that converts between loading
-`BuildSettingDeclaration`, evaluator-independent `StarlarkOptionValue`, and
-short-lived Starlark values. It is the sole configured build-setting converter
-for all five kinds. Do not add kind-specific stores, per-call text encodings or
-another effective-value enum.
+Add one borrowed, allocation-bounded native config-setting matcher owned by
+`slug_configuration_v2`. Its public input is the loading predicate's raw
+`values` and `define_values`; do not expose `OptionRecord`, `OptionValue`,
+converter families, ordinals, Java-shaped objects, or a second configuration
+view. Resolve old names to the existing canonical descriptor when admitted,
+reject unknown, internal/non-configurable, unsupported, and malformed values,
+convert expected text through the same native converter/default metadata, and
+compare against the configuration's existing typed occurrence.
 
-For a canonical setting label, load its package through the existing Root or
-Canonical configured-package DICE path, require the exact target, require a
-valid build-setting declaration, and retain no duplicate declaration. Convert
-loading default and scope into the existing configuration value/scope types.
-Resolve a candidate only when its shape matches the declaration:
+Match Bazel 9.2 option behavior over the admitted descriptor universe:
 
-- integer accepts arbitrary-precision Starlark integer and retains `BigInt`;
-- Boolean accepts only Boolean;
-- ordinary string accepts only string;
-- `allow_multiple` string accepts only a list of strings and uses a singleton
-  list containing the scalar declaration default when no override exists;
-- string-list accepts only a list of strings, preserving order and duplicates;
-- string-set accepts a set or list of strings and normalizes once to sorted
-  unique membership.
+- scalar/absent values use typed equality after conversion;
+- repeatable list expectations use collection containment, including exact
+  empty/empty behavior;
+- repeatable map expectations contain one entry and use the last actual entry
+  with the same key;
+- each `define_values = {key: value}` entry is the native `define` occurrence
+  `key=value`, so repeated actual keys use the same last-wins rule;
+- all predicates are conjunctive and a valid mismatch returns `false`, while an
+  invalid name/value or unsupported converter is a semantic error.
 
-Wrong target, malformed declaration, kind mismatch or wrong element type fails
-closed before a configured child key is published. Do not stringify evaluator
-values or parse command text in this packet.
+Parsing is scratch. Retain no expected-value cache, copied option vector,
+lookup map, boxed dynamic converter, text digest, or diagnostic diff in the
+configuration. The accepted structural configuration bytes and identities do
+not change.
 
-### Effective nondefault map invariant
+### Complete typed `flag_values` matching
 
-Compare the normalized typed candidate with the declaration's effective
-default. A default-equal candidate removes/omits that canonical row; a
-nondefault candidate inserts exactly one row with scope derived from the
-declaration, ignoring any placeholder scope carried by the temporary explicit
-bridge. Unrelated rows survive. Equal update and absent removal preserve the
-existing map/configuration `Arc` identity.
+Extend the existing analysis build-setting module with one pure
+declaration-owned expected-text matcher. Load each canonical flag target from
+its own configured package, require a valid build-setting declaration, obtain
+override-or-default through the accepted effective-value resolver, and convert
+the predicate text by declaration kind:
 
-Absent input leaves no row. A build-setting rule obtains its effective value by
-binary lookup of its own canonical label, verifies that an override kind agrees
-with its declaration, or falls back directly to the loading-owned declaration
-default. No declaration default, source tag, effective-value cache or evaluator
-value enters configuration identity.
+- integer uses Bazel/Starlark base-aware arbitrary-precision parsing;
+- Boolean uses the pinned Bazel Boolean converter spellings;
+- ordinary string is exact text;
+- `allow_multiple` string converts one scalar and matches membership in the
+  effective list;
+- string-list converts comma-separated text, requires exactly one converted
+  member, and matches membership in the effective ordered list;
+- string-set converts comma-separated text to unique membership, requires
+  exactly one member, and matches membership in the effective set.
 
-Delete `root_string_build_setting_default`, the required-label copied-default
-path and any assertion that a build-setting configured node must carry its own
-row. Preserve the root command's current admitted single-string observation by
-routing its one typed candidate through the general resolver. The singular
-command adapter remains a bounded category-3 input bridge, not semantic state.
+Invalid text, an empty or multiple-member list/set expectation, a wrong target,
+or a configured kind/scope disagreement is an error rather than no-match.
+Actual list order and duplicate count do not affect membership matching;
+configuration identity remains order-sensitive for string-list and normalized
+for string-set as already accepted. Do not add aliases, feature flags,
+label-valued build settings, or a second expected/effective value enum.
 
-### Transition and context cutover
+### Sole configured-condition DICE owner
 
-The existing one-output transition subset evaluates as today, then uses the
-same declaration lookup and resolver before constructing each child
-configuration. Generalize its output value shape to all five kinds above;
-preserve the current one-dictionary-entry/output-label restriction. A
-default-equal transition removes a pre-existing row, and a nondefault
-transition replaces only its declared label. Equivalent string-set list/set
-outputs converge on one configuration identity.
+Add one public analysis DICE key identified by workspace and a
+`ConfiguredTargetKey` whose label is the canonical `config_setting` target and
+whose configuration is structural. It loads that exact target through the
+existing Root/Canonical configured-package path, requires
+`PackageTargetKind::ConfigSetting`, and owns match/no-match/error. It evaluates
+native, define, and flag predicates conjunctively and loads each referenced
+flag declaration at most once per key computation.
 
-`ctx.build_setting_value` becomes a generic ephemeral Starlark value allocated
-from the already resolved typed effective value. Return Starlark integer,
-Boolean, string, list, or set with the exact effective shape; in particular an
-absent `allow_multiple` string returns `[default]`, ordered lists preserve
-duplicates, and string sets expose set semantics. The heap value is evaluator
-scratch and never crosses result/DICE boundaries.
+An all-empty predicate is a semantic error before matching. Any nonempty
+`constraint_values` is an explicit unsupported/deferred error naming the
+missing configured target-platform fact; never silently ignore it or return
+false. Duplicate canonical flag keys remain a loading failure. Need, loading
+failure, semantic failure, and cancellation publish no condition result. A
+later corrected request through the same dependency graph recovers normally.
+
+Return one compact match/no-match value suitable for the next selector packet.
+Do not analyze the config-setting as a Starlark rule, fabricate a
+`ConfigMatchingProvider`, retain referenced declarations, or make condition
+labels configured dependencies of their eventual selector branches.
 
 ## Compatibility classification
 
-- **Exact:** declaration authentication; all five typed transition/context
-  shapes; arbitrary-precision configured integer; allow-multiple singleton
-  fallback; list order/multiplicity; set normalization; declaration-owned
-  scope; default-row elision; unrelated-row survival; and the admitted root
-  string lifecycle.
-- **Slug-native:** Rust module/layout, compact allocation, structural
-  configuration bytes/tokens, and diagnostic wording.
-- **Unsupported/deferred:** command text conversion and occurrence precedence,
-  transition inputs/multiple outputs/splits/aliases/native options, condition
-  matching, selector resolution, `PROJECT.scl`, provider payloads,
-  platform/toolchain choice, Bazel checksum/output bytes, and wider rule flow.
+- **Exact:** direct native scalar/list/map and `define_values` matching for the
+  admitted descriptor/converter universe; all five typed build-setting text
+  conversions; collection membership semantics; conjunctive matching;
+  all-empty failure; canonical external flag declaration lookup; and
+  match/no-match/error separation.
+- **Slug-native:** Rust layout, compact scratch, configured-condition result
+  representation, structural configuration identity, and unproved diagnostic
+  wording.
+- **Unsupported/deferred:** `constraint_values` until the configured
+  target-platform fact, native flag aliases/disabled-select warnings, feature
+  flags, label/label-list build settings, selector resolution, condition
+  specialization/ambiguity, command text occurrences and precedence,
+  transitions beyond the accepted subset, providers, platform/toolchain
+  selection, Bazel checksum/output bytes, and wider rule flow.
 
 ## Proof obligations
 
-1. Declaration conversion covers integer beyond i64, Boolean, empty/nonempty
-   string, allow-multiple string, duplicate-preserving string list and
-   list/set-origin string set, with exact wrong-kind/element rejection.
-2. Each declaration scope replaces placeholder input scope and participates in
-   nondefault configuration identity; project remains retained in target
-   configuration and fails only at the accepted exec boundary.
-3. Absent input reads the loaded default with no row; explicit default-equal
-   input removes/omits the row; nondefault input retains one row; unrelated
-   rows survive; A/B/A restores map and configuration identity.
-4. Default-equal transitions remove an inherited row, nondefault transitions
-   replace one row, list order stays significant, and equivalent set/list set
-   outputs converge.
-5. `ctx.build_setting_value` exposes all five effective Starlark shapes,
-   including singleton fallback for allow-multiple string, list duplicates and
-   set behavior, without retaining evaluator memory.
-6. Root string command, transition, analysis, cquery/build/run and retained-
-   daemon lifecycle remain accepted after projection tokens change from the
-   copied-default configuration to the empty override map.
-7. A canonical-external build-setting label resolves the declaration, default
-   and scope from its own selected canonical repository package without root-
-   label repair, and the configured-package dependency is observable in the
-   analysis preparation/observation proof.
-8. Declaration Need, semantic failure and cancellation publish neither an
-   override row nor a transitioned child key. A later successful request
-   recovers through the same declaration dependency and publishes exactly one
-   resolved child; stale partial state is not reused.
-9. Old root-only default/required helpers and the named temporary bridge
-   disappear; no second declaration/value/scope owner is introduced.
+1. Pure native matching discriminates scalar equality, absent/null, list
+   containment and empty behavior, last-wins map entries, `define_values`
+   key/value assembly, unknown/non-configurable names, invalid text and
+   unsupported converters without changing configuration identity.
+2. Direct configured conditions match and mismatch representative native
+   values and `define_values`; multiple native/define entries are conjunctive.
+3. `flag_values` covers integer beyond i64 and base-aware text, every admitted
+   Boolean spelling, exact string, allow-multiple membership, ordered-list
+   membership, normalized-set membership, defaults and nondefault overrides.
+4. List/set expected text converting to zero or multiple members errors;
+   malformed integer/Boolean text, wrong target kind, configured kind/scope
+   mismatch and missing package fail closed.
+5. One condition can combine native, define and multiple typed flag predicates;
+   one mismatch makes the result false and no source-order shortcut changes
+   Need/error precedence.
+6. A canonical-external config-setting and canonical-external flag declaration
+   resolve from their own selected repositories. Their package activations are
+   observable, deduplicated, and invalidated independently from root packages.
+7. All-empty declaration and nonempty constraints error before a condition
+   result publishes; the constraint error explicitly preserves the category-4
+   target-platform boundary.
+8. Predicate/declaration/configuration A/B/A restores condition truth and DICE
+   identity. Need, semantic failure and deterministic cancellation publish no
+   condition result; cold recovery through the same graph publishes one result.
+9. No second native option store, build-setting converter, effective-value map,
+   condition matcher, provider payload, selector resolver or evaluator value is
+   retained.
 
-Use the pinned Bazel `StarlarkRuleContext`, `StarlarkTransition`,
-`FunctionTransitionUtil`, `CoreOptionConverters`, `ConfigStringSetTest` and
-existing loading declaration evidence. Add a new oracle only if one of the
-named conversion shapes is not discriminated by pinned sources/tests.
+Use pinned Bazel `ConfigSetting`, `ConfigSettingTest`,
+`CoreOptionConverters.BUILD_SETTING_CONVERTERS`, `BuildSetting`, and
+`ConfigStringSetTest` evidence. Add an oracle only for a named converter or
+matching shape not discriminated by those pinned sources/tests.
 
 ## Ownership and memory
 
-Loading packages remain the only retained declaration owner. Configuration
-remains the only retained effective-override owner. The resolver uses bounded
-scratch and returns an existing immutable configuration or one changed
-`Arc<[StarlarkOption]>`; evaluator allocations die with the rule/transition
-module. Add no retained map, declaration cache, interner, frozen heap, text
-identity, global store or lock.
+`SlugConfiguration` remains the only retained native/effective-override owner.
+Loading packages remain the only predicate and build-setting declaration
+owners. The configured-condition DICE value retains only truth plus key
+identity; native expected occurrences, text conversion buffers, declaration
+joins and mismatch details are bounded scratch and drop on completion or
+cancellation. Use borrowed option rows and existing immutable `Arc` data; add
+no global table, interner, heap, lock or workspace-wide condition cache.
 
-Zabel's per-canonical-label declaration producer, typed effective-value stage
-and unchanged-parent reuse are useful ownership patterns. Slug implements them
-through its existing configured-package DICE producer and immutable option map;
-it does not copy Zabel representation, diagnostics or checksum policy.
+Zabel's separation of canonical options, typed condition inputs and configured
+matching is useful ownership guidance. Slug implements that separation through
+its existing configuration/loading/analysis producers and copies no Zig
+representation, algorithm, diagnostics, checksum policy or behavior.
 
 ## Allowlist and caps
 
 Production:
 
-1. `Cargo.lock` (generated `slug_analysis_v2` dependency edge only, if direct
-   `num-bigint` use requires it; no version/checksum change);
-2. `app/slug_analysis_v2/Cargo.toml`;
-3. `app/slug_analysis_v2/src/lib.rs`;
-4. `app/slug_analysis_v2/src/build_setting.rs`;
-5. `app/slug_analysis_v2/src/dice.rs`;
-6. `app/slug_analysis_v2/src/starlark_rule.rs`.
+1. `app/slug_configuration_v2/src/native/mod.rs`;
+2. `app/slug_configuration_v2/src/native/configuration.rs`;
+3. `app/slug_configuration_v2/src/native/matching.rs`;
+4. `app/slug_analysis_v2/src/lib.rs`;
+5. `app/slug_analysis_v2/src/build_setting.rs`;
+6. `app/slug_analysis_v2/src/dice.rs`.
 
 Proof:
 
-7. `app/slug_analysis_v2/tests/configured_target.rs`;
-8. `app/slug_analysis_v2/tests/root_analysis.rs`;
-9. `app/slug_analysis_v2/tests/starlark_rule.rs`;
-10. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`;
-11. `app/slug_core_v2/src/runtime/tests/cquery_command_tests.rs`;
-12. `app/slug_cli_v2/tests/cli.rs`;
-13. `app/slug_server_v2/src/tests.rs`.
+7. `app/slug_configuration_v2/src/native/tests.rs`;
+8. `app/slug_analysis_v2/tests/starlark_rule.rs`;
+9. `app/slug_analysis_v2/tests/configured_target.rs`.
 
 Completion docs remain the canonical plan, this manifest and Stage 6 owner
-plan. Caps: 1,100 production Rust lines, 1,500 proof Rust lines, 2,600 total
-Rust lines and 220 completion-ledger lines. The new module is the single pure
-category converter; `dice.rs` owns lookup/orchestration and
-`starlark_rule.rs` owns ephemeral context allocation.
+plan. Caps: 900 production Rust lines, 1,250 proof Rust lines, 2,150 total Rust
+lines and 220 completion-ledger lines. `matching.rs` is the sole native
+converter/comparator boundary; `build_setting.rs` is the sole typed flag-text
+boundary; `dice.rs` owns dependency orchestration and publication.
 
 ## Validation
 
-Run serially: pure resolver conversion/elision tests; focused root preparation,
-transition and typed-context lifecycle tests; canonical-external declaration
-dependency plus Need/error/cancellation/recovery tests; `cargo test -p
-slug_configuration_v2`; `cargo test -p slug_analysis_v2`; direct core, CLI and
-server projection/lifecycle proofs; locked checks for every direct consumer;
+Run serially: pure native scalar/list/map/define matching tests; all typed
+flag-text converter/membership tests; focused root and canonical-external
+configured-condition lifecycle tests; all-empty/constraint/Need/error/
+cancellation/recovery proofs; `cargo test -p slug_configuration_v2`; `cargo
+test -p slug_analysis_v2`; locked checks for analysis and every direct consumer;
 `cargo fmt --all -- --check`; `git diff --check`; exact allowlist/caps; named
-archive baseline; and independent conversion/DICE/evaluator-lifetime review.
+archive baseline; and independent native-converter/DICE/retained-memory review.
 
 ## Stops
 
-STOP and `REPLAN` for a required file outside the allowlist; a second
-declaration/value/scope store or converter; copied defaults after resolution;
-evaluator or frozen-heap retention; text-only typed conversion; integer
-narrowing; list/set conflation; missing declaration authentication; transition
-child publication before its declaration dependency; project-scope exec
-acceptance; command text/occurrence parsing; condition/selector/provider/
-platform/toolchain work; Rust BCR rule flow, `cc_internal` or `cc_common`
-parsing; Zabel authority; cap overflow; or a material contract correction.
+STOP and `REPLAN` for a required file outside the allowlist; a second native
+option/value/scope/predicate/condition store or converter; configuration
+reconstruction in analysis; exposed internal option records; evaluator value
+retention; text-only actual values; copied defaults; source-order-dependent
+truth; constraint matching without the configured target-platform owner;
+selector/provider/toolchain/command-overlay work; Rust BCR rule flow,
+`cc_internal` or `cc_common` parsing; Zabel authority; a lock across DICE; cap
+overflow; or a material contract correction.
