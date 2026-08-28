@@ -19817,3 +19817,25 @@ deferred. Clean Zabel `0795445f…` informs only the explicit-registration-input
 and repository-aware-loading separation; Bazel 9.2 sources/tests and accepted
 fixtures remain authority. BCR Starlark owns all rules including `cc_internal`;
 `cc_common` is a generic evaluator/host-ABI client, not a Rust C++ rule engine.
+
+### Registration cutover REPLAN; canonical package label context active (2026-08-27)
+
+The uncommitted cutover correction computes both expansion families in order
+and applies outer-before-Need-before-semantic precedence, but its mandatory
+selected-nonroot proof found that canonical BUILD evaluation discards the
+`PackageIdentifier` and selected mapping before `PackageRecorder` converts
+string labels. `:` and `//` references become provisional root labels, while
+all `@` spellings—including exact `@@//`—are rejected. Analysis-side rebasing
+would violate the frozen ownership boundary and leave other loading consumers
+incorrect.
+
+Run `WP-4-5-7A-canonical-package-label-context-prerequisite` before resuming
+the cutover. The canonical repository package evaluator must pass its existing
+full package identity and route-owned immutable mapping into synchronous
+package lowering, resolve Bazel 9.2 package-context strings once, and retain
+only canonical labels in `LoadedPackage`. Root package mapping remains
+deferred. Zabel `0795445f…` is peer guidance for keeping BUILD package
+lowering responsible for mapping and canonical identity; Bazel 9.2
+`Label.parseWithPackageContext`, `LabelConverter`, `BuildType.LabelType` and
+their tests remain sole compatibility authority. This is generic Starlark
+loading, not a Rust C++ parser or rule implementation.

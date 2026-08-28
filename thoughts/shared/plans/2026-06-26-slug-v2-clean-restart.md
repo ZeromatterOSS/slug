@@ -36,7 +36,23 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-4-5-7A-expanded-registration-consumer-cutover](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-canonical-package-label-context-prerequisite](./slug-v2-subplans/current-packet.md).
+
+### M7 registration cutover REPLAN; canonical package context prerequisite active (2026-08-27)
+
+Correction proof for the expanded-registration consumer exposed a missing
+loading prerequisite: canonical repository BUILD evaluation drops its full
+package/repository context before string-label conversion. Internal native
+references therefore remain provisional root labels, and explicit canonical
+references are rejected before configured analysis can consume them.
+
+Activate only `WP-4-5-7A-canonical-package-label-context-prerequisite`. Keep
+package-context canonicalization in the loading evaluator, using the existing
+canonical route's selected mapping, and retain only final canonical labels in
+`LoadedPackage`. The registration-consumer implementation remains parked and
+resumes after this prerequisite. Bazel 9.2 remains authority; Zabel supplies
+peer ownership guidance only. BCR Starlark continues to own every rule,
+including `cc_internal`, while `cc_common` remains a generic host-ABI client.
 
 ### M7 configured package identity accepted; registration cutover active (2026-08-27)
 
