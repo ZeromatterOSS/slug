@@ -19751,3 +19751,28 @@ design must not create a Rust C++ rule engine, combine the two loading families
 into a workspace-global configured key, replay their events, or claim alias,
 target-settings, option-precedence or general external configured-graph
 semantics before their own packets.
+
+### Configured registration-consumer architecture accepted; package carrier active (2026-08-27)
+
+Independent correction review returns `ACCEPT`, and commit `104291321` freezes
+the sequence above. The correction makes the bypass exact: registrations are
+skipped only when
+`!has_toolchain_requirement && local_declarations.is_empty()`. A local
+declaration without a requirement must still compute both families to decide
+whether it is registered.
+
+Activate only `WP-4-5-7A-repository-aware-loading-package-carrier`. Add one
+loading key over `workspace + PackageIdentifier` and an observed sibling. Root
+composes the accepted root package owner; canonical composes the accepted
+canonical load route and crate-private general package inventory. Retain the
+exact child result and observation `Arc`s, preserve typed route/package
+terminals and child event ownership, and add no analysis dependency.
+
+The carrier is general package infrastructure, not a toolchain value. It
+retains no registration labels, successful route, mapping, source address,
+evaluator state or event batch. The existing registration expander remains
+unchanged; the later configured package-identity packet consumes this owner.
+Zabel remains peer guidance for separating repository-aware loaded facts from
+configuration/type selection, while Bazel 9.2 alone governs behavior. BCR
+Starlark still owns every rule including `cc_internal`; no C++ parser or Rust
+ruleset is authorized.

@@ -1,238 +1,193 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-configured-registration-consumer-architecture`
+Packet: `WP-4-5-7A-repository-aware-loading-package-carrier`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `3c6779966`.
+Base: `104291321`.
 
-Result: freeze the smallest repository-aware configured-consumer architecture
-for the accepted toolchain and execution-platform expansion families. Select
-the general loading package-carrier prerequisite and a bounded cutover
-sequence; add no Rust, oracle, activation or compatibility claim.
+Result: add one loading-owned Root/Canonical package carrier keyed by workspace
+and full `PackageIdentifier`, plus an observed sibling. Compose only accepted
+route/package owners, retain their exact result `Arc`s, and leave analysis and
+registration expansion behavior unchanged.
 
-## Immediate predecessor
+## Accepted architecture
 
-Commit `3c6779966` accepts the two independently keyed loading expansion
-families. One driver consumes selected MODULE declarations, the contextual
-target-pattern grammar, canonical routes, root/canonical subtree owners and
-general package inventories. It retains ordered canonical labels and warning
-facts, preserves observed result `Arc`s, and publishes no configured meaning.
+Commit `104291321` freezes the configured-consumer sequence. The live analysis
+path reparses root-only exact registrations, keys native packages only by
+`PackagePath`, rejects canonical native references and loads configured rule
+packages through a root-only input. A direct consumer cutover would collapse
+repository identity or introduce analysis-side source routing.
 
-The terminal review required one bounded proof correction. The accepted matrix
-now discriminates a missing package referenced only by the unrequested family,
-canonical route -> subtree -> inventory order, multi-module declaration order,
-root-package stable postorder, and row-terminal suppression. Full loading,
-Bzlmod, identity, query and read-only analysis gates pass.
-
-## Live consumer audit
-
-The current configured path in `slug_analysis_v2/src/dice.rs` cannot safely
-consume the new canonical labels by replacing its parser call:
-
-- `direct_root_registration(s)` reparses only root exact patterns and is called
-  independently from execution-platform preparation and toolchain resolution;
-- `RootPackages` is keyed only by `PackagePath`, so two canonical repositories
-  with the same package path would alias;
-- `load_root_native_packages` computes only `RootPackageLoadKey` and
-  `require_root_native_reference` rejects every canonical nonroot reference;
-- configured Starlark implementation analysis likewise obtains its package
-  through the root-only package input; and
-- the live path bypasses broken registration state only when
-  `!has_toolchain_requirement && local_declarations.is_empty()` and must keep
-  that exact short circuit. A local declaration without a required toolchain
-  still expands registrations to determine whether the declaration is active.
-
-Deleting the parser without replacing those ownership boundaries would either
-collapse semantic repository identity or create an analysis-side source
-loader. Both are stops.
+This packet implements only sequence step 1. Later packets converge configured
+package identity and then consume both expansion families. The exact bypass
+predicate remains
+`!has_toolchain_requirement && local_declarations.is_empty()`; no analysis code
+changes here.
 
 ## Authority and peer guidance
 
-Pinned Bazel 9.2 remains compatibility authority:
+Pinned Bazel 9.2 package/repository and configured-toolchain sources remain
+behavioral authority. This carrier adds no new Bazel-visible behavior: it
+composes Slug's accepted Root package and canonical route/inventory owners.
 
-- `RegisteredToolchainsFunction` and
-  `RegisteredExecutionPlatformsFunction` own MODULE/option registration
-  expansion and precedence before configured validation;
-- `SingleToolchainResolutionFunction` keys compatibility by configuration and
-  requested toolchain type and retains candidate execution-platform order;
-- `ToolchainResolutionFunction`, `ToolchainContextUtil`, `PlatformFunction`
-  and `PlatformKeys` own configured platform, alias, constraint and target-
-  settings behavior; and
-- the focused owning tests remain the source for zero-requirement bypass,
-  provider/settings errors, alias behavior and selection order. Reuse existing
-  accepted evidence until a concrete configured distinction lacks coverage.
+Clean Zabel `0795445f3ab60f4e49070bdd0b94425c5610f73a` remains peer guidance
+only. Its configured registration graph and loaded-native-toolchain input
+projection support keeping repository-aware loading facts separate from
+configuration/type-keyed selection. Copy no Zig type, store ID, registration
+family, allocator pattern, diagnostic or compatibility claim.
 
-Clean Zabel `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance only:
+BCR Starlark continues to own every rule definition and control-flow surface,
+including `cc_internal`. `cc_common` remains a generic evaluator/host-ABI
+consumer. This packet contains no builtin, C++ rule parser or configured rule
+logic.
 
-- `request/configured_analysis_registration_graph.zig` keeps registration
-  sources and the loaded native-toolchain family as explicit configured-graph
-  inputs instead of embedding rule-host logic;
-- `toolchain/loaded_native_toolchain_inputs_projection.zig` separates
-  repository-aware loaded declarations from configuration/type-keyed
-  compatibility;
-- `starlark_host/engine/build_invocation_capture.zig` retains declared
-  toolchain requirements while deferring registered selection to configured
-  resolution; and
-- `tests/workspaces/cquery_zero_toolchains_skip_broken_registration` reinforces
-  a useful bypass test theme.
+## Public key and retained carrier
 
-Copy no Zig code, arena/store ID, service-registration graph, diagnostic or
-compatibility claim. Slug keeps Rust DICE keys, existing canonical labels and
-loading owners. Bazel 9.2 alone decides semantics.
+Add `HostPackageInventoryKey` with structural identity:
 
-## Frozen ownership architecture
+1. `NormalizedAbsolutePath workspace`; and
+2. full `PackageIdentifier`, including canonical repository and package path.
 
-### 1. General repository-aware loading package carrier
+Provide an observed sibling. Root and canonical package identities must never
+compare equal merely because package paths match. Display text is Slug-native
+and includes both semantic fields.
 
-Add a loading-owned key family whose semantic input is
-`NormalizedAbsolutePath workspace + PackageIdentifier`. Root packages compose
-`RootPackageLoadKey`; canonical packages compose
-`HostCanonicalRepositoryLoadRouteKey` and the crate-private general
-`RepositoryPackageInventoryKey`. Its observed sibling preserves child order,
-outer/Need polarity and exact observation result `Arc`s.
+The terminal carrier is a small typed enum retaining one existing child result
+`Arc`:
 
-The retained carrier is a small Root/Canonical enum over the existing child
-result `Arc`; it exposes a borrowed `LoadedPackage` result without copying the
-package, evaluator heap or events. Root and canonical error variants remain
-typed and distinct. The key never reads a path, source or BUILD file directly,
-never uses the old public external policy adapter, and never reconstructs a
-route from label spelling.
+- Root retains `Arc<Result<LoadedPackage, RootPackageLoadError>>` from
+  `RootPackageLoadKey`; or
+- Canonical retains
+  `Arc<Result<LoadedPackage, RepositoryPackageLoadError>>` from the
+  crate-private general `RepositoryPackageInventoryKey`.
 
-This owner is reusable by configured analysis and future canonical package
-consumers. Do not call it `toolchain` or retain registration labels in it. The
-existing expander may continue using its scratch route/package caches; the
-new carrier is a DICE package boundary, not a replacement for per-compute
-dedupe.
+A canonical route semantic failure is a distinct typed carrier terminal that
+retains the route result `Arc`; it is not flattened into a package error.
+Expose borrowed access to the successful `LoadedPackage` and typed terminal
+inspection without cloning the package or evaluator-owned values. The carrier
+retains no workspace mapping, source address, route success, registration
+label, event batch or scratch cache.
 
-### 2. Repository-aware configured package closure
+The exact public names of carrier variants/accessors are Slug-native, but the
+Root/Canonical and route/package distinctions are mandatory. Every retained
+type derives the applicable `Allocative`, `Dupe`, equality and debug traits.
 
-Replace the private path-only `RootPackages` shape with a package closure keyed
-by full `PackageIdentifier`. Every lookup compares the label's complete
-package identity. Direct registered candidates and transitive native
-references use the general loading carrier; no analysis code computes a source
-route or filesystem address.
+## One shared legacy/observed driver
 
-Generalize the configured target's package input through the same carrier so a
-canonical Starlark toolchain implementation can enter the existing configured
-rule evaluator. This does not make arbitrary external configured graphs exact:
-existing dependency/provider/transition guards remain fail-closed until their
-own packets. No root/canonical error is flattened before semantic publication.
+Both key forms use one private driver parameterized by legacy versus observed
+mode.
 
-Use immutable child `Arc`s and bounded `SmallMap`/`SmallSet` scratch already
-present in analysis. Retain no second package map in the final configured
-result, process cache, mapping copy, source route or evaluator state. No lock
-may cross a DICE computation.
+For a root package:
 
-### 3. One prepared registration input per configured owner
+1. compute `RootPackageLoadKey` or its observed sibling;
+2. forward `Need` before any terminal;
+3. retain the exact child result `Arc`; and
+4. in observed mode retain the exact child epoch result `Arc`s.
 
-Bypass registration dependencies only when
-`!has_toolchain_requirement && local_declarations.is_empty()`. A rule with a
-local declaration does not bypass even when it has no required toolchain,
-because the toolchain family decides whether that declaration is registered.
-Otherwise compute the execution-platform expansion family first and the
-toolchain family second.
-Carry the two expansion result `Arc`s together through platform preparation and
-toolchain selection, borrowing their ordered label slices only at each use.
-Remove `direct_root_registration(s)` only when every consumer uses this
-prepared input; do not reparse raw MODULE text in analysis.
+For a canonical package:
 
-The two loading keys remain independently reusable and event-owning. Analysis
-does not combine them into a new workspace-global registration key. The
-configured owner/configuration and requested toolchain type remain the natural
-identity of compatibility and selection, while expanded MODULE labels are
-ordinary DICE dependencies. Warning events stay with expansion keys; analysis
-stores only its local evaluation batch.
+1. compute `HostCanonicalRepositoryLoadRouteKey` or its observed sibling;
+2. forward route `Need` or observed outer before package inventory;
+3. retain a semantic route error as the decisive carrier terminal;
+4. on route success, construct `HostRepositorySourceRoute::canonical` only
+   from the route's accepted input;
+5. compute `RepositoryPackageInventoryKey` or observed sibling; and
+6. retain the exact inventory result `Arc` and, observed, merge route then
+   inventory epochs without replacing any per-demand result `Arc`.
 
-Need/outer/semantic ordering is execution-platform family, toolchain family,
-package closure, configured provider/settings validation, then selection.
-Cancellation publishes no analysis result. Warm equality must prune when
-expansion and loaded/configured semantics are equal, and A/B/A must restore
-the prior selected topology.
+Do not use `RepositoryPackageLoadKey`, the old external consumer-policy
+adapter. Do not read a path, BUILD file, repository mapping or source directly.
+The composed wrapper stores no `EventBatch`; route/root/inventory children
+remain sole event owners. Cache hits are DICE reuse, not a process cache.
 
-### 4. Configured semantics remain category-specific
+## DICE and lifecycle contract
 
-The cutover admits only the already represented native `platform`,
-`constraint_setting`, `constraint_value`, `toolchain_type`, `toolchain` and
-bounded Starlark marker implementation shapes. Exact registration targets may
-reach configured validation and fail there, preserving the loading/configured
-split.
+Use complete-only equality and validity. Root/canonical identity, package
+identity, child terminal kind and child result semantics participate. `Need`
+is transient and self-unequal. Observed outer errors remain complete and typed.
 
-Execution-platform alias resolution, advertised `PlatformInfo`, target
-settings, command-line extra registrations/signed precedence, optional and
-named exec groups, broader external dependency graphs and general returned
-`ToolchainInfo` implementations remain separate configured packets. They may
-reuse the prepared label inputs and package closure but must not widen the
-loading expander or add a rule parser.
+Prove direct dependency order and family isolation:
 
-BCR-delivered Starlark continues to own all rule definitions and control flow,
-including `cc_internal`. `cc_common` remains a demanding client of the generic
-evaluator and host ABI. Native platform/toolchain declarations are configured
-facts consumed beneath that general rule graph, not a Rust C++ ruleset.
+- root carrier -> observed root package only;
+- canonical carrier -> observed canonical route, then observed inventory only;
+- a root request never activates canonical route/inventory;
+- a canonical request never activates the root package key; and
+- the wrapper never owns or replays an event batch.
 
-## Bounded sequence after this design
+Prove exact child result and observation `Arc` identity for nonempty root and
+canonical epochs, semantic route/root-package/canonical-package terminals,
+Need and decisive-prefix behavior, cancellation nonpublication and recovery,
+warm reuse, same-path/different-repository key inequality, and A/B/A result
+restoration. Conflicting observed epochs remain a typed frontier outer error.
 
-1. `WP-4-5-7A-repository-aware-loading-package-carrier`: implement only the
-   general Root/Canonical loading key, observed sibling, zero-copy carrier and
-   lifecycle proofs. Keep analysis unchanged.
-2. `WP-4-5-7A-configured-package-identity-convergence`: key the private native
-   package closure by `PackageIdentifier` and generalize configured package
-   input, while preserving every existing root behavior and fail-closed guard.
-3. `WP-4-5-7A-expanded-registration-consumer-cutover`: compute the two loading
-   families unless
-   `!has_toolchain_requirement && local_declarations.is_empty()`, carry labels
-   once, remove the raw analysis parser, and prove root/canonical candidate
-   order and selection. Its matrix must include a broken-registration case
-   bypassed with no requirement/local declaration and a no-requirement local
-   declaration case that does not bypass either requested family.
-4. Add alias/platform-provider and target-settings semantics in separate
-   configured packets, then configuration-option precedence. Only then claim
-   those rows or retry the remaining ordinary Stage 10.3 graph.
-
-Each implementation packet requires its own exact allowlist, caps, terminal
-review and applicable Buck2 utility audit. STOP rather than merge steps 1-3
-into one patch.
+No lock may cross a DICE compute. The retained enum and child `Arc` are
+semantic DICE memory. Epoch merge buffers are bounded compute scratch and are
+dropped at completion or cancellation.
 
 ## Compatibility classification
 
-- **Exact:** no new runtime behavior in this design packet. The frozen sequence
-  preserves accepted registration expansion order, zero-requirement bypass,
-  repository identity, candidate order and existing admitted native configured
-  semantics as Bazel 9.2-governed targets.
-- **Slug-native:** Rust key/carrier names and layout, typed wrapper errors,
-  observation transport, structural hashes, scratch collections and staged
-  packet boundaries.
-- **Unsupported/deferred:** alias and custom platform-provider resolution,
-  target settings, command-line registration precedence, optional/named exec
-  groups, general external configured dependency graphs, broader toolchain
-  implementations, actions/input trees and exact configuration/output bytes.
+- **Exact:** no new Bazel-visible surface; full canonical package identity and
+  accepted child dependency/terminal order are preserved exactly for the
+  composed Slug graph.
+- **Slug-native:** public key/carrier/error names, enum layout, display/error
+  wording, structural hash, observation transport and memory accounting.
+- **Unsupported/deferred:** configured consumers, alias/provider/settings
+  semantics, option precedence, general external configured graphs, new
+  builtins/rules/actions and exact configuration/output bytes.
 
-## Exact allowlist, caps and validation
+## Exact allowlist and caps
 
-Documentation files only:
+Production files:
 
-1. `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
-2. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
-3. `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
+1. `app/slug_loading_v2/src/host_package_inventory.rs` (new)
+2. `app/slug_loading_v2/src/lib.rs`
+3. `app/slug_loading_v2/src/bzl_module.rs` (crate-private constructor/accessor
+   wiring and stale next-packet annotations only if required)
 
-No Rust, Cargo, BUILD, fixture, oracle, other plan or Zabel file is admitted.
-Caps: at most 360 net lines in this manifest, 80 canonical-plan additions, 120
-Stage-owner additions and 520 total net lines. Run targeted source/structure
-searches, plan/canonical packet-ID agreement, `git diff --check`, allowlist/cap
-checks and `scripts/v2_archive_status.sh` against its recorded three-file
-baseline. Require independent architecture review before acceptance.
+Proof files:
+
+4. `app/slug_loading_v2/src/host_package_inventory_tests.rs` (new)
+
+No Cargo manifest/lockfile, Bzlmod, identity, analysis, query, core, BUILD,
+fixture, oracle, Zabel or plan file is admitted after this scheduling commit.
+`bzl_module.rs` may not change package evaluation or the old policy adapter.
+
+Caps: at most 850 net production lines, 1,150 net proof lines and 2,000 net
+total lines; at most 760 lines in the new production module, 1,100 in its test
+file, 35 additions in `lib.rs`, 45 in `bzl_module.rs`, and 120 lines per new or
+touched function. The new module triggers complexity review at 650 physical
+lines. Add no dependency, `HashMap`, `HashSet`, interner or global cache.
+
+## Validation
+
+Run serially:
+
+1. focused key/carrier root/canonical success and typed terminal tests;
+2. observed dependency, exact `Arc`, event nonownership, Need, cancellation,
+   warm reuse and A/B/A matrices;
+3. complete `slug_loading_v2` tests;
+4. direct read-only `slug_analysis_v2` and `slug_query_v2` dependents;
+5. focused Bzlmod canonical-route and identity package tests if unchanged APIs
+   do not already have current coverage;
+6. `cargo fmt --all --check`, allowlist/cap/function checks,
+   `git diff --check`, packet/canonical ID agreement and
+   `scripts/v2_archive_status.sh` against its recorded three-file baseline.
+
+No new Bazel oracle is planned because this is a composition-only Slug-native
+carrier over accepted exact owners. Require independent terminal review of
+identity, dependency/terminal order, zero-copy and epoch/event ownership,
+scratch lifetime, utility reuse, scope and caps before acceptance.
 
 ## Stops
 
-STOP and `REPLAN` for Rust or oracle edits; a direct raw-pattern parser in
-analysis; package identity without canonical repository; analysis-side route,
-source or filesystem discovery; use of the public external policy adapter;
-copying a loaded package/evaluator/event batch; a workspace-global combined
-configured registration key; family warning-event replay; activation before
-the exact `!has_toolchain_requirement && local_declarations.is_empty()` bypass
-decision, or bypass when either conjunct is false; alias/provider/settings
-claims in the first three packets; one monolithic carrier/identity/cutover
-patch; a lock across DICE; a process cache/interner; Rust ownership of BCR
-rules or `cc_internal`; a C++ parser/rule engine; or treating Zabel as
-compatibility authority.
+STOP and `REPLAN` for analysis or query edits; a path-only key; root/canonical
+identity collapse; direct route/source/path/BUILD/mapping discovery; use of the
+old public external policy adapter; a second package evaluator; cloning a
+`LoadedPackage` or child error instead of retaining its result `Arc`; retaining
+a successful route/source/mapping; wrapper-owned events; loss or replacement
+of observed result `Arc`s; a lock across DICE; process/global cache or interner;
+configured activation; alias/provider/settings or option-precedence behavior;
+Rust ownership of BCR rules or `cc_internal`; a C++ parser/rule engine; cap or
+allowlist overflow; or treating Zabel as compatibility authority.
