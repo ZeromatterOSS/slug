@@ -20269,3 +20269,29 @@ The next packet will authenticate declarations and perform typed
 default-eliding value resolution. Command parsing, transition conversion,
 condition matching, selector/provider/toolchain behavior and exact Bazel
 configuration bytes remain deferred.
+
+### Typed scoped-option map migration accepted; value resolution active (2026-08-27)
+
+Commit `84bda1971` replaces `RootStringSettingValue` and every direct consumer
+with one immutable canonical-label-sorted `Arc` slice. Integer, Boolean,
+string, ordered string-list and normalized string-set values retain scope in
+structural configuration identity. Version-2 canonical bytes use stable label
+serialization so identical display labels with distinct repository-mapping
+provenance cannot collide. Target-to-exec projection carries default/universal,
+filters target and rejects project; equal replacement and absent removal reuse
+the existing map and configuration `Arc`.
+
+Independent retained-identity/DICE review returns `ACCEPT`. The migration also
+removes the singleton-era rejection of unrelated rows while retaining the
+admitted one-setting bridge inside a rule. Buck2-derived Rust remains the
+syntax/evaluator owner, BCR Starlark remains the rule/control-flow owner, and
+Zabel contributes only peer guidance on canonical rows and unchanged-parent
+reuse.
+
+Activate only `WP-4-5-7A-typed-build-setting-value-resolution`. Use one shared
+analysis converter to authenticate explicit and transition values against the
+loading-owned declaration, normalize all five types and declaration scope,
+omit/remove default-equal rows, and allocate the effective typed value only at
+`ctx.build_setting_value`. Preserve the current singular command adapter as a
+bounded category-3 bridge. Command text/occurrences, condition/selector
+matching, providers, platforms and toolchain choice remain deferred.
