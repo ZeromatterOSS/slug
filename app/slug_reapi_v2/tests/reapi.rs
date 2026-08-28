@@ -174,7 +174,7 @@ write(name = "write")
             .unwrap(),
         slug_core_v2::runtime::LockfileMode::Update,
         &[],
-        None,
+        Default::default(),
     )
     .unwrap();
     let projected = accepted.project(|terminal| {

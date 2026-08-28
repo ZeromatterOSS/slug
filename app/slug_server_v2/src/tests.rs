@@ -19,6 +19,8 @@ use fixture_support::FixtureWorkspace;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_configuration_v2::CommandConfigurationOccurrence;
+use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_configuration_v2::SlugConfiguration;
 use slug_configuration_v2::StarlarkOption;
 use slug_configuration_v2::StarlarkOptionScope;
@@ -73,6 +75,14 @@ fn remote_disabled() -> RemoteConfig {
 
 fn target(label: &str) -> TargetPattern {
     TargetPattern::parse(label).unwrap()
+}
+
+fn root_setting_overlay(value: Option<&str>) -> CommandConfigurationOverlay {
+    value
+        .map(|value| CommandConfigurationOccurrence::starlark("//:setting", Some(value), false))
+        .into_iter()
+        .collect::<Vec<_>>()
+        .into()
 }
 
 #[test]
@@ -136,7 +146,7 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
             inputs.1,
             inputs.2,
             inputs.3,
-            None,
+            CommandConfigurationOverlay::default(),
         );
         assert!(!result.stderr.contains("build_runtime_error"), "{result:?}");
     }
@@ -260,7 +270,7 @@ fn retained_daemon_restores_c0_after_root_setting_c1_without_source_invalidation
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             Vec::new(),
-            setting,
+            root_setting_overlay(setting),
         )
     };
 
@@ -821,7 +831,7 @@ fn label_kind_completes_cross_package_depth_boundaries_without_changing_standard
 fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
     let request = DaemonRequest::Build(BuildRequest {
         targets: vec!["//pkg:one".to_owned(), "//pkg:two".to_owned()],
-        root_string_setting: Some("Gr\u{00fc}\u{00df}e".to_owned()),
+        configuration_overlay: root_setting_overlay(Some("Gr\u{00fc}\u{00df}e")),
         executor: Some("grpc://executor".to_owned()),
         default_exec_properties: vec![
             ("cpu".to_owned(), "x86_64".to_owned()),
@@ -836,8 +846,8 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
     };
     assert_eq!(build.targets, ["//pkg:one", "//pkg:two"]);
     assert_eq!(
-        build.root_string_setting.as_deref(),
-        Some("Gr\u{00fc}\u{00df}e")
+        build.configuration_overlay,
+        root_setting_overlay(Some("Gr\u{00fc}\u{00df}e"))
     );
     assert_eq!(build.executor.as_deref(), Some("grpc://executor"));
     assert_eq!(
@@ -867,7 +877,7 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
 fn run_wire_carries_only_build_inputs_and_bounded_launch_authorization() {
     let request = DaemonRequest::Run(BuildRequest {
         targets: vec!["//pkg:hello".to_owned()],
-        root_string_setting: None,
+        configuration_overlay: CommandConfigurationOverlay::default(),
         executor: Some("grpc://executor".to_owned()),
         default_exec_properties: vec![("cpu".to_owned(), "x86_64".to_owned())],
         bzlmod: BzlmodRequestInputs::default(),
@@ -924,7 +934,7 @@ fn tagged_cquery_protocol_is_narrow_and_round_trips() {
             include_implicit: false,
             include_tool: false,
             output,
-            root_string_setting: Some("Gr\u{00fc}\u{00df}e".to_owned()),
+            configuration_overlay: root_setting_overlay(Some("Gr\u{00fc}\u{00df}e")),
             bzlmod: BzlmodRequestInputs::default(),
         });
         let json = serde_json::to_string(&request).unwrap();
@@ -943,8 +953,8 @@ fn tagged_cquery_protocol_is_narrow_and_round_trips() {
         assert!(!request.include_tool);
         assert_eq!(request.output, output);
         assert_eq!(
-            request.root_string_setting.as_deref(),
-            Some("Gr\u{00fc}\u{00df}e")
+            request.configuration_overlay,
+            root_setting_overlay(Some("Gr\u{00fc}\u{00df}e"))
         );
         assert_eq!(request.bzlmod, BzlmodRequestInputs::default());
     }
@@ -1234,7 +1244,7 @@ fn retained_cquery_missing_recovers_without_new_invalidations() {
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             Vec::new(),
-            None,
+            root_setting_overlay(None),
         )
     };
     let success = run(&mut daemon, "//pkg:probe");
@@ -1275,7 +1285,7 @@ fn retained_cquery_executables_observes_capability_edits_warm_and_restoration() 
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             Vec::new(),
-            None,
+            root_setting_overlay(None),
         )
     };
 
@@ -1331,7 +1341,7 @@ fn retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state() 
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             Vec::new(),
-            None,
+            root_setting_overlay(None),
         )
     };
 
@@ -1475,7 +1485,7 @@ fn retained_cquery_siblings_is_an_exact_post_analysis_terminal() {
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             Vec::new(),
-            None,
+            root_setting_overlay(None),
         )
     };
 
@@ -1582,7 +1592,7 @@ fn retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty() {
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             Vec::new(),
-            None,
+            root_setting_overlay(None),
         )
     };
     let expression =
@@ -1699,7 +1709,7 @@ fn retained_cquery_loading_files_are_post_analysis_terminals() {
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             Vec::new(),
-            None,
+            root_setting_overlay(None),
         )
     };
     let expected =
@@ -1807,7 +1817,7 @@ fn retained_cquery_missing_executable_recovers_after_rule_edit() {
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             Vec::new(),
-            None,
+            root_setting_overlay(None),
         )
     };
 
@@ -1855,7 +1865,7 @@ fn retained_cquery_starlark_formats_ordered_sets() {
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
         LockfileMode::Update,
         Vec::new(),
-        None,
+        root_setting_overlay(None),
     );
     assert_eq!(result.exit_code, 0, "{result:?}");
     assert_eq!(result.stdout, "@@//pkg:bin\n@@//pkg:lib\n");
@@ -1871,7 +1881,7 @@ fn retained_cquery_starlark_formats_ordered_sets() {
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
         LockfileMode::Update,
         Vec::new(),
-        None,
+        root_setting_overlay(None),
     );
     assert_eq!(filtered.exit_code, 0, "{filtered:?}");
     assert_eq!(filtered.stdout, "@@//pkg:bin\n");
@@ -1905,7 +1915,7 @@ fn retained_cquery_selection_errors_use_evaluation_exit_and_preserve_invalidatio
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             Vec::new(),
-            None,
+            root_setting_overlay(None),
         )
     };
 
@@ -1969,7 +1979,7 @@ fn retained_cquery_formats_modes_and_restores_root_setting_projection() {
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             Vec::new(),
-            setting,
+            root_setting_overlay(setting),
         )
     };
 
@@ -2074,7 +2084,7 @@ fn bzlmod_protocol_is_primitive_canonical_and_backward_compatible() {
         panic!("expected old build request");
     };
     assert_eq!(old.bzlmod, BzlmodRequestInputs::default());
-    assert_eq!(old.root_string_setting, None);
+    assert!(old.configuration_overlay.is_empty());
 }
 
 #[test]
@@ -2920,7 +2930,7 @@ fn every_active_daemon_decoder_carries_command_module_overrides() {
         r#"{"kind":"run","request":{"targets":["//pkg:probe"],"executor":null,"default_exec_properties":[],"bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
         r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
         r#"{"kind":"aquery","request":{"expression":"//pkg:probe","bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
-        r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"label","root_string_setting":null,"bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
+        r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"label","bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
     ];
     for request in requests {
         let request: DaemonRequest = serde_json::from_str(request).unwrap();

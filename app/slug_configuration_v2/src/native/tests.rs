@@ -20,6 +20,81 @@ struct ExpectedDescriptor {
     normalizer: &'static str,
 }
 
+mod command_configuration_tests {
+    use std::sync::Arc;
+
+    use super::super::configuration::SlugConfiguration;
+    use super::super::host::AutoCpuToken;
+    use super::super::host::HostConversionInputs;
+    use super::super::host::HostPathFlavor;
+    use crate::CommandConfigurationOccurrence;
+    use crate::CommandConfigurationOverlay;
+
+    const PLATFORM_OPTIONS: &str = "com.google.devtools.build.lib.analysis.PlatformOptions";
+
+    fn configuration() -> SlugConfiguration {
+        SlugConfiguration::default_target(
+            &HostConversionInputs::new(
+                Some(AutoCpuToken::K8),
+                Some(HostPathFlavor::Unix),
+                None,
+                Arc::from([]),
+                Arc::from([]),
+            )
+            .unwrap(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn overlay_is_arc_shared_and_batch_native_normalization_is_structural() {
+        let overlay: CommandConfigurationOverlay = vec![
+            CommandConfigurationOccurrence::extra_toolchains("a,b,a"),
+            CommandConfigurationOccurrence::extra_execution_platforms("x,,y"),
+            CommandConfigurationOccurrence::extra_toolchains("c,b"),
+            CommandConfigurationOccurrence::extra_execution_platforms("z,"),
+        ]
+        .into();
+        let copy = overlay.clone();
+        assert_eq!(overlay.as_ptr(), copy.as_ptr());
+
+        let base = configuration();
+        let native = base.prepare_command_native_options(&overlay).unwrap();
+        let prepared = SlugConfiguration::with_prepared_command_configuration(
+            native,
+            base.starlark_options().clone(),
+        );
+        assert_eq!(
+            prepared
+                .native_string_list_option(PLATFORM_OPTIONS, "extra_toolchains")
+                .unwrap()
+                .iter()
+                .collect::<Vec<_>>(),
+            ["a", "c", "b"]
+        );
+        assert_eq!(
+            prepared
+                .native_string_list_option(PLATFORM_OPTIONS, "extra_execution_platforms")
+                .unwrap()
+                .iter()
+                .collect::<Vec<_>>(),
+            ["z", ""]
+        );
+        assert_ne!(prepared.canonical_bytes(), base.canonical_bytes());
+
+        let unchanged = base
+            .with_command_configuration(
+                base.starlark_options().clone(),
+                &CommandConfigurationOverlay::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            unchanged.canonical_bytes().as_ptr(),
+            base.canonical_bytes().as_ptr()
+        );
+    }
+}
+
 macro_rules! expected_descriptor {
     ($class:expr; $name:expr; $field_type:expr; $raw_default:expr; $converter:expr; $allow_multiple:expr; $old_name:expr; $expansion:expr; $implicit_requirements:expr; $normalizer:expr) => {
         ExpectedDescriptor {
@@ -2069,6 +2144,8 @@ mod retry7_private_kernel_contract {
             [
                 "pub use cache_grammar::CacheFieldValue;",
                 "pub use cache_grammar::format_cache_field;",
+                "pub use configuration::NativeStringListOption;",
+                "pub use configuration::PreparedCommandNativeOptions;",
                 "pub use configuration::SlugConfiguration;",
                 "pub use configuration::SlugConfigurationError;",
                 "pub use configuration::SlugConfigurationKind;",

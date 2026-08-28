@@ -754,7 +754,7 @@ fn recursive_action_fixture_reports_all_three_actions_without_execution() {
         environment,
         request.lockfile_mode,
         &request.registry_urls,
-        None,
+        Default::default(),
     )
     .unwrap();
     let mut outputs = Vec::new();

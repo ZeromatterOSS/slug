@@ -11,6 +11,7 @@ use std::path::Path;
 
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_identity_v2::TargetPattern;
 use slug_query_v2::QueryExpression;
 use slug_query_v2::cquery_literals;
@@ -22,6 +23,7 @@ use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_command_policy_for_workspace;
 use crate::common::bzlmod_lockfile_mode;
 use crate::common::bzlmod_registry_urls;
+use crate::common::command_configuration_occurrence;
 use crate::common::parse_bool_flag;
 use crate::common::split_args;
 
@@ -42,9 +44,7 @@ pub struct CqueryRequest {
     pub include_implicit: bool,
     pub include_tool: bool,
     pub output_base: Option<String>,
-    /// The one admitted root build setting transition. Configuration owns its
-    /// typed representation and semantic identity.
-    pub root_string_setting: Option<String>,
+    pub configuration_overlay: CommandConfigurationOverlay,
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
     pub registry_urls: Vec<String>,
@@ -109,27 +109,21 @@ impl CqueryRequest {
         let mut output = None;
         let mut starlark_expression = None;
         let mut output_base = None;
-        let mut root_string_setting = None;
+        let mut configuration = Vec::new();
         let mut include_implicit = true;
         let mut include_tool = true;
         let mut saw_noimplicit_deps = false;
         let mut graph_unfactored = false;
         let mut saw_graph_unfactored = false;
         for flag in &parsed.flags {
+            if let Some(occurrence) = command_configuration_occurrence(flag)? {
+                configuration.push(occurrence);
+                continue;
+            }
             match flag.name.as_str() {
                 "output" => set_once(&mut output, flag, "--output")?,
                 "starlark:expr" => set_once(&mut starlark_expression, flag, "--starlark:expr")?,
                 "output_base" => set_once(&mut output_base, flag, "--output_base")?,
-                "//:setting" => {
-                    let value =
-                        flag.value
-                            .clone()
-                            .ok_or_else(|| CommandParseError::InvalidFlagValue {
-                                flag: flag.raw.clone(),
-                                message: "expected --//:setting=<Unicode>".to_owned(),
-                            })?;
-                    root_string_setting = Some(value);
-                }
                 "implicit_deps" => include_implicit = parse_bool_flag(flag, false)?,
                 "noimplicit_deps" => {
                     include_implicit = parse_bool_flag(flag, true)?;
@@ -202,7 +196,7 @@ impl CqueryRequest {
             include_implicit,
             include_tool,
             output_base,
-            root_string_setting,
+            configuration_overlay: configuration.into(),
             bzlmod_policy,
             lockfile_mode,
             registry_urls,

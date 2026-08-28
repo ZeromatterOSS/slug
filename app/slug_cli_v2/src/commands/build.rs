@@ -63,7 +63,7 @@ pub fn run(argv: Vec<String>) -> i32 {
         environment_policy,
         request.lockfile_mode.clone(),
         &request.registry_urls,
-        request.root_string_setting.as_deref(),
+        request.configuration_overlay.clone(),
     ) {
         Ok(accepted) => accepted,
         Err(error) => {
@@ -403,7 +403,7 @@ fn run_daemon_build(
 
     let daemon_request = slug_server_v2::BuildRequest {
         targets: request.targets.iter().map(|t| t.to_string()).collect(),
-        root_string_setting: request.root_string_setting,
+        configuration_overlay: request.configuration_overlay,
         executor: remote.executor.clone(),
         default_exec_properties: remote
             .default_exec_properties

@@ -78,7 +78,7 @@ pub fn evaluate_workspace_build_command_with_bzlmod_inputs(
     environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
     lockfile_mode: slug_bzlmod_v2::LockfileMode,
     registry_urls: &[String],
-    root_string_setting: Option<&str>,
+    configuration_overlay: slug_configuration_v2::CommandConfigurationOverlay,
 ) -> Result<
     AcceptedCommand<std::sync::Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
     BuildCommandError,
@@ -91,7 +91,7 @@ pub fn evaluate_workspace_build_command_with_bzlmod_inputs(
         environment_policy,
         lockfile_mode,
         registry_urls,
-        root_string_setting,
+        configuration_overlay,
     )
 }
 
@@ -104,7 +104,7 @@ pub fn evaluate_workspace_cquery_command_with_bzlmod_inputs(
     environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
     lockfile_mode: slug_bzlmod_v2::LockfileMode,
     registry_urls: &[String],
-    root_string_setting: Option<&str>,
+    configuration_overlay: slug_configuration_v2::CommandConfigurationOverlay,
 ) -> Result<
     AcceptedCommand<std::sync::Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
     CqueryCommandError,
@@ -119,7 +119,7 @@ pub fn evaluate_workspace_cquery_command_with_bzlmod_inputs(
         environment_policy,
         lockfile_mode,
         registry_urls,
-        root_string_setting,
+        configuration_overlay,
     )
 }
 

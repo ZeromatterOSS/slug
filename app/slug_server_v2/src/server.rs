@@ -25,6 +25,7 @@ use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::YankedVersionPolicy;
+use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_identity_v2::TargetPattern;
 use slug_reapi_v2::RemoteConfig;
 
@@ -34,10 +35,8 @@ use crate::Daemon;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildRequest {
     pub targets: Vec<String>,
-    /// Raw command-boundary input. The retained runtime will turn this into a
-    /// structural configuration key once configuration construction is wired.
     #[serde(default)]
-    pub root_string_setting: Option<String>,
+    pub configuration_overlay: CommandConfigurationOverlay,
     pub executor: Option<String>,
     pub default_exec_properties: Vec<(String, String)>,
     #[serde(default)]
@@ -74,7 +73,8 @@ pub struct CqueryRequest {
     #[serde(default = "default_true")]
     pub include_tool: bool,
     pub output: CqueryOutput,
-    pub root_string_setting: Option<String>,
+    #[serde(default)]
+    pub configuration_overlay: CommandConfigurationOverlay,
     #[serde(default)]
     pub bzlmod: BzlmodRequestInputs,
 }
@@ -324,7 +324,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 environment_policy,
                 lockfile_mode,
                 registry_urls,
-                request.root_string_setting.as_deref(),
+                request.configuration_overlay.clone(),
             );
             DaemonResponse {
                 exit_code: result.exit_code,
@@ -349,8 +349,8 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 }
                 _ => return run_request_error("run requires one main-repository target"),
             };
-            if request.root_string_setting.is_some() {
-                return run_request_error("run root string setting is unsupported");
+            if !request.configuration_overlay.is_empty() {
+                return run_request_error("run command configuration is unsupported");
             }
             let remote = build_remote_config(&request);
             let (result, executable) = daemon.run_with_bzlmod_inputs(
@@ -487,7 +487,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 environment_policy,
                 lockfile_mode,
                 registry_urls,
-                request.root_string_setting.as_deref(),
+                request.configuration_overlay.clone(),
             );
             DaemonResponse {
                 exit_code: result.exit_code,
@@ -677,7 +677,7 @@ pub fn send_cquery_request(
         include_implicit: request.include_implicit,
         include_tool: request.include_tool,
         output: request.output,
-        root_string_setting: request.root_string_setting.clone(),
+        configuration_overlay: request.configuration_overlay.clone(),
         bzlmod: request.bzlmod.clone(),
     }))
     .context("serializing cquery request for daemon")?;

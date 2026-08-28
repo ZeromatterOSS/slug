@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::ProcessHostOwner;
 use slug_core_v2::runtime::TerminalOutput;
@@ -91,7 +92,7 @@ impl Daemon {
                 .expect("default bzlmod environment policy"),
             LockfileMode::Update,
             Vec::new(),
-            None,
+            CommandConfigurationOverlay::default(),
         )
     }
 
@@ -104,7 +105,7 @@ impl Daemon {
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
         registry_urls: Vec<String>,
-        root_string_setting: Option<&str>,
+        configuration_overlay: CommandConfigurationOverlay,
     ) -> BuildResult {
         self.build_or_run_with_bzlmod_inputs(
             targets,
@@ -114,7 +115,7 @@ impl Daemon {
             environment_policy,
             lockfile_mode,
             registry_urls,
-            root_string_setting,
+            configuration_overlay,
             false,
         )
         .0
@@ -137,7 +138,7 @@ impl Daemon {
             environment_policy,
             lockfile_mode,
             registry_urls,
-            None,
+            CommandConfigurationOverlay::default(),
             true,
         )
     }
@@ -151,7 +152,7 @@ impl Daemon {
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
         registry_urls: Vec<String>,
-        root_string_setting: Option<&str>,
+        configuration_overlay: CommandConfigurationOverlay,
         run: bool,
     ) -> (BuildResult, Option<PathBuf>) {
         let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
@@ -178,7 +179,7 @@ impl Daemon {
             environment_policy,
             lockfile_mode,
             &registry_urls,
-            root_string_setting,
+            configuration_overlay,
         ) {
             Ok(accepted) => accepted,
             Err(error) => {
@@ -424,7 +425,7 @@ impl Daemon {
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
         registry_urls: Vec<String>,
-        root_string_setting: Option<&str>,
+        configuration_overlay: CommandConfigurationOverlay,
     ) -> QueryResult {
         let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
@@ -447,7 +448,7 @@ impl Daemon {
             environment_policy,
             lockfile_mode,
             &registry_urls,
-            root_string_setting,
+            configuration_overlay,
         ) {
             Ok(accepted) => accepted,
             Err(error) => return cquery_error_result_for_terminal(&error, invalidated),
@@ -522,7 +523,7 @@ impl Daemon {
             environment_policy,
             lockfile_mode,
             &registry_urls,
-            None,
+            CommandConfigurationOverlay::default(),
         ) {
             Ok(accepted) => accepted,
             Err(error) => {

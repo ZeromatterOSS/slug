@@ -47,6 +47,9 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_analysis_v2::AnalysisError;
 use slug_analysis_v2::AnalysisErrorKind;
+use slug_analysis_v2::CommandConfigurationPreparationKey;
+use slug_analysis_v2::CommandConfigurationPreparationObservationKey;
+use slug_analysis_v2::CommandConfigurationPreparationOuterError;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredActionPlatformConstraint;
 use slug_analysis_v2::ConfiguredActionView;
@@ -92,10 +95,9 @@ use slug_bzlmod_v2::SourcePreparationOutcome as PreparationOutcome;
 use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
+use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_configuration_v2::SlugConfiguration;
 use slug_configuration_v2::SlugConfigurationProjection;
-use slug_configuration_v2::StarlarkOption;
-use slug_configuration_v2::StarlarkOptionScope;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
@@ -1595,6 +1597,14 @@ impl NativeCommandRoot for SingletonRootSingleBuildCommandKey {
         terminal.observations.as_ref()
     }
 
+    fn observed_selection_association(&self) -> ObservedSelectionAssociation {
+        if self.0.configuration_overlay.is_empty() {
+            ObservedSelectionAssociation::StrictPathOnly
+        } else {
+            ObservedSelectionAssociation::SelectedDependencySuperset
+        }
+    }
+
     fn allows_unavailable_terminal_roots(&self, terminal: &Self::Terminal) -> bool {
         matches!(
             terminal.result.as_ref(),
@@ -1619,7 +1629,19 @@ impl NativeCommandRoot for SingletonRootSingleBuildCommandKey {
 
 #[async_trait]
 impl NativeCommandRoot for CqueryCommandRoot {
-    type Terminal = Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>;
+    type Terminal = CqueryCommandTerminal;
+
+    fn observations<'a>(&self, terminal: &'a Self::Terminal) -> Option<&'a PathObservationEpoch> {
+        terminal.observations.as_ref()
+    }
+
+    fn observed_selection_association(&self) -> ObservedSelectionAssociation {
+        if self.configuration_overlay.is_empty() {
+            ObservedSelectionAssociation::StrictPathOnly
+        } else {
+            ObservedSelectionAssociation::SelectedDependencySuperset
+        }
+    }
 
     fn allows_empty_terminal(&self) -> bool {
         true
@@ -1627,7 +1649,7 @@ impl NativeCommandRoot for CqueryCommandRoot {
 
     fn allows_unavailable_terminal_roots(&self, terminal: &Self::Terminal) -> bool {
         matches!(
-            terminal.as_ref(),
+            terminal.result.as_ref(),
             Err(CqueryCommandError::MissingTarget { .. }
                 | CqueryCommandError::ExecutableRuleMissingExecutable(_)
                 | CqueryCommandError::Analysis(_))
@@ -1641,18 +1663,74 @@ impl NativeCommandRoot for CqueryCommandRoot {
     {
         if let Err(error) = preflight_cquery_query(&self.expression) {
             return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
-                Arc::new(Err(CqueryCommandError::from_evaluator_error(error))),
+                CqueryCommandTerminal::new(
+                    Arc::new(Err(CqueryCommandError::from_evaluator_error(error))),
+                    None,
+                ),
             ));
         }
+        let (configuration, preparation_observations) = if self.configuration_overlay.is_empty() {
+            (self.base_configuration.clone(), None)
+        } else {
+            let preparation = match CommandConfigurationPreparationKey::new(
+                self.workspace.dupe(),
+                self.base_configuration.clone(),
+                self.configuration_overlay.clone(),
+            ) {
+                Ok(preparation) => preparation,
+                Err(error) => {
+                    return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                        CqueryCommandTerminal::new(
+                            Arc::new(Err(CqueryCommandError::Analysis(error))),
+                            None,
+                        ),
+                    ));
+                }
+            };
+            match transaction
+                .compute(&CommandConfigurationPreparationObservationKey::new(
+                    preparation,
+                ))
+                .await
+                .map_err(|error| {
+                    NativeDemandSessionError::Computation(anyhow::anyhow!("{error:#}"))
+                })? {
+                slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+                    return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need));
+                }
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error)) => {
+                    return Err(NativeDemandSessionError::Computation(anyhow::anyhow!(
+                        error.to_string()
+                    )));
+                }
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(observed)) => {
+                    let observations = (!observed.observations().observations().is_empty())
+                        .then(|| observed.observations().dupe());
+                    match observed.result() {
+                        Ok(configuration) => (configuration.clone(), observations),
+                        Err(error) => {
+                            return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                                CqueryCommandTerminal::new(
+                                    Arc::new(Err(CqueryCommandError::Analysis(error.clone()))),
+                                    observations,
+                                ),
+                            ));
+                        }
+                    }
+                }
+            }
+        };
+        let wrap_terminal = |result| {
+            CqueryCommandTerminal::new(result, preparation_observations.as_ref().map(Dupe::dupe))
+        };
         let mut batch = CqueryBatchAccumulator::new();
         let mut results = Vec::with_capacity(self.roots.len());
         for root in self.roots.iter() {
             let prepared = prepare_configured_node_analysis_observed(
                 transaction,
-                root.workspace.dupe(),
+                self.workspace.dupe(),
                 root.canonical.clone(),
-                root.base_configuration.clone(),
-                root.explicit_starlark_option.clone(),
+                configuration.clone(),
             )
             .await;
             match prepared {
@@ -1691,7 +1769,7 @@ impl NativeCommandRoot for CqueryCommandRoot {
             }
             Some(CqueryBatchTerminal::Semantic(error)) => {
                 return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
-                    Arc::new(Err(error)),
+                    wrap_terminal(Arc::new(Err(error))),
                 ));
             }
             None => {}
@@ -1704,7 +1782,7 @@ impl NativeCommandRoot for CqueryCommandRoot {
                 Ok(target) => target,
                 Err(error) => {
                     return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
-                        Arc::new(Err(error)),
+                        wrap_terminal(Arc::new(Err(error))),
                     ));
                 }
             };
@@ -1719,9 +1797,9 @@ impl NativeCommandRoot for CqueryCommandRoot {
         if let Some(deps) = self.expression.cquery_preactivation_deps_spec() {
             if self.include_implicit {
                 return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
-                    Arc::new(Err(CqueryCommandError::request(
+                    wrap_terminal(Arc::new(Err(CqueryCommandError::request(
                         "cquery deps() currently requires --noimplicit_deps",
-                    ))),
+                    )))),
                 ));
             }
             let root_index = self
@@ -1730,10 +1808,9 @@ impl NativeCommandRoot for CqueryCommandRoot {
                 .find(|(literal, _)| literal.as_ref() == deps.target())
                 .map(|(_, index)| *index)
                 .expect("validated cquery deps root literal");
-            let root = &self.roots[root_index];
             match compute_cquery_deps_closure(
                 transaction,
-                &root.workspace,
+                &self.workspace,
                 analyses[root_index].dupe(),
                 deps.depth(),
                 self.include_tool,
@@ -1745,7 +1822,7 @@ impl NativeCommandRoot for CqueryCommandRoot {
                 }
                 slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error)) => {
                     return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
-                        Arc::new(Err(error)),
+                        wrap_terminal(Arc::new(Err(error))),
                     ));
                 }
                 slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok((nodes, indices))) => {
@@ -1762,17 +1839,12 @@ impl NativeCommandRoot for CqueryCommandRoot {
             };
             if !seed.repo().is_root() {
                 return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
-                    Arc::new(Err(CqueryCommandError::request(
+                    wrap_terminal(Arc::new(Err(CqueryCommandError::request(
                         "cquery rdeps() seed must be in the root repository",
-                    ))),
+                    )))),
                 ));
             }
-            let workspace = self
-                .roots
-                .first()
-                .expect("rdeps universe has one root")
-                .workspace
-                .dupe();
+            let workspace = self.workspace.dupe();
             let package = match transaction
                 .compute(&RootPackageLoadObservationKey::new(
                     workspace,
@@ -1795,9 +1867,9 @@ impl NativeCommandRoot for CqueryCommandRoot {
                         Ok(package) => package.clone(),
                         Err(error) => {
                             return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
-                                Arc::new(Err(CqueryCommandError::Analysis(
+                                wrap_terminal(Arc::new(Err(CqueryCommandError::Analysis(
                                     AnalysisError::message(error.to_string()),
-                                ))),
+                                )))),
                             ));
                         }
                     }
@@ -1812,11 +1884,11 @@ impl NativeCommandRoot for CqueryCommandRoot {
                     CanonicalLabel::parse(&format!("@@//{}:{}", seed.package(), seed.target()))
                         .expect("validated root seed has a canonical projection");
                 return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
-                    Arc::new(Err(CqueryCommandError::MissingTarget {
+                    wrap_terminal(Arc::new(Err(CqueryCommandError::MissingTarget {
                         requested: Arc::from(raw_seed),
                         label,
                         build_file: package.build_file.clone(),
-                    })),
+                    }))),
                 ));
             }
         }
@@ -1827,7 +1899,7 @@ impl NativeCommandRoot for CqueryCommandRoot {
             .map(|targets| CqueryCommandEvaluation { targets })
             .map_err(CqueryCommandError::from_evaluator_error);
         Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
-            Arc::new(terminal),
+            wrap_terminal(Arc::new(terminal)),
         ))
     }
 }
@@ -2325,9 +2397,8 @@ pub struct WorkspaceBuildEvaluation {
 struct BuildCommandRootKey {
     workspace: NormalizedAbsolutePath,
     targets: Arc<[Arc<str>]>,
-    configuration: ConfigurationKey,
     base_configuration: ConfigurationKey,
-    explicit_starlark_option: Option<StarlarkOption>,
+    configuration_overlay: CommandConfigurationOverlay,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
@@ -2353,6 +2424,7 @@ struct SingletonRootSingleBuildCommandTerminal {
 struct ForceBuildCommandRootObservationOuter(ObservedPathFrontierError);
 
 impl ObservedBuildCommandRoot {
+    #[cfg(test)]
     fn result(&self) -> &Arc<Result<BuildCommandEvaluation, BuildCommandError>> {
         &self.result
     }
@@ -2383,19 +2455,43 @@ impl SingletonRootSingleBuildCommandTerminal {
 #[derive(Clone)]
 struct CqueryCommandRoot {
     expression: QueryExpression,
+    workspace: NormalizedAbsolutePath,
+    base_configuration: ConfigurationKey,
+    configuration_overlay: CommandConfigurationOverlay,
     roots: Arc<[CqueryRootTarget]>,
     literal_roots: Arc<[(Arc<str>, usize)]>,
     include_implicit: bool,
     include_tool: bool,
 }
 
+#[derive(Clone, Debug)]
+struct CqueryCommandTerminal {
+    result: Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>,
+    observations: Option<PathObservationEpoch>,
+}
+
+impl AsRef<Result<CqueryCommandEvaluation, CqueryCommandError>> for CqueryCommandTerminal {
+    fn as_ref(&self) -> &Result<CqueryCommandEvaluation, CqueryCommandError> {
+        self.result.as_ref()
+    }
+}
+
+impl CqueryCommandTerminal {
+    fn new(
+        result: Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>,
+        observations: Option<PathObservationEpoch>,
+    ) -> Self {
+        Self {
+            result,
+            observations,
+        }
+    }
+}
+
 #[derive(Clone)]
 struct CqueryRootTarget {
     requested: Arc<str>,
     canonical: CanonicalLabel,
-    workspace: NormalizedAbsolutePath,
-    base_configuration: ConfigurationKey,
-    explicit_starlark_option: Option<StarlarkOption>,
 }
 
 #[derive(Debug, Clone, Allocative)]
@@ -2975,10 +3071,25 @@ enum BuildActionChildResult {
 }
 
 impl BuildCommandRootKey {
+    #[cfg(test)]
     fn new(
         workspace: NormalizedAbsolutePath,
         targets: &[TargetPattern],
-        configuration: ConfigurationKey,
+        base_configuration: ConfigurationKey,
+    ) -> Result<Self, BuildCommandRequestError> {
+        Self::new_with_overlay(
+            workspace,
+            targets,
+            base_configuration,
+            CommandConfigurationOverlay::default(),
+        )
+    }
+
+    fn new_with_overlay(
+        workspace: NormalizedAbsolutePath,
+        targets: &[TargetPattern],
+        base_configuration: ConfigurationKey,
+        configuration_overlay: CommandConfigurationOverlay,
     ) -> Result<Self, BuildCommandRequestError> {
         let permits_one_external_single = matches!(
             targets,
@@ -3009,26 +3120,9 @@ impl BuildCommandRootKey {
         Ok(Self {
             workspace,
             targets: canonical.into(),
-            base_configuration: configuration.clone(),
-            configuration,
-            explicit_starlark_option: None,
+            base_configuration,
+            configuration_overlay,
         })
-    }
-
-    fn new_with_starlark_option(
-        workspace: NormalizedAbsolutePath,
-        targets: &[TargetPattern],
-        base_configuration: ConfigurationKey,
-        explicit: Option<StarlarkOption>,
-    ) -> Result<Self, BuildCommandRequestError> {
-        let configuration = explicit.as_ref().map_or_else(
-            || base_configuration.clone(),
-            |value| base_configuration.with_starlark_option(value.clone()),
-        );
-        let mut key = Self::new(workspace, targets, configuration)?;
-        key.base_configuration = base_configuration;
-        key.explicit_starlark_option = explicit;
-        Ok(key)
     }
 
     fn singleton_root_package_all(&self) -> Option<PackagePath> {
@@ -3605,6 +3699,10 @@ impl fmt::Display for SingletonRootSingleBuildCommandKey {
 
 type ObservedBuildOutcome<T> =
     slug_bzlmod_v2::SourcePreparationOutcome<Result<T, ObservedPathFrontierError>>;
+type ObservedBuildConfigurationOutcome = ObservedBuildOutcome<(
+    Result<ConfigurationKey, BuildCommandError>,
+    PathObservationEpoch,
+)>;
 type SingletonPackageAllDriverOutcome = ObservedBuildOutcome<(
     Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
     PathObservationEpoch,
@@ -3633,6 +3731,127 @@ fn union_build_observations(
             ),
     )
     .map_err(ObservedPathFrontierError::from)
+}
+
+fn command_configuration_preparation_key(
+    key: &BuildCommandRootKey,
+) -> Result<CommandConfigurationPreparationKey, BuildCommandError> {
+    CommandConfigurationPreparationKey::new(
+        key.workspace.dupe(),
+        key.base_configuration.clone(),
+        key.configuration_overlay.clone(),
+    )
+    .map_err(|error| BuildCommandError::new(BuildCommandErrorKind::Analysis(error)))
+}
+
+async fn prepare_build_configuration_legacy(
+    key: &BuildCommandRootKey,
+    ctx: &mut DiceComputations<'_>,
+) -> PreparationOutcome<Result<ConfigurationKey, BuildCommandError>> {
+    if key.configuration_overlay.is_empty() {
+        return PreparationOutcome::Complete(Ok(key.base_configuration.clone()));
+    }
+    let preparation = match command_configuration_preparation_key(key) {
+        Ok(preparation) => preparation,
+        Err(error) => return PreparationOutcome::Complete(Err(error)),
+    };
+    match ctx.compute(&preparation).await {
+        Err(error) => PreparationOutcome::Complete(Err(BuildCommandError::infrastructure(error))),
+        Ok(PreparationOutcome::Need(need)) => PreparationOutcome::Need(need),
+        Ok(PreparationOutcome::Complete(result)) => PreparationOutcome::Complete(
+            result
+                .as_ref()
+                .clone()
+                .map_err(|error| BuildCommandError::new(BuildCommandErrorKind::Analysis(error))),
+        ),
+    }
+}
+
+async fn prepare_build_configuration_observed(
+    key: &BuildCommandRootKey,
+    ctx: &mut DiceComputations<'_>,
+) -> ObservedBuildConfigurationOutcome {
+    if key.configuration_overlay.is_empty() {
+        return PreparationOutcome::Complete(Ok((
+            Ok(key.base_configuration.clone()),
+            PathObservationEpoch::empty(),
+        )));
+    }
+    let preparation = match command_configuration_preparation_key(key) {
+        Ok(preparation) => preparation,
+        Err(error) => {
+            return PreparationOutcome::Complete(Ok((Err(error), PathObservationEpoch::empty())));
+        }
+    };
+    match ctx
+        .compute(&CommandConfigurationPreparationObservationKey::new(
+            preparation,
+        ))
+        .await
+    {
+        Err(error) => PreparationOutcome::Complete(Ok((
+            Err(BuildCommandError::infrastructure(error)),
+            PathObservationEpoch::empty(),
+        ))),
+        Ok(PreparationOutcome::Need(need)) => PreparationOutcome::Need(need),
+        Ok(PreparationOutcome::Complete(Err(CommandConfigurationPreparationOuterError::Path(
+            error,
+        )))) => PreparationOutcome::Complete(Err(error)),
+        Ok(PreparationOutcome::Complete(Err(
+            CommandConfigurationPreparationOuterError::RootMapping(error),
+        ))) => PreparationOutcome::Complete(Ok((
+            Err(BuildCommandError::infrastructure(format!("{error:?}"))),
+            PathObservationEpoch::empty(),
+        ))),
+        Ok(PreparationOutcome::Complete(Ok(observed))) => PreparationOutcome::Complete(Ok((
+            observed
+                .result()
+                .clone()
+                .map_err(|error| BuildCommandError::new(BuildCommandErrorKind::Analysis(error))),
+            observed.observations().dupe(),
+        ))),
+    }
+}
+
+fn merge_preparation_into_observed_build(
+    outcome: ObservedBuildOutcome<ObservedBuildCommandRoot>,
+    preparation_observations: &PathObservationEpoch,
+) -> ObservedBuildOutcome<ObservedBuildCommandRoot> {
+    match outcome {
+        PreparationOutcome::Need(need) => PreparationOutcome::Need(need),
+        PreparationOutcome::Complete(Err(error)) => PreparationOutcome::Complete(Err(error)),
+        PreparationOutcome::Complete(Ok(mut terminal)) => {
+            terminal.observations =
+                match union_build_observations(preparation_observations, &terminal.observations) {
+                    Ok(observations) => observations,
+                    Err(error) => return PreparationOutcome::Complete(Err(error)),
+                };
+            PreparationOutcome::Complete(Ok(terminal))
+        }
+    }
+}
+
+fn merge_preparation_into_singleton_build(
+    outcome: SingletonRootSingleDriverOutcome,
+    preparation_observations: &PathObservationEpoch,
+) -> SingletonRootSingleDriverOutcome {
+    match outcome {
+        PreparationOutcome::Need(need) => PreparationOutcome::Need(need),
+        PreparationOutcome::Complete(Err(error)) => PreparationOutcome::Complete(Err(error)),
+        PreparationOutcome::Complete(Ok(mut terminal)) => {
+            terminal.observations = match &terminal.observations {
+                Some(observations) => {
+                    match union_build_observations(preparation_observations, observations) {
+                        Ok(observations) => Some(observations),
+                        Err(error) => return PreparationOutcome::Complete(Err(error)),
+                    }
+                }
+                None if preparation_observations.observations().is_empty() => None,
+                None => Some(preparation_observations.dupe()),
+            };
+            PreparationOutcome::Complete(Ok(terminal))
+        }
+    }
 }
 
 async fn compute_singleton_package_all(
@@ -4048,6 +4267,7 @@ async fn compute_build_action_closure(
 async fn compute_build_branch(
     ctx: &mut DiceComputations<'_>,
     key: &BuildCommandRootKey,
+    configuration: &ConfigurationKey,
     pattern: Arc<str>,
 ) -> BuildBranchResult {
     let parsed = TargetPattern::parse(&pattern)
@@ -4110,6 +4330,7 @@ async fn compute_build_branch(
         parsed,
         package,
         package_value,
+        configuration,
         BuildAnalysisMode::Legacy,
     )
     .await
@@ -4122,6 +4343,7 @@ async fn compute_loaded_build_branch(
     parsed: TargetPattern,
     package: PackagePath,
     package_value: LoadedPackage,
+    configuration: &ConfigurationKey,
     analysis_mode: BuildAnalysisMode,
 ) -> BuildBranchResult {
     let revision_eligible = key.initializes_request_revision()
@@ -4206,8 +4428,7 @@ async fn compute_loaded_build_branch(
                             ctx,
                             key.workspace.dupe(),
                             canonical,
-                            key.base_configuration.clone(),
-                            key.explicit_starlark_option.clone(),
+                            configuration.clone(),
                         )
                         .await
                         {
@@ -4238,8 +4459,7 @@ async fn compute_loaded_build_branch(
                             ctx,
                             key.workspace.dupe(),
                             canonical,
-                            key.base_configuration.clone(),
-                            key.explicit_starlark_option.clone(),
+                            configuration.clone(),
                         )
                         .await
                         {
@@ -4325,6 +4545,7 @@ fn observed_multi_branch_complete(
 async fn compute_observed_multi_build_branch(
     ctx: &mut DiceComputations<'_>,
     key: &BuildCommandRootKey,
+    configuration: &ConfigurationKey,
     pattern: Arc<str>,
 ) -> ObservedMultiBuildBranchOutcome {
     let parsed = TargetPattern::parse(&pattern)
@@ -4374,6 +4595,7 @@ async fn compute_observed_multi_build_branch(
         parsed,
         package,
         package_value,
+        configuration,
         BuildAnalysisMode::Observed,
     )
     .await
@@ -4771,6 +4993,7 @@ fn singleton_root_single_complete(
 
 async fn compute_singleton_root_single(
     key: &BuildCommandRootKey,
+    configuration: &ConfigurationKey,
     ctx: &mut DiceComputations<'_>,
 ) -> SingletonRootSingleDriverOutcome {
     let TargetPattern::Single(label) =
@@ -4808,6 +5031,7 @@ async fn compute_singleton_root_single(
         TargetPattern::Single(label),
         package,
         loaded,
+        configuration,
         BuildAnalysisMode::Observed,
     )
     .await;
@@ -4872,7 +5096,27 @@ impl Key for SingletonRootSingleBuildCommandKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        compute_singleton_root_single(&self.0, ctx).await
+        let (configuration, observations) =
+            match prepare_build_configuration_observed(&self.0, ctx).await {
+                PreparationOutcome::Need(need) => return PreparationOutcome::Need(need),
+                PreparationOutcome::Complete(Err(error)) => {
+                    return PreparationOutcome::Complete(Err(error));
+                }
+                PreparationOutcome::Complete(Ok(value)) => value,
+            };
+        let configuration = match configuration {
+            Ok(configuration) => configuration,
+            Err(error) => {
+                return merge_preparation_into_singleton_build(
+                    singleton_root_single_complete(Err(error), &observations),
+                    &observations,
+                );
+            }
+        };
+        merge_preparation_into_singleton_build(
+            compute_singleton_root_single(&self.0, &configuration, ctx).await,
+            &observations,
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -4893,6 +5137,11 @@ impl Key for BuildCommandRootKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        let configuration = match prepare_build_configuration_legacy(self, ctx).await {
+            PreparationOutcome::Need(need) => return PreparationOutcome::Need(need),
+            PreparationOutcome::Complete(Err(error)) => return build_complete(Err(error)),
+            PreparationOutcome::Complete(Ok(configuration)) => configuration,
+        };
         if self.singleton_root_package_all().is_some() {
             return match compute_singleton_package_all(self, ctx, BuildAnalysisMode::Legacy).await {
                 slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
@@ -4926,7 +5175,7 @@ impl Key for BuildCommandRootKey {
         };
         let branches = ctx
             .compute_join(self.targets.iter().cloned(), |ctx, pattern| {
-                Box::pin(compute_build_branch(ctx, self, pattern))
+                Box::pin(compute_build_branch(ctx, self, &configuration, pattern))
             })
             .await;
         match collect_build_branches(branches) {
@@ -5060,6 +5309,7 @@ fn observed_build_root_complete_with_certificate(
 
 async fn compute_observed_multi_build_root(
     key: &BuildCommandRootKey,
+    configuration: &ConfigurationKey,
     ctx: &mut DiceComputations<'_>,
 ) -> ObservedBuildOutcome<ObservedBuildCommandRoot> {
     let anchor_outcome =
@@ -5094,7 +5344,12 @@ async fn compute_observed_multi_build_root(
     };
     let branches = ctx
         .compute_join(key.targets.iter().cloned(), |ctx, pattern| {
-            Box::pin(compute_observed_multi_build_branch(ctx, key, pattern))
+            Box::pin(compute_observed_multi_build_branch(
+                ctx,
+                key,
+                configuration,
+                pattern,
+            ))
         })
         .await;
     let (targets, observations, aggregate_source_certificate) =
@@ -5165,21 +5420,36 @@ impl Key for BuildCommandRootObservationKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        if let Some(label) = self.0.singleton_external_single() {
-            return compute_external_single_observed(&self.0, &label, ctx).await;
-        }
-        if self.0.observed_multi_root() {
-            return compute_observed_multi_build_root(&self.0, ctx).await;
-        }
-        compute_singleton_package_all(&self.0, ctx, BuildAnalysisMode::Observed)
-            .await
-            .map(|value| {
-                value.map(|(result, observations)| ObservedBuildCommandRoot {
-                    result,
-                    observations,
-                    aggregate_source_certificate: None,
+        let (configuration, preparation_observations) =
+            match prepare_build_configuration_observed(&self.0, ctx).await {
+                PreparationOutcome::Need(need) => return PreparationOutcome::Need(need),
+                PreparationOutcome::Complete(Err(error)) => {
+                    return PreparationOutcome::Complete(Err(error));
+                }
+                PreparationOutcome::Complete(Ok(value)) => value,
+            };
+        let configuration = match configuration {
+            Ok(configuration) => configuration,
+            Err(error) => {
+                return observed_build_root_complete(Err(error), preparation_observations);
+            }
+        };
+        let outcome = if let Some(label) = self.0.singleton_external_single() {
+            compute_external_single_observed(&self.0, &label, ctx).await
+        } else if self.0.observed_multi_root() {
+            compute_observed_multi_build_root(&self.0, &configuration, ctx).await
+        } else {
+            compute_singleton_package_all(&self.0, ctx, BuildAnalysisMode::Observed)
+                .await
+                .map(|value| {
+                    value.map(|(result, observations)| ObservedBuildCommandRoot {
+                        result,
+                        observations,
+                        aggregate_source_certificate: None,
+                    })
                 })
-            })
+        };
+        merge_preparation_into_observed_build(outcome, &preparation_observations)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -5781,7 +6051,7 @@ impl WorkspaceRuntime {
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
         registry_urls: &[String],
-        root_string_setting: Option<&str>,
+        configuration_overlay: CommandConfigurationOverlay,
     ) -> Result<
         AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
         BuildCommandError,
@@ -5794,24 +6064,12 @@ impl WorkspaceRuntime {
             .map_err(BuildCommandError::infrastructure)?;
         let base_configuration =
             SlugConfiguration::default_target(&host).map_err(BuildCommandError::infrastructure)?;
-        let fixed_setting =
-            CanonicalLabel::parse("@@//:setting").expect("fixed root setting label is canonical");
-        let explicit_starlark_option = root_string_setting.map(|value| {
-            StarlarkOption::string(fixed_setting, value, StarlarkOptionScope::Default)
-        });
-        let configuration = explicit_starlark_option.as_ref().map_or_else(
-            || base_configuration.clone(),
-            |value| base_configuration.with_starlark_option(value.clone()),
-        );
-        self.configured_output
-            .claim(&configuration)
-            .map_err(BuildCommandError::infrastructure)?;
-        let root = BuildCommandRootKey::new_with_starlark_option(
+        let root = BuildCommandRootKey::new_with_overlay(
             NormalizedAbsolutePath::new(self.workspace.clone())
                 .map_err(BuildCommandError::infrastructure)?,
             targets,
             ConfigurationKey::from_slug(base_configuration),
-            explicit_starlark_option,
+            configuration_overlay,
         )
         .map_err(BuildCommandError::request)?;
         let request = NativeDemandRequestInputBundle {
@@ -5876,7 +6134,7 @@ impl WorkspaceRuntime {
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
         registry_urls: &[String],
-        root_string_setting: Option<&str>,
+        configuration_overlay: CommandConfigurationOverlay,
     ) -> Result<
         AcceptedCommand<Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
         CqueryCommandError,
@@ -5898,20 +6156,9 @@ impl WorkspaceRuntime {
             .map_err(CqueryCommandError::infrastructure)?;
         let base_configuration =
             SlugConfiguration::default_target(&host).map_err(CqueryCommandError::infrastructure)?;
-        let fixed_setting =
-            CanonicalLabel::parse("@@//:setting").expect("fixed root setting label is canonical");
-        let explicit_starlark_option = root_string_setting.map(|value| {
-            StarlarkOption::string(fixed_setting.clone(), value, StarlarkOptionScope::Default)
-        });
-        let configuration = explicit_starlark_option.as_ref().map_or_else(
-            || base_configuration.clone(),
-            |value| base_configuration.with_starlark_option(value.clone()),
-        );
-        self.configured_output
-            .claim(&configuration)
-            .map_err(CqueryCommandError::infrastructure)?;
         let workspace = NormalizedAbsolutePath::new(self.workspace.clone())
             .map_err(CqueryCommandError::infrastructure)?;
+        let base_configuration = ConfigurationKey::from_slug(base_configuration);
         let mut roots = Vec::new();
         let mut root_indices = SmallMap::new();
         let mut literal_roots = Vec::new();
@@ -5939,9 +6186,6 @@ impl WorkspaceRuntime {
                     roots.push(CqueryRootTarget {
                         requested,
                         canonical: canonical.clone(),
-                        workspace: workspace.clone(),
-                        base_configuration: ConfigurationKey::from_slug(base_configuration.clone()),
-                        explicit_starlark_option: explicit_starlark_option.clone(),
                     });
                     root_indices.insert(canonical, index);
                     index
@@ -5951,6 +6195,9 @@ impl WorkspaceRuntime {
         }
         let root = CqueryCommandRoot {
             expression,
+            workspace,
+            base_configuration,
+            configuration_overlay,
             roots: roots.into(),
             literal_roots: literal_roots.into(),
             include_implicit,
@@ -5965,7 +6212,7 @@ impl WorkspaceRuntime {
         let driven = self.drive_command(request, root).map_err(|error| {
             CqueryCommandError::infrastructure(format!("typed cquery command failed: {error}"))
         })?;
-        if let Ok(evaluation) = driven.accepted.terminal().as_ref().as_ref() {
+        if let Ok(evaluation) = driven.accepted.terminal().result.as_ref() {
             for analysis in evaluation.analyses() {
                 let Some(configured) = analysis.configured_target_key() else {
                     continue;
@@ -5984,7 +6231,7 @@ impl WorkspaceRuntime {
                     .map_err(CqueryCommandError::infrastructure)?;
             }
         }
-        Ok(driven.accepted)
+        Ok(driven.accepted.map_terminal(|terminal| terminal.result))
     }
 
     /// Evaluate one typed loading-query command through the retained native
@@ -6878,6 +7125,7 @@ fn associate_terminal_observation_epoch(
     .map_err(NativeDemandSessionError::PathEpoch)
 }
 
+#[cfg(test)]
 fn validate_observed_terminal(
     observed: &PathObservationEpoch,
     selected: &AcceptedNativeDemandSnapshot,
@@ -7619,6 +7867,7 @@ mod tests {
     use dice::RootActivation;
     use slug_analysis_v2::key::StarlarkOption;
     use slug_analysis_v2::key::StarlarkOptionScope;
+    use slug_configuration_v2::CommandConfigurationOccurrence;
     use slug_configuration_v2::native::host::AutoCpuToken;
     use slug_configuration_v2::native::host::HostConversionInputs;
     use slug_configuration_v2::native::host::HostPathFlavor;
@@ -7642,6 +7891,14 @@ mod tests {
             value,
             StarlarkOptionScope::Default,
         )
+    }
+
+    fn root_setting_overlay(value: Option<&str>) -> CommandConfigurationOverlay {
+        value
+            .map(|value| CommandConfigurationOccurrence::starlark("//:setting", Some(value), false))
+            .into_iter()
+            .collect::<Vec<_>>()
+            .into()
     }
 
     fn configuration_string_option<'a>(
@@ -7887,7 +8144,7 @@ mod tests {
                     BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                     LockfileMode::Update,
                     &[],
-                    None,
+                    root_setting_overlay(None),
                 )
                 .unwrap()
         };
@@ -8208,7 +8465,7 @@ mod tests {
                     BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                     LockfileMode::Update,
                     &[],
-                    setting,
+                    root_setting_overlay(setting),
                 )
             };
 
@@ -8333,7 +8590,7 @@ mod tests {
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
-                None,
+                root_setting_overlay(None),
             )
         };
 
@@ -8413,7 +8670,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
-                setting,
+                root_setting_overlay(setting),
             )
         };
         let configuration_for =
@@ -8457,10 +8714,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let retained = test_runtime(workspace.path()).unwrap();
         let c0_build = build(&retained, None).unwrap();
         let c0 = configuration_for(&c0_build, "@@//:parent");
-        assert_eq!(
-            configuration_string_option(&c0, "@@//:setting"),
-            Some("default")
-        );
+        assert_eq!(configuration_string_option(&c0, "@@//:setting"), None);
         assert!(accepted_output_text(&c0_build).contains(&"PARENT_ANALYSIS"));
         assert!(accepted_output_text(&c0_build).contains(&"CONSUMER_ANALYSIS"));
         let c0_topology = topology_for(&c0_build);
@@ -8490,7 +8744,6 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let restored = configuration_for(&restored_build, "@@//:parent");
         assert_eq!(c0, restored);
         assert_eq!(c0_topology, topology_for(&restored_build));
-        assert!(accepted_output_text(&restored_build).is_empty());
 
         let fresh = test_runtime(workspace.path()).unwrap();
         let one_shot_build = build(&fresh, None).unwrap();
@@ -8510,7 +8763,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
-                None,
+                root_setting_overlay(None),
             )
             .unwrap();
         let transitive_parent = configuration_for(&transitive_c0, "@@//:parent");
@@ -8528,7 +8781,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
-                Some("command"),
+                root_setting_overlay(Some("command")),
             )
             .unwrap();
         assert!(accepted_output_text(&transitive_c1).contains(&"TOP_ANALYSIS"));
@@ -8544,7 +8797,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
-                None,
+                root_setting_overlay(None),
             )
             .unwrap();
         assert_eq!(
@@ -8552,7 +8805,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 &configuration_for(&setting_build, "@@//:setting"),
                 "@@//:setting",
             ),
-            Some("default")
+            None
         );
     }
 
@@ -8588,7 +8841,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
-                None,
+                root_setting_overlay(None),
             )
         };
         let assert_roots = |label: &str, expected_count| {
@@ -8698,7 +8951,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
-                None,
+                root_setting_overlay(None),
             )
             .unwrap();
 
@@ -8740,7 +8993,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
-                None,
+                root_setting_overlay(None),
             )
         };
 
@@ -11251,8 +11504,57 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         epoch: PathObservationEpoch,
         mut user_data: UserComputationData,
     ) -> dice::DiceTransaction {
+        let mut text_files = Vec::new();
+        let mut raw_files = Vec::new();
+        for (demand, result) in epoch.observations() {
+            let PathObservationResult::FileBytes(result) = result.as_ref() else {
+                continue;
+            };
+            let path = demand.path().as_path().to_path_buf();
+            match result {
+                PathOperationResult::Present(bytes) => {
+                    text_files.push((
+                        path.clone(),
+                        WorkspaceFileValue::Present(Arc::new(
+                            String::from_utf8(bytes.to_vec())
+                                .expect("build-root test sources are valid UTF-8"),
+                        )),
+                    ));
+                    raw_files.push((path, WorkspaceRawFileValue::Present(bytes.dupe())));
+                }
+                PathOperationResult::Missing => {
+                    text_files.push((path.clone(), WorkspaceFileValue::Absent));
+                    raw_files.push((path, WorkspaceRawFileValue::Absent));
+                }
+                PathOperationResult::Error(error) => {
+                    let error = Arc::new(format!("{error:?}"));
+                    text_files.push((path.clone(), WorkspaceFileValue::ReadError(error.dupe())));
+                    raw_files.push((path, WorkspaceRawFileValue::ReadError(error)));
+                }
+            }
+        }
         user_data.cycle_detector = Some(bzl_load_cycle_detector());
         let mut updater = dice.updater_with_data(user_data);
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                Arc::new(WorkspaceSnapshot {
+                    files: Arc::new(text_files.into_iter().collect()),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceRawSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                Arc::new(WorkspaceRawSnapshot {
+                    files: Arc::new(raw_files.into_iter().collect()),
+                }),
+            )])
+            .unwrap();
         updater
             .changed_to(vec![(PathObservationEpochKey, epoch)])
             .unwrap();
@@ -11276,11 +11578,18 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             LockfileMode::Update,
         )
         .unwrap();
+        inject_registry_request_inputs(
+            &mut updater,
+            Path::new("/workspace"),
+            RegistryUrls::new(std::iter::empty::<&str>()),
+            RegistryRequestGeneration(1),
+        )
+        .unwrap();
         updater.commit().await
     }
 
     #[tokio::test]
-    async fn root_string_setting_preparation_keeps_distinct_transitioned_children() {
+    async fn prepared_command_configuration_keeps_distinct_transitioned_children() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let mut epoch = BuildRootEpoch::base(1);
         epoch.file(
@@ -11303,11 +11612,11 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
         );
         epoch.package("", "load(\":defs.bzl\", \"consumer\", \"parent\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\nconsumer(name = \"consumer\")\nparent(name = \"parent\", left = \":consumer\", right = \":consumer\")\n", 1);
         let mut transaction = build_root_transaction(&dice, epoch.build()).await;
-        let build_key = BuildCommandRootKey::new(
+        let build_key = BuildCommandRootKey::new_with_overlay(
             NormalizedAbsolutePath::new("/workspace").unwrap(),
             &[TargetPattern::parse("//:parent").unwrap()],
-            build_test_configuration("first-build")
-                .with_starlark_option(test_string_option("@@//:setting", "default")),
+            build_test_configuration("first-build"),
+            root_setting_overlay(Some("default")),
         )
         .unwrap();
         let outcome = transaction.compute(&build_key).await.unwrap();
@@ -11563,7 +11872,7 @@ empty_write = rule(implementation = _empty_write, toolchains = ["//:type"])
         replacements: &[(&str, &str)],
     ) -> PathObservationEpoch {
         let mut epoch = BuildRootEpoch::base(variant);
-        let mut module = "module(name = \"root\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:toolchain\")\n".to_owned();
+        let mut module = "module(name = \"bazel_tools\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:toolchain\")\n".to_owned();
         let mut defs = RESOLVED_WRITE_DEFS.to_owned();
         let mut build = format!(
             "load(\":defs.bzl\", \"empty_write\", \"ordered_write\", \"toolchain_impl\", \"write\")\nconstraint_setting(name = \"setting_a\")\nconstraint_setting(name = \"setting_b\")\nconstraint_value(name = \"value\", constraint_setting = \":{setting}\")\nplatform(name = \"platform\", constraint_values = [\":value\"], exec_properties = {{\"z\": \"last\", \"a\": \"first\"}})\nplatform(name = \"platform_alt\", constraint_values = [\":value\"], exec_properties = {{\"z\": \"last\", \"a\": \"first\"}})\ntoolchain_type(name = \"type\")\ntoolchain_impl(name = \"implementation\", marker = \"toolchain\")\ntoolchain(name = \"toolchain\", toolchain_type = \":type\", toolchain = \":implementation\")\nwrite(name = \"write\")\nwrite(name = \"other\")\nordered_write(name = \"ordered\", deps = [\":other\"])\nempty_write(name = \"empty\")\n"

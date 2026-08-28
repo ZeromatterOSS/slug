@@ -274,6 +274,137 @@ fn parse_boolean(input: &str) -> Option<bool> {
     }
 }
 
+pub(crate) fn convert_command_occurrence(
+    label: &CanonicalLabel,
+    declaration: &BuildSettingDeclaration,
+    raw_value: Option<&str>,
+    negated: bool,
+) -> Result<StarlarkOptionValue, String> {
+    let required = || raw_value.ok_or_else(|| format!("expected a value after --{label}"));
+    let value = match declaration.definition() {
+        BuildSettingDefinition::Integer { flag: true } => {
+            let raw = required()?;
+            StarlarkOptionValue::Integer(parse_starlark_integer(raw).ok_or_else(|| {
+                format!("'{raw}' is not an integer build setting value for {label}")
+            })?)
+        }
+        BuildSettingDefinition::Boolean { flag: true } => {
+            let value = match raw_value {
+                Some(value) if negated => {
+                    return Err(format!(
+                        "Boolean no-form for {label} does not accept a joined value '{value}'"
+                    ));
+                }
+                Some(value) => parse_boolean(value).ok_or_else(|| {
+                    format!("'{value}' is not a Boolean build setting value for {label}")
+                })?,
+                None => !negated,
+            };
+            StarlarkOptionValue::Boolean(value)
+        }
+        BuildSettingDefinition::String {
+            flag: true,
+            allow_multiple: false,
+        } => {
+            if negated {
+                return Err(format!(
+                    "illegal no-form for non-Boolean build setting {label}"
+                ));
+            }
+            StarlarkOptionValue::String(required()?.into())
+        }
+        BuildSettingDefinition::String {
+            flag: true,
+            allow_multiple: true,
+        } => {
+            if negated {
+                return Err(format!(
+                    "illegal no-form for non-Boolean build setting {label}"
+                ));
+            }
+            StarlarkOptionValue::string_list([required()?])
+        }
+        BuildSettingDefinition::StringList {
+            flag: true,
+            repeatable,
+        } => {
+            if negated {
+                return Err(format!(
+                    "illegal no-form for non-Boolean build setting {label}"
+                ));
+            }
+            let raw = required()?;
+            StarlarkOptionValue::string_list(if repeatable {
+                vec![raw]
+            } else if raw.is_empty() {
+                Vec::new()
+            } else {
+                raw.split(',').collect()
+            })
+        }
+        BuildSettingDefinition::StringSet {
+            flag: true,
+            repeatable,
+        } => {
+            if negated {
+                return Err(format!(
+                    "illegal no-form for non-Boolean build setting {label}"
+                ));
+            }
+            let raw = required()?;
+            StarlarkOptionValue::string_set(if repeatable {
+                vec![raw]
+            } else if raw.is_empty() {
+                Vec::new()
+            } else {
+                raw.split(',').collect()
+            })
+        }
+        _ => return Err(format!("build setting {label} is not a command-line flag")),
+    };
+    Ok(value)
+}
+
+pub(crate) fn merge_command_occurrences(
+    declaration: &BuildSettingDeclaration,
+    values: &[StarlarkOptionValue],
+) -> Result<StarlarkOptionValue, String> {
+    let Some(last) = values.last() else {
+        return Err("build-setting occurrence group is empty".to_owned());
+    };
+    match declaration.definition() {
+        BuildSettingDefinition::String {
+            allow_multiple: true,
+            ..
+        }
+        | BuildSettingDefinition::StringList {
+            repeatable: true, ..
+        } => {
+            let mut merged = Vec::new();
+            for value in values {
+                let StarlarkOptionValue::StringList(items) = value else {
+                    return Err("command list occurrence has the wrong typed value".to_owned());
+                };
+                merged.extend(items.iter().cloned());
+            }
+            Ok(StarlarkOptionValue::string_list(merged))
+        }
+        BuildSettingDefinition::StringSet {
+            repeatable: true, ..
+        } => {
+            let mut merged = Vec::new();
+            for value in values {
+                let StarlarkOptionValue::StringSet(items) = value else {
+                    return Err("command set occurrence has the wrong typed value".to_owned());
+                };
+                merged.extend(items.iter().cloned());
+            }
+            Ok(StarlarkOptionValue::string_set(merged))
+        }
+        _ => Ok(last.clone()),
+    }
+}
+
 fn single_collection_member(
     label: &CanonicalLabel,
     input: &str,

@@ -74,6 +74,7 @@ use crate::key::ConfigurationKey;
 use crate::key::ConfigurationKind;
 use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
+#[cfg(test)]
 use crate::key::StarlarkOption;
 use crate::result::ConfiguredActionAspectProvenance;
 use crate::result::ConfiguredActionExecGroup;
@@ -408,16 +409,14 @@ pub async fn prepare_configured_node_analysis(
     ctx: &mut DiceComputations<'_>,
     workspace: NormalizedAbsolutePath,
     requested: CanonicalLabel,
-    base_configuration: ConfigurationKey,
-    explicit: Option<StarlarkOption>,
+    configuration: ConfigurationKey,
 ) -> LoadingPreparationOutcome<Result<ConfiguredNodeAnalysisKey, AnalysisError>> {
     match prepare_configured_node_analysis_driver(
         ctx,
         ConfiguredAnalysisMode::Legacy,
         workspace,
         requested,
-        base_configuration,
-        explicit,
+        configuration,
     )
     .await
     {
@@ -436,16 +435,14 @@ pub async fn prepare_configured_node_analysis_observed(
     ctx: &mut DiceComputations<'_>,
     workspace: NormalizedAbsolutePath,
     requested: CanonicalLabel,
-    base_configuration: ConfigurationKey,
-    explicit: Option<StarlarkOption>,
+    configuration: ConfigurationKey,
 ) -> ObservedConfiguredNodeAnalysisPreparationOutcome {
     prepare_configured_node_analysis_driver(
         ctx,
         ConfiguredAnalysisMode::Observed,
         workspace,
         requested,
-        base_configuration,
-        explicit,
+        configuration,
     )
     .await
     .map(|result| result.map(|result| result.map(ConfiguredNodeAnalysisObservationKey)))
@@ -456,42 +453,24 @@ async fn prepare_configured_node_analysis_driver(
     mode: ConfiguredAnalysisMode,
     workspace: NormalizedAbsolutePath,
     requested: CanonicalLabel,
-    base_configuration: ConfigurationKey,
-    explicit: Option<StarlarkOption>,
+    configuration: ConfigurationKey,
 ) -> AnalysisSemanticOutcome<ConfiguredNodeAnalysisKey> {
-    if base_configuration.slug_configuration().is_none() {
+    if configuration.slug_configuration().is_none() {
         return analysis_semantic_complete(Err(AnalysisError::message(
             "production configured-node analysis requires a structural Slug configuration",
         )));
     }
-    let explicit_validation = match explicit.as_ref() {
-        Some(explicit) => {
-            Some(build_setting_declaration(ctx, mode, &workspace, explicit.label()).await)
-        }
-        None => None,
-    };
     let package_outcome = compute_configured_package_input(
         ctx,
         mode,
         workspace.dupe(),
         requested.package().clone(),
-        "loading root setting target package through DICE",
+        "loading configured target package through DICE",
     )
     .await;
     let mut all_need: Option<LoadingPreparationNeeds> = None;
     let mut first_outer = None;
     let mut first_error = None;
-    let mut explicit_declaration = None;
-    if let Some(validation) = explicit_validation {
-        match validation {
-            LoadingPreparationOutcome::Need(need) => all_need = Some(need),
-            LoadingPreparationOutcome::Complete(Err(error)) => first_outer = Some(error),
-            LoadingPreparationOutcome::Complete(Ok(Err(error))) => first_error = Some(error),
-            LoadingPreparationOutcome::Complete(Ok(Ok(declaration))) => {
-                explicit_declaration = Some(declaration)
-            }
-        }
-    }
     let mut package_inventory = None;
     match package_outcome {
         LoadingPreparationOutcome::Need(need) => {
@@ -541,23 +520,6 @@ async fn prepare_configured_node_analysis_driver(
             requested,
             package.build_file.clone(),
         )));
-    };
-    let configuration = match explicit {
-        None => base_configuration,
-        Some(explicit) => {
-            let declaration = explicit_declaration
-                .as_ref()
-                .expect("complete explicit validation stores its declaration");
-            match resolve_candidate(
-                explicit.label().clone(),
-                declaration,
-                explicit.value().clone(),
-            ) {
-                Ok(Some(resolved)) => base_configuration.with_starlark_option(resolved),
-                Ok(None) => without_starlark_option(&base_configuration, explicit.label()),
-                Err(error) => return analysis_semantic_complete(Err(AnalysisError::new(error))),
-            }
-        }
     };
     analysis_semantic_complete(ConfiguredNodeAnalysisKey::new(
         workspace,
@@ -1558,25 +1520,19 @@ async fn compute_configured_child(
     label: CanonicalLabel,
     configuration: ConfigurationKey,
 ) -> RootAnalysisDriverValue {
-    let key = match prepare_configured_node_analysis_driver(
-        ctx,
-        mode,
-        workspace,
-        label,
-        configuration,
-        None,
-    )
-    .await
-    {
-        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
-        LoadingPreparationOutcome::Complete(Err(error)) => {
-            return LoadingPreparationOutcome::Complete(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-            return root_analysis_driver_complete(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Ok(key))) => key,
-    };
+    let key =
+        match prepare_configured_node_analysis_driver(ctx, mode, workspace, label, configuration)
+            .await
+        {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return root_analysis_driver_complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(key))) => key,
+        };
     match mode {
         ConfiguredAnalysisMode::Legacy => match ctx.compute(&key).await {
             Ok(LoadingPreparationOutcome::Need(need)) => LoadingPreparationOutcome::Need(need),
@@ -3500,7 +3456,6 @@ impl ConfiguredNodeAnalysisKey {
                                 workspace.dupe(),
                                 configured_target.label().clone(),
                                 configured_target.configuration().clone(),
-                                None,
                             )
                             .await
                         }

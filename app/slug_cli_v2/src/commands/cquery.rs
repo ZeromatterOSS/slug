@@ -53,7 +53,7 @@ pub fn run(argv: Vec<String>) -> i32 {
         environment_policy,
         request.lockfile_mode,
         &request.registry_urls,
-        request.root_string_setting.as_deref(),
+        request.configuration_overlay.clone(),
     ) {
         Ok(accepted) => accepted,
         Err(error) => {
@@ -118,7 +118,7 @@ fn run_daemon(
                 CqueryOutputMode::StarlarkLabel => slug_server_v2::CqueryOutput::StarlarkLabel,
                 CqueryOutputMode::Graph => slug_server_v2::CqueryOutput::Graph,
             },
-            root_string_setting: request.root_string_setting,
+            configuration_overlay: request.configuration_overlay,
             bzlmod,
         },
     ) {

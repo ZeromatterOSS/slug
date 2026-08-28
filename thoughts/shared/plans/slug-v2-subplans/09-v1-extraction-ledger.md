@@ -1813,3 +1813,19 @@ repository/content closure and generated-input/multi-output REAPI breadth.
 Design that prerequisite first. Any later import must cite exact Bazel 9.2
 verbatim files and preserve structural DICE equality plus separated
 configured/action/REAPI/result identity domains.
+
+### Stage 6 contextual command-configuration preparation utility decision (2026-08-28)
+
+Source inspected: retained V2 configuration/DICE/Starlark/loading owners;
+Buck2 immutable `Arc` slice, `Dupe`, `Allocative`, compact string and small
+deterministic-map patterns; clean Zabel `0795445f…` request-session occurrence
+and typed-final-option ownership as concept guidance only.
+
+Decision: implement a V2-owned `Arc<[CommandConfigurationOccurrence]>`, one
+analysis DICE preparation key and one batch update over the existing native
+vector/Starlark map. Reuse retained compact utilities only. Do not import a V1
+or Zabel parser, option table, scheduler, cache, identity, diagnostic or rule
+engine; do not add an interner or retained standard map/set. Exact behavior is
+anchored in pinned Bazel 9.2 `StarlarkOptionsParser`, `PlatformOptions` and
+their tests. Retained-size, Arc-clone, equal-allocation, structural identity,
+invalidation and lifecycle tests are the acceptance evidence.

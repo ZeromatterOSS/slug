@@ -20396,3 +20396,26 @@ peer request-projection, typed-final-option and compact normalization guidance
 only. Buck2-derived Rust owns generic Starlark syntax/evaluation;
 BCR-delivered Starlark owns every rule definition and control path including
 `cc_internal`; `cc_common` remains only a future generic host-ABI client.
+
+### Contextual command-overlay architecture accepted; setting preparation active (2026-08-28)
+
+Commit `d5362b099` accepts the independently reviewed category-wide design.
+Activate only `WP-4-5-7A-contextual-command-setting-preparation`: introduce the
+one configuration-owned immutable occurrence slice, convert all admitted direct
+Starlark settings and both native extra-registration families at one contextual
+boundary, demand final root mapping only for apparent-external labels, cut
+build/cquery one-shot and daemon roots over to one prepared structural
+configuration, and delete the fixed `@@//:setting` bridge.
+
+The implementation must retain only the raw request projection and final typed
+configuration, union observed declaration frontiers plus mapping observations
+when mapping is semantically required, validate every earlier overwritten
+occurrence, preserve outer > Need > semantic order, and construct canonical
+configuration bytes once. Extra-registration rows are configuration facts only
+in this packet; signed loading expansion and command-before-MODULE consumption
+remain the following packet.
+
+Pinned Bazel 9.2 remains authority. Zabel remains peer guidance, Buck2-derived
+Rust remains the generic evaluator/compact-utility substrate, BCR Starlark owns
+all rules including `cc_internal`, and `cc_common` remains only a later generic
+host-ABI consumer.

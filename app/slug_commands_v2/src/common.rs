@@ -13,6 +13,8 @@ use std::fmt;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_configuration_v2::CommandConfigurationOccurrence;
+use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::TargetPattern;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -398,6 +400,59 @@ pub(crate) fn parse_bool_flag(flag: &ParsedFlag, negated: bool) -> Result<bool, 
         None => true,
     };
     Ok(if negated { !parsed } else { parsed })
+}
+
+/// Classify the only command occurrences admitted to structural
+/// configuration. Contextual declaration/type checks remain DICE-owned.
+pub(crate) fn command_configuration_occurrence(
+    flag: &ParsedFlag,
+) -> Result<Option<CommandConfigurationOccurrence>, CommandParseError> {
+    let occurrence = match flag.name.as_str() {
+        "extra_toolchains" => CommandConfigurationOccurrence::extra_toolchains(
+            required_joined_value(flag, "--extra_toolchains=<patterns>")?,
+        ),
+        "extra_execution_platforms" => CommandConfigurationOccurrence::extra_execution_platforms(
+            required_joined_value(flag, "--extra_execution_platforms=<patterns>")?,
+        ),
+        name => {
+            let (label, negated) = if name.starts_with("//") || name.starts_with('@') {
+                (name, false)
+            } else if let Some(label) = name
+                .strip_prefix("no")
+                .filter(|label| label.starts_with("//") || label.starts_with('@'))
+            {
+                (label, true)
+            } else {
+                return Ok(None);
+            };
+            ApparentLabel::parse(label).map_err(|message| CommandParseError::InvalidFlagValue {
+                flag: flag.raw.clone(),
+                message: format!(
+                    "expected a direct root or apparent-external build-setting label: {message}"
+                ),
+            })?;
+            if negated && flag.value.is_some() {
+                return Err(CommandParseError::InvalidFlagValue {
+                    flag: flag.raw.clone(),
+                    message: "Boolean no-form does not accept a joined value".to_owned(),
+                });
+            }
+            CommandConfigurationOccurrence::starlark(label, flag.value.as_deref(), negated)
+        }
+    };
+    Ok(Some(occurrence))
+}
+
+fn required_joined_value<'a>(
+    flag: &'a ParsedFlag,
+    expected: &str,
+) -> Result<&'a str, CommandParseError> {
+    flag.value
+        .as_deref()
+        .ok_or_else(|| CommandParseError::InvalidFlagValue {
+            flag: flag.raw.clone(),
+            message: format!("expected {expected}"),
+        })
 }
 
 fn parse_bool_value(flag: &str, value: &str) -> Result<bool, CommandParseError> {

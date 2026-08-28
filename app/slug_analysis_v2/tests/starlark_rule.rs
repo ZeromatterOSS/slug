@@ -33,6 +33,8 @@ use num_bigint::BigInt;
 use slug_analysis_v2::AnalysisError;
 use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::AnalysisPreparationOutcome;
+use slug_analysis_v2::CommandConfigurationPreparationKey;
+use slug_analysis_v2::CommandConfigurationPreparationObservationKey;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredActionExecutionState as ActionExecutionState;
 use slug_analysis_v2::ConfiguredConditionKey;
@@ -68,6 +70,8 @@ use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
+use slug_configuration_v2::CommandConfigurationOccurrence;
+use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_configuration_v2::SlugConfiguration;
 use slug_configuration_v2::native::host::AutoCpuToken;
 use slug_configuration_v2::native::host::HostConversionInputs;
@@ -666,15 +670,10 @@ async fn prepared_analysis_key(
     base_configuration: ConfigurationKey,
     explicit: Option<StarlarkOption>,
 ) -> Result<ConfiguredNodeAnalysisKey, String> {
-    match prepare_configured_node_analysis(
-        transaction,
-        workspace,
-        target,
-        base_configuration,
-        explicit,
-    )
-    .await
-    {
+    let configuration = explicit.map_or(base_configuration.clone(), |explicit| {
+        base_configuration.with_starlark_option(explicit)
+    });
+    match prepare_configured_node_analysis(transaction, workspace, target, configuration).await {
         AnalysisPreparationOutcome::Need(_) => Err("root request returned Needs".to_owned()),
         AnalysisPreparationOutcome::Complete(Ok(key)) => Ok(key),
         AnalysisPreparationOutcome::Complete(Err(error)) => Err(error.to_string()),
@@ -817,6 +816,11 @@ impl ActivationTracker for RootActivationTracker {
                 key.downcast_ref::<ModuleRegistrationExpansionObservationKey>()
             {
                 Some(format!("registration/observed/{}", key.family()))
+            } else if key
+                .downcast_ref::<CommandConfigurationPreparationObservationKey>()
+                .is_some()
+            {
+                Some("command-configuration/observed".to_owned())
             } else if key.downcast_ref::<RootModuleLoadingAnchorKey>().is_some() {
                 Some("anchor".to_owned())
             } else {
@@ -851,58 +855,74 @@ async fn root_string_request_result(
     explicit: Option<&str>,
     tracker: Arc<RootActivationTracker>,
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
-    root_string_request_result_with_explicit(
+    command_configuration_request_result(
         dice,
         workspace,
         target,
-        explicit.map(root_string_option),
+        explicit
+            .map(|value| CommandConfigurationOccurrence::starlark("//:setting", Some(value), false))
+            .into_iter()
+            .collect::<Vec<_>>()
+            .into(),
         tracker,
     )
     .await
 }
 
-async fn root_string_request_result_with_explicit(
+async fn command_configuration_request_result(
     dice: &Arc<Dice>,
     workspace: &std::path::Path,
     target: &str,
-    explicit: Option<StarlarkOption>,
+    overlay: CommandConfigurationOverlay,
     tracker: Arc<RootActivationTracker>,
+) -> Result<Arc<ConfiguredNodeResult>, String> {
+    command_configuration_request_result_with_inputs(dice, workspace, target, overlay, tracker, &[])
+        .await
+}
+
+async fn command_configuration_request_result_with_inputs(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    overlay: CommandConfigurationOverlay,
+    tracker: Arc<RootActivationTracker>,
+    repositories: &[(&str, &str)],
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
     let mut updater = dice.updater_with_data(UserComputationData {
         activation_tracker: Some(tracker),
         ..Default::default()
     });
-    updater
-        .changed_to(vec![(PathObservationEpochKey, root_epoch(workspace))])
-        .unwrap();
-    let root = NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap();
-    inject_root_package_policy_inputs(
-        &mut updater,
-        RootPackagePolicyInputs::new(
-            root.clone(),
-            [root],
-            std::iter::empty::<&str>(),
-            None,
-            Some("warning"),
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    inject_root_module_request_inputs(
-        &mut updater,
-        workspace,
-        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
-        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-        LockfileMode::Update,
-    )
-    .unwrap();
+    inject_root_target_inputs(&mut updater, workspace, root_epoch(workspace), repositories);
     let mut transaction = updater.commit().await;
+    let preparation = CommandConfigurationPreparationKey::new(
+        NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
+        test_configuration(),
+        overlay,
+    )
+    .map_err(|error| error.to_string())?;
+    let configuration = match transaction
+        .compute(&CommandConfigurationPreparationObservationKey::new(
+            preparation,
+        ))
+        .await
+        .map_err(|error| error.to_string())?
+    {
+        AnalysisPreparationOutcome::Need(_) => {
+            return Err("command configuration preparation returned Needs".to_owned());
+        }
+        AnalysisPreparationOutcome::Complete(Err(error)) => return Err(error.to_string()),
+        AnalysisPreparationOutcome::Complete(Ok(observed)) => observed
+            .result()
+            .as_ref()
+            .cloned()
+            .map_err(|error| error.to_string())?,
+    };
     let analysis_key = prepared_analysis_key(
         &mut transaction,
         NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
         CanonicalLabel::parse(target).unwrap(),
-        test_configuration(),
-        explicit,
+        configuration,
+        None,
     )
     .await?;
     let outcome = transaction
@@ -2417,7 +2437,7 @@ async fn later_reference_round_need_yields_to_root_semantic_error() {
 }
 
 #[tokio::test]
-async fn root_string_setting_preparation_preserves_lifecycle_transition_and_identity() {
+async fn command_configuration_preparation_preserves_lifecycle_transition_and_identity() {
     let workspace = scratch();
     let defs = workspace.join("defs.bzl");
     let build = workspace.join("BUILD.bazel");
@@ -2446,11 +2466,16 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     let tracker = Arc::new(RootActivationTracker::default());
     let consumer = ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap();
     let parent = ProviderId::new("//:defs.bzl", "ParentInfo").unwrap();
-    let need_before_missing = root_string_request_result_with_explicit(
+    let need_before_missing = command_configuration_request_result(
         &dice,
         &workspace,
         "@@//:missing",
-        Some(string_option("@@//missing_settings:setting", "command")),
+        vec![CommandConfigurationOccurrence::starlark(
+            "//missing_settings:setting",
+            Some("command"),
+            false,
+        )]
+        .into(),
         Arc::new(RootActivationTracker::default()),
     )
     .await
@@ -2642,6 +2667,117 @@ resolved/@@//:setting=right:E"#
 }
 
 #[tokio::test]
+async fn command_configuration_prepares_every_admitted_build_setting_shape() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _impl(ctx): return []
+integer = rule(implementation = _impl, build_setting = config.int(flag = True))
+boolean = rule(implementation = _impl, build_setting = config.bool(flag = True))
+string = rule(implementation = _impl, build_setting = config.string(flag = True))
+multi = rule(implementation = _impl, build_setting = config.string(flag = True, allow_multiple = True))
+string_list = rule(implementation = _impl, build_setting = config.string_list(flag = True, repeatable = True))
+string_set = rule(implementation = _impl, build_setting = config.string_set(flag = True, repeatable = True))
+not_flag = rule(implementation = _impl, build_setting = config.string())
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "boolean", "integer", "multi", "not_flag", "string", "string_list", "string_set")
+integer(name = "integer", build_setting_default = 7)
+boolean(name = "boolean", build_setting_default = False)
+string(name = "string", build_setting_default = "default")
+multi(name = "multi", build_setting_default = "one")
+string_list(name = "list", build_setting_default = [])
+string_set(name = "set", build_setting_default = set())
+not_flag(name = "not_flag", build_setting_default = "hidden")
+"#,
+    )
+    .unwrap();
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let row = |label: &'static str, value: Option<&'static str>, negated| {
+        CommandConfigurationOccurrence::starlark(label, value, negated)
+    };
+    let result = command_configuration_request_result(
+        &dice,
+        &workspace,
+        "@@//:integer",
+        vec![
+            row("//:integer", Some("8"), false),
+            row("//:integer", Some("9"), false),
+            row("//:boolean", None, false),
+            row("//:boolean", None, true),
+            row("//:string", Some("changed"), false),
+            row("//:string", Some("default"), false),
+            row("//:multi", Some("x"), false),
+            row("//:multi", Some("x"), false),
+            row("//:list", Some("a,b"), false),
+            row("//:list", Some("c"), false),
+            row("//:set", Some("z"), false),
+            row("//:set", Some("a"), false),
+            row("//:set", Some("z"), false),
+        ]
+        .into(),
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    let configuration = result.configured_target_key().unwrap().configuration();
+    let option = |name: &str| {
+        configuration
+            .starlark_option(&CanonicalLabel::parse(&format!("@@//:{name}")).unwrap())
+            .map(|option| option.value().clone())
+    };
+    assert_eq!(
+        option("integer"),
+        Some(StarlarkOptionValue::Integer(9.into()))
+    );
+    assert_eq!(option("boolean"), None);
+    assert_eq!(option("string"), None);
+    assert_eq!(
+        option("multi"),
+        Some(StarlarkOptionValue::string_list(["x", "x"]))
+    );
+    assert_eq!(
+        option("list"),
+        Some(StarlarkOptionValue::string_list(["a,b", "c"]))
+    );
+    assert_eq!(
+        option("set"),
+        Some(StarlarkOptionValue::string_set(["a", "z"]))
+    );
+
+    let malformed = command_configuration_request_result(
+        &dice,
+        &workspace,
+        "@@//:integer",
+        vec![
+            row("//:integer", Some("bad"), false),
+            row("//:integer", Some("10"), false),
+        ]
+        .into(),
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap_err();
+    assert!(malformed.contains("not an integer"), "{malformed}");
+
+    let non_flag = command_configuration_request_result(
+        &dice,
+        &workspace,
+        "@@//:integer",
+        vec![row("//:not_flag", Some("visible"), false)].into(),
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap_err();
+    assert!(non_flag.contains("not a command-line flag"), "{non_flag}");
+}
+
+#[tokio::test]
 async fn typed_build_settings_resolve_all_value_shapes_scopes_and_defaults() {
     let workspace = scratch();
     fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
@@ -2760,7 +2896,7 @@ string_set(name = "set", build_setting_default = set(["b", "a"]))
     ];
     for (target, value, expected_scope, expected_provider) in cases {
         let label = CanonicalLabel::parse(target).unwrap();
-        let explicit = StarlarkOption::new(label.clone(), value, StarlarkOptionScope::Default);
+        let explicit = StarlarkOption::new(label.clone(), value, expected_scope);
         let result = request(target, test_configuration(), Some(explicit))
             .await
             .unwrap();
@@ -2788,26 +2924,12 @@ string_set(name = "set", build_setting_default = set(["b", "a"]))
         Some(StarlarkOption::new(
             integer.clone(),
             StarlarkOptionValue::Integer(BigInt::from(8)),
-            StarlarkOptionScope::Default,
+            StarlarkOptionScope::Target,
         )),
     )
     .await
     .unwrap();
-    let restored = request(
-        "@@//:integer",
-        changed
-            .configured_target_key()
-            .unwrap()
-            .configuration()
-            .clone(),
-        Some(StarlarkOption::new(
-            integer.clone(),
-            StarlarkOptionValue::Integer(BigInt::from(7)),
-            StarlarkOptionScope::Default,
-        )),
-    )
-    .await
-    .unwrap();
+    let restored = request("@@//:integer", base, None).await.unwrap();
     assert_ne!(first.key(), changed.key());
     assert_eq!(first.key(), restored.key());
     assert!(
@@ -3037,7 +3159,12 @@ async fn canonical_external_condition_and_flag_packages_invalidate_and_restore()
     .unwrap();
     fs::write(
         workspace.join("BUILD.bazel"),
-        "filegroup(name = \"root\")\n",
+        "load(\":root_defs.bzl\", \"root_rule\")\nroot_rule(name = \"root\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("root_defs.bzl"),
+        "def _root(ctx): return []\nroot_rule = rule(implementation = _root)\n",
     )
     .unwrap();
     fs::write(
@@ -3061,8 +3188,34 @@ async fn canonical_external_condition_and_flag_packages_invalidate_and_restore()
     )
     .unwrap();
 
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let repositories = [("dep+", "dep")];
+    let prepared_external = command_configuration_request_result_with_inputs(
+        &dice,
+        &workspace,
+        "@@//:root",
+        vec![CommandConfigurationOccurrence::starlark(
+            "@dep//flags:mode",
+            Some("command"),
+            false,
+        )]
+        .into(),
+        Arc::new(RootActivationTracker::default()),
+        &repositories,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        prepared_external
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .starlark_option(&CanonicalLabel::parse("@@dep+//flags:mode").unwrap())
+            .unwrap()
+            .value()
+            .as_str(),
+        Some("command")
+    );
     let tracker = Arc::new(RootActivationTracker::with_loading());
     let request = |configuration, tracker| {
         configured_condition_request_with_inputs(
@@ -3937,14 +4090,174 @@ parent(
 }
 
 #[tokio::test]
-async fn explicit_external_setting_uses_its_canonical_package_declaration() {
+async fn mixed_root_and_external_overlay_demands_root_package_before_mapping_need() {
     let workspace = scratch();
-    fs::create_dir_all(workspace.join("dep/flags")).unwrap();
     fs::write(
         workspace.join("MODULE.bazel"),
         "module(name = \"bazel_tools\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
     )
     .unwrap();
+    fs::create_dir(workspace.join("dep")).unwrap();
+    fs::write(
+        workspace.join("dep/MODULE.bazel"),
+        "module(name = \"dep\", version = \"1.0.0\")\n",
+    )
+    .unwrap();
+    fs::create_dir(workspace.join("unrelated")).unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        "def _setting(ctx): return []\nsetting = rule(implementation = _setting, build_setting = config.string(flag = True))\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"setting\")\nsetting(name = \"root_mode\", build_setting_default = \"default\")\n",
+    )
+    .unwrap();
+
+    let tracker = Arc::new(RootActivationTracker::with_loading());
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let error = command_configuration_request_result_with_inputs(
+        &dice,
+        &workspace,
+        "@@//:root_mode",
+        vec![
+            CommandConfigurationOccurrence::starlark("//:root_mode", Some("root"), false),
+            CommandConfigurationOccurrence::extra_toolchains("//toolchain:root"),
+            CommandConfigurationOccurrence::starlark("@dep//flags:mode", Some("external"), false),
+        ]
+        .into(),
+        tracker.clone(),
+        &[("unrelated+", "unrelated")],
+    )
+    .await
+    .unwrap_err();
+    assert!(error.contains("Needs"), "{error}");
+    let (activations, _, _) = tracker.take();
+    assert!(
+        activations
+            .iter()
+            .any(|(identity, _)| identity.starts_with("package/") && identity.contains("@@//")),
+        "root declaration package was not demanded before mapping Need: {activations:#?}"
+    );
+    assert!(
+        activations
+            .iter()
+            .any(|(identity, _)| identity == "command-configuration/observed"),
+        "the invalid Need result must still record its completed driver activation: {activations:#?}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn command_configuration_cancellation_publishes_no_partial_result_and_recovers() {
+    let workspace = scratch();
+    fs::create_dir(workspace.join("settings")).unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        "def _setting(ctx): return []\nsetting = rule(implementation = _setting, build_setting = config.string(flag = True))\n",
+    )
+    .unwrap();
+    fs::write(workspace.join("BUILD.bazel"), "").unwrap();
+    fs::write(
+        workspace.join("settings/BUILD.bazel"),
+        "load(\"//:defs.bzl\", \"setting\")\nsetting(name = \"mode\", build_setting_default = \"default\")\n",
+    )
+    .unwrap();
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let (reached_sender, reached_receiver) = std::sync::mpsc::sync_channel(0);
+    let (release_sender, release_receiver) = std::sync::mpsc::sync_channel(0);
+    let tracker = Arc::new(RootActivationTracker::with_loading_gate(
+        "settings",
+        reached_sender,
+        release_receiver,
+    ));
+    let mut updater = dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(tracker.clone()),
+        ..Default::default()
+    });
+    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
+    let preparation = CommandConfigurationPreparationKey::new(
+        NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+        test_configuration(),
+        vec![CommandConfigurationOccurrence::starlark(
+            "//settings:mode",
+            Some("command"),
+            false,
+        )]
+        .into(),
+    )
+    .unwrap();
+    let key = CommandConfigurationPreparationObservationKey::new(preparation);
+    let mut transaction = updater.commit().await;
+    tracker.take();
+    let computation = tokio::spawn(async move { transaction.compute(&key).await });
+    tokio::task::spawn_blocking(move || reached_receiver.recv().unwrap())
+        .await
+        .unwrap();
+    let (activations, _, _) = tracker.take();
+    assert!(
+        activations
+            .iter()
+            .any(|(identity, _)| identity.starts_with("package/") && identity.contains("settings")),
+        "declaration package was not reached before cancellation: {activations:#?}"
+    );
+    assert!(
+        activations
+            .iter()
+            .all(|(identity, _)| identity != "command-configuration/observed"),
+        "command configuration published before cancellation: {activations:#?}"
+    );
+    computation.abort();
+    release_sender.send(()).unwrap();
+    assert!(computation.await.unwrap_err().is_cancelled());
+
+    let recovery_tracker = Arc::new(RootActivationTracker::with_loading());
+    let recovered = command_configuration_request_result(
+        &dice,
+        &workspace,
+        "@@//settings:mode",
+        vec![CommandConfigurationOccurrence::starlark(
+            "//settings:mode",
+            Some("command"),
+            false,
+        )]
+        .into(),
+        recovery_tracker.clone(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        recovered
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .starlark_option(&CanonicalLabel::parse("@@//settings:mode").unwrap())
+            .unwrap()
+            .value()
+            .as_str(),
+        Some("command")
+    );
+    assert_eq!(
+        recovery_tracker
+            .take()
+            .0
+            .iter()
+            .filter(|(identity, _)| *identity == "command-configuration/observed")
+            .count(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn explicit_external_setting_uses_its_canonical_package_declaration() {
+    let workspace = scratch();
+    fs::create_dir_all(workspace.join("dep/flags")).unwrap();
+    fs::create_dir_all(workspace.join("other/flags")).unwrap();
+    let module_a = "module(name = \"bazel_tools\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n";
+    let module_b = "module(name = \"bazel_tools\")\nbazel_dep(name = \"other\", version = \"1.0.0\", repo_name = \"dep\")\nlocal_path_override(module_name = \"other\", path = \"other\")\n";
+    fs::write(workspace.join("MODULE.bazel"), module_a).unwrap();
     fs::write(
         workspace.join("defs.bzl"),
         "def _empty(ctx): return []\nempty = rule(implementation = _empty)\n",
@@ -3972,24 +4285,40 @@ async fn explicit_external_setting_uses_its_canonical_package_declaration() {
         "load(\":defs.bzl\", \"setting\")\nsetting(name = \"mode\", build_setting_default = \"external-default\", scope = \"target\")\n",
     )
     .unwrap();
+    fs::write(
+        workspace.join("other/MODULE.bazel"),
+        "module(name = \"other\", version = \"1.0.0\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.join("other/REPO.bazel"), "").unwrap();
+    fs::write(workspace.join("other/.bazelignore"), "").unwrap();
+    fs::write(
+        workspace.join("other/flags/defs.bzl"),
+        "def _setting(ctx): return []\nsetting = rule(implementation = _setting, attrs = {\"scope\": attr.string()}, build_setting = config.string(flag = True))\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("other/flags/BUILD.bazel"),
+        "load(\":defs.bzl\", \"setting\")\nsetting(name = \"mode\", build_setting_default = \"other-default\", scope = \"target\")\n",
+    )
+    .unwrap();
 
-    let repositories = [("dep+", "dep")];
+    let repositories = [("dep+", "dep"), ("other+", "other")];
     let label = CanonicalLabel::parse("@@dep+//flags:mode").unwrap();
     let tracker = Arc::new(RootActivationTracker::with_loading());
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let request = |value: &'static str, tracker| {
-        root_target_request_with_explicit_inputs(
+        command_configuration_request_result_with_inputs(
             &dice,
             &workspace,
             "@@//:request",
-            test_configuration(),
-            Some(StarlarkOption::string(
-                label.clone(),
-                value,
-                StarlarkOptionScope::Default,
-            )),
+            vec![CommandConfigurationOccurrence::starlark(
+                "@dep//flags:mode",
+                Some(value),
+                false,
+            )]
+            .into(),
             tracker,
-            root_epoch(&workspace),
             &repositories,
         )
     };
@@ -4017,6 +4346,46 @@ async fn explicit_external_setting_uses_its_canonical_package_declaration() {
     assert_eq!(retained.label(), &label);
     assert_eq!(retained.value().as_str(), Some("external-changed"));
     assert_eq!(retained.scope(), StarlarkOptionScope::Target);
+    let configuration_a = changed
+        .configured_target_key()
+        .unwrap()
+        .configuration()
+        .clone();
+
+    fs::write(workspace.join("MODULE.bazel"), module_b).unwrap();
+    let mapped_b = request(
+        "external-changed",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    let configuration_b = mapped_b.configured_target_key().unwrap().configuration();
+    assert!(
+        configuration_b
+            .starlark_option(&CanonicalLabel::parse("@@dep+//flags:mode").unwrap())
+            .is_none()
+    );
+    assert_eq!(
+        configuration_b
+            .starlark_option(&CanonicalLabel::parse("@@other+//flags:mode").unwrap())
+            .unwrap()
+            .value()
+            .as_str(),
+        Some("external-changed")
+    );
+    assert_ne!(&configuration_a, configuration_b);
+
+    fs::write(workspace.join("MODULE.bazel"), module_a).unwrap();
+    let restored = request(
+        "external-changed",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        &configuration_a,
+        restored.configured_target_key().unwrap().configuration()
+    );
 
     let (activations, _, _) = tracker.take();
     assert!(
@@ -4705,7 +5074,6 @@ async fn analyze_node_request_typed_with_epoch(
             workspace_identity,
             key.label().clone(),
             key.configuration().clone(),
-            None,
         )
         .await
         {

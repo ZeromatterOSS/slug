@@ -9,6 +9,7 @@
  */
 
 mod build_setting;
+mod command_configuration;
 mod configured_attribute;
 pub mod configured_target;
 pub mod dice;
@@ -17,6 +18,12 @@ pub mod result;
 pub mod starlark_rule;
 pub mod toolchains;
 
+pub use command_configuration::CommandConfigurationPreparationKey;
+pub use command_configuration::CommandConfigurationPreparationObservationKey;
+pub use command_configuration::CommandConfigurationPreparationOutcome;
+pub use command_configuration::CommandConfigurationPreparationOuterError;
+pub use command_configuration::ObservedCommandConfiguration;
+pub use command_configuration::ObservedCommandConfigurationPreparationOutcome;
 pub use configured_target::ConfiguredEdge;
 pub use configured_target::ConfiguredEdgeKind;
 pub use dice::AnalysisError;

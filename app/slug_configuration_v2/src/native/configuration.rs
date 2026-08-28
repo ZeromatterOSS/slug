@@ -32,6 +32,8 @@ use super::label_convert::MixedValue;
 use super::registry::NATIVE_OPTION_DESCRIPTORS;
 use super::registry::NativeOptionDescriptor;
 use super::value::*;
+use crate::CommandConfigurationOccurrence;
+use crate::CommandConfigurationOverlay;
 
 const PROJECTION_CONTEXT: &str = "slug.build/configuration-projection/v2";
 const PROJECTION_MAGIC: &[u8] = b"slugcfg\0";
@@ -301,6 +303,9 @@ pub enum SlugConfigurationError {
     ExecProjectionRequiresTarget { actual: SlugConfigurationKind },
     DuplicateStarlarkOption,
     ProjectStarlarkOptionInExecProjection,
+    UnknownNativeOption,
+    InvalidCommandNativeOption { option: &'static str },
+    UnexpectedNativeStringList { option: &'static str },
 }
 
 impl fmt::Display for SlugConfigurationError {
@@ -351,6 +356,16 @@ impl fmt::Display for SlugConfigurationError {
             }
             Self::ProjectStarlarkOptionInExecProjection => formatter
                 .write_str("project-scoped Starlark option cannot enter an exec configuration"),
+            Self::UnknownNativeOption => formatter.write_str("unknown native configuration option"),
+            Self::InvalidCommandNativeOption { option } => {
+                write!(
+                    formatter,
+                    "invalid command value for native option {option}"
+                )
+            }
+            Self::UnexpectedNativeStringList { option } => {
+                write!(formatter, "native option {option} is not a string list")
+            }
         }
     }
 }
@@ -385,6 +400,38 @@ struct SlugConfigurationData {
 /// cheap refcount increment, while equality remains fully structural.
 #[derive(Clone, Debug, Eq, PartialEq, Allocative, Dupe)]
 pub struct SlugConfiguration(Arc<SlugConfigurationData>);
+
+/// Opaque phase-scratch native updates converted before contextual Starlark
+/// declaration preparation completes.
+#[derive(Debug)]
+pub struct PreparedCommandNativeOptions {
+    base: SlugConfiguration,
+    updates: Vec<(usize, NativeOccurrence)>,
+}
+
+/// Borrowed projection of a string-list value retained in the sole native
+/// option vector.
+#[derive(Clone, Copy, Debug)]
+pub struct NativeStringListOption<'a> {
+    values: &'a [NativeValue],
+}
+
+impl<'a> NativeStringListOption<'a> {
+    pub fn iter(self) -> impl ExactSizeIterator<Item = &'a str> {
+        self.values.iter().map(|value| match value {
+            NativeValue::Text(value) => value.as_str(),
+            _ => unreachable!("NativeStringListOption validates every member"),
+        })
+    }
+
+    pub fn len(self) -> usize {
+        self.values.len()
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.values.is_empty()
+    }
+}
 
 impl SlugConfiguration {
     pub fn new_default(
@@ -479,6 +526,156 @@ impl SlugConfiguration {
         )
     }
 
+    /// Convert every native command occurrence into phase scratch without
+    /// publishing a partial configuration.
+    pub fn prepare_command_native_options(
+        &self,
+        overlay: &CommandConfigurationOverlay,
+    ) -> Result<PreparedCommandNativeOptions, SlugConfigurationError> {
+        const PLATFORM_OPTIONS: &str = "com.google.devtools.build.lib.analysis.PlatformOptions";
+        const EXTRA_TOOLCHAINS: &str = "extra_toolchains";
+        const EXTRA_EXECUTION_PLATFORMS: &str = "extra_execution_platforms";
+
+        let (toolchain_index, toolchain_descriptor) = command_native_descriptor(EXTRA_TOOLCHAINS)?;
+        let (execution_index, execution_descriptor) =
+            command_native_descriptor(EXTRA_EXECUTION_PLATFORMS)?;
+        debug_assert_eq!(toolchain_descriptor.class_name, PLATFORM_OPTIONS);
+        debug_assert_eq!(execution_descriptor.class_name, PLATFORM_OPTIONS);
+
+        let mut toolchain_values = None;
+        let mut execution_value = None;
+        for occurrence in overlay.iter() {
+            match occurrence {
+                CommandConfigurationOccurrence::Starlark { .. } => {}
+                CommandConfigurationOccurrence::ExtraToolchains { raw_value } => {
+                    let converted =
+                        super::convert::convert_occurrence(toolchain_descriptor, raw_value)
+                            .map_err(|_| SlugConfigurationError::InvalidCommandNativeOption {
+                                option: EXTRA_TOOLCHAINS,
+                            })?;
+                    let NativeOccurrence::List(values) = converted else {
+                        return Err(SlugConfigurationError::UnexpectedNativeStringList {
+                            option: EXTRA_TOOLCHAINS,
+                        });
+                    };
+                    if toolchain_values.is_none() {
+                        toolchain_values = Some(match &self.0.options[toolchain_index].value {
+                            OptionValue::Native(NativeOccurrence::Absent) => Vec::new(),
+                            OptionValue::Native(NativeOccurrence::List(values))
+                            | OptionValue::Native(NativeOccurrence::Scalar(NativeValue::List(
+                                values,
+                            ))) => values.0.to_vec(),
+                            _ => {
+                                return Err(SlugConfigurationError::UnexpectedNativeStringList {
+                                    option: EXTRA_TOOLCHAINS,
+                                });
+                            }
+                        });
+                    }
+                    toolchain_values
+                        .as_mut()
+                        .expect("toolchain rows initialize the accumulator")
+                        .extend(values.0.iter().cloned());
+                }
+                CommandConfigurationOccurrence::ExtraExecutionPlatforms { raw_value } => {
+                    execution_value = Some(
+                        super::convert::convert_occurrence(execution_descriptor, raw_value)
+                            .map_err(|_| SlugConfigurationError::InvalidCommandNativeOption {
+                                option: EXTRA_EXECUTION_PLATFORMS,
+                            })?,
+                    );
+                }
+            }
+        }
+        let mut updates = Vec::with_capacity(2);
+        if let Some(mut values) = toolchain_values {
+            dedupe_keeping_last(&mut values);
+            updates.push((
+                toolchain_index,
+                NativeOccurrence::List(NativeValues(Arc::from(values))),
+            ));
+        }
+        if let Some(value) = execution_value {
+            updates.push((execution_index, value));
+        }
+        Ok(PreparedCommandNativeOptions {
+            base: self.dupe(),
+            updates,
+        })
+    }
+
+    /// Publish one final configuration from preconverted native scratch and
+    /// the complete Starlark option map.
+    pub fn with_prepared_command_configuration(
+        prepared: PreparedCommandNativeOptions,
+        starlark_options: StarlarkOptions,
+    ) -> Self {
+        let PreparedCommandNativeOptions { base, updates } = prepared;
+        if updates.is_empty() && starlark_options == base.0.starlark_options {
+            return base;
+        }
+        let mut options = base.0.options.to_vec();
+        for (index, value) in updates {
+            options[index].value = OptionValue::Native(value);
+        }
+        if options.as_slice() == base.0.options.as_ref()
+            && starlark_options == base.0.starlark_options
+        {
+            return base;
+        }
+        finish_configuration(base.0.kind, Arc::from(options), starlark_options)
+    }
+
+    /// Apply the contextual command rows and complete Starlark map in one
+    /// structural publication. Every native occurrence is converted even when
+    /// a later occurrence replaces it.
+    pub fn with_command_configuration(
+        &self,
+        starlark_options: StarlarkOptions,
+        overlay: &CommandConfigurationOverlay,
+    ) -> Result<Self, SlugConfigurationError> {
+        Ok(Self::with_prepared_command_configuration(
+            self.prepare_command_native_options(overlay)?,
+            starlark_options,
+        ))
+    }
+
+    /// Project a typed string list without adding a parallel retained store.
+    pub fn native_string_list_option(
+        &self,
+        class_name: &str,
+        canonical_name: &'static str,
+    ) -> Result<NativeStringListOption<'_>, SlugConfigurationError> {
+        let record = self
+            .0
+            .options
+            .iter()
+            .find(|record| {
+                record.class_name == class_name && record.canonical_name == canonical_name
+            })
+            .ok_or(SlugConfigurationError::UnknownNativeOption)?;
+        let values = match &record.value {
+            OptionValue::Native(NativeOccurrence::List(values))
+            | OptionValue::Native(NativeOccurrence::Scalar(NativeValue::List(values))) => {
+                values.0.as_ref()
+            }
+            _ => {
+                return Err(SlugConfigurationError::UnexpectedNativeStringList {
+                    option: canonical_name,
+                });
+            }
+        };
+        if !values
+            .iter()
+            .all(|value| matches!(value, NativeValue::Text(_)))
+        {
+            return Err(SlugConfigurationError::UnexpectedNativeStringList {
+                option: canonical_name,
+            });
+        }
+        Ok(NativeStringListOption { values })
+    }
+
     pub fn projection(&self) -> SlugConfigurationProjection {
         self.0.projection
     }
@@ -507,6 +704,30 @@ impl SlugConfiguration {
     ) -> Result<bool, super::matching::NativeConfigSettingMatchError> {
         super::matching::matches(&self.0.options, values, define_values)
     }
+}
+
+fn command_native_descriptor(
+    canonical_name: &'static str,
+) -> Result<(usize, &'static NativeOptionDescriptor), SlugConfigurationError> {
+    NATIVE_OPTION_DESCRIPTORS
+        .iter()
+        .enumerate()
+        .find(|(_, descriptor)| {
+            descriptor.class_name == "com.google.devtools.build.lib.analysis.PlatformOptions"
+                && descriptor.canonical_name == canonical_name
+        })
+        .ok_or(SlugConfigurationError::UnknownNativeOption)
+}
+
+fn dedupe_keeping_last(values: &mut Vec<NativeValue>) {
+    let mut unique = Vec::with_capacity(values.len());
+    for value in values.drain(..).rev() {
+        if !unique.contains(&value) {
+            unique.push(value);
+        }
+    }
+    unique.reverse();
+    *values = unique;
 }
 
 impl Hash for SlugConfiguration {

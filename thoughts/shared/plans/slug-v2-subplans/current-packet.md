@@ -1,348 +1,251 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-contextual-command-overlays-architecture`
+Packet: `WP-4-5-7A-contextual-command-setting-preparation`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `3b8a353ef`.
+Base: `d5362b099`.
 
-Result: freeze the zero-Rust architecture and bounded implementation sequence
-for contextual Starlark build-setting occurrences plus native
-`--extra_toolchains` and `--extra_execution_platforms` overlays. This packet
-changes no Rust and admits no configured alias/constraint selection, provider
-payload, toolchain implementation analysis or ruleset-specific control flow.
+Result: implement category 3A from the accepted contextual-command-overlay
+architecture. Build and cquery must carry one immutable typed command overlay
+through one-shot and daemon paths, prepare the final structural configuration
+after Bzlmod mapping through one DICE owner, and delete the singular
+`@@//:setting` bridge. Native extra-registration values become typed
+configuration facts in this packet but are not consumed until category 3B.
 
-## Accepted predecessor and category boundary
+## Accepted predecessor and bounded decision
 
-Commit `3b8a353ef` completes typed build-setting/config-condition category 2.
-It resolves every retained selector and concatenation through one typed
-resolver, batches the sole configured-condition key, exposes the complete
-admitted `ctx.attr` and `ctx.outputs` shapes, derives dependencies only from
-selected branches, and applies the same two-phase condition path to native
-toolchain `target_settings`. Independent terminal review returns `ACCEPT`.
+Commit `d5362b099` independently accepts the category-wide architecture. It
+freezes one compact occurrence carrier, one post-Bzlmod configuration-
+preparation owner, and one later shared signed registration consumer. Pinned
+Bazel 9.2 is behavior authority; clean Zabel `0795445f…` is peer ownership and
+allocation guidance only. Buck2-derived Rust owns generic Starlark parsing and
+evaluation. BCR Starlark owns every rule/control path including `cc_internal`;
+`cc_common` remains only a demanding future client of the generic host ABI.
 
-Category 3 must now replace the singular `@@//:setting` command bridge without
-adding another setting value, converter, configuration identity or registration
-parser. It owns command occurrences and their contextual preparation only.
-Configured target-platform facts, registered aliases, declaration eligibility,
-provider payloads, selected implementation exec configuration and
-`ctx.toolchains` remain the following frozen categories.
-
-Buck2-derived Rust remains the sole generic Starlark syntax/evaluator owner.
-BCR-delivered Starlark owns every rule definition and control path, including
-`cc_internal`; `cc_common` is only a demanding future client of the generic
-evaluator/provider/host ABI. No command-overlay packet may add a Rust C++ rule
-parser or engine.
+This packet makes the accepted representation and first DICE boundary real.
+It deliberately does not expand signed registration patterns, merge command
+and MODULE registrations, select configured toolchains, evaluate providers,
+or add any C++-specific parser or rule path.
 
 ## Learned facts and source basis
 
 Pinned Bazel 9.2 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` is behavior authority.
+`8220c6198837d5c13d53fea211cf3282aa12408a` remains exact authority.
 
-- `StarlarkOptionsParser` receives unresolved command occurrences after native
-  option parsing, loads each target, rejects non-rules and build settings with
-  `flag = False`, converts text through the declaration's build-setting type,
-  canonicalizes by the loaded target label, and elides effective defaults.
-- Direct scalar settings are last-wins. `allow_multiple` strings and repeatable
-  list/set settings accumulate occurrences in command order. String sets
-  normalize to unique membership; integer overrides remain arbitrary precision;
-  Boolean flags admit explicit values and the value-less positive/`no` forms.
-  Every occurrence is loaded and converted even if a later scalar occurrence
-  replaces it.
-- Apparent root and external labels are interpreted with the selected root
-  repository mapping. The existing `HostRootRepositoryMappingKey` and its
-  observed counterpart already own that final mapping; loading already owns
-  Root/Canonical package and build-setting declarations.
-- `PlatformOptions.extra_execution_platforms` uses the comma-list converter and
-  is non-repeatable, so a later occurrence replaces the earlier list.
-  `extra_toolchains` uses the same converter with `allowMultiple = true`, then
-  `PlatformOptions.getNormalized` deduplicates while keeping the last copy.
-- `RegisteredExecutionPlatformsFunction` prepends final command patterns to
-  Bzlmod patterns in configuration order. `RegisteredToolchainsFunction`
-  reverses the normalized command list first because the last command
-  toolchain has highest priority, then appends Bzlmod patterns.
-- `TargetPatternUtil` parses command patterns as signed patterns. Expansion is
-  sequential: positive rows add, negative rows remove, and the final ordered
-  set deduplicates labels. Bzlmod registration patterns are always positive.
-- Slug already has the complete typed native descriptor/converter row for both
-  extra-registration options, one structural Starlark-option map, the final
-  root mapping, Root/Canonical loading carriers, complete contextual target
-  pattern syntax and two loading-owned MODULE registration expansion keys.
-  Analysis currently consumes only those MODULE expansions.
-- `slug_commands_v2::ParsedFlag` retains raw name/value/order, but build and
-  cquery collapse only `--//:setting` to a string. The CLI, daemon wire, core
-  runtime, build root and cquery roots repeat that singular bridge. Core creates
-  a final configuration before DICE can resolve Bzlmod context.
-- `SlugConfiguration` has no public native update boundary. Its native option
-  vector and generic converter are already the sole typed identity owner, so
-  extra registrations must enter through a batched descriptor-driven update,
-  not new parallel fields.
-- `registration_expansion.rs` owns the one contextual package/subtree expansion
-  engine, but its public keys intentionally read positive-only MODULE rows.
-  Command rows must reuse/generalize that engine without entering the MODULE
-  key or selected-module carrier.
+- `StarlarkOptionsParser#parseGivenArgs` and `#parseArg`, with
+  `StarlarkOptionsParsingTest`, require every occurrence to load and convert;
+  scalar settings keep the last value, allow-multiple strings and repeatable
+  list/set settings accumulate in command order, nonrepeatable list/set text
+  uses the declaration converter, Boolean no-value and `no` spellings are
+  declaration checked, non-flags fail, and effective defaults are elided.
+- `PlatformOptions` and `PlatformOptionsTest` establish comma conversion,
+  last-occurrence replacement for `extra_execution_platforms`, concatenation
+  for `extra_toolchains`, and normalization by deduplicating while keeping the
+  last copy.
+- Existing loading owns all five admitted direct build-setting declaration
+  kinds and root/canonical package inventories. The selected final root mapping
+  is owned by `HostRootRepositoryMappingKey` and its observed wrapper.
+- Existing analysis owns the sole declaration-authenticated converter and
+  default/scope resolution. Existing configuration owns the only native option
+  vector, canonical Starlark option map, structural equality, canonical bytes,
+  and Slug-native projection.
+- Current command/build/cquery/server/core paths repeat `root_string_setting`
+  and `explicit_starlark_option`, eagerly construct `@@//:setting`, and may
+  claim output identity before contextual declaration resolution. These are
+  the fallbacks deleted by this packet.
+- Buck2 DICE ownership guidance in `docs/developers/dice.md` requires every
+  semantic input in the key/dependency graph, publication only after all
+  dependencies complete, and no lock across a DICE computation. Existing
+  observed mapping/package wrappers provide the path-frontier union inputs.
 
-Primary pinned evidence is `StarlarkOptionsParser`,
-`StarlarkOptionsParsingTest`, `PlatformOptions`, `PlatformOptionsTest`,
-`RegisteredToolchainsFunction`, `RegisteredExecutionPlatformsFunction`,
-`TargetPatternUtil` and their registration-order tests. Use a Bazel 9.2 oracle
-only for a named admitted shape those sources/tests do not discriminate.
+Clean Zabel's immutable request occurrence projection and typed final option
+owner are concept/test guidance. Retained Buck2-derived `Arc` slices, `Dupe`,
+`Allocative`, compact strings and small deterministic maps are approved leaf
+utilities. Copy no Zabel layout/parser/diagnostic/checksum and add no new
+interner, cache, standard retained map/set, or Buck cell/label identity.
 
-Clean Zabel `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance only.
-Its `RequestSession` injects immutable option occurrences, its configuration
-owners normalize typed Starlark/native final options, and its extra-registration
-rows remain configuration facts rather than MODULE facts. Its keep-last native
-list normalization and borrowed typed-option projections are useful ownership
-and allocation ideas. Copy no Zig representation, table layout, parser,
-scheduler, diagnostics, checksum policy or compatibility claim.
+## Implementation contract
 
-## Frozen architecture
+### Shared request projection and sole classifier
 
-### One immutable command-configuration overlay
+Add `CommandConfigurationOverlay` to `slug_configuration_v2`. It is an
+immutable `Arc<[CommandConfigurationOccurrence]>`, cheap-clone, allocative,
+structurally Eq/Hash, serde-compatible, and shared unchanged across command,
+CLI, daemon wire, core root and preparation key. Empty overlays share the
+standard empty allocation. Its only variants are:
 
-Add one configuration-owned immutable occurrence projection shared unchanged by
-build and cquery across command parsing, one-shot invocation, daemon wire and
-core runtime. It is an `Arc` slice in command order with only these admitted
-variants:
+1. direct root/apparent-external Starlark label text plus optional raw value
+   and Boolean negation;
+2. raw `extra_toolchains` joined value; and
+3. raw `extra_execution_platforms` joined value.
 
-1. a direct Starlark build-setting occurrence retaining apparent label text,
-   optional raw value and Boolean negation form;
-2. one raw `extra_toolchains` value occurrence; and
-3. one raw `extra_execution_platforms` value occurrence.
+`slug_commands_v2` remains the sole argv classifier. Build and cquery admit
+direct `--//pkg:flag=value` / `--@repo//pkg:flag=value`, value-less positive
+Boolean candidates and value-less `--no<label>` candidates. Native extras
+require joined values. Preserve raw valid-Unicode bytes, missing versus empty,
+negation and command order. Reject canonical `@@` spellings, relative labels,
+split-token native values, `--config`, aliases and every unadmitted flag before
+one-shot/daemon selection.
 
-The projection retains no full argv, UI/remote/Bzlmod flag, parsed canonical
-label, declaration, evaluator value or final configuration. Its structural
-equality includes variant, raw valid-Unicode bytes, missing-versus-present
-value, negation and occurrence order. An empty projection reuses one shared
-empty allocation. The existing `root_string_setting` field and
-`explicit_starlark_option` bridge are deleted across command, CLI, server and
-core surfaces in one no-shim cutover.
+Replace build/cquery `root_string_setting` with the shared overlay. The daemon
+wire serializes that type directly, with no raw argv or second classifier.
+Delete fixed-label comments, JSON fields, test constructors and run-path
+special cases associated with the old bridge.
 
-`slug_commands_v2` remains the sole argv classifier. It recognizes direct
-label-shaped Starlark flags and the two native names, validates the admitted
-joined `--name=value` and Boolean no-value spellings, and builds the shared
-projection. The daemon serializes the same typed occurrence rows, not a second
-raw argv for reparsing. Unknown configuration-affecting flags continue to fail
-at command admission; presentation, remote and Bzlmod inputs stay in their
-existing owners.
+### Batched structural configuration update
 
-The carrier is generic configuration infrastructure. It contains no
-`cc_common`, `cc_internal`, rules_cc or rules_rust discriminator and reserves no
-per-ruleset fields.
+Add one `SlugConfiguration` batch boundary that accepts the complete final
+`StarlarkOptions` plus the raw overlay and constructs canonical bytes once.
+Convert every native occurrence through the existing descriptors and comma
+converter. Replace execution-platform values with the last occurrence.
+Concatenate toolchain values then deduplicate while keeping the last copy.
+Expose one generic borrowed string-list projection over the existing native
+option vector for category 3B; add no family-specific retained field.
 
-### One contextual configuration-preparation DICE boundary
+If native values and final Starlark options equal the base, return the existing
+configuration allocation. Otherwise retain one new configuration allocation.
+All conversion vectors and dedupe sets are phase scratch. Native descriptor,
+type or layout mismatches fail closed.
 
-Add one analysis/configuration preparation key identified structurally by
-workspace, base target configuration and the immutable overlay. The build and
-cquery roots retain the base configuration plus overlay until this key
-completes. They do not construct or claim the final configured-output identity
-before preparation.
+### One post-Bzlmod preparation DICE owner
 
-The preparation key demands the existing final root repository mapping after
-Bzlmod selection, resolves every apparent Starlark label under that mapping,
-and loads every distinct Root/Canonical target declaration through existing
-loading keys. It admits direct build-setting targets only. Unknown targets,
-non-rules, non-build-settings, `flag = False`, wrong value types, illegal
-Boolean negation, invalid scope and unsupported canonical routes fail before
-any configured target or action publishes.
+Add `CommandConfigurationPreparationKey` and its observed wrapper in
+`slug_analysis_v2`, keyed structurally by workspace, base structural target
+configuration and the overlay. The retained result is only the final
+`ConfigurationKey`; the observed value additionally owns the exact union of
+mapping and distinct declaration-package observations.
 
-All occurrence labels are resolved, loaded and converted even when later
-scalar rows win. Group occurrences by final canonical setting identity only
-after every apparent spelling has resolved. Use the accepted declaration/value
-resolver and the sole existing `StarlarkOptionValue` category:
+The driver resolves main-repository labels directly and demands the final root
+repository mapping before resolving any apparent-external label. This avoids
+making a root-only option depend on an unrelated selected BCR graph while
+retaining exact mapping ownership where canonical identity can change. It then
+demands every distinct root/canonical package declaration even when a later
+scalar occurrence wins. Unknown mapping, missing/non-rule/non-build-setting,
+`flag = False`, project scope, invalid raw type, illegal no-value/negation and
+unsupported route failures are semantic. All independently resolvable
+declarations are demanded before semantic return.
 
-- ordinary scalar settings select the last converted occurrence;
-- allow-multiple strings and repeatable list/set settings accumulate converted
-  elements in command order;
-- nonrepeatable string-list/set text uses the existing build-setting converter;
-- sets normalize to sorted unique membership while lists preserve order and
-  duplicates;
-- each final value derives scope from its loading declaration and default-equal
-  values remove the configuration row.
+Convert all occurrences before grouping final values. Group by mapping-free
+canonical setting label, then apply:
 
-Apply native extra-registration occurrences through one descriptor-driven
-configuration update over the existing native option vector. Convert every
-occurrence with the existing pinned comma-list converter. The final execution-
-platform row is the last occurrence's list. Toolchain rows concatenate in
-command order, then apply the existing Bazel keep-last duplicate normalization.
-Explicit empty lists and lists containing empty strings remain distinct exactly
-as the converter represents them. Add no `extra_toolchains` or
-`extra_execution_platforms` field beside the native vector.
+- integer, Boolean, ordinary string and nonrepeatable list/set: last value;
+- allow-multiple string and repeatable list: concatenate in command order;
+- repeatable set: union then canonical sorted unique membership; and
+- declaration-equal final values: remove that label from the base map.
 
-Build the final structural target configuration once from the base native
-options plus the complete canonical nondefault Starlark map. The prepared value
-retains only that configuration; declarations, mappings, grouping tables and
-conversion buffers are compute scratch. The observed wrapper additionally
-retains the exact union of source observations already required by its mapping
-and package inputs.
+Preserve unrelated base Starlark rows. Build the final `StarlarkOptions` and
+native vector once through the batch boundary. Observed outer failure outranks
+the union of Needs; Need outranks semantic failure. Complete errors/results are
+equal-cutoff; Need is invalid. Deterministic cancellation publishes nothing and
+same-graph corrected input recovers. No lock or evaluator value crosses the
+compute boundary.
 
-Demand all independent mapping/package/declaration inputs before returning.
-Observed outer frontier failure outranks Need, Need outranks semantic failure,
-and deterministic cancellation publishes no prepared configuration. A corrected
-same-graph request recovers without stale rows. One-shot and daemon requests use
-the identical key and final configuration.
+### Build/cquery no-shim cutover
 
-### Shared signed command-registration expansion
+Build roots retain base configuration plus overlay. Legacy, singleton,
+observed multi-root and ordinary observed paths demand the matching preparation
+key before configured-node preparation and pass the same final configuration
+to every literal root and action-closure edge. Cquery computes one observed
+prepared configuration before its root batch and uses it for every literal.
 
-Keep the accepted positive-only MODULE expansion keys unchanged. Factor their
-internal contextual pattern/package/subtree walker so a second loading-owned
-command expansion key can supply borrowed rows with root final mapping, source
-family and sign. There remains one target-pattern parser and one filesystem/
-package expansion engine.
-
-The command key is identified by workspace, final structural configuration and
-registration family. It reads the two native pattern lists through a generic
-typed native-option projection; it never reads the raw command overlay. For
-execution platforms it walks the configured list in order. For toolchains it
-walks the configured keep-last list in reverse. It strips and retains a leading
-sign before parsing the remaining apparent target pattern under the root final
-mapping.
-
-Expansion applies rows sequentially to one ordered set. Positive expansions
-append unseen labels; negative expansions remove every matched label; a later
-positive row may reinsert a removed label at its later position. The existing
-family filters and missing-target errors remain. MODULE rows stay positive and
-retain each declaring module's own canonical repository/mapping context.
-
-Replace analysis's `PreparedModuleRegistrations` scratch with one prepared
-registration owner that computes both command and MODULE expansions for both
-families, then folds command results before MODULE results with the same ordered
-set semantics. Do not copy command patterns into `HostSelectedRegistrationPatterns`,
-change a MODULE key, or parse raw MODULE text in analysis. Candidate/platform
-loading consumes only the merged canonical label slices.
-
-Across both families and sources, observed outer failure outranks the union of
-Needs, Need outranks semantic failure, and no partially merged registration or
-configured candidate publishes. Empty command overlays preserve accepted
-MODULE-only output and DICE equality.
-
-### Root/cquery cutover and lifetime
-
-Build and cquery command roots carry the base configuration and overlay, demand
-the prepared configuration before constructing configured target keys, and use
-that same final configuration for every literal root and action-closure edge.
-Configured-output claiming moves after successful preparation. Delete every
-fixed-label `@@//:setting` construction and per-root explicit option copy.
-
-Raw occurrences live only in the command request/root/preparation key. Final
-typed configuration and command/MODULE expansion results are normal DICE
-semantic values. Mappings, declarations, converted occurrence groups, signed
-pattern rows, expansion worklists and merge sets are scratch. No lock spans a
-DICE computation, and no evaluator heap value escapes synchronous evaluation.
-
-## Bounded implementation sequence
-
-After this architecture is independently accepted, run two implementation
-packets in order.
-
-1. `WP-4-5-7A-contextual-command-setting-preparation`: add the shared compact
-   overlay and daemon cutover; add the descriptor-driven native batch update;
-   add the sole contextual preparation key for all five admitted Starlark kinds
-   and both native extra-registration options; delete the fixed setting bridge;
-   and cut build/cquery roots over to the prepared final configuration. Do not
-   consume extra registrations yet.
-2. `WP-4-5-7A-command-registration-overlay-consumer`: reuse/generalize the
-   loading registration walker for signed root-context command rows; compute
-   command and MODULE expansions independently; merge exact command-first
-   family results in configured analysis; and preserve the existing candidate
-   eligibility boundary.
-
-The first packet owns the public request/configuration representation and must
-receive independent terminal retained-identity/DICE review. The second owns
-loading expansion and configured consumption and must receive independent
-terminal ordering/lifecycle review. Do not split by build-setting kind, command
-kind or registration family and do not add an intermediate string-only
+Move configured-output claiming after successful preparation/analysis. One-
+shot and daemon build/cquery pass the same overlay type and demand the same
+semantic owner. Delete `BuildCommandRootKey::new_with_starlark_option`, every
+`explicit_starlark_option` field/argument, fixed `@@//:setting` construction,
+and the old per-node explicit option repair. Keep the ordinary configured-node
+preparation boundary for package/target admission with an already-final
 configuration.
 
 ## Compatibility classification
 
-- **Exact:** direct root/apparent-external Bazel 9.2 build-setting occurrences
-  in the admitted joined-value and Boolean forms; declaration authentication;
-  all five admitted value kinds; scalar last-wins; multi/repeat accumulation;
-  set normalization; default elision; native extra-registration comma
-  conversion, replacement/accumulation and keep-last normalization; signed
-  command expansion; command-before-MODULE registration order; and unchanged
-  MODULE-only behavior.
-- **Slug-native:** compact raw occurrence layout, DICE key/result decomposition,
-  Rust structural configuration identity and unproved diagnostic wording.
-- **Unsupported/deferred:** `.bazelrc`/`--config` expansion, split-token native
-  option spelling, `--flag_alias` and MODULE `flag_alias`, unconfigured alias
-  chains to build-setting targets, label-valued native settings, feature flags,
-  project scope, configured target-platform constraint truth, registered target
-  aliases/eligibility, provider payloads, selected implementation analysis,
-  broader commands, exact Bazel checksum/output bytes and any Rust
-  implementation of BCR rule flow.
+- **Exact:** admitted direct root/apparent-external joined-value Starlark
+  occurrences; Boolean value-less/no forms; all five loaded declaration kinds;
+  declaration authentication; scalar last-wins; allow-multiple/repeatable
+  accumulation; set normalization; default elision; native comma conversion,
+  execution replacement and toolchain keep-last normalization; one-shot/
+  daemon and build/cquery semantic identity.
+- **Slug-native:** carrier/wire layout, DICE decomposition, Rust structural
+  configuration identity, valid-Unicode strings, error wording and mapping-
+  free canonical grouping representation.
+- **Unsupported/deferred:** `.bazelrc`/`--config`, split-token native values,
+  `--flag_alias` or MODULE `flag_alias`, build-setting aliases, canonical `@@`
+  command spelling, label-valued/feature flags, project scope, signed command
+  registration consumption, configured platform/toolchain eligibility,
+  provider payloads, broader commands and exact Bazel checksum/output bytes.
 
 ## Proof obligations
 
-1. One overlay round-trips one-shot and daemon build/cquery with exact order,
-   missing value, negation, empty string and Unicode identity; the singular
-   setting fields/types and every fixed `@@//:setting` construction are absent.
-2. Root and apparent-external direct flags resolve through the selected final
-   mapping. Mapping, declaration kind/default/scope and raw occurrence changes
-   invalidate independently; equal final values converge structurally.
-3. Every admitted scalar/list/set kind covers single, repeated, default-equal,
-   malformed and non-flag cases. Earlier malformed/unknown scalar occurrences
-   still fail even when a later row would win.
-4. Outer > Need > semantic ordering, deterministic cold cancellation, no
-   partial final configuration and same-graph recovery hold across multiple
-   setting packages and both native families.
-5. Native option scans prove both extras live only in the existing option
-   vector and canonical bytes. Execution-platform last-wins, toolchain
-   accumulation/keep-last, explicit empty and embedded empty members are
-   discriminated.
-6. Signed single/package/recursive command patterns reuse the existing
-   contextual expansion engine. Positive/add, negative/remove and later
-   reinsertion preserve exact order for root and mapped external packages.
-7. Command toolchains reverse after keep-last normalization; execution
-   platforms do not. Both command families precede positive MODULE rows and
-   deduplicate/remove against the combined ordered set.
-8. Empty overlays retain accepted MODULE expansion/output identity and activate
-   no command expansion packages. Unrelated command settings do not invalidate
-   MODULE expansion keys.
-9. Build and cquery roots analyze every target with the same prepared final
-   configuration; changed settings/registrations produce changed structural
-   keys and A/B/A restores results in one-shot and stable daemon modes.
-10. Source/retained-size scans prove one argv classifier, one overlay, one
-    Starlark option map/converter path, one native vector, one contextual
-    registration parser/walker, no raw command field in MODULE keys, no copied
-    defaults/declarations, no evaluator retention and no ruleset discriminator.
+1. Parser matrices distinguish ordered rows, missing/empty values, Unicode,
+   Boolean negation, native joined values and rejected near misses for both
+   build and cquery.
+2. The same overlay round-trips daemon JSON without a second parser; old wire
+   fields, root fields/types and every fixed `@@//:setting` construction are
+   absent from production.
+3. Configuration tests discriminate execution last-wins, toolchain
+   concatenate/keep-last, explicit empty and embedded empty members, canonical
+   bytes, borrowed native projection, equal-allocation reuse and Arc clone cost.
+4. Root and apparent-external labels resolve through final mapping. Mapping,
+   declaration kind/default/scope and raw row changes invalidate independently;
+   semantically equal final configurations converge.
+5. All five kinds cover scalar/repeated/default/malformed/non-flag behavior;
+   malformed earlier scalar rows fail despite a later valid winner.
+6. Multi-package tests prove outer > Need > semantic, cold cancellation,
+   no partial publication and same-graph recovery for legacy and observed keys.
+7. Build/cquery use one final configuration across every root/dependency;
+   A/B/A one-shot and stable daemon requests restore structural results, and
+   output claiming never precedes successful preparation.
+8. Ownership scans prove one classifier/carrier/Starlark map/native vector,
+   no retained standard collection or copied declaration/default, no raw row in
+   MODULE keys, no evaluator retention and no ruleset discriminator.
 
-## Allowlist, cap and validation
+## Allowlist, caps and validation
 
-This is a zero-Rust architecture packet. Writable files are only:
+Writable production/test files are limited to:
 
-1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-2. `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
-3. `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`.
+1. `app/slug_configuration_v2/{Cargo.toml,src/lib.rs,src/command.rs,src/native/configuration.rs,src/native/mod.rs,src/native/tests.rs}`;
+2. `app/slug_commands_v2/{Cargo.toml,src/common.rs,src/build.rs,src/cquery.rs,src/lib.rs,tests/commands.rs}`;
+3. `app/slug_server_v2/{Cargo.toml,src/lib.rs,src/server.rs,src/tests.rs}`;
+4. `app/slug_cli_v2/src/commands/{aquery.rs,build.rs,cquery.rs,run.rs}` and the
+   mechanical compile-dependent call site in `app/slug_cli_v2/tests/cli.rs`;
+5. `app/slug_analysis_v2/src/{lib.rs,build_setting.rs,dice.rs,command_configuration.rs}` and `app/slug_analysis_v2/tests/{root_analysis.rs,starlark_rule.rs}`;
+6. `app/slug_core_v2/src/runtime/{mod.rs,dice.rs,tests/build_command_tests.rs,tests/cquery_command_tests.rs}` and `app/slug_core_v2/tests/runtime.rs`;
+7. the mechanical compile-dependent call site in
+   `app/slug_reapi_v2/tests/reapi.rs`;
+8. workspace `Cargo.lock` only if dependency resolution changes; and
+9. the canonical plan, Stage 6 owner, Stage 9 ledger and this manifest.
 
-Cap: 700 net documentation lines. No source, test, fixture, oracle, Cargo,
-lockfile, BUILD, Zabel, Buck2 or routing-log file is admitted.
+Caps: 1,900 net production Rust lines, 2,500 net test Rust lines, 550 net plan
+lines, two new production modules and no fixture/oracle files. `runtime/dice.rs`,
+analysis `dice.rs`, server tests and the owner plan exceed complexity triggers;
+touch them only for their existing cohesive root/preparation/test/status roles.
+New preparation semantics live in the bounded analysis module, not either
+large DICE file. No performance benchmark is required: retained memory changes
+are bounded by size/Arc identity and equal-allocation tests, not a demonstrated
+runtime hot path.
 
-Validate canonical/current packet ID and base agreement; pinned Bazel 9.2
-source/test anchors for every occurrence and registration rule; clean Zabel
-commit plus guidance-only wording; zero Rust diff; exact allowlist/cap;
-`scripts/v2_archive_status.sh`; `git diff --check`; and independent
-architecture/DICE/retained-representation review.
+Run formatting; focused configuration/commands/analysis/core/server/CLI tests;
+one direct compile-dependent suite; `cargo build -p slug_cli_v2` before any
+`SLUG_V2_BIN` smoke; stale-`slugd` cleanup around daemon tests; locked ownership
+and forbidden-surface scans; `scripts/v2_archive_status.sh`; and
+`git diff --check`. Obtain independent retained-identity/DICE/lifecycle review
+before acceptance.
 
-## Architecture review and stops
+No new fixture is needed: accepted upstream source/tests discriminate this
+internal command/configuration cutover, and owner-local unit/lifecycle tests are
+stronger than copying a workspace. Alias/project/label-setting upstream tests
+are skipped as explicitly deferred surfaces; Java implementation-detail maps
+and diagnostic text are not ported. There is no fallback: the old bridge is
+deleted in the same cutover.
 
-This packet edits only the canonical plan, Stage 6 owner plan and current
-manifest. Obtain independent review of Bazel occurrence semantics,
-configuration identity, DICE ownership, signed registration order, retained
-memory and the BCR/Buck2 boundary before committing the architecture.
+## Stops
 
-Independent pre-review returns `ACCEPT`: the pinned occurrence conversions,
-toolchain normalize-then-reverse order, signed command-before-MODULE fold,
-post-Bzlmod DICE ownership, compact lifetime, two-packet cut and generic
-BCR/`cc_common` boundary are coherent and bounded.
-
-STOP and `REPLAN` for a second argv/configuration/target-pattern parser; a
-parallel Starlark or native option store; raw command input in a MODULE key;
-configuration construction before final repository mapping; skipped earlier
-occurrence validation; copied build-setting defaults/declarations; source-order
-loss; command patterns appended after MODULE rows; unsigned command expansion;
-provider/platform eligibility breadth; evaluator values in retained state; a
-bootstrap-only or C++-specific path; Rust `cc_internal`/rule control flow;
-Zabel authority; a lock across DICE; or a material contract correction.
+STOP and `REPLAN` for a second argv/configuration parser; parallel native or
+Starlark option storage; raw argv on daemon wire or MODULE key; configuration
+construction before final mapping; skipped earlier occurrence validation;
+copied declarations/defaults; per-kind or per-command carrier fields; output
+claim before preparation; retained evaluator state; global cache/interner or a
+lock across DICE; signed-registration/provider/eligibility breadth; a C++-
+specific path; Rust `cc_internal` control flow; Zabel as authority; caps/
+allowlist breach; or a material correction to the accepted architecture.

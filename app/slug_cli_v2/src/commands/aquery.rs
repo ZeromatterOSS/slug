@@ -52,7 +52,7 @@ pub fn run(argv: Vec<String>) -> i32 {
         environment_policy,
         request.lockfile_mode,
         &request.registry_urls,
-        None,
+        Default::default(),
     ) {
         Ok(accepted) => accepted,
         Err(error) => {

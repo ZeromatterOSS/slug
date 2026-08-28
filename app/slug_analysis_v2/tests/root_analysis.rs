@@ -433,12 +433,15 @@ async fn observed_key_with_setting(
     explicit: Option<StarlarkOption>,
 ) -> ConfiguredNodeAnalysisObservationKey {
     let configured = configured(label);
+    let configuration = explicit.map_or_else(
+        || configured.configuration().clone(),
+        |explicit| configured.configuration().with_starlark_option(explicit),
+    );
     match prepare_configured_node_analysis_observed(
         transaction,
         workspace(),
         configured.label().clone(),
-        configured.configuration().clone(),
-        explicit,
+        configuration,
     )
     .await
     {
@@ -1047,7 +1050,7 @@ consumer(name = "consumer")
 }
 
 #[tokio::test]
-async fn observed_root_string_setting_preserves_default_explicit_and_restore_lifecycle() {
+async fn observed_analysis_preserves_typed_configuration_and_restore_lifecycle() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = Arc::new(AnalysisTracker::default());
     let provider = ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap();

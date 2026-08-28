@@ -9,6 +9,7 @@
  */
 
 use slug_bzlmod_v2::LockfileMode;
+use slug_commands_v2::CommandConfigurationOccurrence;
 use slug_commands_v2::FlagDisposition;
 use slug_commands_v2::HELP_SUMMARY;
 use slug_commands_v2::QueryOutputFormat;
@@ -89,9 +90,33 @@ fn build_request_parses_target_patterns_and_classifies_flags() {
 }
 
 #[test]
-fn build_admits_only_operational_flags_and_the_root_string_setting() {
+fn independently_parsed_empty_build_and_cquery_overlays_share_allocation() {
+    let build = BuildRequest::parse(&["//pkg:bin"]).unwrap();
+    let other_build = BuildRequest::parse(&["//pkg:other"]).unwrap();
+    let cquery = CqueryRequest::parse(&["//pkg:bin"]).unwrap();
+
+    assert!(build.configuration_overlay.is_empty());
+    assert!(cquery.configuration_overlay.is_empty());
+    assert!(
+        build
+            .configuration_overlay
+            .shares_allocation_with(&other_build.configuration_overlay)
+    );
+    assert!(
+        build
+            .configuration_overlay
+            .shares_allocation_with(&cquery.configuration_overlay)
+    );
+}
+
+#[test]
+fn build_classifies_ordered_contextual_configuration_occurrences() {
     let request = BuildRequest::parse(&[
         "--//:setting=Gr\u{00fc}\u{00df}e",
+        "--@dep//settings:enabled",
+        "--no//settings:debug",
+        "--extra_toolchains=//tc:a,//tc:b",
+        "--extra_execution_platforms=//platform:x,",
         "--output_base=/tmp/slug",
         "--build_event_json_file=events.json",
         "--build_event_text_file=events.txt",
@@ -108,21 +133,48 @@ fn build_admits_only_operational_flags_and_the_root_string_setting() {
         "//pkg:bin",
     ])
     .unwrap();
-    assert_eq!(
-        request.root_string_setting.as_deref(),
-        Some("Gr\u{00fc}\u{00df}e")
-    );
+    assert_eq!(request.configuration_overlay.len(), 5);
+    assert!(matches!(
+        request.configuration_overlay.iter().next(),
+        Some(CommandConfigurationOccurrence::Starlark {
+            apparent_label,
+            raw_value: Some(value),
+            negated: false,
+        }) if apparent_label == "//:setting" && value == "Grüße"
+    ));
+    assert!(matches!(
+        request.configuration_overlay.iter().nth(1),
+        Some(CommandConfigurationOccurrence::Starlark {
+            apparent_label,
+            raw_value: None,
+            negated: false,
+        }) if apparent_label == "@dep//settings:enabled"
+    ));
+    assert!(matches!(
+        request.configuration_overlay.iter().nth(2),
+        Some(CommandConfigurationOccurrence::Starlark {
+            apparent_label,
+            raw_value: None,
+            negated: true,
+        }) if apparent_label == "//settings:debug"
+    ));
 
     for flag in [
         "--config=dbg",
         "--unknown_configuration=value",
-        "--//:setting",
+        "--@@dep+//settings:value=x",
+        "--no//:setting=true",
+        "--extra_toolchains",
+        "--extra_execution_platforms",
     ] {
         let error = BuildRequest::parse(&[flag, "//pkg:bin"])
             .unwrap_err()
             .to_string();
         assert!(
-            error.contains("not supported by build") || error.contains("expected --//:setting")
+            error.contains("not supported by build")
+                || error.contains("expected a direct root")
+                || error.contains("does not accept")
+                || error.contains("expected --extra")
         );
     }
 }
@@ -909,24 +961,41 @@ fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
 }
 
 #[test]
-fn cquery_root_string_setting_accepts_unicode_empty_and_last_occurrence() {
+fn cquery_configuration_overlay_preserves_unicode_empty_and_every_occurrence() {
     let default = CqueryRequest::parse(&["//pkg:bin"]).unwrap();
-    assert_eq!(default.root_string_setting, None);
+    assert!(default.configuration_overlay.is_empty());
 
     let unicode = CqueryRequest::parse(&["--//:setting=Grüße", "//pkg:bin"]).unwrap();
-    assert_eq!(unicode.root_string_setting.as_deref(), Some("Grüße"));
+    assert!(matches!(
+        unicode.configuration_overlay.iter().next(),
+        Some(CommandConfigurationOccurrence::Starlark {
+            raw_value: Some(value),
+            ..
+        }) if value == "Grüße"
+    ));
 
     let empty = CqueryRequest::parse(&["--//:setting=", "//pkg:bin"]).unwrap();
-    assert_eq!(empty.root_string_setting.as_deref(), Some(""));
+    assert!(matches!(
+        empty.configuration_overlay.iter().next(),
+        Some(CommandConfigurationOccurrence::Starlark {
+            raw_value: Some(value),
+            ..
+        }) if value.is_empty()
+    ));
 
     let repeated =
         CqueryRequest::parse(&["--//:setting=first", "--//:setting=最後", "//pkg:bin"]).unwrap();
-    assert_eq!(repeated.root_string_setting.as_deref(), Some("最後"));
+    assert_eq!(repeated.configuration_overlay.len(), 2);
+    assert!(matches!(
+        repeated.configuration_overlay.iter().nth(1),
+        Some(CommandConfigurationOccurrence::Starlark {
+            raw_value: Some(value),
+            ..
+        }) if value == "最後"
+    ));
 
-    let error = CqueryRequest::parse(&["--//:setting", "//pkg:bin"])
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("expected --//:setting=<Unicode>"), "{error}");
+    let boolean = CqueryRequest::parse(&["--//:setting", "--no//:other", "//pkg:bin"]).unwrap();
+    assert_eq!(boolean.configuration_overlay.len(), 2);
 }
 
 #[test]

@@ -13,5 +13,6 @@ compact_str = { workspace = true }
 dupe = { workspace = true }
 hex = { workspace = true }
 num-bigint = { workspace = true }
+serde = { workspace = true }
 slug_identity_v2 = { workspace = true }
 strong_hash = { workspace = true }

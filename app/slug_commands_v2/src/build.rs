@@ -12,6 +12,7 @@ use std::path::Path;
 
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_identity_v2::TargetPattern;
 
 use crate::common::CommandKind;
@@ -22,6 +23,7 @@ use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_command_policy_for_workspace;
 use crate::common::bzlmod_lockfile_mode;
 use crate::common::bzlmod_registry_urls;
+use crate::common::command_configuration_occurrence;
 use crate::common::parse_target_patterns;
 use crate::common::split_args;
 
@@ -29,10 +31,7 @@ use crate::common::split_args;
 pub struct BuildRequest {
     pub targets: Vec<TargetPattern>,
     pub flags: Vec<ParsedFlag>,
-    /// The one admitted root build setting transition. This remains a raw
-    /// Unicode value at the command boundary; configuration owns its typed
-    /// representation and semantic identity.
-    pub root_string_setting: Option<String>,
+    pub configuration_overlay: CommandConfigurationOverlay,
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
     pub registry_urls: Vec<String>,
@@ -61,11 +60,11 @@ impl BuildRequest {
         };
         let lockfile_mode = bzlmod_lockfile_mode(&parsed.flags)?;
         let registry_urls = bzlmod_registry_urls(&parsed.flags)?;
-        let root_string_setting = build_flag_admission(&parsed.flags)?;
+        let configuration_overlay = build_flag_admission(&parsed.flags)?;
         Ok(Self {
             targets: parse_target_patterns(CommandKind::Build, &parsed.positionals)?,
             flags: parsed.flags,
-            root_string_setting,
+            configuration_overlay,
             bzlmod_policy,
             lockfile_mode,
             registry_urls,
@@ -84,20 +83,16 @@ impl BuildRequest {
 /// Reject configuration-affecting flags until their typed structural
 /// representation is admitted. This runs before the CLI selects one-shot or
 /// daemon mode, so neither path can silently discard a configuration input.
-fn build_flag_admission(flags: &[ParsedFlag]) -> Result<Option<String>, CommandParseError> {
-    let mut root_string_setting = None;
+fn build_flag_admission(
+    flags: &[ParsedFlag],
+) -> Result<CommandConfigurationOverlay, CommandParseError> {
+    let mut configuration = Vec::new();
     for flag in flags {
+        if let Some(occurrence) = command_configuration_occurrence(flag)? {
+            configuration.push(occurrence);
+            continue;
+        }
         match flag.name.as_str() {
-            "//:setting" => {
-                let value =
-                    flag.value
-                        .clone()
-                        .ok_or_else(|| CommandParseError::InvalidFlagValue {
-                            flag: flag.raw.clone(),
-                            message: "expected --//:setting=<Unicode>".to_owned(),
-                        })?;
-                root_string_setting = Some(value);
-            }
             "config" => {
                 return Err(unsupported_build_flag(flag));
             }
@@ -105,7 +100,7 @@ fn build_flag_admission(flags: &[ParsedFlag]) -> Result<Option<String>, CommandP
             _ => return Err(unsupported_build_flag(flag)),
         }
     }
-    Ok(root_string_setting)
+    Ok(configuration.into())
 }
 
 fn unsupported_build_flag(flag: &ParsedFlag) -> CommandParseError {

@@ -23,6 +23,8 @@ pub use common::FlagDisposition;
 pub use common::ParsedFlag;
 pub use common::QueryOutputFormat;
 pub use common::normalize_bzlmod_environment_value;
+pub use slug_configuration_v2::CommandConfigurationOccurrence;
+pub use slug_configuration_v2::CommandConfigurationOverlay;
 
 pub const HELP_SUMMARY: &str = "\
 Slug V2 commands:\n\

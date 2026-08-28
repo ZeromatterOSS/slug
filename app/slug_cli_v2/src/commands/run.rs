@@ -66,7 +66,7 @@ pub fn run(argv: Vec<String>) -> i32 {
         environment,
         request.lockfile_mode,
         &[],
-        None,
+        Default::default(),
     ) {
         Ok(accepted) => accepted,
         Err(error) => return run_error(&error.to_string(), "one-shot", 2),
@@ -126,7 +126,7 @@ fn run_daemon(
     }
     let daemon_request = slug_server_v2::BuildRequest {
         targets: vec![request.target.to_string()],
-        root_string_setting: None,
+        configuration_overlay: Default::default(),
         executor: remote.executor,
         default_exec_properties: remote.default_exec_properties.into_iter().collect(),
         bzlmod,
