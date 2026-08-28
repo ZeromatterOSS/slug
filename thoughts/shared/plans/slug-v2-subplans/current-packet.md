@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r6`
+Packet: `WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r7`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
@@ -8,14 +8,15 @@ Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 Base: `c2ec8481e`.
 
 Result: retain the independently reviewed R4 target-platform candidate and R5
-graph-only Bzlmod mapping architecture; make that owner include graph-declared
-module-extension imports, admit already-typed aliases through the generic
-external-package gate, and prove the default host platform end to end. Do not
-implement toolchain selection.
+graph-only Bzlmod mapping architecture; derive root and non-root module-
+extension repository mappings once from their complete graph-level inputs,
+share that projection with ordinary extension ownership, admit already-typed
+aliases through the generic external-package gate, and prove the default host
+platform end to end. Do not implement toolchain selection.
 
-Design commit `c2ec8481e` and independent Sol review: `ACCEPT`. The corrected graph-only owner is acyclic,
-keeps RepoSpec/source metadata out of mapping publication, and retains only the
-compact mapping carrier at the builtin boundary.
+R5 design commit `c2ec8481e` and independent Sol review: `ACCEPT`. R6
+implementation review: `REPLAN`. R7 requires fresh independent acceptance
+before implementation resumes.
 
 ## R4, R5 and design replan record
 
@@ -48,8 +49,20 @@ RepoSpec/source metadata, but the graph-only owner omitted non-root MODULE
 `use_repo` imports already present in the selected graph, so the exact BUILD
 could not resolve `@buildozer_binary`. The generic external package gate then
 rejected the now-typed `alias` target even though loading and configured
-analysis represent it. R6 corrects those two category-wide boundaries; it does
-not add a dependency-specific mapping or a C++ rule path.
+analysis represent it. R6 attempted to correct those two category-wide
+boundaries without a dependency-specific mapping or a C++ rule path.
+
+Independent R6 review returned `REPLAN`. Root extension usages are retained by
+`RootModuleFiles`, not `HostSelectedModuleGraph`. The provisional candidate
+therefore projected non-root usages once with an empty root usage set and the
+existing extension owner would later project the combined root/non-root set a
+second time. Their shared collision namespace can choose different suffixes,
+which would change canonical generated repositories and invalidate already-
+published mappings. R7 removes that shortcut and freezes one complete
+projection consumed by both mapping and extension owners. The review also
+found a predecessor-order regression: semantic mapping failure must not outrank
+an outstanding RepoSpec Need that the former selected-route owner completed
+first. R7 preserves that order explicitly.
 
 ## Learned facts and authority
 
@@ -84,21 +97,33 @@ identity or behavior claim is imported. Buck2-derived `SmallMap`, immutable
 
 ## Decision
 
-Extract one graph-only Bzlmod mapping owner, then add one public, hidden
-builtin projection family:
+Extract one graph-only Bzlmod mapping owner, one graph-level root-extension-
+usage projection, and one shared complete extension-mapping projection; then
+add one public, hidden builtin projection family:
 
-- `HostSelectedRepositoryMappingsKey(workspace)` consumes only the existing
-  selected module graph key. It owns canonical-name derivation and the complete
-  ordered mapping for every selected module. It also projects non-root
-  module-extension `use_repo` imports from graph-retained MODULE values by
-  reusing the existing pure extension namespace/mapping logic. It does not
-  evaluate extensions or request registry RepoSpecs, source metadata,
-  materialization, root visibility or packages;
-- its observed sibling consumes only the existing selected-graph observation
-  key and forwards exactly that graph frontier;
+- `HostRootExtensionUsagesKey(workspace)` consumes the existing
+  `RootModuleFilesKey` and retains only its immutable ordered
+  `RootExtensionUsage` slice. Its observed sibling forwards exactly the root-
+  module-files frontier. It does not retain the rest of `RootModuleFiles`;
+- `HostSelectedRepositoryMappingsKey(workspace)` consumes the selected module
+  graph and root-extension-usage projection. It owns canonical-name derivation,
+  selected-dependency mappings, and exactly one invocation of the existing
+  extension namespace/import/override semantics over the complete ordered root
+  plus non-root usage set. It retains one internal compact projection containing
+  usage/override/base/final mapping facts needed by the existing extension
+  owner. It does not evaluate extensions or request registry RepoSpecs, source
+  metadata, repository materialization, root visibility or packages;
+- its observed sibling consumes the observed selected graph and observed root-
+  usage projection and merges exactly those two frontiers;
 - `HostSelectedModuleRoutesKey` consumes that mapping owner plus its existing
   RepoSpec owner, joins registry RepoSpecs to the already-selected mapping
-  rows, and preserves its current result, errors, order and observations;
+  rows, and preserves its current result, errors, order and observations. It
+  requests and finishes RepoSpecs before publishing a completed mapping-
+  semantic error, so a competing RepoSpec Need retains predecessor precedence;
+- `HostSelectedExtensionMappingsKey` consumes selected routes plus the same
+  retained complete extension projection. It attaches the route predecessor
+  and publishes the existing usage/override/base/final fields without assigning
+  names or applying mappings again;
 - `HostBuiltinBazelToolsRepositoryMappingKey(workspace)` consumes only the
   graph-only mapping owner and selects the unique `bazel_tools` row;
 - its observed sibling consumes the observed graph-only mapping key and
@@ -127,6 +152,12 @@ This is the full builtin module mapping, not a hard-coded `platforms` pair.
 That keeps `tools/build_defs.bzl`, later autoloaded rule modules and all other
 BCR dependencies on one architecture and prevents one dependency-specific
 repair from becoming permanent.
+
+The complete root/non-root usage ordering and collision namespace are semantic
+inputs to one producer, never two staged mutation passes. Ordinary selected
+routes and the builtin projection consume its final mappings; extension
+evaluation consumes its retained definition facts. No consumer is permitted to
+rerun namespace allocation.
 
 ## Non-decisions and compatibility
 
@@ -172,20 +203,27 @@ The implementation packet must prove the composition, not its parts:
 
 1. Graph-only mapping tests publish complete ordered mappings for root,
    registry, nonregistry and builtin rows, including builtin self and
-   `platforms` plus its graph-declared `use_repo` imports; reject missing,
-   duplicate and wrong-context rows; and prove
+   `platforms` plus graph-declared `use_repo` imports from both root and non-root
+   modules; force a root/non-root namespace collision and prove both the builtin
+   and existing extension owners retain the same canonical generated names;
+   reject missing, duplicate and wrong-context rows; and prove
    missing/erroring registry RepoSpec/source metadata cannot block mapping
    publication or enter its observed frontier.
-2. Legacy and observed canonical routes retain that exact mapping, mapping
+2. Legacy and observed mapping owners merge selected-graph and root-module-file
+   frontiers exactly, preserve A/B/A, cancellation and same-graph repair, and
+   retain no full root-files/graph predecessor at the public builtin boundary.
+   A mapping-semantic error competing with a RepoSpec Need must publish the Need
+   first, matching the predecessor route owner.
+3. Legacy and observed canonical routes retain that exact mapping, mapping
    changes affect structural identity, equal mappings reuse results, and
    Need/outer/cancellation/lifecycle behavior is preserved.
-3. One Slug loading proof evaluates exact builtin `tools/BUILD` and its eager
+4. One Slug loading proof evaluates exact builtin `tools/BUILD` and its eager
    `tools/build_defs.bzl` load using a provenance-pinned selected `platforms`
    source, then observes alias actual `@@platforms//host:host`.
-4. One configured-analysis proof starts from the default structural
+5. One configured-analysis proof starts from the default structural
    `host_platform` option and reaches the same actual configured platform
    through the generic route/package/alias/platform keys.
-5. Existing selected, generated and root mapping suites remain unchanged;
+6. Existing selected, generated and root mapping suites remain unchanged;
    exact builtin hashes/modes and all R4 platform/cycle/action proofs remain.
 
 Retained R4 proofs include visible/non-visible option projection; first
@@ -269,11 +307,11 @@ Every retained R4 baseline remains `cf91fe8de`; `ce38f0373`, `959cbd889` and
 | `app/slug_core_v2/src/runtime/tests/build_command_tests.rs` | `fd3f417977f417a0098decd36c34097d1d50d391` / 4,056 | +0; replace one token |
 | `app/slug_analysis_v2/Cargo.toml` | `36cd3ffd8e681d998d6f1bcd47f493e2496484e6` / 31 | +0; move Tokio row |
 
-R6 uses these `c2ec8481e` mapping-owner baselines:
+R7 uses these `c2ec8481e` mapping-owner baselines:
 
 | Path | Baseline blob / lines | Maximum physical growth |
 |---|---:|---:|
-| `app/slug_bzlmod_v2/src/selected_repo_spec.rs` | `286d9e1042f76fef1ca6f50c8c6df92c516f4352` / 14,538 | +600 |
+| `app/slug_bzlmod_v2/src/selected_repo_spec.rs` | `286d9e1042f76fef1ca6f50c8c6df92c516f4352` / 14,538 | +850 |
 | `app/slug_bzlmod_v2/src/lib.rs` | `279b4d8d98a8c534eca9a7112a57788e2c3f8326` / 539 | +20 |
 | `app/slug_bzlmod_v2/src/canonical_repository_route.rs` | `9aa6bc6ad89b754c23e5d0897a15011a07d3ffcd` / 415 | +80 |
 | `app/slug_loading_v2/src/canonical_repository_route.rs` | `86cd5e194fe4ce37fe5677a2ef7190472a081c68` / 326 | +160 |
@@ -286,10 +324,11 @@ the exact 106-line `tools/build_defs.bzl`, and the at-most-350-line configured
 cycle detector. R4 caps remain 950 production, 700 proof and 1,750 total added
 Rust lines. Mapping-owner and loaded-target-gate additions have separate caps
 of 900 production, 700 proof and 1,600 total; combined R6 caps are
-1,850/1,400/3,350. The large
+2,100/1,400/3,600. The large
 `selected_repo_spec.rs` owner remains cohesive because R5 extracts an existing
-mapping calculation beside its selected-graph/route keys; splitting would
-expose private graph internals without separating semantic responsibility.
+mapping calculation beside its selected-graph/route/extension keys, and R7
+shares their existing private extension projection without exposing graph
+internals across a crate boundary.
 
 No files beyond both tables, the three named new files and writable plans may
 change. No new fixture, lockfile, sync script, CLI/core production,
@@ -308,7 +347,9 @@ report unsupported CLI materialization honestly.
 STOP and `REPLAN` for a selected-route/package-load DICE cycle; any RepoSpec,
 source-metadata or materialization dependency in the mapping owner; a mapping
 derived from source spelling or root visibility; `platforms`-only injection;
-copied full graph/source/evaluator state; lost observations; changed
+staged or repeated root/non-root namespace assignment; a mapping-semantic error
+outranking the predecessor RepoSpec Need; copied full graph/root-files/source/
+evaluator state at the builtin boundary; lost observations; changed
 root/selected/generated mapping semantics; an unguarded lock across DICE;
 live-registry or catalog expansion; Rust BCR/ruleset control flow;
 `cc_common` specialization; Zabel authority; cap breach; or any further

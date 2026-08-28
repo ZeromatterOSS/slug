@@ -20611,3 +20611,37 @@ exact live allowlist/caps: retain the reviewed target-platform candidate, add
 the graph-only mapping owner and builtin projection, consume it through the
 generic canonical route, and prove default host-platform composition. Do not
 begin toolchain selection or widen live registry materialization.
+
+#### Target-platform R6 complete-extension-mapping REPLAN (2026-08-28)
+
+R5's exact builtin loading proof reached a second generic boundary. The full
+`bazel_tools` mapping needs module-extension imports such as
+`@buildozer_binary`, and the canonical external-package gate must admit its
+already-typed alias/config-setting declarations. R6 proposed applying the
+existing extension-mapping semantics inside the graph-only selected-mapping
+owner before the existing extension owner ran.
+
+Independent Sol review returns `REPLAN`. Non-root extension usages are in the
+selected graph, but root usages are retained separately by `RootModuleFiles`.
+Running namespace allocation first with an empty root set and later with the
+complete root/non-root set can choose different collision suffixes and mutate
+canonical generated-repository identity after mappings were retained. The R6
+candidate is not accepted. Review also finds that completed mapping-semantic
+errors would precede an outstanding RepoSpec Need, reversing the former
+selected-route predecessor order.
+
+Activate only the zero-Rust R7 design review recorded in the current manifest.
+Freeze one graph-level root-usage projection; one graph-only mapping owner that
+invokes namespace/import/override projection exactly once over complete root
+plus non-root usages; and one retained internal projection shared with the
+existing extension owner so it attaches selected routes without recomputation.
+The public builtin carrier remains only the compact final mapping. Ordinary
+selected routes still complete RepoSpecs before publishing mapping-semantic
+failure, preserving Need precedence. The generic alias/config-setting gate and
+exact loading/configured-analysis composition proofs remain in scope.
+
+Pinned Bazel 9.2 remains behavior authority. Clean Zabel `0795445f…` remains
+peer architecture/optimization guidance only. BCR Starlark owns all rule
+definitions and control flow including `cc_internal`; `cc_common` is a generic
+host-ABI stress case, never a Rust C++ rule engine. Do not resume Rust until
+independent review returns `ACCEPT` on R7.
