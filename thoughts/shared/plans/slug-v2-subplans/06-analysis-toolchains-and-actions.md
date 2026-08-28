@@ -20236,3 +20236,36 @@ semantic predicate; derive its native row; and add root/external query edges
 for flag and constraint labels. Preserve all-empty loading success and defer
 configuration maps, transitions, matching, selectors, aliases, providers,
 platforms and toolchain selection.
+
+### Typed build-setting/config declaration loading accepted (2026-08-27)
+
+Commit `57b1e8a1f` completes category-2 packet one. Loading now exposes public
+heap-independent definitions and declarations for integer, Boolean, string,
+string-list and string-set build settings. Integer defaults remain signed
+32-bit, lists retain order and duplicates, sets require Starlark sets and lower
+to deterministic unique membership, and allow-multiple strings retain scalar
+declaration defaults. The declaration accessor derives default and magic scope
+from the existing target attribute row, so absent/non-explicit scope remains
+internal `DEFAULT` and no parallel retained scope store exists.
+
+Native `config_setting` now has one semantic four-field declaration retaining
+`values`, `define_values`, canonical `flag_values`, ordered
+`constraint_values`, and default/explicit provenance. Its native RuleClass row
+is derived, canonical flag-label collisions fail during loading, all-empty
+declarations remain valid, and root/external loading-query edges deduplicate
+flag/constraint traversal without changing source order. DICE equality and
+A/B/A proofs cover every declaration and predicate field.
+
+Independent review accepts the compact `Arc`/`CompactString` representation and
+the unchanged language boundary: Buck2-derived Rust parses/evaluates generic
+Starlark, BCR modules own rule flow including `cc_internal`, and `cc_common` is
+only a generic host-ABI client. Zabel remains peer guidance, never authority.
+
+Activate only `WP-4-5-7A-typed-scoped-option-map-migration`. Replace the
+singleton root string slot across its full public consumer closure with one
+sorted canonical-label-keyed typed map carrying scope per nondefault row,
+including target-to-exec projection and versioned Slug-native canonical bytes.
+The next packet will authenticate declarations and perform typed
+default-eliding value resolution. Command parsing, transition conversion,
+condition matching, selector/provider/toolchain behavior and exact Bazel
+configuration bytes remain deferred.
