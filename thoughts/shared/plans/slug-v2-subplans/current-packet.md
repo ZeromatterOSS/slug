@@ -195,7 +195,13 @@ Proof:
 
 3. `app/slug_loading_v2/tests/build_file_loading.rs`
 4. `app/slug_loading_v2/tests/bzl_invalidation.rs`
-5. `app/slug_analysis_v2/tests/starlark_rule.rs`
+5. `app/slug_loading_v2/src/host_package_inventory_tests.rs`
+6. `app/slug_analysis_v2/tests/starlark_rule.rs`
+
+The existing canonical-package proof exhaustively destructures the native
+toolchain declaration and is the natural discriminator for full repository
+identity in every newly retained label category. Its admission is proof-only;
+no other loading source module or behavior is widened.
 
 No configuration, command, core, Bzlmod, query, identity, build-api provider,
 fixture, oracle, Cargo, BUILD, Zabel or plan file is admitted after this
