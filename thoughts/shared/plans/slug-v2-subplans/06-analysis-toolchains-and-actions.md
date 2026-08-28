@@ -20419,3 +20419,28 @@ Pinned Bazel 9.2 remains authority. Zabel remains peer guidance, Buck2-derived
 Rust remains the generic evaluator/compact-utility substrate, BCR Starlark owns
 all rules including `cc_internal`, and `cc_common` remains only a later generic
 host-ABI consumer.
+
+### Contextual command setting preparation accepted; registration consumer active (2026-08-28)
+
+Commit `f76576ccd` accepts category 3A. One immutable occurrence slice now
+crosses build/cquery one-shot and daemon paths, one contextual DICE owner
+authenticates all admitted declarations and final root mappings, and one batch
+publication produces the sole typed configuration. Both extra-registration
+families are normalized native configuration facts; the singular fixed setting
+bridge and pre-preparation output claim are gone.
+
+Activate only `WP-4-5-7A-command-registration-overlay-consumer`. Add a loading-
+owned command key over workspace, final structural configuration and family;
+read the generic native string-list projection; reuse the existing contextual
+pattern/package/subtree walker with signed ordered-set operations; and merge
+command labels before the unchanged positive MODULE results in configured
+analysis. Reverse only the normalized toolchain list. Preserve observed
+frontiers, outer/Need/semantic precedence, cancellation and MODULE-only
+identity. Configured alias/constraint eligibility, provider payloads and
+selected implementation analysis remain category 4 and later.
+
+Pinned Bazel 9.2 `RegisteredToolchainsFunction`,
+`RegisteredExecutionPlatformsFunction`, `TargetPatternUtil` and their tests
+remain authority. Zabel is peer ownership/optimization guidance only;
+BCR Starlark continues to own all rules and control flow including
+`cc_internal`, and `cc_common` remains a generic host-ABI client.

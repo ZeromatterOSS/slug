@@ -42,6 +42,13 @@ use slug_bzlmod_v2::RepositoryMaterializationSuccess;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
+use slug_configuration_v2::CommandConfigurationOccurrence;
+use slug_configuration_v2::CommandConfigurationOverlay;
+use slug_configuration_v2::SlugConfiguration;
+use slug_configuration_v2::StarlarkOptions;
+use slug_configuration_v2::native::host::AutoCpuToken;
+use slug_configuration_v2::native::host::HostConversionInputs;
+use slug_configuration_v2::native::host::HostPathFlavor;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationDiagnosticLevel;
 use slug_events_v2::EvaluationEvent;
@@ -72,6 +79,8 @@ use slug_workspace_v2::WorkspaceSnapshotKey;
 use starlark_map::small_map::SmallMap;
 use starlark_map::sorted_map::SortedMap;
 
+use crate::CommandRegistrationExpansionKey;
+use crate::CommandRegistrationExpansionObservationKey;
 use crate::LoadingPreparationOutcome;
 use crate::ModuleRegistrationExpansionErrorKind;
 use crate::ModuleRegistrationExpansionKey;
@@ -82,6 +91,29 @@ use crate::registration_expansion::package_postorder;
 
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
+}
+
+fn default_configuration() -> SlugConfiguration {
+    SlugConfiguration::default_target(
+        &HostConversionInputs::new(
+            Some(AutoCpuToken::K8),
+            Some(HostPathFlavor::Unix),
+            None,
+            Arc::from([]),
+            Arc::from([]),
+        )
+        .unwrap(),
+    )
+    .unwrap()
+}
+
+fn command_configuration(
+    occurrences: impl IntoIterator<Item = CommandConfigurationOccurrence>,
+) -> SlugConfiguration {
+    let overlay = CommandConfigurationOverlay::from(occurrences.into_iter().collect::<Vec<_>>());
+    default_configuration()
+        .with_command_configuration(StarlarkOptions::default(), &overlay)
+        .unwrap()
 }
 
 #[derive(Debug)]
@@ -526,6 +558,356 @@ fn family_key_identity_is_independent() {
     );
     assert_ne!(toolchains, platforms);
     assert_ne!(toolchains.to_string(), platforms.to_string());
+}
+
+#[test]
+fn command_key_identity_includes_configuration_and_family() {
+    let empty = default_configuration();
+    let configured =
+        command_configuration([CommandConfigurationOccurrence::extra_toolchains("//pkg:tc")]);
+    let empty_toolchains = CommandRegistrationExpansionKey::toolchains(workspace(), empty.clone());
+    let configured_toolchains =
+        CommandRegistrationExpansionKey::toolchains(workspace(), configured.clone());
+    let configured_platforms =
+        CommandRegistrationExpansionKey::execution_platforms(workspace(), configured);
+    assert_ne!(empty_toolchains, configured_toolchains);
+    assert_ne!(configured_toolchains, configured_platforms);
+    assert_eq!(
+        configured_toolchains.family(),
+        ModuleRegistrationFamily::Toolchains
+    );
+    assert_eq!(
+        configured_platforms.family(),
+        ModuleRegistrationFamily::ExecutionPlatforms
+    );
+}
+
+#[tokio::test]
+async fn command_rows_apply_signed_order_and_family_specific_reversal() {
+    let module = "module(name = 'bazel_tools')\n";
+    let build = concat!(
+        "filegroup(name = 'impl')\n",
+        "toolchain_type(name = 'type')\n",
+        "toolchain(name = 'ta', toolchain_type = ':type', toolchain = ':impl')\n",
+        "toolchain(name = 'tb', toolchain_type = ':type', toolchain = ':impl')\n",
+        "platform(name = 'pa')\n",
+        "platform(name = 'pb')\n",
+    );
+    let configuration = command_configuration([
+        CommandConfigurationOccurrence::extra_toolchains("//pkg:ta,//pkg:tb"),
+        CommandConfigurationOccurrence::extra_execution_platforms(
+            "//pkg:pa,//pkg:pb,-//pkg:pa,//pkg:pa",
+        ),
+    ]);
+    let mut tx = transaction(module, EpochBuilder::root_package(module, build, 50)).await;
+    let toolchains = tx
+        .compute(&CommandRegistrationExpansionKey::toolchains(
+            workspace(),
+            configuration.clone(),
+        ))
+        .await
+        .unwrap();
+    let platforms = tx
+        .compute(&CommandRegistrationExpansionKey::execution_platforms(
+            workspace(),
+            configuration,
+        ))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(toolchains) = toolchains else {
+        panic!("command toolchain expansion returned Need")
+    };
+    let LoadingPreparationOutcome::Complete(platforms) = platforms else {
+        panic!("command execution-platform expansion returned Need")
+    };
+    assert_eq!(labels(&toolchains), ["@@//pkg:tb", "@@//pkg:ta"]);
+    assert_eq!(labels(&platforms), ["@@//pkg:pb", "@@//pkg:pa"]);
+}
+
+#[tokio::test]
+async fn command_recursive_negative_removal_and_reinsertion_reuse_package_walker() {
+    let module = "module(name = 'bazel_tools')\n";
+    let build = "platform(name = 'platform')\n";
+    let configuration =
+        command_configuration([CommandConfigurationOccurrence::extra_execution_platforms(
+            "//tree/...:all,-//tree/b/...:all,//tree/b:all",
+        )]);
+    let mut tx = transaction(module, EpochBuilder::root_tree(module, build, 51)).await;
+    let outcome = tx
+        .compute(&CommandRegistrationExpansionKey::execution_platforms(
+            workspace(),
+            configuration,
+        ))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(value) = outcome else {
+        panic!("signed recursive command expansion returned Need")
+    };
+    assert_eq!(
+        labels(&value),
+        [
+            "@@//tree/c:platform",
+            "@@//tree:platform",
+            "@@//tree/b:platform",
+        ]
+    );
+}
+
+#[tokio::test]
+async fn command_apparent_external_rows_use_final_root_mapping() {
+    let module = concat!(
+        "module(name = 'bazel_tools')\n",
+        "bazel_dep(name = 'dep', version = '1.0.0')\n",
+        "local_path_override(module_name = 'dep', path = 'dep')\n",
+    );
+    let build = "platform(name = 'platform')\n";
+    let configuration =
+        command_configuration([CommandConfigurationOccurrence::extra_execution_platforms(
+            "@dep//:platform",
+        )]);
+    let mut tx = transaction(module, EpochBuilder::canonical_package(module, build, 52)).await;
+    let outcome = tx
+        .compute(&CommandRegistrationExpansionKey::execution_platforms(
+            workspace(),
+            configuration,
+        ))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(value) = outcome else {
+        panic!("mapped command expansion returned Need")
+    };
+    assert_eq!(labels(&value), ["@@dep+//:platform"]);
+}
+
+#[tokio::test]
+async fn command_apparent_external_recursive_rows_reuse_canonical_subtree_walker() {
+    let module = concat!(
+        "module(name = 'bazel_tools')\n",
+        "bazel_dep(name = 'dep', version = '1.0.0')\n",
+        "local_path_override(module_name = 'dep', path = 'dep')\n",
+    );
+    let build = "platform(name = 'platform')\n";
+    let configuration =
+        command_configuration([CommandConfigurationOccurrence::extra_execution_platforms(
+            "@dep//tree/...:all",
+        )]);
+    let mut tx = transaction(module, EpochBuilder::canonical_tree(module, build, 57)).await;
+    let outcome = tx
+        .compute(&CommandRegistrationExpansionKey::execution_platforms(
+            workspace(),
+            configuration,
+        ))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(value) = outcome else {
+        panic!("mapped recursive command expansion returned Need")
+    };
+    assert_eq!(
+        labels(&value),
+        [
+            "@@dep+//tree/b/deep:platform",
+            "@@dep+//tree/b:platform",
+            "@@dep+//tree/c:platform",
+            "@@dep+//tree:platform",
+        ]
+    );
+}
+
+#[tokio::test]
+async fn observed_command_mapping_route_and_package_frontiers_are_exact_and_ordered() {
+    let module = concat!(
+        "module(name = 'bazel_tools')\n",
+        "bazel_dep(name = 'dep', version = '1.0.0')\n",
+        "local_path_override(module_name = 'dep', path = 'dep')\n",
+    );
+    let build = "platform(name = 'platform')\n";
+    let epoch = EpochBuilder::canonical_package(module, build, 54);
+    let expected_epoch = epoch.dupe();
+    let configuration =
+        command_configuration([CommandConfigurationOccurrence::extra_execution_platforms(
+            "@dep//:platform",
+        )]);
+    let tracker = Arc::new(ExpansionTracker::default());
+    let mut tx = transaction_with_tracker(module, epoch, true, Some(tracker.dupe())).await;
+    let key =
+        CommandRegistrationExpansionObservationKey::execution_platforms(workspace(), configuration);
+    let outcome = tx.compute(&key).await.unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(observed)) = &outcome else {
+        panic!("observed mapped command expansion did not complete: {outcome:?}")
+    };
+    assert_eq!(labels(observed.result()), ["@@dep+//:platform"]);
+    for (demand, result) in observed.observations().observations() {
+        assert!(Arc::ptr_eq(result, expected_epoch.get(demand).unwrap()));
+    }
+    let dependencies = tracker.dependencies(&key.to_string());
+    assert_eq!(dependencies.len(), 3, "dependencies: {dependencies:#?}");
+    assert!(dependencies[0].starts_with("observed-host-root-repository-mapping:"));
+    assert!(dependencies[1].starts_with("observed-host-canonical-repository-load-route:"));
+    assert!(dependencies[2].starts_with("observed-repository-package-inventory:"));
+    let activations = tracker.take();
+    assert!(
+        activations.iter().all(|activation| {
+            !activation.key.contains("command-registration-expansion:")
+                || !activation.key.ends_with(":toolchains")
+        }),
+        "unexpected command toolchain activation: {activations:#?}"
+    );
+}
+
+#[tokio::test]
+async fn command_configuration_a_b_a_restores_equal_arc_backed_expansion() {
+    let module = "module(name = 'bazel_tools')\n";
+    let build = "platform(name = 'a')\nplatform(name = 'b')\n";
+    let a_configuration =
+        command_configuration([CommandConfigurationOccurrence::extra_execution_platforms(
+            "//pkg:a",
+        )]);
+    let b_configuration =
+        command_configuration([CommandConfigurationOccurrence::extra_execution_platforms(
+            "//pkg:b",
+        )]);
+    let a_key = CommandRegistrationExpansionObservationKey::execution_platforms(
+        workspace(),
+        a_configuration,
+    );
+    let b_key = CommandRegistrationExpansionObservationKey::execution_platforms(
+        workspace(),
+        b_configuration,
+    );
+    let tracker = Arc::new(ExpansionTracker::default());
+    let mut tx = transaction_with_tracker(
+        module,
+        EpochBuilder::root_package(module, build, 55),
+        true,
+        Some(tracker.dupe()),
+    )
+    .await;
+    let a = tx.compute(&a_key).await.unwrap();
+    let b = tx.compute(&b_key).await.unwrap();
+    assert!(!CommandRegistrationExpansionObservationKey::equality(
+        &a, &b
+    ));
+    tracker.take();
+    let restored = tx.compute(&a_key).await.unwrap();
+    assert!(CommandRegistrationExpansionObservationKey::equality(
+        &a, &restored
+    ));
+    let (
+        LoadingPreparationOutcome::Complete(Ok(a)),
+        LoadingPreparationOutcome::Complete(Ok(restored)),
+    ) = (&a, &restored)
+    else {
+        panic!("A/B/A command expansions did not complete")
+    };
+    assert!(Arc::ptr_eq(a.result(), restored.result()));
+    assert_eq!(
+        activation_for(&tracker.take(), &a_key).kind,
+        ActivationKind::Reused
+    );
+}
+
+#[tokio::test]
+async fn observed_command_cancellation_publishes_nothing_then_recovers_and_reuses() {
+    let module = "module(name = 'bazel_tools')\n";
+    let build = "platform(name = 'platform')\n";
+    let epoch = EpochBuilder::root_package(module, build, 56);
+    let configuration =
+        command_configuration([CommandConfigurationOccurrence::extra_execution_platforms(
+            "//pkg:platform",
+        )]);
+    let key =
+        CommandRegistrationExpansionObservationKey::execution_platforms(workspace(), configuration);
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(ExpansionTracker::default());
+    let mut cancelled =
+        transaction_on(&dice, module, epoch.dupe(), true, Some(tracker.dupe())).await;
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(future);
+    assert!(tracker.take().iter().all(|row| row.key != key.to_string()));
+    assert!(tracker.dependencies(&key.to_string()).is_empty());
+    drop(cancelled);
+
+    let mut recovered = transaction_on(&dice, module, epoch, true, Some(tracker.dupe())).await;
+    let first = recovered.compute(&key).await.unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(first_value)) = &first else {
+        panic!("command cancellation recovery did not complete: {first:?}")
+    };
+    assert_eq!(labels(first_value.result()), ["@@//pkg:platform"]);
+    tracker.take();
+    let warm = recovered.compute(&key).await.unwrap();
+    assert!(CommandRegistrationExpansionObservationKey::equality(
+        &first, &warm
+    ));
+    let LoadingPreparationOutcome::Complete(Ok(warm_value)) = &warm else {
+        panic!("warm command recovery did not complete")
+    };
+    assert!(Arc::ptr_eq(first_value.result(), warm_value.result()));
+    assert_eq!(
+        activation_for(&tracker.take(), &key).kind,
+        ActivationKind::Reused
+    );
+}
+
+#[tokio::test]
+async fn empty_command_list_activates_no_mapping_or_package_owner() {
+    let module = "module(name = 'bazel_tools')\n";
+    let tracker = Arc::new(ExpansionTracker::default());
+    let mut tx = transaction_with_tracker(
+        module,
+        PathObservationEpoch::new([]).unwrap(),
+        false,
+        Some(tracker.dupe()),
+    )
+    .await;
+    let key = CommandRegistrationExpansionObservationKey::toolchains(
+        workspace(),
+        default_configuration(),
+    );
+    let outcome = tx.compute(&key).await.unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(observed)) = outcome else {
+        panic!("empty command expansion did not complete")
+    };
+    assert!(labels(observed.result()).is_empty());
+    let activations = tracker.take();
+    assert_no_activation_containing(&activations, "root-repository-mapping");
+    assert_no_activation_containing(&activations, "package-load");
+    assert_no_activation_containing(&activations, "package-inventory");
+}
+
+#[tokio::test]
+async fn negative_exact_missing_target_remains_a_typed_row_error() {
+    let module = "module(name = 'bazel_tools')\n";
+    let configuration =
+        command_configuration([CommandConfigurationOccurrence::extra_execution_platforms(
+            "-//pkg:missing",
+        )]);
+    let mut tx = transaction(
+        module,
+        EpochBuilder::root_package(module, "platform(name = 'present')\n", 53),
+    )
+    .await;
+    let outcome = tx
+        .compute(&CommandRegistrationExpansionKey::execution_platforms(
+            workspace(),
+            configuration,
+        ))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(value) = outcome else {
+        panic!("negative missing target returned Need")
+    };
+    let error = value.labels().unwrap_err();
+    assert_eq!(error.row(), Some(0));
+    assert!(matches!(
+        error.kind(),
+        ModuleRegistrationExpansionErrorKind::MissingTarget(label)
+            if label.to_string() == "@@//pkg:missing"
+    ));
 }
 
 #[tokio::test]

@@ -42,6 +42,8 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
+use slug_loading_v2::CommandRegistrationExpansionKey;
+use slug_loading_v2::CommandRegistrationExpansionObservationKey;
 use slug_loading_v2::HostPackageInventoryKey;
 use slug_loading_v2::HostPackageInventoryObservationError;
 use slug_loading_v2::HostPackageInventoryObservationKey;
@@ -306,6 +308,16 @@ impl ActivationTracker for AnalysisTracker {
                 .is_some()
             {
                 Some("registration/observed")
+            } else if key
+                .downcast_ref::<CommandRegistrationExpansionKey>()
+                .is_some()
+            {
+                Some("registration/command-legacy")
+            } else if key
+                .downcast_ref::<CommandRegistrationExpansionObservationKey>()
+                .is_some()
+            {
+                Some("registration/command-observed")
             } else {
                 None
             };
@@ -813,7 +825,7 @@ request(name = "request")
 "#;
 
 #[tokio::test]
-async fn observed_toolchain_closure_depends_on_both_expansion_families_once() {
+async fn observed_toolchain_closure_depends_on_both_sources_and_families_once() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = Arc::new(AnalysisTracker::default());
     let mut epoch = EpochBuilder::base("toolchain-", &[], 30);
@@ -835,11 +847,17 @@ async fn observed_toolchain_closure_depends_on_both_expansion_families_once() {
     let dependencies = tracker.dependencies(&key);
     let registrations = dependencies
         .iter()
-        .filter(|dependency| dependency.starts_with("observed-module-registration-expansion:"))
+        .filter(|dependency| dependency.contains("registration-expansion:"))
         .collect::<Vec<_>>();
-    assert_eq!(registrations.len(), 2, "{dependencies:#?}");
+    assert_eq!(registrations.len(), 4, "{dependencies:#?}");
+    assert!(registrations[0].starts_with("observed-command-registration-expansion:"));
     assert!(registrations[0].ends_with(":execution-platforms"));
-    assert!(registrations[1].ends_with(":toolchains"));
+    assert!(registrations[1].starts_with("observed-module-registration-expansion:"));
+    assert!(registrations[1].ends_with(":execution-platforms"));
+    assert!(registrations[2].starts_with("observed-command-registration-expansion:"));
+    assert!(registrations[2].ends_with(":toolchains"));
+    assert!(registrations[3].starts_with("observed-module-registration-expansion:"));
+    assert!(registrations[3].ends_with(":toolchains"));
     assert!(
         dependencies
             .iter()
@@ -851,6 +869,13 @@ async fn observed_toolchain_closure_depends_on_both_expansion_families_once() {
         families
             .iter()
             .filter(|family| family.as_str() == "registration/observed")
+            .count()
+            >= 2
+    );
+    assert!(
+        families
+            .iter()
+            .filter(|family| family.as_str() == "registration/command-observed")
             .count()
             >= 2
     );

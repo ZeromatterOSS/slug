@@ -31,6 +31,8 @@ use slug_identity_v2::TargetName;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::CoercedAttributeValue;
+use slug_loading_v2::CommandRegistrationExpansionKey;
+use slug_loading_v2::CommandRegistrationExpansionObservationKey;
 use slug_loading_v2::HostPackageInventory;
 use slug_loading_v2::HostPackageInventoryErrorRef;
 use slug_loading_v2::HostPackageInventoryKey;
@@ -1608,24 +1610,18 @@ type ConfiguredPackageValue = Arc<HostPackageInventory>;
 type ConfiguredPackages = Vec<(PackageIdentifier, ConfiguredPackageValue)>;
 
 #[derive(Debug, Clone)]
-struct PreparedModuleRegistrations {
-    execution_platforms: Arc<ModuleRegistrationExpansion>,
-    toolchains: Arc<ModuleRegistrationExpansion>,
+struct PreparedRegistrations {
+    execution_platforms: Arc<[CanonicalLabel]>,
+    toolchains: Arc<[CanonicalLabel]>,
 }
 
-impl PreparedModuleRegistrations {
-    fn execution_platforms(&self) -> Result<&[CanonicalLabel], AnalysisError> {
-        self.execution_platforms
-            .labels()
-            .map(|labels| labels.as_ref())
-            .map_err(|error| AnalysisError::new(error.to_string()))
+impl PreparedRegistrations {
+    fn execution_platforms(&self) -> &[CanonicalLabel] {
+        &self.execution_platforms
     }
 
-    fn toolchains(&self) -> Result<&[CanonicalLabel], AnalysisError> {
-        self.toolchains
-            .labels()
-            .map(|labels| labels.as_ref())
-            .map_err(|error| AnalysisError::new(error.to_string()))
+    fn toolchains(&self) -> &[CanonicalLabel] {
+        &self.toolchains
     }
 }
 
@@ -1633,103 +1629,238 @@ fn toolchain_outcome(result: Result<PreparedToolchain, AnalysisError>) -> Prepar
     analysis_semantic_complete(result)
 }
 
+enum RegistrationExpansionInput {
+    Need(LoadingPreparationNeeds),
+    OuterPath(ObservedPathFrontierError),
+    OuterMessage(AnalysisError),
+    Semantic(AnalysisError),
+    Value(Arc<ModuleRegistrationExpansion>),
+}
+
+#[derive(Clone, Copy)]
+enum RegistrationExpansionSource {
+    Command,
+    Module,
+}
+
+fn observed_registration_error(
+    error: ModuleRegistrationExpansionObservationError,
+) -> RegistrationExpansionInput {
+    match error {
+        ModuleRegistrationExpansionObservationError::Frontier(error) => {
+            RegistrationExpansionInput::OuterPath(error)
+        }
+        error => RegistrationExpansionInput::OuterMessage(AnalysisError::new(error.to_string())),
+    }
+}
+
 async fn compute_registration_expansion_input(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: NormalizedAbsolutePath,
+    configuration: &slug_configuration_v2::SlugConfiguration,
+    source: RegistrationExpansionSource,
     execution_platforms: bool,
     context: &str,
-) -> AnalysisSemanticOutcome<Arc<ModuleRegistrationExpansion>> {
-    match mode {
-        ConfiguredAnalysisMode::Legacy => {
+) -> RegistrationExpansionInput {
+    match (mode, source) {
+        (ConfiguredAnalysisMode::Legacy, RegistrationExpansionSource::Module) => {
             let key = if execution_platforms {
                 ModuleRegistrationExpansionKey::execution_platforms(workspace)
             } else {
                 ModuleRegistrationExpansionKey::toolchains(workspace)
             };
             match ctx.compute(&key).await {
-                Ok(LoadingPreparationOutcome::Need(need)) => LoadingPreparationOutcome::Need(need),
+                Ok(LoadingPreparationOutcome::Need(need)) => RegistrationExpansionInput::Need(need),
                 Ok(LoadingPreparationOutcome::Complete(value)) => {
-                    analysis_semantic_complete(Ok(value))
+                    RegistrationExpansionInput::Value(value)
                 }
-                Err(error) => analysis_semantic_complete(Err(AnalysisError::new(format!(
+                Err(error) => RegistrationExpansionInput::Semantic(AnalysisError::new(format!(
                     "{context}: {error}"
-                )))),
+                ))),
             }
         }
-        ConfiguredAnalysisMode::Observed => {
+        (ConfiguredAnalysisMode::Observed, RegistrationExpansionSource::Module) => {
             let key = if execution_platforms {
                 ModuleRegistrationExpansionObservationKey::execution_platforms(workspace)
             } else {
                 ModuleRegistrationExpansionObservationKey::toolchains(workspace)
             };
             match ctx.compute(&key).await {
-                Ok(LoadingPreparationOutcome::Need(need)) => LoadingPreparationOutcome::Need(need),
-                Ok(LoadingPreparationOutcome::Complete(Err(
-                    ModuleRegistrationExpansionObservationError::Frontier(error),
-                ))) => LoadingPreparationOutcome::Complete(Err(error)),
+                Ok(LoadingPreparationOutcome::Need(need)) => RegistrationExpansionInput::Need(need),
                 Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
-                    analysis_semantic_complete(Err(AnalysisError::new(error.to_string())))
+                    observed_registration_error(error)
                 }
                 Ok(LoadingPreparationOutcome::Complete(Ok(observed))) => {
-                    analysis_semantic_complete(Ok(observed.result().dupe()))
+                    RegistrationExpansionInput::Value(observed.result().dupe())
                 }
-                Err(error) => analysis_semantic_complete(Err(AnalysisError::new(format!(
+                Err(error) => RegistrationExpansionInput::Semantic(AnalysisError::new(format!(
                     "{context}: {error}"
-                )))),
+                ))),
+            }
+        }
+        (ConfiguredAnalysisMode::Legacy, RegistrationExpansionSource::Command) => {
+            let key = if execution_platforms {
+                CommandRegistrationExpansionKey::execution_platforms(
+                    workspace,
+                    configuration.dupe(),
+                )
+            } else {
+                CommandRegistrationExpansionKey::toolchains(workspace, configuration.dupe())
+            };
+            match ctx.compute(&key).await {
+                Ok(LoadingPreparationOutcome::Need(need)) => RegistrationExpansionInput::Need(need),
+                Ok(LoadingPreparationOutcome::Complete(value)) => {
+                    RegistrationExpansionInput::Value(value)
+                }
+                Err(error) => RegistrationExpansionInput::Semantic(AnalysisError::new(format!(
+                    "{context}: {error}"
+                ))),
+            }
+        }
+        (ConfiguredAnalysisMode::Observed, RegistrationExpansionSource::Command) => {
+            let key = if execution_platforms {
+                CommandRegistrationExpansionObservationKey::execution_platforms(
+                    workspace,
+                    configuration.dupe(),
+                )
+            } else {
+                CommandRegistrationExpansionObservationKey::toolchains(
+                    workspace,
+                    configuration.dupe(),
+                )
+            };
+            match ctx.compute(&key).await {
+                Ok(LoadingPreparationOutcome::Need(need)) => RegistrationExpansionInput::Need(need),
+                Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
+                    observed_registration_error(error)
+                }
+                Ok(LoadingPreparationOutcome::Complete(Ok(observed))) => {
+                    RegistrationExpansionInput::Value(observed.result().dupe())
+                }
+                Err(error) => RegistrationExpansionInput::Semantic(AnalysisError::new(format!(
+                    "{context}: {error}"
+                ))),
             }
         }
     }
 }
 
-async fn prepare_module_registrations(
+fn merge_registration_labels(
+    command: &ModuleRegistrationExpansion,
+    module: &ModuleRegistrationExpansion,
+) -> Result<Arc<[CanonicalLabel]>, AnalysisError> {
+    let command = command
+        .labels()
+        .map_err(|error| AnalysisError::new(error.to_string()))?;
+    let module = module
+        .labels()
+        .map_err(|error| AnalysisError::new(error.to_string()))?;
+    let mut seen = SmallSet::with_capacity(command.len() + module.len());
+    let mut labels = Vec::with_capacity(command.len() + module.len());
+    for label in command.iter().chain(module.iter()) {
+        if seen.insert(label.clone()) {
+            labels.push(label.clone());
+        }
+    }
+    Ok(labels.into())
+}
+
+async fn prepare_registrations(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
+    configuration: &ConfigurationKey,
     has_toolchain_requirement: bool,
     has_local_declarations: bool,
-) -> AnalysisSemanticOutcome<Option<PreparedModuleRegistrations>> {
+) -> AnalysisSemanticOutcome<Option<PreparedRegistrations>> {
     if !has_toolchain_requirement && !has_local_declarations {
         return analysis_semantic_complete(Ok(None));
     }
-    let execution_platforms = compute_registration_expansion_input(
+    let Some(structural) = configuration.slug_configuration() else {
+        return analysis_semantic_complete(Err(AnalysisError::new(
+            "registration preparation requires a structural Slug configuration",
+        )));
+    };
+    let command_execution_platforms = compute_registration_expansion_input(
         ctx,
         mode,
         workspace.dupe(),
+        structural,
+        RegistrationExpansionSource::Command,
         true,
-        "loading execution-platform registrations through DICE",
+        "loading command execution-platform registrations through DICE",
     )
     .await;
-    let toolchains = compute_registration_expansion_input(
+    let module_execution_platforms = compute_registration_expansion_input(
         ctx,
         mode,
         workspace.dupe(),
-        false,
-        "loading toolchain registrations through DICE",
+        structural,
+        RegistrationExpansionSource::Module,
+        true,
+        "loading MODULE execution-platform registrations through DICE",
     )
     .await;
-    let mut values = [None, None];
+    let command_toolchains = compute_registration_expansion_input(
+        ctx,
+        mode,
+        workspace.dupe(),
+        structural,
+        RegistrationExpansionSource::Command,
+        false,
+        "loading command toolchain registrations through DICE",
+    )
+    .await;
+    let module_toolchains = compute_registration_expansion_input(
+        ctx,
+        mode,
+        workspace.dupe(),
+        structural,
+        RegistrationExpansionSource::Module,
+        false,
+        "loading MODULE toolchain registrations through DICE",
+    )
+    .await;
+    let mut values = [None, None, None, None];
     let mut needs: Option<LoadingPreparationNeeds> = None;
-    let mut first_outer = None;
+    let mut first_outer_path = None;
+    let mut first_outer_message = None;
     let mut first_error = None;
-    for (index, outcome) in [execution_platforms, toolchains].into_iter().enumerate() {
+    for (index, outcome) in [
+        command_execution_platforms,
+        module_execution_platforms,
+        command_toolchains,
+        module_toolchains,
+    ]
+    .into_iter()
+    .enumerate()
+    {
         match outcome {
-            LoadingPreparationOutcome::Need(need) => {
+            RegistrationExpansionInput::Need(need) => {
                 needs = Some(needs.map_or(need.clone(), |current| {
                     current
                         .try_union(&need)
                         .expect("registration family Needs agree")
                 }));
             }
-            LoadingPreparationOutcome::Complete(Err(error)) if first_outer.is_none() => {
-                first_outer = Some(error);
+            RegistrationExpansionInput::OuterPath(error)
+                if first_outer_path.is_none() && first_outer_message.is_none() =>
+            {
+                first_outer_path = Some(error);
             }
-            LoadingPreparationOutcome::Complete(Err(_)) => {}
-            LoadingPreparationOutcome::Complete(Ok(Err(error))) if first_error.is_none() => {
+            RegistrationExpansionInput::OuterMessage(error)
+                if first_outer_path.is_none() && first_outer_message.is_none() =>
+            {
+                first_outer_message = Some(error);
+            }
+            RegistrationExpansionInput::OuterPath(_)
+            | RegistrationExpansionInput::OuterMessage(_) => {}
+            RegistrationExpansionInput::Semantic(error) if first_error.is_none() => {
                 first_error = Some(error);
             }
-            LoadingPreparationOutcome::Complete(Ok(Err(_))) => {}
-            LoadingPreparationOutcome::Complete(Ok(Ok(value))) => match value.labels() {
+            RegistrationExpansionInput::Semantic(_) => {}
+            RegistrationExpansionInput::Value(value) => match value.labels() {
                 Ok(_) => values[index] = Some(value),
                 Err(error) if first_error.is_none() => {
                     first_error = Some(AnalysisError::new(error.to_string()));
@@ -1738,8 +1869,11 @@ async fn prepare_module_registrations(
             },
         }
     }
-    if let Some(error) = first_outer {
+    if let Some(error) = first_outer_path {
         return LoadingPreparationOutcome::Complete(Err(error));
+    }
+    if let Some(error) = first_outer_message {
+        return analysis_semantic_complete(Err(error));
     }
     if let Some(need) = needs {
         return LoadingPreparationOutcome::Need(need);
@@ -1747,10 +1881,27 @@ async fn prepare_module_registrations(
     if let Some(error) = first_error {
         return analysis_semantic_complete(Err(error));
     }
-    let [Some(execution_platforms), Some(toolchains)] = values else {
-        unreachable!("complete registration preparation retains both family values")
+    let [
+        Some(command_execution_platforms),
+        Some(module_execution_platforms),
+        Some(command_toolchains),
+        Some(module_toolchains),
+    ] = values
+    else {
+        unreachable!("complete registration preparation retains all source/family values")
     };
-    analysis_semantic_complete(Ok(Some(PreparedModuleRegistrations {
+    let execution_platforms = match merge_registration_labels(
+        &command_execution_platforms,
+        &module_execution_platforms,
+    ) {
+        Ok(labels) => labels,
+        Err(error) => return analysis_semantic_complete(Err(error)),
+    };
+    let toolchains = match merge_registration_labels(&command_toolchains, &module_toolchains) {
+        Ok(labels) => labels,
+        Err(error) => return analysis_semantic_complete(Err(error)),
+    };
+    analysis_semantic_complete(Ok(Some(PreparedRegistrations {
         execution_platforms,
         toolchains,
     })))
@@ -1780,7 +1931,7 @@ fn local_toolchain_declarations(
 
 fn rule_execution_platforms(
     configuration: &ConfigurationKey,
-    registrations: Option<&PreparedModuleRegistrations>,
+    registrations: Option<&PreparedRegistrations>,
     local_declarations: &SmallSet<CanonicalLabel>,
     has_toolchain_requirement: bool,
 ) -> Result<Option<Vec<ConfiguredTargetKey>>, AnalysisError> {
@@ -1788,7 +1939,7 @@ fn rule_execution_platforms(
         debug_assert!(!has_toolchain_requirement && local_declarations.is_empty());
         return Ok(None);
     };
-    let toolchains = registrations.toolchains()?;
+    let toolchains = registrations.toolchains();
     if !has_toolchain_requirement {
         let registered = toolchains
             .iter()
@@ -1807,7 +1958,7 @@ fn rule_execution_platforms(
         Err(error) => return Err(AnalysisError::new(error.to_string())),
     };
     let platforms = registrations
-        .execution_platforms()?
+        .execution_platforms()
         .iter()
         .cloned()
         .map(|label| ConfiguredTargetKey::new(label, execution_configuration.clone()))
@@ -2579,16 +2730,13 @@ async fn resolve_root_toolchain(
     required: &CanonicalLabel,
     owner: &ConfiguredTargetKey,
     candidate_execution_platforms: &[ConfiguredTargetKey],
-    registrations: &PreparedModuleRegistrations,
+    registrations: &PreparedRegistrations,
 ) -> PreparedToolchainOutcome {
     let required_type = match root_apparent_type(required) {
         Ok(required_type) => required_type,
         Err(error) => return toolchain_outcome(Err(error)),
     };
-    let toolchain_labels = match registrations.toolchains() {
-        Ok(labels) => labels,
-        Err(error) => return toolchain_outcome(Err(error)),
-    };
+    let toolchain_labels = registrations.toolchains();
     let mut labels = candidate_execution_platforms
         .iter()
         .map(|candidate| candidate.label().clone())
@@ -3333,10 +3481,11 @@ impl ConfiguredNodeAnalysisKey {
                 .map(|requirement| requirement.label().clone())
         };
         let local_declarations = local_toolchain_declarations(package, configured_target.label());
-        let registrations = match prepare_module_registrations(
+        let registrations = match prepare_registrations(
             ctx,
             mode,
             &self.workspace,
+            configured_target.configuration(),
             requirement.is_some(),
             !local_declarations.is_empty(),
         )

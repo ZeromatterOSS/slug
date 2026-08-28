@@ -23,6 +23,11 @@ use dice::Key;
 use dupe::Dupe;
 use slug_bzlmod_v2::HostCanonicalRepositorySourceInput;
 use slug_bzlmod_v2::HostRepositorySourceRoute;
+use slug_bzlmod_v2::HostRootRepositoryMapping;
+use slug_bzlmod_v2::HostRootRepositoryMappingError;
+use slug_bzlmod_v2::HostRootRepositoryMappingKey;
+use slug_bzlmod_v2::HostRootRepositoryMappingObservationError;
+use slug_bzlmod_v2::HostRootRepositoryMappingObservationKey;
 use slug_bzlmod_v2::HostSelectedRegistrationPatternView;
 use slug_bzlmod_v2::HostSelectedRegistrationPatterns;
 use slug_bzlmod_v2::HostSelectedRegistrationPatternsError;
@@ -31,10 +36,13 @@ use slug_bzlmod_v2::HostSelectedRegistrationPatternsObservationError;
 use slug_bzlmod_v2::HostSelectedRegistrationPatternsObservationKey;
 use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
+use slug_configuration_v2::SlugConfiguration;
+use slug_configuration_v2::SlugConfigurationError;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationDiagnosticLevel;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
+use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::CanonicalTargetPattern;
@@ -127,6 +135,9 @@ impl ModuleRegistrationAmbiguity {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum ModuleRegistrationExpansionErrorKind {
     Selected(HostSelectedRegistrationPatternsError),
+    Configuration(SlugConfigurationError),
+    RootMapping(HostRootRepositoryMappingError),
+    RootMappingUnavailable,
     Parse(Arc<str>),
     RowOverflow,
     CanonicalRoute(HostCanonicalRepositoryLoadRouteError),
@@ -189,6 +200,7 @@ impl ModuleRegistrationExpansion {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub enum ModuleRegistrationExpansionObservationError {
     Selected(HostSelectedRegistrationPatternsObservationError),
+    RootMapping(HostRootRepositoryMappingObservationError),
     CanonicalRoute(HostCanonicalRepositoryLoadRouteObservationError),
     Frontier(ObservedPathFrontierError),
 }
@@ -263,11 +275,106 @@ impl fmt::Display for ModuleRegistrationExpansionObservationKey {
     }
 }
 
+/// Loading-owned expansion of typed command registration configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct CommandRegistrationExpansionKey {
+    workspace: NormalizedAbsolutePath,
+    configuration: SlugConfiguration,
+    family: ModuleRegistrationFamily,
+}
+
+impl CommandRegistrationExpansionKey {
+    pub fn toolchains(workspace: NormalizedAbsolutePath, configuration: SlugConfiguration) -> Self {
+        Self {
+            workspace,
+            configuration,
+            family: ModuleRegistrationFamily::Toolchains,
+        }
+    }
+
+    pub fn execution_platforms(
+        workspace: NormalizedAbsolutePath,
+        configuration: SlugConfiguration,
+    ) -> Self {
+        Self {
+            workspace,
+            configuration,
+            family: ModuleRegistrationFamily::ExecutionPlatforms,
+        }
+    }
+
+    pub fn family(&self) -> ModuleRegistrationFamily {
+        self.family
+    }
+}
+
+impl fmt::Display for CommandRegistrationExpansionKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "command-registration-expansion:{}:{}:{}",
+            self.workspace,
+            self.configuration.projection(),
+            self.family
+        )
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct CommandRegistrationExpansionObservationKey(CommandRegistrationExpansionKey);
+
+impl CommandRegistrationExpansionObservationKey {
+    pub fn toolchains(workspace: NormalizedAbsolutePath, configuration: SlugConfiguration) -> Self {
+        Self(CommandRegistrationExpansionKey::toolchains(
+            workspace,
+            configuration,
+        ))
+    }
+
+    pub fn execution_platforms(
+        workspace: NormalizedAbsolutePath,
+        configuration: SlugConfiguration,
+    ) -> Self {
+        Self(CommandRegistrationExpansionKey::execution_platforms(
+            workspace,
+            configuration,
+        ))
+    }
+
+    pub fn family(&self) -> ModuleRegistrationFamily {
+        self.0.family
+    }
+}
+
+impl fmt::Display for CommandRegistrationExpansionObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct ObservedModuleRegistrationExpansion {
     result: Arc<ModuleRegistrationExpansion>,
     observations: PathObservationEpoch,
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedCommandRegistrationExpansion {
+    result: Arc<ModuleRegistrationExpansion>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedCommandRegistrationExpansion {
+    pub fn result(&self) -> &Arc<ModuleRegistrationExpansion> {
+        &self.result
+    }
+
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
 }
 
 impl ObservedModuleRegistrationExpansion {
@@ -301,6 +408,7 @@ type DriverOutcome = SourcePreparationOutcome<
 >;
 type SelectedCarrier =
     Arc<Result<HostSelectedRegistrationPatterns, HostSelectedRegistrationPatternsError>>;
+type RootMappingCarrier = Arc<Result<HostRootRepositoryMapping, HostRootRepositoryMappingError>>;
 
 #[derive(Clone)]
 enum PackageCarrier {
@@ -330,11 +438,21 @@ struct ExpansionScratch {
     observations: PathObservationEpoch,
 }
 
+#[derive(Clone, Copy)]
+enum RegistrationSign {
+    Positive,
+    Negative,
+}
+
 impl ExpansionScratch {
-    fn new(key: &ModuleRegistrationExpansionKey, mode: ObservationMode) -> Self {
+    fn new(
+        workspace: NormalizedAbsolutePath,
+        family: ModuleRegistrationFamily,
+        mode: ObservationMode,
+    ) -> Self {
         Self {
-            workspace: key.workspace.dupe(),
-            family: key.family,
+            workspace,
+            family,
             mode,
             labels: Vec::new(),
             seen: SmallSet::new(),
@@ -370,9 +488,18 @@ impl ExpansionScratch {
         Ok(())
     }
 
-    fn append(&mut self, label: CanonicalLabel) {
-        if self.seen.insert(label.clone()) {
-            self.labels.push(label);
+    fn apply(&mut self, label: CanonicalLabel, sign: RegistrationSign) {
+        match sign {
+            RegistrationSign::Positive => {
+                if self.seen.insert(label.clone()) {
+                    self.labels.push(label);
+                }
+            }
+            RegistrationSign::Negative => {
+                if self.seen.shift_remove(&label) {
+                    self.labels.retain(|candidate| candidate != &label);
+                }
+            }
         }
     }
 
@@ -430,6 +557,50 @@ async fn selected_patterns(
                     Err(error) => Err(scratch.error(
                         None,
                         ModuleRegistrationExpansionErrorKind::Selected(error.clone()),
+                    )),
+                }
+            }
+        },
+    }
+}
+
+async fn root_mapping(
+    ctx: &mut DiceComputations<'_>,
+    scratch: &mut ExpansionScratch,
+) -> Step<RootMappingCarrier> {
+    match scratch.mode {
+        ObservationMode::Legacy => match ctx
+            .compute(&HostRootRepositoryMappingKey::new(scratch.workspace.dupe()))
+            .await
+            .expect("root registration mapping DICE invariant")
+        {
+            SourcePreparationOutcome::Need(need) => Err(DriverBreak::Need(need)),
+            SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                Ok(_) => Ok(value),
+                Err(error) => Err(scratch.error(
+                    None,
+                    ModuleRegistrationExpansionErrorKind::RootMapping(error.clone()),
+                )),
+            },
+        },
+        ObservationMode::Observed => match ctx
+            .compute(&HostRootRepositoryMappingObservationKey::new(
+                scratch.workspace.dupe(),
+            ))
+            .await
+            .expect("observed root registration mapping DICE invariant")
+        {
+            SourcePreparationOutcome::Need(need) => Err(DriverBreak::Need(need)),
+            SourcePreparationOutcome::Complete(Err(error)) => Err(DriverBreak::Outer(
+                ModuleRegistrationExpansionObservationError::RootMapping(error),
+            )),
+            SourcePreparationOutcome::Complete(Ok(observed)) => {
+                scratch.merge(observed.observations())?;
+                match observed.result().as_ref() {
+                    Ok(_) => Ok(observed.result().dupe()),
+                    Err(error) => Err(scratch.error(
+                        None,
+                        ModuleRegistrationExpansionErrorKind::RootMapping(error.clone()),
                     )),
                 }
             }
@@ -787,6 +958,7 @@ async fn expand_wildcard(
     raw: &CompactString,
     wildcard: TargetPatternWildcard,
     row: u32,
+    sign: RegistrationSign,
 ) -> Step<()> {
     let carrier = loaded_package(ctx, scratch, &package, row).await?;
     if let Some(conflict) = conflict {
@@ -796,7 +968,7 @@ async fn expand_wildcard(
             .iter()
             .any(|target| target.name == conflict.target().as_str())
         {
-            scratch.append(conflict.clone());
+            scratch.apply(conflict.clone(), sign);
             scratch.ambiguities.push(ModuleRegistrationAmbiguity {
                 family: scratch.family,
                 row,
@@ -815,7 +987,7 @@ async fn expand_wildcard(
         .collect::<Vec<_>>();
     candidates.sort_unstable_by(|left, right| left.name.cmp(&right.name));
     for target in candidates {
-        scratch.append(label_in_package(&package, &target.name));
+        scratch.apply(label_in_package(&package, &target.name), sign);
     }
     Ok(())
 }
@@ -826,6 +998,7 @@ async fn expand_pattern(
     pattern: CanonicalTargetPattern,
     raw: &CompactString,
     row: u32,
+    sign: RegistrationSign,
 ) -> Step<()> {
     match pattern {
         CanonicalTargetPattern::Single(label) => {
@@ -841,14 +1014,24 @@ async fn expand_pattern(
                     ModuleRegistrationExpansionErrorKind::MissingTarget(label),
                 ));
             }
-            scratch.append(label);
+            scratch.apply(label, sign);
         }
         CanonicalTargetPattern::PackageWildcard {
             package,
             wildcard,
             conflict_target,
         } => {
-            expand_wildcard(ctx, scratch, package, conflict_target, raw, wildcard, row).await?;
+            expand_wildcard(
+                ctx,
+                scratch,
+                package,
+                conflict_target,
+                raw,
+                wildcard,
+                row,
+                sign,
+            )
+            .await?;
         }
         CanonicalTargetPattern::Recursive { package, wildcard } => {
             let subtree = subtree_packages(ctx, scratch, &package, row).await?;
@@ -867,6 +1050,7 @@ async fn expand_pattern(
                     raw,
                     wildcard,
                     row,
+                    sign,
                 )
                 .await?;
             }
@@ -875,7 +1059,29 @@ async fn expand_pattern(
     Ok(())
 }
 
-async fn expand_rows<'a>(
+async fn expand_contextual_row<'a>(
+    ctx: &mut DiceComputations<'_>,
+    scratch: &mut ExpansionScratch,
+    parse_text: &str,
+    display_text: &str,
+    current_repo: &CanonicalRepoName,
+    mapping_target: impl FnOnce(&ApparentRepoName) -> Option<&'a CanonicalRepoName>,
+    row: u32,
+    sign: RegistrationSign,
+) -> Step<()> {
+    let raw = CompactString::new(display_text);
+    let pattern = CanonicalTargetPattern::parse(parse_text, current_repo, mapping_target).map_err(
+        |error| {
+            scratch.error(
+                Some(row),
+                ModuleRegistrationExpansionErrorKind::Parse(error.into()),
+            )
+        },
+    )?;
+    expand_pattern(ctx, scratch, pattern, &raw, row, sign).await
+}
+
+async fn expand_module_rows<'a>(
     ctx: &mut DiceComputations<'_>,
     scratch: &mut ExpansionScratch,
     rows: impl Iterator<Item = HostSelectedRegistrationPatternView<'a>>,
@@ -883,46 +1089,120 @@ async fn expand_rows<'a>(
     for (ordinal, view) in rows.enumerate() {
         let row = u32::try_from(ordinal)
             .map_err(|_| scratch.error(None, ModuleRegistrationExpansionErrorKind::RowOverflow))?;
-        let raw = CompactString::new(view.raw_pattern());
-        let pattern = CanonicalTargetPattern::parse(&raw, view.canonical_repo(), |apparent| {
-            view.mapping_target(apparent)
-        })
-        .map_err(|error| {
-            scratch.error(
-                Some(row),
-                ModuleRegistrationExpansionErrorKind::Parse(error.into()),
-            )
-        })?;
-        expand_pattern(ctx, scratch, pattern, &raw, row).await?;
+        expand_contextual_row(
+            ctx,
+            scratch,
+            view.raw_pattern(),
+            view.raw_pattern(),
+            view.canonical_repo(),
+            |apparent| view.mapping_target(apparent),
+            row,
+            RegistrationSign::Positive,
+        )
+        .await?;
     }
     Ok(())
 }
 
-async fn drive_registration_expansion(
-    ctx: &mut DiceComputations<'_>,
-    key: &ModuleRegistrationExpansionKey,
-    mode: ObservationMode,
-) -> DriverOutcome {
-    let mut scratch = ExpansionScratch::new(key, mode);
-    let result = async {
-        let selected = selected_patterns(ctx, &mut scratch).await?;
-        let selected = selected.as_ref().as_ref().unwrap();
-        match key.family {
-            ModuleRegistrationFamily::Toolchains => {
-                expand_rows(ctx, &mut scratch, selected.toolchains()).await
-            }
-            ModuleRegistrationFamily::ExecutionPlatforms => {
-                expand_rows(ctx, &mut scratch, selected.execution_platforms()).await
-            }
-        }
-    }
-    .await;
+fn finish_driver(scratch: ExpansionScratch, result: Step<()>) -> DriverOutcome {
     match result {
         Ok(()) => scratch.finish(None),
         Err(DriverBreak::Need(need)) => SourcePreparationOutcome::Need(need),
         Err(DriverBreak::Outer(error)) => SourcePreparationOutcome::Complete(Err(error)),
         Err(DriverBreak::Semantic(error)) => scratch.finish(Some(error)),
     }
+}
+
+async fn drive_module_registration_expansion(
+    ctx: &mut DiceComputations<'_>,
+    key: &ModuleRegistrationExpansionKey,
+    mode: ObservationMode,
+) -> DriverOutcome {
+    let mut scratch = ExpansionScratch::new(key.workspace.dupe(), key.family, mode);
+    let result = async {
+        let selected = selected_patterns(ctx, &mut scratch).await?;
+        let selected = selected.as_ref().as_ref().unwrap();
+        match key.family {
+            ModuleRegistrationFamily::Toolchains => {
+                expand_module_rows(ctx, &mut scratch, selected.toolchains()).await
+            }
+            ModuleRegistrationFamily::ExecutionPlatforms => {
+                expand_module_rows(ctx, &mut scratch, selected.execution_platforms()).await
+            }
+        }
+    }
+    .await;
+    finish_driver(scratch, result)
+}
+
+async fn drive_command_registration_expansion(
+    ctx: &mut DiceComputations<'_>,
+    key: &CommandRegistrationExpansionKey,
+    mode: ObservationMode,
+) -> DriverOutcome {
+    const PLATFORM_OPTIONS: &str = "com.google.devtools.build.lib.analysis.PlatformOptions";
+    const EXTRA_TOOLCHAINS: &str = "extra_toolchains";
+    const EXTRA_EXECUTION_PLATFORMS: &str = "extra_execution_platforms";
+
+    let mut scratch = ExpansionScratch::new(key.workspace.dupe(), key.family, mode);
+    let result = async {
+        let option = match key.family {
+            ModuleRegistrationFamily::Toolchains => key
+                .configuration
+                .native_string_list_option(PLATFORM_OPTIONS, EXTRA_TOOLCHAINS),
+            ModuleRegistrationFamily::ExecutionPlatforms => key
+                .configuration
+                .native_string_list_option(PLATFORM_OPTIONS, EXTRA_EXECUTION_PLATFORMS),
+        }
+        .map_err(|error| {
+            scratch.error(
+                None,
+                ModuleRegistrationExpansionErrorKind::Configuration(error),
+            )
+        })?;
+        if option.is_empty() {
+            return Ok(());
+        }
+        let mut rows = option.iter().collect::<Vec<_>>();
+        if key.family == ModuleRegistrationFamily::Toolchains {
+            rows.reverse();
+        }
+        let mapping = root_mapping(ctx, &mut scratch).await?;
+        let mapping = mapping.as_ref().as_ref().unwrap();
+        let view = mapping.view().ok_or_else(|| {
+            scratch.error(
+                None,
+                ModuleRegistrationExpansionErrorKind::RootMappingUnavailable,
+            )
+        })?;
+        for (ordinal, raw) in rows.into_iter().enumerate() {
+            let row = u32::try_from(ordinal).map_err(|_| {
+                scratch.error(None, ModuleRegistrationExpansionErrorKind::RowOverflow)
+            })?;
+            let (sign, parse_text) = raw
+                .strip_prefix('-')
+                .map_or((RegistrationSign::Positive, raw), |pattern| {
+                    (RegistrationSign::Negative, pattern)
+                });
+            expand_contextual_row(
+                ctx,
+                &mut scratch,
+                parse_text,
+                raw,
+                view.canonical_repo(),
+                |apparent| {
+                    view.mapping()
+                        .find_map(|(name, target)| (name == apparent).then_some(target))
+                },
+                row,
+                sign,
+            )
+            .await?;
+        }
+        Ok(())
+    }
+    .await;
+    finish_driver(scratch, result)
 }
 
 fn event_batch(value: &ModuleRegistrationExpansion) -> EventBatch {
@@ -943,7 +1223,7 @@ impl Key for ModuleRegistrationExpansionKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let value = drive_registration_expansion(ctx, self, ObservationMode::Legacy).await;
+        let value = drive_module_registration_expansion(ctx, self, ObservationMode::Legacy).await;
         match value {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
             SourcePreparationOutcome::Complete(Err(error)) => {
@@ -985,7 +1265,7 @@ impl Key for ModuleRegistrationExpansionObservationKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        match drive_registration_expansion(ctx, &self.0, ObservationMode::Observed).await {
+        match drive_module_registration_expansion(ctx, &self.0, ObservationMode::Observed).await {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
             SourcePreparationOutcome::Complete(Err(error)) => {
                 SourcePreparationOutcome::Complete(Err(error))
@@ -1002,6 +1282,91 @@ impl Key for ModuleRegistrationExpansionObservationKey {
                     );
                 }
                 SourcePreparationOutcome::Complete(Ok(ObservedModuleRegistrationExpansion {
+                    result,
+                    observations,
+                }))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for CommandRegistrationExpansionKey {
+    type Value = SourcePreparationOutcome<Arc<ModuleRegistrationExpansion>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let value = drive_command_registration_expansion(ctx, self, ObservationMode::Legacy).await;
+        match value {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                panic!("legacy command registration expansion produced outer error: {error}")
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                debug_assert!(observations.observations().is_empty());
+                if ctx
+                    .per_transaction_data()
+                    .data
+                    .get::<CaptureEvaluationEvents>()
+                    .is_ok()
+                {
+                    ctx.store_evaluation_data(event_batch(&result)).expect(
+                        "command registration expansion stores one local Complete event batch",
+                    );
+                }
+                SourcePreparationOutcome::Complete(result)
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for CommandRegistrationExpansionObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedCommandRegistrationExpansion, ModuleRegistrationExpansionObservationError>,
+    >;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match drive_command_registration_expansion(ctx, &self.0, ObservationMode::Observed).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                if ctx
+                    .per_transaction_data()
+                    .data
+                    .get::<CaptureEvaluationEvents>()
+                    .is_ok()
+                {
+                    ctx.store_evaluation_data(event_batch(&result)).expect(
+                        "observed command registration expansion stores one local Complete event batch",
+                    );
+                }
+                SourcePreparationOutcome::Complete(Ok(ObservedCommandRegistrationExpansion {
                     result,
                     observations,
                 }))

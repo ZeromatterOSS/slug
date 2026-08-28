@@ -191,6 +191,9 @@ pub use package::RuleCapability;
 pub use package::TestMetadata;
 pub use package::TestRuleKind;
 pub use package::TestSuiteMembership;
+pub use registration_expansion::CommandRegistrationExpansionKey;
+#[doc(hidden)]
+pub use registration_expansion::CommandRegistrationExpansionObservationKey;
 pub use registration_expansion::ModuleRegistrationAmbiguity;
 pub use registration_expansion::ModuleRegistrationExpansion;
 pub use registration_expansion::ModuleRegistrationExpansionError;
@@ -201,6 +204,8 @@ pub use registration_expansion::ModuleRegistrationExpansionObservationError;
 #[doc(hidden)]
 pub use registration_expansion::ModuleRegistrationExpansionObservationKey;
 pub use registration_expansion::ModuleRegistrationFamily;
+#[doc(hidden)]
+pub use registration_expansion::ObservedCommandRegistrationExpansion;
 #[doc(hidden)]
 pub use registration_expansion::ObservedModuleRegistrationExpansion;
 #[doc(hidden)]

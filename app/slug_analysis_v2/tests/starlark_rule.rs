@@ -83,6 +83,8 @@ use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
+use slug_loading_v2::CommandRegistrationExpansionKey;
+use slug_loading_v2::CommandRegistrationExpansionObservationKey;
 use slug_loading_v2::HostPackageInventoryKey;
 use slug_loading_v2::HostPackageInventoryObservationError;
 use slug_loading_v2::HostPackageInventoryObservationKey;
@@ -816,6 +818,12 @@ impl ActivationTracker for RootActivationTracker {
                 key.downcast_ref::<ModuleRegistrationExpansionObservationKey>()
             {
                 Some(format!("registration/observed/{}", key.family()))
+            } else if let Some(key) = key.downcast_ref::<CommandRegistrationExpansionKey>() {
+                Some(format!("registration/command-legacy/{}", key.family()))
+            } else if let Some(key) =
+                key.downcast_ref::<CommandRegistrationExpansionObservationKey>()
+            {
+                Some(format!("registration/command-observed/{}", key.family()))
             } else if key
                 .downcast_ref::<CommandConfigurationPreparationObservationKey>()
                 .is_some()
@@ -1420,6 +1428,79 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
     .await
     .unwrap();
     assert_eq!(recreated, first);
+}
+
+#[tokio::test]
+async fn command_registrations_precede_module_and_empty_overlay_restores_module_only_result() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), TOOLCHAIN_MODULE).unwrap();
+    fs::write(workspace.join("defs.bzl"), TOOLCHAIN_DEFS).unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        TOOLCHAIN_BUILD.replacen(
+            "platform(name = \"platform\", constraint_values = [\":linux\"])",
+            "platform(name = \"platform\", constraint_values = [\":linux\"])\nplatform(name = \"command_platform\", constraint_values = [\":linux\"])",
+            1,
+        ),
+    )
+    .unwrap();
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let consumer = ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap();
+    let overlay: CommandConfigurationOverlay = vec![
+        CommandConfigurationOccurrence::extra_toolchains("//:first,-//:first"),
+        CommandConfigurationOccurrence::extra_execution_platforms(
+            "//:command_platform,-//:command_platform,//:command_platform",
+        ),
+    ]
+    .into();
+    let first = command_configuration_request_result(
+        &dice,
+        &workspace,
+        "@@//:request",
+        overlay.clone(),
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(provider_value(&first, &consumer), "first");
+    assert_eq!(
+        candidate_labels(&first),
+        ["@@//:command_platform", "@@//:platform"]
+    );
+    assert_eq!(
+        first
+            .toolchain_topology()
+            .unwrap()
+            .selection()
+            .unwrap()
+            .declaration()
+            .to_string(),
+        "@@//:first"
+    );
+
+    let module_only = command_configuration_request_result(
+        &dice,
+        &workspace,
+        "@@//:request",
+        CommandConfigurationOverlay::default(),
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(provider_value(&module_only, &consumer), "second");
+    assert_eq!(candidate_labels(&module_only), ["@@//:platform"]);
+
+    let restored = command_configuration_request_result(
+        &dice,
+        &workspace,
+        "@@//:request",
+        overlay,
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(restored, first);
 }
 
 #[tokio::test]
@@ -2390,13 +2471,15 @@ async fn registration_family_outer_precedes_earlier_semantic_error() {
         .take()
         .0
         .into_iter()
-        .filter(|(identity, _)| identity.starts_with("registration/observed/"))
+        .filter(|(identity, _)| identity.starts_with("registration/"))
         .map(|(identity, _)| identity)
         .collect::<Vec<_>>();
     assert_eq!(
         registrations,
         [
+            "registration/command-observed/execution-platforms",
             "registration/observed/execution-platforms",
+            "registration/command-observed/toolchains",
             "registration/observed/toolchains",
         ]
     );

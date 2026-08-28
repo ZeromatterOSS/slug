@@ -1829,3 +1829,19 @@ engine; do not add an interner or retained standard map/set. Exact behavior is
 anchored in pinned Bazel 9.2 `StarlarkOptionsParser`, `PlatformOptions` and
 their tests. Retained-size, Arc-clone, equal-allocation, structural identity,
 invalidation and lifecycle tests are the acceptance evidence.
+
+### Stage 6 command-registration overlay utility decision (2026-08-28)
+
+Source inspected: the accepted V2 contextual registration expander and typed
+configuration projection; Buck2 immutable `Arc` slice, `Dupe`, `Allocative`
+and compact `SmallMap`/`SmallSet` patterns; clean Zabel `0795445f…` separate
+final-option/MODULE ownership as concept guidance only.
+
+Decision: reuse the existing immutable registration result and phase-scratch
+compact maps/sets for a configuration-keyed signed command expansion. Add no
+V1/Buck2/Zabel import, retained standard collection, parallel registration
+store, cache or interner. Exact sign, ordering and command-before-MODULE
+behavior is anchored in pinned Bazel 9.2 `RegisteredToolchainsFunction`,
+`RegisteredExecutionPlatformsFunction`, `SignedTargetPattern` and
+`TargetPatternUtil`; focused ordering, structural equality, observation and
+lifecycle tests are the acceptance evidence.
