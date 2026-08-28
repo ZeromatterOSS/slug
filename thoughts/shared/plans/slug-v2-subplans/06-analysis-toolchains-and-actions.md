@@ -19871,3 +19871,17 @@ Run `WP-4-5-7A-canonical-package-label-context-prerequisite-r3`. Add only
 that synthetic edge with explicit canonical `@@other+//:group`. Preserve the
 same query rejection and competing-error precedence; do not add a mapping,
 accept an unmapped apparent name, or change production behavior.
+
+### Canonical package context accepted; registration cutover resumed (2026-08-27)
+
+Independent terminal review accepts commit `97f2bfeeb`. Canonical BUILD
+lowering now resolves labels with the selected route mapping, retains only
+final canonical identities, and its complete external-query consumer category
+requires exact repository plus package matches. Root BUILD mapping remains
+deferred.
+
+Resume `WP-4-5-7A-expanded-registration-consumer-cutover` under its original
+three-file analysis allowlist with base `97f2bfeeb`. Replace the parked
+selected-nonroot fixture's root BUILD apparent references with declarations
+and internal references loaded from their canonical repository packages. Do
+not repair labels or discover mappings in analysis.
