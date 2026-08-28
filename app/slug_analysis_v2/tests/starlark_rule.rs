@@ -21,6 +21,7 @@ use dice::DetectCycles;
 use dice::Dice;
 use dice::DiceComputations;
 use dice::DiceNodeId;
+use dice::DiceTransactionUpdater;
 use dice::DynKey;
 use dice::Key;
 use dice::RichActivation;
@@ -45,6 +46,17 @@ use slug_build_api_v2::ProviderId;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::OverrideAttributeValue;
+use slug_bzlmod_v2::RepoRuleId;
+use slug_bzlmod_v2::RepoSpec;
+use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
+use slug_bzlmod_v2::RepositoryMaterializationKind;
+use slug_bzlmod_v2::RepositoryMaterializationRequest;
+use slug_bzlmod_v2::RepositoryMaterializationRequestId;
+use slug_bzlmod_v2::RepositoryMaterializationResult;
+use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
+use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
+use slug_bzlmod_v2::RepositoryMaterializationSuccess;
 use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
@@ -57,7 +69,11 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
 use slug_loading_v2::HostPackageInventoryKey;
+use slug_loading_v2::ModuleRegistrationExpansionKey;
+use slug_loading_v2::ModuleRegistrationExpansionObservationError;
+use slug_loading_v2::ModuleRegistrationExpansionObservationKey;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
@@ -68,6 +84,10 @@ use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathDirectoryEntries;
+use slug_workspace_v2::PathDirectoryEntry;
+use slug_workspace_v2::PathDirectoryEntryKind;
+use slug_workspace_v2::PathDirectoryName;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
@@ -289,30 +309,118 @@ fn workspace_snapshot(root: &std::path::Path) -> WorkspaceSnapshot {
 }
 
 fn raw_snapshot_from_text(snapshot: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnapshot> {
+    let mut files = snapshot
+        .files
+        .iter()
+        .map(|(path, value)| {
+            let value = match value {
+                WorkspaceFileValue::Present(source) => {
+                    WorkspaceRawFileValue::Present(Arc::from(source.as_bytes()))
+                }
+                WorkspaceFileValue::Absent => WorkspaceRawFileValue::Absent,
+                WorkspaceFileValue::ReadError(error) => {
+                    WorkspaceRawFileValue::ReadError(error.clone())
+                }
+            };
+            (path.clone(), value)
+        })
+        .collect::<Vec<_>>();
+    if let Some(module) = snapshot
+        .files
+        .keys()
+        .find(|path| path.file_name().is_some_and(|name| name == "MODULE.bazel"))
+    {
+        let lockfile = module.with_file_name("MODULE.bazel.lock");
+        if !snapshot.files.contains_key(&lockfile) {
+            files.push((lockfile, WorkspaceRawFileValue::Absent));
+        }
+    }
     Arc::new(WorkspaceRawSnapshot {
-        files: Arc::new(
-            snapshot
-                .files
-                .iter()
-                .map(|(path, value)| {
-                    let value = match value {
-                        WorkspaceFileValue::Present(source) => {
-                            WorkspaceRawFileValue::Present(Arc::from(source.as_bytes()))
-                        }
-                        WorkspaceFileValue::Absent => WorkspaceRawFileValue::Absent,
-                        WorkspaceFileValue::ReadError(error) => {
-                            WorkspaceRawFileValue::ReadError(error.clone())
-                        }
-                    };
-                    (path.clone(), value)
-                })
-                .collect(),
-        ),
+        files: Arc::new(files.into_iter().collect()),
     })
+}
+
+fn local_repository_materializations(
+    workspace: &NormalizedAbsolutePath,
+    repositories: &[(&str, &str)],
+) -> RepositoryMaterializationResultEpoch {
+    let entries = repositories.iter().map(|(canonical_repo, path)| {
+        let mut attributes = SmallMap::new();
+        attributes.insert(
+            "path".into(),
+            OverrideAttributeValue::String((*path).into()),
+        );
+        RepositoryMaterializationEpochEntry {
+            request: Arc::new(RepositoryMaterializationRequest {
+                id: RepositoryMaterializationRequestId {
+                    workspace: workspace.dupe(),
+                    canonical_repo: CanonicalRepoName::new(*canonical_repo).unwrap(),
+                },
+                repo_spec: RepoSpec {
+                    rule_id: RepoRuleId {
+                        bzl_file: CanonicalLabel::parse(
+                            "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                        )
+                        .unwrap(),
+                        rule_name: "local_repository".into(),
+                    },
+                    attributes: Arc::new(attributes),
+                },
+                kind: RepositoryMaterializationKind::Local {
+                    logical_root: NormalizedAbsolutePath::new(workspace.as_path().join(path))
+                        .unwrap(),
+                },
+            }),
+            result: RepositoryMaterializationResult::Success(
+                RepositoryMaterializationSuccess::Local,
+            ),
+        }
+    });
+    RepositoryMaterializationResultEpoch::new(workspace.dupe(), entries).unwrap()
 }
 
 fn root_epoch(root: &std::path::Path) -> PathObservationEpoch {
     root_epoch_with_missing(root, std::iter::empty::<PathBuf>())
+}
+
+fn root_epoch_with_listings(
+    root: &std::path::Path,
+    directories: &[PathBuf],
+) -> PathObservationEpoch {
+    let base = root_epoch(root);
+    let listings = directories.iter().map(|directory| {
+        let entries = fs::read_dir(directory).unwrap().map(|entry| {
+            let entry = entry.unwrap();
+            let file_type = entry.file_type().unwrap();
+            let kind = if file_type.is_file() {
+                PathDirectoryEntryKind::File
+            } else if file_type.is_dir() {
+                PathDirectoryEntryKind::Directory
+            } else if file_type.is_symlink() {
+                PathDirectoryEntryKind::Symlink
+            } else {
+                PathDirectoryEntryKind::Unknown
+            };
+            PathDirectoryEntry::new(PathDirectoryName::new(entry.file_name()).unwrap(), kind)
+        });
+        (
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(directory.clone()).unwrap(),
+                PathObservationOperation::DirectoryEntries,
+            ),
+            Arc::new(PathObservationResult::DirectoryEntries(
+                PathOperationResult::Present(PathDirectoryEntries::new(entries)),
+            )),
+        )
+    });
+    PathObservationEpoch::from_shared(
+        base.observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain(listings),
+    )
+    .unwrap()
 }
 
 fn root_epoch_with_missing(
@@ -402,6 +510,23 @@ fn root_epoch_with_missing(
             );
         }
     }
+    let lockfile = NormalizedAbsolutePath::new(root.join("MODULE.bazel.lock")).unwrap();
+    entries.insert(
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            lockfile.clone(),
+            PathObservationOperation::Lstat,
+        ),
+        PathObservationResult::Lstat(PathOperationResult::Missing),
+    );
+    entries.insert(
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            lockfile,
+            PathObservationOperation::FileBytes,
+        ),
+        PathObservationResult::FileBytes(PathOperationResult::Missing),
+    );
     for directory in directories {
         for name in ["BUILD", "BUILD.bazel"] {
             let path = directory.join(name);
@@ -569,6 +694,12 @@ impl ActivationTracker for RootActivationTracker {
         } else if self.all_loading {
             let identity = if let Some(key) = key.downcast_ref::<HostPackageInventoryKey>() {
                 Some(format!("package/{key}"))
+            } else if let Some(key) = key.downcast_ref::<ModuleRegistrationExpansionKey>() {
+                Some(format!("registration/legacy/{}", key.family()))
+            } else if let Some(key) =
+                key.downcast_ref::<ModuleRegistrationExpansionObservationKey>()
+            {
+                Some(format!("registration/observed/{}", key.family()))
             } else if key.downcast_ref::<RootModuleLoadingAnchorKey>().is_some() {
                 Some("anchor".to_owned())
             } else {
@@ -693,18 +824,66 @@ async fn root_target_request_with_configuration(
     configuration: ConfigurationKey,
     tracker: Arc<RootActivationTracker>,
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
-    let mut user_data = UserComputationData {
-        activation_tracker: Some(tracker),
-        ..Default::default()
-    };
-    user_data.data.set(CaptureEvaluationEvents);
-    let mut updater = dice.updater_with_data(user_data);
+    root_target_request_with_inputs(
+        dice,
+        workspace,
+        target,
+        configuration,
+        tracker,
+        root_epoch(workspace),
+        &[],
+    )
+    .await
+}
+
+fn inject_root_target_inputs(
+    updater: &mut DiceTransactionUpdater,
+    workspace: &std::path::Path,
+    epoch: PathObservationEpoch,
+    repositories: &[(&str, &str)],
+) {
+    let text = Arc::new(workspace_snapshot(workspace));
+    let raw = raw_snapshot_from_text(&text);
     updater
-        .changed_to(vec![(PathObservationEpochKey, root_epoch(workspace))])
+        .changed_to(vec![(
+            WorkspaceSnapshotKey {
+                workspace: workspace.to_path_buf(),
+            },
+            text,
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.to_path_buf(),
+            },
+            raw,
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceDirectorySnapshotKey {
+                workspace: workspace.to_path_buf(),
+            },
+            Arc::new(directory_snapshot(workspace)),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
     let root = NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap();
+    if !repositories.is_empty() {
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: root.dupe(),
+                },
+                local_repository_materializations(&root, repositories),
+            )])
+            .unwrap();
+    }
     inject_root_package_policy_inputs(
-        &mut updater,
+        updater,
         RootPackagePolicyInputs::new(
             root.clone(),
             [root],
@@ -716,13 +895,32 @@ async fn root_target_request_with_configuration(
     )
     .unwrap();
     inject_root_module_request_inputs(
-        &mut updater,
+        updater,
         workspace,
         BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
         LockfileMode::Update,
     )
     .unwrap();
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn root_target_request_with_inputs(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    configuration: ConfigurationKey,
+    tracker: Arc<RootActivationTracker>,
+    epoch: PathObservationEpoch,
+    repositories: &[(&str, &str)],
+) -> Result<Arc<ConfiguredNodeResult>, String> {
+    let mut user_data = UserComputationData {
+        activation_tracker: Some(tracker),
+        ..Default::default()
+    };
+    user_data.data.set(CaptureEvaluationEvents);
+    let mut updater = dice.updater_with_data(user_data);
+    inject_root_target_inputs(&mut updater, workspace, epoch, repositories);
     let mut transaction = updater.commit().await;
     let analysis_key = prepared_analysis_key(
         &mut transaction,
@@ -737,7 +935,44 @@ async fn root_target_request_with_configuration(
         .await
         .map_err(|error| error.to_string())?;
     let AnalysisPreparationOutcome::Complete(value) = value else {
-        return Err("root target returned Needs".to_owned());
+        return Err(format!("root target returned Needs: {value:#?}"));
+    };
+    value
+        .as_ref()
+        .as_ref()
+        .cloned()
+        .map_err(|error| error.to_string())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn observed_root_target_request_with_inputs(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    configuration: ConfigurationKey,
+    tracker: Arc<RootActivationTracker>,
+    epoch: PathObservationEpoch,
+    repositories: &[(&str, &str)],
+) -> Result<Arc<ConfiguredNodeResult>, String> {
+    let mut data = UserComputationData {
+        activation_tracker: Some(tracker),
+        ..Default::default()
+    };
+    data.data.set(CaptureEvaluationEvents);
+    let mut updater = dice.updater_with_data(data);
+    inject_root_target_inputs(&mut updater, workspace, epoch, repositories);
+    let mut transaction = updater.commit().await;
+    let key = ConfiguredNodeAnalysisObservationKey::new(
+        NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
+        ConfiguredTargetKey::new(CanonicalLabel::parse(target).unwrap(), configuration),
+    )
+    .unwrap();
+    let value = transaction
+        .compute(&key)
+        .await
+        .map_err(|error| error.to_string())?;
+    let AnalysisPreparationOutcome::Complete(Ok(value)) = value else {
+        return Err(format!("observed root target did not complete: {value:#?}"));
     };
     value
         .as_ref()
@@ -770,7 +1005,7 @@ fn root_setting_value(key: &ConfiguredTargetKey) -> &str {
     key.configuration().root_string_setting().unwrap().as_str()
 }
 
-const TOOLCHAIN_MODULE: &str = "module(name = \"root\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:second\", \"//:first\")\n";
+const TOOLCHAIN_MODULE: &str = "module(name = \"bazel_tools\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:second\", \"//:first\")\n";
 const TOOLCHAIN_DEFS: &str = r#"ConsumerInfo = provider(fields = {"value": ""})
 def _first(ctx):
     print("FIRST_LOCAL")
@@ -788,7 +1023,7 @@ second_impl = rule(implementation = _second, attrs = {"marker": attr.string(mand
 request = rule(implementation = _request, toolchains = ["//:type"])
 "#;
 const TOOLCHAIN_BUILD: &str = "load(\":defs.bzl\", \"first_impl\", \"request\", \"second_impl\")\nconstraint_setting(name = \"setting\")\nconstraint_value(name = \"linux\", constraint_setting = \":setting\")\nconstraint_value(name = \"other\", constraint_setting = \":setting\")\nplatform(name = \"platform\", constraint_values = [\":linux\"])\ntoolchain_type(name = \"type\")\nfirst_impl(name = \"first_impl\", marker = \"first\")\nsecond_impl(name = \"second_impl\", marker = \"second\")\ntoolchain(name = \"first\", toolchain_type = \":type\", toolchain = \":first_impl\", exec_compatible_with = [\":linux\"])\ntoolchain(name = \"second\", toolchain_type = \":type\", toolchain = \":second_impl\", exec_compatible_with = [\":linux\"])\nrequest(name = \"request\")\n";
-const TOPOLOGY_MODULE: &str = "module(name = \"root\")\nregister_execution_platforms(\"//:first_platform\", \"//:second_platform\")\nregister_toolchains(\"//:first_toolchain\", \"//:second_toolchain\")\n";
+const TOPOLOGY_MODULE: &str = "module(name = \"bazel_tools\")\nregister_execution_platforms(\"//:first_platform\", \"//:second_platform\")\nregister_toolchains(\"//:first_toolchain\", \"//:second_toolchain\")\n";
 const TOPOLOGY_BUILD: &str = "load(\":defs.bzl\", \"first_impl\", \"request\", \"second_impl\")\nconstraint_setting(name = \"selection\")\nconstraint_value(name = \"first\", constraint_setting = \":selection\")\nconstraint_value(name = \"second\", constraint_setting = \":selection\")\nplatform(name = \"first_platform\", constraint_values = [\":first\"], exec_properties = {\"z\": \"last\", \"a\": \"first\"})\nplatform(name = \"second_platform\", constraint_values = [\":second\"])\ntoolchain_type(name = \"type\")\nfirst_impl(name = \"first_impl\", marker = \"first\")\nsecond_impl(name = \"second_impl\", marker = \"second\")\nfirst_impl(name = \"orphan\", marker = \"orphan\")\ntoolchain(name = \"first_toolchain\", toolchain_type = \":type\", toolchain = \":first_impl\", exec_compatible_with = [\":first\"])\ntoolchain(name = \"second_toolchain\", toolchain_type = \":type\", toolchain = \":second_impl\", exec_compatible_with = [\":second\"])\nrequest(name = \"request\")\n";
 
 async fn toolchain_case(
@@ -1025,9 +1260,23 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = || Arc::new(RootActivationTracker::default());
 
-    let direct_impl = root_target_request(&dice, &workspace, "@@//:first_impl", tracker())
-        .await
-        .unwrap();
+    let direct_tracker = Arc::new(RootActivationTracker::with_loading());
+    let direct_impl =
+        root_target_request(&dice, &workspace, "@@//:first_impl", direct_tracker.clone())
+            .await
+            .unwrap();
+    let direct_loading = direct_tracker.take().0;
+    assert_eq!(
+        direct_loading
+            .iter()
+            .filter(|(identity, _)| identity.starts_with("registration/legacy/"))
+            .map(|(identity, _)| identity.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "registration/legacy/execution-platforms",
+            "registration/legacy/toolchains",
+        ]
+    );
     assert_eq!(
         candidate_labels(&direct_impl),
         vec!["@@//:first_platform", "@@//:second_platform"]
@@ -1256,7 +1505,7 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
         root_target_request(&dice, &workspace, "@@//:first_impl", tracker())
             .await
             .unwrap_err()
-            .contains("external toolchain topology registration")
+            .contains("target pattern repository '@external' is not visible")
     );
     fs::write(
         workspace.join("BUILD.bazel"),
@@ -1527,6 +1776,7 @@ async fn selected_platform_terminals_suppress_implementation_and_rule_evaluation
         };
         data.data.set(CaptureEvaluationEvents);
         let mut updater = dice.updater_with_data(data);
+        inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
         updater
             .changed_to(vec![(platform_key.clone(), value)])
             .unwrap();
@@ -1534,7 +1784,8 @@ async fn selected_platform_terminals_suppress_implementation_and_rule_evaluation
         let outcome = transaction.compute(&root_key).await.unwrap();
         match name {
             "outer" => assert!(
-                matches!(&outcome, AnalysisPreparationOutcome::Complete(Err(error)) if error == &outer)
+                matches!(&outcome, AnalysisPreparationOutcome::Complete(Err(error)) if error == &outer),
+                "{outcome:#?}"
             ),
             "semantic" => assert!(matches!(
                 &outcome,
@@ -1637,6 +1888,11 @@ async fn zero_toolchain_requirement_bypasses_registration_resolution() {
             .iter()
             .any(|(identity, _)| identity.starts_with("package/"))
     );
+    assert!(
+        activations
+            .iter()
+            .all(|(identity, _)| !identity.starts_with("registration/"))
+    );
     let request = nodes
         .iter()
         .find(|(identity, _, _)| identity.contains("@@//:request"))
@@ -1654,7 +1910,7 @@ async fn root_toolchain_resolution_loads_reachable_cross_package_references() {
     for package in ["platforms", "tools", "constraints", "impl", "rules"] {
         fs::create_dir_all(workspace.join(package)).unwrap();
     }
-    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\nregister_execution_platforms(\"//platforms:p\")\nregister_toolchains(\"//tools:tc\")\n").unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"bazel_tools\")\nregister_execution_platforms(\"//platforms:p\")\nregister_toolchains(\"//tools:tc\")\n").unwrap();
     fs::write(workspace.join("defs.bzl"), "ConsumerInfo = provider(fields = {\"value\": \"\"})\ndef _request(ctx): return [ConsumerInfo(value = ctx.toolchains[\"//tools:type\"].marker)]\nrequest = rule(implementation = _request, toolchains = [\"//tools:type\"])\n").unwrap();
     fs::write(
         workspace.join("BUILD.bazel"),
@@ -1693,15 +1949,122 @@ async fn root_toolchain_resolution_loads_reachable_cross_package_references() {
 }
 
 #[tokio::test]
-async fn external_registration_error_yields_to_root_package_needs() {
-    let missing_module = "module(name = \"root\")\nregister_execution_platforms(\"@external//:p\", \"//platforms:p\")\nregister_toolchains(\"//tools:tc\")\n";
-    let required_defs = TOOLCHAIN_DEFS.replace("[\"//:type\"]", "[\"//:type\"]");
-    let need = toolchain_case(missing_module, &required_defs, TOOLCHAIN_BUILD)
+async fn selected_nonroot_registrations_preserve_canonical_repository_identity() {
+    let workspace = scratch();
+    for repository in ["dep_a", "dep_b"] {
+        fs::create_dir_all(workspace.join(repository).join("shared")).unwrap();
+        fs::write(workspace.join(repository).join("REPO.bazel"), "").unwrap();
+        fs::write(workspace.join(repository).join(".bazelignore"), "").unwrap();
+        fs::write(
+            workspace.join(repository).join("shared/defs.bzl"),
+            "def _impl(ctx): return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]\nimpl = rule(implementation = _impl, attrs = {\"marker\": attr.string(mandatory = True)})\n",
+        )
+        .unwrap();
+    }
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"bazel_tools\")\nbazel_dep(name = \"dep_a\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep_a\", path = \"dep_a\")\nbazel_dep(name = \"dep_b\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep_b\", path = \"dep_b\")\nregister_toolchains(\"@dep_b//shared:selected\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        "ConsumerInfo = provider(fields = {\"value\": \"\"})\ndef _request(ctx): return [ConsumerInfo(value = ctx.toolchains[\"//:type\"].marker)]\nrequest = rule(implementation = _request, toolchains = [\"//:type\"])\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"request\")\ntoolchain_type(name = \"type\")\nrequest(name = \"request\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("dep_a/MODULE.bazel"),
+        "module(name = \"dep_a\", version = \"1.0.0\")\nregister_execution_platforms(\"//shared:platform\")\nregister_toolchains(\"//shared:all\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("dep_a/shared/BUILD.bazel"),
+        "load(\":defs.bzl\", \"impl\")\nconstraint_setting(name = \"setting\")\nconstraint_value(name = \"value\", constraint_setting = \":setting\")\nplatform(name = \"platform\", constraint_values = [\":value\"])\ntoolchain_type(name = \"type\")\nimpl(name = \"impl\", marker = \"a\")\ntoolchain(name = \"toolchain\", toolchain_type = \":type\", toolchain = \":impl\", exec_compatible_with = [\":value\"])\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("dep_b/MODULE.bazel"),
+        "module(name = \"dep_b\", version = \"1.0.0\")\nregister_execution_platforms(\"//shared/...\")\nregister_toolchains(\"//shared/...\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("dep_b/shared/BUILD.bazel"),
+        "load(\":defs.bzl\", \"impl\")\nconstraint_setting(name = \"setting\")\nconstraint_value(name = \"value\", constraint_setting = \":setting\")\nplatform(name = \"platform\", constraint_values = [\":value\"])\ntoolchain_type(name = \"type\")\nimpl(name = \"impl\", marker = \"b\")\nimpl(name = \"unused_impl\", marker = \"unused\")\ntoolchain(name = \"toolchain\", toolchain_type = \":type\", toolchain = \":unused_impl\", exec_compatible_with = [\":value\"])\ntoolchain(name = \"selected\", toolchain_type = \"@@//:type\", toolchain = \":impl\", exec_compatible_with = [\":value\"])\n",
+    )
+    .unwrap();
+    let repositories = [("dep_a+", "dep_a"), ("dep_b+", "dep_b")];
+    let epoch = root_epoch_with_listings(&workspace, &[workspace.join("dep_b").join("shared")]);
+    let tracker = Arc::new(RootActivationTracker::with_loading());
+    let legacy = root_target_request_with_inputs(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        "@@//:request",
+        test_configuration(),
+        tracker.clone(),
+        epoch.dupe(),
+        &repositories,
+    )
+    .await
+    .unwrap();
+    let observed = observed_root_target_request_with_inputs(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        "@@//:request",
+        test_configuration(),
+        Arc::new(RootActivationTracker::default()),
+        epoch,
+        &repositories,
+    )
+    .await
+    .unwrap();
+    assert_eq!(observed, legacy);
+    let consumer = ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap();
+    assert_eq!(provider_value(&legacy, &consumer), "b");
+    assert_eq!(
+        candidate_labels(&legacy),
+        ["@@dep_a+//shared:platform", "@@dep_b+//shared:platform",]
+    );
+    let selection = legacy.toolchain_topology().unwrap().selection().unwrap();
+    assert_eq!(
+        selection.declaration().to_string(),
+        "@@dep_b+//shared:selected"
+    );
+    assert_eq!(
+        selection.implementation().label().to_string(),
+        "@@dep_b+//shared:impl"
+    );
+    let packages = tracker
+        .take()
+        .0
+        .into_iter()
+        .filter(|(identity, _)| identity.starts_with("package/"))
+        .map(|(identity, _)| identity)
+        .collect::<Vec<_>>();
+    assert!(
+        packages
+            .iter()
+            .any(|identity| identity.contains("@@dep_a+//shared"))
+    );
+    assert!(
+        packages
+            .iter()
+            .any(|identity| identity.contains("@@dep_b+//shared"))
+    );
+}
+
+#[tokio::test]
+async fn registration_family_need_precedes_earlier_semantic_error() {
+    let module = "module(name = \"bazel_tools\")\nregister_execution_platforms(\"@external//:p\")\nregister_toolchains(\"//missing:tc\")\n";
+    let need = toolchain_case(module, TOOLCHAIN_DEFS, TOOLCHAIN_BUILD)
         .await
         .unwrap_err();
-    assert!(need.contains("Needs"), "{need}");
+    assert!(need.starts_with("root target returned Needs:"), "{need}");
 
-    let external = toolchain_case(
+    let semantic = toolchain_case(
         &TOOLCHAIN_MODULE.replacen(
             "register_execution_platforms(",
             "register_execution_platforms(\"@external//:p\", ",
@@ -1713,8 +2076,72 @@ async fn external_registration_error_yields_to_root_package_needs() {
     .await
     .unwrap_err();
     assert!(
-        external.contains("external toolchain registration"),
-        "{external}"
+        semantic.contains("target pattern repository '@external' is not visible"),
+        "{semantic}"
+    );
+}
+
+#[tokio::test]
+async fn registration_family_outer_precedes_earlier_semantic_error() {
+    let workspace = scratch();
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"bazel_tools\")\nregister_execution_platforms(\"@external//:p\")\nregister_toolchains(\"//:second\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.join("defs.bzl"), TOOLCHAIN_DEFS).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), TOOLCHAIN_BUILD).unwrap();
+    let root = NormalizedAbsolutePath::new(workspace.clone()).unwrap();
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new(workspace.join("registration-terminal")).unwrap(),
+        PathObservationOperation::Lstat,
+    );
+    let outer = ObservedPathFrontierError::from(PathObservationEpochError::DuplicateDemand(demand));
+    let tracker = Arc::new(RootActivationTracker::with_loading());
+    let mut data = UserComputationData {
+        activation_tracker: Some(tracker.clone()),
+        ..Default::default()
+    };
+    data.data.set(CaptureEvaluationEvents);
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut updater = dice.updater_with_data(data);
+    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
+    updater
+        .changed_to(vec![(
+            ModuleRegistrationExpansionObservationKey::toolchains(root.dupe()),
+            AnalysisPreparationOutcome::Complete(Err(
+                ModuleRegistrationExpansionObservationError::Frontier(outer.clone()),
+            )),
+        )])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    let key = ConfiguredNodeAnalysisObservationKey::new(
+        root,
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:request").unwrap(),
+            test_configuration(),
+        ),
+    )
+    .unwrap();
+    let outcome = transaction.compute(&key).await.unwrap();
+    assert!(
+        matches!(&outcome, AnalysisPreparationOutcome::Complete(Err(error)) if error == &outer),
+        "{outcome:#?}"
+    );
+    let registrations = tracker
+        .take()
+        .0
+        .into_iter()
+        .filter(|(identity, _)| identity.starts_with("registration/observed/"))
+        .map(|(identity, _)| identity)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        registrations,
+        [
+            "registration/observed/execution-platforms",
+            "registration/observed/toolchains",
+        ]
     );
 }
 

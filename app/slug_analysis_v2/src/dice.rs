@@ -21,14 +21,10 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
-use slug_bzlmod_v2::ModuleRegistrationPattern;
-use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
-use slug_bzlmod_v2::RootModuleLoadingAnchorObservationKey;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
-use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::TargetName;
@@ -42,6 +38,10 @@ use slug_loading_v2::HostPackageInventoryObservationKey;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::LoadingPreparationNeeds;
 use slug_loading_v2::LoadingPreparationOutcome;
+use slug_loading_v2::ModuleRegistrationExpansion;
+use slug_loading_v2::ModuleRegistrationExpansionKey;
+use slug_loading_v2::ModuleRegistrationExpansionObservationError;
+use slug_loading_v2::ModuleRegistrationExpansionObservationKey;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::package::NativeToolchainTarget;
 use slug_loading_v2::package::StarlarkRuleImplementation;
@@ -250,11 +250,6 @@ async fn compute_configured_package_input(
     package: PackageIdentifier,
     context: &str,
 ) -> AnalysisSemanticOutcome<ConfiguredPackageValue> {
-    if !package.repo().is_root() {
-        return analysis_semantic_complete(Err(AnalysisError::message(format!(
-            "external repository configured packages are not supported: {package}"
-        ))));
-    }
     match mode {
         ConfiguredAnalysisMode::Legacy => {
             match ctx
@@ -281,9 +276,9 @@ async fn compute_configured_package_input(
                 ))) => LoadingPreparationOutcome::Complete(Err(error)),
                 Ok(LoadingPreparationOutcome::Complete(Err(
                     slug_loading_v2::HostPackageInventoryObservationError::CanonicalRoute(error),
-                ))) => panic!(
-                    "root-only configured package input produced canonical route outer: {error:?}"
-                ),
+                ))) => {
+                    analysis_semantic_complete(Err(AnalysisError::message(format!("{error:?}"))))
+                }
                 Ok(LoadingPreparationOutcome::Complete(Ok(observed))) => {
                     analysis_semantic_complete(Ok(observed.result().dupe()))
                 }
@@ -1173,53 +1168,104 @@ fn root_analysis_is_success(value: &RootAnalysisKeyValue) -> bool {
     )
 }
 
+fn require_supported_canonical_configured_target(
+    node: &ConfiguredNodeKey,
+    target: Option<&slug_loading_v2::PackageTarget>,
+) -> Result<(), AnalysisError> {
+    if node.label().package().repo().is_root() {
+        return Ok(());
+    }
+    let supported = matches!(
+        (node, target),
+        (
+            ConfiguredNodeKey::Configured(_),
+            Some(slug_loading_v2::PackageTarget {
+                kind: PackageTargetKind::NativeToolchain(_),
+                ..
+            })
+        )
+    ) || matches!((node, target), (ConfiguredNodeKey::Configured(_), Some(target)) if is_marker_leaf_target(target));
+    if supported {
+        Ok(())
+    } else {
+        Err(AnalysisError::new(format!(
+            "external repository configured target shape is not supported: {}",
+            node.label()
+        )))
+    }
+}
+
 type PreparedToolchainOutcome = AnalysisSemanticOutcome<PreparedToolchain>;
 type ConfiguredPackageValue = Arc<HostPackageInventory>;
 type ConfiguredPackages = Vec<(PackageIdentifier, ConfiguredPackageValue)>;
+
+#[derive(Debug, Clone)]
+struct PreparedModuleRegistrations {
+    execution_platforms: Arc<ModuleRegistrationExpansion>,
+    toolchains: Arc<ModuleRegistrationExpansion>,
+}
+
+impl PreparedModuleRegistrations {
+    fn execution_platforms(&self) -> Result<&[CanonicalLabel], AnalysisError> {
+        self.execution_platforms
+            .labels()
+            .map(|labels| labels.as_ref())
+            .map_err(|error| AnalysisError::new(error.to_string()))
+    }
+
+    fn toolchains(&self) -> Result<&[CanonicalLabel], AnalysisError> {
+        self.toolchains
+            .labels()
+            .map(|labels| labels.as_ref())
+            .map_err(|error| AnalysisError::new(error.to_string()))
+    }
+}
 
 fn toolchain_outcome(result: Result<PreparedToolchain, AnalysisError>) -> PreparedToolchainOutcome {
     analysis_semantic_complete(result)
 }
 
-async fn compute_root_anchor_input(
+async fn compute_registration_expansion_input(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: NormalizedAbsolutePath,
+    execution_platforms: bool,
     context: &str,
-) -> AnalysisSemanticOutcome<slug_bzlmod_v2::RootModuleLoadingAnchor> {
+) -> AnalysisSemanticOutcome<Arc<ModuleRegistrationExpansion>> {
     match mode {
         ConfiguredAnalysisMode::Legacy => {
-            match ctx
-                .compute(&RootModuleLoadingAnchorKey::new(workspace))
-                .await
-            {
+            let key = if execution_platforms {
+                ModuleRegistrationExpansionKey::execution_platforms(workspace)
+            } else {
+                ModuleRegistrationExpansionKey::toolchains(workspace)
+            };
+            match ctx.compute(&key).await {
                 Ok(LoadingPreparationOutcome::Need(need)) => LoadingPreparationOutcome::Need(need),
-                Ok(LoadingPreparationOutcome::Complete(value)) => match value.as_ref() {
-                    Ok(anchor) => analysis_semantic_complete(Ok(anchor.dupe())),
-                    Err(error) => {
-                        analysis_semantic_complete(Err(AnalysisError::new(error.to_string())))
-                    }
-                },
+                Ok(LoadingPreparationOutcome::Complete(value)) => {
+                    analysis_semantic_complete(Ok(value))
+                }
                 Err(error) => analysis_semantic_complete(Err(AnalysisError::new(format!(
                     "{context}: {error}"
                 )))),
             }
         }
         ConfiguredAnalysisMode::Observed => {
-            match ctx
-                .compute(&RootModuleLoadingAnchorObservationKey::new(workspace))
-                .await
-            {
+            let key = if execution_platforms {
+                ModuleRegistrationExpansionObservationKey::execution_platforms(workspace)
+            } else {
+                ModuleRegistrationExpansionObservationKey::toolchains(workspace)
+            };
+            match ctx.compute(&key).await {
                 Ok(LoadingPreparationOutcome::Need(need)) => LoadingPreparationOutcome::Need(need),
+                Ok(LoadingPreparationOutcome::Complete(Err(
+                    ModuleRegistrationExpansionObservationError::Frontier(error),
+                ))) => LoadingPreparationOutcome::Complete(Err(error)),
                 Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
-                    LoadingPreparationOutcome::Complete(Err(error))
+                    analysis_semantic_complete(Err(AnalysisError::new(error.to_string())))
                 }
-                Ok(LoadingPreparationOutcome::Complete(Ok(observed))) => match observed.result() {
-                    Ok(anchor) => analysis_semantic_complete(Ok(anchor.dupe())),
-                    Err(error) => {
-                        analysis_semantic_complete(Err(AnalysisError::new(error.to_string())))
-                    }
-                },
+                Ok(LoadingPreparationOutcome::Complete(Ok(observed))) => {
+                    analysis_semantic_complete(Ok(observed.result().dupe()))
+                }
                 Err(error) => analysis_semantic_complete(Err(AnalysisError::new(format!(
                     "{context}: {error}"
                 )))),
@@ -1228,16 +1274,85 @@ async fn compute_root_anchor_input(
     }
 }
 
-async fn root_rule_execution_platforms(
+async fn prepare_module_registrations(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
-    configuration: &ConfigurationKey,
+    has_toolchain_requirement: bool,
+    has_local_declarations: bool,
+) -> AnalysisSemanticOutcome<Option<PreparedModuleRegistrations>> {
+    if !has_toolchain_requirement && !has_local_declarations {
+        return analysis_semantic_complete(Ok(None));
+    }
+    let execution_platforms = compute_registration_expansion_input(
+        ctx,
+        mode,
+        workspace.dupe(),
+        true,
+        "loading execution-platform registrations through DICE",
+    )
+    .await;
+    let toolchains = compute_registration_expansion_input(
+        ctx,
+        mode,
+        workspace.dupe(),
+        false,
+        "loading toolchain registrations through DICE",
+    )
+    .await;
+    let mut values = [None, None];
+    let mut needs: Option<LoadingPreparationNeeds> = None;
+    let mut first_outer = None;
+    let mut first_error = None;
+    for (index, outcome) in [execution_platforms, toolchains].into_iter().enumerate() {
+        match outcome {
+            LoadingPreparationOutcome::Need(need) => {
+                needs = Some(needs.map_or(need.clone(), |current| {
+                    current
+                        .try_union(&need)
+                        .expect("registration family Needs agree")
+                }));
+            }
+            LoadingPreparationOutcome::Complete(Err(error)) if first_outer.is_none() => {
+                first_outer = Some(error);
+            }
+            LoadingPreparationOutcome::Complete(Err(_)) => {}
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) if first_error.is_none() => {
+                first_error = Some(error);
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(_))) => {}
+            LoadingPreparationOutcome::Complete(Ok(Ok(value))) => match value.labels() {
+                Ok(_) => values[index] = Some(value),
+                Err(error) if first_error.is_none() => {
+                    first_error = Some(AnalysisError::new(error.to_string()));
+                }
+                Err(_) => {}
+            },
+        }
+    }
+    if let Some(error) = first_outer {
+        return LoadingPreparationOutcome::Complete(Err(error));
+    }
+    if let Some(need) = needs {
+        return LoadingPreparationOutcome::Need(need);
+    }
+    if let Some(error) = first_error {
+        return analysis_semantic_complete(Err(error));
+    }
+    let [Some(execution_platforms), Some(toolchains)] = values else {
+        unreachable!("complete registration preparation retains both family values")
+    };
+    analysis_semantic_complete(Ok(Some(PreparedModuleRegistrations {
+        execution_platforms,
+        toolchains,
+    })))
+}
+
+fn local_toolchain_declarations(
     package: &LoadedPackage,
     rule_label: &CanonicalLabel,
-    has_toolchain_requirement: bool,
-) -> AnalysisSemanticOutcome<Option<Vec<ConfiguredTargetKey>>> {
-    let local_declarations = package
+) -> SmallSet<CanonicalLabel> {
+    package
         .targets
         .iter()
         .filter_map(|target| match &target.kind {
@@ -1252,71 +1367,44 @@ async fn root_rule_execution_platforms(
             ),
             _ => None,
         })
-        .collect::<SmallSet<_>>();
-    if !has_toolchain_requirement && local_declarations.is_empty() {
-        return analysis_semantic_complete(Ok(None));
-    }
-    let anchor = match compute_root_anchor_input(
-        ctx,
-        mode,
-        workspace.dupe(),
-        "loading execution-platform registrations through DICE",
-    )
-    .await
-    {
-        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
-        LoadingPreparationOutcome::Complete(Err(error)) => {
-            return LoadingPreparationOutcome::Complete(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-            return analysis_semantic_complete(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Ok(anchor))) => anchor,
+        .collect()
+}
+
+fn rule_execution_platforms(
+    configuration: &ConfigurationKey,
+    registrations: Option<&PreparedModuleRegistrations>,
+    local_declarations: &SmallSet<CanonicalLabel>,
+    has_toolchain_requirement: bool,
+) -> Result<Option<Vec<ConfiguredTargetKey>>, AnalysisError> {
+    let Some(registrations) = registrations else {
+        debug_assert!(!has_toolchain_requirement && local_declarations.is_empty());
+        return Ok(None);
     };
-    let (execution_platforms, mut registration_error) = match direct_root_registrations(
-        anchor.registrations().execution_platforms(),
-        "toolchain topology",
-    ) {
-        Ok(labels) => labels,
-        Err(error) => return analysis_semantic_complete(Err(error)),
-    };
-    let (toolchains, toolchain_error) = match direct_root_registrations(
-        anchor.registrations().toolchains(),
-        "toolchain topology",
-    ) {
-        Ok(labels) => labels,
-        Err(error) => return analysis_semantic_complete(Err(error)),
-    };
-    if registration_error.is_none() {
-        registration_error = toolchain_error;
-    }
+    let toolchains = registrations.toolchains()?;
     if !has_toolchain_requirement {
         let registered = toolchains
             .iter()
             .any(|declaration| local_declarations.contains(declaration));
         if !registered {
-            return analysis_semantic_complete(Ok(None));
-        }
-        if let Some(error) = registration_error {
-            return analysis_semantic_complete(Err(error));
+            return Ok(None);
         }
     }
     let Some(structural) = configuration.slug_configuration() else {
-        return analysis_semantic_complete(Err(AnalysisError::new(
+        return Err(AnalysisError::new(
             "execution-platform topology requires a structural Slug configuration",
-        )));
+        ));
     };
     let execution_configuration = match structural.to_exec() {
         Ok(configuration) => ConfigurationKey::from_slug(configuration),
-        Err(error) => {
-            return analysis_semantic_complete(Err(AnalysisError::new(error.to_string())));
-        }
+        Err(error) => return Err(AnalysisError::new(error.to_string())),
     };
-    let platforms = execution_platforms
-        .into_iter()
+    let platforms = registrations
+        .execution_platforms()?
+        .iter()
+        .cloned()
         .map(|label| ConfiguredTargetKey::new(label, execution_configuration.clone()))
         .collect();
-    analysis_semantic_complete(Ok(Some(platforms)))
+    Ok(Some(platforms))
 }
 
 fn root_apparent_type(label: &CanonicalLabel) -> Result<CompactString, AnalysisError> {
@@ -1330,50 +1418,6 @@ fn root_apparent_type(label: &CanonicalLabel) -> Result<CompactString, AnalysisE
         .strip_prefix("@@")
         .expect("root canonical labels have the @@ spelling")
         .into())
-}
-
-fn direct_root_registration(
-    pattern: &ModuleRegistrationPattern,
-) -> Result<Option<CanonicalLabel>, AnalysisError> {
-    let raw = pattern.as_str();
-    let target = raw.rsplit_once(':').map(|(_, target)| target);
-    if raw.ends_with("/...") || matches!(target, Some("all" | "all-targets" | "*")) {
-        return Err(AnalysisError::new(format!(
-            "unexpanded registration target pattern is not supported: {raw}"
-        )));
-    }
-    let apparent = ApparentLabel::parse(raw).map_err(|error| {
-        AnalysisError::new(format!(
-            "invalid registration target pattern '{raw}': {error}"
-        ))
-    })?;
-    if !apparent.repo().is_root() {
-        return Ok(None);
-    }
-    CanonicalLabel::parse(&format!("@@{apparent}"))
-        .map(Some)
-        .map_err(AnalysisError::new)
-}
-
-fn direct_root_registrations(
-    patterns: &[ModuleRegistrationPattern],
-    context: &str,
-) -> Result<(Vec<CanonicalLabel>, Option<AnalysisError>), AnalysisError> {
-    let mut labels = Vec::new();
-    let mut external = None;
-    for pattern in patterns {
-        match direct_root_registration(pattern)? {
-            Some(label) => labels.push(label),
-            None => {
-                external.get_or_insert_with(|| {
-                    AnalysisError::new(format!(
-                        "external {context} registration is not supported: {pattern}"
-                    ))
-                });
-            }
-        };
-    }
-    Ok((labels, external))
 }
 
 fn package_target<'a>(
@@ -1446,16 +1490,6 @@ fn native_references(target: &slug_loading_v2::PackageTarget) -> Vec<CanonicalLa
             .cloned()
             .collect(),
         _ => Vec::new(),
-    }
-}
-
-fn require_root_native_reference(reference: &CanonicalLabel) -> Result<(), AnalysisError> {
-    if reference.package().repo().is_root() {
-        Ok(())
-    } else {
-        Err(AnalysisError::new(format!(
-            "external native toolchain reference is not supported: {reference}"
-        )))
     }
 }
 
@@ -1601,13 +1635,6 @@ async fn load_configured_native_packages(
     let mut packages = Vec::new();
     let mut seen = labels.iter().cloned().collect::<SmallSet<_>>();
     loop {
-        if let Some(label) = labels
-            .iter()
-            .find(|label| !label.package().repo().is_root())
-        {
-            return analysis_semantic_complete(Err(require_root_native_reference(label)
-                .expect_err("nonroot label must fail root native-reference admission")));
-        }
         let packages_to_load = labels
             .iter()
             .map(|label| label.package().clone())
@@ -1618,9 +1645,6 @@ async fn load_configured_native_packages(
             for label in labels.clone() {
                 if let Ok(target) = package_target(&packages, &label) {
                     for reference in native_references(target) {
-                        if let Err(error) = require_root_native_reference(&reference) {
-                            return analysis_semantic_complete(Err(error));
-                        }
                         if seen.insert(reference.clone()) {
                             next.insert(reference.package().clone());
                             labels.push(reference);
@@ -1755,44 +1779,16 @@ fn validate_constraint_settings(
     Ok(())
 }
 
-fn validate_marker_toolchain(
-    packages: &ConfiguredPackages,
-    label: &CanonicalLabel,
-) -> Result<(), AnalysisError> {
-    let target = package_target(packages, label)?;
-    let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
-        toolchain_type,
-        implementation,
-        exec_compatible_with,
-    }) = &target.kind
-    else {
-        return Err(AnalysisError::new(format!(
-            "registered toolchain is not toolchain: {label}"
-        )));
-    };
-    if !matches!(package_target(packages, toolchain_type), Ok(target) if matches!(target.kind, PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)))
-    {
-        return Err(AnalysisError::new(format!(
-            "toolchain references a non-toolchain type: {label}"
-        )));
-    }
-    validate_constraint_settings(packages, exec_compatible_with, || {
-        AnalysisError::new(format!(
-            "toolchain has duplicate execution constraint setting: {label}"
-        ))
-    })?;
-    let implementation = package_target(packages, implementation)?;
-    let PackageTargetKind::StarlarkRule(rule) = &implementation.kind else {
-        return Err(AnalysisError::new(format!(
-            "toolchain implementation is not a Starlark rule: {label}"
-        )));
+fn is_marker_leaf_target(target: &slug_loading_v2::PackageTarget) -> bool {
+    let PackageTargetKind::StarlarkRule(rule) = &target.kind else {
+        return false;
     };
     let marker = rule.values().iter().any(|value| {
         value.declaration_name == "marker"
             && value.provenance == AttributeProvenance::Explicit
             && matches!(value.value.as_ref(), CoercedAttributeValue::String(_))
     });
-    let capability = implementation
+    let capability = target
         .rule_capability()
         .expect("Starlark rule has a capability");
     let empty_tags = rule.values().iter().any(|value| {
@@ -1846,21 +1842,55 @@ fn validate_marker_toolchain(
             }
         }
     });
-    if !marker
-        || !rule.dependencies().is_empty()
-        || !rule.required_toolchains().is_empty()
-        || rule.is_root_string_build_setting()
-        || user_schema.len() != 1
-        || user_schema[0].declaration_name() != "marker"
-        || !matches!(user_schema[0].kind(), AttributeKind::String)
-        || user_schema[0].transition().is_some()
-        || user_schema[0].dependency_reachable()
-        || rule.values().len() != rule.schema().len()
-        || !builtin_defaults
-        || !empty_tags
-        || capability.executable
-        || capability.test_kind.is_some()
+    marker
+        && rule.dependencies().is_empty()
+        && rule.required_toolchains().is_empty()
+        && !rule.is_root_string_build_setting()
+        && user_schema.len() == 1
+        && user_schema[0].declaration_name() == "marker"
+        && matches!(user_schema[0].kind(), AttributeKind::String)
+        && user_schema[0].transition().is_none()
+        && !user_schema[0].dependency_reachable()
+        && rule.values().len() == rule.schema().len()
+        && builtin_defaults
+        && empty_tags
+        && !capability.executable
+        && capability.test_kind.is_none()
+}
+
+fn validate_marker_toolchain(
+    packages: &ConfiguredPackages,
+    label: &CanonicalLabel,
+) -> Result<(), AnalysisError> {
+    let target = package_target(packages, label)?;
+    let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+        toolchain_type,
+        implementation,
+        exec_compatible_with,
+    }) = &target.kind
+    else {
+        return Err(AnalysisError::new(format!(
+            "registered toolchain is not toolchain: {label}"
+        )));
+    };
+    if !matches!(package_target(packages, toolchain_type), Ok(target) if matches!(target.kind, PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)))
     {
+        return Err(AnalysisError::new(format!(
+            "toolchain references a non-toolchain type: {label}"
+        )));
+    }
+    validate_constraint_settings(packages, exec_compatible_with, || {
+        AnalysisError::new(format!(
+            "toolchain has duplicate execution constraint setting: {label}"
+        ))
+    })?;
+    let implementation = package_target(packages, implementation)?;
+    let PackageTargetKind::StarlarkRule(_) = &implementation.kind else {
+        return Err(AnalysisError::new(format!(
+            "toolchain implementation is not a Starlark rule: {label}"
+        )));
+    };
+    if !is_marker_leaf_target(implementation) {
         return Err(AnalysisError::new(format!(
             "toolchain implementation is not a marker leaf: {label}"
         )));
@@ -2014,43 +2044,20 @@ async fn resolve_root_toolchain(
     required: &CanonicalLabel,
     owner: &ConfiguredTargetKey,
     candidate_execution_platforms: &[ConfiguredTargetKey],
+    registrations: &PreparedModuleRegistrations,
 ) -> PreparedToolchainOutcome {
     let required_type = match root_apparent_type(required) {
         Ok(required_type) => required_type,
         Err(error) => return toolchain_outcome(Err(error)),
     };
-    let anchor = match compute_root_anchor_input(
-        ctx,
-        mode,
-        workspace.dupe(),
-        "loading root module anchor through DICE",
-    )
-    .await
-    {
-        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
-        LoadingPreparationOutcome::Complete(Err(error)) => {
-            return LoadingPreparationOutcome::Complete(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-            return toolchain_outcome(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Ok(anchor))) => anchor,
+    let toolchain_labels = match registrations.toolchains() {
+        Ok(labels) => labels,
+        Err(error) => return toolchain_outcome(Err(error)),
     };
-    let registrations = anchor.registrations();
-    let (execution_platforms, mut registration_error) =
-        match direct_root_registrations(registrations.execution_platforms(), "toolchain") {
-            Ok(labels) => labels,
-            Err(error) => return toolchain_outcome(Err(error)),
-        };
-    let (toolchain_labels, toolchain_error) =
-        match direct_root_registrations(registrations.toolchains(), "toolchain") {
-            Ok(labels) => labels,
-            Err(error) => return toolchain_outcome(Err(error)),
-        };
-    if registration_error.is_none() {
-        registration_error = toolchain_error;
-    }
-    let mut labels = execution_platforms;
+    let mut labels = candidate_execution_platforms
+        .iter()
+        .map(|candidate| candidate.label().clone())
+        .collect::<Vec<_>>();
     labels.extend(toolchain_labels.iter().cloned());
     labels.push(required.clone());
     let packages = match load_configured_native_packages(ctx, mode, workspace, &mut labels).await {
@@ -2063,9 +2070,6 @@ async fn resolve_root_toolchain(
         }
         LoadingPreparationOutcome::Complete(Ok(Ok(packages))) => packages,
     };
-    if let Some(error) = registration_error {
-        return toolchain_outcome(Err(error));
-    }
     if !matches!(package_target(&packages, required), Ok(target) if matches!(target.kind, PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)))
     {
         return toolchain_outcome(Err(AnalysisError::new(format!(
@@ -2097,7 +2101,7 @@ async fn resolve_root_toolchain(
             return toolchain_outcome(Err(error));
         }
     }
-    for toolchain_label in &toolchain_labels {
+    for toolchain_label in toolchain_labels {
         if let Err(error) = validate_marker_toolchain(&packages, toolchain_label) {
             return toolchain_outcome(Err(error));
         }
@@ -2145,45 +2149,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn registration_adapter_accepts_only_direct_root_labels_and_fails_patterns_closed() {
-        let direct = ModuleRegistrationPattern::parse("//pkg:target").unwrap();
-        assert_eq!(
-            direct_root_registration(&direct)
-                .unwrap()
-                .unwrap()
-                .to_string(),
-            "@@//pkg:target"
-        );
-        for raw in [
-            "//...",
-            "@tools//...",
-            "//pkg/...",
-            "//pkg:all",
-            "//pkg:*",
-            "//pkg:all-targets",
-        ] {
-            let pattern = ModuleRegistrationPattern::parse(raw).unwrap();
-            assert_eq!(
-                direct_root_registration(&pattern).unwrap_err().to_string(),
-                format!("unexpanded registration target pattern is not supported: {raw}")
-            );
-        }
-        let external = ModuleRegistrationPattern::parse("@tools//pkg:target").unwrap();
-        assert!(direct_root_registration(&external).unwrap().is_none());
-        let (_, external_error) = direct_root_registrations(&[external], "toolchain").unwrap();
-        assert_eq!(
-            external_error.unwrap().to_string(),
-            "external toolchain registration is not supported: @tools//pkg:target"
-        );
-    }
-
-    #[test]
-    fn external_native_reference_is_rejected_before_same_root_path_projection() {
+    fn configured_package_identity_distinguishes_same_paths_across_repositories() {
         let root = CanonicalLabel::parse("@@//collision:value").unwrap();
         let external = CanonicalLabel::parse("@@external//collision:value").unwrap();
         assert_eq!(root.package().package(), external.package().package());
-        assert!(require_root_native_reference(&root).is_ok());
-        assert!(require_root_native_reference(&external).is_err());
         assert!(configured_package_identity_matches(root.package(), &root));
         assert!(!configured_package_identity_matches(
             root.package(),
@@ -2374,12 +2343,6 @@ impl ConfiguredNodeAnalysisKey {
         event_batch: &mut Option<EventBatch>,
     ) -> RootAnalysisDriverValue {
         let node = &self.node;
-        if !node.label().package().repo().is_root() {
-            return root_analysis_driver_complete(Err(AnalysisError::new(format!(
-                "external repository configured targets are not supported: {}",
-                node.label()
-            ))));
-        }
         let label = node.label();
         let package_inventory = match compute_configured_package_input(
             ctx,
@@ -2411,6 +2374,9 @@ impl ConfiguredNodeAnalysisKey {
             .targets
             .iter()
             .find(|target| target.name == label.target().as_str());
+        if let Err(error) = require_supported_canonical_configured_target(node, target) {
+            return root_analysis_driver_complete(Err(error));
+        }
         match (&self.node, target.map(|target| &target.kind)) {
             (ConfiguredNodeKey::Null(_), None) if package_declares_source_label(package, label) => {
                 let source_path = source_path(&self.workspace, label);
@@ -2510,9 +2476,6 @@ impl ConfiguredNodeAnalysisKey {
                     constraint_setting,
                 })),
             ) if configured_target.configuration().kind() == ConfigurationKind::Exec => {
-                if let Err(error) = require_root_native_reference(constraint_setting) {
-                    return root_analysis_driver_complete(Err(error));
-                }
                 let child = compute_configured_child(
                     ctx,
                     mode,
@@ -2562,9 +2525,6 @@ impl ConfiguredNodeAnalysisKey {
                 let mut seen_settings = SmallSet::with_capacity(constraint_values.len());
                 let mut edges = Vec::with_capacity(constraint_values.len());
                 for (index, constraint_value) in constraint_values.iter().enumerate() {
-                    if let Err(error) = require_root_native_reference(constraint_value) {
-                        return root_analysis_driver_complete(Err(error));
-                    }
                     let child = compute_configured_child(
                         ctx,
                         mode,
@@ -2799,14 +2759,13 @@ impl ConfiguredNodeAnalysisKey {
                 marker,
             )
         };
-        let candidate_execution_platforms = match root_rule_execution_platforms(
+        let local_declarations = local_toolchain_declarations(package, configured_target.label());
+        let registrations = match prepare_module_registrations(
             ctx,
             mode,
             &self.workspace,
-            configured_target.configuration(),
-            package,
-            configured_target.label(),
             requirement.is_some(),
+            !local_declarations.is_empty(),
         )
         .await
         {
@@ -2819,12 +2778,24 @@ impl ConfiguredNodeAnalysisKey {
             LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
                 return root_analysis_driver_complete(Err(error));
             }
-            LoadingPreparationOutcome::Complete(Ok(Ok(platforms))) => platforms,
+            LoadingPreparationOutcome::Complete(Ok(Ok(registrations))) => registrations,
+        };
+        let candidate_execution_platforms = match rule_execution_platforms(
+            configured_target.configuration(),
+            registrations.as_ref(),
+            &local_declarations,
+            requirement.is_some(),
+        ) {
+            Ok(platforms) => platforms,
+            Err(error) => return root_analysis_driver_complete(Err(error)),
         };
         let prepared_toolchain = if let Some(requirement) = requirement {
             let candidates = candidate_execution_platforms
                 .as_ref()
                 .expect("a toolchain requirement prepares candidate execution platforms");
+            let registrations = registrations
+                .as_ref()
+                .expect("a toolchain requirement prepares module registrations");
             match resolve_root_toolchain(
                 ctx,
                 mode,
@@ -2832,6 +2803,7 @@ impl ConfiguredNodeAnalysisKey {
                 &requirement,
                 configured_target,
                 candidates,
+                registrations,
             )
             .await
             {

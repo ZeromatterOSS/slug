@@ -163,6 +163,7 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
             r#"print("MODULE_LOADING")"#,
             variant,
         );
+        builder.missing("/workspace/MODULE.bazel.lock");
         builder.missing("/workspace/REPO.bazel");
         builder.missing("/workspace/.bazelignore");
         builder.package("rules", "", variant);
@@ -455,7 +456,7 @@ fn observed_result(
     outcome: &<ConfiguredNodeAnalysisObservationKey as Key>::Value,
 ) -> &Arc<ConfiguredNodeResult> {
     let AnalysisPreparationOutcome::Complete(Ok(value)) = outcome else {
-        panic!("observed analysis did not complete semantically");
+        panic!("observed analysis did not complete semantically: {outcome:#?}");
     };
     value.as_ref().as_ref().unwrap()
 }
@@ -754,31 +755,6 @@ async fn observed_analysis_is_family_isolated_recursive_and_arc_stable() {
 }
 
 #[tokio::test]
-async fn external_configured_target_stops_before_package_carrier_activation() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let tracker = Arc::new(AnalysisTracker::default());
-    let epoch = EpochBuilder::base("external-", &[], 11).build();
-    let mut transaction = transaction(&dice, epoch, tracker.dupe()).await;
-    let key = ConfiguredNodeAnalysisObservationKey::new(
-        workspace(),
-        configured("@@external//parent:parent"),
-    )
-    .unwrap();
-    let outcome = transaction.compute(&key).await.unwrap();
-    let AnalysisPreparationOutcome::Complete(Ok(result)) = outcome else {
-        panic!("external configured target did not retain semantic terminal")
-    };
-    assert!(result.as_ref().is_err());
-    assert!(tracker.dependencies(&key).is_empty());
-    let families = tracker.take_families();
-    assert!(
-        families.iter().all(|family| {
-            !family.starts_with("package/") && !family.starts_with("registration/")
-        })
-    );
-}
-
-#[tokio::test]
 async fn observed_null_source_uses_only_observed_resolution() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = Arc::new(AnalysisTracker::default());
@@ -810,7 +786,7 @@ parent(name = "declares", deps = [":data.txt"])
     );
 }
 
-const OBSERVED_TOOLCHAIN_MODULE: &str = r#"module(name = "root")
+const OBSERVED_TOOLCHAIN_MODULE: &str = r#"module(name = "bazel_tools")
 register_execution_platforms("//:platform")
 register_toolchains("//:toolchain")
 "#;
@@ -833,7 +809,7 @@ request(name = "request")
 "#;
 
 #[tokio::test]
-async fn observed_toolchain_closure_keeps_anchor_packages_and_analysis_observed() {
+async fn observed_toolchain_closure_depends_on_both_expansion_families_once() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = Arc::new(AnalysisTracker::default());
     let mut epoch = EpochBuilder::base("toolchain-", &[], 30);
@@ -852,8 +828,28 @@ async fn observed_toolchain_closure_keeps_anchor_packages_and_analysis_observed(
             .field("value"),
         Some("selected")
     );
+    let dependencies = tracker.dependencies(&key);
+    let registrations = dependencies
+        .iter()
+        .filter(|dependency| dependency.starts_with("observed-module-registration-expansion:"))
+        .collect::<Vec<_>>();
+    assert_eq!(registrations.len(), 2, "{dependencies:#?}");
+    assert!(registrations[0].ends_with(":execution-platforms"));
+    assert!(registrations[1].ends_with(":toolchains"));
+    assert!(
+        dependencies
+            .iter()
+            .all(|dependency| !dependency.starts_with("observed-root-module-loading-anchor:"))
+    );
     let families = tracker.take_families();
     assert!(families.iter().any(|family| family == "anchor/observed"));
+    assert!(
+        families
+            .iter()
+            .filter(|family| family.as_str() == "registration/observed")
+            .count()
+            >= 2
+    );
     assert!(families.iter().any(|family| family == "package/observed"));
     assert!(
         families
