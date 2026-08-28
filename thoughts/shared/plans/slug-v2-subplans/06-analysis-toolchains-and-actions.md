@@ -19792,3 +19792,28 @@ from `PackagePath` plus root-load errors to full `PackageIdentifier` plus the
 general carrier. Preserve today's root-only label admission and behavior. This
 is an identity/owner cutover prerequisite: it must not call the registration
 expander, admit canonical configured targets, or alter selection semantics.
+
+### Configured package identity accepted; two-family cutover active (2026-08-27)
+
+Independent terminal review returns `ACCEPT`, and commit `58d0d0357` accepts
+the second configured-consumer prerequisite. `ConfiguredPackages` now keys full
+`PackageIdentifier` and retains the exact general package-carrier `Arc`; every
+lookup compares complete repository-plus-package identity and borrows the
+loaded package. Legacy and observed analysis depend directly on their carrier
+families, preserve root behavior and do not activate registration expansion.
+
+Activate only `WP-4-5-7A-expanded-registration-consumer-cutover`, step 3 of the
+sequence frozen by `104291321`. Add one private compute-scratch pair retaining
+the existing execution-platform and toolchain expansion `Arc`s. Bypass it only
+for `!has_toolchain_requirement && local_declarations.is_empty()`; otherwise
+demand execution platforms first and toolchains second, carry their label
+slices once through closure and selection, and delete the raw MODULE adapter.
+
+Canonical admission is bounded to the represented native constraint/platform/
+toolchain shapes and dependency-free marker-leaf Starlark implementation.
+Aliases, custom `PlatformInfo`, target settings, option precedence, contextual
+external toolchain indexing and general external configured graphs remain
+deferred. Clean Zabel `0795445f…` informs only the explicit-registration-input
+and repository-aware-loading separation; Bazel 9.2 sources/tests and accepted
+fixtures remain authority. BCR Starlark owns all rules including `cc_internal`;
+`cc_common` is a generic evaluator/host-ABI client, not a Rust C++ rule engine.
