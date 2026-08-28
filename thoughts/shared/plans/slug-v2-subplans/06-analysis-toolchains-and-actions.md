@@ -20480,7 +20480,7 @@ guidance only. Bazel 9.2 and authenticated sources remain authority; BCR
 Starlark owns rule/control flow including `cc_internal`, and `cc_common`
 remains a later generic host/provider-ABI client.
 
-#### Configured selection architecture accepted; target-platform prerequisite next (2026-08-28)
+#### Configured selection architecture accepted; target-platform prerequisite active (2026-08-28)
 
 Independent reserved-architecture correction review returns `ACCEPT`. The
 correction rejects converged registered execution-platform aliases at Bazel's
@@ -20546,3 +20546,10 @@ current packet contains the complete keys, values, pseudocode, compatibility,
 exact Packet-1 file/blob/line allowlist, verbatim builtin hashes, caps, proofs
 and stop conditions for independent reserved-architecture review. Packet 2's
 exact allowlist is deliberately materialized only after Packet 1 lands.
+
+Commit `ce38f0373` accepts that design. Activate only
+`WP-4-5-7A-target-platform-and-exec-configuration-prerequisite` at the verified
+source baselines. Implement the two configuration projections, exact two-file
+builtin extension, general actual-target projection, configured platform and
+target-platform keys, no-default constraint validation and the sole condition-
+constraint cutover. Do not start selection, provider or implementation work.

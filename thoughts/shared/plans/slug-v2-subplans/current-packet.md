@@ -1,235 +1,142 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-configured-toolchain-selection-architecture`
+Packet: `WP-4-5-7A-target-platform-and-exec-configuration-prerequisite`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `e1d0723ea`.
+Base: `ce38f0373`.
 
-Result: freeze category 4's provider-independent configured platform and
-toolchain selection boundary and its bounded implementation sequence. This
-packet changes documentation only.
+Result: implement the independently accepted category-4 prerequisite: exact
+configuration-owned target-platform selection for the admitted surface,
+platform-specific exec configuration identity, one reusable configured
+platform fact owner, and constraint-category matching through the sole
+configured-condition key. Do not implement toolchain selection in this packet.
 
-## Boundary and authority
+## Accepted design and authority
 
-Commit `e1d0723ea` completes category 3. Configured analysis consumes typed
-command registrations before unchanged MODULE registrations through the sole
-loading pattern/package walker. Category 4 consumes those canonical results;
-it adds no command parser, registration store, provider graph or ruleset path.
+Commit `ce38f0373` freezes the full configured toolchain selection architecture
+after independent correction review. This packet is step 1 of 2. The future
+`WP-4-5-7A-configured-toolchain-selection` must consume these owners and may
+not absorb or replace them.
 
 Pinned Bazel 9.2 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` is behavior authority. Clean
-`../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` contributes only
-peer ownership and representation guidance. Buck2-derived Rust remains the
-generic Starlark syntax/evaluator and compact-utility substrate. Authenticated
-BCR Starlark owns every rule definition and control path, including
-`cc_internal`; `cc_common` is a later demanding client of the same generic
-host/provider ABI, never a Rust C++ parser or rule engine.
+`8220c6198837d5c13d53fea211cf3282aa12408a` is behavior authority:
+`PlatformOptions#getNormalized`/`computeTargetPlatform`, `PlatformKeys`,
+`RegisteredExecutionPlatformsFunction`, `ConstraintCollection`,
+`ExecutionTransitionFactory`, `ConfigSetting` and their focused tests. Clean
+`../zabel` `0795445f…` is peer ownership/representation guidance only.
+Buck2-derived Rust remains the generic Starlark evaluator and compact utility
+substrate. BCR Starlark owns all rule definitions and control flow including
+`cc_internal`; `cc_common` is only a later generic host/provider-ABI client.
 
-The existing marker selector is a bridge, not architecture: it accepts one
-mandatory root type, rejects aliases and target compatibility, gives every
-candidate the same exec configuration, and analyzes the implementation under
-the requesting target configuration.
+## Compatibility
 
-## Source findings and compatibility
+- **Exact:** first configured `platforms` label or `host_platform` fallback;
+  pinned default `@bazel_tools//tools:host_platform` aliasing BCR
+  `@platforms//host`; nonconvergent static alias chains; direct no-default
+  constraint setting/value identity; duplicate-setting rejection; configured
+  `config_setting.constraint_values`; selected-platform installation in the
+  derived exec configuration.
+- **Slug-native:** Rust/DICE layout, structural configuration bytes,
+  observation carriers and unproved diagnostic wording.
+- **Unsupported/deferred:** command `--platforms`/`--host_platform`, platform
+  mappings/flags, configurable alias `actual`, constraint-setting default
+  semantics, converged registered execution-platform aliases, platform
+  required-settings/flags/allowed types, host/forced execution candidates,
+  toolchain eligibility/selection, providers and implementation analysis.
 
-Bazel `PlatformOptions#getNormalized` retains only the first `platforms`
-entry, while `computeTargetPlatform` uses that entry or falls back to
-`host_platform`. `PlatformKeys` configures target, host and registered
-platforms and replaces aliases with their actual labels. Earlier,
-`RegisteredExecutionPlatformsFunction` inserts those actual keys with
-`ImmutableMap.Builder#buildOrThrow`; distinct registrations converging on one
-actual platform are not a first-occurrence deduplication surface. Bazel's
-default host label is
-`@bazel_tools//tools:host_platform`; in Bazel 9's embedded `tools/BUILD.tools`
-that is an alias to BCR `@platforms//host`.
+The two upstream builtin files are ported byte-for-byte and with upstream
+`100644` mode. Do not invent or simplify `@bazel_tools` content.
 
-Slug already structurally stores typed `platforms` and `host_platform` label
-rows but exposes no label projection. Its builtin `@bazel_tools` tree does not
-contain upstream `tools/BUILD.tools`/`tools/build_defs.bzl`, so the default
-target cannot honestly load. Its `to_exec()` also does not write the selected
-platform into the `platforms` row. These are real prerequisites; an execution
-candidate must not stand in for the target platform.
+## Required implementation
 
-Bazel `RegisteredToolchainsFunction` and
-`RegisteredExecutionPlatformsFunction` configure labels and obtain terminal
-providers through aliases. All registered toolchain labels are validated;
-`target_settings` are evaluated before selection and source order survives.
-`ToolchainTypeLookupUtil` retains requested and actual type identity.
-`SingleToolchainResolutionFunction` scans declarations in registration order
-and, for every still-unfilled candidate, keeps the first declaration matching
-that type, target platform and execution platform.
+### Configuration and embedded source
 
-`ToolchainResolutionFunction` resolves all types, reports all missing
-mandatory types, permits absent optional types, filters platforms missing any
-mandatory type, then chooses the platform resolving the greatest number of
-distinct types. Java's sequential `Stream.max` keeps the first candidate on
-equal counts. The relevant source regressions are the registered target-
-setting and platform-alias tests, toolchain-type alias test, optional first/
-second/max/multiple/missing cases, missing mandatory case and no-type case.
+1. Add a direct typed conversion between a visible `ResolvedOptionLabel` and
+   `CanonicalLabel`; non-visible repositories remain an error with their
+   requested/owner state intact. Do not stringify or expose private option
+   rows.
+2. Add `SlugConfiguration::target_platform_label()`: return the first typed
+   `platforms` entry, otherwise the typed `host_platform` label. Reject wrong
+   shapes and non-visible labels. It works for any structural configuration.
+3. Replace the generic call-site use of `to_exec()` with
+   `to_exec_for_platform(&CanonicalLabel)`. It requires a Target configuration,
+   writes exactly one selected actual platform into the existing `platforms`
+   native row, applies the existing Starlark exec projection, and publishes one
+   `Exec` configuration. No parallel field/store is allowed; keep `to_exec()`
+   only if an existing direct API proof still needs it, and do not use it for
+   action/platform identity.
+4. Add upstream `tools/BUILD.tools` as builtin `tools/BUILD` and upstream
+   `tools/build_defs.bzl`, extend the immutable catalog and exact snapshot
+   digest tests, and prove the default alias reaches the selected BCR
+   `@platforms//host` source. Do not touch the obsolete sync script.
 
-The selected exact surface is configured static alias chains whose registered
-execution-platform terminals remain distinct; direct
-constraint settings with no default; target-setting filtering; explicit target
-and execution constraints; `use_target_platform_constraints`; registered and
-candidate ordering; requested/actual type identity; mandatory/optional
-multi-type resolution; and stable maximal-optional platform choice. Rust
-layout, DICE decomposition, diagnostics and structural configuration/exec
-identity are Slug-native.
+### Sole alias and platform owners
 
-Unsupported/deferred are command `--platforms`/`--host_platform`, platform
-mappings and platform flags; constraint-setting defaults beyond retaining and
-rejecting their presence; platform `required_settings`, flags and allowed-type
-policy; forced/host execution candidates and exec groups; configurable alias
-`actual`; converged registered execution-platform aliases (fail closed rather
-than invent first-wins behavior); provider payloads, selected implementation analysis under exec
-configuration, `ctx.toolchains`, and exact Bazel configuration/output bytes.
+5. Add `actual_configured_target` to `ConfiguredNodeResult`: direct configured
+   nodes publish self; the existing alias branch publishes its child's terminal
+   actual key while preserving the alias node, provider projection and
+   `AliasActual` edge. Null nodes have no actual. Do not add another alias key,
+   walk or cache.
+6. Admit direct native toolchain declaration nodes as provider-empty configured
+   nodes so alias recursion has a terminal. This does not admit their provider
+   or implementation analysis. Add `ToolchainDeclaration` only to the typed
+   node-kind enum.
+7. Generalize configured native platform/constraint analysis to Target and Exec
+   structural configurations. When a platform names a constraint-value alias,
+   or a value names a setting alias, validate the terminal actual node through
+   the existing child analysis and retain the original ordered graph edge.
+   A constraint setting with `default_constraint_value` fails closed at this
+   admitted slice after loading retains its canonical presence.
+8. Add `ConfiguredPlatformKey(workspace, requested ConfiguredTargetKey)`. It
+   consumes the requested configured-node result, its actual terminal result,
+   and each existing platform/value/setting edge; publishes requested and
+   actual keys, platform fact, and
+   `Arc<[ConfiguredActionPlatformConstraint]>` normalized to actual value and
+   setting keys; and rejects duplicate actual settings. It does not reread a
+   package, copy a native declaration or own an event batch.
+9. Add `ConfiguredTargetPlatformKey(workspace, structural configuration)`. It
+   consumes only `target_platform_label()` and `ConfiguredPlatformKey`, so
+   category 2 conditions and category 4 selection cannot form a DICE cycle.
+   Its retained result is the exact platform result `Arc`.
 
-## Frozen producers and identities
+### Condition cutover
 
-| Fact | Sole producer/key | Retained value |
-|---|---|---|
-| target-platform option | existing `SlugConfiguration`; new typed `target_platform_label()` projection | first visible canonical `platforms` label, otherwise visible canonical `host_platform`; errors preserve a non-visible repository |
-| derived exec configuration | existing configuration owner; new `to_exec_for_platform(&CanonicalLabel)` | same typed native vector with `platforms=[selected actual platform]`, existing Starlark exec projection, and `Exec` kind; no parallel platform field |
-| configured alias terminal | existing `ConfiguredNodeAnalysisKey` recursion | new general `actual_configured_target` projection: self for a direct node, child's terminal for an alias; alias edges and providers remain unchanged |
-| configured platform | `ConfiguredPlatformKey(workspace, requested configured key)` | requested and actual configured keys, platform fact, and an immutable ordered actual constraint value/setting slice |
-| target platform | `ConfiguredTargetPlatformKey(workspace, structural configuration)` | the exact `ConfiguredPlatformKey` result selected by that configuration's projection; category 4 calls it with the requesting target configuration and later exec analysis can reuse it |
-| registrations | accepted `PreparedRegistrations` producer | command-before-MODULE requested labels and original positions, unchanged |
-| toolchain resolution | `ConfiguredToolchainResolutionKey(workspace, structural target configuration, Arc<[ToolchainTypeRequirement]>)` | target platform, selected actual execution platform under its derived exec configuration, and ordered requested requirements with actual type and optional selected declaration |
+10. Replace the current `constraint_values before target platform` rejection
+    in the sole `ConfiguredConditionKey`. Compute the target-platform key and
+    every requested constraint value through configured-node actual identity;
+    match when every requested actual setting maps to the identical actual
+    value on the platform. Extra platform settings do not matter. Preserve
+    native/define/flag matching, all-empty rejection, batching, result shape,
+    outer-before-Need-before-semantic precedence and invalid semantic errors.
 
-`ConfiguredNodeResult` gains no copied platform/toolchain declaration store.
-Direct native toolchain declarations become provider-empty configured nodes so
-the general alias recursion can terminate on them; selection rereads the
-loading-owned native declaration through the already-observed package carrier.
-The result projection is canonical configured identity, not a provider.
+## DICE, lifetime and complexity
 
-`ConfiguredPlatformKey` resolves the platform alias and each constraint-value
-and setting alias through that same configured-node owner, requires the
-terminal native kinds, and rejects duplicate actual settings. It retains
-`Arc<[ConfiguredPlatformConstraint]>`, canonical configured keys, `Dupe` and
-`Allocative`. The exact child result Arcs remain DICE dependencies; packages
-and native declarations remain loading-owned.
+`ConfiguredPlatform` is retained semantic state: immutable configured keys,
+the existing compact platform fact and an `Arc` constraint slice with `Dupe`
+and `Allocative`. `ConfiguredTargetPlatformKey` retains the exact child result
+`Arc`. Alias/edge child results remain dependencies, not copied state. Vectors,
+`SmallSet` duplicate detection and Need/error accumulation are compute scratch.
 
-`ConfiguredToolchainResolution` retains
-`Arc<[ResolvedToolchainRequirement]>`. Each row is
-`{requested_type, actual_type, mandatory, selection}`; `selection` is `None`
-only for an unresolved optional request, otherwise it contains the requested
-registration label, actual declaration label and implementation label. The
-target platform and selected execution platform are retained once. No
-evaluator value, provider occurrence, checksum, display label or text digest
-enters semantic identity.
+Complete successes and observed outer errors use equality cutoff. Need and
+semantic errors are invalid. Cancellation publishes nothing; cold cancellation
+at alias, constraint and target-platform boundaries must recover on the same
+graph. A changed option, alias target, platform constraint, value setting,
+setting default-presence bit or child fact invalidates the result.
 
-All keys include the full structural configuration. Mapping provenance is
-already present in canonical labels and configuration rows. Alias targets,
-package carriers, condition results, constraint facts, declaration fields,
-requirement order/mandatory bits and registration order are direct DICE
-dependencies. Complete successes and outer observation errors use equality
-cutoff; semantic errors and Need are invalid; cancellation publishes nothing
-and same-graph repair must recover.
+Complexity is one existing alias traversal per configured node and one linear
+normalization over a platform's constraint edges. There is no declaration or
+candidate cross product. Measure retained size, unchanged-result `Arc` reuse
+and A/B/A invalidation; no benchmark is required unless the default-host
+bootstrap smoke exceeds the existing analysis envelope.
 
-## Selection algebra
+## Exact allowlist and caps
 
-The implementation is one provider-independent computation:
+The accepted source baseline is `cf91fe8de`; `ce38f0373` changed docs only.
+Before editing, every blob and line count below must match.
 
-```text
-target := configured_target_platform(configuration)
-candidates := resolve each registered execution platform alias in order;
-              reject distinct requests with one actual platform key
-declarations := resolve every registered toolchain alias in order;
-                validate terminal kind and all declaration fields
-types := resolve every requested type alias in request order
-groups := group types by actual type, preserving first actual occurrence;
-          group.mandatory = OR(request.mandatory)
-
-resolve every configurable target_settings expression using the existing
-selector resolver; batch every selected condition through the sole configured
-condition key; a declaration is eligible only when every condition matches
-
-validate target, candidate and declaration constraint values through
-ConfiguredPlatformKey's actual setting identity; reject defaults in this slice
-for each actual type group, in group order:
-  for declaration in registration order where declaration.actual_type == group:
-    if explicit target constraints do not match target: continue
-    for each candidate not yet filled for this group, in candidate order:
-      required_exec := target.constraints when use_target_platform_constraints,
-                       otherwise declaration.exec constraints
-      if required_exec matches candidate: fill with this declaration
-
-accumulate all outer states, Need unions and semantic failures before terminal
-precedence; then fail with all actual groups missing a mandatory request
-suitable := candidates having a fill for every mandatory actual group
-if suitable is empty: fail NoMatchingExecutionPlatform, distinct from a
-                      mandatory group that resolved on no candidate at all
-choose the first suitable candidate with the greatest number of distinct
-filled actual groups
-publish one row per requested requirement; converged aliases share the same
-group selection, while each requested label and mandatory bit remains visible
-```
-
-`use_target_platform_constraints=True` with either explicit target or exec
-constraints is a declaration error. In the admitted no-default surface,
-matching means every required actual setting maps to the identical actual
-value; extra platform settings are irrelevant. Repeated declaration aliases
-do not change the first-compatible result. Converged execution-platform aliases
-fail closed at registered-platform preparation and never reach selection.
-
-Loading already rejects an identical requested type twice. If distinct
-requested aliases converge, grouping prevents duplicate resolution and
-optional scoring; mandatory is the strictest (`OR`) requirement, and all
-requested aliases remain lookup-ready for category 6. This is the effective
-Bazel 9 behavior while avoiding its internal duplicate-key accidents.
-
-With zero requirements, an invoked resolution chooses the first candidate and
-retains an empty requirement slice. Existing owners that bypass registration
-because they have neither requirements nor local declarations remain
-`UnresolvedDefault`; a registered local declaration without requirements still
-gets the existing selected-platform-only context.
-
-## Marker bridge and result cutover
-
-`ToolchainTopology` retains the general resolution plus the ordered actual
-candidate sequence, each projected under its own platform-specific exec
-configuration; the selected key is one member of that sequence. The old
-singular `ToolchainSelection` and
-`ConfiguredActionToolchainContext(marker)` are produced only by
-`prepare_marker_toolchain_bridge` after selection when exactly one mandatory
-request resolved and no optional request is present. The bridge analyzes that
-implementation under the requesting target configuration solely to preserve
-the already accepted marker fixture. It cannot filter candidates, change the
-chosen declaration, enter `ConfiguredToolchainResolution`, or widen its string
-payload.
-
-Category 6 deletes the bridge and singular marker context after it can analyze
-every selected implementation under `execution_configuration`, require the
-real `ToolchainInfo` occurrence from category 5's value graph, and expose it by
-both requested and actual type through generic `ctx.toolchains`.
-
-## Bounded rollout
-
-1. `WP-4-5-7A-target-platform-and-exec-configuration-prerequisite`: add the
-   two configuration projections, port the required Bazel 9.2
-   `tools/BUILD.tools` as builtin `tools/BUILD` plus referenced embedded files
-   verbatim, add the general configured-node actual projection,
-   `ConfiguredPlatformKey` and reusable `ConfiguredTargetPlatformKey`, and activate
-   constraint-category matching in the sole condition key. Retain and reject
-   `constraint_setting(default_constraint_value=...)`; do not implement its
-   matching semantics.
-2. `WP-4-5-7A-configured-toolchain-selection`: add the one resolution key and
-   value, replace the inline single selector, carry all rule requirements,
-   derive the selected exec configuration, generalize topology, and isolate
-   the marker bridge. Do not analyze an implementation as part of resolution.
-
-The prerequisite is real: condition constraint matching must consume target
-platform state without cycling through toolchain target-setting selection, and
-the default platform label currently names absent builtin content. Do not
-merge the packets merely to reduce scheduling rows.
-
-Packet 1's source baseline is clean `cf91fe8de`; the docs-only architecture
-commit must not change these blobs. Its exact existing-file allowlist, baseline
-blob/lines and maximum added lines is:
-
-| Path | Baseline blob / lines | Ceiling |
+| Path | Baseline blob / lines | Maximum added lines |
 |---|---:|---:|
 | `app/slug_identity_v2/src/label.rs` | `081bbb5b49238d361a83c437dbebd29b543334f4` / 537 | +30 |
 | `app/slug_configuration_v2/src/native/configuration.rs` | `12b7e78d753633a42f0a5fc1ebdb4be0fdfe2536` / 1,540 | +90 |
@@ -244,67 +151,58 @@ blob/lines and maximum added lines is:
 | `app/slug_analysis_v2/src/lib.rs` | `777f01622c2051a3b54c2a697173e136072ac792` / 77 | +10 |
 | `app/slug_analysis_v2/tests/starlark_rule.rs` | `5fba7dd923011f724073ac8b6674b1ce4d283db9` / 6,304 | +320 |
 
-The only new non-plan files are
-`app/slug_bzlmod_v2/builtin/bazel_tools/tools/BUILD` (exact 50 lines and
-nonexecutable `100644` mode from
-pinned `tools/BUILD.tools`, SHA-256
-`b0fbb2f8eb70acce9a307cca3d487a360f32a89d412e22a39c38346b979fc1a6`)
-and `app/slug_bzlmod_v2/builtin/bazel_tools/tools/build_defs.bzl` (exact 106
-lines and nonexecutable `100644` mode, SHA-256
-`d5f935c4e72a365438711f08a2640094cbf0a03392eebb06d8cecdc58b8ab19c`).
+The only new non-plan files are:
+
+- `app/slug_bzlmod_v2/builtin/bazel_tools/tools/BUILD`: 50 lines, upstream
+  `tools/BUILD.tools`, mode `100644`, SHA-256
+  `b0fbb2f8eb70acce9a307cca3d487a360f32a89d412e22a39c38346b979fc1a6`.
+- `app/slug_bzlmod_v2/builtin/bazel_tools/tools/build_defs.bzl`: 106 lines,
+  mode `100644`, SHA-256
+  `d5f935c4e72a365438711f08a2640094cbf0a03392eebb06d8cecdc58b8ab19c`.
+
 Writable plans are only the canonical plan, Stage 6, Stage 9 and this manifest.
-No Cargo, lockfile, sync-script, fixture or generated-evidence file is allowed.
+No Cargo, lockfile, sync-script, fixture or generated evidence is allowed.
+Caps: 604 production, 500 proof and 1,200 total added Rust lines; upstream
+assets must be exact. Plan caps remain 260 manifest, 140 Stage 6, 40 canonical
+and 40 Stage 9 net lines.
 
-Packet 1 caps 604 production, 500 proof and 1,200 total added Rust lines;
-assets must be byte-identical rather than fit a growth cap. Its complexity is
-one alias walk per configured node plus one linear constraint normalization
-per platform; DICE owns reuse, while duplicate detection uses scratch
-`SmallSet`. No nested declaration scan belongs to this prerequisite. Packet 2
-remains reserved, with its exact allowlist and baselines materialized only
-after Packet 1 lands; its provisional category caps are 760 production, 1,000
-proof and 1,600 total added Rust lines. A baseline mismatch, allowlist need,
-cap breach, superlinear platform normalization, competing owner or provider-
-shaped result is `REPLAN`.
+## Proof and validation
 
-Reuse accepted registration, first-platform, canonical-package, condition and
-lifecycle evidence. Add focused discriminators only for: default host alias to
-BCR platform; explicit internal configuration projection; nonconvergent
-platform alias chains and converged-platform fail-closed behavior; type and
-declaration alias chains/convergence; constraint aliases/duplicates;
-target versus exec constraints; target-to-exec policy; target-setting false and
-error precedence; mandatory/optional multi-type maximal selection, ties and
-the distinct no-common-platform failure;
-exec-configuration distinction; zero-type platform choice; marker nonauthority;
-cold cancellation and same-graph repair. Record upstream defaults, platform
-policy, forced/host candidates and provider-context tests as skipped for the
-declared boundary.
+Required focused proofs:
 
-Run targeted and full affected crate tests serially where Cargo shares a target
-directory, `cargo build -p slug_cli_v2` before binary gates, daemon cleanup,
-locked owner/identity scans, rustfmt, `git diff --check`, cap accounting and
-`scripts/v2_archive_status.sh`. Measure retained size and unchanged-result Arc
-reuse for both keys; benchmark candidate-by-declaration selection only if the
-accepted bootstrap fixture exceeds the existing analysis envelope.
+- visible/non-visible target-platform projection, first platform and host
+  fallback; Target/Exec shape checks; selected platform changes exec structural
+  identity while equal input reuses the configuration `Arc`;
+- builtin catalog bytes, modes, snapshot identity, directory listing and
+  default host alias through authenticated BCR `@platforms//host`;
+- direct and multi-hop aliases for platform, constraint value and setting;
+  wrong terminal kinds, cycles, default setting and duplicate actual setting;
+- target-platform Target and Exec results, exact child `Arc` reuse,
+  independent alias/constraint/option invalidation, A/B/A and cold
+  cancellation/same-graph repair;
+- constraint-category match/no-match/extra-setting plus competing error/Need;
+  previous native/define/flag condition and selector suites unchanged; and
+- locked scans proving one alias recursion, one condition key, no package read
+  in platform-result consumers, no retained standard collection/cache/interner,
+  no toolchain selector/provider/ruleset specialization and no lock across DICE.
+
+Run targeted identity/configuration, builtin Bzlmod, loading and analysis tests,
+then the full affected crate suites serially where Cargo shares `target/`.
+Run rustfmt on touched Rust, `git diff --check`, exact asset SHA/mode checks,
+blob/line/cap accounting, packet/canonical ID matching and
+`scripts/v2_archive_status.sh`. Build `slug_cli_v2` before any binary smoke and
+clean stale `slugd` before/after daemon-sensitive tests. Independent Sol review
+must return `ACCEPT`; one material correction is allowed, a second is `REPLAN`.
 
 ## Stops
 
-STOP and `REPLAN` for an execution platform substituted as target platform;
-invented rather than verbatim `@bazel_tools`; display/checksum identity; copied
-native option storage; a second alias, condition, constraint, registration or
-selection owner; package/source discovery by a result consumer; a retained
-standard map/set, cache, interner, evaluator value or lock across DICE; provider
-analysis inside resolution; one-required-type architecture; silent optional-
-to-mandatory conversion; first-wins deduplication of converged execution-
-platform aliases; marker-influenced selection; Rust ruleset or
-`cc_internal` control flow; `cc_common` specialization; Zabel as authority; or
-a second material architecture correction after review.
-
-## Architecture proof
-
-The source-to-owner table, algorithm, identity/lifetime contract, real
-prerequisite, bridge deletion condition, allowlists, caps and tests above are
-independently reviewed and return `ACCEPT` after the one permitted correction.
-The correction limits exact execution-platform aliases to distinct actual
-terminals, names the separate no-common-platform failure, and freezes Packet
-1's exact file/blob/line and upstream-asset inventory. A further material
-architecture correction is `REPLAN`.
+STOP and `REPLAN` for a missing baseline/allowlist file; non-verbatim builtin
+content; execution candidate substituted for target platform; string/display/
+checksum label conversion; copied option vector or parallel platform field; a
+second alias/platform/condition owner; a package/source read in a result
+consumer; constraint-default matching instead of typed rejection; lost alias
+edge; shared exec configuration across different platforms; toolchain
+selection, provider or implementation analysis; retained standard map/set,
+cache/interner/evaluator value or lock across DICE; superlinear normalization;
+Rust BCR/`cc_internal` control flow; `cc_common` specialization; Zabel
+authority; cap breach; or a second material correction.
