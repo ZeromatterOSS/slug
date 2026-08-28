@@ -19885,3 +19885,220 @@ three-file analysis allowlist with base `97f2bfeeb`. Replace the parked
 selected-nonroot fixture's root BUILD apparent references with declarations
 and internal references loaded from their canonical repository packages. Do
 not repair labels or discover mappings in analysis.
+
+### Expanded registration cutover accepted; bootstrap toolchain semantics architecture (2026-08-27)
+
+Commit `1f0b396cd` accepts the final consumer step frozen by `104291321`.
+Configured analysis now consumes the two loading expansion families in
+execution-platform-before-toolchain order, carries their canonical labels
+through a full-identity package closure, and contains no raw MODULE registration
+parser. The exact bypass, outer/Need/semantic polarity, warning ownership,
+first-compatible marker selection, cancellation, warm equality and root/nonroot
+same-path distinction are proved.
+
+#### Live bootstrap facts
+
+The next Stage 10.3 retry would still exercise unowned semantics rather than an
+ordinary ruleset graph:
+
+- the BCR-generated rules_rust declaration retains `target_compatible_with`
+  and `target_settings`; the latter names
+  `@rules_rust//rust/toolchain/channel:nightly`;
+- that `config_setting` matches `flag_values` against the custom string build
+  setting selected by
+  `--@rules_rust//rust/toolchain/channel=nightly`;
+- the selected implementation is an external dependency-bearing Starlark
+  `rust_toolchain` rule analyzed for the execution platform, not a marker leaf
+  analyzed under the requesting target configuration;
+- its `platform_common.ToolchainInfo(**kwargs)` payload contains arbitrary
+  structured values used through `ctx.toolchains[...]`; and
+- Bazel command `--extra_toolchains` and `--extra_execution_platforms` are
+  typed configuration inputs with precedence over MODULE registrations.
+
+The live Slug path currently retains only execution constraints in
+`NativeToolchainTarget`, carries one root string setting outside the general
+native option rows, rejects canonical Starlark flag spelling, ignores
+`config_setting.flag_values`, stores one `ToolchainInfo.marker`, and analyzes
+the selected implementation under the owner's configuration. The old public
+`toolchains::{RegisteredToolchainsKey, ToolchainResolutionRequest}` types are
+test-only scaffolding and are not a production owner; do not connect their
+text digests or independent vectors to DICE.
+
+Pinned Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` remains authority. The relevant
+owners are `ToolchainRule`, `RegisteredToolchainsFunction`,
+`RegisteredExecutionPlatformsFunction`, `ConfigMatchingUtil`,
+`SingleToolchainResolutionFunction`, `ToolchainResolutionFunction`,
+`ResolvedToolchainContext`, `StarlarkToolchainContext`, `ToolchainInfo`, and
+the build-setting/config-setting rule implementations. Reuse
+`RegisteredToolchainsFunctionTest#testRegisteredToolchains_targetSetting`, its
+extra-toolchain ordering cases, `ResolvedToolchainContextTest`,
+`ToolchainInfoTest#toolchainInfoConstructor`, and build-setting/config-setting
+tests. Public behavior is already anchored by
+`query-attr-observable-candidates`, `nonroot-module-consumers`,
+`toolchain-resolution-first-platform`, and
+`rules-rust-073-toolchain-owner`; add a fixture only for a demonstrated gap.
+
+Clean Zabel `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance only.
+Its loading publication keeps full native declarations, configured condition
+selection treats settings as prerequisites, final options keep extra
+registrations distinct from MODULE sources, and its provider store shows why
+arbitrary provider payloads need one owner rather than a builtin-specific
+string struct. Copy no Zig code, packed row, arena/store identifier, scheduler,
+diagnostic or compatibility claim.
+
+#### Frozen category architecture
+
+The bootstrap toolchain boundary is one sequence of reusable semantic
+categories, not a rules_rust or `cc_common` special case.
+
+1. **Loading-owned native declaration semantics.** The native `toolchain()`
+   target retains canonical type/implementation labels, ordered exec and target
+   constraints, `use_target_platform_constraints`, and the original coerced
+   configurable target-settings expression. Selector conditions are explicit
+   configuration prerequisites. `NativeRuleAttributes` is a derived
+   RuleClass/query view, not an independent configured-semantic side channel.
+   Until later steps land, the existing marker consumer rejects every
+   non-default newly represented case.
+
+2. **Typed build-setting and condition configuration.** Replace the singleton
+   root-string slot with a compact canonical-label-keyed immutable setting map
+   covering the admitted Bazel build-setting kinds. Loading owns rule kind and
+   default; a configuration-preparation DICE owner combines defaults with typed
+   transition/command overrides. Complete setting labels, kinds and values
+   participate structurally in configuration equality, hash, exec projection
+   and invalidation. A build setting's semantic value is distinct from the
+   ordinary providers returned by its Starlark implementation.
+
+   Extend the loading `config_setting` fact to the required `values`,
+   `flag_values` and constraint categories. Configured condition owners demand
+   every referenced build setting/provider under the target configuration and
+   publish a typed match result consumed by both `select()` and native
+   `toolchain.target_settings`. They do not reparse option text, read source,
+   or infer labels from display strings.
+
+3. **Contextual command overlays and registration precedence.** Command
+   parsing retains raw Starlark flag label/value occurrences and native
+   extra-registration occurrences in an immutable request projection. After
+   Bzlmod selection, one DICE preparation boundary resolves apparent labels
+   with the root's final mapping, loads the setting declarations, applies
+   Bazel's per-kind repeat/last-wins conversion, and produces the structural
+   target configuration. Unknown, non-flag or mistyped settings fail closed
+   before analysis publication.
+
+   Extra toolchain/execution-platform values use the existing contextual
+   target-pattern grammar and shared loading expansion engine, but remain a
+   separate configuration/request input from the positive-only MODULE family.
+   A prepared configured owner merges command expansions before MODULE labels
+   with Bazel's exact occurrence reversal/sign/deduplication rules. Do not add a
+   second parser, put command inputs into the workspace-only MODULE expansion
+   key, or hash raw joined text as semantic identity.
+
+4. **Provider-independent configured eligibility and selection.** Resolve
+   registered aliases to configured native declarations while retaining
+   requested and canonical identities. Validate target settings in the
+   requesting target configuration, target constraints against the target
+   platform, execution constraints against candidate execution platforms, and
+   `use_target_platform_constraints` under Bazel's policy. Preserve configured
+   candidate order and required/optional toolchain-type identity.
+
+   This category publishes only the selected declaration, execution platform
+   and derived exec configuration. It does not analyze the implementation,
+   materialize `ToolchainInfo`, expose `ctx.toolchains`, or claim a complete
+   resolved context. Existing marker behavior remains separately bounded until
+   categories 5 and 6 replace it without a new temporary payload shape.
+
+5. **One recursive analysis-value/provider representation.** Replace the
+   marker-only `ToolchainInfo` and string-only user-provider field assumptions
+   with one V2-owned immutable value graph. It must cover admitted scalars,
+   canonical labels/artifacts, sequences/maps/structs, provider occurrences and
+   shared depset references without borrowing an evaluator heap. Provider
+   identity is builtin ID or authenticated Starlark definition identity;
+   `ToolchainInfo` accepts arbitrary named fields through the same graph, so
+   category 6 can expose the selected occurrence through
+   `ctx.toolchains[type]` without copying or stringifying it.
+
+   Use compact deterministic maps, immutable `Arc` slices/shared DAG nodes,
+   `CompactString`, `Dupe` and `Allocative`. Equality is structural where Bazel
+   values are structural and occurrence/definition identity where Bazel values
+   are identity-bearing. Weak/precomputed hashes are lookup accelerators only,
+   never DICE or content identity. Retain no raw `Value`, `FrozenHeap`, global
+   mutable interner or process semantic store. A separate reviewed packet must
+   freeze this public retained representation before implementation.
+
+6. **Selected implementation and toolchain-context cutover.** Analyze the
+   selected implementation with the toolchain/exec configuration derived from
+   category 4's chosen execution platform. Require its builtin
+   `ToolchainInfo` occurrence from category 5's provider graph, retain the exact
+   selected configured payload, and expose that occurrence through
+   `ctx.toolchains[type]`. The requesting target retains a typed selection edge
+   and provider reference; it never re-analyzes the implementation under the
+   target configuration, copies/stringifies the payload, or selects by an
+   output/display token.
+
+The fifth category is the reusable builtin boundary. `ToolchainInfo`, Skylib
+`BuildSettingInfo`-shaped user providers, C++ provider values and future
+`cc_common`/`cc_internal` host operations all lower through the same provider
+identity/value graph. Language builtins such as `set` remain evaluator-global
+categories and do not enter the provider store. The Buck2-derived parser owns
+syntax; BCR Starlark owns all rule definitions and control flow. Rust never
+implements a C++ or rules_rust rule engine.
+
+#### Ownership, lifetime and request contract
+
+Loading declarations, build-setting definitions, condition results,
+configuration values, configured selections and returned providers each keep
+their natural DICE producer/key/value. No combined workspace-global
+toolchain/configuration key is allowed. Every configuration-affecting label,
+type, value, target platform, command occurrence, registration source and
+repository mapping participates structurally in equality and invalidation.
+
+Raw command overlays are request-retained until prepared. Prepared typed
+configuration and configured results are DICE-retained semantic memory.
+Evaluator values, conversion buffers, candidate lists and provider builders are
+phase scratch and drop on completion/cancellation. Action/RPC transfer remains
+owned by later stages. Overlapping requests use independent transactions and
+final observed-input validation; unavailable historical host state fails
+closed. No lock may span a DICE computation.
+
+#### Compatibility and packet sequence
+
+- **Exact:** admitted Bazel 9.2 attribute/default/type behavior, setting and
+  condition matching, registration precedence, alias/constraint/settings
+  filtering and provider-independent selection under their named evidence;
+  selected exec-configuration implementation analysis and arbitrary
+  `ToolchainInfo` field access become exact only after categories 5 and 6 land
+  with their named source/oracle evidence.
+- **Slug-native:** Rust representation/layout, structural configuration and
+  provider identity bytes, compact containers, DICE key decomposition,
+  memory accounting and unproved diagnostic text.
+- **Unsupported/deferred:** exact Bazel configuration/output/checksum bytes,
+  unnamed action families/input trees, builtin/provider value kinds not yet
+  admitted by an owning packet, optional/named exec-group breadth beyond cited
+  evidence, and ruleset semantics past the live bootstrap closure.
+
+Run these bounded packets in order:
+
+1. `WP-4-5-7A-native-toolchain-declaration-semantics`;
+2. typed build-setting/config-condition architecture and implementation;
+3. contextual command-setting and extra-registration overlay architecture and
+   implementation;
+4. provider-independent configured alias/constraint/settings eligibility and
+   selection;
+5. recursive analysis-value/provider architecture and implementation;
+6. selected implementation exec-configuration and `ctx.toolchains` payload
+   cutover; and
+7. the ordinary `rules-rust-073-toolchain-owner` Stage 10.3 vertical, followed
+   only then by the next observed bootstrap failure.
+
+Steps 2, 3 and 5 cross public configuration/retained-value boundaries and each
+requires a zero-Rust pre-review. Do not combine their writers. Reuse accepted
+fixtures, add only discriminating gaps, validate direct public dependents, and
+obtain independent terminal review for every identity or retained-
+representation packet.
+
+Activate only `WP-4-5-7A-native-toolchain-declaration-semantics`. STOP for a
+query-only semantic store, flattened target-settings selector, text digest as
+configuration identity, raw command input inside the MODULE key, provider heap
+retention, per-builtin field structs, a bootstrap-only rule path, Rust
+`cc_internal`/ruleset control flow, Zabel authority, or a lock across DICE.
