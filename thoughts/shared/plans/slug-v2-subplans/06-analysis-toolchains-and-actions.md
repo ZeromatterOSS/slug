@@ -20323,3 +20323,39 @@ platforms and toolchain choice remain deferred. Buck2-derived Rust owns generic
 syntax/evaluation, BCR Starlark owns rule flow including `cc_internal`, and
 `cc_common` remains a generic host-ABI client. Zabel is peer guidance only;
 pinned Bazel 9.2 is behavior authority.
+
+### Direct config-setting matching accepted; selector resolution activated (2026-08-28)
+
+Commit `21ad43d24` completes category-2 packet four. One borrowed configuration
+boundary reuses the pinned typed native descriptors, defaults and converters
+for scalar, repeatable list/map and synthesized define matching. It resolves
+old names, filters the complete retained INTERNAL name shape, rejects the six
+pinned NON_CONFIGURABLE rows and consults the typed
+`incompatible_disable_select_on` occurrence without retaining another lookup
+or expected-value cache.
+
+One analysis text matcher reuses declaration-authenticated effective values
+for arbitrary-precision/base-aware integers, Bazel's exact Boolean spellings,
+ordinary/allow-multiple strings and single-member list/set membership. One
+workspace plus configured-target DICE key owns direct truth across Root and
+Canonical packages. It retains only match/no-match; declarations remain
+loading-owned and nonempty constraints still fail closed at the missing
+configured target-platform fact.
+
+Root/canonical matching, independent predicate and declaration invalidation,
+A/B/A DICE identity, Need/error precedence, deterministic cold cancellation
+and same-graph recovery pass. Full configuration/analysis tests, locked direct
+consumer checks, hygiene, 629/900 production, 686/1,250 proof and 1,315/2,150
+total added Rust lines, and the unchanged three-row archive baseline pass.
+Independent native-converter/DICE/retained-memory review returns `ACCEPT`.
+
+Activate only `WP-4-5-7A-batched-selector-resolution`. Add one pure recursive
+configured-value resolver, batch `$config_dependencies` through the accepted
+condition key, expose every admitted resolved shape through generic `ctx.attr`,
+and apply the same resolution/matching path to native toolchain
+`target_settings`. Preserve selected-only dependency edges and action closure.
+Command occurrences, condition aliases/groups, feature flags, providers,
+configured target-platform constraint truth and broader toolchain choice remain
+deferred. Buck2-derived Rust owns generic syntax/evaluation, BCR Starlark owns
+rule flow including `cc_internal`, and `cc_common` remains a generic host-ABI
+client. Zabel is peer guidance only; pinned Bazel 9.2 is behavior authority.
