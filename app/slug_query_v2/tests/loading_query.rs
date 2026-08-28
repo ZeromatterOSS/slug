@@ -1362,7 +1362,13 @@ async fn config_setting_is_a_loading_rule_without_configuration_evaluation() {
     write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
     write(
         workspace.join("pkg/BUILD.bazel"),
-        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\"})\n",
+        concat!(
+            "filegroup(name = \"flag\")\n",
+            "filegroup(name = \"constraint\")\n",
+            "config_setting(name = \"linux\", values = {\"cpu\": \"k8\"}, ",
+            "flag_values = {\":flag\": \"enabled\"}, ",
+            "constraint_values = [\":constraint\", \":flag\"])\n",
+        ),
     );
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut transaction = transaction(&dice, &workspace).await;
@@ -1380,7 +1386,14 @@ async fn config_setting_is_a_loading_rule_without_configuration_evaluation() {
         .find(|node| node.label.to_string() == "//pkg:linux")
         .unwrap();
     assert_eq!(node.kind, QueryNodeKind::Rule("config_setting rule".into()));
-    assert!(node.edges.is_empty());
+    assert_eq!(
+        node.edges
+            .iter()
+            .filter(|edge| edge.kind == QueryEdgeKind::Ordinary)
+            .map(|edge| edge.target.to_string())
+            .collect::<Vec<_>>(),
+        ["//pkg:flag", "//pkg:constraint"]
+    );
 
     let output =
         evaluate_loading_query(&mut transaction, workspace, "//pkg:linux", QueryOrder::Auto)
@@ -4333,6 +4346,8 @@ async fn native_toolchain_targets_project_root_and_external_declaration_graphs()
             "toolchain_type(name = \"type\")\n",
             "constraint_setting(name = \"setting\")\n",
             "constraint_value(name = \"value\", constraint_setting = \":setting\")\n",
+            "filegroup(name = \"flag\")\n",
+            "config_setting(name = \"condition\", flag_values = {\":flag\": \"on\"}, constraint_values = [\":value\", \":flag\"])\n",
             "filegroup(name = \"ordinary_after\")\n",
         ),
         80,
@@ -4360,6 +4375,17 @@ async fn native_toolchain_targets_project_root_and_external_declaration_graphs()
             "//native:type"
         ]
     );
+    let value = root
+        .compute(&root_query_key("deps(//native:condition, 1)"))
+        .await
+        .unwrap();
+    let QueryPreparationOutcome::Complete(result) = value else {
+        panic!("root config_setting deps requested preparation: {value:?}")
+    };
+    assert_eq!(
+        result.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["//native:condition", "//native:flag", "//native:value"]
+    );
 
     let mut external_epoch = RootQueryEpochBuilder::external_package(81);
     external_epoch.file(
@@ -4369,6 +4395,8 @@ async fn native_toolchain_targets_project_root_and_external_declaration_graphs()
             "toolchain_type(name = \"type\")\n",
             "constraint_setting(name = \"setting\")\n",
             "constraint_value(name = \"value\", constraint_setting = \":setting\")\n",
+            "filegroup(name = \"flag\")\n",
+            "config_setting(name = \"condition\", flag_values = {\":flag\": \"on\"}, constraint_values = [\":value\", \":flag\"])\n",
             "filegroup(name = \"ordinary_after\")\n",
         ),
         81,
@@ -4402,6 +4430,17 @@ async fn native_toolchain_targets_project_root_and_external_declaration_graphs()
     assert_eq!(
         result.as_ref().as_ref().unwrap().labels.as_ref(),
         ["@dep//:setting"]
+    );
+    let value = external
+        .compute(&root_query_key("deps(@dep//:condition, 1)"))
+        .await
+        .unwrap();
+    let QueryPreparationOutcome::Complete(result) = value else {
+        panic!("external config_setting deps requested preparation: {value:?}")
+    };
+    assert_eq!(
+        result.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["@dep//:condition", "@dep//:flag", "@dep//:value"]
     );
 }
 

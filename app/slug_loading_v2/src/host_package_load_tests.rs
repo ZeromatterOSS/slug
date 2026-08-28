@@ -122,12 +122,13 @@ use crate::AttributeKind;
 use crate::CoercedAttributeValue;
 use crate::HostCanonicalRepositoryLoadRouteObservationKey;
 use crate::LoadingPreparationOutcome;
+use crate::PackageTargetKind;
 use crate::RootPackageLoadKey;
 use crate::TestRuleKind;
 use crate::attrs::AllowedAttributeValues;
 use crate::bzl_visibility::BzlLoadVisibility;
 use crate::cycle_detector::bzl_load_cycle_detector;
-use crate::package::BuildSettingKind;
+use crate::package::BuildSettingDefinition;
 use crate::package::FrozenAspectDefinition;
 use crate::package::FrozenRuleDefinition;
 use crate::provider::BzlEvaluationContext;
@@ -2700,11 +2701,11 @@ async fn external_bzl_module_freezes_typed_bazel_config_definitions() {
     let files: &[(&str, &[u8])] = &[
         (
             "root.bzl",
-            b"load(\":support.bzl\", \"bool_flag\", \"bool_setting\", \"bool_false\", \"list_rule\", \"repeatable_rule\", \"list_setting\", \"list_false\")\nBOOL_FLAG = bool_flag\nBOOL_SETTING = bool_setting\nBOOL_FALSE = bool_false\n",
+            b"load(\":support.bzl\", \"bool_flag\", \"bool_setting\", \"bool_false\", \"list_rule\", \"repeatable_rule\", \"list_setting\", \"list_false\", \"set_rule\", \"repeatable_set_rule\")\nBOOL_FLAG = bool_flag\nBOOL_SETTING = bool_setting\nBOOL_FALSE = bool_false\nSET_RULE = set_rule\nREPEATABLE_SET_RULE = repeatable_set_rule\n",
         ),
         (
             "support.bzl",
-            b"def _impl(ctx): fail('build setting implementations must stay lazy')\nbool_flag = rule(implementation = _impl, build_setting = config.bool(flag = True))\nbool_setting = rule(implementation = _impl, build_setting = config.bool())\nbool_false = rule(implementation = _impl, build_setting = config.bool(flag = False))\nlist_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True))\nrepeatable_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True, repeatable = True))\nlist_setting = rule(implementation = _impl, build_setting = config.string_list())\nlist_false = rule(implementation = _impl, build_setting = config.string_list(flag = False, repeatable = False))\n",
+            b"def _impl(ctx): fail('build setting implementations must stay lazy')\nbool_flag = rule(implementation = _impl, build_setting = config.bool(flag = True))\nbool_setting = rule(implementation = _impl, build_setting = config.bool())\nbool_false = rule(implementation = _impl, build_setting = config.bool(flag = False))\nlist_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True))\nrepeatable_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True, repeatable = True))\nlist_setting = rule(implementation = _impl, build_setting = config.string_list())\nlist_false = rule(implementation = _impl, build_setting = config.string_list(flag = False, repeatable = False))\nset_rule = rule(implementation = _impl, build_setting = config.string_set(flag = True))\nrepeatable_set_rule = rule(implementation = _impl, build_setting = config.string_set(flag = True, repeatable = True))\n",
         ),
     ];
     let dice = Dice::builder().build(DetectCycles::Enabled);
@@ -2727,15 +2728,15 @@ async fn external_bzl_module_freezes_typed_bazel_config_definitions() {
             .unwrap()
             .downcast::<FrozenRuleDefinition>()
             .unwrap()
-            .build_setting_kind
+            .build_setting_definition
     };
     assert_eq!(
         bool_kind("BOOL_FLAG"),
-        Some(BuildSettingKind::Boolean { flag: true })
+        Some(BuildSettingDefinition::Boolean { flag: true })
     );
     assert_eq!(
         bool_kind("BOOL_SETTING"),
-        Some(BuildSettingKind::Boolean { flag: false })
+        Some(BuildSettingDefinition::Boolean { flag: false })
     );
     assert_eq!(bool_kind("BOOL_SETTING"), bool_kind("BOOL_FALSE"));
     assert_ne!(bool_kind("BOOL_FLAG"), bool_kind("BOOL_SETTING"));
@@ -2767,30 +2768,44 @@ async fn external_bzl_module_freezes_typed_bazel_config_definitions() {
             .unwrap()
             .downcast::<FrozenRuleDefinition>()
             .unwrap()
-            .build_setting_kind
+            .build_setting_definition
     };
     assert_eq!(
         list_kind("list_rule"),
-        Some(BuildSettingKind::StringList {
+        Some(BuildSettingDefinition::StringList {
             flag: true,
             repeatable: false,
         })
     );
     assert_eq!(
         list_kind("repeatable_rule"),
-        Some(BuildSettingKind::StringList {
+        Some(BuildSettingDefinition::StringList {
             flag: true,
             repeatable: true,
         })
     );
     assert_eq!(
         list_kind("list_setting"),
-        Some(BuildSettingKind::StringList {
+        Some(BuildSettingDefinition::StringList {
             flag: false,
             repeatable: false,
         })
     );
     assert_eq!(list_kind("list_setting"), list_kind("list_false"));
+    assert_eq!(
+        list_kind("SET_RULE"),
+        Some(BuildSettingDefinition::StringSet {
+            flag: true,
+            repeatable: false,
+        })
+    );
+    assert_eq!(
+        list_kind("REPEATABLE_SET_RULE"),
+        Some(BuildSettingDefinition::StringSet {
+            flag: true,
+            repeatable: true,
+        })
+    );
     for export in ["list_rule", "repeatable_rule", "list_setting", "list_false"] {
         let list_rule = module
             .get(export)
@@ -2855,8 +2870,8 @@ async fn external_bzl_module_freezes_config_string_definitions() {
             .unwrap();
         assert_eq!(rule.capability().rule_class, rule_class);
         assert_eq!(
-            rule.build_setting_kind,
-            Some(BuildSettingKind::String {
+            rule.build_setting_definition,
+            Some(BuildSettingDefinition::String {
                 flag,
                 allow_multiple,
             })
@@ -2882,7 +2897,7 @@ async fn external_bzl_module_freezes_config_string_definitions() {
             .unwrap()
             .downcast::<FrozenRuleDefinition>()
             .unwrap()
-            .build_setting_kind
+            .build_setting_definition
     };
     assert_eq!(kind("SETTING"), kind("FALSE"));
 }
@@ -2925,8 +2940,8 @@ async fn external_bzl_module_freezes_config_int_definitions() {
             .unwrap();
         assert_eq!(rule.capability().rule_class, rule_class);
         assert_eq!(
-            rule.build_setting_kind,
-            Some(BuildSettingKind::Integer { flag })
+            rule.build_setting_definition,
+            Some(BuildSettingDefinition::Integer { flag })
         );
         let default = rule
             .schema
@@ -29501,8 +29516,8 @@ fn exact_rules_rust_incompatible_settings_freezes_complete_producer() {
         .unwrap();
     assert_eq!(rule.capability().rule_class, "incompatible_flag");
     assert_eq!(
-        rule.build_setting_kind,
-        Some(BuildSettingKind::Boolean { flag: true })
+        rule.build_setting_definition,
+        Some(BuildSettingDefinition::Boolean { flag: true })
     );
     let issue = rule
         .schema
@@ -29532,7 +29547,7 @@ fn exact_rules_rust_incompatible_settings_freezes_complete_producer() {
 fn assert_skylib_common_settings_rule(
     module: &FrozenModule,
     name: &str,
-    kind: BuildSettingKind,
+    kind: BuildSettingDefinition,
     make_variable: bool,
     values: bool,
 ) {
@@ -29542,7 +29557,7 @@ fn assert_skylib_common_settings_rule(
         .downcast::<FrozenRuleDefinition>()
         .unwrap();
     assert_eq!(rule.capability().rule_class, name);
-    assert_eq!(rule.build_setting_kind, Some(kind));
+    assert_eq!(rule.build_setting_definition, Some(kind));
     let scope = rule
         .schema
         .iter()
@@ -29591,31 +29606,31 @@ fn assert_skylib_common_settings_declarations(module: &FrozenModule) {
     for (name, kind, make_variable, values) in [
         (
             "int_flag",
-            BuildSettingKind::Integer { flag: true },
+            BuildSettingDefinition::Integer { flag: true },
             true,
             false,
         ),
         (
             "int_setting",
-            BuildSettingKind::Integer { flag: false },
+            BuildSettingDefinition::Integer { flag: false },
             true,
             false,
         ),
         (
             "bool_flag",
-            BuildSettingKind::Boolean { flag: true },
+            BuildSettingDefinition::Boolean { flag: true },
             false,
             false,
         ),
         (
             "bool_setting",
-            BuildSettingKind::Boolean { flag: false },
+            BuildSettingDefinition::Boolean { flag: false },
             false,
             false,
         ),
         (
             "string_list_flag",
-            BuildSettingKind::StringList {
+            BuildSettingDefinition::StringList {
                 flag: true,
                 repeatable: false,
             },
@@ -29624,7 +29639,7 @@ fn assert_skylib_common_settings_declarations(module: &FrozenModule) {
         ),
         (
             "repeatable_string_flag",
-            BuildSettingKind::StringList {
+            BuildSettingDefinition::StringList {
                 flag: true,
                 repeatable: true,
             },
@@ -29633,7 +29648,7 @@ fn assert_skylib_common_settings_declarations(module: &FrozenModule) {
         ),
         (
             "string_list_setting",
-            BuildSettingKind::StringList {
+            BuildSettingDefinition::StringList {
                 flag: false,
                 repeatable: false,
             },
@@ -29642,7 +29657,7 @@ fn assert_skylib_common_settings_declarations(module: &FrozenModule) {
         ),
         (
             "string_flag",
-            BuildSettingKind::String {
+            BuildSettingDefinition::String {
                 flag: true,
                 allow_multiple: false,
             },
@@ -29651,7 +29666,7 @@ fn assert_skylib_common_settings_declarations(module: &FrozenModule) {
         ),
         (
             "string_setting",
-            BuildSettingKind::String {
+            BuildSettingDefinition::String {
                 flag: false,
                 allow_multiple: false,
             },
@@ -29893,8 +29908,8 @@ fn exact_rules_rust_lto_freezes_complete_recursive_producer() {
         .unwrap();
     assert_eq!(rule.capability().rule_class, "rust_lto_flag");
     assert_eq!(
-        rule.build_setting_kind,
-        Some(BuildSettingKind::String {
+        rule.build_setting_definition,
+        Some(BuildSettingDefinition::String {
             flag: true,
             allow_multiple: false,
         })
@@ -30521,7 +30536,7 @@ load("//rust/private:providers.bzl", "CaptureClippyOutputInfo", "ClippyInfo", "C
     assert_eq!(transition.output(), "//command_line_option:platforms");
     for name in ["capture_clippy_output", "clippy_output_diagnostics"] {
         let setting = module.get(name).unwrap().downcast::<FrozenRuleDefinition>().unwrap();
-        assert_eq!(setting.build_setting_kind, Some(BuildSettingKind::Boolean { flag: true }));
+        assert_eq!(setting.build_setting_definition, Some(BuildSettingDefinition::Boolean { flag: true }));
     }
     for rich in [
         "P=provider()\nX=attr.label(providers=[P])",
@@ -33046,6 +33061,31 @@ fn bazel_config_typed_descriptors_are_bzl_only_and_require_supported_flags() {
             "{error}"
         );
     }
+    for source in [
+        "X=config.string_set(True)",
+        "X=config.string_set(flag=None)",
+        "X=config.string_set(flag=1)",
+        "X=config.string_set(repeatable=None)",
+        "X=config.string_set(repeatable=1)",
+        "X=config.string_set(unknown=True)",
+    ] {
+        assert!(eval_global(source, &bzl).is_err(), "{source}");
+    }
+    eval_global(
+        "S=config.string_set(flag=True)\nSR=config.string_set(flag=True, repeatable=True)\nSO=config.string_set()",
+        &bzl,
+    )
+    .unwrap();
+    for source in [
+        "X=config.string_set(repeatable=True)",
+        "X=config.string_set(flag=False, repeatable=True)",
+    ] {
+        let error = eval_global(source, &bzl).unwrap_err();
+        assert!(
+            error.contains("'repeatable' can only be set for a setting with 'flag = True'"),
+            "{error}"
+        );
+    }
     let build = build_file_loading_globals();
     eval_global("S=config.string(flag=True)", &build).unwrap();
     for source in [
@@ -33072,11 +33112,16 @@ fn bazel_config_typed_descriptors_are_bzl_only_and_require_supported_flags() {
 }
 
 #[tokio::test]
-async fn repository_package_rejects_unsupported_config_string_rules_before_recording() {
-    for (facts, descriptor) in [
-        (3974, "config.string()"),
-        (3975, "config.string(flag=True, allow_multiple=True)"),
-        (3976, "config.string(allow_multiple=True)"),
+async fn repository_package_retains_all_config_string_rule_shapes() {
+    for (facts, descriptor, flag, allow_multiple) in [
+        (3974, "config.string()", false, false),
+        (
+            3975,
+            "config.string(flag=True, allow_multiple=True)",
+            true,
+            true,
+        ),
+        (3976, "config.string(allow_multiple=True)", false, true),
     ] {
         let defs = format!(
             "def _impl(ctx): fail('string implementation must stay lazy')\nstring_rule=rule(implementation=_impl, build_setting={descriptor})\n"
@@ -33084,7 +33129,7 @@ async fn repository_package_rejects_unsupported_config_string_rules_before_recor
         let files: &[(&str, &[u8])] = &[
             (
                 "BUILD.bazel",
-                b"load(':defs.bzl', 'string_rule')\nstring_rule(name='blocked', build_setting_default='value')\n",
+                b"load(':defs.bzl', 'string_rule')\nstring_rule(name='blocked', build_setting_default='value', visibility=['//visibility:public'])\n",
             ),
             ("defs.bzl", defs.as_bytes()),
         ];
@@ -33104,22 +33149,33 @@ async fn repository_package_rejects_unsupported_config_string_rules_before_recor
             ))
             .await
             .unwrap();
-        assert!(repository_package_error(&outcome).contains(
-            "non-flag or allow-multiple string build setting rule invocation is not supported"
-        ));
+        let package = repository_package_terminal(&outcome);
+        let PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+            panic!("expected retained string build setting")
+        };
+        assert_eq!(
+            rule.build_setting_definition(),
+            Some(BuildSettingDefinition::String {
+                flag,
+                allow_multiple,
+            })
+        );
     }
 }
 
 #[tokio::test]
-async fn repository_package_rejects_config_int_rules_before_target_recording() {
-    for (facts, descriptor) in [(3972, "config.int(flag=True)"), (3973, "config.int()")] {
+async fn repository_package_retains_config_int_rules() {
+    for (facts, descriptor, flag) in [
+        (3972, "config.int(flag=True)", true),
+        (3973, "config.int()", false),
+    ] {
         let defs = format!(
             "def _impl(ctx): fail('integer implementation must stay lazy')\nint_rule=rule(implementation=_impl, build_setting={descriptor})\n"
         );
         let files: &[(&str, &[u8])] = &[
             (
                 "BUILD.bazel",
-                b"load(':defs.bzl', 'int_rule')\nint_rule(name='blocked', build_setting_default=1)\n",
+                b"load(':defs.bzl', 'int_rule')\nint_rule(name='blocked', build_setting_default=1, visibility=['//visibility:public'])\n",
             ),
             ("defs.bzl", defs.as_bytes()),
         ];
@@ -33139,23 +33195,30 @@ async fn repository_package_rejects_config_int_rules_before_target_recording() {
             ))
             .await
             .unwrap();
-        assert!(
-            repository_package_error(&outcome)
-                .contains("integer build setting rule invocation is not supported")
+        let package = repository_package_terminal(&outcome);
+        let PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+            panic!("expected retained integer build setting")
+        };
+        assert_eq!(
+            rule.build_setting_definition(),
+            Some(BuildSettingDefinition::Integer { flag })
         );
     }
 }
 
 #[tokio::test]
-async fn repository_package_rejects_config_bool_rule_before_target_recording() {
-    for (facts, descriptor) in [(398, "config.bool(flag=True)"), (399, "config.bool()")] {
+async fn repository_package_retains_config_bool_rules() {
+    for (facts, descriptor, flag) in [
+        (398, "config.bool(flag=True)", true),
+        (399, "config.bool()", false),
+    ] {
         let defs = format!(
             "def _impl(ctx): fail('boolean implementation must stay lazy')\nbool_rule=rule(implementation=_impl, build_setting={descriptor})\n"
         );
         let files: &[(&str, &[u8])] = &[
             (
                 "BUILD.bazel",
-                b"load(':defs.bzl', 'bool_rule')\nbool_rule(name='blocked', build_setting_default=True)\n",
+                b"load(':defs.bzl', 'bool_rule')\nbool_rule(name='blocked', build_setting_default=True, visibility=['//visibility:public'])\n",
             ),
             ("defs.bzl", defs.as_bytes()),
         ];
@@ -33175,18 +33238,27 @@ async fn repository_package_rejects_config_bool_rule_before_target_recording() {
             ))
             .await
             .unwrap();
-        assert!(
-            repository_package_error(&outcome)
-                .contains("boolean build setting rule invocation is not supported")
+        let package = repository_package_terminal(&outcome);
+        let PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+            panic!("expected retained boolean build setting")
+        };
+        assert_eq!(
+            rule.build_setting_definition(),
+            Some(BuildSettingDefinition::Boolean { flag })
         );
     }
 }
 
 #[tokio::test]
-async fn repository_package_rejects_config_string_list_rule_before_target_recording() {
-    for (facts, descriptor) in [
-        (400, "config.string_list(flag=True, repeatable=True)"),
-        (401, "config.string_list()"),
+async fn repository_package_retains_config_string_list_rules() {
+    for (facts, descriptor, flag, repeatable) in [
+        (
+            400,
+            "config.string_list(flag=True, repeatable=True)",
+            true,
+            true,
+        ),
+        (401, "config.string_list()", false, false),
     ] {
         let defs = format!(
             "def _impl(ctx): fail('list implementation must stay lazy')\nlist_rule=rule(implementation=_impl, build_setting={descriptor})\n"
@@ -33194,7 +33266,7 @@ async fn repository_package_rejects_config_string_list_rule_before_target_record
         let files: &[(&str, &[u8])] = &[
             (
                 "BUILD.bazel",
-                b"load(':defs.bzl', 'list_rule')\nlist_rule(name='blocked', build_setting_default=['value'])\n",
+                b"load(':defs.bzl', 'list_rule')\nlist_rule(name='blocked', build_setting_default=['value'], visibility=['//visibility:public'])\n",
             ),
             ("defs.bzl", defs.as_bytes()),
         ];
@@ -33214,9 +33286,13 @@ async fn repository_package_rejects_config_string_list_rule_before_target_record
             ))
             .await
             .unwrap();
-        assert!(
-            repository_package_error(&outcome)
-                .contains("string-list build setting rule invocation is not supported")
+        let package = repository_package_terminal(&outcome);
+        let PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+            panic!("expected retained string-list build setting")
+        };
+        assert_eq!(
+            rule.build_setting_definition(),
+            Some(BuildSettingDefinition::StringList { flag, repeatable })
         );
     }
 }

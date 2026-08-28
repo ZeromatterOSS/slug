@@ -49,6 +49,9 @@ use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
+use slug_loading_v2::package::BuildSettingDefault;
+use slug_loading_v2::package::BuildSettingDefinition;
+use slug_loading_v2::package::BuildSettingScope;
 use slug_loading_v2::package::NativeToolchainTarget;
 use slug_workspace_v2::WorkspaceRawFileValue;
 use slug_workspace_v2::WorkspaceRawSnapshot;
@@ -813,46 +816,265 @@ fn rule_export_rejects_test_suffix_mismatches_with_bazel_shape() {
 }
 
 #[test]
-fn config_setting_retains_values_and_rejects_unmodeled_arguments() {
+fn config_setting_retains_all_matching_fields_and_provenance() {
     let workspace = scratch("config-setting");
     let package = workspace.join("pkg");
     fs::create_dir_all(&package).unwrap();
     fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
     fs::write(
         package.join(BUILD_FILE_PRIMARY),
-        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\", \"compilation_mode\": \"opt\"})\n",
+        concat!(
+            "config_setting(\n",
+            "    name = \"linux\",\n",
+            "    values = {\"cpu\": \"k8\", \"compilation_mode\": \"opt\"},\n",
+            "    define_values = {\"mode\": \"fast\"},\n",
+            "    flag_values = {\":flag\": \"enabled\"},\n",
+            "    constraint_values = [\":constraint_b\", \":constraint\"],\n",
+            ")\n",
+        ),
     )
     .unwrap();
 
     let loaded = load_package(&workspace, &package);
+    let PackageTargetKind::ConfigSetting { declaration } = &loaded.targets[0].kind else {
+        panic!("expected config_setting")
+    };
+    assert_eq!(loaded.targets[0].name, "linux");
+    assert_eq!(loaded.targets[0].visibility, VisibilitySource::AlwaysPublic);
     assert_eq!(
-        loaded.targets,
-        vec![PackageTarget {
-            name: "linux".to_owned(),
-            kind: PackageTargetKind::ConfigSetting {
-                values: vec![
-                    ("compilation_mode".into(), "opt".into()),
-                    ("cpu".into(), "k8".into()),
-                ]
-                .into(),
-            },
-            visibility: VisibilitySource::AlwaysPublic,
-        }]
+        declaration.values().value().as_ref(),
+        [
+            ("compilation_mode".into(), "opt".into()),
+            ("cpu".into(), "k8".into())
+        ]
     );
+    assert_eq!(
+        declaration.define_values().value().as_ref(),
+        [("mode".into(), "fast".into())]
+    );
+    assert_eq!(
+        declaration.flag_values().value().as_ref(),
+        [(
+            CanonicalLabel::parse("@@//pkg:flag").unwrap(),
+            "enabled".into()
+        )]
+    );
+    assert_eq!(
+        declaration.constraint_values().value().as_ref(),
+        [
+            CanonicalLabel::parse("@@//pkg:constraint_b").unwrap(),
+            CanonicalLabel::parse("@@//pkg:constraint").unwrap(),
+        ]
+    );
+    for attribute in [
+        declaration.values().provenance(),
+        declaration.define_values().provenance(),
+        declaration.flag_values().provenance(),
+        declaration.constraint_values().provenance(),
+    ] {
+        assert_eq!(attribute, AttributeProvenance::Explicit);
+    }
+    assert_eq!(declaration.semantic_references().len(), 3);
 
     fs::write(
         package.join(BUILD_FILE_PRIMARY),
-        "config_setting(name = \"unsupported\", values = {}, define_values = {\"mode\": \"fast\"})\n",
+        "config_setting(name = \"empty\")\n",
     )
     .unwrap();
     let loaded = load_package(&workspace, &package);
+    let PackageTargetKind::ConfigSetting { declaration } = &loaded.targets[0].kind else {
+        panic!("expected config_setting")
+    };
+    assert!(declaration.semantic_references().is_empty());
+    for provenance in [
+        declaration.values().provenance(),
+        declaration.define_values().provenance(),
+        declaration.flag_values().provenance(),
+        declaration.constraint_values().provenance(),
+    ] {
+        assert_eq!(provenance, AttributeProvenance::Default);
+    }
+
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "config_setting(name = \"collision\", flag_values = {\":flag\": \"one\", \"//pkg:flag\": \"two\"})\n",
+    )
+    .unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
     assert!(
-        loaded
-            .native_attributes("unsupported")
-            .unwrap()
-            .get("define_values")
-            .is_some()
+        error.contains("duplicate canonical label `@@//pkg:flag`"),
+        "{error}"
     );
+}
+
+#[test]
+fn build_setting_invocations_retain_complete_typed_declarations() {
+    let workspace = scratch("typed-build-setting-declarations");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+def _impl(ctx):
+    fail("build setting implementation ran during loading")
+
+int_flag = rule(implementation = _impl, attrs = {"scope": attr.string(default = "universal")}, build_setting = config.int(flag = True))
+wrong_scope = rule(implementation = _impl, attrs = {"scope": attr.int()}, build_setting = config.int())
+bool_setting = rule(implementation = _impl, build_setting = config.bool())
+string_flag = rule(implementation = _impl, build_setting = config.string(flag = True))
+multi_string = rule(implementation = _impl, build_setting = config.string(flag = True, allow_multiple = True))
+string_list = rule(implementation = _impl, build_setting = config.string_list())
+string_set = rule(implementation = _impl, build_setting = config.string_set(flag = True))
+repeatable_set = rule(implementation = _impl, build_setting = config.string_set(flag = True, repeatable = True))
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        r#"
+load(":defs.bzl", "bool_setting", "int_flag", "multi_string", "repeatable_set", "string_flag", "string_list", "string_set", "wrong_scope")
+config_setting(name = "condition", values = {})
+int_flag(name = "integer", build_setting_default = 7, scope = "TaRgEt")
+int_flag(name = "integer_universal", build_setting_default = 8, scope = "UnIvErSaL")
+int_flag(name = "integer_project", build_setting_default = 9, scope = "PrOjEcT")
+int_flag(name = "integer_default", build_setting_default = 10)
+int_flag(name = "integer_selected", build_setting_default = 11, scope = select({":condition": "target", "//conditions:default": "universal"}))
+wrong_scope(name = "integer_wrong_scope", build_setting_default = 12, scope = 1)
+bool_setting(name = "boolean", build_setting_default = False)
+string_flag(name = "string", build_setting_default = "plain")
+multi_string(name = "multi", build_setting_default = "one")
+string_list(name = "list", build_setting_default = ["b", "a"])
+string_set(name = "set", build_setting_default = set(["b", "a"]))
+repeatable_set(name = "repeatable", build_setting_default = set(["z"]))
+"#,
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let declaration = |name: &str| {
+        let target = loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap();
+        let PackageTargetKind::StarlarkRule(rule) = &target.kind else {
+            panic!("expected Starlark build setting")
+        };
+        rule.build_setting_declaration().unwrap().unwrap()
+    };
+    let integer = declaration("integer");
+    assert_eq!(
+        integer.definition(),
+        BuildSettingDefinition::Integer { flag: true }
+    );
+    assert_eq!(integer.default(), &BuildSettingDefault::Integer(7));
+    assert_eq!(integer.scope(), BuildSettingScope::Target);
+    assert_eq!(
+        declaration("integer_universal").scope(),
+        BuildSettingScope::Universal
+    );
+    assert_eq!(
+        declaration("integer_project").scope(),
+        BuildSettingScope::Project
+    );
+    assert_eq!(
+        declaration("integer_default").scope(),
+        BuildSettingScope::Default
+    );
+    assert_eq!(
+        declaration("boolean").default(),
+        &BuildSettingDefault::Boolean(false)
+    );
+    assert_eq!(
+        declaration("string").default(),
+        &BuildSettingDefault::String("plain".into())
+    );
+    assert_eq!(
+        declaration("multi").default(),
+        &BuildSettingDefault::String("one".into())
+    );
+    assert_eq!(
+        declaration("list").default(),
+        &BuildSettingDefault::StringList(Arc::from(["b".into(), "a".into()]))
+    );
+    let set = declaration("set");
+    assert_eq!(
+        set.definition(),
+        BuildSettingDefinition::StringSet {
+            flag: true,
+            repeatable: false,
+        }
+    );
+    assert_eq!(
+        set.default(),
+        &BuildSettingDefault::StringSet(Arc::from(["a".into(), "b".into()]))
+    );
+    assert_eq!(
+        declaration("repeatable").definition(),
+        BuildSettingDefinition::StringSet {
+            flag: true,
+            repeatable: true,
+        }
+    );
+    for name in ["integer_selected", "integer_wrong_scope"] {
+        let target = loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap();
+        let PackageTargetKind::StarlarkRule(rule) = &target.kind else {
+            panic!("expected Starlark build setting")
+        };
+        assert!(rule.build_setting_declaration().is_err(), "{name}");
+    }
+}
+
+#[test]
+fn build_setting_invocations_reject_invalid_defaults_without_running_implementations() {
+    let workspace = scratch("invalid-build-setting-defaults");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+def _impl(ctx):
+    fail("build setting implementation ran during loading")
+
+int_flag = rule(implementation = _impl, build_setting = config.int(flag = True))
+bool_flag = rule(implementation = _impl, build_setting = config.bool(flag = True))
+string_flag = rule(implementation = _impl, build_setting = config.string(flag = True))
+string_list = rule(implementation = _impl, build_setting = config.string_list(flag = True))
+string_set = rule(implementation = _impl, build_setting = config.string_set(flag = True))
+"#,
+    )
+    .unwrap();
+    let load = "load(\":defs.bzl\", \"bool_flag\", \"int_flag\", \"string_flag\", \"string_list\", \"string_set\")\n";
+    for invocation in [
+        "int_flag(name = \"bad\", build_setting_default = 2147483648)\n",
+        "bool_flag(name = \"bad\", build_setting_default = \"false\")\n",
+        "string_flag(name = \"bad\", build_setting_default = 1)\n",
+        "string_list(name = \"bad\", build_setting_default = set([\"one\"]))\n",
+        "string_set(name = \"bad\", build_setting_default = [\"one\"])\n",
+        "string_set(name = \"bad\", build_setting_default = set([\"one\", 1]))\n",
+        "int_flag(name = \"bad\")\n",
+    ] {
+        fs::write(
+            package.join(BUILD_FILE_PRIMARY),
+            format!("{load}{invocation}"),
+        )
+        .unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            !error.contains("implementation ran during loading"),
+            "{error}"
+        );
+    }
 }
 
 #[test]
@@ -3221,6 +3443,18 @@ fn native_rule_attributes_keep_ruleclass_order_overrides_and_removals() {
     );
     assert!(
         matches!(&setting.get("define_values").unwrap().1.value, CoercedAttributeValue::StringDict(values) if values.as_ref() == [("feature".into(), "on".into())])
+    );
+    assert_eq!(
+        setting.get("define_values").unwrap().1.provenance,
+        AttributeProvenance::Explicit
+    );
+    assert_eq!(
+        setting.get("flag_values").unwrap().1.provenance,
+        AttributeProvenance::Default
+    );
+    assert_eq!(
+        setting.get("constraint_values").unwrap().1.provenance,
+        AttributeProvenance::Default
     );
     assert!(setting.get("compatible_with").is_none());
     assert!(

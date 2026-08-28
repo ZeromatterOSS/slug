@@ -56,6 +56,7 @@ use starlark::values::list::ListRef;
 use starlark::values::list::UnpackList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneType;
+use starlark::values::set::SetRef;
 use starlark::values::starlark_value;
 use starlark::values::tuple::TupleRef;
 use starlark::values::typing::StarlarkCallable;
@@ -335,6 +336,70 @@ impl TestSuiteMembership {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct ConfigSettingAttribute<T> {
+    value: T,
+    provenance: AttributeProvenance,
+}
+
+impl<T> ConfigSettingAttribute<T> {
+    fn from_optional(value: Option<T>, default: T) -> Self {
+        match value {
+            Some(value) => Self {
+                value,
+                provenance: AttributeProvenance::Explicit,
+            },
+            None => Self {
+                value: default,
+                provenance: AttributeProvenance::Default,
+            },
+        }
+    }
+
+    pub fn value(&self) -> &T {
+        &self.value
+    }
+
+    pub fn provenance(&self) -> AttributeProvenance {
+        self.provenance
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct ConfigSettingTarget {
+    values: ConfigSettingAttribute<Arc<[(CompactString, CompactString)]>>,
+    define_values: ConfigSettingAttribute<Arc<[(CompactString, CompactString)]>>,
+    flag_values: ConfigSettingAttribute<Arc<[(CanonicalLabel, CompactString)]>>,
+    constraint_values: ConfigSettingAttribute<Arc<[CanonicalLabel]>>,
+}
+
+impl ConfigSettingTarget {
+    pub fn values(&self) -> &ConfigSettingAttribute<Arc<[(CompactString, CompactString)]>> {
+        &self.values
+    }
+
+    pub fn define_values(&self) -> &ConfigSettingAttribute<Arc<[(CompactString, CompactString)]>> {
+        &self.define_values
+    }
+
+    pub fn flag_values(&self) -> &ConfigSettingAttribute<Arc<[(CanonicalLabel, CompactString)]>> {
+        &self.flag_values
+    }
+
+    pub fn constraint_values(&self) -> &ConfigSettingAttribute<Arc<[CanonicalLabel]>> {
+        &self.constraint_values
+    }
+
+    pub fn semantic_references(&self) -> Vec<CanonicalLabel> {
+        self.flag_values
+            .value
+            .iter()
+            .map(|(label, _)| label.clone())
+            .chain(self.constraint_values.value.iter().cloned())
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum PackageTargetKind {
     ExportedFile,
     Filegroup {
@@ -344,11 +409,10 @@ pub enum PackageTargetKind {
     Alias {
         actual: CanonicalLabel,
     },
-    /// Loading-only representation of Bazel's `config_setting`. Its values
-    /// are retained for package semantic equality; configuration matching is
-    /// intentionally owned by a later configured-analysis stage.
+    /// Loading-owned declaration of Bazel's `config_setting`. Configuration
+    /// matching is intentionally owned by a later configured-analysis stage.
     ConfigSetting {
-        values: Arc<[(CompactString, CompactString)]>,
+        declaration: ConfigSettingTarget,
     },
     NativeToolchain(NativeToolchainTarget),
     TestSuite {
@@ -524,11 +588,50 @@ impl NativeToolchainTarget {
 /// The frozen rule implementation retained for configured-target analysis.
 /// The containing package keeps its source `.bzl` module alive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
-pub(crate) enum BuildSettingKind {
+pub enum BuildSettingDefinition {
     Integer { flag: bool },
     String { flag: bool, allow_multiple: bool },
     Boolean { flag: bool },
     StringList { flag: bool, repeatable: bool },
+    StringSet { flag: bool, repeatable: bool },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum BuildSettingDefault {
+    Integer(i32),
+    Boolean(bool),
+    String(CompactString),
+    StringList(Arc<[CompactString]>),
+    StringSet(Arc<[CompactString]>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
+pub enum BuildSettingScope {
+    Default,
+    Universal,
+    Target,
+    Project,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct BuildSettingDeclaration {
+    definition: BuildSettingDefinition,
+    default: BuildSettingDefault,
+    scope: BuildSettingScope,
+}
+
+impl BuildSettingDeclaration {
+    pub fn definition(&self) -> BuildSettingDefinition {
+        self.definition
+    }
+
+    pub fn default(&self) -> &BuildSettingDefault {
+        &self.default
+    }
+
+    pub fn scope(&self) -> BuildSettingScope {
+        self.scope
+    }
 }
 
 /// One rule/aspect toolchain type requirement detached from its Starlark value.
@@ -560,13 +663,13 @@ impl PartialEq<CanonicalLabel> for ToolchainTypeRequirement {
     }
 }
 
-impl BuildSettingKind {
+impl BuildSettingDefinition {
     fn attribute_kind(self) -> AttributeKind {
         match self {
             Self::Integer { .. } => AttributeKind::Integer,
             Self::String { .. } => AttributeKind::String,
             Self::Boolean { .. } => AttributeKind::Boolean,
-            Self::StringList { .. } => AttributeKind::StringList,
+            Self::StringList { .. } | Self::StringSet { .. } => AttributeKind::StringList,
         }
     }
 }
@@ -582,7 +685,7 @@ pub struct StarlarkRuleImplementation {
     schema: Arc<[AttributeSchema]>,
     values: Arc<[AttributeValue]>,
     capability: Arc<RuleCapability>,
-    build_setting_kind: Option<BuildSettingKind>,
+    build_setting_definition: Option<BuildSettingDefinition>,
 }
 
 impl PartialEq for StarlarkRuleImplementation {
@@ -596,7 +699,7 @@ impl PartialEq for StarlarkRuleImplementation {
             && self.schema == other.schema
             && self.values == other.values
             && self.capability == other.capability
-            && self.build_setting_kind == other.build_setting_kind
+            && self.build_setting_definition == other.build_setting_definition
     }
 }
 
@@ -632,9 +735,69 @@ impl StarlarkRuleImplementation {
     pub fn values(&self) -> &[AttributeValue] {
         &self.values
     }
+
+    pub fn build_setting_definition(&self) -> Option<BuildSettingDefinition> {
+        self.build_setting_definition
+    }
+
+    pub fn build_setting_declaration(&self) -> anyhow::Result<Option<BuildSettingDeclaration>> {
+        let Some(definition) = self.build_setting_definition else {
+            return Ok(None);
+        };
+        let value = self
+            .value("build_setting_default")
+            .expect("build setting schema has a mandatory default")
+            .value
+            .as_ref();
+        let default = match (definition, value) {
+            (BuildSettingDefinition::Integer { .. }, CoercedAttributeValue::Integer(value)) => {
+                BuildSettingDefault::Integer(*value)
+            }
+            (BuildSettingDefinition::Boolean { .. }, CoercedAttributeValue::Boolean(value)) => {
+                BuildSettingDefault::Boolean(*value)
+            }
+            (BuildSettingDefinition::String { .. }, CoercedAttributeValue::String(value)) => {
+                BuildSettingDefault::String(value.clone())
+            }
+            (
+                BuildSettingDefinition::StringList { .. },
+                CoercedAttributeValue::StringList(value),
+            ) => BuildSettingDefault::StringList(value.clone()),
+            (
+                BuildSettingDefinition::StringSet { .. },
+                CoercedAttributeValue::StringList(value),
+            ) => BuildSettingDefault::StringSet(value.clone()),
+            _ => anyhow::bail!("build setting default does not match its definition"),
+        };
+        let scope = match self.value("scope") {
+            Some(value) if value.provenance == AttributeProvenance::Explicit => {
+                let CoercedAttributeValue::String(scope) = value.value.as_ref() else {
+                    anyhow::bail!("explicit build setting scope must be a nonconfigurable string")
+                };
+                if scope.eq_ignore_ascii_case("universal") {
+                    BuildSettingScope::Universal
+                } else if scope.eq_ignore_ascii_case("target") {
+                    BuildSettingScope::Target
+                } else if scope.eq_ignore_ascii_case("project") {
+                    BuildSettingScope::Project
+                } else {
+                    anyhow::bail!(
+                        "invalid build setting scope `{scope}`; expected universal, target, or project"
+                    )
+                }
+            }
+            _ => BuildSettingScope::Default,
+        };
+        Ok(Some(BuildSettingDeclaration {
+            definition,
+            default,
+            scope,
+        }))
+    }
+
     pub fn is_root_string_build_setting(&self) -> bool {
-        self.build_setting_kind
-            == Some(BuildSettingKind::String {
+        self.build_setting_definition
+            == Some(BuildSettingDefinition::String {
                 flag: true,
                 allow_multiple: false,
             })
@@ -968,18 +1131,67 @@ impl PackageRecorder {
     fn config_setting(
         &self,
         name: String,
-        values: SmallMap<String, String>,
+        values: Option<SmallMap<String, String>>,
+        define_values: Option<SmallMap<String, String>>,
+        flag_values: Option<SmallMap<String, String>>,
+        constraint_values: Option<Vec<String>>,
         visibility: Option<Vec<String>>,
     ) -> anyhow::Result<()> {
-        let mut values = values
-            .into_iter()
-            .map(|(key, value)| (CompactString::from(key), CompactString::from(value)))
-            .collect::<Vec<_>>();
-        values.sort_unstable();
+        let normalize_strings = |values: Option<SmallMap<String, String>>| {
+            values.map(|values| {
+                let mut values = values
+                    .into_iter()
+                    .map(|(key, value)| (CompactString::from(key), CompactString::from(value)))
+                    .collect::<Vec<_>>();
+                values.sort_unstable();
+                Arc::from(values)
+            })
+        };
+        let values = normalize_strings(values);
+        let define_values = normalize_strings(define_values);
+        let flag_values = flag_values
+            .map(|values| {
+                let mut result = Vec::with_capacity(values.len());
+                for (label, value) in values {
+                    let label = self.dependency_label(&label)?;
+                    if result
+                        .iter()
+                        .any(|(existing, _): &(CanonicalLabel, CompactString)| existing == &label)
+                    {
+                        anyhow::bail!("duplicate canonical label `{label}` in flag_values")
+                    }
+                    result.push((label, CompactString::from(value)));
+                }
+                result.sort_by(|(left, _), (right, _)| {
+                    CanonicalLabel::bazel_natural_cmp(left, right)
+                });
+                Ok::<Arc<[(CanonicalLabel, CompactString)]>, anyhow::Error>(result.into())
+            })
+            .transpose()?;
+        let constraint_values = constraint_values
+            .map(|values| {
+                values
+                    .iter()
+                    .map(|value| self.dependency_label(value))
+                    .collect::<anyhow::Result<Vec<_>>>()
+                    .map(Arc::from)
+            })
+            .transpose()?;
         self.record_target(
             name,
             PackageTargetKind::ConfigSetting {
-                values: values.into(),
+                declaration: ConfigSettingTarget {
+                    values: ConfigSettingAttribute::from_optional(values, Arc::from([])),
+                    define_values: ConfigSettingAttribute::from_optional(
+                        define_values,
+                        Arc::from([]),
+                    ),
+                    flag_values: ConfigSettingAttribute::from_optional(flag_values, Arc::from([])),
+                    constraint_values: ConfigSettingAttribute::from_optional(
+                        constraint_values,
+                        Arc::from([]),
+                    ),
+                },
             },
             self.visibility_source(visibility, VisibilitySource::AlwaysPublic)?,
         )
@@ -1102,7 +1314,7 @@ impl PackageRecorder {
         capability: Arc<RuleCapability>,
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
-        build_setting_kind: Option<BuildSettingKind>,
+        build_setting_definition: Option<BuildSettingDefinition>,
         visibility: Option<Vec<String>>,
     ) -> anyhow::Result<()> {
         let mut dependencies = Vec::new();
@@ -1134,7 +1346,7 @@ impl PackageRecorder {
                 schema,
                 values,
                 capability,
-                build_setting_kind,
+                build_setting_definition,
             }),
             self.visibility_source(visibility, VisibilitySource::PackageDefault)?,
         )
@@ -1722,7 +1934,7 @@ fn native_rule_attributes(
             CoercedAttributeValue::Label(actual.clone()),
         ),
         PackageTargetKind::ConfigSetting {
-            values: setting_values,
+            declaration: setting,
         } => {
             set_native_value(
                 class,
@@ -1742,8 +1954,29 @@ fn native_rule_attributes(
                 class,
                 &mut values,
                 "values",
-                AttributeProvenance::Explicit,
-                CoercedAttributeValue::StringDict(setting_values.clone()),
+                setting.values.provenance,
+                CoercedAttributeValue::StringDict(setting.values.value.clone()),
+            );
+            set_native_value(
+                class,
+                &mut values,
+                "define_values",
+                setting.define_values.provenance,
+                CoercedAttributeValue::StringDict(setting.define_values.value.clone()),
+            );
+            set_native_value(
+                class,
+                &mut values,
+                "flag_values",
+                setting.flag_values.provenance,
+                CoercedAttributeValue::LabelKeyedStringDict(setting.flag_values.value.clone()),
+            );
+            set_native_value(
+                class,
+                &mut values,
+                "constraint_values",
+                setting.constraint_values.provenance,
+                CoercedAttributeValue::LabelList(setting.constraint_values.value.clone()),
             );
         }
         PackageTargetKind::TestSuite { membership, tags } => {
@@ -2720,6 +2953,27 @@ fn coerce_starlark_value(
     coerce_raw_value(RawLabelContext::Package(recorder), kind, &raw)
 }
 
+fn coerce_string_set_default<'v>(
+    value: Value<'v>,
+    heap: Heap<'v>,
+) -> anyhow::Result<CoercedAttributeValue> {
+    if SetRef::unpack_value_opt(value).is_none() {
+        anyhow::bail!("attribute `build_setting_default` must be a set of strings")
+    }
+    let mut values = value
+        .iterate(heap)
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?
+        .map(|value| {
+            value
+                .unpack_str()
+                .map(CompactString::from)
+                .ok_or_else(|| anyhow::anyhow!("string-set default members must be strings"))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    values.sort_unstable();
+    Ok(CoercedAttributeValue::StringList(values.into()))
+}
+
 /// The callable returned by Bazel's `rule()` global during package loading.
 /// It retains the implementation for Stage 6, but package construction never
 /// executes that implementation.
@@ -2736,7 +2990,7 @@ struct RuleDefinitionGen<V> {
     schema: Arc<[RuleAttributeSchemaGen<V>]>,
     executable: bool,
     test: bool,
-    build_setting_kind: Option<BuildSettingKind>,
+    build_setting_definition: Option<BuildSettingDefinition>,
     #[trace(unsafe_ignore)]
     rule_class: OnceCell<CompactString>,
 }
@@ -2751,7 +3005,7 @@ pub(crate) struct FrozenRuleDefinition {
     required_fragments: Arc<[CompactString]>,
     pub(crate) schema: Arc<[FrozenRuleAttributeSchema]>,
     capability: Arc<RuleCapability>,
-    pub(crate) build_setting_kind: Option<BuildSettingKind>,
+    pub(crate) build_setting_definition: Option<BuildSettingDefinition>,
 }
 
 type RuleDefinition<'v> = RuleDefinitionGen<Value<'v>>;
@@ -2820,32 +3074,6 @@ impl FrozenRuleDefinition {
                 attribute.name
             );
         }
-        if matches!(
-            self.build_setting_kind,
-            Some(BuildSettingKind::Integer { .. })
-        ) {
-            anyhow::bail!("integer build setting rule invocation is not supported");
-        }
-        if matches!(
-            self.build_setting_kind,
-            Some(BuildSettingKind::Boolean { .. })
-        ) {
-            anyhow::bail!("boolean build setting rule invocation is not supported");
-        }
-        if matches!(
-            self.build_setting_kind,
-            Some(
-                BuildSettingKind::String { flag: false, .. }
-                    | BuildSettingKind::String {
-                        allow_multiple: true,
-                        ..
-                    }
-            )
-        ) {
-            anyhow::bail!(
-                "non-flag or allow-multiple string build setting rule invocation is not supported"
-            );
-        }
         Ok(())
     }
 }
@@ -2878,7 +3106,7 @@ impl<'v> Freeze for RuleDefinition<'v> {
                 executable: self.executable || self.test,
                 test_kind: self.test.then_some(TestRuleKind::Test),
             }),
-            build_setting_kind: self.build_setting_kind,
+            build_setting_definition: self.build_setting_definition,
         })
     }
 }
@@ -3368,7 +3596,7 @@ fn declared_attribute_schema<'v>(
 fn starlark_builtin_schema<V>(
     executable: bool,
     test: bool,
-    build_setting_kind: Option<BuildSettingKind>,
+    build_setting_definition: Option<BuildSettingDefinition>,
     has_transition: bool,
 ) -> Vec<RuleAttributeSchemaGen<V>> {
     let mut result = Vec::new();
@@ -3461,7 +3689,7 @@ fn starlark_builtin_schema<V>(
         }
         push("$is_executable", AttributeKind::Boolean, false, false);
     }
-    if let Some(kind) = build_setting_kind {
+    if let Some(kind) = build_setting_definition {
         push("build_setting_default", kind.attribute_kind(), true, false);
         push("help", AttributeKind::String, false, false);
     }
@@ -4932,6 +5160,20 @@ impl fmt::Display for RootStringListBuildSetting {
 #[starlark_value(type = "config_string_list")]
 impl<'v> StarlarkValue<'v> for RootStringListBuildSetting {}
 
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct RootStringSetBuildSetting {
+    flag: bool,
+    repeatable: bool,
+}
+starlark::starlark_simple_value!(RootStringSetBuildSetting);
+impl fmt::Display for RootStringSetBuildSetting {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("config.string_set")
+    }
+}
+#[starlark_value(type = "config_string_set")]
+impl<'v> StarlarkValue<'v> for RootStringSetBuildSetting {}
+
 fn root_string_build_setting(flag: bool) -> anyhow::Result<RootStringBuildSetting> {
     if !flag {
         anyhow::bail!("only config.string(flag = True) is supported")
@@ -4978,6 +5220,17 @@ fn config_methods(builder: &mut MethodsBuilder) {
             anyhow::bail!("'repeatable' can only be set for a setting with 'flag = True'")
         }
         Ok(RootStringListBuildSetting { flag, repeatable })
+    }
+
+    fn string_set(
+        #[starlark(this)] _config: Value,
+        #[starlark(require = named, default = false)] flag: bool,
+        #[starlark(require = named, default = false)] repeatable: bool,
+    ) -> anyhow::Result<RootStringSetBuildSetting> {
+        if repeatable && !flag {
+            anyhow::bail!("'repeatable' can only be set for a setting with 'flag = True'")
+        }
+        Ok(RootStringSetBuildSetting { flag, repeatable })
     }
 }
 #[starlark_module]
@@ -5047,14 +5300,6 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         })?;
         self.reject_deferred_attribute_invocation()
             .map_err(starlark::Error::new_other)?;
-        if matches!(
-            self.build_setting_kind,
-            Some(BuildSettingKind::StringList { .. })
-        ) {
-            return Err(starlark::Error::new_other(anyhow::anyhow!(
-                "string-list build setting rule invocation is not supported"
-            )));
-        }
         for attribute in names.keys() {
             if attribute.as_str() != "name"
                 && attribute.as_str() != "visibility"
@@ -5094,6 +5339,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         let advertised_providers = self.advertised_providers.clone();
         let required_fragments = self.required_fragments.clone();
         let capability = self.capability.clone();
+        let heap = eval.heap();
         PackageRecorder::from_evaluator(eval)
             .and_then(|recorder| {
                 let (default_visibility, default_deprecation, default_testonly, default_metadata) = {
@@ -5170,6 +5416,19 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     let (provenance, value) = match explicit {
                         Some(_) if builtin && declaration.name == "visibility" => {
                             (AttributeProvenance::Explicit, visibility_value.clone())
+                        }
+                        Some(value)
+                            if builtin
+                                && declaration.name == "build_setting_default"
+                                && matches!(
+                                    self.build_setting_definition,
+                                    Some(BuildSettingDefinition::StringSet { .. })
+                                ) =>
+                        {
+                            (
+                                AttributeProvenance::Explicit,
+                                coerce_string_set_default(value, heap)?,
+                            )
                         }
                         Some(value) => (
                             AttributeProvenance::Explicit,
@@ -5276,7 +5535,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     capability,
                     schema,
                     values,
-                    self.build_setting_kind,
+                    self.build_setting_definition,
                     visibility,
                 )?;
                 for output in generated {
@@ -5554,6 +5813,9 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn config_setting<'v>(
         name: &str,
         #[starlark(require = named)] values: Option<SmallMap<String, String>>,
+        #[starlark(require = named)] define_values: Option<SmallMap<String, String>>,
+        #[starlark(require = named)] flag_values: Option<SmallMap<String, String>>,
+        #[starlark(require = named)] constraint_values: Option<UnpackListOrTuple<&str>>,
         visibility: Option<UnpackListOrTuple<&str>>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -5561,7 +5823,10 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         let recorder = PackageRecorder::from_evaluator(eval)?;
         recorder.config_setting(
             name.to_owned(),
-            values.unwrap_or_default(),
+            values,
+            define_values,
+            flag_values,
+            constraint_values.map(list),
             visibility.map(list),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
@@ -5712,18 +5977,23 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         if doc.is_some_and(|value| !value.is_none() && value.unpack_str().is_none()) {
             anyhow::bail!("rule doc must be a string or None");
         }
-        let build_setting_kind = build_setting.and_then(|value| {
+        let build_setting_definition = build_setting.and_then(|value| {
             if let Some(setting) = RootIntBuildSetting::from_value(value) {
-                Some(BuildSettingKind::Integer { flag: setting.flag })
+                Some(BuildSettingDefinition::Integer { flag: setting.flag })
             } else if let Some(setting) = RootStringBuildSetting::from_value(value) {
-                Some(BuildSettingKind::String {
+                Some(BuildSettingDefinition::String {
                     flag: setting.flag,
                     allow_multiple: setting.allow_multiple,
                 })
             } else if let Some(setting) = RootBoolBuildSetting::from_value(value) {
-                Some(BuildSettingKind::Boolean { flag: setting.flag })
+                Some(BuildSettingDefinition::Boolean { flag: setting.flag })
             } else if let Some(setting) = RootStringListBuildSetting::from_value(value) {
-                Some(BuildSettingKind::StringList {
+                Some(BuildSettingDefinition::StringList {
+                    flag: setting.flag,
+                    repeatable: setting.repeatable,
+                })
+            } else if let Some(setting) = RootStringSetBuildSetting::from_value(value) {
+                Some(BuildSettingDefinition::StringSet {
                     flag: setting.flag,
                     repeatable: setting.repeatable,
                 })
@@ -5731,13 +6001,13 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 None
             }
         });
-        if build_setting.is_some() && build_setting_kind.is_none() {
+        if build_setting.is_some() && build_setting_definition.is_none() {
             anyhow::bail!(
-                "only rule(build_setting = config.int(), config.string(), config.bool(), or config.string_list()) is supported"
+                "rule build_setting must use config.int(), config.string(), config.bool(), config.string_list(), or config.string_set()"
             )
         }
         let declared_builtin_names =
-            starlark_builtin_schema::<Value<'v>>(executable, test, build_setting_kind, true);
+            starlark_builtin_schema::<Value<'v>>(executable, test, build_setting_definition, true);
         let mut user_schema = Vec::new();
         if let Some(attrs) = attrs {
             for (name, value) in attrs {
@@ -5759,7 +6029,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         }
         let has_transition = user_schema.iter().any(|schema| schema.transition.is_some());
         let mut schema =
-            starlark_builtin_schema(executable, test, build_setting_kind, has_transition);
+            starlark_builtin_schema(executable, test, build_setting_definition, has_transition);
         schema.extend(user_schema);
         Ok(RuleDefinition {
             implementation,
@@ -5769,7 +6039,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             schema: schema.into(),
             executable,
             test,
-            build_setting_kind,
+            build_setting_definition,
             rule_class: OnceCell::new(),
         })
     }
@@ -5975,6 +6245,9 @@ fn native_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] _native: Value<'v>,
         name: &str,
         #[starlark(require = named)] values: Option<SmallMap<String, String>>,
+        #[starlark(require = named)] define_values: Option<SmallMap<String, String>>,
+        #[starlark(require = named)] flag_values: Option<SmallMap<String, String>>,
+        #[starlark(require = named)] constraint_values: Option<UnpackListOrTuple<&str>>,
         visibility: Option<UnpackListOrTuple<&str>>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -5982,7 +6255,10 @@ fn native_methods(builder: &mut MethodsBuilder) {
         let recorder = PackageRecorder::from_evaluator(eval)?;
         recorder.config_setting(
             name.to_owned(),
-            values.unwrap_or_default(),
+            values,
+            define_values,
+            flag_values,
+            constraint_values.map(list),
             visibility.map(list),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;

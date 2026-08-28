@@ -954,11 +954,25 @@ fn package_graph_from_loaded(
                     }],
                 )
             }
-            PackageTargetKind::ConfigSetting { .. } => (
-                QueryNodeKind::Rule(CompactString::new("config_setting rule")),
-                visibility_edges,
-                Vec::new(),
-            ),
+            PackageTargetKind::ConfigSetting { declaration } => {
+                let mut seen = SmallSet::new();
+                let ordinary = declaration
+                    .semantic_references()
+                    .into_iter()
+                    .map(QueryLabel::from_canonical)
+                    .filter(|label| seen.insert(label.dupe()))
+                    .map(|target| QueryEdge {
+                        kind: QueryEdgeKind::Ordinary,
+                        target,
+                    });
+                let mut edges = visibility_edges;
+                edges.extend(ordinary);
+                (
+                    QueryNodeKind::Rule(CompactString::new("config_setting rule")),
+                    edges,
+                    Vec::new(),
+                )
+            }
             PackageTargetKind::NativeToolchain(native) => (
                 QueryNodeKind::Rule(CompactString::new(format!("{} rule", native.rule_class()))),
                 visibility_edges,
@@ -1318,11 +1332,39 @@ fn external_package_graph_from_targets(
                     }]),
                 )
             }
-            PackageTargetKind::ConfigSetting { .. } => (
-                QueryNodeKind::Rule(CompactString::new("config_setting rule")),
-                Arc::from([]),
-                Arc::from([]),
-            ),
+            PackageTargetKind::ConfigSetting { declaration } => {
+                let mut seen = SmallSet::new();
+                let edges = declaration
+                    .semantic_references()
+                    .into_iter()
+                    .map(|label| {
+                        let label = if label.package().repo().is_root() {
+                            label
+                                .rebind_provisional_root_repository(canonical_repo)
+                                .map_err(QueryError::evaluation)?
+                        } else {
+                            label
+                        };
+                        Ok(QueryLabel::from_canonical_for_external_owner(
+                            label,
+                            canonical_repo,
+                            apparent_repo,
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, QueryError>>()?
+                    .into_iter()
+                    .filter(|label| seen.insert(label.dupe()))
+                    .map(|target| QueryEdge {
+                        kind: QueryEdgeKind::Ordinary,
+                        target,
+                    })
+                    .collect::<Vec<_>>();
+                (
+                    QueryNodeKind::Rule(CompactString::new("config_setting rule")),
+                    edges.into(),
+                    Arc::from([]),
+                )
+            }
             PackageTargetKind::NativeToolchain(native) => (
                 QueryNodeKind::Rule(CompactString::new(format!("{} rule", native.rule_class()))),
                 Arc::from([]),
@@ -2306,20 +2348,6 @@ mod graph_tests {
                 },
                 visibility: VisibilitySource::PackageDefault,
             },
-            PackageTarget {
-                name: "is_k8".to_owned(),
-                kind: PackageTargetKind::ConfigSetting {
-                    values: Arc::from([("cpu".into(), "k8".into())]),
-                },
-                visibility: VisibilitySource::PackageDefault,
-            },
-            PackageTarget {
-                name: "public_k8".to_owned(),
-                kind: PackageTargetKind::ConfigSetting {
-                    values: Arc::from([("cpu".into(), "k8".into())]),
-                },
-                visibility: VisibilitySource::AlwaysPublic,
-            },
         ];
         let graph = external_package_graph_from_targets(
             &canonical_repo,
@@ -2408,32 +2436,6 @@ mod graph_tests {
                 .attributes
                 .iter()
                 .all(|attribute| attribute.name != "visibility")
-        );
-
-        let setting = graph.nodes.get(&label("is_k8")).unwrap();
-        assert_eq!(
-            setting.kind,
-            QueryNodeKind::Rule("config_setting rule".into())
-        );
-        assert_eq!(
-            setting
-                .rule_capability
-                .as_ref()
-                .map(|capability| capability.rule_class.as_str()),
-            Some("config_setting")
-        );
-        assert!(setting.edges.is_empty());
-        assert!(setting.attributes.is_empty());
-        assert_eq!(setting.effective_visibility, RuleVisibility::Private);
-        assert_eq!(setting.visibility_source, VisibilitySource::PackageDefault);
-        assert_eq!(setting.label.to_string(), "@@dep+//:is_k8");
-        assert_eq!(setting.label.output_label(), "@dep//:is_k8");
-
-        let public_setting = graph.nodes.get(&label("public_k8")).unwrap();
-        assert_eq!(public_setting.effective_visibility, RuleVisibility::Public);
-        assert_eq!(
-            public_setting.visibility_source,
-            VisibilitySource::AlwaysPublic
         );
 
         let existing = graph.nodes.get(&label("existing.txt")).unwrap();

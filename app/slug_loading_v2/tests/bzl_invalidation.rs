@@ -1460,7 +1460,7 @@ fn build_comment_and_whitespace_edits_do_not_change_loaded_package() {
 }
 
 #[test]
-fn same_dice_config_setting_values_are_package_semantics() {
+fn same_dice_config_setting_declaration_fields_are_package_semantics() {
     let workspace = scratch("config-setting-values");
     let package = workspace.join("pkg");
     write(
@@ -1468,34 +1468,120 @@ fn same_dice_config_setting_values_are_package_semantics() {
         "module(name = \"loading\")\n",
     );
     let build = package.join("BUILD.bazel");
-    write(
-        &build,
-        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\", \"compilation_mode\": \"opt\"})\n",
-    );
+    let declaration = |cpu: &str, mode: &str, flag: &str, flag_value: &str, constraint: &str| {
+        format!(
+            concat!(
+                "config_setting(name = \"linux\", ",
+                "values = {{\"cpu\": \"{cpu}\", \"compilation_mode\": \"opt\"}}, ",
+                "define_values = {{\"mode\": \"{mode}\"}}, ",
+                "flag_values = {{\":{flag}\": \"{flag_value}\"}}, ",
+                "constraint_values = [\":{constraint}\"])\n",
+            ),
+            cpu = cpu,
+            mode = mode,
+            flag = flag,
+            flag_value = flag_value,
+            constraint = constraint,
+        )
+    };
+    let source_a = declaration("k8", "fast", "flag_a", "enabled", "constraint_a");
+    write(&build, &source_a);
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let initial = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
 
     write(
         &build,
-        "config_setting(name = \"linux\", values = {\"compilation_mode\": \"opt\", \"cpu\": \"k8\"})\n",
+        "config_setting(name = \"linux\", values = {\"compilation_mode\": \"opt\", \"cpu\": \"k8\"}, define_values = {\"mode\": \"fast\"}, flag_values = {\":flag_a\": \"enabled\"}, constraint_values = [\":constraint_a\"])\n",
     );
     let reordered = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
     assert_eq!(initial, reordered);
 
-    write(
-        &build,
-        "config_setting(name = \"linux\", values = {\"cpu\": \"arm\", \"compilation_mode\": \"opt\"})\n",
-    );
-    let changed = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
-    assert_ne!(reordered, changed);
+    for changed_source in [
+        declaration("arm", "fast", "flag_a", "enabled", "constraint_a"),
+        declaration("k8", "slow", "flag_a", "enabled", "constraint_a"),
+        declaration("k8", "fast", "flag_a", "disabled", "constraint_a"),
+        declaration("k8", "fast", "flag_b", "enabled", "constraint_a"),
+        declaration("k8", "fast", "flag_a", "enabled", "constraint_b"),
+    ] {
+        write(&build, &changed_source);
+        let changed = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
+        assert_ne!(initial, changed, "{changed_source}");
+        write(&build, &source_a);
+        let restored = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
+        assert_eq!(initial, restored, "{changed_source}");
+    }
 
     write(
         &build,
-        "# formatting only\nconfig_setting( name = \"linux\", values = {\"cpu\": \"arm\", \"compilation_mode\": \"opt\"} )\n",
+        "config_setting(name = \"linux\", values = {}, define_values = {}, flag_values = {}, constraint_values = [])\n",
     );
-    let formatted = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
-    assert_eq!(changed, formatted);
+    let explicit_empty = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
+    write(&build, "config_setting(name = \"linux\")\n");
+    let default_empty = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
+    assert_ne!(explicit_empty, default_empty);
+
+    write(&build, &source_a);
+    let restored = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
+    assert_eq!(initial, restored);
+}
+
+#[test]
+fn same_dice_build_setting_definition_default_and_scope_restore_by_semantics() {
+    let workspace = scratch("build-setting-declaration-semantics");
+    let package = workspace.join("pkg");
+    let build = package.join("BUILD.bazel");
+    let defs = package.join("defs.bzl");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    let definition = |flag: bool| {
+        format!(
+            concat!(
+                "def _impl(ctx): fail(\"must remain lazy\")\n",
+                "setting = rule(implementation = _impl, attrs = {{\"scope\": attr.string(default = \"universal\")}}, ",
+                "build_setting = config.int(flag = {}))\n",
+            ),
+            if flag { "True" } else { "False" }
+        )
+    };
+    let invocation = |default: i32, scope: &str| {
+        format!(
+            "load(\":defs.bzl\", \"setting\")\nsetting(name = \"value\", build_setting_default = {default}, scope = \"{scope}\")\n"
+        )
+    };
+    let definition_a = definition(true);
+    let invocation_a = invocation(7, "target");
+    write(&defs, &definition_a);
+    write(&build, &invocation_a);
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let load = || {
+        load_package(
+            &dice,
+            &runtime,
+            &workspace,
+            &package,
+            std::slice::from_ref(&defs),
+        )
+    };
+    let initial = load().unwrap();
+
+    write(&defs, &definition(false));
+    assert_ne!(initial, load().unwrap());
+    write(&defs, &definition_a);
+    assert_eq!(initial, load().unwrap());
+
+    write(&build, &invocation(8, "target"));
+    assert_ne!(initial, load().unwrap());
+    write(&build, &invocation_a);
+    assert_eq!(initial, load().unwrap());
+
+    write(&build, &invocation(7, "universal"));
+    assert_ne!(initial, load().unwrap());
+    write(&build, &invocation_a);
+    assert_eq!(initial, load().unwrap());
 }
 
 #[test]
