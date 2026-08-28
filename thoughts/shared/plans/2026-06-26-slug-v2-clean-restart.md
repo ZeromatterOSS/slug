@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-4-5-7A-canonical-package-label-context-prerequisite-r2](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-canonical-package-label-context-prerequisite-r3](./slug-v2-subplans/current-packet.md).
 
 ### M7 registration cutover REPLAN; canonical package context prerequisite active (2026-08-27)
 
@@ -46,7 +46,7 @@ package/repository context before string-label conversion. Internal native
 references therefore remain provisional root labels, and explicit canonical
 references are rejected before configured analysis can consume them.
 
-Activate only `WP-4-5-7A-canonical-package-label-context-prerequisite-r2`. Keep
+Activate only `WP-4-5-7A-canonical-package-label-context-prerequisite-r3`. Keep
 package-context canonicalization in the loading evaluator, using the existing
 canonical route's selected mapping, and retain only final canonical labels in
 `LoadedPackage`. The registration-consumer implementation remains parked and
@@ -60,6 +60,11 @@ external labels. R2 converts the complete existing external-query consumer
 category—visibility, filegroup, alias, test-suite and package-group—to compare
 full canonical repository plus package identity. It must not accept both
 representations or repair final labels back to root.
+
+Complete query validation then exposed one existing precedence fixture that
+used unmapped apparent `@dep` as a stand-in for a different-repository query
+edge. R3 admits only that proof file and converts the fixture to explicit
+canonical `@@other+`; loading continues to reject absent apparent mappings.
 
 ### M7 configured package identity accepted; registration cutover active (2026-08-27)
 

@@ -19857,3 +19857,17 @@ idempotent only for an already-matching canonical repository. Different
 repositories, equal paths, root mapping breadth and general external graph
 admission remain deferred. No mapping, route lookup or source discovery moves
 into query.
+
+### Canonical package context R3; query precedence proof corrected (2026-08-27)
+
+Complete `slug_query_v2` validation found one existing rejection-precedence
+fixture whose external BUILD used unmapped apparent `@dep` merely to reach the
+query graph's different-repository rejection. Package-context conversion must
+reject that label during loading because the selected external route exposes
+no such apparent mapping.
+
+Run `WP-4-5-7A-canonical-package-label-context-prerequisite-r3`. Add only
+`app/slug_query_v2/tests/loading_query.rs` to the proof allowlist and replace
+that synthetic edge with explicit canonical `@@other+//:group`. Preserve the
+same query rejection and competing-error precedence; do not add a mapping,
+accept an unmapped apparent name, or change production behavior.

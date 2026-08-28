@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-canonical-package-label-context-prerequisite-r2`
+Packet: `WP-4-5-7A-canonical-package-label-context-prerequisite-r3`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
@@ -42,6 +42,14 @@ named-repository edge. The same query projection uses that old assumption for
 filegroup sources, aliases, test-suite members and package-group includes.
 Correct the whole existing consumer category here; accepting both identities
 or repairing them back to root would create a path-only compatibility shim.
+
+R2's complete query validation then found one pre-existing precedence fixture
+whose external BUILD used unmapped apparent `@dep` solely to reach the query
+projection's different-repository rejection. Final package-context conversion
+correctly rejects that spelling during loading, before query projection. R3
+adds only that existing test file to the proof allowlist and spells the case as
+an explicit different canonical repository so it continues to prove its
+query-layer ordering without weakening the loading boundary.
 
 ## Learned facts and research basis
 
@@ -162,6 +170,7 @@ Production:
 Proof:
 
 5. `app/slug_loading_v2/src/host_package_inventory_tests.rs`
+6. `app/slug_query_v2/tests/loading_query.rs`
 
 The parked analysis files, identity/Bzlmod/core/CLI/Cargo/BUILD/fixture/
 oracle/Zabel files and all other plans are excluded after this scheduling
