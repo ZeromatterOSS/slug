@@ -69,6 +69,10 @@ with ordinary extension ownership, preserve RepoSpec-Need predecessor order,
 and prove the default host alias through configured analysis. Toolchain
 selection and provider/implementation analysis remain later packets.
 
+Commit `dfb56b9b5` records R7. Independent Sol review returns `ACCEPT`; preserve
+selected-graph failure precedence while deferring only completed mapping-
+projection semantic failures behind RepoSpec completion.
+
 Pinned Bazel 9.2 remains behavior authority. Clean Zabel `0795445f…` remains
 peer architecture/optimization guidance only. Buck2-derived Rust owns generic
 Starlark syntax/evaluation, BCR-delivered Starlark owns all rule definitions and

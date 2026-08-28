@@ -20645,3 +20645,8 @@ peer architecture/optimization guidance only. BCR Starlark owns all rule
 definitions and control flow including `cc_internal`; `cc_common` is a generic
 host-ABI stress case, never a Rust C++ rule engine. Do not resume Rust until
 independent review returns `ACCEPT` on R7.
+
+Commit `dfb56b9b5` records R7 and independent Sol review returns `ACCEPT`.
+Implementation may resume only within the current manifest. Preserve original
+pre-RepoSpec precedence for selected-graph failures; defer only completed
+mapping-projection semantic failures until after RepoSpec completion.

@@ -15,8 +15,8 @@ aliases through the generic external-package gate, and prove the default host
 platform end to end. Do not implement toolchain selection.
 
 R5 design commit `c2ec8481e` and independent Sol review: `ACCEPT`. R6
-implementation review: `REPLAN`. R7 requires fresh independent acceptance
-before implementation resumes.
+implementation review: `REPLAN`. R7 design commit `dfb56b9b5` and independent
+Sol review: `ACCEPT`.
 
 ## R4, R5 and design replan record
 
@@ -323,7 +323,7 @@ The only new non-plan files remain the exact 50-line builtin `tools/BUILD`,
 the exact 106-line `tools/build_defs.bzl`, and the at-most-350-line configured
 cycle detector. R4 caps remain 950 production, 700 proof and 1,750 total added
 Rust lines. Mapping-owner and loaded-target-gate additions have separate caps
-of 900 production, 700 proof and 1,600 total; combined R6 caps are
+of 1,150 production, 700 proof and 1,850 total; combined R7 caps are
 2,100/1,400/3,600. The large
 `selected_repo_spec.rs` owner remains cohesive because R5 extracts an existing
 mapping calculation beside its selected-graph/route/extension keys, and R7
