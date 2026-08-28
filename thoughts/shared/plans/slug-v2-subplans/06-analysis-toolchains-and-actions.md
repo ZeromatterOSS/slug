@@ -20218,3 +20218,21 @@ value map/matcher/resolver/converter, flattened selectors, evaluator-heap
 retention, command or platform/toolchain selection,
 provider payload work, Rust BCR rule control flow, Zabel authority, or a lock
 across DICE.
+
+### Typed condition architecture accepted; declaration loading activated (2026-08-27)
+
+Commit `b949ce8da` accepts the architecture above after independent review.
+The final source audit preserves Bazel's signed-32-bit integer declaration
+defaults versus arbitrary-precision configured overrides, the singleton
+effective default for allow-multiple strings, and per-nondefault-option scope
+inside the sole future setting map. No new parser or rule-control path exists:
+Buck2 syntax and BCR Starlark remain the boundary, while Zabel remains peer
+guidance.
+
+Run only `WP-4-5-7A-build-setting-config-declaration-loading`. Add the fifth
+definition kind, type-correct target defaults and a derived magic-scope view;
+replace the values-only native config-setting target with one four-field
+semantic predicate; derive its native row; and add root/external query edges
+for flag and constraint labels. Preserve all-empty loading success and defer
+configuration maps, transitions, matching, selectors, aliases, providers,
+platforms and toolchain selection.
