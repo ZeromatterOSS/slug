@@ -57,7 +57,7 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
-use slug_loading_v2::RootPackageLoadKey;
+use slug_loading_v2::HostPackageInventoryKey;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
@@ -567,7 +567,7 @@ impl ActivationTracker for RootActivationTracker {
                 self.batches.lock().unwrap().push((identity, batch.dupe()));
             }
         } else if self.all_loading {
-            let identity = if let Some(key) = key.downcast_ref::<RootPackageLoadKey>() {
+            let identity = if let Some(key) = key.downcast_ref::<HostPackageInventoryKey>() {
                 Some(format!("package/{key}"))
             } else if key.downcast_ref::<RootModuleLoadingAnchorKey>().is_some() {
                 Some("anchor".to_owned())

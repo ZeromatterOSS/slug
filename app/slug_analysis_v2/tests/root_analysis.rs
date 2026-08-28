@@ -41,8 +41,11 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
-use slug_loading_v2::RootPackageLoadKey;
-use slug_loading_v2::RootPackageLoadObservationKey;
+use slug_loading_v2::HostPackageInventoryKey;
+use slug_loading_v2::HostPackageInventoryObservationError;
+use slug_loading_v2::HostPackageInventoryObservationKey;
+use slug_loading_v2::ModuleRegistrationExpansionKey;
+use slug_loading_v2::ModuleRegistrationExpansionObservationKey;
 use slug_loading_v2::bzl_load_cycle_detector;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
@@ -207,6 +210,7 @@ struct AnalysisTracker {
     activations: Mutex<Vec<TrackedAnalysis>>,
     families: Mutex<Vec<String>>,
     batches: Mutex<Vec<TrackedBatch>>,
+    dependencies: Mutex<Vec<(String, Vec<String>)>>,
 }
 
 impl AnalysisTracker {
@@ -221,15 +225,30 @@ impl AnalysisTracker {
     fn take_batches(&self) -> Vec<TrackedBatch> {
         std::mem::take(&mut *self.batches.lock().unwrap())
     }
+
+    fn dependencies(&self, key: &impl ToString) -> Vec<String> {
+        let key = key.to_string();
+        self.dependencies
+            .lock()
+            .unwrap()
+            .iter()
+            .rev()
+            .find_map(|(candidate, dependencies)| (candidate == &key).then(|| dependencies.clone()))
+            .unwrap_or_default()
+    }
 }
 
 impl ActivationTracker for AnalysisTracker {
     fn key_activated(
         &self,
-        _key: &DynKey,
-        _deps: &mut dyn Iterator<Item = &DynKey>,
+        key: &DynKey,
+        deps: &mut dyn Iterator<Item = &DynKey>,
         _activation: ActivationData,
     ) {
+        self.dependencies
+            .lock()
+            .unwrap()
+            .push((key.to_string(), deps.map(ToString::to_string).collect()));
     }
 
     fn tracks_rich_activations(&self) -> bool {
@@ -257,10 +276,10 @@ impl ActivationTracker for AnalysisTracker {
                 .push("analysis/observed".into());
             key.configured_target()
         } else {
-            let family = if key.downcast_ref::<RootPackageLoadKey>().is_some() {
+            let family = if key.downcast_ref::<HostPackageInventoryKey>().is_some() {
                 Some("package/legacy")
             } else if key
-                .downcast_ref::<RootPackageLoadObservationKey>()
+                .downcast_ref::<HostPackageInventoryObservationKey>()
                 .is_some()
             {
                 Some("package/observed")
@@ -275,6 +294,16 @@ impl ActivationTracker for AnalysisTracker {
                 Some("resolved/legacy")
             } else if key.downcast_ref::<ResolvedPathObservationKey>().is_some() {
                 Some("resolved/observed")
+            } else if key
+                .downcast_ref::<ModuleRegistrationExpansionKey>()
+                .is_some()
+            {
+                Some("registration/legacy")
+            } else if key
+                .downcast_ref::<ModuleRegistrationExpansionObservationKey>()
+                .is_some()
+            {
+                Some("registration/observed")
             } else {
                 None
             };
@@ -677,10 +706,26 @@ async fn observed_analysis_is_family_isolated_recursive_and_arc_stable() {
         families.iter().all(|family| !family.ends_with("/legacy")),
         "{families:#?}"
     );
+    let dependencies = tracker.dependencies(&key);
+    assert!(
+        dependencies
+            .iter()
+            .any(|dependency| dependency.starts_with("observed-host-package-inventory:"))
+    );
+    assert!(
+        dependencies
+            .iter()
+            .all(|dependency| !dependency.starts_with("observed-host-package-load:"))
+    );
+    assert!(
+        families
+            .iter()
+            .all(|family| !family.starts_with("registration/"))
+    );
 
     let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let legacy_tracker = Arc::new(AnalysisTracker::default());
-    let mut legacy_transaction = transaction(&legacy_dice, epoch, legacy_tracker).await;
+    let mut legacy_transaction = transaction(&legacy_dice, epoch, legacy_tracker.dupe()).await;
     let legacy = legacy_transaction.compute(&parent_key()).await.unwrap();
     let AnalysisPreparationOutcome::Complete(legacy) = legacy else {
         panic!("legacy parity analysis returned Need")
@@ -688,6 +733,48 @@ async fn observed_analysis_is_family_isolated_recursive_and_arc_stable() {
     assert_eq!(
         legacy.as_ref().as_ref().unwrap().as_ref(),
         observed_result(&first).as_ref()
+    );
+    let legacy_dependencies = legacy_tracker.dependencies(&parent_key());
+    assert!(
+        legacy_dependencies
+            .iter()
+            .any(|dependency| dependency.starts_with("host-package-inventory:"))
+    );
+    assert!(
+        legacy_dependencies
+            .iter()
+            .all(|dependency| !dependency.starts_with("host-package-load:"))
+    );
+    assert!(
+        legacy_tracker
+            .take_families()
+            .iter()
+            .all(|family| !family.starts_with("registration/"))
+    );
+}
+
+#[tokio::test]
+async fn external_configured_target_stops_before_package_carrier_activation() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisTracker::default());
+    let epoch = EpochBuilder::base("external-", &[], 11).build();
+    let mut transaction = transaction(&dice, epoch, tracker.dupe()).await;
+    let key = ConfiguredNodeAnalysisObservationKey::new(
+        workspace(),
+        configured("@@external//parent:parent"),
+    )
+    .unwrap();
+    let outcome = transaction.compute(&key).await.unwrap();
+    let AnalysisPreparationOutcome::Complete(Ok(result)) = outcome else {
+        panic!("external configured target did not retain semantic terminal")
+    };
+    assert!(result.as_ref().is_err());
+    assert!(tracker.dependencies(&key).is_empty());
+    let families = tracker.take_families();
+    assert!(
+        families.iter().all(|family| {
+            !family.starts_with("package/") && !family.starts_with("registration/")
+        })
     );
 }
 
@@ -822,18 +909,16 @@ async fn observed_outer_wins_need_and_semantic_while_semantic_error_publishes_on
     let outer = ObservedPathFrontierError::from(PathObservationEpochError::DuplicateDemand(
         EpochBuilder::demand("/outer", PathObservationOperation::Lstat),
     ));
-    let outer_value: <RootPackageLoadObservationKey as Key>::Value =
-        AnalysisPreparationOutcome::Complete(Err(outer.clone()));
+    let outer_value: <HostPackageInventoryObservationKey as Key>::Value =
+        AnalysisPreparationOutcome::Complete(Err(HostPackageInventoryObservationError::Frontier(
+            outer.clone(),
+        )));
     let mut updater = transaction.into_updater();
     updater
         .changed_to(vec![(
-            RootPackageLoadObservationKey::new(
+            HostPackageInventoryObservationKey::new(
                 workspace(),
-                configured("@@//outer:leaf")
-                    .label()
-                    .package()
-                    .package()
-                    .clone(),
+                configured("@@//outer:leaf").label().package().clone(),
             ),
             outer_value,
         )])

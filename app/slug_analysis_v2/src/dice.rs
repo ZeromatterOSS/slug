@@ -30,16 +30,19 @@ use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::TargetName;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::CoercedAttributeValue;
+use slug_loading_v2::HostPackageInventory;
+use slug_loading_v2::HostPackageInventoryErrorRef;
+use slug_loading_v2::HostPackageInventoryKey;
+use slug_loading_v2::HostPackageInventoryObservationKey;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::LoadingPreparationNeeds;
 use slug_loading_v2::LoadingPreparationOutcome;
 use slug_loading_v2::PackageTargetKind;
-use slug_loading_v2::RootPackageLoadKey;
-use slug_loading_v2::RootPackageLoadObservationKey;
 use slug_loading_v2::package::NativeToolchainTarget;
 use slug_loading_v2::package::StarlarkRuleImplementation;
 use slug_workspace_v2::NormalizedAbsolutePath;
@@ -231,17 +234,31 @@ fn analysis_semantic_complete<T>(result: Result<T, AnalysisError>) -> AnalysisSe
     LoadingPreparationOutcome::Complete(Ok(result))
 }
 
-async fn compute_root_package_input(
+fn package_inventory_error(error: HostPackageInventoryErrorRef<'_>) -> AnalysisError {
+    let message = match error {
+        HostPackageInventoryErrorRef::Root(error) => error.to_string(),
+        HostPackageInventoryErrorRef::CanonicalRoute(error) => error.to_string(),
+        HostPackageInventoryErrorRef::Canonical(error) => error.to_string(),
+    };
+    AnalysisError::message(message)
+}
+
+async fn compute_configured_package_input(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: NormalizedAbsolutePath,
-    package: slug_identity_v2::PackagePath,
+    package: PackageIdentifier,
     context: &str,
-) -> AnalysisSemanticOutcome<RootPackageValue> {
+) -> AnalysisSemanticOutcome<ConfiguredPackageValue> {
+    if !package.repo().is_root() {
+        return analysis_semantic_complete(Err(AnalysisError::message(format!(
+            "external repository configured packages are not supported: {package}"
+        ))));
+    }
     match mode {
         ConfiguredAnalysisMode::Legacy => {
             match ctx
-                .compute(&RootPackageLoadKey::new(workspace, package))
+                .compute(&HostPackageInventoryKey::new(workspace, package))
                 .await
             {
                 Ok(LoadingPreparationOutcome::Need(need)) => LoadingPreparationOutcome::Need(need),
@@ -255,13 +272,18 @@ async fn compute_root_package_input(
         }
         ConfiguredAnalysisMode::Observed => {
             match ctx
-                .compute(&RootPackageLoadObservationKey::new(workspace, package))
+                .compute(&HostPackageInventoryObservationKey::new(workspace, package))
                 .await
             {
                 Ok(LoadingPreparationOutcome::Need(need)) => LoadingPreparationOutcome::Need(need),
-                Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
-                    LoadingPreparationOutcome::Complete(Err(error))
-                }
+                Ok(LoadingPreparationOutcome::Complete(Err(
+                    slug_loading_v2::HostPackageInventoryObservationError::Frontier(error),
+                ))) => LoadingPreparationOutcome::Complete(Err(error)),
+                Ok(LoadingPreparationOutcome::Complete(Err(
+                    slug_loading_v2::HostPackageInventoryObservationError::CanonicalRoute(error),
+                ))) => panic!(
+                    "root-only configured package input produced canonical route outer: {error:?}"
+                ),
                 Ok(LoadingPreparationOutcome::Complete(Ok(observed))) => {
                     analysis_semantic_complete(Ok(observed.result().dupe()))
                 }
@@ -342,11 +364,11 @@ async fn prepare_configured_node_analysis_driver(
         }),
         None => None,
     };
-    let package_outcome = compute_root_package_input(
+    let package_outcome = compute_configured_package_input(
         ctx,
         mode,
         workspace.dupe(),
-        requested.package().package().clone(),
+        requested.package().clone(),
         "loading root setting target package through DICE",
     )
     .await;
@@ -361,7 +383,7 @@ async fn prepare_configured_node_analysis_driver(
             LoadingPreparationOutcome::Complete(Ok(Ok(_))) => {}
         }
     }
-    let mut package = None;
+    let mut package_inventory = None;
     match package_outcome {
         LoadingPreparationOutcome::Need(need) => {
             all_need = Some(match all_need {
@@ -384,14 +406,7 @@ async fn prepare_configured_node_analysis_driver(
                 first_error = Some(error);
             }
         }
-        LoadingPreparationOutcome::Complete(Ok(Ok(value))) => match value.as_ref() {
-            Ok(value) => package = Some(value.clone()),
-            Err(error) => {
-                if first_error.is_none() {
-                    first_error = Some(AnalysisError::message(error.to_string()));
-                }
-            }
-        },
+        LoadingPreparationOutcome::Complete(Ok(Ok(value))) => package_inventory = Some(value),
     }
     if let Some(error) = first_outer {
         return LoadingPreparationOutcome::Complete(Err(error));
@@ -402,7 +417,12 @@ async fn prepare_configured_node_analysis_driver(
     if let Some(error) = first_error {
         return analysis_semantic_complete(Err(error));
     }
-    let package = package.expect("complete target package preparation stores its value");
+    let package_inventory =
+        package_inventory.expect("complete target package preparation stores its value");
+    let package = match package_inventory.loaded() {
+        Ok(package) => package,
+        Err(error) => return analysis_semantic_complete(Err(package_inventory_error(error))),
+    };
     let Some(target) = package
         .targets
         .iter()
@@ -489,11 +509,11 @@ async fn root_string_build_setting_default(
     workspace: &NormalizedAbsolutePath,
     setting: &CanonicalLabel,
 ) -> AnalysisSemanticOutcome<CompactString> {
-    let package = match compute_root_package_input(
+    let package_inventory = match compute_configured_package_input(
         ctx,
         mode,
         workspace.dupe(),
-        setting.package().package().clone(),
+        setting.package().clone(),
         "loading root string setting through DICE",
     )
     .await
@@ -505,12 +525,11 @@ async fn root_string_build_setting_default(
         LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
             return analysis_semantic_complete(Err(error));
         }
-        LoadingPreparationOutcome::Complete(Ok(Ok(value))) => match value.as_ref() {
-            Ok(package) => package.clone(),
-            Err(error) => {
-                return analysis_semantic_complete(Err(AnalysisError::message(error.to_string())));
-            }
-        },
+        LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
+    };
+    let package = match package_inventory.loaded() {
+        Ok(package) => package,
+        Err(error) => return analysis_semantic_complete(Err(package_inventory_error(error))),
     };
     let Some(default) = package
         .targets
@@ -1155,8 +1174,8 @@ fn root_analysis_is_success(value: &RootAnalysisKeyValue) -> bool {
 }
 
 type PreparedToolchainOutcome = AnalysisSemanticOutcome<PreparedToolchain>;
-type RootPackageValue = Arc<Result<LoadedPackage, slug_loading_v2::RootPackageLoadError>>;
-type RootPackages = Vec<(slug_identity_v2::PackagePath, RootPackageValue)>;
+type ConfiguredPackageValue = Arc<HostPackageInventory>;
+type ConfiguredPackages = Vec<(PackageIdentifier, ConfiguredPackageValue)>;
 
 fn toolchain_outcome(result: Result<PreparedToolchain, AnalysisError>) -> PreparedToolchainOutcome {
     analysis_semantic_complete(result)
@@ -1358,19 +1377,18 @@ fn direct_root_registrations(
 }
 
 fn package_target<'a>(
-    packages: &'a RootPackages,
+    packages: &'a ConfiguredPackages,
     label: &CanonicalLabel,
 ) -> Result<&'a slug_loading_v2::PackageTarget, AnalysisError> {
     let package = packages
         .iter()
-        .find(|(path, _)| path == label.package().package())
+        .find(|(package, _)| configured_package_identity_matches(package, label))
         .ok_or_else(|| {
             AnalysisError::new(format!("toolchain label package was not loaded: {label}"))
         })?
         .1
-        .as_ref()
-        .as_ref()
-        .map_err(|error| AnalysisError::new(error.to_string()))?;
+        .loaded()
+        .map_err(package_inventory_error)?;
     package
         .targets
         .iter()
@@ -1378,8 +1396,15 @@ fn package_target<'a>(
         .ok_or_else(|| AnalysisError::new(format!("toolchain target was not found: {label}")))
 }
 
+fn configured_package_identity_matches(
+    package: &PackageIdentifier,
+    label: &CanonicalLabel,
+) -> bool {
+    package == label.package()
+}
+
 fn constraint_value_setting(
-    packages: &RootPackages,
+    packages: &ConfiguredPackages,
     label: &CanonicalLabel,
 ) -> Result<CanonicalLabel, AnalysisError> {
     let target = package_target(packages, label)?;
@@ -1492,7 +1517,7 @@ async fn prepare_execution_platform(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
-    packages: &RootPackages,
+    packages: &ConfiguredPackages,
     key: ConfiguredTargetKey,
 ) -> PreparedExecutionPlatformOutcome {
     let analysis_key = ConfiguredNodeAnalysisKey::new(workspace.dupe(), key.clone())
@@ -1567,21 +1592,28 @@ async fn prepare_execution_platform(
     }))
 }
 
-async fn load_root_native_packages(
+async fn load_configured_native_packages(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
     labels: &mut Vec<CanonicalLabel>,
-) -> AnalysisSemanticOutcome<RootPackages> {
+) -> AnalysisSemanticOutcome<ConfiguredPackages> {
     let mut packages = Vec::new();
     let mut seen = labels.iter().cloned().collect::<SmallSet<_>>();
     loop {
-        let paths = labels
+        if let Some(label) = labels
             .iter()
-            .map(|label| label.package().package().clone())
-            .filter(|path| !packages.iter().any(|(loaded, _)| loaded == path))
+            .find(|label| !label.package().repo().is_root())
+        {
+            return analysis_semantic_complete(Err(require_root_native_reference(label)
+                .expect_err("nonroot label must fail root native-reference admission")));
+        }
+        let packages_to_load = labels
+            .iter()
+            .map(|label| label.package().clone())
+            .filter(|package| !packages.iter().any(|(loaded, _)| loaded == package))
             .collect::<SmallSet<_>>();
-        if paths.is_empty() {
+        if packages_to_load.is_empty() {
             let mut next = SmallSet::new();
             for label in labels.clone() {
                 if let Ok(target) = package_target(&packages, &label) {
@@ -1590,7 +1622,7 @@ async fn load_root_native_packages(
                             return analysis_semantic_complete(Err(error));
                         }
                         if seen.insert(reference.clone()) {
-                            next.insert(reference.package().package().clone());
+                            next.insert(reference.package().clone());
                             labels.push(reference);
                         }
                     }
@@ -1598,15 +1630,15 @@ async fn load_root_native_packages(
             }
             if next
                 .iter()
-                .all(|path| packages.iter().any(|(loaded, _)| loaded == path))
+                .all(|package| packages.iter().any(|(loaded, _)| loaded == package))
             {
                 return analysis_semantic_complete(Ok(packages));
             }
         }
         let outcomes = ctx
-            .compute_join(paths.into_iter(), |ctx, package| {
+            .compute_join(packages_to_load.into_iter(), |ctx, package| {
                 Box::pin(async move {
-                    let value = compute_root_package_input(
+                    let value = compute_configured_package_input(
                         ctx,
                         mode,
                         workspace.dupe(),
@@ -1621,7 +1653,7 @@ async fn load_root_native_packages(
         let mut needs: Option<LoadingPreparationNeeds> = None;
         let mut first_outer = None;
         let mut first_error = None;
-        for (path, outcome) in outcomes {
+        for (package, outcome) in outcomes {
             match outcome {
                 LoadingPreparationOutcome::Need(need) => {
                     needs = Some(needs.map_or(need.clone(), |current| {
@@ -1637,7 +1669,7 @@ async fn load_root_native_packages(
                 }
                 LoadingPreparationOutcome::Complete(Ok(Err(_))) => {}
                 LoadingPreparationOutcome::Complete(Ok(Ok(value))) => {
-                    packages.push((path, value));
+                    packages.push((package, value));
                 }
             }
         }
@@ -1668,7 +1700,7 @@ async fn prepare_default_action_context(
         );
     };
     let mut labels = vec![platform_key.label().clone()];
-    let packages = match load_root_native_packages(ctx, mode, workspace, &mut labels).await {
+    let packages = match load_configured_native_packages(ctx, mode, workspace, &mut labels).await {
         LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
         LoadingPreparationOutcome::Complete(Err(error)) => {
             return LoadingPreparationOutcome::Complete(Err(error));
@@ -1709,7 +1741,7 @@ async fn prepare_default_action_context(
 }
 
 fn validate_constraint_settings(
-    packages: &RootPackages,
+    packages: &ConfiguredPackages,
     values: &[CanonicalLabel],
     duplicate: impl Fn() -> AnalysisError,
 ) -> Result<(), AnalysisError> {
@@ -1724,7 +1756,7 @@ fn validate_constraint_settings(
 }
 
 fn validate_marker_toolchain(
-    packages: &RootPackages,
+    packages: &ConfiguredPackages,
     label: &CanonicalLabel,
 ) -> Result<(), AnalysisError> {
     let target = package_target(packages, label)?;
@@ -1837,7 +1869,7 @@ fn validate_marker_toolchain(
 }
 
 fn select_root_toolchain(
-    packages: &RootPackages,
+    packages: &ConfiguredPackages,
     required: &CanonicalLabel,
     platforms: &[CanonicalLabel],
     toolchains: &[CanonicalLabel],
@@ -2021,7 +2053,7 @@ async fn resolve_root_toolchain(
     let mut labels = execution_platforms;
     labels.extend(toolchain_labels.iter().cloned());
     labels.push(required.clone());
-    let packages = match load_root_native_packages(ctx, mode, workspace, &mut labels).await {
+    let packages = match load_configured_native_packages(ctx, mode, workspace, &mut labels).await {
         LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
         LoadingPreparationOutcome::Complete(Err(error)) => {
             return LoadingPreparationOutcome::Complete(Err(error));
@@ -2152,6 +2184,15 @@ mod tests {
         assert_eq!(root.package().package(), external.package().package());
         assert!(require_root_native_reference(&root).is_ok());
         assert!(require_root_native_reference(&external).is_err());
+        assert!(configured_package_identity_matches(root.package(), &root));
+        assert!(!configured_package_identity_matches(
+            root.package(),
+            &external
+        ));
+        assert!(!configured_package_identity_matches(
+            external.package(),
+            &root
+        ));
     }
 
     #[test]
@@ -2340,11 +2381,11 @@ impl ConfiguredNodeAnalysisKey {
             ))));
         }
         let label = node.label();
-        let package_value = match compute_root_package_input(
+        let package_inventory = match compute_configured_package_input(
             ctx,
             mode,
             self.workspace.dupe(),
-            label.package().package().clone(),
+            label.package().clone(),
             "loading package through DICE",
         )
         .await
@@ -2360,10 +2401,10 @@ impl ConfiguredNodeAnalysisKey {
             }
             LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
         };
-        let package = match package_value.as_ref() {
+        let package = match package_inventory.loaded() {
             Ok(package) => package,
             Err(error) => {
-                return root_analysis_driver_complete(Err(AnalysisError::new(error.to_string())));
+                return root_analysis_driver_complete(Err(package_inventory_error(error)));
             }
         };
         let target = package
@@ -2708,14 +2749,6 @@ impl ConfiguredNodeAnalysisKey {
             .configured_target()
             .expect("Starlark rule nodes retain structural configuration");
         let required_root_string_setting = {
-            let package = match package_value.as_ref() {
-                Ok(package) => package,
-                Err(error) => {
-                    return root_analysis_driver_complete(Err(AnalysisError::new(
-                        error.to_string(),
-                    )));
-                }
-            };
             let rule = match starlark_rule_implementation(package, configured_target) {
                 Ok(rule) => rule,
                 Err(error) => return root_analysis_driver_complete(Err(error)),
@@ -2742,14 +2775,6 @@ impl ConfiguredNodeAnalysisKey {
             ))));
         }
         let (requirement, marker) = {
-            let package = match package_value.as_ref() {
-                Ok(package) => package,
-                Err(error) => {
-                    return root_analysis_driver_complete(Err(AnalysisError::new(
-                        error.to_string(),
-                    )));
-                }
-            };
             let rule = match starlark_rule_implementation(package, configured_target) {
                 Ok(rule) => rule,
                 Err(error) => return root_analysis_driver_complete(Err(error)),
@@ -2779,10 +2804,7 @@ impl ConfiguredNodeAnalysisKey {
             mode,
             &self.workspace,
             configured_target.configuration(),
-            package_value
-                .as_ref()
-                .as_ref()
-                .expect("validated root package value remains immutable"),
+            package,
             configured_target.label(),
             requirement.is_some(),
         )
@@ -2852,14 +2874,6 @@ impl ConfiguredNodeAnalysisKey {
             }
         };
         let declared_dependency_keys = {
-            let package = match package_value.as_ref() {
-                Ok(package) => package,
-                Err(error) => {
-                    return root_analysis_driver_complete(Err(AnalysisError::new(
-                        error.to_string(),
-                    )));
-                }
-            };
             match root_declared_dependency_keys(package, configured_target) {
                 Ok(keys) => keys,
                 Err(error) => return root_analysis_driver_complete(Err(error)),
@@ -3010,10 +3024,6 @@ impl ConfiguredNodeAnalysisKey {
             return root_analysis_driver_complete(Err(error));
         }
 
-        let package = package_value
-            .as_ref()
-            .as_ref()
-            .expect("validated root package value remains immutable");
         root_analysis_driver_complete(finish_analysis(
             package,
             configured_target,
