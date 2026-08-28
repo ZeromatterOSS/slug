@@ -14,7 +14,10 @@ use std::sync::Arc;
 use allocative::Allocative;
 use compact_str::CompactString;
 use dupe::Dupe;
+use num_bigint::BigInt;
+use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::OptionLabelContext;
+use slug_identity_v2::serialization::StableSerialize;
 use strong_hash::StrongHash;
 
 use super::convert::ConvertError;
@@ -30,9 +33,9 @@ use super::registry::NATIVE_OPTION_DESCRIPTORS;
 use super::registry::NativeOptionDescriptor;
 use super::value::*;
 
-const PROJECTION_CONTEXT: &str = "slug.build/configuration-projection/v1";
+const PROJECTION_CONTEXT: &str = "slug.build/configuration-projection/v2";
 const PROJECTION_MAGIC: &[u8] = b"slugcfg\0";
-const PROJECTION_VERSION: u16 = 1;
+const PROJECTION_VERSION: u16 = 2;
 
 /// The semantic role of a configuration.  Its byte spelling is Slug-native.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
@@ -66,31 +69,195 @@ impl fmt::Display for SlugConfigurationKind {
     }
 }
 
-/// The one string build setting currently carried by a Slug configuration.
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
-pub struct RootStringSettingValue {
-    label: CompactString,
-    value: CompactString,
+/// Scope declared by a Starlark build setting.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+pub enum StarlarkOptionScope {
+    Default,
+    Universal,
+    Target,
+    Project,
 }
 
-impl RootStringSettingValue {
-    pub fn new(value: impl Into<CompactString>) -> Self {
-        Self::new_for_label("@@//:setting", value)
+impl StarlarkOptionScope {
+    fn tag(self) -> u16 {
+        match self {
+            Self::Default => 0x0630,
+            Self::Universal => 0x0631,
+            Self::Target => 0x0632,
+            Self::Project => 0x0633,
+        }
+    }
+}
+
+/// Typed value of a Starlark build setting.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+pub enum StarlarkOptionValue {
+    Integer(BigInt),
+    Boolean(bool),
+    String(CompactString),
+    StringList(Arc<[CompactString]>),
+    StringSet(Arc<[CompactString]>),
+}
+
+impl StarlarkOptionValue {
+    pub fn string(value: impl Into<CompactString>) -> Self {
+        Self::String(value.into())
     }
 
-    pub fn new_for_label(label: impl Into<CompactString>, value: impl Into<CompactString>) -> Self {
+    pub fn string_list(values: impl IntoIterator<Item = impl Into<CompactString>>) -> Self {
+        Self::StringList(Arc::from(
+            values.into_iter().map(Into::into).collect::<Vec<_>>(),
+        ))
+    }
+
+    pub fn string_set(values: impl IntoIterator<Item = impl Into<CompactString>>) -> Self {
+        let mut values = values.into_iter().map(Into::into).collect::<Vec<_>>();
+        values.sort_unstable();
+        values.dedup();
+        Self::StringSet(Arc::from(values))
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Self::String(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+
+/// One canonical Starlark build-setting entry.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+pub struct StarlarkOption {
+    label: CanonicalLabel,
+    value: StarlarkOptionValue,
+    scope: StarlarkOptionScope,
+}
+
+impl StarlarkOption {
+    pub fn new(
+        label: CanonicalLabel,
+        value: StarlarkOptionValue,
+        scope: StarlarkOptionScope,
+    ) -> Self {
         Self {
-            label: label.into(),
-            value: value.into(),
+            label,
+            value,
+            scope,
         }
     }
 
-    pub fn label(&self) -> &str {
+    pub fn string(
+        label: CanonicalLabel,
+        value: impl Into<CompactString>,
+        scope: StarlarkOptionScope,
+    ) -> Self {
+        Self::new(label, StarlarkOptionValue::string(value), scope)
+    }
+
+    pub fn label(&self) -> &CanonicalLabel {
         &self.label
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn value(&self) -> &StarlarkOptionValue {
         &self.value
+    }
+
+    pub fn scope(&self) -> StarlarkOptionScope {
+        self.scope
+    }
+}
+
+/// Immutable canonical-label-sorted Starlark option map.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Allocative, Dupe)]
+pub struct StarlarkOptions(Arc<[StarlarkOption]>);
+
+impl StarlarkOptions {
+    pub fn try_from_entries(
+        mut entries: Vec<StarlarkOption>,
+    ) -> Result<Self, SlugConfigurationError> {
+        for entry in &mut entries {
+            normalize_starlark_option(entry);
+        }
+        entries.sort_unstable_by(|left, right| left.label.cmp(&right.label));
+        if entries
+            .windows(2)
+            .any(|pair| pair[0].label == pair[1].label)
+        {
+            return Err(SlugConfigurationError::DuplicateStarlarkOption);
+        }
+        Ok(Self(Arc::from(entries)))
+    }
+
+    pub fn get(&self, label: &CanonicalLabel) -> Option<&StarlarkOption> {
+        self.0
+            .binary_search_by(|entry| entry.label.cmp(label))
+            .ok()
+            .map(|index| &self.0[index])
+    }
+
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &StarlarkOption> {
+        self.0.iter()
+    }
+
+    pub fn with(&self, mut entry: StarlarkOption) -> Self {
+        normalize_starlark_option(&mut entry);
+        let mut entries = self.0.to_vec();
+        match entries.binary_search_by(|existing| existing.label.cmp(&entry.label)) {
+            Ok(index) if entries[index] == entry => return self.dupe(),
+            Ok(index) => entries[index] = entry,
+            Err(index) => entries.insert(index, entry),
+        }
+        Self(Arc::from(entries))
+    }
+
+    pub fn without(&self, label: &CanonicalLabel) -> Self {
+        let mut entries = self.0.to_vec();
+        if let Ok(index) = entries.binary_search_by(|entry| entry.label.cmp(label)) {
+            entries.remove(index);
+        } else {
+            return self.dupe();
+        }
+        Self(Arc::from(entries))
+    }
+
+    fn to_exec(&self) -> Result<Self, SlugConfigurationError> {
+        let mut entries = Vec::with_capacity(self.0.len());
+        for entry in self.iter() {
+            match entry.scope {
+                StarlarkOptionScope::Default | StarlarkOptionScope::Universal => {
+                    entries.push(entry.clone());
+                }
+                StarlarkOptionScope::Target => {}
+                StarlarkOptionScope::Project => {
+                    return Err(SlugConfigurationError::ProjectStarlarkOptionInExecProjection);
+                }
+            }
+        }
+        Ok(Self(Arc::from(entries)))
+    }
+}
+
+fn normalize_starlark_option(entry: &mut StarlarkOption) {
+    if let StarlarkOptionValue::StringSet(values) = &entry.value {
+        entry.value = StarlarkOptionValue::string_set(values.iter().cloned());
+    }
+}
+
+impl Hash for StarlarkOptions {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+impl PartialOrd for StarlarkOptions {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for StarlarkOptions {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
     }
 }
 
@@ -106,12 +273,12 @@ impl SlugConfigurationProjection {
 
     /// Stable display token for diagnostics only.
     pub fn display_token(&self) -> String {
-        format!("slugcfg-v1:{}", hex::encode(self.0))
+        format!("slugcfg-v2:{}", hex::encode(self.0))
     }
 
     /// Versioned, namespaced component for Slug-owned output paths.
     pub fn path_component(&self) -> String {
-        format!("slugcfg-v1-{}", hex::encode(self.0))
+        format!("slugcfg-v2-{}", hex::encode(self.0))
     }
 }
 
@@ -132,6 +299,8 @@ pub enum SlugConfigurationError {
     DuplicateDescriptor { ordinal: u32 },
     DescriptorOrdinalOverflow,
     ExecProjectionRequiresTarget { actual: SlugConfigurationKind },
+    DuplicateStarlarkOption,
+    ProjectStarlarkOptionInExecProjection,
 }
 
 impl fmt::Display for SlugConfigurationError {
@@ -177,6 +346,11 @@ impl fmt::Display for SlugConfigurationError {
                     "exec projection requires a target configuration, got {actual}"
                 )
             }
+            Self::DuplicateStarlarkOption => {
+                formatter.write_str("duplicate canonical Starlark option label")
+            }
+            Self::ProjectStarlarkOptionInExecProjection => formatter
+                .write_str("project-scoped Starlark option cannot enter an exec configuration"),
         }
     }
 }
@@ -202,7 +376,7 @@ struct OptionRecord {
 struct SlugConfigurationData {
     kind: SlugConfigurationKind,
     options: Arc<[OptionRecord]>,
-    root_string_setting: Option<RootStringSettingValue>,
+    starlark_options: StarlarkOptions,
     canonical_bytes: Arc<[u8]>,
     projection: SlugConfigurationProjection,
 }
@@ -243,7 +417,11 @@ impl SlugConfiguration {
                 value: default_option(descriptor, ordinal, auto_cpu, path_flavor)?,
             });
         }
-        Ok(finish_configuration(kind, Arc::from(options), None))
+        Ok(finish_configuration(
+            kind,
+            Arc::from(options),
+            StarlarkOptions::default(),
+        ))
     }
 
     pub fn default_target(host: &HostConversionInputs) -> Result<Self, SlugConfigurationError> {
@@ -271,16 +449,34 @@ impl SlugConfiguration {
         Ok(finish_configuration(
             SlugConfigurationKind::Exec,
             self.0.options.dupe(),
-            self.0.root_string_setting.clone(),
+            self.0.starlark_options.to_exec()?,
         ))
     }
 
-    pub fn root_string_setting(&self) -> Option<&RootStringSettingValue> {
-        self.0.root_string_setting.as_ref()
+    pub fn starlark_options(&self) -> &StarlarkOptions {
+        &self.0.starlark_options
     }
 
-    pub fn with_root_string_setting(&self, value: RootStringSettingValue) -> Self {
-        finish_configuration(self.0.kind, self.0.options.dupe(), Some(value))
+    pub fn with_starlark_option(&self, value: StarlarkOption) -> Self {
+        if self.0.starlark_options.get(value.label()) == Some(&value) {
+            return self.dupe();
+        }
+        finish_configuration(
+            self.0.kind,
+            self.0.options.dupe(),
+            self.0.starlark_options.with(value),
+        )
+    }
+
+    pub fn without_starlark_option(&self, label: &CanonicalLabel) -> Self {
+        if self.0.starlark_options.get(label).is_none() {
+            return self.dupe();
+        }
+        finish_configuration(
+            self.0.kind,
+            self.0.options.dupe(),
+            self.0.starlark_options.without(label),
+        )
     }
 
     pub fn projection(&self) -> SlugConfigurationProjection {
@@ -406,12 +602,12 @@ fn default_option(
 fn finish_configuration(
     kind: SlugConfigurationKind,
     options: Arc<[OptionRecord]>,
-    root_string_setting: Option<RootStringSettingValue>,
+    starlark_options: StarlarkOptions,
 ) -> SlugConfiguration {
     let provisional = SlugConfigurationData {
         kind,
         options: options.dupe(),
-        root_string_setting: root_string_setting.clone(),
+        starlark_options: starlark_options.clone(),
         canonical_bytes: Arc::from([]),
         projection: SlugConfigurationProjection([0; 32]),
     };
@@ -422,7 +618,7 @@ fn finish_configuration(
     SlugConfiguration(Arc::new(SlugConfigurationData {
         kind,
         options,
-        root_string_setting,
+        starlark_options,
         canonical_bytes,
         projection,
     }))
@@ -445,12 +641,20 @@ fn canonical_bytes(data: &SlugConfigurationData) -> Vec<u8> {
                 });
             }
         });
-        root.field(0x0012, |setting| match &data.root_string_setting {
-            None => setting.field(0x0600, |_| {}),
-            Some(value) => setting.field(0x0601, |some| {
-                some.field(0x0610, |label| label.raw_text(value.label()));
-                some.field(0x0611, |value_field| value_field.raw_text(value.as_str()));
-            }),
+        root.field(0x0012, |options| {
+            options.u64(
+                u64::try_from(data.starlark_options.iter().len())
+                    .expect("Starlark option count fits u64"),
+            );
+            for option in data.starlark_options.iter() {
+                options.field(0x0600, |entry| {
+                    entry.field(0x0610, |label| {
+                        label.raw_text(&option.label.stable_serialize())
+                    });
+                    entry.field(0x0611, |value| value.starlark_option_value(&option.value));
+                    entry.field(0x0612, |scope| scope.field(option.scope.tag(), |_| {}));
+                });
+            }
         });
     });
     encoder.into_bytes()
@@ -511,6 +715,24 @@ impl Encoder {
             OptionValue::Mixed(value) => {
                 self.field(0x0202, |field| field.mixed_occurrence(value.as_ref()))
             }
+        }
+    }
+
+    fn starlark_option_value(&mut self, value: &StarlarkOptionValue) {
+        match value {
+            StarlarkOptionValue::Integer(value) => {
+                self.field(0x0620, |field| field.bytes(&value.to_signed_bytes_be()))
+            }
+            StarlarkOptionValue::Boolean(value) => {
+                self.field(0x0621, |field| field.bytes(&[u8::from(*value)]))
+            }
+            StarlarkOptionValue::String(value) => self.field(0x0622, |field| field.raw_text(value)),
+            StarlarkOptionValue::StringList(values) => self.field(0x0623, |field| {
+                field.sequence(values, 0x0640, |item, value| item.raw_text(value));
+            }),
+            StarlarkOptionValue::StringSet(values) => self.field(0x0624, |field| {
+                field.sequence(values, 0x0640, |item, value| item.raw_text(value));
+            }),
         }
     }
 
@@ -778,44 +1000,54 @@ mod tests {
         assert_eq!(first.projection(), second.projection());
         assert_eq!(
             hex::encode(first.projection().as_bytes()),
-            "abc6de66486cc9eff604c3e0795796631112a6d92cf3336370de8e8f6acf953a"
+            "fffe28602c6d30adb3f8bb9e72adfcabad773522f5dc6bc3c719167f60b1cd43"
         );
-        assert_eq!(&first.canonical_bytes()[..10], b"slugcfg\0\0\x01");
+        assert_eq!(&first.canonical_bytes()[..10], b"slugcfg\0\0\x02");
         assert_eq!(&first.canonical_bytes()[10..12], &0x0001u16.to_be_bytes());
         assert_eq!(
             first.projection().display_token().len(),
-            "slugcfg-v1:".len() + 64
+            "slugcfg-v2:".len() + 64
         );
         assert_eq!(
             first.projection().path_component().len(),
-            "slugcfg-v1-".len() + 64
+            "slugcfg-v2-".len() + 64
         );
         assert!(
             first
                 .projection()
                 .display_token()
-                .starts_with("slugcfg-v1:")
+                .starts_with("slugcfg-v2:")
         );
     }
 
     #[test]
-    fn cpu_kind_and_root_setting_are_structural_and_domain_separated() {
+    fn cpu_kind_and_starlark_options_are_structural_and_domain_separated() {
         let base = SlugConfiguration::default_target(&host(AutoCpuToken::K8, HostPathFlavor::Unix))
             .unwrap();
         let cpu_changed =
             SlugConfiguration::default_target(&host(AutoCpuToken::Aarch64, HostPathFlavor::Unix))
                 .unwrap();
-        let setting = base.with_root_string_setting(RootStringSettingValue::new("command"));
-        let other_setting = base.with_root_string_setting(RootStringSettingValue::new_for_label(
-            "@@//attr:base_string_setting",
+        let setting = base.with_starlark_option(StarlarkOption::string(
+            CanonicalLabel::parse("@@//:setting").unwrap(),
             "command",
+            StarlarkOptionScope::Default,
+        ));
+        let other_label = CanonicalLabel::parse("@@//attr:base_string_setting").unwrap();
+        let other_setting = base.with_starlark_option(StarlarkOption::string(
+            other_label.clone(),
+            "command",
+            StarlarkOptionScope::Default,
         ));
         assert_ne!(base.projection(), cpu_changed.projection());
         assert_ne!(base.projection(), setting.projection());
         assert_ne!(setting.projection(), other_setting.projection());
         assert_eq!(
-            other_setting.root_string_setting().unwrap().label(),
-            "@@//attr:base_string_setting"
+            other_setting
+                .starlark_options()
+                .get(&other_label)
+                .unwrap()
+                .label(),
+            &other_label
         );
         assert_ne!(
             base.projection(),
@@ -830,15 +1062,16 @@ mod tests {
         let target =
             SlugConfiguration::default_target(&host(AutoCpuToken::K8, HostPathFlavor::Unix))
                 .unwrap()
-                .with_root_string_setting(RootStringSettingValue::new_for_label(
-                    "@@//settings:mode",
+                .with_starlark_option(StarlarkOption::string(
+                    CanonicalLabel::parse("@@//settings:mode").unwrap(),
                     "fast",
+                    StarlarkOptionScope::Universal,
                 ));
         let exec = target.to_exec().unwrap();
 
         assert_eq!(exec.kind(), SlugConfigurationKind::Exec);
         assert_eq!(exec.option_count(), target.option_count());
-        assert_eq!(exec.root_string_setting(), target.root_string_setting(),);
+        assert_eq!(exec.starlark_options(), target.starlark_options());
         assert_ne!(exec.projection(), target.projection());
         assert_eq!(exec, target.to_exec().unwrap());
         assert_eq!(
@@ -846,6 +1079,187 @@ mod tests {
             Err(SlugConfigurationError::ExecProjectionRequiresTarget {
                 actual: SlugConfigurationKind::Exec,
             })
+        );
+    }
+
+    #[test]
+    fn starlark_option_map_is_sorted_typed_and_set_normalized() {
+        let a = CanonicalLabel::parse("@@//settings:a").unwrap();
+        let b = CanonicalLabel::parse("@@//settings:b").unwrap();
+        let options = StarlarkOptions::try_from_entries(vec![
+            StarlarkOption::new(
+                b.clone(),
+                StarlarkOptionValue::StringList(Arc::from([
+                    CompactString::new("x"),
+                    CompactString::new("x"),
+                ])),
+                StarlarkOptionScope::Target,
+            ),
+            StarlarkOption::new(
+                a.clone(),
+                StarlarkOptionValue::StringSet(Arc::from([
+                    CompactString::new("z"),
+                    CompactString::new("a"),
+                    CompactString::new("z"),
+                ])),
+                StarlarkOptionScope::Universal,
+            ),
+        ])
+        .unwrap();
+        assert_eq!(
+            options
+                .iter()
+                .map(StarlarkOption::label)
+                .collect::<Vec<_>>(),
+            vec![&a, &b]
+        );
+        assert_eq!(
+            options.get(&a).unwrap().value(),
+            &StarlarkOptionValue::string_set(["a", "z"])
+        );
+        assert_eq!(
+            options.get(&b).unwrap().value(),
+            &StarlarkOptionValue::string_list(["x", "x"])
+        );
+        assert_eq!(
+            StarlarkOptions::try_from_entries(vec![
+                StarlarkOption::string(a.clone(), "first", StarlarkOptionScope::Default),
+                StarlarkOption::string(a.clone(), "second", StarlarkOptionScope::Default),
+            ]),
+            Err(SlugConfigurationError::DuplicateStarlarkOption)
+        );
+
+        let forward = StarlarkOptions::try_from_entries(vec![
+            StarlarkOption::string(a.clone(), "a", StarlarkOptionScope::Default),
+            StarlarkOption::string(b.clone(), "b", StarlarkOptionScope::Universal),
+        ])
+        .unwrap();
+        let reverse = StarlarkOptions::try_from_entries(vec![
+            StarlarkOption::string(b, "b", StarlarkOptionScope::Universal),
+            StarlarkOption::string(a, "a", StarlarkOptionScope::Default),
+        ])
+        .unwrap();
+        assert_eq!(forward, reverse);
+        assert_eq!(forward.cmp(&reverse), Ordering::Equal);
+        let mut forward_hash = RecordingHasher::default();
+        let mut reverse_hash = RecordingHasher::default();
+        forward.hash(&mut forward_hash);
+        reverse.hash(&mut reverse_hash);
+        assert_eq!(forward_hash.0, reverse_hash.0);
+    }
+
+    #[test]
+    fn all_starlark_value_and_scope_tags_are_structurally_distinct() {
+        let base = SlugConfiguration::default_target(&host(AutoCpuToken::K8, HostPathFlavor::Unix))
+            .unwrap();
+        let label = CanonicalLabel::parse("@@//settings:value").unwrap();
+        let values = [
+            StarlarkOptionValue::Integer(
+                BigInt::parse_bytes(b"1234567890123456789012345678901234567890", 10).unwrap(),
+            ),
+            StarlarkOptionValue::Boolean(false),
+            StarlarkOptionValue::string(""),
+            StarlarkOptionValue::string_list(std::iter::empty::<&str>()),
+            StarlarkOptionValue::string_set(std::iter::empty::<&str>()),
+        ];
+        let projections = values.map(|value| {
+            base.with_starlark_option(StarlarkOption::new(
+                label.clone(),
+                value,
+                StarlarkOptionScope::Default,
+            ))
+            .projection()
+        });
+        for (index, left) in projections.iter().enumerate() {
+            for right in projections.iter().skip(index + 1) {
+                assert_ne!(left, right);
+            }
+        }
+        let scopes = [
+            StarlarkOptionScope::Default,
+            StarlarkOptionScope::Universal,
+            StarlarkOptionScope::Target,
+            StarlarkOptionScope::Project,
+        ];
+        let scope_projections = scopes.map(|scope| {
+            base.with_starlark_option(StarlarkOption::string(label.clone(), "value", scope))
+                .projection()
+        });
+        for (index, left) in scope_projections.iter().enumerate() {
+            for right in scope_projections.iter().skip(index + 1) {
+                assert_ne!(left, right);
+            }
+        }
+        for scope in [StarlarkOptionScope::Default, StarlarkOptionScope::Universal] {
+            let carried =
+                base.with_starlark_option(StarlarkOption::string(label.clone(), "value", scope));
+            assert!(
+                carried
+                    .to_exec()
+                    .unwrap()
+                    .starlark_options()
+                    .get(&label)
+                    .is_some()
+            );
+        }
+        let target = base.with_starlark_option(StarlarkOption::string(
+            label.clone(),
+            "value",
+            StarlarkOptionScope::Target,
+        ));
+        assert!(
+            target
+                .to_exec()
+                .unwrap()
+                .starlark_options()
+                .get(&label)
+                .is_none()
+        );
+        let project = base.with_starlark_option(StarlarkOption::string(
+            label,
+            "value",
+            StarlarkOptionScope::Project,
+        ));
+        assert_eq!(
+            project.to_exec(),
+            Err(SlugConfigurationError::ProjectStarlarkOptionInExecProjection)
+        );
+    }
+
+    #[test]
+    fn starlark_option_maps_are_compact_and_clone_the_arc() {
+        assert_eq!(
+            std::mem::size_of::<StarlarkOptions>(),
+            std::mem::size_of::<Arc<[StarlarkOption]>>()
+        );
+        let label = CanonicalLabel::parse("@@//settings:value").unwrap();
+        let empty = StarlarkOptions::default();
+        let singleton = empty.with(StarlarkOption::string(
+            label.clone(),
+            "value",
+            StarlarkOptionScope::Default,
+        ));
+        let mixed = singleton.with(StarlarkOption::new(
+            CanonicalLabel::parse("@@//settings:list").unwrap(),
+            StarlarkOptionValue::string_list(["a", "a"]),
+            StarlarkOptionScope::Universal,
+        ));
+        for options in [&empty, &singleton, &mixed] {
+            let cloned = options.dupe();
+            assert_eq!(options.0.as_ptr(), cloned.0.as_ptr());
+        }
+        let normalized = empty.with(StarlarkOption::new(
+            label,
+            StarlarkOptionValue::StringSet(Arc::from([
+                CompactString::new("z"),
+                CompactString::new("a"),
+                CompactString::new("z"),
+            ])),
+            StarlarkOptionScope::Default,
+        ));
+        assert_eq!(
+            normalized.iter().next().unwrap().value(),
+            &StarlarkOptionValue::string_set(["a", "z"])
         );
     }
 
@@ -867,7 +1281,7 @@ mod tests {
                 RegexFilterDefaultSeed::new("different spelling", seed.semantic),
             )));
         data.options = Arc::from(options);
-        let changed = finish_configuration(data.kind, data.options, data.root_string_setting);
+        let changed = finish_configuration(data.kind, data.options, data.starlark_options);
         assert_eq!(base, changed);
         assert_eq!(base.projection(), changed.projection());
         let mut first = RecordingHasher::default();

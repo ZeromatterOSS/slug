@@ -448,9 +448,11 @@ pub(crate) fn evaluate_loaded_rule(
         dependencies: dependencies.into(),
         build_setting_value: implementation.is_root_string_build_setting().then(|| {
             key.configuration()
-                .root_string_setting()
+                .starlark_option(key.label())
                 .expect("root setting key carries value")
+                .value()
                 .as_str()
+                .expect("root string setting carries a string value")
                 .into()
         }),
         marker,

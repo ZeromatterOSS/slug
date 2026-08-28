@@ -944,11 +944,11 @@ fn finalize_epoch_for_test(
                 "action 'Writing file write.txt'\n",
                 "  Mnemonic: FileWrite\n",
                 "  Target: //:write\n",
-                "  Configuration: slugcfg-v1:abc6de66486cc9eff604c3e0795796631112a6d92cf3336370de8e8f6acf953a\n",
+                "  Configuration: slugcfg-v2:fffe28602c6d30adb3f8bb9e72adfcabad773522f5dc6bc3c719167f60b1cd43\n",
                 "  Execution platform: //:platform\n",
                 "  SlugActionToken: slugact-display-v1:9107d642a3e8b06ebfbe865544a76344a8cdf2078f75ba39e01e6dca5125f361\n",
                 "  Inputs: []\n",
-                "  Outputs: [bazel-out/slugcfg-v1-abc6de66486cc9eff604c3e0795796631112a6d92cf3336370de8e8f6acf953a/bin/write.txt]\n",
+                "  Outputs: [bazel-out/slugcfg-v2-fffe28602c6d30adb3f8bb9e72adfcabad773522f5dc6bc3c719167f60b1cd43/bin/write.txt]\n",
                 "  IsExecutable: false\n\n",
             )
         );

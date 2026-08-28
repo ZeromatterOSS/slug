@@ -19,11 +19,13 @@ use fixture_support::FixtureWorkspace;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
-use slug_configuration_v2::RootStringSettingValue;
 use slug_configuration_v2::SlugConfiguration;
+use slug_configuration_v2::StarlarkOption;
+use slug_configuration_v2::StarlarkOptionScope;
 use slug_configuration_v2::native::host::AutoCpuToken;
 use slug_configuration_v2::native::host::HostConversionInputs;
 use slug_configuration_v2::native::host::HostPathFlavor;
+use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::TargetPattern;
 use slug_query_v2::QueryOrder;
 use slug_query_v2::QueryPolicy;
@@ -295,7 +297,11 @@ fn reapi_materialization_uses_distinct_and_restored_structural_configuration_roo
     )
     .unwrap();
     let c0 = SlugConfiguration::default_target(&host).unwrap();
-    let c1 = c0.with_root_string_setting(RootStringSettingValue::new("transitioned"));
+    let c1 = c0.with_starlark_option(StarlarkOption::string(
+        CanonicalLabel::parse("@@//:setting").unwrap(),
+        "transitioned",
+        StarlarkOptionScope::Default,
+    ));
     let c0_root = slug_core_v2::runtime::configured_output_root(&workspace, &c0);
     let c1_root = slug_core_v2::runtime::configured_output_root(&workspace, &c1);
     assert_ne!(c0_root, c1_root);
@@ -1020,7 +1026,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     assert!(
         label_kind
             .stdout
-            .starts_with("probe rule //pkg:probe (slugcfg-v1:")
+            .starts_with("probe rule //pkg:probe (slugcfg-v2:")
     );
     assert!(label_kind.stderr.is_empty());
     let graph_non_deps = handle_request(
@@ -1979,7 +1985,7 @@ fn retained_cquery_formats_modes_and_restores_root_setting_projection() {
         assert_eq!(result.invalidated_files, 0, "{result:?}");
         let projection = result
             .stdout
-            .strip_prefix("//pkg:probe (slugcfg-v1:")
+            .strip_prefix("//pkg:probe (slugcfg-v2:")
             .and_then(|stdout| stdout.strip_suffix(")\n"))
             .expect("label mode must use the namespaced Slug projection");
         assert_eq!(projection.len(), 64, "{result:?}");

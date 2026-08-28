@@ -200,10 +200,12 @@ impl std::error::Error for ConfiguredOutputError {
 mod tests {
     use std::sync::Arc;
 
-    use slug_configuration_v2::RootStringSettingValue;
+    use slug_configuration_v2::StarlarkOption;
+    use slug_configuration_v2::StarlarkOptionScope;
     use slug_configuration_v2::native::host::AutoCpuToken;
     use slug_configuration_v2::native::host::HostConversionInputs;
     use slug_configuration_v2::native::host::HostPathFlavor;
+    use slug_identity_v2::CanonicalLabel;
 
     use super::*;
 
@@ -217,8 +219,11 @@ mod tests {
         )
         .unwrap();
         let base = SlugConfiguration::default_target(&host).unwrap();
-        let transitioned =
-            base.with_root_string_setting(RootStringSettingValue::new("transitioned"));
+        let transitioned = base.with_starlark_option(StarlarkOption::string(
+            CanonicalLabel::parse("@@//:setting").unwrap(),
+            "transitioned",
+            StarlarkOptionScope::Default,
+        ));
         (base, transitioned)
     }
 

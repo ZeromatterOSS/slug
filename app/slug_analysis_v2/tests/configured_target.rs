@@ -29,7 +29,8 @@ use slug_analysis_v2::DiagnosticSeverity;
 use slug_analysis_v2::PlatformSemanticFact;
 use slug_analysis_v2::ToolchainSelection;
 use slug_analysis_v2::ToolchainTopology;
-use slug_analysis_v2::key::RootStringSettingValue;
+use slug_analysis_v2::key::StarlarkOption;
+use slug_analysis_v2::key::StarlarkOptionScope;
 use slug_build_api_v2::ActionInput;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutput;
@@ -496,7 +497,11 @@ fn toolchain_topology_is_ordered_role_checked_and_structurally_equal() {
 #[test]
 fn configured_file_write_view_tracks_and_restores_structural_identity() {
     let c0 = structural_configurations()[0].clone();
-    let c1 = c0.with_root_string_setting(RootStringSettingValue::new("c1"));
+    let c1 = c0.with_starlark_option(StarlarkOption::string(
+        canonical("@@//:setting"),
+        "c1",
+        StarlarkOptionScope::Default,
+    ));
     let baseline = file_write_result(c0.clone(), "@@//:p0", "content-A", "path-A.txt");
     let changed_configuration = file_write_result(c1, "@@//:p0", "content-A", "path-A.txt");
     let changed_platform = file_write_result(c0.clone(), "@@//:p1", "content-A", "path-A.txt");

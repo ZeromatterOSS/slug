@@ -2,8 +2,11 @@
 
 pub mod native;
 
-pub use native::RootStringSettingValue;
 pub use native::SlugConfiguration;
 pub use native::SlugConfigurationError;
 pub use native::SlugConfigurationKind;
 pub use native::SlugConfigurationProjection;
+pub use native::StarlarkOption;
+pub use native::StarlarkOptionScope;
+pub use native::StarlarkOptionValue;
+pub use native::StarlarkOptions;

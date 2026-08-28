@@ -66,7 +66,8 @@ use crate::key::ConfigurationKey;
 use crate::key::ConfigurationKind;
 use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
-use crate::key::RootStringSettingValue;
+use crate::key::StarlarkOption;
+use crate::key::StarlarkOptionScope;
 use crate::result::ConfiguredActionAspectProvenance;
 use crate::result::ConfiguredActionExecGroup;
 use crate::result::ConfiguredActionOwnerContext;
@@ -297,7 +298,7 @@ pub async fn prepare_configured_node_analysis(
     workspace: NormalizedAbsolutePath,
     requested: CanonicalLabel,
     base_configuration: ConfigurationKey,
-    explicit: Option<RootStringSettingValue>,
+    explicit: Option<StarlarkOption>,
 ) -> LoadingPreparationOutcome<Result<ConfiguredNodeAnalysisKey, AnalysisError>> {
     match prepare_configured_node_analysis_driver(
         ctx,
@@ -325,7 +326,7 @@ pub async fn prepare_configured_node_analysis_observed(
     workspace: NormalizedAbsolutePath,
     requested: CanonicalLabel,
     base_configuration: ConfigurationKey,
-    explicit: Option<RootStringSettingValue>,
+    explicit: Option<StarlarkOption>,
 ) -> ObservedConfiguredNodeAnalysisPreparationOutcome {
     prepare_configured_node_analysis_driver(
         ctx,
@@ -345,7 +346,7 @@ async fn prepare_configured_node_analysis_driver(
     workspace: NormalizedAbsolutePath,
     requested: CanonicalLabel,
     base_configuration: ConfigurationKey,
-    explicit: Option<RootStringSettingValue>,
+    explicit: Option<StarlarkOption>,
 ) -> AnalysisSemanticOutcome<ConfiguredNodeAnalysisKey> {
     if base_configuration.slug_configuration().is_none() {
         return analysis_semantic_complete(Err(AnalysisError::message(
@@ -353,10 +354,9 @@ async fn prepare_configured_node_analysis_driver(
         )));
     }
     let explicit_validation = match explicit.as_ref() {
-        Some(explicit) => Some(match CanonicalLabel::parse(explicit.label()) {
-            Ok(setting) => root_string_build_setting_default(ctx, mode, &workspace, &setting).await,
-            Err(error) => analysis_semantic_complete(Err(AnalysisError::message(error))),
-        }),
+        Some(explicit) => {
+            Some(root_string_build_setting_default(ctx, mode, &workspace, explicit.label()).await)
+        }
         None => None,
     };
     let package_outcome = compute_configured_package_input(
@@ -434,31 +434,21 @@ async fn prepare_configured_node_analysis_driver(
             ConfiguredTargetKey::new(requested, base_configuration),
         ));
     };
-    let required = match required_root_string_setting(rule, &requested) {
+    let required = match required_starlark_option(rule, &requested) {
         Ok(required) => required,
         Err(error) => return analysis_semantic_complete(Err(error)),
     };
-    if explicit.is_none()
-        && let Err(error) =
-            validate_carried_root_string_setting(&base_configuration, required.as_ref())
-    {
-        return analysis_semantic_complete(Err(error));
-    }
     let configuration = match (required, explicit) {
-        (Some(setting), Some(explicit)) if explicit.label() != setting.to_string() => {
+        (Some(setting), Some(explicit)) if explicit.label() != &setting => {
             return analysis_semantic_complete(Err(AnalysisError::message(format!(
                 "root string setting request for {setting} carried {}",
                 explicit.label()
             ))));
         }
-        (Some(_), Some(explicit)) => base_configuration.with_root_string_setting(explicit),
-        (None, Some(explicit)) => base_configuration.with_root_string_setting(explicit),
+        (Some(_), Some(explicit)) => base_configuration.with_starlark_option(explicit),
+        (None, Some(explicit)) => base_configuration.with_starlark_option(explicit),
         (None, None) => base_configuration,
-        (Some(setting), None)
-            if base_configuration
-                .root_string_setting()
-                .is_some_and(|carried| carried.label() == setting.to_string()) =>
-        {
+        (Some(setting), None) if base_configuration.starlark_option(&setting).is_some() => {
             match root_string_build_setting_default(ctx, mode, &workspace, &setting).await {
                 LoadingPreparationOutcome::Need(need) => {
                     return LoadingPreparationOutcome::Need(need);
@@ -486,9 +476,10 @@ async fn prepare_configured_node_analysis_driver(
                     }
                     LoadingPreparationOutcome::Complete(Ok(Ok(default))) => default,
                 };
-            base_configuration.with_root_string_setting(RootStringSettingValue::new_for_label(
-                setting.to_string(),
+            base_configuration.with_starlark_option(StarlarkOption::string(
+                setting,
                 default,
+                StarlarkOptionScope::Default,
             ))
         }
     };
@@ -605,7 +596,7 @@ fn starlark_rule_implementation<'a>(
     Ok(implementation)
 }
 
-fn required_root_string_setting(
+fn required_starlark_option(
     implementation: &StarlarkRuleImplementation,
     target: &CanonicalLabel,
 ) -> Result<Option<CanonicalLabel>, AnalysisError> {
@@ -640,22 +631,6 @@ fn required_root_string_setting(
         insert(fixed)?;
     }
     Ok(required)
-}
-
-fn validate_carried_root_string_setting(
-    configuration: &ConfigurationKey,
-    required: Option<&CanonicalLabel>,
-) -> Result<(), AnalysisError> {
-    let (Some(carried), Some(required)) = (configuration.root_string_setting(), required) else {
-        return Ok(());
-    };
-    if carried.label() != required.to_string() {
-        return Err(AnalysisError::new(format!(
-            "multiple string build settings are not supported: {} and {required}",
-            carried.label()
-        )));
-    }
-    Ok(())
 }
 
 fn root_declared_dependency_keys(
@@ -718,9 +693,13 @@ fn root_declared_dependency_keys(
             })?;
             let output_label = CanonicalLabel::parse(&format!("@@{}", transition.output()))
                 .map_err(AnalysisError::new)?;
-            configured_target.configuration().with_root_string_setting(
-                RootStringSettingValue::new_for_label(output_label.to_string(), setting),
-            )
+            configured_target
+                .configuration()
+                .with_starlark_option(StarlarkOption::string(
+                    output_label,
+                    setting,
+                    StarlarkOptionScope::Default,
+                ))
         } else {
             configured_target.configuration().clone()
         };
@@ -2715,22 +2694,16 @@ impl ConfiguredNodeAnalysisKey {
                 Ok(rule) => rule,
                 Err(error) => return root_analysis_driver_complete(Err(error)),
             };
-            match required_root_string_setting(rule, label) {
+            match required_starlark_option(rule, label) {
                 Ok(required) => required,
                 Err(error) => return root_analysis_driver_complete(Err(error)),
             }
         };
-        if let Err(error) = validate_carried_root_string_setting(
-            configured_target.configuration(),
-            required_root_string_setting.as_ref(),
-        ) {
-            return root_analysis_driver_complete(Err(error));
-        }
-        if configured_target
-            .configuration()
-            .root_string_setting()
-            .is_none()
-            && let Some(setting) = &required_root_string_setting
+        if let Some(setting) = &required_root_string_setting
+            && configured_target
+                .configuration()
+                .starlark_option(setting)
+                .is_none()
         {
             return root_analysis_driver_complete(Err(AnalysisError::new(format!(
                 "configured node was constructed before resolving root string setting {setting}"

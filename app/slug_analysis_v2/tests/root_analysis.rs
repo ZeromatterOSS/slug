@@ -22,7 +22,8 @@ use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeKind;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
-use slug_analysis_v2::key::RootStringSettingValue;
+use slug_analysis_v2::key::StarlarkOption;
+use slug_analysis_v2::key::StarlarkOptionScope;
 use slug_analysis_v2::prepare_configured_node_analysis_observed;
 use slug_build_api_v2::ProviderId;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
@@ -429,7 +430,7 @@ async fn observed_key(
 async fn observed_key_with_setting(
     transaction: &mut DiceTransaction,
     label: &str,
-    explicit: Option<RootStringSettingValue>,
+    explicit: Option<StarlarkOption>,
 ) -> ConfiguredNodeAnalysisObservationKey {
     let configured = configured(label);
     match prepare_configured_node_analysis_observed(
@@ -1061,9 +1062,10 @@ async fn observed_root_string_setting_preserves_default_explicit_and_restore_lif
     let explicit_key = observed_key_with_setting(
         &mut explicit_transaction,
         "@@//:consumer",
-        Some(RootStringSettingValue::new_for_label(
-            "@@//:setting",
+        Some(StarlarkOption::string(
+            CanonicalLabel::parse("@@//:setting").unwrap(),
             "command",
+            StarlarkOptionScope::Default,
         )),
     )
     .await;

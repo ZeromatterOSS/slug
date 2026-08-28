@@ -50,7 +50,7 @@ fn write(path: impl AsRef<std::path::Path>, content: &str) {
 fn assert_slug_cquery_label(stdout: &[u8], label: &str) -> String {
     let stdout = std::str::from_utf8(stdout).unwrap();
     let projection = stdout
-        .strip_prefix(&format!("{label} (slugcfg-v1:"))
+        .strip_prefix(&format!("{label} (slugcfg-v2:"))
         .and_then(|stdout| stdout.strip_suffix(")\n"))
         .unwrap_or_else(|| panic!("unexpected cquery label output: {stdout:?}"));
     assert_eq!(projection.len(), 64, "{stdout:?}");
@@ -1411,10 +1411,10 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
     );
     let label_kind_stdout = String::from_utf8_lossy(&label_kind_one_shot.stdout);
     assert!(
-        label_kind_stdout.starts_with("node rule //:root (slugcfg-v1:"),
+        label_kind_stdout.starts_with("node rule //:root (slugcfg-v2:"),
         "{label_kind_stdout}"
     );
-    assert!(label_kind_stdout.contains("node rule //:child (slugcfg-v1:"));
+    assert!(label_kind_stdout.contains("node rule //:child (slugcfg-v2:"));
     assert!(label_kind_one_shot.stderr.is_empty());
     let label_kind_daemon = run_label_kind(Some(&output_base), expression);
     assert!(label_kind_daemon.status.success(), "{label_kind_daemon:?}");
@@ -1489,11 +1489,11 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     assert!(one_shot.status.success(), "{one_shot:?}");
     let stdout = String::from_utf8_lossy(&one_shot.stdout);
     assert!(stdout.starts_with("digraph mygraph {\n  node [shape=box];\n"));
-    assert!(stdout.contains("\"//:root (slugcfg-v1:"), "{stdout}");
-    assert!(stdout.contains("\" -> \"//:child (slugcfg-v1:"), "{stdout}");
-    assert!(stdout.contains("\" -> \"//:leaf (slugcfg-v1:"), "{stdout}");
+    assert!(stdout.contains("\"//:root (slugcfg-v2:"), "{stdout}");
+    assert!(stdout.contains("\" -> \"//:child (slugcfg-v2:"), "{stdout}");
+    assert!(stdout.contains("\" -> \"//:leaf (slugcfg-v2:"), "{stdout}");
     assert!(
-        stdout.contains("\" -> \"//:deepest (slugcfg-v1:"),
+        stdout.contains("\" -> \"//:deepest (slugcfg-v2:"),
         "{stdout}"
     );
     assert!(one_shot.stderr.is_empty());
@@ -1510,7 +1510,7 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     assert!(reverse.status.success(), "{reverse:?}");
     let reverse_stdout = String::from_utf8_lossy(&reverse.stdout);
     for label in ["root", "child", "leaf"] {
-        assert!(reverse_stdout.contains(&format!("\"//:{label} (slugcfg-v1:")));
+        assert!(reverse_stdout.contains(&format!("\"//:{label} (slugcfg-v2:")));
     }
     assert!(!reverse_stdout.contains("//:depth_three"));
     let reverse_daemon = run(Some(&output_base), "rdeps(deps(//:root), //:leaf)");
@@ -1569,8 +1569,8 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     let depth_one = run(None, "deps(//:root, 1)");
     assert!(depth_one.status.success(), "{depth_one:?}");
     let stdout = String::from_utf8_lossy(&depth_one.stdout);
-    assert!(stdout.contains("\"//:root (slugcfg-v1:"), "{stdout}");
-    assert!(stdout.contains("\" -> \"//:child (slugcfg-v1:"), "{stdout}");
+    assert!(stdout.contains("\"//:root (slugcfg-v2:"), "{stdout}");
+    assert!(stdout.contains("\" -> \"//:child (slugcfg-v2:"), "{stdout}");
     assert!(!stdout.contains("//:leaf"), "{stdout}");
     assert!(depth_one.stderr.is_empty());
 
@@ -1583,7 +1583,7 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     assert!(depth_three.status.success(), "{depth_three:?}");
     let stdout = String::from_utf8_lossy(&depth_three.stdout);
     assert!(
-        stdout.contains("\" -> \"//:depth_three (slugcfg-v1:"),
+        stdout.contains("\" -> \"//:depth_three (slugcfg-v2:"),
         "{stdout}"
     );
     assert!(!stdout.contains("//:deepest"), "{stdout}");

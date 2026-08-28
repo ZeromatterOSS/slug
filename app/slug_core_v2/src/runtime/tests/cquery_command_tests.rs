@@ -419,7 +419,7 @@ executable_rule(
                 canonical: CanonicalLabel::parse("@@//:root").unwrap(),
                 workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
                 base_configuration: build_test_configuration("target"),
-                explicit_root_string_setting: None,
+                explicit_starlark_option: None,
             }]),
             literal_roots: Arc::from([(Arc::from("//:root"), 0)]),
             include_implicit: false,
@@ -751,14 +751,14 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
                 .configured_target_key()
                 .expect("current cquery analysis only contains configured nodes")
                 .configuration()
-                .root_string_setting()
-                .map(|value| value.as_str()),
+                .starlark_option(&CanonicalLabel::parse("@@//:setting").unwrap())
+                .and_then(|option| option.value().as_str()),
             Some("default")
         );
-        assert!(c0.label_stdout().starts_with("//:consumer (slugcfg-v1:"));
+        assert!(c0.label_stdout().starts_with("//:consumer (slugcfg-v2:"));
         assert_eq!(
             c0.label_stdout().len(),
-            "//:consumer (slugcfg-v1:)\n".len() + 64
+            "//:consumer (slugcfg-v2:)\n".len() + 64
         );
         assert_eq!(c0.starlark_label_stdout(), "@@//:consumer\n");
         assert_eq!(accepted_output_text(&c0_command), ["CONSUMER_ANALYSIS"]);
@@ -773,8 +773,8 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
                 .configured_target_key()
                 .expect("current cquery analysis only contains configured nodes")
                 .configuration()
-                .root_string_setting()
-                .map(|value| value.as_str()),
+                .starlark_option(&CanonicalLabel::parse("@@//:setting").unwrap())
+                .and_then(|option| option.value().as_str()),
             Some("command")
         );
         assert_ne!(c0_stdout, c1.label_stdout());
@@ -811,8 +811,8 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
                 .configured_target_key()
                 .expect("current cquery analysis only contains configured nodes")
                 .configuration()
-                .root_string_setting()
-                .map(|value| value.as_str()),
+                .starlark_option(&CanonicalLabel::parse("@@//:setting").unwrap())
+                .and_then(|option| option.value().as_str()),
             Some("default")
         );
 
@@ -830,8 +830,8 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
         assert_eq!(
             child
                 .configuration()
-                .root_string_setting()
-                .map(|value| value.as_str()),
+                .starlark_option(&CanonicalLabel::parse("@@//:setting").unwrap())
+                .and_then(|option| option.value().as_str()),
             Some("left")
         );
     }
@@ -1018,7 +1018,7 @@ root = rule(implementation = _root, attrs = {"child": attr.label()})
                 canonical: CanonicalLabel::parse("@@//:root").unwrap(),
                 workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
                 base_configuration: build_test_configuration("target"),
-                explicit_root_string_setting: None,
+                explicit_starlark_option: None,
             }]),
             literal_roots: Arc::from([(Arc::from("//:root"), 0)]),
             include_implicit: true,

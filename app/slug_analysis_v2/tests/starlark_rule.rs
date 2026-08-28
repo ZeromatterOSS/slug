@@ -39,7 +39,8 @@ use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeKind;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
-use slug_analysis_v2::key::RootStringSettingValue;
+use slug_analysis_v2::key::StarlarkOption;
+use slug_analysis_v2::key::StarlarkOptionScope;
 use slug_analysis_v2::prepare_configured_node_analysis;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ProviderId;
@@ -586,13 +587,27 @@ impl RootActivationTracker {
 }
 
 fn root_activation_identity(key: &ConfiguredTargetKey) -> String {
+    let setting = CanonicalLabel::parse("@@//:setting").unwrap();
     format!(
         "resolved/{}={}",
         key.label(),
         key.configuration()
-            .root_string_setting()
-            .map_or("<default>", RootStringSettingValue::as_str)
+            .starlark_option(&setting)
+            .and_then(|option| option.value().as_str())
+            .unwrap_or("<default>")
     )
+}
+
+fn string_option(label: &str, value: impl Into<compact_str::CompactString>) -> StarlarkOption {
+    StarlarkOption::string(
+        CanonicalLabel::parse(label).unwrap(),
+        value,
+        StarlarkOptionScope::Default,
+    )
+}
+
+fn root_string_option(value: impl Into<compact_str::CompactString>) -> StarlarkOption {
+    string_option("@@//:setting", value)
 }
 
 fn test_configuration() -> ConfigurationKey {
@@ -616,7 +631,7 @@ async fn prepared_analysis_key(
     workspace: NormalizedAbsolutePath,
     target: CanonicalLabel,
     base_configuration: ConfigurationKey,
-    explicit: Option<RootStringSettingValue>,
+    explicit: Option<StarlarkOption>,
 ) -> Result<ConfiguredNodeAnalysisKey, String> {
     match prepare_configured_node_analysis(
         transaction,
@@ -731,7 +746,7 @@ async fn root_string_request_result(
         dice,
         workspace,
         target,
-        explicit.map(RootStringSettingValue::new),
+        explicit.map(root_string_option),
         tracker,
     )
     .await
@@ -741,7 +756,7 @@ async fn root_string_request_result_with_explicit(
     dice: &Arc<Dice>,
     workspace: &std::path::Path,
     target: &str,
-    explicit: Option<RootStringSettingValue>,
+    explicit: Option<StarlarkOption>,
     tracker: Arc<RootActivationTracker>,
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
     let mut updater = dice.updater_with_data(UserComputationData {
@@ -1002,7 +1017,13 @@ fn candidate_labels(result: &ConfiguredNodeResult) -> Vec<String> {
 }
 
 fn root_setting_value(key: &ConfiguredTargetKey) -> &str {
-    key.configuration().root_string_setting().unwrap().as_str()
+    let setting = CanonicalLabel::parse("@@//:setting").unwrap();
+    key.configuration()
+        .starlark_option(&setting)
+        .unwrap()
+        .value()
+        .as_str()
+        .unwrap()
 }
 
 const TOOLCHAIN_MODULE: &str = "module(name = \"bazel_tools\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:second\", \"//:first\")\n";
@@ -2282,10 +2303,7 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
         &dice,
         &workspace,
         "@@//:missing",
-        Some(RootStringSettingValue::new_for_label(
-            "@@//missing_settings:setting",
-            "command",
-        )),
+        Some(string_option("@@//missing_settings:setting", "command")),
         Arc::new(RootActivationTracker::default()),
     )
     .await
@@ -2828,7 +2846,7 @@ parent = rule(implementation = _parent, attrs = {"dep": attr.label(cfg = setting
         &workspace,
         &ConfiguredTargetKey::new(
             CanonicalLabel::parse("@@//:parent").unwrap(),
-            test_configuration().with_root_string_setting(RootStringSettingValue::new("unrelated")),
+            test_configuration().with_starlark_option(root_string_option("unrelated")),
         ),
         None,
         false,
@@ -2837,7 +2855,7 @@ parent = rule(implementation = _parent, attrs = {"dep": attr.label(cfg = setting
     .unwrap_err();
     assert!(
         mismatched.contains(
-            "multiple string build settings are not supported: @@//:setting and @@//settings:settings"
+            "configured node was constructed before resolving root string setting @@//settings:settings"
         ),
         "{mismatched}"
     );
@@ -2860,10 +2878,10 @@ parent = rule(implementation = _parent, attrs = {"dep": attr.label(cfg = setting
             .configured_target_key()
             .unwrap()
             .configuration()
-            .root_string_setting()
+            .starlark_option(&CanonicalLabel::parse("@@//settings:settings").unwrap())
             .unwrap()
             .label(),
-        "@@//settings:settings"
+        &CanonicalLabel::parse("@@//settings:settings").unwrap()
     );
 }
 

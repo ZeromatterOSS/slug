@@ -154,37 +154,41 @@ consumer edits and hold no lock across a DICE computation.
 
 Production/configuration:
 
-1. `app/slug_configuration_v2/Cargo.toml`;
-2. `app/slug_configuration_v2/src/lib.rs`;
-3. `app/slug_configuration_v2/src/native/mod.rs`;
-4. `app/slug_configuration_v2/src/native/configuration.rs`;
-5. `app/slug_analysis_v2/src/key.rs`;
-6. `app/slug_analysis_v2/src/dice.rs`;
-7. `app/slug_analysis_v2/src/starlark_rule.rs`;
-8. `app/slug_commands_v2/src/build.rs`;
-9. `app/slug_commands_v2/src/cquery.rs`;
-10. `app/slug_cli_v2/src/commands/build.rs`;
-11. `app/slug_cli_v2/src/commands/cquery.rs`;
-12. `app/slug_cli_v2/src/commands/run.rs`;
-13. `app/slug_core_v2/src/runtime/configured_output.rs`;
-14. `app/slug_core_v2/src/runtime/dice.rs`;
-15. `app/slug_core_v2/src/runtime/mod.rs`;
-16. `app/slug_server_v2/src/lib.rs`;
-17. `app/slug_server_v2/src/server.rs`.
+1. `Cargo.lock` (generated `slug_configuration_v2` dependency edge only;
+   pinned package/version/checksum rows remain unchanged);
+2. `app/slug_configuration_v2/Cargo.toml`;
+3. `app/slug_configuration_v2/src/lib.rs`;
+4. `app/slug_configuration_v2/src/native/mod.rs`;
+5. `app/slug_configuration_v2/src/native/configuration.rs`;
+6. `app/slug_analysis_v2/src/key.rs`;
+7. `app/slug_analysis_v2/src/dice.rs`;
+8. `app/slug_analysis_v2/src/starlark_rule.rs`;
+9. `app/slug_commands_v2/src/build.rs`;
+10. `app/slug_commands_v2/src/cquery.rs`;
+11. `app/slug_cli_v2/src/commands/build.rs`;
+12. `app/slug_cli_v2/src/commands/cquery.rs`;
+13. `app/slug_cli_v2/src/commands/run.rs`;
+14. `app/slug_core_v2/src/runtime/configured_output.rs`;
+15. `app/slug_core_v2/src/runtime/dice.rs`;
+16. `app/slug_core_v2/src/runtime/mod.rs`;
+17. `app/slug_server_v2/src/lib.rs`;
+18. `app/slug_server_v2/src/server.rs`.
 
 Proof:
 
-18. `app/slug_configuration_v2/src/native/tests.rs`;
-19. `app/slug_analysis_v2/tests/configured_target.rs`;
-20. `app/slug_analysis_v2/tests/root_analysis.rs`;
-21. `app/slug_analysis_v2/tests/starlark_rule.rs`;
-22. `app/slug_core_v2/src/runtime/tests/cquery_command_tests.rs`;
-23. `app/slug_server_v2/src/tests.rs`.
+19. `app/slug_configuration_v2/src/native/tests.rs`;
+20. `app/slug_analysis_v2/tests/configured_target.rs`;
+21. `app/slug_analysis_v2/tests/root_analysis.rs`;
+22. `app/slug_analysis_v2/tests/starlark_rule.rs`;
+23. `app/slug_core_v2/src/runtime/tests/cquery_command_tests.rs`;
+24. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`;
+25. `app/slug_cli_v2/tests/cli.rs`;
+26. `app/slug_server_v2/src/tests.rs`.
 
 Completion docs remain the canonical plan, this manifest and Stage 6 owner
 plan. Caps: 1,500 production Rust lines, 1,800 proof Rust lines, 3,300 total
 Rust lines and 220 completion-ledger lines. `configuration.rs` and `dice.rs`
-remain cohesive owners for this single public migration. Cargo lock/root
+remain cohesive owners for this single public migration. The root Cargo
 manifest, loading/query crates, fixtures, oracle and Zabel files are excluded.
 
 ## Validation
@@ -198,8 +202,9 @@ independent retained-identity/DICE review.
 
 ## Stops
 
-STOP and `REPLAN` for a required file outside the allowlist; lockfile/root
-dependency change; retained hash map/interner/evaluator value; copied loading
+STOP and `REPLAN` for a required file outside the allowlist; root dependency
+change or a lockfile change beyond the admitted generated edge; retained hash
+map/interner/evaluator value; copied loading
 defaults beyond the named temporary effective-row bridge; parallel scope/value
 stores; incomplete singleton removal; i32
 configured integer narrowing; list/set conflation; unversioned byte grammar;
@@ -207,3 +212,14 @@ project-scope acceptance; loading lookup or command/transition conversion;
 condition/selector/provider/platform/toolchain work; Rust BCR rule flow,
 `cc_internal` or `cc_common` parsing; Zabel authority; cap overflow; or a
 second material contract correction.
+
+The live implementation preflight exposed two frozen projection-display proof
+consumers omitted from the initial enumerated closure: core build-command
+tests and CLI integration tests. They are admitted above for version-2 token
+replacement only; this correction changes no production owner, semantic
+surface or line cap.
+
+Adding the already workspace-pinned `num-bigint` crate also necessarily adds
+one generated direct-dependency edge to the configuration package's lockfile
+entry. That exact metadata-only diff is admitted above; it changes no package
+version, checksum, root dependency or Rust scope.

@@ -11,9 +11,12 @@
 use std::fmt;
 
 use allocative::Allocative;
-pub use slug_configuration_v2::RootStringSettingValue;
 use slug_configuration_v2::SlugConfiguration;
 pub use slug_configuration_v2::SlugConfigurationKind as ConfigurationKind;
+pub use slug_configuration_v2::StarlarkOption;
+pub use slug_configuration_v2::StarlarkOptionScope;
+pub use slug_configuration_v2::StarlarkOptionValue;
+use slug_configuration_v2::StarlarkOptions;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::serialization::StableSerialize;
 
@@ -61,7 +64,7 @@ enum ConfigurationIdentity {
     Legacy {
         kind: ConfigurationKind,
         checksum: ConfigurationChecksum,
-        root_string_setting: Option<RootStringSettingValue>,
+        starlark_options: StarlarkOptions,
     },
 }
 
@@ -71,7 +74,7 @@ impl ConfigurationKey {
             identity: ConfigurationIdentity::Legacy {
                 kind,
                 checksum,
-                root_string_setting: None,
+                starlark_options: StarlarkOptions::default(),
             },
         }
     }
@@ -124,28 +127,42 @@ impl ConfigurationKey {
         }
     }
 
-    pub fn with_root_string_setting(&self, value: RootStringSettingValue) -> Self {
+    pub fn with_starlark_option(&self, value: StarlarkOption) -> Self {
         match &self.identity {
             ConfigurationIdentity::Slug(configuration) => {
-                Self::from_slug(configuration.with_root_string_setting(value))
+                Self::from_slug(configuration.with_starlark_option(value))
             }
-            ConfigurationIdentity::Legacy { kind, checksum, .. } => Self {
+            ConfigurationIdentity::Legacy {
+                kind,
+                checksum,
+                starlark_options,
+            } => Self {
                 identity: ConfigurationIdentity::Legacy {
                     kind: *kind,
                     checksum: checksum.clone(),
-                    root_string_setting: Some(value),
+                    starlark_options: starlark_options.with(value),
                 },
             },
         }
     }
 
-    pub fn root_string_setting(&self) -> Option<&RootStringSettingValue> {
+    pub fn starlark_option(&self, label: &CanonicalLabel) -> Option<&StarlarkOption> {
         match &self.identity {
-            ConfigurationIdentity::Slug(configuration) => configuration.root_string_setting(),
+            ConfigurationIdentity::Slug(configuration) => {
+                configuration.starlark_options().get(label)
+            }
             ConfigurationIdentity::Legacy {
-                root_string_setting,
-                ..
-            } => root_string_setting.as_ref(),
+                starlark_options, ..
+            } => starlark_options.get(label),
+        }
+    }
+
+    pub fn starlark_options(&self) -> &StarlarkOptions {
+        match &self.identity {
+            ConfigurationIdentity::Slug(configuration) => configuration.starlark_options(),
+            ConfigurationIdentity::Legacy {
+                starlark_options, ..
+            } => starlark_options,
         }
     }
 

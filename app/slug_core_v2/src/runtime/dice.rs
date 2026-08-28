@@ -92,9 +92,10 @@ use slug_bzlmod_v2::SourcePreparationOutcome as PreparationOutcome;
 use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
-use slug_configuration_v2::RootStringSettingValue;
 use slug_configuration_v2::SlugConfiguration;
 use slug_configuration_v2::SlugConfigurationProjection;
+use slug_configuration_v2::StarlarkOption;
+use slug_configuration_v2::StarlarkOptionScope;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
@@ -1651,7 +1652,7 @@ impl NativeCommandRoot for CqueryCommandRoot {
                 root.workspace.dupe(),
                 root.canonical.clone(),
                 root.base_configuration.clone(),
-                root.explicit_root_string_setting.clone(),
+                root.explicit_starlark_option.clone(),
             )
             .await;
             match prepared {
@@ -2326,7 +2327,7 @@ struct BuildCommandRootKey {
     targets: Arc<[Arc<str>]>,
     configuration: ConfigurationKey,
     base_configuration: ConfigurationKey,
-    explicit_root_string_setting: Option<RootStringSettingValue>,
+    explicit_starlark_option: Option<StarlarkOption>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
@@ -2394,7 +2395,7 @@ struct CqueryRootTarget {
     canonical: CanonicalLabel,
     workspace: NormalizedAbsolutePath,
     base_configuration: ConfigurationKey,
-    explicit_root_string_setting: Option<RootStringSettingValue>,
+    explicit_starlark_option: Option<StarlarkOption>,
 }
 
 #[derive(Debug, Clone, Allocative)]
@@ -3010,23 +3011,23 @@ impl BuildCommandRootKey {
             targets: canonical.into(),
             base_configuration: configuration.clone(),
             configuration,
-            explicit_root_string_setting: None,
+            explicit_starlark_option: None,
         })
     }
 
-    fn new_with_root_string_setting(
+    fn new_with_starlark_option(
         workspace: NormalizedAbsolutePath,
         targets: &[TargetPattern],
         base_configuration: ConfigurationKey,
-        explicit: Option<RootStringSettingValue>,
+        explicit: Option<StarlarkOption>,
     ) -> Result<Self, BuildCommandRequestError> {
         let configuration = explicit.as_ref().map_or_else(
             || base_configuration.clone(),
-            |value| base_configuration.with_root_string_setting(value.clone()),
+            |value| base_configuration.with_starlark_option(value.clone()),
         );
         let mut key = Self::new(workspace, targets, configuration)?;
         key.base_configuration = base_configuration;
-        key.explicit_root_string_setting = explicit;
+        key.explicit_starlark_option = explicit;
         Ok(key)
     }
 
@@ -4206,7 +4207,7 @@ async fn compute_loaded_build_branch(
                             key.workspace.dupe(),
                             canonical,
                             key.base_configuration.clone(),
-                            key.explicit_root_string_setting.clone(),
+                            key.explicit_starlark_option.clone(),
                         )
                         .await
                         {
@@ -4238,7 +4239,7 @@ async fn compute_loaded_build_branch(
                             key.workspace.dupe(),
                             canonical,
                             key.base_configuration.clone(),
-                            key.explicit_root_string_setting.clone(),
+                            key.explicit_starlark_option.clone(),
                         )
                         .await
                         {
@@ -5793,20 +5794,24 @@ impl WorkspaceRuntime {
             .map_err(BuildCommandError::infrastructure)?;
         let base_configuration =
             SlugConfiguration::default_target(&host).map_err(BuildCommandError::infrastructure)?;
-        let explicit_root_string_setting = root_string_setting.map(RootStringSettingValue::new);
-        let configuration = explicit_root_string_setting.as_ref().map_or_else(
+        let fixed_setting =
+            CanonicalLabel::parse("@@//:setting").expect("fixed root setting label is canonical");
+        let explicit_starlark_option = root_string_setting.map(|value| {
+            StarlarkOption::string(fixed_setting, value, StarlarkOptionScope::Default)
+        });
+        let configuration = explicit_starlark_option.as_ref().map_or_else(
             || base_configuration.clone(),
-            |value| base_configuration.with_root_string_setting(value.clone()),
+            |value| base_configuration.with_starlark_option(value.clone()),
         );
         self.configured_output
             .claim(&configuration)
             .map_err(BuildCommandError::infrastructure)?;
-        let root = BuildCommandRootKey::new_with_root_string_setting(
+        let root = BuildCommandRootKey::new_with_starlark_option(
             NormalizedAbsolutePath::new(self.workspace.clone())
                 .map_err(BuildCommandError::infrastructure)?,
             targets,
             ConfigurationKey::from_slug(base_configuration),
-            explicit_root_string_setting,
+            explicit_starlark_option,
         )
         .map_err(BuildCommandError::request)?;
         let request = NativeDemandRequestInputBundle {
@@ -5893,10 +5898,14 @@ impl WorkspaceRuntime {
             .map_err(CqueryCommandError::infrastructure)?;
         let base_configuration =
             SlugConfiguration::default_target(&host).map_err(CqueryCommandError::infrastructure)?;
-        let explicit_root_string_setting = root_string_setting.map(RootStringSettingValue::new);
-        let configuration = explicit_root_string_setting.as_ref().map_or_else(
+        let fixed_setting =
+            CanonicalLabel::parse("@@//:setting").expect("fixed root setting label is canonical");
+        let explicit_starlark_option = root_string_setting.map(|value| {
+            StarlarkOption::string(fixed_setting.clone(), value, StarlarkOptionScope::Default)
+        });
+        let configuration = explicit_starlark_option.as_ref().map_or_else(
             || base_configuration.clone(),
-            |value| base_configuration.with_root_string_setting(value.clone()),
+            |value| base_configuration.with_starlark_option(value.clone()),
         );
         self.configured_output
             .claim(&configuration)
@@ -5932,7 +5941,7 @@ impl WorkspaceRuntime {
                         canonical: canonical.clone(),
                         workspace: workspace.clone(),
                         base_configuration: ConfigurationKey::from_slug(base_configuration.clone()),
-                        explicit_root_string_setting: explicit_root_string_setting.clone(),
+                        explicit_starlark_option: explicit_starlark_option.clone(),
                     });
                     root_indices.insert(canonical, index);
                     index
@@ -7608,7 +7617,8 @@ mod tests {
     use dice::ActivationTracker;
     use dice::DynKey;
     use dice::RootActivation;
-    use slug_analysis_v2::key::RootStringSettingValue;
+    use slug_analysis_v2::key::StarlarkOption;
+    use slug_analysis_v2::key::StarlarkOptionScope;
     use slug_configuration_v2::native::host::AutoCpuToken;
     use slug_configuration_v2::native::host::HostConversionInputs;
     use slug_configuration_v2::native::host::HostPathFlavor;
@@ -7625,6 +7635,23 @@ mod tests {
     use super::*;
     use crate::runtime::ProcessHostOwner;
     use crate::runtime::events::CommandEffectOwner;
+
+    fn test_string_option(label: &str, value: &str) -> StarlarkOption {
+        StarlarkOption::string(
+            CanonicalLabel::parse(label).unwrap(),
+            value,
+            StarlarkOptionScope::Default,
+        )
+    }
+
+    fn configuration_string_option<'a>(
+        configuration: &'a ConfigurationKey,
+        label: &str,
+    ) -> Option<&'a str> {
+        configuration
+            .starlark_option(&CanonicalLabel::parse(label).unwrap())
+            .and_then(|option| option.value().as_str())
+    }
 
     fn test_runtime(workspace: impl Into<PathBuf>) -> anyhow::Result<WorkspaceRuntime> {
         WorkspaceRuntime::new(workspace, ProcessHostOwner::native())
@@ -8431,7 +8458,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let c0_build = build(&retained, None).unwrap();
         let c0 = configuration_for(&c0_build, "@@//:parent");
         assert_eq!(
-            c0.root_string_setting().map(|value| value.as_str()),
+            configuration_string_option(&c0, "@@//:setting"),
             Some("default")
         );
         assert!(accepted_output_text(&c0_build).contains(&"PARENT_ANALYSIS"));
@@ -8441,7 +8468,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let c1_build = build(&retained, Some("command")).unwrap();
         let c1 = configuration_for(&c1_build, "@@//:parent");
         assert_eq!(
-            c1.root_string_setting().map(|value| value.as_str()),
+            configuration_string_option(&c1, "@@//:setting"),
             Some("command")
         );
         assert_ne!(c0, c1);
@@ -8490,9 +8517,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let transitive_consumer = configuration_for(&transitive_c0, "@@//:consumer");
         assert_eq!(transitive_parent, c0);
         assert_eq!(
-            transitive_consumer
-                .root_string_setting()
-                .map(|value| value.as_str()),
+            configuration_string_option(&transitive_consumer, "@@//:setting"),
             Some("left")
         );
 
@@ -8523,9 +8548,10 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             )
             .unwrap();
         assert_eq!(
-            configuration_for(&setting_build, "@@//:setting")
-                .root_string_setting()
-                .map(|value| value.as_str()),
+            configuration_string_option(
+                &configuration_for(&setting_build, "@@//:setting"),
+                "@@//:setting",
+            ),
             Some("default")
         );
     }
@@ -8574,7 +8600,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             );
             for root in roots {
                 let serialized = root.stable_serialize();
-                assert!(serialized.starts_with(&format!("{label} [target:slugcfg-v1:")));
+                assert!(serialized.starts_with(&format!("{label} [target:slugcfg-v2:")));
                 assert!(serialized.ends_with(']'));
             }
         };
@@ -8729,7 +8755,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             depth_zero
                 .label_kind_stdout()
                 .unwrap()
-                .starts_with("ordinary_rule rule //:root (slugcfg-v1:")
+                .starts_with("ordinary_rule rule //:root (slugcfg-v2:")
         );
 
         let full = run("deps(//:root)", false, true).unwrap();
@@ -8874,15 +8900,14 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let topology = |evaluation: &CqueryCommandEvaluation| {
             let mut graph = evaluation.graph_stdout();
             for analysis in evaluation.analyses() {
-                let Some(configuration) = analysis
-                    .configured_target_key()
-                    .and_then(|key| key.configuration().slug_configuration())
-                else {
+                let Some(key) = analysis.configured_target_key() else {
                     continue;
                 };
-                let name = if configuration
-                    .root_string_setting()
-                    .is_some_and(|setting| setting.as_str() == "transitioned")
+                let Some(configuration) = key.configuration().slug_configuration() else {
+                    continue;
+                };
+                let name = if configuration_string_option(key.configuration(), "@@//:setting")
+                    == Some("transitioned")
                 {
                     "transition"
                 } else {
@@ -11139,7 +11164,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
 
     fn build_test_configuration_with_root_setting(value: &str) -> ConfigurationKey {
         build_test_configuration("base")
-            .with_root_string_setting(RootStringSettingValue::new(value))
+            .with_starlark_option(test_string_option("@@//:setting", value))
     }
 
     #[derive(Default)]
@@ -11282,7 +11307,7 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
             NormalizedAbsolutePath::new("/workspace").unwrap(),
             &[TargetPattern::parse("//:parent").unwrap()],
             build_test_configuration("first-build")
-                .with_root_string_setting(RootStringSettingValue::new("default")),
+                .with_starlark_option(test_string_option("@@//:setting", "default")),
         )
         .unwrap();
         let outcome = transaction.compute(&build_key).await.unwrap();
