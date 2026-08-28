@@ -19709,3 +19709,45 @@ bounded scratch `SmallMap`s and native DICE identity rather than Zig storage,
 IDs or scheduling. Bazel 9.2 alone owns compatibility. BCR Starlark continues
 to own all rules including `cc_internal`; `cc_common` remains a generic
 evaluator/host-ABI stress consumer rather than a Rust C++ parser or rule engine.
+
+### Shared registration expander accepted; configured-consumer design active (2026-08-27)
+
+Independent correction review returns `ACCEPT`, and commit `3c6779966`
+accepts both loading families. One driver preserves selected/declaration order,
+contextual repository mappings, root/canonical route and package identity,
+recursive stable postorder, lexical targets, first-seen dedupe and conflict
+warnings. Observed terminals retain exact child result `Arc`s and family-local
+events; cancellation, warm reuse, A/B/A and first-row stops are proved. No
+configured consumer or activation was added.
+
+Activate only `WP-4-5-7A-configured-registration-consumer-architecture` at zero
+Rust. The live configured path is not ready for a direct call-site swap:
+`RootPackages` keys only `PackagePath`, native references and configured package
+inputs are root-only, and the raw root-registration adapter is called twice.
+Canonical labels would therefore alias equal package paths or fail before the
+accepted external package owner.
+
+Freeze a four-step sequence: a general loading key over
+`workspace + PackageIdentifier`, configured package identity convergence, the
+two-family consumer cutover except when
+`!has_toolchain_requirement && local_declarations.is_empty()`, then separate
+alias/provider/settings and command-option packets. A local declaration without
+a required toolchain still expands both families to decide whether it is
+registered. The general carrier composes the accepted root load or canonical
+route plus package inventory and retains their result `Arc`; analysis never
+discovers a route or reads a source.
+
+Zabel `0795445f…` supports only the separation: its configured graph keeps
+registration source and loaded toolchain inputs explicit, while its loaded
+projection separates repository-aware declarations from configuration/type-
+keyed compatibility. Slug does not copy its store/registration families or
+scheduling. Bazel 9.2 `SingleToolchainResolutionFunction`,
+`ToolchainResolutionFunction`, `ToolchainContextUtil`, `PlatformFunction` and
+their focused tests remain authority.
+
+BCR Starlark continues to own every rule and rule control flow including
+`cc_internal`; `cc_common` remains a general evaluator/host-ABI client. The
+design must not create a Rust C++ rule engine, combine the two loading families
+into a workspace-global configured key, replay their events, or claim alias,
+target-settings, option-precedence or general external configured-graph
+semantics before their own packets.
