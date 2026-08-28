@@ -20480,7 +20480,7 @@ guidance only. Bazel 9.2 and authenticated sources remain authority; BCR
 Starlark owns rule/control flow including `cc_internal`, and `cc_common`
 remains a later generic host/provider-ABI client.
 
-#### Configured selection architecture accepted; target-platform prerequisite active (2026-08-28)
+#### Target-platform prerequisite R2 cycle-safety correction active (2026-08-28)
 
 Independent reserved-architecture correction review returns `ACCEPT`. The
 correction rejects converged registered execution-platform aliases at Bazel's
@@ -20547,9 +20547,60 @@ exact Packet-1 file/blob/line allowlist, verbatim builtin hashes, caps, proofs
 and stop conditions for independent reserved-architecture review. Packet 2's
 exact allowlist is deliberately materialized only after Packet 1 lands.
 
-Commit `ce38f0373` accepts that design. Activate only
-`WP-4-5-7A-target-platform-and-exec-configuration-prerequisite` at the verified
+Commit `ce38f0373` accepts that design. The first candidate then proved that
+configured alias cycles silently deadlock because runtime installs only the
+`.bzl` request detector. Independent review accepted R2: retain the candidate,
+compose one analysis-owned detector with the existing detector at the shared
+request owner, and guard only the existing alias-child await. Activate only
+`WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r4` at the verified
 source baselines. Implement the two configuration projections, exact two-file
 builtin extension, general actual-target projection, configured platform and
 target-platform keys, no-default constraint validation and the sole condition-
-constraint cutover. Do not start selection, provider or implementation work.
+constraint cutover. Do not add an alias prewalk or start selection, provider or
+implementation work.
+
+Full loading validation of the R2 candidate showed that the newly ported exact
+`@bazel_tools//tools:BUILD` also makes `tools` a package. Independent review
+accepted R3 solely to add the omitted existing subtree-package-set proof file
+and correct its root and `tools` prefix expectations; no production owner,
+compatibility class or implementation scope changes.
+
+Full core validation then showed the selected-platform exec identity changes
+the frozen Slug-native FileWrite action token while leaving target
+configuration, output path and execution-platform label unchanged.
+Independent review accepted R4 solely to update that one downstream proof
+literal; no production owner or compatibility class changes.
+
+#### Target-platform R4 builtin-mapping REPLAN (2026-08-28)
+
+Terminal review rejects R4. Exact `tools/BUILD` depends on the eager
+`@platforms//host:constraints.bzl` load in exact `tools/build_defs.bzl`, but
+the canonical builtin route publishes an empty mapping. The candidate proves
+the fallback option, exact bytes and local alias normalization separately; it
+does not realize `@bazel_tools//tools:host_platform ->
+@@platforms//host:host` inside Slug. The failed smoke confirms the missing
+mapping boundary, while the existing Bazel oracle remains behavior evidence
+only.
+
+Activate the zero-Rust
+`WP-4-5-7A-builtin-bazel-tools-selected-mapping-design-r2`. The existing
+route builder computes the full selected `bazel_tools` mapping from pinned
+builtin MODULE dependencies, but also awaits unrelated registry RepoSpecs.
+Extract one graph-only compact Bzlmod mapping owner and observed sibling; make
+the ordinary route builder and builtin projection consume it, then make the
+generic canonical route consume the builtin fact in corrected R5. Prove
+registry-source metadata cannot block mapping publication. Do not inject only
+`platforms`, infer from source text, use the root mapping, or widen live
+registry materialization.
+
+Bazel 9.2 `RepositoryMappingFunction`, `BzlLoadFunction` and mapping tests are
+authority. Clean Zabel `0795445f…` is guidance only for keeping mapping
+selection in Bzlmod and evaluators as consumers. BCR Starlark continues to own
+all rules and control flow including `cc_internal`; `cc_common` remains a
+generic host-ABI consumer, never a Rust C++ rule engine.
+
+Independent Sol review accepts corrected R2: the selected graph feeds one
+graph-only mapping owner, the builtin projection feeds the canonical route,
+and ordinary selected routes separately join mappings with RepoSpecs. The
+compact builtin carrier retains no graph predecessor. Materialize corrected
+R5 only after recording exact live baselines and caps.

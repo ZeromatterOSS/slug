@@ -1,208 +1,211 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-target-platform-and-exec-configuration-prerequisite`
+Packet: `WP-4-5-7A-builtin-bazel-tools-selected-mapping-design-r2`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
-Base: `ce38f0373`.
+Base: `959cbd889`.
 
-Result: implement the independently accepted category-4 prerequisite: exact
-configuration-owned target-platform selection for the admitted surface,
-platform-specific exec configuration identity, one reusable configured
-platform fact owner, and constraint-category matching through the sole
-configured-condition key. Do not implement toolchain selection in this packet.
+Result: freeze one bounded Bzlmod-owned selected-repository-mapping projection
+for builtin `bazel_tools`, then materialize a corrected implementation packet
+that may retain the uncommitted target-platform candidate. This packet changes
+plans only. It does not authorize Rust edits or acceptance of the candidate.
 
-## Accepted design and authority
+Independent Sol review: `ACCEPT`. The corrected graph-only owner is acyclic,
+keeps RepoSpec/source metadata out of mapping publication, and retains only the
+compact mapping carrier at the builtin boundary.
 
-Commit `ce38f0373` freezes the full configured toolchain selection architecture
-after independent correction review. This packet is step 1 of 2. The future
-`WP-4-5-7A-configured-toolchain-selection` must consume these owners and may
-not absorb or replace them.
+## Why R4 and the first design replanned
+
+Independent terminal review returned `REPLAN`. The R4 candidate embeds exact
+Bazel 9.2 `tools/BUILD` and `tools/build_defs.bzl`, but
+`HostCanonicalRepositoryRoute::builtin()` publishes an empty repository
+mapping. `tools/build_defs.bzl` eagerly loads
+`@platforms//host:constraints.bzl`, so Slug cannot evaluate the builtin package
+far enough to publish `host_platform -> @@platforms//host:host`. Focused tests
+proved the fallback option label, local alias normalization and exact source
+bytes separately; they did not prove their required composition. The failed
+Slug smoke confirmed the missing mapping boundary. The pinned Bazel oracle
+proves Bazel behavior, not Slug realization.
+
+R4 stops on any further material correction. Do not commit its Rust candidate
+or silently narrow an exact claim. Retain it only as uncommitted input while
+this design is reviewed.
+
+The first design proposed projecting the builtin mapping from
+`HostSelectedModuleRoutesKey`. Independent pre-review returned `REPLAN` because
+that owner also awaits every selected registry RepoSpec and its source
+metadata. A mapping-only request would inherit unrelated materialization
+Needs/errors and an overbroad observed frontier. R2 instead extracts the
+mapping computation directly over the selected module graph, matching Bazel's
+`BazelDepGraphValue` dependency boundary.
+
+## Learned facts and authority
 
 Pinned Bazel 9.2 commit
 `8220c6198837d5c13d53fea211cf3282aa12408a` is behavior authority:
-`PlatformOptions#getNormalized`/`computeTargetPlatform`, `PlatformKeys`,
-`RegisteredExecutionPlatformsFunction`, `ConstraintCollection`,
-`ExecutionTransitionFactory`, `ConfigSetting` and their focused tests. Clean
-`../zabel` `0795445f…` is peer ownership/representation guidance only.
-Buck2-derived Rust remains the generic Starlark evaluator and compact utility
-substrate. BCR Starlark owns all rule definitions and control flow including
-`cc_internal`; `cc_common` is only a later generic host/provider-ABI client.
 
-## Compatibility
+- `RepositoryMappingFunction#computeForBazelModuleRepo` publishes a module
+  repository's full mapping from the selected dependency graph;
+- `BzlLoadFunction#getRepositoryMapping` consumes that full mapping for normal
+  `@bazel_tools` `.bzl` and BUILD evaluation after bootstrap;
+- `RepositoryMappingFunctionTest` covers selected dependency mappings; and
+- the existing `toolchain-resolution-first-platform` oracle records
+  `@bazel_tools//tools:host_platform -> @@platforms//host:host`.
 
-- **Exact:** first configured `platforms` label or `host_platform` fallback;
-  pinned default `@bazel_tools//tools:host_platform` aliasing BCR
-  `@platforms//host`; nonconvergent static alias chains; direct no-default
-  constraint setting/value identity; duplicate-setting rejection; configured
-  `config_setting.constraint_values`; selected-platform installation in the
-  derived exec configuration.
-- **Slug-native:** Rust/DICE layout, structural configuration bytes,
-  observation carriers and unproved diagnostic wording.
-- **Unsupported/deferred:** command `--platforms`/`--host_platform`, platform
-  mappings/flags, configurable alias `actual`, constraint-setting default
-  semantics, converged registered execution-platform aliases, platform
-  required-settings/flags/allowed types, host/forced execution candidates,
-  toolchain eligibility/selection, providers and implementation analysis.
+Slug already computes the required semantic fact inside
+`selected_routes_with_canonicals`: the selected module graph gives
+`bazel_tools` its exact special canonical name and complete
+apparent-to-canonical mapping, including `platforms -> platforms`. That
+calculation is currently fused with selected registry RepoSpec consumption in
+`HostSelectedModuleRoutesKey`. The selected-definition API deliberately returns
+`BuiltinDeferred`, while the loading-owned canonical-route key bypasses the
+mapping and constructs a static builtin route with an empty mapping. The fused
+owner and shortcut are the defects.
 
-The two upstream builtin files are ported byte-for-byte and with upstream
-`100644` mode. Do not invent or simplify `@bazel_tools` content.
+Clean `../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a`
+is concept/test guidance only: Bzlmod workspace/repository-view producers own
+selected mappings, and generic package/`.bzl` evaluators consume immutable
+mapping contexts without selecting or inferring them. No Zig type, scheduler,
+identity or behavior claim is imported. Buck2-derived `SmallMap`, immutable
+`Arc` carriers, `Dupe` and `Allocative` remain the preferred compact substrate.
 
-## Required implementation
+## Decision
 
-### Configuration and embedded source
+Extract one graph-only Bzlmod mapping owner, then add one public, hidden
+builtin projection family:
 
-1. Add a direct typed conversion between a visible `ResolvedOptionLabel` and
-   `CanonicalLabel`; non-visible repositories remain an error with their
-   requested/owner state intact. Do not stringify or expose private option
-   rows.
-2. Add `SlugConfiguration::target_platform_label()`: return the first typed
-   `platforms` entry, otherwise the typed `host_platform` label. Reject wrong
-   shapes and non-visible labels. It works for any structural configuration.
-3. Replace the generic call-site use of `to_exec()` with
-   `to_exec_for_platform(&CanonicalLabel)`. It requires a Target configuration,
-   writes exactly one selected actual platform into the existing `platforms`
-   native row, applies the existing Starlark exec projection, and publishes one
-   `Exec` configuration. No parallel field/store is allowed; keep `to_exec()`
-   only if an existing direct API proof still needs it, and do not use it for
-   action/platform identity.
-4. Add upstream `tools/BUILD.tools` as builtin `tools/BUILD` and upstream
-   `tools/build_defs.bzl`, extend the immutable catalog and exact snapshot
-   digest tests, and prove the default alias reaches the selected BCR
-   `@platforms//host` source. Do not touch the obsolete sync script.
+- `HostSelectedRepositoryMappingsKey(workspace)` consumes only the existing
+  selected module graph key. It owns canonical-name derivation and the complete
+  ordered mapping for every selected module. It does not request registry
+  RepoSpecs, source metadata, materialization or packages;
+- its observed sibling consumes only the existing selected-graph observation
+  key and forwards exactly that graph frontier;
+- `HostSelectedModuleRoutesKey` consumes that mapping owner plus its existing
+  RepoSpec owner, joins registry RepoSpecs to the already-selected mapping
+  rows, and preserves its current result, errors, order and observations;
+- `HostBuiltinBazelToolsRepositoryMappingKey(workspace)` consumes only the
+  graph-only mapping owner and selects the unique `bazel_tools` row;
+- its observed sibling consumes the observed graph-only mapping key and
+  forwards only that mapping frontier;
+- the retained value clones only the existing compact mapping owner
+  (`context_repo`, ordered apparent names and shared entry map), not the full
+  selected graph, evaluator values or source bytes; and
+- missing, duplicate, wrong-context or non-builtin routes fail closed with a
+  typed semantic error. Need, outer error and cancellation publish nothing.
 
-### Sole alias and platform owners
+The loading-owned canonical-route key must consume that projection for the
+`bazel_tools` canonical identity in both legacy and observed modes. The builtin
+route retains its pinned snapshot identity plus the selected mapping. Its
+existing `mapping_target()` and `bzl_repository_mapping()` methods then serve
+generic label resolution and evaluator construction exactly like other route
+families. Route equality and hashing include the mapping; no consumer rereads
+MODULE, registry, lockfile or source state.
 
-5. Add `actual_configured_target` to `ConfiguredNodeResult`: direct configured
-   nodes publish self; the existing alias branch publishes its child's terminal
-   actual key while preserving the alias node, provider projection and
-   `AliasActual` edge. Null nodes have no actual. Do not add another alias key,
-   walk or cache.
-6. Admit direct native toolchain declaration nodes as provider-empty configured
-   nodes so alias recursion has a terminal. This does not admit their provider
-   or implementation analysis. Add `ToolchainDeclaration` only to the typed
-   node-kind enum.
-7. Generalize configured native platform/constraint analysis to Target and Exec
-   structural configurations. When a platform names a constraint-value alias,
-   or a value names a setting alias, validate the terminal actual node through
-   the existing child analysis and retain the original ordered graph edge.
-   A constraint setting with `default_constraint_value` fails closed at this
-   admitted slice after loading retains its canonical presence.
-8. Add `ConfiguredPlatformKey(workspace, requested ConfiguredTargetKey)`. It
-   consumes the requested configured-node result, its actual terminal result,
-   and each existing platform/value/setting edge; publishes requested and
-   actual keys, platform fact, and
-   `Arc<[ConfiguredActionPlatformConstraint]>` normalized to actual value and
-   setting keys; and rejects duplicate actual settings. It does not reread a
-   package, copy a native declaration or own an event batch.
-9. Add `ConfiguredTargetPlatformKey(workspace, structural configuration)`. It
-   consumes only `target_platform_label()` and `ConfiguredPlatformKey`, so
-   category 2 conditions and category 4 selection cannot form a DICE cycle.
-   Its retained result is the exact platform result `Arc`.
+This is the full builtin module mapping, not a hard-coded `platforms` pair.
+That keeps `tools/build_defs.bzl`, later autoloaded rule modules and all other
+BCR dependencies on one architecture and prevents one dependency-specific
+repair from becoming permanent.
 
-### Condition cutover
+## Non-decisions and compatibility
 
-10. Replace the current `constraint_values before target platform` rejection
-    in the sole `ConfiguredConditionKey`. Compute the target-platform key and
-    every requested constraint value through configured-node actual identity;
-    match when every requested actual setting maps to the identical actual
-    value on the platform. Extra platform settings do not matter. Preserve
-    native/define/flag matching, all-empty rejection, batching, result shape,
-    outer-before-Need-before-semantic precedence and invalid semantic errors.
+- **Exact:** selected full repository mapping for builtin `bazel_tools` on the
+  admitted Bzlmod graph; generic eager `@platforms` load resolution; exact
+  `host_platform -> @@platforms//host:host` alias realization.
+- **Slug-native:** Rust/DICE keys, compact retained carriers, observed-frontier
+  error wording and structural route identity.
+- **Unsupported/deferred:** live network BCR materialization in direct CLI
+  query/cquery, missing builtin packages outside the catalog, command platform
+  flags, platform mappings, toolchain selection, providers and implementation
+  analysis.
 
-## DICE, lifetime and complexity
+Do not change builtin source bytes, infer mappings from source labels, inject a
+root mapping, special-case `platforms` in loading/evaluation, widen selected
+registry materialization, or turn `cc_common`/`cc_internal` into Rust rule
+control flow. Buck2-derived Rust remains the generic Starlark evaluator and
+compact utility substrate. BCR Starlark owns every rule definition and control
+path including `cc_internal`; `cc_common` is only a demanding generic host-ABI
+consumer. Zabel is peer guidance, never authority.
 
-`ConfiguredPlatform` is retained semantic state: immutable configured keys,
-the existing compact platform fact and an `Arc` constraint slice with `Dupe`
-and `Allocative`. `ConfiguredTargetPlatformKey` retains the exact child result
-`Arc`. Alias/edge child results remain dependencies, not copied state. Vectors,
-`SmallSet` duplicate detection and Need/error accumulation are compute scratch.
+## Request, revision and lifetime
 
-Complete successes and observed outer errors use equality cutoff. Need and
-semantic errors are invalid. Cancellation publishes nothing; cold cancellation
-at alias, constraint and target-platform boundaries must recover on the same
-graph. A changed option, alias target, platform constraint, value setting,
-setting default-presence bit or child fact invalidates the result.
+The key identity is the immutable workspace path. The selected module graph
+owns root and builtin MODULE inputs, version selection, canonical identities,
+dependency edges and their observed path frontier. RepoSpec/source metadata is
+not a dependency of the mapping owner. Concurrent requests deduplicate through
+DICE. A mapping-changing revision invalidates the builtin projection and
+route; equal selected mappings cut off downstream recomputation. A/B/A, cold
+cancellation and same-graph repair must work without manual locks or
+process-global state.
 
-Complexity is one existing alias traversal per configured node and one linear
-normalization over a platform's constraint edges. There is no declaration or
-candidate cross product. Measure retained size, unchanged-result `Arc` reuse
-and A/B/A invalidation; no benchmark is required unless the default-host
-bootstrap smoke exceeds the existing analysis envelope.
+The mapping is DICE-retained semantic state. Ordered names and entries retain
+their existing compact shared allocations; route consumers borrow or clone
+only immutable `Arc` state. Lookup scratch is compute-local. No evaluator heap,
+command scratch, cache, interner, task or filesystem handle is retained. No
+lock may cross a DICE computation.
 
-## Exact allowlist and caps
+## Corrected successor proof contract
 
-The accepted source baseline is `cf91fe8de`; `ce38f0373` changed docs only.
-Before editing, every blob and line count below must match.
+The implementation packet must prove the composition, not its parts:
 
-| Path | Baseline blob / lines | Maximum added lines |
-|---|---:|---:|
-| `app/slug_identity_v2/src/label.rs` | `081bbb5b49238d361a83c437dbebd29b543334f4` / 537 | +30 |
-| `app/slug_configuration_v2/src/native/configuration.rs` | `12b7e78d753633a42f0a5fc1ebdb4be0fdfe2536` / 1,540 | +90 |
-| `app/slug_configuration_v2/src/native/tests.rs` | `4f9b01a779a6ebd5518c46728954348512987c8c` / 3,529 | +90 |
-| `app/slug_bzlmod_v2/src/builtin_repository.rs` | `28819e3b37b6be21f1d855bbf68d9de6a37f4d44` / 889 | +20 |
-| `app/slug_bzlmod_v2/src/host_module.rs` | `28c78c310ab6804da7824829efcc2c06f9d5bca8` / 5,349 | +4 |
-| `app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs` | `3002f00320df7540b4c4905610f11e42534b4f7b` / 149 | +35 |
-| `app/slug_loading_v2/src/package.rs` | `bfc62b265d336a57a612e2f50def2ce3da587a2e` / 6,852 | +50 |
-| `app/slug_loading_v2/tests/build_file_loading.rs` | `fa35fbbedc839f49b701ffc98810554349d28629` / 3,559 | +55 |
-| `app/slug_analysis_v2/src/dice.rs` | `08711874e49e37b297b8a7eb989ba7a1c60d70e1` / 3,748 | +300 |
-| `app/slug_analysis_v2/src/result.rs` | `2d5fb57083c522ea5229610e1c033371065ad790` / 668 | +100 |
-| `app/slug_analysis_v2/src/lib.rs` | `777f01622c2051a3b54c2a697173e136072ac792` / 77 | +10 |
-| `app/slug_analysis_v2/tests/starlark_rule.rs` | `5fba7dd923011f724073ac8b6674b1ce4d283db9` / 6,304 | +320 |
+1. Graph-only mapping tests publish complete ordered mappings for root,
+   registry, nonregistry and builtin rows, including builtin self and
+   `platforms`; reject missing, duplicate and wrong-context rows; and prove
+   missing/erroring registry RepoSpec/source metadata cannot block mapping
+   publication or enter its observed frontier.
+2. Legacy and observed canonical routes retain that exact mapping, mapping
+   changes affect structural identity, equal mappings reuse results, and
+   Need/outer/cancellation/lifecycle behavior is preserved.
+3. One Slug loading proof evaluates exact builtin `tools/BUILD` and its eager
+   `tools/build_defs.bzl` load using a provenance-pinned selected `platforms`
+   source, then observes alias actual `@@platforms//host:host`.
+4. One configured-analysis proof starts from the default structural
+   `host_platform` option and reaches the same actual configured platform
+   through the generic route/package/alias/platform keys.
+5. Existing selected, generated and root mapping suites remain unchanged;
+   exact builtin hashes/modes and all R4 platform/cycle/action proofs remain.
 
-The only new non-plan files are:
+Reuse the existing Bazel oracle and the provenance-pinned local `platforms`
+module fixture; add no oracle fixture unless the implementation audit proves a
+real evidence gap. The local fixture authenticates Slug composition but does
+not support a claim of live network BCR materialization.
 
-- `app/slug_bzlmod_v2/builtin/bazel_tools/tools/BUILD`: 50 lines, upstream
-  `tools/BUILD.tools`, mode `100644`, SHA-256
-  `b0fbb2f8eb70acce9a307cca3d487a360f32a89d412e22a39c38346b979fc1a6`.
-- `app/slug_bzlmod_v2/builtin/bazel_tools/tools/build_defs.bzl`: 106 lines,
-  mode `100644`, SHA-256
-  `d5f935c4e72a365438711f08a2640094cbf0a03392eebb06d8cecdc58b8ab19c`.
+## Implementation packet to materialize after review
 
-Writable plans are only the canonical plan, Stage 6, Stage 9 and this manifest.
-No Cargo, lockfile, sync-script, fixture or generated evidence is allowed.
-Caps: 604 production, 500 proof and 1,200 total added Rust lines; upstream
-assets must be exact. Plan caps remain 260 manifest, 140 Stage 6, 40 canonical
-and 40 Stage 9 net lines.
+After independent Sol `ACCEPT`, replace this manifest with
+`WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r5`. R5 may
+retain the current uncommitted R4 candidate and add only the natural mapping
+producer, route consumption and composition proofs above. Before editing,
+record exact blobs/line counts and caps for:
 
-## Proof and validation
+- `app/slug_bzlmod_v2/src/selected_repo_spec.rs` and `src/lib.rs`;
+- `app/slug_bzlmod_v2/src/canonical_repository_route.rs`;
+- `app/slug_loading_v2/src/canonical_repository_route.rs` and its focused
+  route/load tests; and
+- only the minimum existing analysis test/harness files needed for the final
+  configured composition proof.
 
-Required focused proofs:
+Preserve every R4 allowlist entry and cap exactly. Do not authorize a new
+fixture, Cargo/lockfile change, CLI/core production change, registry
+materialization change or second mapping owner. Set separate production and
+proof caps only after measuring the live owners; the new production addition
+must remain below 500 physical Rust lines and the new proof addition below 500.
 
-- visible/non-visible target-platform projection, first platform and host
-  fallback; Target/Exec shape checks; selected platform changes exec structural
-  identity while equal input reuses the configuration `Arc`;
-- builtin catalog bytes, modes, snapshot identity, directory listing and
-  default host alias through authenticated BCR `@platforms//host`;
-- direct and multi-hop aliases for platform, constraint value and setting;
-  wrong terminal kinds, cycles, default setting and duplicate actual setting;
-- target-platform Target and Exec results, exact child `Arc` reuse,
-  independent alias/constraint/option invalidation, A/B/A and cold
-  cancellation/same-graph repair;
-- constraint-category match/no-match/extra-setting plus competing error/Need;
-  previous native/define/flag condition and selector suites unchanged; and
-- locked scans proving one alias recursion, one condition key, no package read
-  in platform-result consumers, no retained standard collection/cache/interner,
-  no toolchain selector/provider/ruleset specialization and no lock across DICE.
+## Validation and stops
 
-Run targeted identity/configuration, builtin Bzlmod, loading and analysis tests,
-then the full affected crate suites serially where Cargo shares `target/`.
-Run rustfmt on touched Rust, `git diff --check`, exact asset SHA/mode checks,
-blob/line/cap accounting, packet/canonical ID matching and
-`scripts/v2_archive_status.sh`. Build `slug_cli_v2` before any binary smoke and
-clean stale `slugd` before/after daemon-sensitive tests. Independent Sol review
-must return `ACCEPT`; one material correction is allowed, a second is `REPLAN`.
+The design closes only after independent Sol review returns `ACCEPT`. The R5
+implementation must run focused Bzlmod route, loading and analysis suites;
+full affected crate suites serially; direct dependents; rustfmt;
+`git diff --check`; source/hash/mode and cap audits; packet/canonical matching;
+and `scripts/v2_archive_status.sh`. Rebuild `slug_cli_v2` before any smoke and
+report unsupported CLI materialization honestly.
 
-## Stops
-
-STOP and `REPLAN` for a missing baseline/allowlist file; non-verbatim builtin
-content; execution candidate substituted for target platform; string/display/
-checksum label conversion; copied option vector or parallel platform field; a
-second alias/platform/condition owner; a package/source read in a result
-consumer; constraint-default matching instead of typed rejection; lost alias
-edge; shared exec configuration across different platforms; toolchain
-selection, provider or implementation analysis; retained standard map/set,
-cache/interner/evaluator value or lock across DICE; superlinear normalization;
-Rust BCR/`cc_internal` control flow; `cc_common` specialization; Zabel
-authority; cap breach; or a second material correction.
+STOP and `REPLAN` for a selected-route/package-load DICE cycle; any RepoSpec,
+source-metadata or materialization dependency in the mapping owner; a mapping
+derived from source spelling or root visibility; `platforms`-only injection;
+copied full graph/source/evaluator state; lost observations; changed
+root/selected/generated mapping semantics; an unguarded lock across DICE;
+live-registry or catalog expansion; Rust BCR/ruleset control flow;
+`cc_common` specialization; Zabel authority; cap breach; or a second material
+implementation correction.
