@@ -36,10 +36,40 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-4-5-7A-provider-independent-configured-toolchain-selection-r5](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-recursive-analysis-value-provider-architecture](./slug-v2-subplans/current-packet.md).
 
-The M7 status-table row's active-packet suffix is superseded by this R5 link.
-R5 is terminally accepted; categories 5-6 remain next before M8.
+The M7 status-table row's category-4 suffix is superseded by this link.
+Category 4 is terminally accepted in `568b0c698`. Category 5's zero-Rust
+retained provider-value design has passed independent Sol pre-review and must
+commit before its exact implementation packet is materialized; category 6
+then analyzes the selected implementation under its execution configuration
+and exposes the retained occurrence through `ctx.toolchains`.
+
+### M7 recursive analysis-value/provider architecture active (2026-08-28)
+
+Category 4 is complete. Activate only
+`WP-4-5-7A-recursive-analysis-value-provider-architecture`: freeze one opaque,
+heap-independent recursive value handle, general provider occurrence keyed by
+builtin or authenticated Starlark definition identity, and distinct
+Bazel-visible versus DICE-publication equality domains. The admitted graph
+covers scalars including arbitrary integers/floats, canonical labels,
+configured targets, artifacts, lists, tuples, dictionaries, structs, nested
+providers and typed occurrence-identity shared depsets. Starlark hashability is
+separate from immutability and DICE publication equality; dictionary insertion
+order and depset order/type/topology/aliasing participate in publication
+equality. Immutable retained storage does not make builtin `ToolchainInfo`
+semantically immutable or legal as a dictionary key/strict depset leaf.
+`ToolchainInfo` and user providers use this one path, with
+`ToolchainInfo` values bounded to the admitted graph; no per-builtin arbitrary
+field struct is allowed.
+
+Pinned Bazel 9.2 remains behavior authority. Buck2 and clean Zabel
+`0795445f...` are concept/optimization guidance only; neither evaluator heaps
+nor Zabel store/layout identity may be retained. BCR Starlark owns every rule
+and control path including `cc_internal`; `cc_common` is a generic host-ABI
+client. Do not begin Rust until independent Sol review returns `ACCEPT`.
+That pre-review now returns `ACCEPT`; the docs-only architecture commit is the
+remaining gate before implementation materialization.
 
 ### M7 configured-selection server projection-proof REPLAN (2026-08-28)
 

@@ -20769,3 +20769,62 @@ server regression, full server reports exactly 50 passes plus the unchanged
 inherited replay assertion, and the same test passes in isolation. All owner,
 direct-dependent, CLI, structural, cap and archive gates satisfy R5; the packet
 is complete.
+
+#### Provider-independent configured selection accepted; recursive provider-value design active (2026-08-28)
+
+Commit `568b0c698` completes category 4. One DICE-owned configured resolution
+now selects ordered mandatory/optional toolchain declarations and the actual
+execution platform without analyzing an implementation or reading providers.
+The requesting rule uses the selected execution platform for action context;
+the marker payload remains only the declared post-selection single-type bridge
+that categories 5-6 delete. Full focused and direct-dependent validation is
+accepted with the separately documented inherited core/server event-replay
+baselines.
+
+Activate only the zero-Rust
+`WP-4-5-7A-recursive-analysis-value-provider-architecture`. Freeze one opaque,
+cheap-clone, evaluator-independent `AnalysisValue` handle and one general
+provider occurrence keyed by builtin name or authenticated exported Starlark
+definition identity. The admitted graph covers `None`, Boolean, arbitrary
+integer, float, string, canonical label, configured target, artifact, list,
+tuple, insertion-ordered dictionary, struct, nested provider and shared
+typed occurrence-identity depset. Empty or any-count builtin `ToolchainInfo`
+whose field values belong to that admitted graph and user providers use the
+same graph; existing operationally typed builtin providers remain but no new
+per-builtin arbitrary field struct is allowed.
+
+The retained API has two explicit equality domains. Bazel-visible equality and
+hashing follow Starlark numeric/container/provider/occurrence rules, including
+identity equality/hash for depsets and configured targets. A separate exact
+hashability matrix rejects direct list/dict keys, recursively checks tuples and
+admits immutable provider occurrences even with frozen list/dict fields;
+strict depset admission rejects top-level list/dict, preserves one homogeneous
+top-level type and does not flatten. Retained storage immutability is separate
+from Bazel semantic immutability: builtin `ToolchainInfo`, and a recursively
+checked tuple/struct/provider containing it, is rejected as a key and strict
+depset leaf. Deeper publication equality additionally
+compares every owned payload required to materialize a value, dictionary entry
+order, and depset order/type/deep DAG/alias partition, so equal configured-
+target occurrences with changed provider collections cannot be hidden by DICE
+equality cutoff. Production
+configured-target identity uses the complete structural configuration bytes,
+never a display token, projection, checksum or digest. One analysis-owned
+lowerer uses evaluator pointer identity only as cycle/memo scratch, then drops
+all `Value`/`FrozenValue`/heap state before publication. One inverse adapter
+reuses retained handles for dependency provider access.
+
+Pinned Bazel 9.2 `ToolchainInfo`, `StructImpl`, `StarlarkInfo*` and their named
+tests remain authority. Buck2's frozen-heap provider collection is rejected as
+storage but informs `SmallMap`/borrowed-key/`Dupe` patterns. Clean Zabel
+`0795445f...` informs only opaque value roots, producer-owned references,
+shared depsets and later dense-store replaceability; copy no Zig layout,
+ordinal, scheduler or claim. Language `set` remains evaluator-global and is
+not retained. BCR Starlark owns rule/control flow including `cc_internal`,
+while `cc_common` is only a generic future host-ABI client.
+
+Independent Sol pre-review returns `ACCEPT`; commit the docs-only architecture
+before materializing the Rust packet. STOP for evaluator-heap
+retention, a global provider store/interner, flattened depsets, lossy numeric or
+configured identity, missing publication equality, a per-builtin payload
+shape, parser/ruleset control flow, Zabel authority, or a second material
+contract correction after implementation starts.

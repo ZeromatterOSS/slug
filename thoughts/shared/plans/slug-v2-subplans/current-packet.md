@@ -1,478 +1,406 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-provider-independent-configured-toolchain-selection-r5`
+Packet: `WP-4-5-7A-recursive-analysis-value-provider-architecture`
 
-Milestone: M7A provider-independent configured eligibility and selection,
-feeding ordinary M8 Stage 10.3 analysis.
+Milestone: M7A category 5, one recursive retained analysis-value/provider
+boundary before selected toolchain implementation analysis.
 
-Base: `c8064b106`; commits through `76980a0b3` changed plans only.
+Base: `568b0c698`. Category 4 is accepted in that commit and this packet has
+made no Rust change. This packet is deliberately zero-Rust. Independent Sol
+pre-review returns `ACCEPT` after the bounded depset occurrence/type,
+hashability, semantic-immutability and publication-equality corrections below;
+the architecture must commit before an implementation packet is materialized.
 
-Design: commit `a2dbdb553` froze the original nine-file packet. Downstream
-validation forced the bounded R2 authority correction below. Live R2 proof then
-exposed the narrower repository-sidecar authority correction recorded as R3.
-Independent Sol design review returns `ACCEPT`; implementation resumed within
-R4 and exposed the narrower proof correction recorded as R5 below.
+Observable result: freeze one general, heap-independent provider-value
+architecture that can retain any number of named `ToolchainInfo` fields whose
+values belong to the admitted graph, user-provider fields and future builtin-
+provider payloads without a per-builtin value shape. No selected implementation
+is analyzed and `ctx.toolchains` is not cut over in this packet.
 
-Result: implement category 4 of the frozen M7A toolchain sequence as one
-provider-free configured-selection owner, then cut the configured rule path
-over to its selected execution platform while retaining the old marker payload
-only as a post-selection single-type bridge.
-
-## R5 server projection proof and inherited event baseline correction
-
-The accepted R4 helper closes all 14 missing-`platforms` failures and the full
-server suite reaches 49 passing tests. Two assertions now expose previously
-unreachable state. First, the retained C0/C1 build proof finds four stable
-configuration projections, not two: category 4 lawfully owns one target and
-one selected-execution projection for each command configuration. R5 changes
-only that assertion from two to four and names both projection domains in its
-message. The already accepted core and cquery identity proofs discriminate the
-four structural values and A/B/A restoration; no marker production or identity
-behavior changes.
-
-Second, the final remote-disabled/remote-enabled request in
-`retained_daemon_build_observes_direct_external_exported_sources` reproduces
-the independently documented inherited stale external-package event-replay
-failure: `DEP_BUILD_EVENT` precedes the otherwise exact successful exported-
-source terminal with zero invalidations. R5 does not change, ignore or weaken
-that assertion and authorizes no event-owner correction. Record this single
-server failure separately as the same inherited event-replay family already
-reported by full core; the other 50 server tests must pass. A different event,
-terminal, invalidation count or server failure is not admitted.
-
-R5 retains R4's exact one-file, zero-production, +120-line authority and all
-compatibility boundaries. The assertion correction is **Slug-native** proof of
-Slug's structural target/exec configuration identity; it makes no exact Bazel
-path/checksum claim. Pinned Bazel 9.2 remains behavior authority. Clean Zabel
-remains peer architecture/optimization guidance only. BCR-delivered Starlark
-continues to own all rule logic including `cc_internal`; `cc_common` remains a
-generic host-ABI client, not a parser or rules engine.
-
-Independent Sol design and terminal implementation reviews return `ACCEPT`.
-The formatted candidate passes every focused owner and direct-dependent gate;
-full server reports exactly 50 passes plus the unchanged inherited
-`DEP_BUILD_EVENT` replay assertion, while the same test passes in isolation.
-The CLI rebuild, allowlist/blob/line/cap audit, diff hygiene and archive audit
-all satisfy this manifest. R5 is complete.
-
-## R4 server direct-dependent fixture correction
-
-The formatted R3 candidate closes every selection-related core regression:
-full `slug_core_v2` reports 291 passed, one ignored and only the independently
-documented stale external-query event-replay baseline. All configuration,
-loading, analysis, query, Bzlmod and command suites pass. The required server
-direct-dependent gate then reports 14 configured build/cquery failures. Each
-reaches the verbatim builtin `bazel_tools` graph and requests
-`@platforms//host:constraints.bzl`; the server test workspaces provide neither
-the local `platforms` dependency used by the accepted core fixture nor a
-registry/materializer capable of the upstream `http_archive` shape.
-
-This is the same test-only hermetic provenance gap as R2, not a semantic or
-production defect. R4 adds exactly one proof file:
-`app/slug_server_v2/src/tests.rs`. Add one local helper that writes the minimal
-`platforms` 1.0.0 module, `host/BUILD.bazel` platform and empty
-`HOST_CONSTRAINTS`, and writes a supplied root MODULE body followed by its
-`bazel_dep` and `local_path_override`. Use it only in the 14 failing configured
-build/cquery fixtures named by the server failure inventory:
-`cquery_wire_requires_a_known_output_mode_before_dispatch` (only its configured
-workspace tail), `retained_cquery_executables_observes_capability_edits_warm_and_restoration`,
-`retained_cquery_formats_modes_and_restores_root_setting_projection`,
-`retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state`,
-`retained_cquery_loading_files_are_post_analysis_terminals`,
-`retained_cquery_missing_executable_recovers_after_rule_edit`,
-`retained_cquery_missing_recovers_without_new_invalidations`,
-`retained_cquery_selection_errors_use_evaluation_exit_and_preserve_invalidation`,
-`retained_cquery_siblings_is_an_exact_post_analysis_terminal`,
-`retained_cquery_starlark_formats_ordered_sets`,
-`retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty`,
-`retained_daemon_build_observes_direct_external_exported_sources`,
-`retained_daemon_build_publishes_cold_and_changed_events_without_warm_replay`,
-and
-`retained_daemon_restores_c0_after_root_setting_c1_without_source_invalidation`.
-Ordinary loading
-query, Bzlmod request-locality, wire-only validation and unrelated daemon
-fixtures retain their existing MODULE sources and policies. The helper changes
-no command policy, production builtin, registry source, daemon request, DICE
-key, retained value, invalidation rule or overlapping-request behavior.
-
-Classify R4 as **Slug-native** test harness plumbing. It adds no exact behavior
-claim and changes no unsupported/deferred boundary. The minimal local module
-is hermetic test setup, not a BCR or Bazel source fixture; the accepted Bazel
-9.2 selection evidence remains unchanged. It is created before daemon
-construction, is observed through the existing workspace/source owners and
-has no retained memory beyond those ordinary test inputs. Delete it when the
-server harness can hermetically materialize the complete verbatim builtin/BCR
-dependency graph; category 4 owns that deletion condition and the full server
-suite prevents the bridge from becoming invisible.
-
-The server test file is 2,948 lines at baseline but is proof-only; one shared
-helper reduces repetition and a production/test split would widen no semantic
-owner. No hot-path or retained-representation measurement applies. Clean
-Zabel remains peer architecture guidance only and contributes no R4 behavior
-or fixture bytes. Pinned Bazel 9.2 remains the sole behavior authority, and
-BCR-delivered Starlark still owns every rule/control path including
-`cc_internal`; `cc_common` remains only a future generic host-ABI client.
-
-Independent Sol design review returns `ACCEPT`; implementation may resume only
-within the exact R4 server proof scope.
-
-## R3 repository-sidecar authority correction
-
-The R2 in-memory fixture closes discovery and reaches the intended candidate-
-platform topology. A retained-runtime public multi-build with a hermetic local
-`platforms` dependency then stops at
-`ObservedTerminalMismatch::RepositoryRequests`: configured platform selection
-lawfully adds the platform repository request to the selected analysis closure,
-while the pre-category-4 `SelectedDependencySuperset` validator rejects every
-repository request and validation before checking its exact path superset.
-
-This is a general native-demand/analysis-closure contract defect, not a
-ruleset-specific exception. R3 adds one bounded core production correction:
-`SelectedDependencySuperset` admits selected closure repository request and
-validation sidecars, while retaining exact demand/value/Arc checks for every
-terminal-observed path. `StrictPathOnly` continues to reject all repository
-sidecars, and `ClosureRepositories` retains its exact path-epoch comparison.
-Repository session validation, request identity, source association and
-selection remain unchanged. Add a direct regression proving the three modes
-remain distinct.
-
-R3 also corrects the fixture description to the implementation seam actually
-supported by core. In-memory DICE fixtures use the command-overridden minimal
-`bazel_tools` plus a direct root host platform. Filesystem retained-runtime
-configured fixtures keep the verbatim builtin `bazel_tools` and locally supply
-only its minimal `platforms` dependency and `//host:host` target. This is
-test-only hermetic provenance; it does not replace any production builtin or
-BCR-delivered rule graph.
-
-Classify the validator correction as **Slug-native** closure-integrity
-plumbing required to carry the exact selected platform graph. Exact Bazel
-selection semantics, unsupported provider surfaces and every generic
-configured-selection boundary below remain unchanged.
-
-## R2 downstream-proof authority correction
-
-The original implementation candidate passes its focused owner proofs, but
-full `slug_core_v2` validation reports 30 failures versus the two documented
-inherited core baselines. At least 28 new failures are the required consequence
-of the exact zero-type contract: ordinary configured rules now materialize the
-selected registered/host execution platform, retain its candidate-platform
-topology and replay the newly reached MODULE/platform event producers.
-
-Independent terminal Sol review returns `REPLAN`. Restoring the former core
-behavior would violate the exact contract below, while the original allowlist
-forbids the test fixture and expected-topology changes required by its own
-direct-dependent gate. R2 preserves every semantic owner, compatibility class,
-production cap and generic implementation boundary of the original packet. It
-adds only:
-
-- the `#[cfg(test)]` harness in core `runtime/dice.rs`, to install hermetic
-  configured build/cquery fixtures without changing production's verbatim
-  builtin or default host label;
-- build and cquery proof expectations for the newly visible candidate-platform
-  nodes/edges and child-owned MODULE/platform events; and
-- focused proof that zero-type public action contexts select the test host
-  through the same generic resolution owner, with warm replay and A/B/A
-  behavior unchanged; and
-- the exact exec-scope correction demonstrated by pinned Bazel 9.2
-  `BuildConfigurationValueTest.starlarkFlagExecScopes`: default, universal and
-  project-scoped Starlark flags survive exec projection while target-scoped
-  flags are removed. Correct the existing configuration projection/regression
-  only; add no owner or representation.
-
-Apart from the R3 validator correction above, do not edit core production
-behavior. The test-only override/local dependency is fixture
-provenance, not a semantic fallback: it exists because these unit tests provide
-no registry/materializer capability for the real `@platforms` dependency. Its
-deletion condition is a core harness that supplies the complete verbatim
-builtin/BCR dependency graph hermetically; category 4 owns the fixture until
-then. A regression must continue to prove that production configuration
-defaults to `@@bazel_tools//tools:host_platform` and that the local override is
-installed only by the test helper.
-
-## Accepted prerequisite and live audit
-
-Commit `c8064b106` supplies the reusable configured target-platform fact,
-actual-target alias projection, platform-specific exec configuration,
-constraint-aware configured conditions, complete graph-derived builtin mapping
-and exact `@bazel_tools//tools:host_platform` composition. Independent
-terminal review returned `ACCEPT`.
-
-The live `c8064b106` audit found a bounded complete seam:
-
-- loading already retains ordered `ToolchainTypeRequirement` values including
-  `mandatory`, complete native toolchain declaration semantics and the
-  command-before-MODULE registration expansions;
-- configuration already owns structural target-platform selection and
-  `to_exec_for_platform()`; its typed host-platform row needs only the matching
-  canonical-label projection for Bazel's final execution-platform fallback;
-- analysis already owns configured aliases, configured platform facts, target-
-  setting condition batches, configured package loading and the singular marker
-  consumer;
-- no provider, evaluator heap, raw MODULE/source carrier, new parser, new
-  configuration store or ruleset-specific state is required for eligibility
-  and selection.
-
-The loading invocation gate still rejects an already-retained optional
-requirement, and the configured analysis path still narrows requirements to
-zero-or-one and performs selection inline with marker implementation analysis.
-Those are the only cutover defects in this packet.
-
-## Behavior authority
+## Learned facts and research basis
 
 Pinned Bazel 9.2 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` is the sole behavior authority:
+`8220c6198837d5c13d53fea211cf3282aa12408a` is behavior authority.
 
-- `ToolchainResolutionFunction#loadToolchainTypes` resolves requested aliases
-  to actual type identity while preserving requirement policy;
-- `RegisteredToolchainsFunction` filters declarations by configured
-  `target_settings` before selection;
-- `SingleToolchainResolutionFunction#resolveConstraints` preserves
-  declaration order, target constraints, execution constraints and
-  target-to-exec constraint policy;
-- `ToolchainResolutionFunction#determineToolchainImplementations`,
-  `findExecutionPlatformForToolchains` and `PlatformKeys#isPlatformSuitable`
-  distinguish mandatory absence from no common platform, allow optional
-  absence, require every mandatory actual type, maximize covered distinct
-  requested actual types and preserve candidate order on ties;
-- `PlatformKeys#findExecutionPlatformKeys` appends the configured host platform
-  after registered candidates and deduplicates it through the ordered set;
-- `RegisteredExecutionPlatformsFunction` resolves configured aliases and its
-  immutable-map construction rejects distinct registrations converging on one
-  actual platform.
+- `ToolchainInfo.java#copyValues` copies any number of keyword fields into a
+  key-sorted Starlark map. `ToolchainInfoTest#toolchainInfoConstructor` proves
+  string and configured-target fields; `toolchainInfo_equalsTester` proves
+  structural value equality but does not independently vary construction
+  order. Sorted-name behavior comes from `copyValues` and `StructImpl`, not
+  that test.
+- `StructImpl` defines provider-instance equality as provider identity plus
+  field names and Starlark-equal values, and hashes fields in sorted-name
+  order. `StarlarkInfoNoSchema` and `StarlarkInfoWithSchema` retain only present
+  fields and expose sorted field names.
+- `StarlarkInfoTest#equivalence` proves same provider plus equal fields is
+  equal while distinct provider identities, values or present-field sets are
+  unequal. Its concatenation tests remain evaluator behavior, not a retained
+  store operation in category 5.
+- `StarlarkProviderTest#schemafulProvider_withDepset` proves `None`, strings,
+  arbitrary provider fields and typed depsets share the provider boundary;
+  its immutable-provider tests prove mutable evaluator lists must not escape
+  analysis publication.
+- Bazel configured targets do not supply structural value equality; their
+  Starlark identity is the configured target occurrence. Their provider
+  payload must nevertheless participate in Slug publication equality so a
+  DICE equality cutoff cannot retain stale materialization data.
+- Bazel/Starlark numbers include arbitrary integers and floats. Equality and
+  hashing equate an integer with an exactly equal integral float, equate both
+  zero signs, and treat all NaNs consistently. The retained graph must not use
+  Rust's derived `f64` equality or an `i64` narrowing.
+- `Depset.java` retains one nullable top-level `ElementType` token (`empty`
+  when no nonempty direct or transitive member fixes it), rejects a mismatched
+  direct/transitive type, preserves order compatibility, and delegates equality
+  and hashing to its underlying `NestedSet` occurrence. Empty depsets are
+  shared per order and a constructor optimized to one unchanged transitive
+  occurrence reuses that occurrence; independently constructed nonempty
+  depsets remain unequal even when their flattened elements or DAG shape match.
+  `DepsetTest#testEmptyGenericType`, `testHomogeneousGenericTypeTransitive`,
+  `testBadGenericTypeTransitive`, `testEmptyDepsetInternedPerOrder` and
+  `testSingleNonEmptyTransitiveAndNoDirectsUnwrapped` discriminate those cases.
+- `StarlarkValue#checkHashable`, `StarlarkList`, `Dict`, `Tuple`,
+  `AbstractConfiguredTarget` and `Depset` distinguish immutability from
+  Starlark hashability. Frozen lists/dicts are never direct dictionary keys;
+  tuples recurse through key hashability; configured targets and depsets are
+  identity-hashable; and an exported immutable provider/struct uses its
+  structural hash and may remain hashable while containing a frozen list or
+  dictionary. Strict depset admission is different again: it requires
+  semantic immutability, then independently rejects a top-level list/dict and
+  enforces one top-level element type.
+- Builtin `ToolchainInfo` extends `StructImpl` but does not override
+  `StarlarkValue#isImmutable`, so its immutable Java/Rust storage does not make
+  it semantically immutable: it is not a dictionary key or strict depset leaf,
+  and a tuple/struct/user-provider field graph that recursively exposes it is
+  likewise non-immutable. Frozen list/dictionary immutability remains Bazel's
+  container-level exception and does not recursively inspect their children.
 
-Reuse the authenticated source/tests already frozen in
-`06-analysis-toolchains-and-actions.md`. Add oracle evidence only for a
-demonstrated uncovered discriminator.
+Live Slug facts:
 
-Clean `../zabel` commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer architecture and
-optimization guidance only. It guides producer-owned platform facts,
-requested/actual identity separation and immutable compact selection rows. No
-Zig layout, scheduler, store, identity, diagnostic or behavior is copied.
+- `slug_build_api_v2::providers` owns `ProviderId`, `ProviderCollection` and
+  configured-result provider values, but `ToolchainInfo` is one marker string
+  and `UserProvider` fields are `SmallMap<CompactString, CompactString>`.
+- `slug_analysis_v2::starlark_rule` reconstructs dependency providers on an
+  evaluator heap and lowers only string user providers, marker
+  `ToolchainInfo`, and direct-only `DefaultInfo` depsets.
+- `slug_loading_v2::provider` already retains authenticated exported provider
+  identity and evaluator-generic schemaful/schemaless field values. The
+  configured string fast path is the narrowing seam, not a second semantic
+  owner.
+- `Depset<T>` is already an immutable `Arc` shared DAG with all four admitted
+  orders and a depth bound, but its derived equality is structural and it has
+  no retained top-level Starlark element type. Category 5 must therefore wrap
+  its storage rather than expose `Depset<AnalysisValue>` directly.
+  `SlugConfiguration::canonical_bytes()` is the full collision-free structural
+  configuration identity; its BLAKE3 projection and display spelling are not
+  suitable configured-target value identity.
 
-## Ownership and representation
+Prior art classification:
 
-Add one legacy/observed DICE family:
-`ConfiguredToolchainResolutionKey` and its doc-hidden observation sibling.
-The semantic key is exactly workspace, structural target configuration and the
-ordered immutable requirement slice. It consumes the existing four prepared
-registration families, configured target-platform key, configured
-node/actual-target keys, configured platform keys, configured package owners
-and configured-condition key.
+- Buck2's `ProviderCollectionGen` supplies **concept/test only** guidance for
+  authenticated provider IDs, `SmallMap`, borrowed-key lookup, `Hashed`,
+  `Dupe` and `Allocative`. Its retained values are `FrozenValue` backed by a
+  `FrozenHeap`, so that storage design is explicitly **avoided**.
+- Existing V2 `Depset`, `SmallMap`, `CompactString`, immutable `Arc` slices,
+  `Dupe`, arbitrary `BigInt` and `Allocative` are **leaf reuse**. No new
+  interner, weak hash, packed store or Buck/V1 import is authorized.
+- Clean Zabel commit
+  `0795445f3ab60f4e49070bdd0b94425c5610f73a` is **concept/test only** peer
+  guidance. Its producer-owned value roots, separation of semantic provider
+  keys from dense row IDs, shared depset references, evaluator-lowering
+  boundary, dictionary alternating storage and rejection of provider-specific
+  ordinal shortcuts inform this design. Copy no Zig layout, arena/store ID,
+  packed row, scheduler, fingerprint or compatibility claim.
 
-Publish one immutable `ConfiguredToolchainResolution`:
+## Frozen decision
 
-- the configured target-platform fact;
-- the selected actual configured execution-platform fact and its platform-
-  specific exec configuration;
-- an ordered `Arc<[ConfiguredToolchainResolutionRow]>` with one row per
-  requested requirement, retaining requested configured type, actual
-  configured type, mandatory policy and optional selected native declaration
-  identity.
+### Opaque value and occurrence handles
 
-Rows contain no implementation/provider/evaluator value. Distinct requested
-aliases converging on one actual type retain distinct output rows. Their actual
-selection group is mandatory when any requested row is mandatory; the group is
-evaluated once, and its selected declaration or optional absence is projected
-back to every requested row.
+`slug_build_api_v2` owns these public retained concepts:
 
-Use existing Buck2-derived `SmallMap`/`SmallSet` only as compute scratch,
-preserving registration, requirement and candidate order explicitly. Retained
-state uses `Arc` slices, existing configured/canonical identities, `Dupe`
-and `Allocative`; add no hash cache, interner, standard retained hash
-collection, global store or memory-ledger category.
+- `AnalysisValue`: an opaque, `Dupe`/`Allocative` cheap-clone handle. Its first
+  implementation is an immutable `Arc` graph, but callers receive accessors and
+  a borrowed kind view rather than the backing enum. A future measured dense
+  owner store may replace the internals without changing provider consumers.
+- `AnalysisValue::is_starlark_immutable()`: the Bazel semantic predicate,
+  explicitly separate from immutable retained storage. Scalars, labels,
+  targets, artifacts and depsets are true; retained frozen lists/dictionaries
+  are true without recursing; tuples recurse; structs/exported user providers
+  recurse through fields; builtin `ToolchainInfo` is false. No caller may infer
+  this predicate from Arc ownership or Rust mutability.
+- `AnalysisNumber`: arbitrary `BigInt` or exact `f64` bits with Bazel/Starlark
+  numeric equality and hash behavior, including integral int/float equality,
+  signed zero and NaN.
+- distinct immutable list and tuple sequences; an insertion-ordered dictionary
+  with order-independent mapping equality; and a key-sorted string-field map
+  shared by structs and provider occurrences.
+- `AnalysisArtifact`: source identity by canonical label, or derived identity
+  by full configured owner identity plus the existing `ActionOutput`. This is
+  Slug's structural artifact identity and makes no Bazel output-path claim.
+- `ConfiguredTargetValue`: full configured-target identity plus an immutable
+  provider collection. Production configuration identity copies the complete
+  canonical byte slice, never a checksum, projection or display token. The
+  existing legacy configuration variant receives a separately tagged complete
+  test-only encoding.
+- `AnalysisDepset`: an opaque occurrence handle over the existing shared DAG,
+  with its order and a canonical top-level `AnalysisValueType` token retained
+  separately. `Empty` unifies with the first nonempty direct/transitive type;
+  otherwise types must match exactly. The token follows the evaluator's
+  top-level Starlark type rather than a Rust enum discriminant or provider
+  identity. Lowering preserves source occurrence reuse and DAG sharing without
+  flattening; materialization memoizes by this handle so two references to one
+  occurrence stay equal while independently constructed equal-shaped
+  occurrences stay unequal.
+- `ProviderIdentity`: builtin provider name or authenticated exported
+  `ProviderId`; and `ProviderOccurrence`: that identity plus one key-sorted
+  field map. Empty occurrences are valid.
 
-## Computation and precedence
+The first admitted value kinds are `None`, Boolean, integer, float, string,
+canonical label, configured target, artifact, list, tuple, dictionary, struct,
+provider occurrence and depset. This is the full category-5 shape; adding a
+future host builtin does not add a new retained field struct. Functions,
+mutable sets, opaque evaluator values, actions, command lines and unowned
+native objects remain unsupported/deferred until a packet names their
+identity, lifetime and evaluator semantics. The evaluator-global `set`
+builtin remains outside this store.
 
-1. Always prepare command-before-MODULE execution-platform registrations for a
-   structurally configured rule, resolve their configured aliases and append
-   the typed configured host-platform label as the final candidate. Add the
-   small `host_platform_label()` projection beside the accepted target-platform
-   projection; do not parse or stringify the native row. With no requested
-   type, select the first actual registered execution platform, or the host
-   fallback when none is registered. Bypass toolchain-registration,
-   declaration, package and condition work only when there is no requested type
-   and no local marker-topology declaration. Otherwise prepare the remaining
-   registration families through the accepted owner.
-2. Compute the configured target platform and resolve every requested type,
-   registered execution platform, host fallback and declaration type through
-   existing actual-target/configured-platform owners. Candidate convergence
-   among registered platforms is a semantic error before selection; convergence
-   between an earlier registered actual platform and the appended host fallback
-   keeps the earlier candidate once, matching Bazel's ordered-set fallback.
-3. Load complete native declarations and referenced constraints/settings via
-   existing configured package owners. Resolve all declaration
-   `target_settings` through the sole configured-condition batch in the target
-   configuration.
-4. Validate actual toolchain types and constraint values/settings. Filter each
-   declaration by type group, settings, target compatibility and
-   `use_target_platform_constraints`; then retain its first compatible
-   declaration per candidate execution platform.
-5. If one mandatory actual type has no declaration on any candidate, return the
-   mandatory-absent error. Otherwise choose among candidates containing every
-   mandatory group by greatest number of distinct requested actual groups;
-   preserve registered candidate order on ties. A nonempty eligible set with no
-   common candidate is a distinct error. Optional missing groups publish
-   `None`.
-6. Derive the selected execution platform through its existing
-   `ConfiguredPlatformKey`; its actual key already carries
-   `to_exec_for_platform()` identity. Publish rows in requested order.
+`ProviderValue` retains the existing operationally typed builtin providers
+(`DefaultInfo`, `OutputGroupInfo`, `RunEnvironmentInfo`,
+`FilesToRunProvider`, and `PlatformInfo`) and one general
+`ProviderOccurrence` variant. Both builtin `ToolchainInfo` and exported user
+providers use the general occurrence path. `ProviderCollection` becomes an
+opaque Arc-backed compact map keyed solely by `ProviderIdentity`; duplicate
+identity remains an error and `DefaultInfo` validation remains unchanged.
+Existing typed builtin internals are not generalized in this packet, but no
+new builtin-specific payload representation is permitted.
 
-Compute independent prerequisite batches completely before reduction. Preserve
-outer frontier error before merged Need before semantic failure. Need unions
-must retain all compatible source/repository demands. Cancellation publishes no
-resolution value; same-graph repair must recover. Hold no lock across DICE.
+### Two explicit equality domains
 
-## Configured-analysis cutover
+`AnalysisValue`'s Bazel-visible equality/hash domain follows Starlark:
 
-Configured rule analysis passes the complete retained ordered requirement slice
-to the new family; delete the zero-or-one restriction and the inline selector.
-All admitted rules use the resolution's selected execution platform for their
-default action context.
+- numeric cross-kind equality follows Bazel/Starlark rather than enum tags;
+- list/tuple order and type are significant;
+- dictionaries compare mappings independent of insertion order while
+  preserving insertion order for iteration;
+- structs and provider occurrences compare fields independent of construction
+  order; provider identity is significant;
+- configured targets and artifacts compare their complete occurrence
+  identity; and
+- depsets compare and hash only by retained occurrence identity. Reusing one
+  occurrence is equal; separately constructed occurrences are unequal even
+  when type, order, DAG and leaves are otherwise identical. Flattening still
+  deduplicates leaves with the same Starlark equality domain. The first Arc
+  implementation uses handle identity for this process-local Starlark
+  equality/hash only; its address is never publication identity or serialized
+  semantic state.
 
-The existing marker payload remains a temporary post-selection bridge only when
-there is exactly one mandatory requested row, no optional row and one selected
-declaration. After selection, reload that declaration's implementation through
-existing owners and retain the current marker validation/analysis behavior.
-The bridge cannot affect eligibility, grouping, platform choice or the
-resolution value. Multi-type and optional cases expose no `ctx.toolchains`
-payload and perform no selected implementation analysis; attempting provider
-access remains deferred/fail-closed until categories 5 and 6.
+Separately, retained-publication equality recursively includes every owned
+payload needed to materialize the value again. In particular, two configured
+target values with equal occurrence identity but different provider
+collections are Starlark-equal but publication-unequal. `ProviderCollection`
+and therefore `ConfiguredNodeResult` use publication equality for DICE cutoff.
+Dictionary publication equality compares the ordered key/value sequence, not
+only the mapping: equal mappings with different insertion order are
+Starlark-equal but publication-unequal because iteration is observable.
+Depset publication equality performs an unflattened, bidirectional graph-
+isomorphism comparison over order, top-level type, ordered direct leaves,
+ordered transitive edges, deeply publication-equal leaf payloads and the
+occurrence/alias partition. Thus the same child referenced twice is not
+publication-equal to two distinct equal-shaped children, while independently
+allocated A and A' graphs with the same complete topology may cut off safely.
+Comparison scratch is pair-memoized and phase-local; no process ordinal,
+pointer address or traversal-assigned ID becomes semantic identity. No
+weak/precomputed hash is semantic identity; any later `Hashed` use is
+lookup-only.
 
-Keep existing candidate-platform topology edges. Publish the old singular
-toolchain selection/implementation edges only for the marker bridge; do not
-invent a partial multi-type provider/topology projection.
+### Hashability and depset admission
 
-## Compatibility
+The retained API exposes a fallible Starlark-key hash separately from a total
+internal structural hash used to hash an otherwise hashable struct/provider
+field graph. For the admitted graph, exact dictionary-key behavior is:
 
-- **Exact:** admitted Bazel 9.2 empty-type first-registered/host-fallback
-  platform selection, requested/actual alias grouping, mandatory-OR, one row per
-  request, optional absence, configured target settings, target and execution
-  constraints, `use_target_platform_constraints`, registration and declaration
-  order, candidate coverage/tie order, platform alias convergence, mandatory-
-  absent versus no-common-platform behavior and selected exec-configuration
-  semantics.
-- **Slug-native:** Rust representation/layout, structural configuration and
-  DICE identity bytes, compact scratch/retained containers, memory accounting
-  and unproved diagnostic wording.
-- **Unsupported/deferred:** arbitrary `ToolchainInfo` or user-provider values,
-  `ctx.toolchains` for the new multi/optional category, selected implementation
-  analysis under the exec configuration, provider/action behavior beyond the
-  old marker bridge, broader exec groups and exact Bazel configuration/output
-  bytes. Categories 5 and 6 own those surfaces.
+- `None`, Boolean, integer, float, string, label, configured target, artifact
+  and depset are accepted; configured targets and depsets use occurrence hash;
+- tuples are accepted only when every element independently passes this same
+  dictionary-key check;
+- structs and authenticated exported provider occurrences are accepted when
+  `is_starlark_immutable()` is true, including when a field is a retained frozen
+  list or dictionary; their sorted-field structural hash uses the total
+  internal hash of those children; and
+- list, dictionary and builtin `ToolchainInfo` are rejected directly. A tuple,
+  struct or user provider that reaches `ToolchainInfo` through semantic-
+  immutability recursion (without crossing a frozen list/dictionary) is
+  rejected too. Sets/functions/opaque values are already outside the admitted
+  graph. No rejected direct kind is admitted merely because retention made its
+  storage immutable.
 
-BCR-delivered Starlark owns every rule definition and control path, including
-`cc_internal`. `cc_common` remains only a demanding client of the future
-generic host/provider ABI. No C++ or rules_rust rule engine, builtin-specific
-selector or source-level ruleset shortcut is permitted.
+The total internal hash remains consistent with Starlark equality: list/tuple
+hashing is ordered, dictionary hashing is mapping-based and insertion-order
+independent, and struct/provider fields hash in sorted-name order. It is not a
+public permission to place list/dictionary values directly in a dictionary.
 
-## Exact allowlist and caps
+Strict depset-leaf admission is a distinct exact matrix. It first requires
+`is_starlark_immutable()`, then rejects a top-level list or dictionary. Thus
+tuples and exported provider/struct occurrences containing retained frozen
+lists or dictionaries remain legal, while builtin `ToolchainInfo` and a
+tuple/struct/user provider that reaches it through semantic-immutability
+recursion (without crossing a frozen list/dictionary) are rejected. It also
+rejects every unsupported kind, incompatible order, a nonempty direct/
+transitive `AnalysisValueType` mismatch and the existing depth overflow. Empty
+direct and transitive children contribute no type; the first nonempty child
+fixes it. This validation occurs while composing the shared DAG and never by
+flattening.
 
-All baselines are the live `c8064b106` blobs:
+### Evaluator boundary
 
-| Path | Baseline blob / lines | Maximum physical growth |
-|---|---:|---:|
-| `app/slug_configuration_v2/src/native/configuration.rs` | `0adf79acda69b71204c826c7524411affced6dc3` / 1,629 | +25 |
-| `app/slug_configuration_v2/src/native/tests.rs` | `63141d47f9bc75f65cb533b31ca2417d2e06b4c9` / 3,550 | +35 |
-| `app/slug_loading_v2/src/package.rs` | `0f54f092669e37551c70290ef0a35b3200dee047` / 6,901 | +5 |
-| `app/slug_loading_v2/src/host_package_load_tests.rs` | `59477bc6a2204fef5fa091e5fd769390d165a535` / 35,108 | +20 |
-| `app/slug_analysis_v2/src/dice.rs` | `2fa5583b541f167f095901f37be292e25287cc20` / 4,065 | +1,250 |
-| `app/slug_analysis_v2/src/result.rs` | `eb0c73b830714475777eed55d8b05366c1a295c2` / 723 | +350 |
-| `app/slug_analysis_v2/src/lib.rs` | `9a8e4bacb9c99d3a430602fa3282cf7a8249d02e` / 83 | +20 |
-| `app/slug_analysis_v2/tests/starlark_rule.rs` | `e53ead56097cd882c1ccc48f6a6a7afaef7275f9` / 6,602 | +900 |
-| `app/slug_analysis_v2/tests/root_analysis.rs` | `afab443f8ae51a78a38926cfdcfdea3796f4f797` / 1,204 | +300 |
-| `app/slug_core_v2/src/runtime/dice.rs` | `6ad6f61973f51dd3cbf94a9c0c01e257c231b1a0` / 12,010 | +325, at most +10 production |
-| `app/slug_core_v2/src/runtime/tests/build_command_tests.rs` | `8f6eb8444539fd2a6b3efb5ff8233e5444e40ba8` / 4,056 | +250 |
-| `app/slug_core_v2/src/runtime/tests/cquery_command_tests.rs` | `749b1703c5ce6b8c8af909104f7b88495ebf5cb3` / 1,082 | +300 |
-| `app/slug_server_v2/src/tests.rs` | `fe3596b4b4953c1565f72b173bd921cc571a1060` / 2,948 | +120 |
+One analysis-owned lowerer converts returned evaluator graphs to
+`AnalysisValue` before the evaluator/module heap drops. It:
 
-Production additions are capped at 1,660 physical Rust lines, proof additions
-are capped at 2,240, and total additions at 3,900. No new non-plan
-file is allowed. The
-existing large `dice.rs` remains cohesive because the new key reuses its
-private configured-package, condition, platform, alias and rule-driver
-helpers; exporting those internals into a new module would widen the ownership
-surface and cause more churn.
+1. recognizes every admitted scalar and container, loading-owned user-provider
+   occurrence, builtin `ToolchainInfo`, analysis label/configured-target and
+   declared-artifact adapter, and existing depset occurrence/type/order/DAG;
+2. uses evaluator `ValueIdentity` only in phase scratch for a visiting set and
+   memo table, preserving acyclic DAG sharing and rejecting cycles;
+3. retains field names and dictionary iteration order, validates the frozen
+   dictionary-key and depset-leaf matrices above, and reports the first
+   unsupported value path; and
+4. publishes no raw `Value`, `FrozenValue`, heap, pointer identity, scratch
+   memo or evaluator lifetime.
 
-No file beyond this table and writable plans/ledgers may change. Core
-`runtime/dice.rs` production authority is confined to the existing terminal-
-association validator and may add no public API. All other core authority is
-confined to its `#[cfg(test)]` module. No Cargo/BUILD, CLI, server production or
-server file other than the exact R5 proof file, registration-expansion,
-Bzlmod/repository, fixture/asset, lockfile, oracle or generated-file change is
-authorized.
+The inverse adapter allocates evaluator-facing immutable views from retained
+handles. Provider/struct attribute access and list/tuple/dict iteration plus
+depset `to_list()` delegate to the same retained nodes; depsets themselves
+remain non-iterable. Its memo table rematerializes each retained depset
+occurrence once per evaluator heap, preserving shared-versus-distinct identity.
+A configured-target view carries its full identity and provider collection, so
+`target[Provider]`, membership and field access do not stringify or copy the
+occurrence. Repeated accesses may allocate evaluator wrappers but always
+`Dupe` the same retained handle.
 
-## Proof matrix
+Schemaful and schemaless provider constructors keep schema validation in
+`slug_loading_v2`, then produce one evaluator-generic occurrence shape. The
+configured string shortcut is deleted. `platform_common.ToolchainInfo`
+accepts zero or more named fields whose values belong to the admitted graph and
+uses the same generic occurrence path; positional arguments and values outside
+that graph remain rejected.
 
-Use the existing local generic fixtures and add only discriminating gaps:
+## Ownership, lifetime and revision behavior
 
-1. two mandatory types, optional present/absent and mandatory-absent versus
-   no-common-platform;
-2. requested aliases converging on one actual type, mandatory-OR, first-request
-   order and one row per requested alias;
-3. declaration type aliases and registered execution-platform alias chains,
-   including convergence rejection;
-4. target-setting selected/unselected branches, target constraints, execution
-   constraints and `use_target_platform_constraints`;
-5. declaration order, candidate order and greatest-distinct-type coverage with
-   stable ties;
-6. target-platform versus selected actual execution-platform identity and
-   platform-specific exec configuration;
-7. legacy/observed dependency rows, outer/Need/semantic precedence, cancellation,
-   A/B/A restoration and unchanged-parent Arc reuse;
-8. zero-requirement first-registered then host-fallback selection, registered/
-   host actual convergence, no toolchain-declaration/condition activation,
-   platform-only local-declaration context and exact single-mandatory marker
-   bridge isolation; and
-9. optional invocation loading acceptance while malformed/duplicate
-   requirements remain fail closed; and
-10. terminal-association separation: strict path-only rejects repository
-    sidecars, selected dependency supersets admit closure-owned repository
-    request/validation sidecars while retaining exact observed path Arcs, and
-    closure-repository mode retains exact path-epoch comparison.
+The existing configured-analysis DICE producer remains the sole semantic
+owner. `ConfiguredNodeResult` retains the Arc-backed `ProviderCollection`;
+dependency results are prepared before synchronous evaluator entry. No DICE
+key, global provider registry, process store, query cache or new lock is added.
 
-## Validation and stops
+Evaluator values, conversion stacks, pointer-identity and publication graph-
+comparison memo tables, and wrapper allocations are phase scratch and drop on
+success, error or cancellation. `AnalysisValue`, provider occurrences,
+configured-target values, depset occurrence handles and DAG nodes are DICE-
+retained semantic memory and release with their result Arcs.
+No retained node borrows command scratch or an evaluator heap. Existing DICE
+dependency recording and request isolation govern edits: a dependency provider
+change recomputes its consumers, and publication equality prevents a stale
+embedded provider payload from being cut off. No lock spans a DICE compute.
 
-Run focused loading/analysis proofs; full `slug_loading_v2` and
-`slug_analysis_v2` suites serially; configuration/query/Bzlmod and core direct
-dependents; the full `slug_server_v2` suite; rebuild `slug_cli_v2`; rustfmt;
-`git diff --check`; source/blob/
-line/cap and packet/canonical audits; and `scripts/v2_archive_status.sh`.
-Full core may reproduce only its two independently documented inherited
-failures—workspace-directory Lstat drift after lockfile publication and the
-stale external-query event replay expectation—with every selection-related
-regression closed.
-The full server suite may reproduce only the exact inherited external-package
-event replay described by R5; its other 50 tests must pass. Report the core and
-server manifestations separately from the three tracked-thoughts archive
-baseline. Completion requires independent Sol terminal review returning
-`ACCEPT`.
+## Compatibility classification
 
-STOP and `REPLAN` for provider/evaluator data in the resolution value;
-implementation analysis inside selection; raw source/MODULE/display-label
-inputs; a second condition/platform/registration/parser/configuration owner; a
-DICE cycle or lock across compute; narrowed multi-type/optional/alias behavior;
-platform alias first-wins; a selection error outranking outer/Need; lost
-observations; ruleset/`cc_common` specialization; Zabel authority; an
-unallowlisted file; cap breach; or any material implementation correction not
-already bounded above.
+- **Exact:** the admitted Bazel 9.2 value kinds' Starlark equality/hash shape,
+  the dictionary-key and strict depset-leaf matrices above, list/tuple/
+  dictionary/struct distinctions, dictionary iteration order, provider
+  identity plus field equality, depset element-type/order/occurrence behavior,
+  zero or more `ToolchainInfo` field names whose values belong to the admitted
+  graph, configured-target provider access, and rejection of duplicate returned
+  provider identities under the named source regressions.
+- **Slug-native:** Rust layout, Arc graph, complete structural configuration
+  bytes used for configured-target occurrence identity, artifact owner/output
+  identity, publication-equality API, memory accounting and unproved
+  diagnostic wording.
+- **Unsupported/deferred:** evaluator functions and sets as retained provider
+  values, mutable/cyclic graphs, unowned opaque/native values, exact Bazel
+  configuration/output bytes, broader typed builtin-provider internals, and
+  selected implementation/`ctx.toolchains` behavior reserved for category 6.
 
-R3 additionally stops on any production core edit beyond the bounded existing
-association validator, a test helper that changes ordinary command policy
-outside configured build/cquery fixtures, replacement
-of the verbatim builtin in production, suppression of candidate-platform
-topology/events merely to restore old expectations, or a third newly failing
-core baseline.
+BCR-delivered Starlark owns all rule definitions and control flow, including
+`cc_internal`. `cc_common` and future C++ builtins are generic host-ABI clients
+of this representation, not parsers or Rust rule engines. The Buck2-derived
+parser/evaluator remains the language substrate.
 
-R4 additionally stops on any server production edit; any helper applied to an
-ordinary loading/query/Bzlmod or wire-only fixture; a changed command policy;
-replacement of the verbatim builtin; a server failure with a cause other than
-the missing local `platforms` dependency, except only the exact R5 inherited
-`DEP_BUILD_EVENT`/zero-invalidation manifestation; more than +120 server proof
-lines; or any new production, semantic, compatibility or memory owner.
+## Evidence and implementation packet after ACCEPT
 
-R5 additionally stops on any assertion change beyond the exact two-to-four
-projection count/message correction; suppressing, ignoring or accepting the
-stale event bytes; a server result other than 50 passes plus that exact inherited
-event-replay assertion; or any widened baseline, production owner or
-compatibility claim.
+No new Bazel fixture is needed: the pinned source/tests above discriminate the
+representation contract, and category 6 owns the public selected-toolchain
+oracle. The implementation packet must add focused Rust regressions for:
+
+- every value kind, int/float/zero/NaN equality and hash, list-versus-tuple,
+  dictionary same-mapping/different-order Starlark equality plus publication
+  inequality, every admitted/rejected direct dictionary-key kind, recursive
+  tuple-key rejection, provider-with-frozen-list and provider-with-frozen-
+  dictionary key acceptance when the frozen container contains
+  `ToolchainInfo`, and direct plus tuple/struct/provider-nested `ToolchainInfo`
+  key rejection, sorted struct/provider fields, and shared Arc nodes;
+- depset shared occurrence equality/hash, distinct equal-shaped occurrence
+  inequality, same-order empty occurrence reuse, single-transitive occurrence
+  reuse, empty/direct/transitive element-type unification, heterogeneous and
+  incompatible-order rejection, the exact admitted/rejected leaf matrix
+  including direct and recursively exposed `ToolchainInfo` plus separately
+  proven frozen-list and frozen-dictionary barriers, unchanged DAG sharing
+  without flattening, and publication comparison of order/type/topology/
+  aliasing/deep leaf payload;
+- builtin/user provider identity, empty/admitted-field `ToolchainInfo`, nested
+  provider/struct/list/dict/depset values, field-order-independent equality,
+  duplicate-provider rejection and publication inequality for changed embedded
+  target providers;
+- analysis lowering/materialization across a direct dependency, including a
+  configured-target field and declared artifact, A/B/A provider edits, an
+  A/B/A same-mapping/different-dictionary-order dependency-provider transition,
+  depset occurrence reuse versus separation after rematerialization, no
+  evaluator heap retention, and deterministic errors for cycles and each
+  unsupported kind; and
+- unchanged `DefaultInfo`, executable and marker-era direct dependents until
+  category 6 deletes the marker bridge.
+
+The post-review implementation allowlist is frozen in principle but its exact
+blob/cap table is materialized only after this design commits:
+
+- `app/slug_build_api_v2/{Cargo.toml,src/lib.rs,src/analysis_value.rs,src/providers/mod.rs}`;
+- `app/slug_loading_v2/src/provider.rs`;
+- `app/slug_analysis_v2/src/{key.rs,starlark_rule.rs}`;
+- focused build-api and analysis provider tests, plus only mechanical direct
+  constructor assertions demonstrated by compilation.
+
+Expected caps are at most +1,800 net production lines and +1,000 proof lines;
+the implementation audit must reduce these after exact baselines. No touched
+production file currently exceeds 2,000 lines. The 35,115-line loading host
+test file and 6,988-line analysis integration test are proof-only; changes
+there are bounded to focused cases or mechanical API migration, with no new
+semantic owner. A new production file owns the recursive value abstraction so
+`providers/mod.rs` remains cohesive.
+
+Validation after implementation: formatting; `slug_build_api_v2` owner tests;
+full `slug_loading_v2` because both provider constructor families and the
+evaluator depset boundary change; full `slug_analysis_v2` including direct
+dependency/A-B-A proof; one direct `slug_core_v2` compile/test gate; rebuild
+`slug_cli_v2` before any binary smoke; `scripts/v2_archive_status.sh`; blob,
+allowlist, line-cap and `git diff --check` audits; then independent terminal
+review. Broad server validation belongs to category 6 unless category 5 changes
+an existing server-observable provider result.
+
+## Stops and residual risk
+
+Return `REPLAN` before Rust for a raw/frozen evaluator value, provider heap,
+global mutable interner/store, display/checksum/digest identity, missing deep
+publication equality, mapping-only dictionary publication equality, structural
+Starlark depset equality, missing depset type/alias preservation, conflated
+hashability/semantic-immutability/storage-immutability, per-builtin arbitrary
+field struct, flattened depset, unbounded copied field graph, parser/ruleset
+control flow, Zabel authority, or an implementation that cannot round-trip the
+admitted graph without semantic loss. A second material contract correction
+after implementation begins is also `REPLAN`.
+
+Residual performance risk is per-node Arc allocation and wrapper
+materialization. The opaque handle deliberately permits a later measured dense
+store without API churn. Zabel's measurements justify small compact fields and
+reject provider-specific shortcuts, but do not establish a Slug performance
+claim; no benchmark gate applies until a demonstrated Slug hot path exists.
+
+Immediate predecessor: category 4 was accepted in `568b0c698`, with 50 server
+passes plus the unchanged inherited event-replay failure and 291 core passes,
+one ignored test and the unchanged inherited external-query event failure.
