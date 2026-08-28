@@ -63,6 +63,7 @@ use starlark::values::dict::DictRef;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::build_setting::matches_expected_text;
 use crate::build_setting::resolve_candidate;
 use crate::build_setting::unpack_transition_value;
 use crate::key::ConfigurationKey;
@@ -193,6 +194,45 @@ pub struct ConfiguredNodeAnalysisKey {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
 pub struct ConfiguredNodeAnalysisObservationKey(ConfiguredNodeAnalysisKey);
 
+/// The sole configured `config_setting` match owner.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+pub struct ConfiguredConditionKey {
+    workspace: NormalizedAbsolutePath,
+    target: ConfiguredTargetKey,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative)]
+pub enum ConfiguredConditionMatch {
+    Match,
+    NoMatch,
+}
+
+pub type ConfiguredConditionOutcome = LoadingPreparationOutcome<
+    Result<Arc<Result<ConfiguredConditionMatch, AnalysisError>>, ObservedPathFrontierError>,
+>;
+
+impl ConfiguredConditionKey {
+    pub fn new(
+        workspace: NormalizedAbsolutePath,
+        target: ConfiguredTargetKey,
+    ) -> Result<Self, AnalysisError> {
+        if target.configuration().slug_configuration().is_none() {
+            return Err(AnalysisError::message(
+                "configured-condition matching requires a structural Slug configuration",
+            ));
+        }
+        Ok(Self { workspace, target })
+    }
+
+    pub fn workspace(&self) -> &NormalizedAbsolutePath {
+        &self.workspace
+    }
+
+    pub fn target(&self) -> &ConfiguredTargetKey {
+        &self.target
+    }
+}
+
 impl ConfiguredNodeAnalysisObservationKey {
     #[doc(hidden)]
     pub fn new(
@@ -257,6 +297,44 @@ impl ConfiguredNodeAnalysisKey {
 
     pub fn configured_target(&self) -> Option<&ConfiguredTargetKey> {
         self.node.configured_target()
+    }
+}
+
+#[async_trait]
+impl Key for ConfiguredConditionKey {
+    type Value = ConfiguredConditionOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match compute_configured_condition(ctx, self).await {
+            LoadingPreparationOutcome::Need(need) => LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                LoadingPreparationOutcome::Complete(Err(error))
+            }
+            LoadingPreparationOutcome::Complete(Ok(result)) => {
+                LoadingPreparationOutcome::Complete(Ok(Arc::new(result)))
+            }
+        }
+    }
+
+    fn equality(left: &Self::Value, right: &Self::Value) -> bool {
+        matches!(
+            (left, right),
+            (
+                LoadingPreparationOutcome::Complete(Ok(left)),
+                LoadingPreparationOutcome::Complete(Ok(right)),
+            ) if matches!((left.as_ref(), right.as_ref()), (Ok(left), Ok(right)) if left == right)
+        )
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        matches!(
+            value,
+            LoadingPreparationOutcome::Complete(Ok(result)) if result.as_ref().is_ok()
+        )
     }
 }
 
@@ -536,6 +614,141 @@ async fn build_setting_declaration(
     }
 }
 
+async fn compute_configured_condition(
+    ctx: &mut DiceComputations<'_>,
+    key: &ConfiguredConditionKey,
+) -> AnalysisSemanticOutcome<ConfiguredConditionMatch> {
+    let package_inventory = match compute_configured_package_input(
+        ctx,
+        ConfiguredAnalysisMode::Observed,
+        key.workspace.dupe(),
+        key.target.label().package().clone(),
+        "loading config_setting target package through DICE",
+    )
+    .await
+    {
+        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Complete(Err(error)) => {
+            return LoadingPreparationOutcome::Complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+            return analysis_semantic_complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
+    };
+    let package = match package_inventory.loaded() {
+        Ok(package) => package,
+        Err(error) => return analysis_semantic_complete(Err(package_inventory_error(error))),
+    };
+    let Some(target) = package
+        .targets
+        .iter()
+        .find(|target| target.name == key.target.label().target().as_str())
+    else {
+        return analysis_semantic_complete(Err(AnalysisError::target_not_found(
+            key.target.label().clone(),
+            package.build_file.clone(),
+        )));
+    };
+    let PackageTargetKind::ConfigSetting { declaration } = &target.kind else {
+        return analysis_semantic_complete(Err(AnalysisError::message(format!(
+            "target {} is not a config_setting",
+            key.target.label()
+        ))));
+    };
+    let declaration = declaration.clone();
+    if declaration.values().value().is_empty()
+        && declaration.define_values().value().is_empty()
+        && declaration.flag_values().value().is_empty()
+        && declaration.constraint_values().value().is_empty()
+    {
+        return analysis_semantic_complete(Err(AnalysisError::message(format!(
+            "config_setting {} must specify at least one non-empty predicate",
+            key.target.label()
+        ))));
+    }
+    if !declaration.constraint_values().value().is_empty() {
+        return analysis_semantic_complete(Err(AnalysisError::message(format!(
+            "config_setting {} uses constraint_values before the configured target-platform fact is available",
+            key.target.label()
+        ))));
+    }
+    let configuration = key
+        .target
+        .configuration()
+        .slug_configuration()
+        .expect("ConfiguredConditionKey validates structural configuration");
+    let (native_match, mut first_error) = match configuration.matches_config_setting(
+        declaration.values().value(),
+        declaration.define_values().value(),
+    ) {
+        Ok(matches) => (matches, None),
+        Err(error) => (
+            false,
+            Some(AnalysisError::message(format!(
+                "matching native predicates for {}: {error}",
+                key.target.label()
+            ))),
+        ),
+    };
+
+    let mut flag_match = true;
+    let mut all_need: Option<LoadingPreparationNeeds> = None;
+    let mut first_outer = None;
+    for (flag, expected) in declaration.flag_values().value().iter() {
+        match build_setting_declaration(ctx, ConfiguredAnalysisMode::Observed, &key.workspace, flag)
+            .await
+        {
+            LoadingPreparationOutcome::Need(need) => {
+                all_need = Some(match all_need {
+                    Some(current) => current.try_union(&need).unwrap_or_else(|error| {
+                        panic!("configured-condition Needs must agree: {error:?}")
+                    }),
+                    None => need,
+                });
+            }
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                if first_outer.is_none() {
+                    first_outer = Some(error);
+                }
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                if first_error.is_none() {
+                    first_error = Some(error);
+                }
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(flag_declaration))) => {
+                match matches_expected_text(
+                    flag,
+                    &flag_declaration,
+                    key.target.configuration().starlark_option(flag),
+                    expected,
+                ) {
+                    Ok(matches) => flag_match &= matches,
+                    Err(error) if first_error.is_none() => {
+                        first_error = Some(AnalysisError::message(error));
+                    }
+                    Err(_) => {}
+                }
+            }
+        }
+    }
+    if let Some(error) = first_outer {
+        return LoadingPreparationOutcome::Complete(Err(error));
+    }
+    if let Some(need) = all_need {
+        return LoadingPreparationOutcome::Need(need);
+    }
+    if let Some(error) = first_error {
+        return analysis_semantic_complete(Err(error));
+    }
+    analysis_semantic_complete(Ok(if native_match && flag_match {
+        ConfiguredConditionMatch::Match
+    } else {
+        ConfiguredConditionMatch::NoMatch
+    }))
+}
+
 impl fmt::Display for ConfiguredNodeAnalysisKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "configured-node-analysis:{}", self.node)
@@ -545,6 +758,12 @@ impl fmt::Display for ConfiguredNodeAnalysisKey {
 impl fmt::Display for ConfiguredNodeAnalysisObservationKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "observed-{}", self.0)
+    }
+}
+
+impl fmt::Display for ConfiguredConditionKey {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "configured-condition:{}", self.target)
     }
 }
 

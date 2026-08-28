@@ -180,6 +180,122 @@ pub(crate) fn effective_value(
     Ok(configured.value().clone())
 }
 
+pub(crate) fn matches_expected_text(
+    label: &CanonicalLabel,
+    declaration: &BuildSettingDeclaration,
+    configured: Option<&StarlarkOption>,
+    expected: &str,
+) -> Result<bool, String> {
+    let actual = effective_value(label, declaration, configured)?;
+    match (declaration.definition(), actual) {
+        (BuildSettingDefinition::Integer { .. }, StarlarkOptionValue::Integer(actual)) => {
+            Ok(actual
+                == parse_starlark_integer(expected).ok_or_else(|| {
+                    format!("'{expected}' cannot be converted to integer build setting {label}")
+                })?)
+        }
+        (BuildSettingDefinition::Boolean { .. }, StarlarkOptionValue::Boolean(actual)) => {
+            Ok(actual
+                == parse_boolean(expected).ok_or_else(|| {
+                    format!("'{expected}' cannot be converted to Boolean build setting {label}")
+                })?)
+        }
+        (
+            BuildSettingDefinition::String {
+                allow_multiple: false,
+                ..
+            },
+            StarlarkOptionValue::String(actual),
+        ) => Ok(actual == expected),
+        (
+            BuildSettingDefinition::String {
+                allow_multiple: true,
+                ..
+            },
+            StarlarkOptionValue::StringList(actual),
+        ) => Ok(actual.iter().any(|actual| actual == expected)),
+        (BuildSettingDefinition::StringList { .. }, StarlarkOptionValue::StringList(actual)) => {
+            let expected = single_collection_member(label, expected, false)?;
+            Ok(actual.contains(&expected))
+        }
+        (BuildSettingDefinition::StringSet { .. }, StarlarkOptionValue::StringSet(actual)) => {
+            let expected = single_collection_member(label, expected, true)?;
+            Ok(actual.contains(&expected))
+        }
+        _ => unreachable!("effective_value validates declaration kind"),
+    }
+}
+
+fn parse_starlark_integer(input: &str) -> Option<BigInt> {
+    if input.is_empty() {
+        return None;
+    }
+    let (negative, unsigned) = match input.as_bytes().first() {
+        Some(b'+') => (false, &input[1..]),
+        Some(b'-') => (true, &input[1..]),
+        _ => (false, input),
+    };
+    if unsigned.is_empty() {
+        return None;
+    }
+    let (radix, digits) = if let Some(digits) = unsigned
+        .strip_prefix("0b")
+        .or_else(|| unsigned.strip_prefix("0B"))
+    {
+        (2, digits)
+    } else if let Some(digits) = unsigned
+        .strip_prefix("0o")
+        .or_else(|| unsigned.strip_prefix("0O"))
+    {
+        (8, digits)
+    } else if let Some(digits) = unsigned
+        .strip_prefix("0x")
+        .or_else(|| unsigned.strip_prefix("0X"))
+    {
+        (16, digits)
+    } else {
+        if unsigned.len() > 1 && unsigned.starts_with('0') {
+            return None;
+        }
+        (10, unsigned)
+    };
+    if digits.is_empty() || matches!(digits.as_bytes().first(), Some(b'+' | b'-')) {
+        return None;
+    }
+    let value = BigInt::parse_bytes(digits.as_bytes(), radix)?;
+    Some(if negative { -value } else { value })
+}
+
+fn parse_boolean(input: &str) -> Option<bool> {
+    match input.to_ascii_lowercase().as_str() {
+        "true" | "1" | "yes" | "t" | "y" => Some(true),
+        "false" | "0" | "no" | "f" | "n" => Some(false),
+        _ => None,
+    }
+}
+
+fn single_collection_member(
+    label: &CanonicalLabel,
+    input: &str,
+    unique: bool,
+) -> Result<CompactString, String> {
+    let mut values = if input.is_empty() {
+        Vec::new()
+    } else {
+        input.split(',').map(CompactString::new).collect::<Vec<_>>()
+    };
+    if unique {
+        values.sort_unstable();
+        values.dedup();
+    }
+    let [value] = values.as_slice() else {
+        return Err(format!(
+            "'{input}' is not a single exact value for build setting {label}"
+        ));
+    };
+    Ok(value.clone())
+}
+
 fn unpack_string_values<'v>(
     value: Value<'v>,
     heap: Heap<'v>,

@@ -1090,6 +1090,9 @@ mod retry7_private_kernel_contract {
     use super::super::convert::convert_duration;
     use super::super::convert::convert_occurrence;
     use super::super::defaults::materialize_default;
+    use super::super::matching::NativeConfigSettingMatchError;
+    use super::super::matching::matches;
+    use super::super::matching::native_occurrence_matches;
     use super::super::value::Duration;
     use super::super::value::NativeOccurrence;
     use super::super::value::NativePairs;
@@ -1126,6 +1129,149 @@ mod retry7_private_kernel_contract {
     ) -> Result<String, ConvertError> {
         let value = occurrence_value(convert_occurrence(option, input)?);
         Ok(field(option, value.as_ref()))
+    }
+
+    #[test]
+    fn native_config_setting_matching_is_typed_borrowed_and_conjunctive() {
+        use super::super::configuration::SlugConfiguration;
+        use super::super::host::AutoCpuToken;
+        use super::super::host::HostConversionInputs;
+        use super::super::host::HostPathFlavor;
+
+        let configuration = SlugConfiguration::default_target(
+            &HostConversionInputs::new(
+                Some(AutoCpuToken::K8),
+                Some(HostPathFlavor::Unix),
+                None,
+                Arc::from([]),
+                Arc::from([]),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let bytes = configuration.canonical_bytes().as_ptr();
+        assert!(
+            configuration
+                .matches_config_setting(
+                    &[
+                        ("compilation_mode".into(), "fastbuild".into()),
+                        ("stamp".into(), "false".into()),
+                    ],
+                    &[],
+                )
+                .unwrap()
+        );
+        assert!(
+            !configuration
+                .matches_config_setting(&[("compilation_mode".into(), "opt".into())], &[])
+                .unwrap()
+        );
+        assert!(
+            !configuration
+                .matches_config_setting(&[], &[("name".into(), "value".into())])
+                .unwrap()
+        );
+        assert_eq!(configuration.canonical_bytes().as_ptr(), bytes);
+        assert_eq!(
+            configuration
+                .matches_config_setting(&[("platform_mappings".into(), "mapping".into())], &[],),
+            Err(NativeConfigSettingMatchError::NonConfigurableOption(
+                "platform_mappings".into()
+            ))
+        );
+        assert_eq!(
+            configuration.matches_config_setting(&[("unknown".into(), "value".into())], &[]),
+            Err(NativeConfigSettingMatchError::UnknownOption(
+                "unknown".into()
+            ))
+        );
+        for descriptor in NATIVE_OPTION_DESCRIPTORS
+            .iter()
+            .filter(|descriptor| descriptor.canonical_name.contains(' '))
+        {
+            assert_eq!(
+                configuration.matches_config_setting(
+                    &[(descriptor.canonical_name.into(), "anything".into())],
+                    &[],
+                ),
+                Err(NativeConfigSettingMatchError::UnknownOption(
+                    descriptor.canonical_name.into()
+                )),
+                "INTERNAL option became selectable: {}",
+                descriptor.canonical_name
+            );
+        }
+        assert_eq!(
+            configuration
+                .matches_config_setting(&[("compilation_mode".into(), "not-a-mode".into())], &[],),
+            Err(NativeConfigSettingMatchError::InvalidValue(
+                "compilation_mode".into()
+            ))
+        );
+
+        let disabled_descriptor = option(
+            "com.google.devtools.build.lib.analysis.config.CoreOptions",
+            "incompatible_disable_select_on",
+        );
+        let mut options = configuration.option_records().to_vec();
+        let disabled = options
+            .iter_mut()
+            .find(|record| record.canonical_name == disabled_descriptor.canonical_name)
+            .unwrap();
+        disabled.value = super::super::configuration::OptionValue::Native(
+            convert_occurrence(disabled_descriptor, "stamp").unwrap(),
+        );
+        assert_eq!(
+            matches(&options, &[("stamp".into(), "false".into())], &[]),
+            Err(NativeConfigSettingMatchError::NonConfigurableOption(
+                "stamp".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn repeatable_native_list_and_map_matching_follows_bazel_rules() {
+        let actual = NativeOccurrence::List(NativeValues(Arc::from([
+            NativeValue::Text("a".into()),
+            NativeValue::Text("b".into()),
+            NativeValue::Text("c".into()),
+        ])));
+        let expected = NativeOccurrence::List(NativeValues(Arc::from([
+            NativeValue::Text("b".into()),
+            NativeValue::Text("c".into()),
+        ])));
+        assert!(native_occurrence_matches(&actual, &expected, true));
+        assert!(!native_occurrence_matches(
+            &actual,
+            &NativeOccurrence::Scalar(NativeValue::Text("d".into())),
+            true,
+        ));
+        assert!(native_occurrence_matches(
+            &NativeOccurrence::Absent,
+            &NativeOccurrence::List(NativeValues(Arc::from([]))),
+            true,
+        ));
+
+        let actual = NativeOccurrence::List(NativeValues(Arc::from([
+            NativeValue::Entry("key".into(), "old".into()),
+            NativeValue::Entry("other".into(), "kept".into()),
+            NativeValue::Entry("key".into(), "new".into()),
+        ])));
+        assert!(native_occurrence_matches(
+            &actual,
+            &NativeOccurrence::Scalar(NativeValue::Entry("key".into(), "new".into())),
+            true,
+        ));
+        assert!(!native_occurrence_matches(
+            &actual,
+            &NativeOccurrence::Scalar(NativeValue::Entry("key".into(), "old".into())),
+            true,
+        ));
+        assert!(!native_occurrence_matches(
+            &actual,
+            &NativeOccurrence::Scalar(NativeValue::Entry("missing".into(), "new".into())),
+            true,
+        ));
     }
 
     #[test]
@@ -1869,6 +2015,7 @@ mod retry7_private_kernel_contract {
             include_str!("defaults.rs"),
             include_str!("convert.rs"),
             include_str!("cache_grammar.rs"),
+            include_str!("matching.rs"),
         ]
         .join("\n");
         for forbidden in [
@@ -1930,6 +2077,7 @@ mod retry7_private_kernel_contract {
                 "pub use configuration::StarlarkOptionScope;",
                 "pub use configuration::StarlarkOptionValue;",
                 "pub use configuration::StarlarkOptions;",
+                "pub use matching::NativeConfigSettingMatchError;",
                 "pub use registry::NATIVE_OPTION_DESCRIPTORS;",
                 "pub use registry::NativeOptionDescriptor;",
             ]

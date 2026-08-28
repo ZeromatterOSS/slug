@@ -4,6 +4,7 @@ mod convert;
 mod defaults;
 pub mod host;
 mod label_convert;
+mod matching;
 mod registry;
 mod value;
 
@@ -20,5 +21,6 @@ pub use configuration::StarlarkOption;
 pub use configuration::StarlarkOptionScope;
 pub use configuration::StarlarkOptionValue;
 pub use configuration::StarlarkOptions;
+pub use matching::NativeConfigSettingMatchError;
 pub use registry::NATIVE_OPTION_DESCRIPTORS;
 pub use registry::NativeOptionDescriptor;

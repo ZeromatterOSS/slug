@@ -35,6 +35,8 @@ use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::AnalysisPreparationOutcome;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredActionExecutionState as ActionExecutionState;
+use slug_analysis_v2::ConfiguredConditionKey;
+use slug_analysis_v2::ConfiguredConditionMatch;
 use slug_analysis_v2::ConfiguredEdgeKind;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredNodeAnalysisObservationKey;
@@ -76,6 +78,7 @@ use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_loading_v2::HostPackageInventoryKey;
+use slug_loading_v2::HostPackageInventoryObservationKey;
 use slug_loading_v2::ModuleRegistrationExpansionKey;
 use slug_loading_v2::ModuleRegistrationExpansionObservationError;
 use slug_loading_v2::ModuleRegistrationExpansionObservationKey;
@@ -675,6 +678,60 @@ async fn prepared_analysis_key(
     }
 }
 
+async fn configured_condition_request(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    configuration: ConfigurationKey,
+) -> Result<ConfiguredConditionMatch, String> {
+    configured_condition_request_with_inputs(
+        dice,
+        workspace,
+        target,
+        configuration,
+        root_epoch(workspace),
+        &[],
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn configured_condition_request_with_inputs(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    configuration: ConfigurationKey,
+    epoch: PathObservationEpoch,
+    repositories: &[(&str, &str)],
+    tracker: Arc<RootActivationTracker>,
+) -> Result<ConfiguredConditionMatch, String> {
+    let mut updater = dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(tracker),
+        ..Default::default()
+    });
+    inject_root_target_inputs(&mut updater, workspace, epoch, repositories);
+    let key = ConfiguredConditionKey::new(
+        NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
+        ConfiguredTargetKey::new(CanonicalLabel::parse(target).unwrap(), configuration),
+    )
+    .map_err(|error| error.to_string())?;
+    let mut transaction = updater.commit().await;
+    match transaction
+        .compute(&key)
+        .await
+        .map_err(|error| error.to_string())?
+    {
+        AnalysisPreparationOutcome::Need(need) => {
+            Err(format!("configured condition returned Needs: {need:?}"))
+        }
+        AnalysisPreparationOutcome::Complete(Err(error)) => Err(error.to_string()),
+        AnalysisPreparationOutcome::Complete(Ok(result)) => {
+            result.as_ref().clone().map_err(|error| error.to_string())
+        }
+    }
+}
+
 fn activation_codes(activations: &[(String, ActivationKind)]) -> Vec<String> {
     let mut codes = activations
         .iter()
@@ -706,6 +763,19 @@ impl ActivationTracker for RootActivationTracker {
     }
 
     fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+        if let Some(key) = key.downcast_ref::<ConfiguredConditionKey>() {
+            let identity = format!("condition/{}", key.target());
+            self.activations
+                .lock()
+                .unwrap()
+                .push((identity.clone(), activation.kind()));
+            self.nodes.lock().unwrap().push((
+                identity,
+                activation.node(),
+                activation.dependencies().to_vec(),
+            ));
+            return;
+        }
         let analysis = key
             .downcast_ref::<ConfiguredNodeAnalysisKey>()
             .and_then(|key| key.configured_target().map(|target| (target, false)))
@@ -735,6 +805,8 @@ impl ActivationTracker for RootActivationTracker {
             }
         } else if self.all_loading {
             let identity = if let Some(key) = key.downcast_ref::<HostPackageInventoryKey>() {
+                Some(format!("package/{key}"))
+            } else if let Some(key) = key.downcast_ref::<HostPackageInventoryObservationKey>() {
                 Some(format!("package/{key}"))
             } else if let Some(key) = key.downcast_ref::<ModuleRegistrationExpansionKey>() {
                 Some(format!("registration/legacy/{}", key.family()))
@@ -2750,6 +2822,472 @@ string_set(name = "set", build_setting_default = set(["b", "a"]))
     .await
     .unwrap_err();
     assert!(error.contains("expects Boolean, not string"), "{error}");
+}
+
+#[tokio::test]
+async fn direct_config_settings_match_native_define_and_every_typed_flag_shape() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _empty(ctx): return []
+integer = rule(implementation = _empty, build_setting = config.int(flag = True))
+boolean = rule(implementation = _empty, build_setting = config.bool(flag = True))
+string = rule(implementation = _empty, build_setting = config.string(flag = True))
+multi = rule(implementation = _empty, build_setting = config.string(flag = True, allow_multiple = True))
+string_list = rule(implementation = _empty, build_setting = config.string_list(flag = True))
+string_set = rule(implementation = _empty, build_setting = config.string_set(flag = True))
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "boolean", "integer", "multi", "string", "string_list", "string_set")
+integer(name = "integer", build_setting_default = 16)
+boolean(name = "boolean", build_setting_default = False)
+string(name = "string", build_setting_default = "text")
+multi(name = "multi", build_setting_default = "one")
+string_list(name = "list", build_setting_default = ["a", "b", "a"])
+string_set(name = "set", build_setting_default = set(["a", "b"]))
+filegroup(name = "ordinary")
+
+config_setting(name = "native_match", values = {"compilation_mode": "fastbuild", "stamp": "false"})
+config_setting(name = "native_no_match", values = {"compilation_mode": "opt"})
+config_setting(name = "define_no_match", define_values = {"name": "value"})
+config_setting(name = "combined", values = {"compilation_mode": "fastbuild"}, flag_values = {":integer": "0x10", ":boolean": "no"})
+config_setting(name = "int_big", flag_values = {":integer": "0x10000000000000000"})
+config_setting(name = "int_invalid", flag_values = {":integer": "010"})
+config_setting(name = "bool_invalid", flag_values = {":boolean": "maybe"})
+config_setting(name = "string_match", flag_values = {":string": "text"})
+config_setting(name = "multi_match", flag_values = {":multi": "one"})
+config_setting(name = "list_match", flag_values = {":list": "b"})
+config_setting(name = "list_invalid", flag_values = {":list": "a,b"})
+config_setting(name = "set_match", flag_values = {":set": "a,a"})
+config_setting(name = "set_invalid", flag_values = {":set": ""})
+config_setting(name = "wrong_flag", flag_values = {":ordinary": "x"})
+config_setting(name = "empty")
+constraint_setting(name = "constraint")
+constraint_value(name = "value", constraint_setting = ":constraint")
+config_setting(name = "constraint_match", constraint_values = [":value"])
+
+config_setting(name = "bf_false", flag_values = {":boolean": "false"})
+config_setting(name = "bf_zero", flag_values = {":boolean": "0"})
+config_setting(name = "bf_no", flag_values = {":boolean": "no"})
+config_setting(name = "bf_f", flag_values = {":boolean": "f"})
+config_setting(name = "bf_n", flag_values = {":boolean": "n"})
+config_setting(name = "bf_null", flag_values = {":boolean": "null"})
+config_setting(name = "bt_true", flag_values = {":boolean": "true"})
+config_setting(name = "bt_one", flag_values = {":boolean": "1"})
+config_setting(name = "bt_yes", flag_values = {":boolean": "yes"})
+config_setting(name = "bt_t", flag_values = {":boolean": "t"})
+config_setting(name = "bt_y", flag_values = {":boolean": "y"})
+"#,
+    )
+    .unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for target in [
+        "native_match",
+        "combined",
+        "string_match",
+        "multi_match",
+        "list_match",
+        "set_match",
+        "bf_false",
+        "bf_zero",
+        "bf_no",
+        "bf_f",
+        "bf_n",
+    ] {
+        assert_eq!(
+            configured_condition_request(
+                &dice,
+                &workspace,
+                &format!("@@//:{target}"),
+                test_configuration(),
+            )
+            .await
+            .unwrap_or_else(|error| panic!("{target}: {error}")),
+            ConfiguredConditionMatch::Match,
+            "{target}"
+        );
+    }
+    for target in ["native_no_match", "define_no_match"] {
+        assert_eq!(
+            configured_condition_request(
+                &dice,
+                &workspace,
+                &format!("@@//:{target}"),
+                test_configuration(),
+            )
+            .await
+            .unwrap(),
+            ConfiguredConditionMatch::NoMatch,
+            "{target}"
+        );
+    }
+
+    let integer = CanonicalLabel::parse("@@//:integer").unwrap();
+    let big = test_configuration().with_starlark_option(StarlarkOption::new(
+        integer,
+        StarlarkOptionValue::Integer(BigInt::parse_bytes(b"18446744073709551616", 10).unwrap()),
+        StarlarkOptionScope::Default,
+    ));
+    assert_eq!(
+        configured_condition_request(&dice, &workspace, "@@//:int_big", big)
+            .await
+            .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
+    let boolean = CanonicalLabel::parse("@@//:boolean").unwrap();
+    let true_configuration = test_configuration().with_starlark_option(StarlarkOption::new(
+        boolean,
+        StarlarkOptionValue::Boolean(true),
+        StarlarkOptionScope::Default,
+    ));
+    for target in ["bt_true", "bt_one", "bt_yes", "bt_t", "bt_y"] {
+        assert_eq!(
+            configured_condition_request(
+                &dice,
+                &workspace,
+                &format!("@@//:{target}"),
+                true_configuration.clone(),
+            )
+            .await
+            .unwrap(),
+            ConfiguredConditionMatch::Match,
+            "{target}"
+        );
+    }
+
+    for (target, expected) in [
+        ("int_invalid", "cannot be converted to integer"),
+        ("bool_invalid", "cannot be converted to Boolean"),
+        ("bf_null", "cannot be converted to Boolean"),
+        ("list_invalid", "single exact value"),
+        ("set_invalid", "single exact value"),
+        ("wrong_flag", "not a Starlark build setting"),
+        ("empty", "at least one non-empty predicate"),
+        ("constraint_match", "configured target-platform fact"),
+    ] {
+        let error = configured_condition_request(
+            &dice,
+            &workspace,
+            &format!("@@//:{target}"),
+            test_configuration(),
+        )
+        .await
+        .unwrap_err();
+        assert!(error.contains(expected), "{target}: {error}");
+    }
+
+    let integer = CanonicalLabel::parse("@@//:integer").unwrap();
+    let wrong_kind = test_configuration().with_starlark_option(StarlarkOption::string(
+        integer.clone(),
+        "16",
+        StarlarkOptionScope::Default,
+    ));
+    let error = configured_condition_request(&dice, &workspace, "@@//:combined", wrong_kind)
+        .await
+        .unwrap_err();
+    assert!(error.contains("expects integer, not string"), "{error}");
+    let wrong_scope = test_configuration().with_starlark_option(StarlarkOption::new(
+        integer,
+        StarlarkOptionValue::Integer(BigInt::from(16)),
+        StarlarkOptionScope::Target,
+    ));
+    let error = configured_condition_request(&dice, &workspace, "@@//:combined", wrong_scope)
+        .await
+        .unwrap_err();
+    assert!(
+        error.contains("scope instead of declaration scope"),
+        "{error}"
+    );
+}
+
+#[tokio::test]
+async fn canonical_external_condition_and_flag_packages_invalidate_and_restore() {
+    let workspace = scratch();
+    fs::create_dir_all(workspace.join("dep/flags")).unwrap();
+    fs::create_dir_all(workspace.join("dep/conditions")).unwrap();
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"bazel_tools\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "filegroup(name = \"root\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("dep/MODULE.bazel"),
+        "module(name = \"dep\", version = \"1.0.0\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.join("dep/REPO.bazel"), "").unwrap();
+    fs::write(workspace.join("dep/.bazelignore"), "").unwrap();
+    fs::write(
+        workspace.join("dep/flags/defs.bzl"),
+        "def _empty(ctx): return []\nsetting = rule(implementation = _empty, build_setting = config.string(flag = True))\n",
+    )
+    .unwrap();
+    let flag_source = "load(\":defs.bzl\", \"setting\")\nsetting(name = \"mode\", build_setting_default = \"external-default\")\n";
+    fs::write(workspace.join("dep/flags/BUILD.bazel"), flag_source).unwrap();
+    let condition_source = "config_setting(name = \"match\", flag_values = {\"//flags:mode\": \"external-default\"})\n";
+    fs::write(
+        workspace.join("dep/conditions/BUILD.bazel"),
+        condition_source,
+    )
+    .unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let repositories = [("dep+", "dep")];
+    let tracker = Arc::new(RootActivationTracker::with_loading());
+    let request = |configuration, tracker| {
+        configured_condition_request_with_inputs(
+            &dice,
+            &workspace,
+            "@@dep+//conditions:match",
+            configuration,
+            root_epoch(&workspace),
+            &repositories,
+            tracker,
+        )
+    };
+    assert_eq!(
+        request(test_configuration(), tracker.clone())
+            .await
+            .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
+    let flag = CanonicalLabel::parse("@@dep+//flags:mode").unwrap();
+    let changed = test_configuration().with_starlark_option(StarlarkOption::string(
+        flag,
+        "changed",
+        StarlarkOptionScope::Default,
+    ));
+    assert_eq!(
+        request(changed, Arc::new(RootActivationTracker::default()))
+            .await
+            .unwrap(),
+        ConfiguredConditionMatch::NoMatch
+    );
+    assert_eq!(
+        request(
+            test_configuration(),
+            Arc::new(RootActivationTracker::default())
+        )
+        .await
+        .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
+
+    fs::write(
+        workspace.join("dep/conditions/BUILD.bazel"),
+        condition_source.replace("external-default", "other"),
+    )
+    .unwrap();
+    assert_eq!(
+        request(
+            test_configuration(),
+            Arc::new(RootActivationTracker::default())
+        )
+        .await
+        .unwrap(),
+        ConfiguredConditionMatch::NoMatch
+    );
+    fs::write(
+        workspace.join("dep/conditions/BUILD.bazel"),
+        condition_source,
+    )
+    .unwrap();
+    assert_eq!(
+        request(
+            test_configuration(),
+            Arc::new(RootActivationTracker::default())
+        )
+        .await
+        .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
+
+    fs::write(
+        workspace.join("dep/flags/BUILD.bazel"),
+        flag_source.replace("external-default", "other"),
+    )
+    .unwrap();
+    assert_eq!(
+        request(
+            test_configuration(),
+            Arc::new(RootActivationTracker::default())
+        )
+        .await
+        .unwrap(),
+        ConfiguredConditionMatch::NoMatch
+    );
+    fs::write(workspace.join("dep/flags/BUILD.bazel"), flag_source).unwrap();
+    let restored_tracker = Arc::new(RootActivationTracker::default());
+    assert_eq!(
+        request(test_configuration(), restored_tracker.clone())
+            .await
+            .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
+
+    let (activations, _, nodes) = tracker.take();
+    for package in ["@@dep+//conditions", "@@dep+//flags"] {
+        assert_eq!(
+            activations
+                .iter()
+                .filter(|(identity, _)| {
+                    identity.starts_with("package/") && identity.contains(package)
+                })
+                .count(),
+            1,
+            "canonical package must activate once: {package}: {activations:#?}"
+        );
+    }
+    assert_eq!(
+        activations
+            .iter()
+            .filter(|(identity, _)| identity.starts_with("condition/"))
+            .count(),
+        1
+    );
+    let condition_nodes = nodes
+        .iter()
+        .filter(|(identity, _, _)| identity.starts_with("condition/"))
+        .collect::<Vec<_>>();
+    assert_eq!(condition_nodes.len(), 1);
+    assert!(
+        !condition_nodes[0].2.is_empty(),
+        "configured-condition node must retain its observed package frontier"
+    );
+    let restored_condition_nodes = restored_tracker
+        .take()
+        .2
+        .into_iter()
+        .filter(|(identity, _, _)| identity.starts_with("condition/"))
+        .collect::<Vec<_>>();
+    assert_eq!(restored_condition_nodes.len(), 1);
+    assert_eq!(
+        condition_nodes[0].1, restored_condition_nodes[0].1,
+        "A/B/A restoration must return to the same configured-condition DICE identity"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn configured_condition_need_error_and_cancellation_recover_without_partial_result() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        "def _empty(ctx): return []\nsetting = rule(implementation = _empty, build_setting = config.string(flag = True))\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"config_setting(name = "match", flag_values = {"//settings:mode": "ready"})
+config_setting(name = "precedence", values = {"not_a_native_option": "x"}, flag_values = {"//settings:mode": "ready"})
+"#,
+    )
+    .unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let missing =
+        configured_condition_request(&dice, &workspace, "@@//:precedence", test_configuration())
+            .await
+            .unwrap_err();
+    assert!(missing.contains("Needs"), "{missing}");
+
+    fs::create_dir(workspace.join("settings")).unwrap();
+    fs::write(
+        workspace.join("settings/BUILD.bazel"),
+        "load(\"//:defs.bzl\", \"setting\")\nsetting(name = \"mode\", build_setting_default = \"ready\")\n",
+    )
+    .unwrap();
+    let semantic =
+        configured_condition_request(&dice, &workspace, "@@//:precedence", test_configuration())
+            .await
+            .unwrap_err();
+    assert!(semantic.contains("not_a_native_option"), "{semantic}");
+    assert_eq!(
+        configured_condition_request(&dice, &workspace, "@@//:match", test_configuration())
+            .await
+            .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
+
+    let cancel_dice = Dice::builder().build(DetectCycles::Enabled);
+    let (reached_sender, reached_receiver) = std::sync::mpsc::sync_channel(0);
+    let (release_sender, release_receiver) = std::sync::mpsc::sync_channel(0);
+    let cancel_tracker = Arc::new(RootActivationTracker::with_loading_gate(
+        "settings",
+        reached_sender,
+        release_receiver,
+    ));
+    let mut updater = cancel_dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(cancel_tracker.clone()),
+        ..Default::default()
+    });
+    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
+    let key = ConfiguredConditionKey::new(
+        NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:match").unwrap(),
+            test_configuration(),
+        ),
+    )
+    .unwrap();
+    let mut cancelled = updater.commit().await;
+    cancel_tracker.take();
+    let computation = tokio::spawn(async move { cancelled.compute(&key).await });
+    tokio::task::spawn_blocking(move || reached_receiver.recv().unwrap())
+        .await
+        .unwrap();
+    let (cancelled_activations, _, _) = cancel_tracker.take();
+    assert!(
+        cancelled_activations.iter().any(|(identity, _)| {
+            identity.starts_with("package/") && identity.contains("//settings")
+        }),
+        "build-setting package dependency was not reached: {cancelled_activations:#?}"
+    );
+    assert!(
+        cancelled_activations
+            .iter()
+            .all(|(identity, _)| !identity.starts_with("condition/")),
+        "configured-condition result published before cancellation: {cancelled_activations:#?}"
+    );
+    computation.abort();
+    release_sender.send(()).unwrap();
+    assert!(computation.await.unwrap_err().is_cancelled());
+
+    let recovery_tracker = Arc::new(RootActivationTracker::default());
+    assert_eq!(
+        configured_condition_request_with_inputs(
+            &cancel_dice,
+            &workspace,
+            "@@//:match",
+            test_configuration(),
+            root_epoch(&workspace),
+            &[],
+            recovery_tracker.clone(),
+        )
+        .await
+        .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
+    assert_eq!(
+        recovery_tracker
+            .take()
+            .0
+            .iter()
+            .filter(|(identity, _)| identity.starts_with("condition/"))
+            .count(),
+        1,
+        "recovery must publish exactly one configured-condition result"
+    );
 }
 
 #[tokio::test]

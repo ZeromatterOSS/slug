@@ -358,18 +358,18 @@ impl fmt::Display for SlugConfigurationError {
 impl std::error::Error for SlugConfigurationError {}
 
 #[derive(Clone, Debug, Eq, PartialEq, Allocative)]
-enum OptionValue {
+pub(super) enum OptionValue {
     Native(NativeOccurrence),
     Label(Option<LabelValue>),
     Mixed(Option<MixedValue>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Allocative)]
-struct OptionRecord {
-    ordinal: u32,
-    class_name: &'static str,
-    canonical_name: &'static str,
-    value: OptionValue,
+pub(super) struct OptionRecord {
+    pub(super) ordinal: u32,
+    pub(super) class_name: &'static str,
+    pub(super) canonical_name: &'static str,
+    pub(super) value: OptionValue,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Allocative)]
@@ -491,6 +491,21 @@ impl SlugConfiguration {
 
     pub fn option_count(&self) -> usize {
         self.0.options.len()
+    }
+
+    #[cfg(test)]
+    pub(super) fn option_records(&self) -> &[OptionRecord] {
+        &self.0.options
+    }
+
+    /// Match Bazel `config_setting(values=..., define_values=...)` predicates
+    /// against the already-retained typed native configuration.
+    pub fn matches_config_setting(
+        &self,
+        values: &[(CompactString, CompactString)],
+        define_values: &[(CompactString, CompactString)],
+    ) -> Result<bool, super::matching::NativeConfigSettingMatchError> {
+        super::matching::matches(&self.0.options, values, define_values)
     }
 }
 

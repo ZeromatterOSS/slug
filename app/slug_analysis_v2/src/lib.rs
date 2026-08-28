@@ -20,6 +20,9 @@ pub use configured_target::ConfiguredEdge;
 pub use configured_target::ConfiguredEdgeKind;
 pub use dice::AnalysisError;
 pub use dice::AnalysisErrorKind;
+pub use dice::ConfiguredConditionKey;
+pub use dice::ConfiguredConditionMatch;
+pub use dice::ConfiguredConditionOutcome;
 pub use dice::ConfiguredNodeAnalysisKey;
 #[doc(hidden)]
 pub use dice::ConfiguredNodeAnalysisObservationKey;
