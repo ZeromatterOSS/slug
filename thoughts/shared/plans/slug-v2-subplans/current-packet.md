@@ -312,6 +312,8 @@ R7 uses these `c2ec8481e` mapping-owner baselines:
 | Path | Baseline blob / lines | Maximum physical growth |
 |---|---:|---:|
 | `app/slug_bzlmod_v2/src/selected_repo_spec.rs` | `286d9e1042f76fef1ca6f50c8c6df92c516f4352` / 14,538 | +850 |
+| `app/slug_bzlmod_v2/src/selected_repo_spec/selected_extension_demand.rs` | `ece6a03a72a120dc531fcf1d2ce5df1f02d4c7b0` / 1,195 | +4; initialize the retained projection in test-only constructors |
+| `app/slug_bzlmod_v2/src/host_external_package_boundary/tests.rs` | `4db50c6d185b3238c67fda5f3dbc818e4504efc4` / 501 | +4; initialize the builtin mapping in test-only constructors |
 | `app/slug_bzlmod_v2/src/lib.rs` | `279b4d8d98a8c534eca9a7112a57788e2c3f8326` / 539 | +20 |
 | `app/slug_bzlmod_v2/src/canonical_repository_route.rs` | `9aa6bc6ad89b754c23e5d0897a15011a07d3ffcd` / 415 | +80 |
 | `app/slug_loading_v2/src/canonical_repository_route.rs` | `86cd5e194fe4ce37fe5677a2ef7190472a081c68` / 326 | +160 |

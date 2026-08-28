@@ -20650,3 +20650,10 @@ Commit `dfb56b9b5` records R7 and independent Sol review returns `ACCEPT`.
 Implementation may resume only within the current manifest. Preserve original
 pre-RepoSpec precedence for selected-graph failures; defer only completed
 mapping-projection semantic failures until after RepoSpec completion.
+
+R7 allowlist audit adds exactly two omitted test-only constructor files at
+their verified `c2ec8481e` blobs: four projection-initializer lines in
+`selected_extension_demand.rs` and net four builtin-mapping initializer lines
+in `host_external_package_boundary/tests.rs`. This changes no production
+owner, cap total, compatibility class or proof claim; independent review must
+accept the bookkeeping correction before implementation acceptance.
