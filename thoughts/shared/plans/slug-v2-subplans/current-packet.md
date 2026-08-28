@@ -1,14 +1,15 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-recursive-analysis-evaluator-adapter-implementation-r2`
+Packet: `WP-4-5-7A-recursive-analysis-evaluator-adapter-implementation-r3`
 
 Milestone: M7A category 5, one recursive retained analysis-value/provider
 boundary before selected toolchain implementation analysis.
 
 Base: `500f0f038`. Category 4 is accepted in `568b0c698`; the retained
 category-5 graph and its two equality domains are accepted in `5ce967d55`.
-The first implementation candidate is uncommitted and terminal review returned
-`REPLAN`: it must not be accepted or extended under its old adapter contract.
+The R1 and R2 implementation candidates are uncommitted. R2 terminal rereview
+returned `REPLAN`: no more Rust may be changed until this corrected R3 contract
+passes independent architecture review.
 
 Observable result: implement and prove one heap-independent retained value
 graph plus one lossless evaluator adapter family. Fresh, frozen and dependency-
@@ -43,6 +44,30 @@ accepted:
 These are explicit no-flatten/lossless-round-trip stops in the accepted
 architecture, so R2 changes the evaluator adapter ownership rather than adding
 another wrapper layer.
+
+## Why R2 was rejected
+
+R2 corrects the shared evaluator classes, authenticated provider lookup, typed
+views, owner checks, alias materialization, iterative deep-DAG conversion and
+most shared depset construction/traversal behavior. Focused build-api, loading
+and analysis suites pass. Terminal correction rereview nevertheless found one
+exact retained-representation miss and one scope violation:
+
+- for a sole compatible different-order, nonsingleton transitive child with no
+  directs, the builder decrements depth but retains a new
+  `Transitive(child)` successor. Pinned `NestedSet` instead dereferences its
+  sole physical successor, so the requested-order root shares the child's
+  internal successor array without the extra node; and
+- the vendored struct patch changes an existing JSON field-order assertion
+  from `foo,bar` to `bar,foo`. JSON serialization is unrelated to the admitted
+  structural-hash barrier and this packet has no authority to change or weaken
+  that regression.
+
+Because publication equality deliberately observes exact DAG topology and
+alias partition, flattening equality is insufficient proof for the first miss.
+R3 is limited to the canonical sole-successor representation/proof, restoration
+of the untouched JSON assertion, and the unchanged R2 contract. No R1/R2 Rust
+is accepted or committed.
 
 ## Learned facts and research basis
 
@@ -83,6 +108,13 @@ Pinned Bazel 9.2 commit
   empty children, repeated identical children and a sole unchanged child,
   which are eliminated or reused and do not add depth. These semantics belong
   in the shared generic DAG, not in an analysis-only wrapper.
+- Pinned `NestedSet` lines 253-267 canonicalize the physical successor count
+  after hoisting: for `n == 1`, `children` becomes `children[0]` and depth is
+  decremented. This is not limited to same-order `Depset` object reuse. A sole
+  compatible different-order nonsingleton child therefore produces a distinct
+  requested-order root that shares the child's internal successor array. An
+  extra `Transitive(child)` node is noncanonical and changes Slug publication
+  equality even when `to_list()` agrees.
 - `AbstractConfiguredTarget#getIndex`, `containsKey` and `get(Provider.Key)`
   accept an exported declared-provider constructor, synthesize `DefaultInfo`
   and otherwise query the target's provider key. Lookup is by provider identity,
@@ -107,9 +139,9 @@ Live Slug facts:
   by loading-time construction, frozen module constants and analysis-time
   rematerialization.
 - `slug_analysis_v2::starlark_rule` owns prepared dependency/result conversion,
-  but its R1 materializer/lowerer now mixes that conversion with the rule
-  context and action host. R2 splits conversion into an analysis-owned module;
-  no DICE key or lock changes.
+  but its R1 materializer/lowerer mixed that conversion with the rule context
+  and action host. The R2 candidate split conversion into an analysis-owned
+  module; R3 preserves that split and changes no DICE key or lock.
 - `ProviderCollection` retains typed `DefaultInfo`, `OutputGroupInfo`,
   `RunEnvironmentInfo`, `FilesToRunProvider` and `PlatformInfo` plus general
   occurrences. Typed payloads remain their existing operational owners; an
@@ -137,7 +169,7 @@ Prior art classification:
   ordinal shortcut, hash, scheduler, diagnostic or compatibility claim is
   copied.
 
-## R2 decision
+## R3 decision
 
 ### Retained graph and equality domains
 
@@ -178,8 +210,15 @@ by typed providers and `AnalysisDepset`:
   ordered nonempty child edges;
 - the builder returns the existing child Arc for one same-order nonempty
   transitive with no direct members, and for the Bazel singleton/matching-
-  direct case; singleton leaves are hoisted and duplicates eliminated before
-  the final depth is recorded;
+  direct case; after singleton hoisting and deduplication, any sole physical
+  successor is dereferenced. A compatible different-order nonsingleton child
+  keeps the requested root order but shares that child's internal successor
+  array rather than retaining an extra transitive wrapper node;
+- the generic builder reports that last case as one explicit dereference result,
+  not by copying child edges or teaching analysis/loading a second algorithm.
+  The build-api root creates a new requested-order node with the child's
+  `Arc` successor slice, while the evaluator adapter creates a new occurrence
+  and delegates its retained `AnalysisDepset` to the same shared-slice path;
 - empty is depth zero, a leaf is depth one, and a materialized non-leaf is one
   plus its deepest retained successor after those builder optimizations;
 - default/postorder and preorder retain their source-defined left-to-right
@@ -237,6 +276,11 @@ token behavior but must not implement a second depset algorithm.
   unhashable. Top-level list/dict and ordinary tuple key admission stay
   unchanged; mutable direct children reject. No global mutable state, new
   Starlark type or replacement `struct` builtin is added.
+
+The vendored change is limited to that structural-hash capability and focused
+hash/key tests. Restore the pre-existing `json.encode(struct(foo = 42,
+bar = "some"))` field-order assertion byte-for-byte; no serialization behavior
+or assertion changes are admitted.
 
 Provider/depset equality must be symmetric because both operands downcast to
 the same class. Cross-class equality hooks and analysis-only wrapper classes are
@@ -352,6 +396,9 @@ Focused Rust proof must discriminate:
   all admitted orders, the pinned `[3, 5, 6, 4, 2]` mixed-order topological
   vector, rightmost-conflict and deep-diamond sharing, empty/repeated/sole/two-
   child depth distinctions, direct deduplication and singleton hoisting,
+  sole compatible different-order nonsingleton canonicalization with shared
+  successor-array identity and publication equality against the equivalent
+  direct canonical graph (not merely equal flattening),
   type/order/depth failures at the constructor call, and publication topology/
   alias discrimination; the discriminating topological and depth cases run
   through both a freshly constructed and dependency-rematerialized depset;
@@ -377,7 +424,7 @@ absence; the dirty candidate is not a new baseline.
 |---|---:|---:|
 | `app/slug_build_api_v2/src/lib.rs` | `8091bec244d55c433a5179b8848a0f514a66d58a` / 50 | +25 |
 | `app/slug_build_api_v2/src/analysis_value.rs` | absent / 0 | +1,250 |
-| `app/slug_build_api_v2/src/depset.rs` | `a122f17aec87716a052181c3a835972d42a82d3c` / 253 | +220 |
+| `app/slug_build_api_v2/src/depset.rs` | `a122f17aec87716a052181c3a835972d42a82d3c` / 253 | +240 |
 | `app/slug_build_api_v2/src/providers/mod.rs` | `b191b11f8b9ee26f45a8558b257d90212c155c81` / 434 | +300 |
 | `app/slug_build_api_v2/tests/analysis_value.rs` | absent / 0 | +650 |
 | `app/slug_build_api_v2/tests/depset.rs` | `76f6ec58d30279b0d31d797dff63addb08df677f` / 170 | +200 |
@@ -395,14 +442,15 @@ absence; the dirty candidate is not a new baseline.
 | `starlark-rust/starlark/src/values/types/structs.rs` | `7d08daa2203814a43a09dd7c7164d47275fb9938` / 45 | +5 |
 | `starlark-rust/starlark/src/values/types/structs/value.rs` | `b5671a957adfdda88cbb71153f91441cbb0e77c1` / 274 | +160 |
 
-Net production growth is capped at +3,450 lines and proof growth at +2,050.
+Net production growth is capped at +3,470 lines and proof growth at +2,050.
 `analysis_value.rs` in build-api remains the sole retained recursive-value
 owner; the new analysis module is conversion only. Loading `provider.rs` remains
 cohesive because it owns provider/depset constructors and their shared evaluator
 classes. The 35,115-line loading and 6,988-line analysis test files are only
 integration proof surfaces. The 4,749-line DICE file may change only the
 existing marker/accessor handoff. The vendored struct file may change only the
-bounded internal structural-hash barrier and its focused tests.
+bounded internal structural-hash barrier and its focused tests; its existing
+JSON serialization assertions must remain byte-for-byte unchanged.
 
 No other file may change. In particular, do not edit parser/compiler syntax,
 loading globals/package registration, configuration, query/server/CLI/action
@@ -433,7 +481,7 @@ occurrence/DAG alias identity, printable-name provider lookup, missing typed
 provider view, direct list/dict key admission, tuple-key weakening, per-builtin
 arbitrary retained field struct, configuration/display/digest identity
 substitution, parser/ruleset control flow, Zabel authority, or inability to
-round-trip the admitted graph losslessly. A second material R2 contract
+round-trip the admitted graph losslessly. A second material R3 contract
 correction after implementation begins is another `REPLAN`.
 
 Residual performance risk is per-node Arc allocation, recursive frozen-heap

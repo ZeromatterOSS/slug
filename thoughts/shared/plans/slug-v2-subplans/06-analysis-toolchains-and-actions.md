@@ -20870,3 +20870,29 @@ the marker-era `AnalysisToolchainInfo` value class in favor of the shared
 loading class and proves frozen-list plus frozen-dictionary structural-hash
 barriers containing `ToolchainInfo` without weakening direct/tuple rejection.
 Independent architecture review is required before resuming Rust.
+
+#### Recursive evaluator-adapter R2 canonical-successor REPLAN; R3 selected (2026-08-28)
+
+The R2 candidate corrects the shared evaluator classes, authenticated complete
+provider views, owner/alias semantics, iterative deep-DAG conversion and the
+generic depset traversal/depth families. Terminal correction rereview still
+rejects it. After hoisting, the generic builder represents a sole compatible
+different-order nonsingleton child as a new `Transitive(child)` node. Pinned
+Bazel 9.2 `NestedSet` lines 253-267 instead dereference every `n == 1` physical
+successor and decrement depth: a distinct requested-order root shares the
+child's internal successor array. Slug's publication equality observes the
+extra wrapper even though flattening agrees. The candidate also changes the
+vendored struct JSON field-order assertion, which is unrelated to the admitted
+structural-hash barrier.
+
+Run only
+`WP-4-5-7A-recursive-analysis-evaluator-adapter-implementation-r3`. Preserve
+the accepted retained graph and complete R2 evaluator architecture. Correct and
+prove sole compatible different-order canonicalization through physical
+successor sharing and publication equality, and restore the pre-existing JSON
+assertion byte-for-byte. Do not change serialization semantics, parser or BCR
+control flow. Pinned Bazel 9.2 remains compatibility authority; Buck2 compact
+utilities remain leaf reuse and clean Zabel `0795445f...` remains concept-only
+peer guidance. BCR Starlark owns all rule/control paths including
+`cc_internal`; `cc_common` remains a generic host-ABI client. Independent
+architecture review is required before Rust resumes.
