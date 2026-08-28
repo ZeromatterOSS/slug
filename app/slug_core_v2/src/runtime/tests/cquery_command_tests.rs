@@ -753,7 +753,7 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
                 .configuration()
                 .starlark_option(&CanonicalLabel::parse("@@//:setting").unwrap())
                 .and_then(|option| option.value().as_str()),
-            Some("default")
+            None
         );
         assert!(c0.label_stdout().starts_with("//:consumer (slugcfg-v2:"));
         assert_eq!(
@@ -813,7 +813,7 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
                 .configuration()
                 .starlark_option(&CanonicalLabel::parse("@@//:setting").unwrap())
                 .and_then(|option| option.value().as_str()),
-            Some("default")
+            None
         );
 
         let parent = "//:parent";

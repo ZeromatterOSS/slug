@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+mod build_setting;
 pub mod configured_target;
 pub mod dice;
 pub mod key;

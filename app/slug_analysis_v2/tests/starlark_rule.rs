@@ -12,6 +12,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::SyncSender;
 use std::time::SystemTime;
 
 use dice::ActivationData;
@@ -27,6 +29,7 @@ use dice::Key;
 use dice::RichActivation;
 use dice::UserComputationData;
 use dupe::Dupe;
+use num_bigint::BigInt;
 use slug_analysis_v2::AnalysisError;
 use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::AnalysisPreparationOutcome;
@@ -41,6 +44,7 @@ use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::key::StarlarkOption;
 use slug_analysis_v2::key::StarlarkOptionScope;
+use slug_analysis_v2::key::StarlarkOptionValue;
 use slug_analysis_v2::prepare_configured_node_analysis;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ProviderId;
@@ -562,12 +566,35 @@ struct RootActivationTracker {
     batches: Mutex<Vec<(String, EventBatch)>>,
     nodes: Mutex<Vec<(String, DiceNodeId, Vec<DiceNodeId>)>>,
     all_loading: bool,
+    loading_gate: Option<LoadingActivationGate>,
+}
+
+struct LoadingActivationGate {
+    needle: &'static str,
+    reached: Mutex<Option<SyncSender<()>>>,
+    release: Mutex<Receiver<()>>,
 }
 
 impl RootActivationTracker {
     fn with_loading() -> Self {
         Self {
             all_loading: true,
+            ..Default::default()
+        }
+    }
+
+    fn with_loading_gate(
+        needle: &'static str,
+        reached: SyncSender<()>,
+        release: Receiver<()>,
+    ) -> Self {
+        Self {
+            all_loading: true,
+            loading_gate: Some(LoadingActivationGate {
+                needle,
+                reached: Mutex::new(Some(reached)),
+                release: Mutex::new(release),
+            }),
             ..Default::default()
         }
     }
@@ -726,10 +753,17 @@ impl ActivationTracker for RootActivationTracker {
                     .unwrap()
                     .push((identity.clone(), activation.kind()));
                 self.nodes.lock().unwrap().push((
-                    identity,
+                    identity.clone(),
                     activation.node(),
                     activation.dependencies().to_vec(),
                 ));
+                if let Some(gate) = &self.loading_gate
+                    && identity.contains(gate.needle)
+                    && let Some(reached) = gate.reached.lock().unwrap().take()
+                {
+                    reached.send(()).unwrap();
+                    gate.release.lock().unwrap().recv().unwrap();
+                }
             }
         }
     }
@@ -929,6 +963,30 @@ async fn root_target_request_with_inputs(
     epoch: PathObservationEpoch,
     repositories: &[(&str, &str)],
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
+    root_target_request_with_explicit_inputs(
+        dice,
+        workspace,
+        target,
+        configuration,
+        None,
+        tracker,
+        epoch,
+        repositories,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn root_target_request_with_explicit_inputs(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    configuration: ConfigurationKey,
+    explicit: Option<StarlarkOption>,
+    tracker: Arc<RootActivationTracker>,
+    epoch: PathObservationEpoch,
+    repositories: &[(&str, &str)],
+) -> Result<Arc<ConfiguredNodeResult>, String> {
     let mut user_data = UserComputationData {
         activation_tracker: Some(tracker),
         ..Default::default()
@@ -942,7 +1000,7 @@ async fn root_target_request_with_inputs(
         NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
         CanonicalLabel::parse(target).unwrap(),
         configuration,
-        None,
+        explicit,
     )
     .await?;
     let value = transaction
@@ -1016,14 +1074,11 @@ fn candidate_labels(result: &ConfiguredNodeResult) -> Vec<String> {
         .collect()
 }
 
-fn root_setting_value(key: &ConfiguredTargetKey) -> &str {
+fn root_setting_value(key: &ConfiguredTargetKey) -> Option<&str> {
     let setting = CanonicalLabel::parse("@@//:setting").unwrap();
     key.configuration()
         .starlark_option(&setting)
-        .unwrap()
-        .value()
-        .as_str()
-        .unwrap()
+        .and_then(|option| option.value().as_str())
 }
 
 const TOOLCHAIN_MODULE: &str = "module(name = \"bazel_tools\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:second\", \"//:first\")\n";
@@ -2327,7 +2382,7 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     .unwrap();
     assert_eq!(
         root_setting_value(legacy_setting.configured_target_key().unwrap()),
-        "default"
+        None
     );
     let legacy_parent = analyze_request(
         &dice,
@@ -2341,7 +2396,7 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     assert_eq!(provider_value(&legacy_parent, &parent), "left,right");
     assert_eq!(
         root_setting_value(legacy_parent.configured_target_key().unwrap()),
-        "default"
+        None
     );
     let default =
         root_string_request(&dice, &workspace, "@@//:consumer", None, tracker.clone()).await;
@@ -2390,7 +2445,7 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
             .iter()
             .map(root_setting_value)
             .collect::<Vec<_>>(),
-        ["left", "right"]
+        [Some("left"), Some("right")]
     );
     fs::write(&defs, defs_source.replacen("\"left\"", "\"changed\"", 1)).unwrap();
     let edited_parent =
@@ -2441,17 +2496,18 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     .await;
     assert_eq!(
         root_setting_value(unrelated.configured_target_key().unwrap()),
-        "command"
+        Some("command")
     );
 
     let (activations, _, _) = tracker.take();
     assert_eq!(
         activation_codes(&activations),
-        r#"resolved/@@//:consumer=changed:E resolved/@@//:consumer=command:E resolved/@@//:consumer=default:E resolved/@@//:consumer=default:E
-resolved/@@//:consumer=default:R resolved/@@//:consumer=default:R resolved/@@//:consumer=edited-default:E resolved/@@//:consumer=left:E
-resolved/@@//:consumer=right:E resolved/@@//:consumer=right:E resolved/@@//:parent=default:E resolved/@@//:parent=default:E
-resolved/@@//:parent=default:R resolved/@@//:setting=changed:E resolved/@@//:setting=command:E resolved/@@//:setting=default:E
-resolved/@@//:setting=default:R resolved/@@//:setting=edited-default:E resolved/@@//:setting=left:E resolved/@@//:setting=right:E
+        r#"resolved/@@//:consumer=<default>:E resolved/@@//:consumer=<default>:E resolved/@@//:consumer=<default>:E
+resolved/@@//:consumer=<default>:R resolved/@@//:consumer=<default>:R resolved/@@//:consumer=changed:E
+resolved/@@//:consumer=command:E resolved/@@//:consumer=left:E resolved/@@//:consumer=right:E resolved/@@//:consumer=right:E
+resolved/@@//:parent=<default>:E resolved/@@//:parent=<default>:E resolved/@@//:parent=<default>:R
+resolved/@@//:setting=<default>:E resolved/@@//:setting=<default>:E resolved/@@//:setting=<default>:R
+resolved/@@//:setting=changed:E resolved/@@//:setting=command:E resolved/@@//:setting=left:E resolved/@@//:setting=right:E
 resolved/@@//:setting=right:E"#
             .split_whitespace()
             .map(str::to_owned)
@@ -2488,8 +2544,616 @@ resolved/@@//:setting=right:E"#
     .await
     .unwrap_err();
     assert!(
-        unrelated_error.contains("root string build setting @@//:setting is missing"),
+        unrelated_error.contains("target @@//:setting is not a Starlark build setting"),
         "{unrelated_error}"
+    );
+}
+
+#[tokio::test]
+async fn typed_build_settings_resolve_all_value_shapes_scopes_and_defaults() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"Info = provider(fields = {"value": "value"})
+def _integer(ctx): return [Info(value = "int:" + str(ctx.build_setting_value))]
+def _boolean(ctx): return [Info(value = "bool:" + str(ctx.build_setting_value))]
+def _string(ctx): return [Info(value = "string:" + ctx.build_setting_value)]
+def _list(ctx): return [Info(value = "list:" + ",".join(ctx.build_setting_value))]
+def _set(ctx): return [Info(value = "set:" + str(len(ctx.build_setting_value)) + ":" + str("a" in ctx.build_setting_value) + ":" + str("z" in ctx.build_setting_value))]
+integer = rule(implementation = _integer, attrs = {"scope": attr.string()}, build_setting = config.int(flag = True))
+boolean = rule(implementation = _boolean, attrs = {"scope": attr.string()}, build_setting = config.bool(flag = True))
+string = rule(implementation = _string, attrs = {"scope": attr.string()}, build_setting = config.string(flag = True))
+multi = rule(implementation = _list, attrs = {"scope": attr.string()}, build_setting = config.string(flag = True, allow_multiple = True))
+string_list = rule(implementation = _list, attrs = {"scope": attr.string()}, build_setting = config.string_list(flag = True))
+string_set = rule(implementation = _set, attrs = {"scope": attr.string()}, build_setting = config.string_set(flag = True))
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "boolean", "integer", "multi", "string", "string_list", "string_set")
+integer(name = "integer", build_setting_default = 7, scope = "target")
+boolean(name = "boolean", build_setting_default = False, scope = "universal")
+string(name = "string", build_setting_default = "", scope = "project")
+multi(name = "multi", build_setting_default = "one")
+string_list(name = "list", build_setting_default = ["b", "a", "b"])
+string_set(name = "set", build_setting_default = set(["b", "a"]))
+"#,
+    )
+    .unwrap();
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let info = ProviderId::new("//:defs.bzl", "Info").unwrap();
+    let request = |target: &'static str, configuration, explicit| {
+        root_target_request_with_explicit_inputs(
+            &dice,
+            &workspace,
+            target,
+            configuration,
+            explicit,
+            Arc::new(RootActivationTracker::default()),
+            root_epoch(&workspace),
+            &[],
+        )
+    };
+    for (target, expected) in [
+        ("@@//:integer", "int:7"),
+        ("@@//:boolean", "bool:False"),
+        ("@@//:string", "string:"),
+        ("@@//:multi", "list:one"),
+        ("@@//:list", "list:b,a,b"),
+        ("@@//:set", "set:2:True:False"),
+    ] {
+        let result = request(target, test_configuration(), None)
+            .await
+            .unwrap_or_else(|error| panic!("{target}: {error}"));
+        assert_eq!(provider_value(&result, &info), expected);
+        assert!(
+            result
+                .configured_target_key()
+                .unwrap()
+                .configuration()
+                .starlark_options()
+                .iter()
+                .next()
+                .is_none(),
+            "absent {target} must use its declaration default without a row"
+        );
+    }
+
+    let cases = [
+        (
+            "@@//:integer",
+            StarlarkOptionValue::Integer(
+                BigInt::parse_bytes(b"9223372036854775808123", 10).unwrap(),
+            ),
+            StarlarkOptionScope::Target,
+            "int:9223372036854775808123",
+        ),
+        (
+            "@@//:boolean",
+            StarlarkOptionValue::Boolean(true),
+            StarlarkOptionScope::Universal,
+            "bool:True",
+        ),
+        (
+            "@@//:string",
+            StarlarkOptionValue::string("changed"),
+            StarlarkOptionScope::Project,
+            "string:changed",
+        ),
+        (
+            "@@//:multi",
+            StarlarkOptionValue::string_list(["x", "x"]),
+            StarlarkOptionScope::Default,
+            "list:x,x",
+        ),
+        (
+            "@@//:list",
+            StarlarkOptionValue::string_list(["a", "b", "a"]),
+            StarlarkOptionScope::Default,
+            "list:a,b,a",
+        ),
+        (
+            "@@//:set",
+            StarlarkOptionValue::StringSet(Arc::from([
+                compact_str::CompactString::from("z"),
+                compact_str::CompactString::from("a"),
+                compact_str::CompactString::from("z"),
+            ])),
+            StarlarkOptionScope::Default,
+            "set:2:True:True",
+        ),
+    ];
+    for (target, value, expected_scope, expected_provider) in cases {
+        let label = CanonicalLabel::parse(target).unwrap();
+        let explicit = StarlarkOption::new(label.clone(), value, StarlarkOptionScope::Default);
+        let result = request(target, test_configuration(), Some(explicit))
+            .await
+            .unwrap();
+        assert_eq!(provider_value(&result, &info), expected_provider);
+        let retained = result
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .starlark_option(&label)
+            .unwrap();
+        assert_eq!(retained.scope(), expected_scope);
+    }
+
+    let integer = CanonicalLabel::parse("@@//:integer").unwrap();
+    let unrelated = CanonicalLabel::parse("@@//:unrelated").unwrap();
+    let base = test_configuration().with_starlark_option(StarlarkOption::string(
+        unrelated.clone(),
+        "kept",
+        StarlarkOptionScope::Universal,
+    ));
+    let first = request("@@//:integer", base.clone(), None).await.unwrap();
+    let changed = request(
+        "@@//:integer",
+        base.clone(),
+        Some(StarlarkOption::new(
+            integer.clone(),
+            StarlarkOptionValue::Integer(BigInt::from(8)),
+            StarlarkOptionScope::Default,
+        )),
+    )
+    .await
+    .unwrap();
+    let restored = request(
+        "@@//:integer",
+        changed
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .clone(),
+        Some(StarlarkOption::new(
+            integer.clone(),
+            StarlarkOptionValue::Integer(BigInt::from(7)),
+            StarlarkOptionScope::Default,
+        )),
+    )
+    .await
+    .unwrap();
+    assert_ne!(first.key(), changed.key());
+    assert_eq!(first.key(), restored.key());
+    assert!(
+        restored
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .starlark_option(&integer)
+            .is_none()
+    );
+    assert_eq!(
+        restored
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .starlark_option(&unrelated)
+            .unwrap()
+            .value()
+            .as_str(),
+        Some("kept")
+    );
+
+    let error = request(
+        "@@//:boolean",
+        test_configuration(),
+        Some(StarlarkOption::string(
+            CanonicalLabel::parse("@@//:boolean").unwrap(),
+            "true",
+            StarlarkOptionScope::Default,
+        )),
+    )
+    .await
+    .unwrap_err();
+    assert!(error.contains("expects Boolean, not string"), "{error}");
+}
+
+#[tokio::test]
+async fn typed_transitions_replace_one_row_elide_defaults_and_normalize_sets() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _empty(ctx): return []
+empty = rule(implementation = _empty)
+integer = rule(implementation = _empty, attrs = {"scope": attr.string()}, build_setting = config.int(flag = True))
+boolean = rule(implementation = _empty, attrs = {"scope": attr.string()}, build_setting = config.bool(flag = True))
+string = rule(implementation = _empty, build_setting = config.string(flag = True))
+multi = rule(implementation = _empty, build_setting = config.string(flag = True, allow_multiple = True))
+string_list = rule(implementation = _empty, build_setting = config.string_list(flag = True))
+string_set = rule(implementation = _empty, build_setting = config.string_set(flag = True))
+def _int(settings, attr): return {"//:integer": 7}
+def _bool(settings, attr): return {"//:boolean": True}
+def _string(settings, attr): return {"//:string": "changed"}
+def _multi(settings, attr): return {"//:multi": ["x", "x"]}
+def _list_a(settings, attr): return {"//:list": ["a", "b", "a"]}
+def _list_b(settings, attr): return {"//:list": ["b", "a", "a"]}
+def _set_list(settings, attr): return {"//:set": ["b", "a", "b"]}
+def _set_set(settings, attr): return {"//:set": set(["a", "b"])}
+t_int = transition(implementation = _int, inputs = [], outputs = ["//:integer"])
+t_bool = transition(implementation = _bool, inputs = [], outputs = ["//:boolean"])
+t_string = transition(implementation = _string, inputs = [], outputs = ["//:string"])
+t_multi = transition(implementation = _multi, inputs = [], outputs = ["//:multi"])
+t_list_a = transition(implementation = _list_a, inputs = [], outputs = ["//:list"])
+t_list_b = transition(implementation = _list_b, inputs = [], outputs = ["//:list"])
+t_set_list = transition(implementation = _set_list, inputs = [], outputs = ["//:set"])
+t_set_set = transition(implementation = _set_set, inputs = [], outputs = ["//:set"])
+parent = rule(implementation = _empty, attrs = {
+    "int_dep": attr.label(cfg = t_int),
+    "bool_dep": attr.label(cfg = t_bool),
+    "string_dep": attr.label(cfg = t_string),
+    "multi_dep": attr.label(cfg = t_multi),
+    "list_a_dep": attr.label(cfg = t_list_a),
+    "list_b_dep": attr.label(cfg = t_list_b),
+    "set_list_dep": attr.label(cfg = t_set_list),
+    "set_set_dep": attr.label(cfg = t_set_set),
+})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "boolean", "empty", "integer", "multi", "parent", "string", "string_list", "string_set")
+integer(name = "integer", build_setting_default = 7, scope = "target")
+boolean(name = "boolean", build_setting_default = False, scope = "universal")
+string(name = "string", build_setting_default = "default")
+multi(name = "multi", build_setting_default = "one")
+string_list(name = "list", build_setting_default = ["default"])
+string_set(name = "set", build_setting_default = set(["default"]))
+empty(name = "c_int")
+empty(name = "c_bool")
+empty(name = "c_string")
+empty(name = "c_multi")
+empty(name = "c_list_a")
+empty(name = "c_list_b")
+empty(name = "c_set_list")
+empty(name = "c_set_set")
+parent(
+    name = "parent",
+    int_dep = ":c_int",
+    bool_dep = ":c_bool",
+    string_dep = ":c_string",
+    multi_dep = ":c_multi",
+    list_a_dep = ":c_list_a",
+    list_b_dep = ":c_list_b",
+    set_list_dep = ":c_set_list",
+    set_set_dep = ":c_set_set",
+)
+"#,
+    )
+    .unwrap();
+
+    let integer = CanonicalLabel::parse("@@//:integer").unwrap();
+    let unrelated = CanonicalLabel::parse("@@//:unrelated").unwrap();
+    let base = test_configuration()
+        .with_starlark_option(StarlarkOption::new(
+            integer.clone(),
+            StarlarkOptionValue::Integer(BigInt::from(8)),
+            StarlarkOptionScope::Target,
+        ))
+        .with_starlark_option(StarlarkOption::string(
+            unrelated.clone(),
+            "kept",
+            StarlarkOptionScope::Universal,
+        ));
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let result = analyze_request(
+        &dice,
+        &workspace,
+        &ConfiguredTargetKey::new(CanonicalLabel::parse("@@//:parent").unwrap(), base),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    let child = |name: &str| {
+        result
+            .configured_dependencies()
+            .find(|key| key.label().target().as_str() == name)
+            .unwrap()
+            .configuration()
+    };
+    assert!(child("c_int").starlark_option(&integer).is_none());
+    for name in [
+        "c_int",
+        "c_bool",
+        "c_string",
+        "c_multi",
+        "c_list_a",
+        "c_list_b",
+        "c_set_list",
+        "c_set_set",
+    ] {
+        assert_eq!(
+            child(name)
+                .starlark_option(&unrelated)
+                .unwrap()
+                .value()
+                .as_str(),
+            Some("kept")
+        );
+    }
+    let value = |child_name: &str, setting: &str| {
+        child(child_name)
+            .starlark_option(&CanonicalLabel::parse(setting).unwrap())
+            .unwrap()
+            .value()
+            .clone()
+    };
+    assert_eq!(
+        value("c_bool", "@@//:boolean"),
+        StarlarkOptionValue::Boolean(true)
+    );
+    assert_eq!(
+        child("c_bool")
+            .starlark_option(&CanonicalLabel::parse("@@//:boolean").unwrap())
+            .unwrap()
+            .scope(),
+        StarlarkOptionScope::Universal
+    );
+    assert_eq!(
+        value("c_string", "@@//:string"),
+        StarlarkOptionValue::string("changed")
+    );
+    assert_eq!(
+        value("c_multi", "@@//:multi"),
+        StarlarkOptionValue::string_list(["x", "x"])
+    );
+    assert_eq!(
+        value("c_list_a", "@@//:list"),
+        StarlarkOptionValue::string_list(["a", "b", "a"])
+    );
+    assert_ne!(child("c_list_a"), child("c_list_b"));
+    assert_eq!(child("c_set_list"), child("c_set_set"));
+    assert_eq!(
+        value("c_set_list", "@@//:set"),
+        StarlarkOptionValue::string_set(["a", "b"])
+    );
+}
+
+#[tokio::test]
+async fn explicit_external_setting_uses_its_canonical_package_declaration() {
+    let workspace = scratch();
+    fs::create_dir_all(workspace.join("dep/flags")).unwrap();
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"bazel_tools\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        "def _empty(ctx): return []\nempty = rule(implementation = _empty)\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"empty\")\nempty(name = \"request\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("dep/MODULE.bazel"),
+        "module(name = \"dep\", version = \"1.0.0\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.join("dep/REPO.bazel"), "").unwrap();
+    fs::write(workspace.join("dep/.bazelignore"), "").unwrap();
+    fs::write(
+        workspace.join("dep/flags/defs.bzl"),
+        "def _setting(ctx): return []\nsetting = rule(implementation = _setting, attrs = {\"scope\": attr.string()}, build_setting = config.string(flag = True))\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("dep/flags/BUILD.bazel"),
+        "load(\":defs.bzl\", \"setting\")\nsetting(name = \"mode\", build_setting_default = \"external-default\", scope = \"target\")\n",
+    )
+    .unwrap();
+
+    let repositories = [("dep+", "dep")];
+    let label = CanonicalLabel::parse("@@dep+//flags:mode").unwrap();
+    let tracker = Arc::new(RootActivationTracker::with_loading());
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let request = |value: &'static str, tracker| {
+        root_target_request_with_explicit_inputs(
+            &dice,
+            &workspace,
+            "@@//:request",
+            test_configuration(),
+            Some(StarlarkOption::string(
+                label.clone(),
+                value,
+                StarlarkOptionScope::Default,
+            )),
+            tracker,
+            root_epoch(&workspace),
+            &repositories,
+        )
+    };
+    let default = request("external-default", tracker.clone()).await.unwrap();
+    assert!(
+        default
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .starlark_option(&label)
+            .is_none()
+    );
+    let changed = request(
+        "external-changed",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    let retained = changed
+        .configured_target_key()
+        .unwrap()
+        .configuration()
+        .starlark_option(&label)
+        .unwrap();
+    assert_eq!(retained.label(), &label);
+    assert_eq!(retained.value().as_str(), Some("external-changed"));
+    assert_eq!(retained.scope(), StarlarkOptionScope::Target);
+
+    let (activations, _, _) = tracker.take();
+    assert!(
+        activations.iter().any(|(identity, _)| {
+            identity.starts_with("package/") && identity.contains("@@dep+//flags")
+        }),
+        "canonical external declaration package must be an observable preparation dependency: {activations:#?}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn transition_declaration_need_errors_and_cancellation_publish_no_child_and_recover() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    let definitions = r#"def _empty(ctx): return []
+empty = rule(implementation = _empty)
+string_list = rule(implementation = _empty, build_setting = config.string_list(flag = True))
+def _transition(settings, attr): return {"//settings:mode": ["a", 1]}
+t = transition(implementation = _transition, inputs = [], outputs = ["//settings:mode"])
+parent = rule(implementation = _empty, attrs = {"dep": attr.label(cfg = t)})
+"#;
+    fs::write(workspace.join("defs.bzl"), definitions).unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"empty\", \"parent\")\nempty(name = \"child\")\nparent(name = \"parent\", dep = \":child\")\n",
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let request = |tracker| root_target_request(&dice, &workspace, "@@//:parent", tracker);
+
+    let need_tracker = Arc::new(RootActivationTracker::default());
+    let need = request(need_tracker.clone()).await.unwrap_err();
+    assert!(need.contains("Needs"), "{need}");
+    assert!(
+        need_tracker
+            .take()
+            .0
+            .iter()
+            .all(|(identity, _)| !identity.contains("@@//:child"))
+    );
+
+    fs::create_dir(workspace.join("settings")).unwrap();
+    fs::write(
+        workspace.join("settings/BUILD.bazel"),
+        "load(\"//:defs.bzl\", \"empty\")\nempty(name = \"mode\")\n",
+    )
+    .unwrap();
+    let target_tracker = Arc::new(RootActivationTracker::default());
+    let target_error = request(target_tracker.clone()).await.unwrap_err();
+    assert!(
+        target_error.contains("target @@//settings:mode is not a Starlark build setting"),
+        "{target_error}"
+    );
+    assert!(
+        target_tracker
+            .take()
+            .0
+            .iter()
+            .all(|(identity, _)| !identity.contains("@@//:child"))
+    );
+
+    fs::write(
+        workspace.join("settings/BUILD.bazel"),
+        "load(\"//:defs.bzl\", \"string_list\")\nstring_list(name = \"mode\", build_setting_default = [\"default\"])\n",
+    )
+    .unwrap();
+    let value_tracker = Arc::new(RootActivationTracker::default());
+    let value_error = request(value_tracker.clone()).await.unwrap_err();
+    assert!(
+        value_error.contains("collection members must be strings"),
+        "{value_error}"
+    );
+    assert!(
+        value_tracker
+            .take()
+            .0
+            .iter()
+            .all(|(identity, _)| !identity.contains("@@//:child"))
+    );
+
+    fs::write(
+        workspace.join("defs.bzl"),
+        definitions.replace("[\"a\", 1]", "[\"a\", \"b\"]"),
+    )
+    .unwrap();
+    let cancel_dice = Dice::builder().build(DetectCycles::Enabled);
+    let (reached_sender, reached_receiver) = std::sync::mpsc::sync_channel(0);
+    let (release_sender, release_receiver) = std::sync::mpsc::sync_channel(0);
+    let cancel_tracker = Arc::new(RootActivationTracker::with_loading_gate(
+        "settings",
+        reached_sender,
+        release_receiver,
+    ));
+    let mut updater = cancel_dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(cancel_tracker.clone()),
+        ..Default::default()
+    });
+    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
+    let mut cancelled = updater.commit().await;
+    let key = prepared_analysis_key(
+        &mut cancelled,
+        NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+        CanonicalLabel::parse("@@//:parent").unwrap(),
+        test_configuration(),
+        None,
+    )
+    .await
+    .unwrap();
+    cancel_tracker.take();
+    let computation = tokio::spawn(async move { cancelled.compute(&key).await });
+    tokio::task::spawn_blocking(move || reached_receiver.recv().unwrap())
+        .await
+        .unwrap();
+    let (cancelled_activations, _, _) = cancel_tracker.take();
+    assert!(
+        cancelled_activations.iter().any(|(identity, _)| {
+            identity.starts_with("package/") && identity.contains("settings")
+        }),
+        "declaration package dependency was not observed: {cancelled_activations:#?}"
+    );
+    assert!(
+        cancelled_activations
+            .iter()
+            .all(|(identity, _)| !identity.contains("@@//:child")),
+        "transitioned child published before cancellation: {cancelled_activations:#?}"
+    );
+    computation.abort();
+    release_sender.send(()).unwrap();
+    assert!(computation.await.unwrap_err().is_cancelled());
+    let recovery_tracker = Arc::new(RootActivationTracker::default());
+    let recovered = root_target_request(
+        &cancel_dice,
+        &workspace,
+        "@@//:parent",
+        recovery_tracker.clone(),
+    )
+    .await
+    .unwrap();
+    let dependencies = recovered.configured_dependencies().collect::<Vec<_>>();
+    assert_eq!(dependencies.len(), 1);
+    assert_eq!(dependencies[0].label().to_string(), "@@//:child");
+    assert_eq!(
+        dependencies[0]
+            .configuration()
+            .starlark_option(&CanonicalLabel::parse("@@//settings:mode").unwrap())
+            .unwrap()
+            .value(),
+        &StarlarkOptionValue::string_list(["a", "b"])
+    );
+    assert_eq!(
+        recovery_tracker
+            .take()
+            .0
+            .iter()
+            .filter(|(identity, _)| identity.contains("@@//:child"))
+            .count(),
+        1,
+        "recovery must publish exactly one resolved child"
     );
 }
 
@@ -2841,7 +3505,7 @@ parent = rule(implementation = _parent, attrs = {"dep": attr.label(cfg = setting
     .unwrap();
 
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let mismatched = analyze_request(
+    let with_unrelated = analyze_request(
         &dice,
         &workspace,
         &ConfiguredTargetKey::new(
@@ -2852,12 +3516,12 @@ parent = rule(implementation = _parent, attrs = {"dep": attr.label(cfg = setting
         false,
     )
     .await
-    .unwrap_err();
-    assert!(
-        mismatched.contains(
-            "configured node was constructed before resolving root string setting @@//settings:settings"
-        ),
-        "{mismatched}"
+    .unwrap();
+    let parent = ProviderId::new("//:defs.bzl", "ParentInfo").unwrap();
+    assert_eq!(provider_value(&with_unrelated, &parent), "transitioned");
+    assert_eq!(
+        root_setting_value(with_unrelated.configured_target_key().unwrap()),
+        Some("unrelated")
     );
     let result = analyze_request(
         &dice,
@@ -2871,12 +3535,13 @@ parent = rule(implementation = _parent, attrs = {"dep": attr.label(cfg = setting
     )
     .await
     .unwrap();
-    let parent = ProviderId::new("//:defs.bzl", "ParentInfo").unwrap();
     assert_eq!(provider_value(&result, &parent), "transitioned");
+    let transitioned = result
+        .configured_dependencies()
+        .next()
+        .expect("parent retains its transitioned child");
     assert_eq!(
-        result
-            .configured_target_key()
-            .unwrap()
+        transitioned
             .configuration()
             .starlark_option(&CanonicalLabel::parse("@@//settings:settings").unwrap())
             .unwrap()

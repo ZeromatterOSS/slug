@@ -35,15 +35,24 @@ use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
+use starlark::starlark_complex_value;
 use starlark::starlark_module;
+use starlark::values::Coerce;
+use starlark::values::Freeze;
+use starlark::values::FreezeResult;
+use starlark::values::Freezer;
+use starlark::values::FrozenValue;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
+use starlark::values::Trace;
 use starlark::values::Value;
+use starlark::values::ValueLike;
 use starlark::values::list::ListRef;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 
+use crate::build_setting;
 use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
 use crate::result::ConfiguredActionOwnerContext;
@@ -76,28 +85,53 @@ impl fmt::Display for LoadedRuleError {
     }
 }
 
-#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct AnalysisContext {
+#[derive(Debug, Clone, Trace, ProvidesStaticType, NoSerialize, Allocative)]
+#[repr(C)]
+struct AnalysisContextGen<V> {
     #[allocative(skip)]
     actions: Arc<Mutex<CtxActions>>,
     target_name: String,
     package_path: String,
     dependencies: Arc<[PreparedDependency]>,
-    build_setting_value: Option<CompactString>,
+    build_setting_value: Option<V>,
     marker: Option<CompactString>,
     toolchain: Option<PreparedToolchain>,
 }
 
-impl fmt::Display for AnalysisContext {
+unsafe impl<'v> Coerce<AnalysisContextGen<Value<'v>>> for AnalysisContextGen<FrozenValue> {}
+
+starlark_complex_value!(AnalysisContext);
+
+impl<'v> Freeze for AnalysisContext<'v> {
+    type Frozen = FrozenAnalysisContext;
+
+    fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
+        Ok(AnalysisContextGen {
+            actions: self.actions,
+            target_name: self.target_name,
+            package_path: self.package_path,
+            dependencies: self.dependencies,
+            build_setting_value: self
+                .build_setting_value
+                .map(|value| value.freeze(freezer))
+                .transpose()?,
+            marker: self.marker,
+            toolchain: self.toolchain,
+        })
+    }
+}
+
+impl<V> fmt::Display for AnalysisContextGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("<analysis ctx>")
     }
 }
 
-starlark::starlark_simple_value!(AnalysisContext);
-
 #[starlark_value(type = "analysis_ctx")]
-impl<'v> StarlarkValue<'v> for AnalysisContext {
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for AnalysisContextGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "label" => Some(heap.alloc_simple(AnalysisLabel {
@@ -115,10 +149,7 @@ impl<'v> StarlarkValue<'v> for AnalysisContext {
                 .toolchain
                 .clone()
                 .map(|toolchain| heap.alloc_simple(AnalysisToolchains(toolchain))),
-            "build_setting_value" => self
-                .build_setting_value
-                .as_ref()
-                .map(|value| heap.alloc_str(value).to_value()),
+            "build_setting_value" => self.build_setting_value.map(|value| value.to_value()),
             _ => None,
         }
     }
@@ -437,34 +468,45 @@ pub(crate) fn evaluate_loaded_rule(
     let PackageTargetKind::StarlarkRule(implementation) = &target.kind else {
         return Err(format!("target `{target_name}` is not a Starlark rule").into());
     };
+    let build_setting_value = match implementation
+        .build_setting_declaration()
+        .map_err(|error| error.to_string())?
+    {
+        Some(declaration) => Some(
+            build_setting::effective_value(
+                key.label(),
+                &declaration,
+                key.configuration().starlark_option(key.label()),
+            )
+            .map_err(LoadedRuleError::from)?,
+        ),
+        None => None,
+    };
 
     let action_contexts = vec![action_context];
     let actions = Arc::new(Mutex::new(CtxActions::new()));
     let module = Module::new();
-    let context = module.heap().alloc_simple(AnalysisContext {
-        actions: actions.clone(),
-        target_name: target.name.clone(),
-        package_path: package_path.to_owned(),
-        dependencies: dependencies.into(),
-        build_setting_value: implementation.is_root_string_build_setting().then(|| {
-            key.configuration()
-                .starlark_option(key.label())
-                .expect("root setting key carries value")
-                .value()
-                .as_str()
-                .expect("root string setting carries a string value")
-                .into()
-        }),
-        marker,
-        toolchain,
-    });
     let returned = {
-        let mut evaluator = Evaluator::new(&module);
         let toolchain_info_context = ToolchainInfoAnalysisContext;
+        let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&toolchain_info_context);
         if let Some(print_handler) = print_handler {
             evaluator.set_print_handler(print_handler);
         }
+        let build_setting_value = build_setting_value
+            .as_ref()
+            .map(|value| build_setting::alloc_value(value, module.heap(), &mut evaluator))
+            .transpose()
+            .map_err(|error| error.to_string())?;
+        let context = module.heap().alloc(AnalysisContextGen {
+            actions: actions.clone(),
+            target_name: target.name.clone(),
+            package_path: package_path.to_owned(),
+            dependencies: dependencies.into(),
+            build_setting_value,
+            marker,
+            toolchain,
+        });
         let result =
             evaluator.eval_function(implementation.frozen_value().to_value(), &[context], &[]);
         drop(evaluator);

@@ -43,6 +43,7 @@ use slug_loading_v2::ModuleRegistrationExpansionKey;
 use slug_loading_v2::ModuleRegistrationExpansionObservationError;
 use slug_loading_v2::ModuleRegistrationExpansionObservationKey;
 use slug_loading_v2::PackageTargetKind;
+use slug_loading_v2::package::BuildSettingDeclaration;
 use slug_loading_v2::package::NativeToolchainTarget;
 use slug_loading_v2::package::StarlarkRuleImplementation;
 use slug_workspace_v2::NormalizedAbsolutePath;
@@ -62,12 +63,13 @@ use starlark::values::dict::DictRef;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::build_setting::resolve_candidate;
+use crate::build_setting::unpack_transition_value;
 use crate::key::ConfigurationKey;
 use crate::key::ConfigurationKind;
 use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
 use crate::key::StarlarkOption;
-use crate::key::StarlarkOptionScope;
 use crate::result::ConfiguredActionAspectProvenance;
 use crate::result::ConfiguredActionExecGroup;
 use crate::result::ConfiguredActionOwnerContext;
@@ -82,6 +84,33 @@ use crate::starlark_rule::LoadedRuleError;
 use crate::starlark_rule::PreparedDependency;
 use crate::starlark_rule::PreparedToolchain;
 use crate::starlark_rule::evaluate_loaded_rule;
+
+fn without_starlark_option(
+    configuration: &ConfigurationKey,
+    label: &CanonicalLabel,
+) -> ConfigurationKey {
+    if configuration.starlark_option(label).is_none() {
+        return configuration.clone();
+    }
+    if let Some(configuration) = configuration.slug_configuration() {
+        return ConfigurationKey::from_slug(configuration.without_starlark_option(label));
+    }
+    let mut result = ConfigurationKey::new(
+        configuration.kind(),
+        configuration
+            .checksum()
+            .expect("legacy configuration carries a checksum")
+            .clone(),
+    );
+    for option in configuration
+        .starlark_options()
+        .iter()
+        .filter(|option| option.label() != label)
+    {
+        result = result.with_starlark_option(option.clone());
+    }
+    result
+}
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum AnalysisErrorKind {
@@ -355,7 +384,7 @@ async fn prepare_configured_node_analysis_driver(
     }
     let explicit_validation = match explicit.as_ref() {
         Some(explicit) => {
-            Some(root_string_build_setting_default(ctx, mode, &workspace, explicit.label()).await)
+            Some(build_setting_declaration(ctx, mode, &workspace, explicit.label()).await)
         }
         None => None,
     };
@@ -370,12 +399,15 @@ async fn prepare_configured_node_analysis_driver(
     let mut all_need: Option<LoadingPreparationNeeds> = None;
     let mut first_outer = None;
     let mut first_error = None;
+    let mut explicit_declaration = None;
     if let Some(validation) = explicit_validation {
         match validation {
             LoadingPreparationOutcome::Need(need) => all_need = Some(need),
             LoadingPreparationOutcome::Complete(Err(error)) => first_outer = Some(error),
             LoadingPreparationOutcome::Complete(Ok(Err(error))) => first_error = Some(error),
-            LoadingPreparationOutcome::Complete(Ok(Ok(_))) => {}
+            LoadingPreparationOutcome::Complete(Ok(Ok(declaration))) => {
+                explicit_declaration = Some(declaration)
+            }
         }
     }
     let mut package_inventory = None;
@@ -418,7 +450,7 @@ async fn prepare_configured_node_analysis_driver(
         Ok(package) => package,
         Err(error) => return analysis_semantic_complete(Err(package_inventory_error(error))),
     };
-    let Some(target) = package
+    let Some(_target) = package
         .targets
         .iter()
         .find(|target| target.name == requested.target().as_str())
@@ -428,59 +460,21 @@ async fn prepare_configured_node_analysis_driver(
             package.build_file.clone(),
         )));
     };
-    let PackageTargetKind::StarlarkRule(rule) = &target.kind else {
-        return analysis_semantic_complete(ConfiguredNodeAnalysisKey::new(
-            workspace,
-            ConfiguredTargetKey::new(requested, base_configuration),
-        ));
-    };
-    let required = match required_starlark_option(rule, &requested) {
-        Ok(required) => required,
-        Err(error) => return analysis_semantic_complete(Err(error)),
-    };
-    let configuration = match (required, explicit) {
-        (Some(setting), Some(explicit)) if explicit.label() != &setting => {
-            return analysis_semantic_complete(Err(AnalysisError::message(format!(
-                "root string setting request for {setting} carried {}",
-                explicit.label()
-            ))));
-        }
-        (Some(_), Some(explicit)) => base_configuration.with_starlark_option(explicit),
-        (None, Some(explicit)) => base_configuration.with_starlark_option(explicit),
-        (None, None) => base_configuration,
-        (Some(setting), None) if base_configuration.starlark_option(&setting).is_some() => {
-            match root_string_build_setting_default(ctx, mode, &workspace, &setting).await {
-                LoadingPreparationOutcome::Need(need) => {
-                    return LoadingPreparationOutcome::Need(need);
-                }
-                LoadingPreparationOutcome::Complete(Err(error)) => {
-                    return LoadingPreparationOutcome::Complete(Err(error));
-                }
-                LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-                    return analysis_semantic_complete(Err(error));
-                }
-                LoadingPreparationOutcome::Complete(Ok(Ok(_))) => base_configuration,
+    let configuration = match explicit {
+        None => base_configuration,
+        Some(explicit) => {
+            let declaration = explicit_declaration
+                .as_ref()
+                .expect("complete explicit validation stores its declaration");
+            match resolve_candidate(
+                explicit.label().clone(),
+                declaration,
+                explicit.value().clone(),
+            ) {
+                Ok(Some(resolved)) => base_configuration.with_starlark_option(resolved),
+                Ok(None) => without_starlark_option(&base_configuration, explicit.label()),
+                Err(error) => return analysis_semantic_complete(Err(AnalysisError::new(error))),
             }
-        }
-        (Some(setting), None) => {
-            let default =
-                match root_string_build_setting_default(ctx, mode, &workspace, &setting).await {
-                    LoadingPreparationOutcome::Need(need) => {
-                        return LoadingPreparationOutcome::Need(need);
-                    }
-                    LoadingPreparationOutcome::Complete(Err(error)) => {
-                        return LoadingPreparationOutcome::Complete(Err(error));
-                    }
-                    LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-                        return analysis_semantic_complete(Err(error));
-                    }
-                    LoadingPreparationOutcome::Complete(Ok(Ok(default))) => default,
-                };
-            base_configuration.with_starlark_option(StarlarkOption::string(
-                setting,
-                default,
-                StarlarkOptionScope::Default,
-            ))
         }
     };
     analysis_semantic_complete(ConfiguredNodeAnalysisKey::new(
@@ -489,18 +483,18 @@ async fn prepare_configured_node_analysis_driver(
     ))
 }
 
-async fn root_string_build_setting_default(
+async fn build_setting_declaration(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
     setting: &CanonicalLabel,
-) -> AnalysisSemanticOutcome<CompactString> {
+) -> AnalysisSemanticOutcome<BuildSettingDeclaration> {
     let package_inventory = match compute_configured_package_input(
         ctx,
         mode,
         workspace.dupe(),
         setting.package().clone(),
-        "loading root string setting through DICE",
+        "loading Starlark build-setting declaration through DICE",
     )
     .await
     {
@@ -517,22 +511,29 @@ async fn root_string_build_setting_default(
         Ok(package) => package,
         Err(error) => return analysis_semantic_complete(Err(package_inventory_error(error))),
     };
-    let Some(default) = package
+    let Some(target) = package
         .targets
         .iter()
         .find(|target| target.name == setting.target().as_str())
-        .and_then(|target| match &target.kind {
-            PackageTargetKind::StarlarkRule(rule) if rule.is_root_string_build_setting() => {
-                rule.root_string_build_setting_default()
-            }
-            _ => None,
-        })
     else {
         return analysis_semantic_complete(Err(AnalysisError::message(format!(
-            "root string build setting {setting} is missing"
+            "build setting {setting} is missing"
         ))));
     };
-    analysis_semantic_complete(Ok(default.into()))
+    let PackageTargetKind::StarlarkRule(rule) = &target.kind else {
+        return analysis_semantic_complete(Err(AnalysisError::message(format!(
+            "target {setting} is not a Starlark build setting"
+        ))));
+    };
+    match rule.build_setting_declaration() {
+        Ok(Some(declaration)) => analysis_semantic_complete(Ok(declaration)),
+        Ok(None) => analysis_semantic_complete(Err(AnalysisError::message(format!(
+            "target {setting} is not a Starlark build setting"
+        )))),
+        Err(error) => analysis_semantic_complete(Err(AnalysisError::message(format!(
+            "invalid build-setting declaration for {setting}: {error}"
+        )))),
+    }
 }
 
 impl fmt::Display for ConfiguredNodeAnalysisKey {
@@ -596,48 +597,17 @@ fn starlark_rule_implementation<'a>(
     Ok(implementation)
 }
 
-fn required_starlark_option(
-    implementation: &StarlarkRuleImplementation,
-    target: &CanonicalLabel,
-) -> Result<Option<CanonicalLabel>, AnalysisError> {
-    let mut required = implementation
-        .is_root_string_build_setting()
-        .then(|| target.clone());
-    let mut insert = |candidate: CanonicalLabel| -> Result<(), AnalysisError> {
-        if let Some(existing) = &required
-            && existing != &candidate
-        {
-            return Err(AnalysisError::new(format!(
-                "multiple string build settings are not supported: {existing} and {candidate}"
-            )));
-        }
-        required = Some(candidate);
-        Ok(())
-    };
-    for schema in implementation.schema() {
-        if let Some(transition) = schema.transition() {
-            insert(
-                CanonicalLabel::parse(&format!("@@{}", transition.output()))
-                    .map_err(AnalysisError::new)?,
-            )?;
-        }
-    }
-    let fixed = CanonicalLabel::parse("@@//:setting").expect("fixed setting label is valid");
-    if implementation
-        .dependencies()
-        .iter()
-        .any(|dependency| dependency == &fixed)
-    {
-        insert(fixed)?;
-    }
-    Ok(required)
-}
-
-fn root_declared_dependency_keys(
+async fn root_declared_dependency_keys(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
     package: &LoadedPackage,
     configured_target: &ConfiguredTargetKey,
-) -> Result<Vec<DeclaredDependencyKey>, AnalysisError> {
-    let implementation = starlark_rule_implementation(package, configured_target)?;
+) -> AnalysisSemanticOutcome<Vec<DeclaredDependencyKey>> {
+    let implementation = match starlark_rule_implementation(package, configured_target) {
+        Ok(implementation) => implementation,
+        Err(error) => return analysis_semantic_complete(Err(error)),
+    };
     let mut dependencies = Vec::new();
     for value in implementation.values() {
         let Some(schema) = implementation
@@ -661,53 +631,70 @@ fn root_declared_dependency_keys(
             CoercedAttributeValue::LabelList(labels) => labels.iter().collect(),
             _ => continue,
         };
-        let configuration = if let Some(transition) = schema.transition() {
-            let module = Module::new();
-            let returned = Evaluator::new(&module)
-                .eval_function(
-                    transition.implementation().to_value(),
-                    &[Value::new_none(), Value::new_none()],
-                    &[],
-                )
-                .map_err(|error| AnalysisError::new(error.to_string()))?;
-            let entries = DictRef::from_value(returned)
-                .ok_or_else(|| AnalysisError::new("transition must return a dictionary"))?
-                .iter()
-                .collect::<Vec<_>>();
-            let [(output, setting)] = entries.as_slice() else {
-                return Err(AnalysisError::new(
-                    "transition must return exactly one declared output",
-                ));
+        let (configuration, transition_output) = if let Some(transition) = schema.transition() {
+            let output_label = match CanonicalLabel::parse(&format!("@@{}", transition.output())) {
+                Ok(label) => label,
+                Err(error) => return analysis_semantic_complete(Err(AnalysisError::new(error))),
             };
-            if output.unpack_str() != Some(transition.output()) {
-                return Err(AnalysisError::new(format!(
-                    "transition output must be exactly {}",
-                    transition.output()
-                )));
-            }
-            let setting = setting.unpack_str().ok_or_else(|| {
-                AnalysisError::new(format!(
-                    "transition {} output must be a string",
-                    transition.output()
-                ))
-            })?;
-            let output_label = CanonicalLabel::parse(&format!("@@{}", transition.output()))
-                .map_err(AnalysisError::new)?;
-            configured_target
-                .configuration()
-                .with_starlark_option(StarlarkOption::string(
-                    output_label,
-                    setting,
-                    StarlarkOptionScope::Default,
-                ))
+            let declaration =
+                match build_setting_declaration(ctx, mode, workspace, &output_label).await {
+                    LoadingPreparationOutcome::Need(need) => {
+                        return LoadingPreparationOutcome::Need(need);
+                    }
+                    LoadingPreparationOutcome::Complete(Err(error)) => {
+                        return LoadingPreparationOutcome::Complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                        return analysis_semantic_complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Ok(declaration))) => declaration,
+                };
+            let resolved = (|| -> Result<_, AnalysisError> {
+                let module = Module::new();
+                let returned = Evaluator::new(&module)
+                    .eval_function(
+                        transition.implementation().to_value(),
+                        &[Value::new_none(), Value::new_none()],
+                        &[],
+                    )
+                    .map_err(|error| AnalysisError::new(error.to_string()))?;
+                let entries = DictRef::from_value(returned)
+                    .ok_or_else(|| AnalysisError::new("transition must return a dictionary"))?
+                    .iter()
+                    .collect::<Vec<_>>();
+                let [(output, setting)] = entries.as_slice() else {
+                    return Err(AnalysisError::new(
+                        "transition must return exactly one declared output",
+                    ));
+                };
+                if output.unpack_str() != Some(transition.output()) {
+                    return Err(AnalysisError::new(format!(
+                        "transition output must be exactly {}",
+                        transition.output()
+                    )));
+                }
+                let candidate =
+                    unpack_transition_value(&output_label, &declaration, *setting, module.heap())
+                        .map_err(AnalysisError::new)?;
+                let resolved = resolve_candidate(output_label.clone(), &declaration, candidate)
+                    .map_err(AnalysisError::new)?;
+                Ok(match resolved {
+                    Some(resolved) => configured_target
+                        .configuration()
+                        .with_starlark_option(resolved),
+                    None => {
+                        without_starlark_option(configured_target.configuration(), &output_label)
+                    }
+                })
+            })();
+            let configuration = match resolved {
+                Ok(configuration) => configuration,
+                Err(error) => return analysis_semantic_complete(Err(error)),
+            };
+            (configuration, Some(output_label))
         } else {
-            configured_target.configuration().clone()
+            (configured_target.configuration().clone(), None)
         };
-        let transition_output = schema
-            .transition()
-            .map(|transition| CanonicalLabel::parse(&format!("@@{}", transition.output())))
-            .transpose()
-            .map_err(AnalysisError::new)?;
         for (attribute_index, label) in labels.into_iter().enumerate() {
             let node = if label.package() == configured_target.label().package()
                 && package
@@ -734,7 +721,7 @@ fn root_declared_dependency_keys(
             });
         }
     }
-    Ok(dependencies)
+    analysis_semantic_complete(Ok(dependencies))
 }
 #[derive(Debug, Clone)]
 struct DeclaredDependencyKey {
@@ -2130,6 +2117,37 @@ mod tests {
     use super::*;
 
     #[test]
+    fn absent_legacy_starlark_option_removal_preserves_configuration() {
+        let retained = CanonicalLabel::parse("@@//:retained").unwrap();
+        let configuration = ConfigurationKey::target("legacy-checksum-with-owned-storage")
+            .unwrap()
+            .with_starlark_option(StarlarkOption::string(
+                retained,
+                "value",
+                crate::key::StarlarkOptionScope::Default,
+            ));
+        let missing = CanonicalLabel::parse("@@//:missing").unwrap();
+        let retained_before = configuration
+            .starlark_options()
+            .iter()
+            .next()
+            .expect("fixture carries one retained option")
+            as *const StarlarkOption;
+
+        let unchanged = without_starlark_option(&configuration, &missing);
+
+        assert_eq!(unchanged, configuration);
+        assert!(unchanged.starlark_option(&missing).is_none());
+        let retained_after = unchanged
+            .starlark_options()
+            .iter()
+            .next()
+            .expect("unchanged configuration retains the fixture option")
+            as *const StarlarkOption;
+        assert_eq!(retained_after, retained_before);
+    }
+
+    #[test]
     fn configured_package_identity_distinguishes_same_paths_across_repositories() {
         let root = CanonicalLabel::parse("@@//collision:value").unwrap();
         let external = CanonicalLabel::parse("@@external//collision:value").unwrap();
@@ -2689,26 +2707,6 @@ impl ConfiguredNodeAnalysisKey {
             .node
             .configured_target()
             .expect("Starlark rule nodes retain structural configuration");
-        let required_root_string_setting = {
-            let rule = match starlark_rule_implementation(package, configured_target) {
-                Ok(rule) => rule,
-                Err(error) => return root_analysis_driver_complete(Err(error)),
-            };
-            match required_starlark_option(rule, label) {
-                Ok(required) => required,
-                Err(error) => return root_analysis_driver_complete(Err(error)),
-            }
-        };
-        if let Some(setting) = &required_root_string_setting
-            && configured_target
-                .configuration()
-                .starlark_option(setting)
-                .is_none()
-        {
-            return root_analysis_driver_complete(Err(AnalysisError::new(format!(
-                "configured node was constructed before resolving root string setting {setting}"
-            ))));
-        }
         let (requirement, marker) = {
             let rule = match starlark_rule_implementation(package, configured_target) {
                 Ok(rule) => rule,
@@ -2820,11 +2818,25 @@ impl ConfiguredNodeAnalysisKey {
                 LoadingPreparationOutcome::Complete(Ok(Ok(context))) => context,
             }
         };
-        let declared_dependency_keys = {
-            match root_declared_dependency_keys(package, configured_target) {
-                Ok(keys) => keys,
-                Err(error) => return root_analysis_driver_complete(Err(error)),
+        let declared_dependency_keys = match root_declared_dependency_keys(
+            ctx,
+            mode,
+            &self.workspace,
+            package,
+            configured_target,
+        )
+        .await
+        {
+            LoadingPreparationOutcome::Need(need) => {
+                return LoadingPreparationOutcome::Need(need);
             }
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return root_analysis_driver_complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(keys))) => keys,
         };
 
         let mut unique = SmallSet::with_capacity(declared_dependency_keys.len());

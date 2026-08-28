@@ -15,6 +15,7 @@ dice = { workspace = true }
 dice_futures = { workspace = true }
 dupe = { workspace = true }
 futures = { workspace = true }
+num-bigint = { workspace = true }
 slug_build_api_v2 = { workspace = true }
 slug_bzlmod_v2 = { workspace = true }
 slug_configuration_v2 = { workspace = true }
