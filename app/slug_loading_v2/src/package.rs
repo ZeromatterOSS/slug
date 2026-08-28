@@ -520,7 +520,9 @@ impl<T> NativeToolchainAttribute<T> {
 /// retained input is outside its admitted default-only surface.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum NativeToolchainTarget {
-    ConstraintSetting,
+    ConstraintSetting {
+        default_constraint_value: Option<CanonicalLabel>,
+    },
     ConstraintValue {
         constraint_setting: CanonicalLabel,
     },
@@ -541,7 +543,7 @@ pub enum NativeToolchainTarget {
 impl NativeToolchainTarget {
     pub fn rule_class(&self) -> &'static str {
         match self {
-            Self::ConstraintSetting => "constraint_setting",
+            Self::ConstraintSetting { .. } => "constraint_setting",
             Self::ConstraintValue { .. } => "constraint_value",
             Self::Platform { .. } => "platform",
             Self::ToolchainType => "toolchain_type",
@@ -551,7 +553,7 @@ impl NativeToolchainTarget {
 
     fn rule_capability(&self) -> &'static RuleCapability {
         match self {
-            Self::ConstraintSetting => &CONSTRAINT_SETTING_RULE_CAPABILITY,
+            Self::ConstraintSetting { .. } => &CONSTRAINT_SETTING_RULE_CAPABILITY,
             Self::ConstraintValue { .. } => &CONSTRAINT_VALUE_RULE_CAPABILITY,
             Self::Platform { .. } => &PLATFORM_RULE_CAPABILITY,
             Self::ToolchainType => &TOOLCHAIN_TYPE_RULE_CAPABILITY,
@@ -561,7 +563,10 @@ impl NativeToolchainTarget {
 
     pub fn semantic_references(&self) -> Vec<CanonicalLabel> {
         match self {
-            Self::ConstraintSetting | Self::ToolchainType => Vec::new(),
+            Self::ConstraintSetting {
+                default_constraint_value,
+            } => default_constraint_value.iter().cloned().collect(),
+            Self::ToolchainType => Vec::new(),
             Self::ConstraintValue { constraint_setting } => vec![constraint_setting.clone()],
             Self::Platform { constraint_values } => constraint_values.to_vec(),
             Self::Toolchain {
@@ -1754,7 +1759,7 @@ fn native_rule_class(kind: &PackageTargetKind) -> Option<NativeRuleClass> {
         PackageTargetKind::ConfigSetting { .. } => NativeRuleClass::ConfigSetting,
         PackageTargetKind::TestSuite { .. } => NativeRuleClass::TestSuite,
         PackageTargetKind::NativeToolchain(native) => match native {
-            NativeToolchainTarget::ConstraintSetting => NativeRuleClass::ConstraintSetting,
+            NativeToolchainTarget::ConstraintSetting { .. } => NativeRuleClass::ConstraintSetting,
             NativeToolchainTarget::ConstraintValue { .. } => NativeRuleClass::ConstraintValue,
             NativeToolchainTarget::Platform { .. } => NativeRuleClass::Platform,
             NativeToolchainTarget::ToolchainType => NativeRuleClass::ToolchainType,
@@ -2028,7 +2033,23 @@ fn native_rule_attributes(
                 );
             }
             match native {
-                NativeToolchainTarget::ConstraintSetting => {}
+                NativeToolchainTarget::ConstraintSetting {
+                    default_constraint_value,
+                } => set_native_value(
+                    class,
+                    &mut values,
+                    "default_constraint_value",
+                    if default_constraint_value.is_some() {
+                        AttributeProvenance::Explicit
+                    } else {
+                        AttributeProvenance::Default
+                    },
+                    default_constraint_value
+                        .as_ref()
+                        .map_or(CoercedAttributeValue::None, |label| {
+                            CoercedAttributeValue::Label(label.clone())
+                        }),
+                ),
                 NativeToolchainTarget::ConstraintValue { constraint_setting } => {
                     set_native_value(
                         class,
@@ -5838,14 +5859,28 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
 
     fn constraint_setting<'v>(
         name: &str,
+        #[starlark(require = named)] default_constraint_value: Option<Value<'v>>,
         visibility: Option<UnpackListOrTuple<&str>>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         let recorder = PackageRecorder::from_evaluator(eval)?;
+        let default_constraint_value = match default_constraint_value {
+            None => None,
+            Some(value) if value.is_none() => None,
+            Some(value) => Some(if let Some(label) = StarlarkLabel::from_value(value) {
+                label.canonical().clone()
+            } else if let Some(label) = value.unpack_str() {
+                recorder.native_toolchain_label(label)?
+            } else {
+                anyhow::bail!("default_constraint_value must be a Label, string, or None")
+            }),
+        };
         recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
-            NativeToolchainTarget::ConstraintSetting,
+            NativeToolchainTarget::ConstraintSetting {
+                default_constraint_value,
+            },
             visibility.map(list),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
@@ -6271,14 +6306,28 @@ fn native_methods(builder: &mut MethodsBuilder) {
     fn constraint_setting<'v>(
         #[starlark(this)] _native: Value<'v>,
         name: &str,
+        #[starlark(require = named)] default_constraint_value: Option<Value<'v>>,
         visibility: Option<UnpackListOrTuple<&str>>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         let recorder = PackageRecorder::from_evaluator(eval)?;
+        let default_constraint_value = match default_constraint_value {
+            None => None,
+            Some(value) if value.is_none() => None,
+            Some(value) => Some(if let Some(label) = StarlarkLabel::from_value(value) {
+                label.canonical().clone()
+            } else if let Some(label) = value.unpack_str() {
+                recorder.native_toolchain_label(label)?
+            } else {
+                anyhow::bail!("default_constraint_value must be a Label, string, or None")
+            }),
+        };
         recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
-            NativeToolchainTarget::ConstraintSetting,
+            NativeToolchainTarget::ConstraintSetting {
+                default_constraint_value,
+            },
             visibility.map(list),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;

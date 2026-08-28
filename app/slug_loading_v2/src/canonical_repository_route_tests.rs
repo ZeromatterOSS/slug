@@ -9,6 +9,7 @@ pub(super) mod tests {
     use std::sync::Mutex;
 
     use async_trait::async_trait;
+    use compact_str::CompactString;
     use dice::ActivationData;
     use dice::ActivationKind;
     use dice::ActivationTracker;
@@ -21,6 +22,8 @@ pub(super) mod tests {
     use dupe::Dupe;
     use slug_bzlmod_v2::BzlmodCommandPolicyKey;
     use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+    use slug_bzlmod_v2::HostBuiltinBazelToolsRepositoryMappingKey;
+    use slug_bzlmod_v2::HostBuiltinBazelToolsRepositoryMappingObservationKey;
     use slug_bzlmod_v2::HostCanonicalRepositoryRoute;
     use slug_bzlmod_v2::HostCanonicalRepositoryRouteKind;
     use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionErrorDisposition;
@@ -32,6 +35,7 @@ pub(super) mod tests {
     use slug_bzlmod_v2::HostRootRepositoryMappingObservationKey;
     use slug_bzlmod_v2::HostSelectedExtensionDemandObservationKey;
     use slug_bzlmod_v2::LockfileMode;
+    use slug_bzlmod_v2::OverrideAttributeValue;
     use slug_bzlmod_v2::RegistryFileKey;
     use slug_bzlmod_v2::RegistryFileUrl;
     use slug_bzlmod_v2::RegistryIo;
@@ -39,8 +43,13 @@ pub(super) mod tests {
     use slug_bzlmod_v2::RegistryRequestGeneration;
     use slug_bzlmod_v2::RegistryTransportError;
     use slug_bzlmod_v2::RegistryUrls;
+    use slug_bzlmod_v2::RepoRuleId;
+    use slug_bzlmod_v2::RepoSpec;
     use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
     use slug_bzlmod_v2::RepositoryMaterializationKey;
+    use slug_bzlmod_v2::RepositoryMaterializationKind;
+    use slug_bzlmod_v2::RepositoryMaterializationRequest;
+    use slug_bzlmod_v2::RepositoryMaterializationRequestId;
     use slug_bzlmod_v2::RepositoryMaterializationResult;
     use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
     use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
@@ -54,6 +63,7 @@ pub(super) mod tests {
     use slug_events_v2::EvaluationEvent;
     use slug_events_v2::EventBatch;
     use slug_identity_v2::ApparentRepoName;
+    use slug_identity_v2::CanonicalLabel;
     use slug_identity_v2::CanonicalRepoName;
     use slug_workspace_v2::NormalizedAbsolutePath;
     use slug_workspace_v2::ObservedPathFrontierError;
@@ -80,6 +90,19 @@ pub(super) mod tests {
 
     pub(crate) const WORKSPACE: &str = "/generated-repository-definition";
     pub(crate) const MODULE: &str = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, first='first', second='second')\n";
+    pub(crate) fn builtin_graph_module() -> String {
+        let mut module = include_str!("../../slug_bzlmod_v2/builtin/bazel_tools/MODULE.bazel")
+            .replacen(
+                "module(name = \"bazel_tools\")",
+                "module(name = \"root\")",
+                1,
+            )
+            .replace(", repo_name = None", "");
+        module.push_str(
+            "\n# builtin_graph\nlocal_path_override(module_name='platforms', path='platforms')\n",
+        );
+        module
+    }
     pub(crate) const EXTENSION_A: &str = r#"
 repo=repository_rule(implementation=lambda ctx: None, attrs={'value':attr.string(), 'target':attr.label()})
 def impl(ctx):
@@ -97,6 +120,8 @@ ext=module_extension(implementation=impl)
 
     struct StaticRegistryIo(BTreeMap<String, Arc<[u8]>>);
 
+    struct BuiltinGraphRegistryIo;
+
     #[async_trait]
     impl RegistryIo for StaticRegistryIo {
         async fn read_exact(
@@ -109,6 +134,39 @@ ext=module_extension(implementation=impl)
                 .cloned()
                 .map_or(RegistryIoOutcome::NotFound, RegistryIoOutcome::Found))
         }
+    }
+
+    #[async_trait]
+    impl RegistryIo for BuiltinGraphRegistryIo {
+        async fn read_exact(
+            &self,
+            url: &RegistryFileUrl,
+        ) -> Result<RegistryIoOutcome, RegistryTransportError> {
+            let parts = url.as_str().split('/').collect::<Vec<_>>();
+            let bytes = match parts.as_slice() {
+                [.., "modules", name, version, "MODULE.bazel"] => Some(
+                    format!("module(name='{name}', version='{version}')\n")
+                        .into_bytes()
+                        .into(),
+                ),
+                [.., "modules", name, _, "source.json"] => Some(
+                    format!(
+                        "{{\"url\":\"https://origin.invalid/{name}.tgz\",\"integrity\":\"sha256-a\"}}"
+                    )
+                    .into_bytes()
+                    .into(),
+                ),
+                [.., "bazel_registry.json"] => Some(Arc::from(b"{}".as_slice())),
+                _ => None,
+            };
+            Ok(bytes.map_or(RegistryIoOutcome::NotFound, RegistryIoOutcome::Found))
+        }
+    }
+
+    pub(crate) fn builtin_graph_dice() -> Arc<Dice> {
+        let mut builder = Dice::builder();
+        slug_bzlmod_v2::install_registry_io(&mut builder, Arc::new(BuiltinGraphRegistryIo));
+        builder.build(DetectCycles::Enabled)
     }
 
     #[derive(Default)]
@@ -274,6 +332,63 @@ ext=module_extension(implementation=impl)
                 module.as_bytes(),
             ))),
         ));
+        if module.contains("# builtin_graph") {
+            for (name, kind, stamp) in [
+                ("platforms", PathNodeKind::Directory, 20),
+                ("platforms/MODULE.bazel", PathNodeKind::RegularFile, 21),
+                ("platforms/host", PathNodeKind::Directory, 22),
+                (
+                    "platforms/host/constraints.bzl",
+                    PathNodeKind::RegularFile,
+                    23,
+                ),
+                ("platforms/host/BUILD.bazel", PathNodeKind::RegularFile, 24),
+            ] {
+                observations.push((
+                    demand(&path(name), PathObservationOperation::Lstat),
+                    lstat(
+                        kind,
+                        stamp,
+                        if kind == PathNodeKind::Directory {
+                            0o755
+                        } else {
+                            0o644
+                        },
+                    ),
+                ));
+            }
+            for name in [
+                "platforms/REPO.bazel",
+                "platforms/.bazelignore",
+                "platforms/BUILD",
+            ] {
+                observations.push((
+                    demand(&path(name), PathObservationOperation::Lstat),
+                    PathObservationResult::Lstat(PathOperationResult::Missing),
+                ));
+            }
+            for (name, bytes) in [
+                (
+                    "platforms/MODULE.bazel",
+                    b"module(name='platforms', version='1.0.0')\n".as_slice(),
+                ),
+                (
+                    "platforms/host/constraints.bzl",
+                    b"HOST_CONSTRAINTS = ['@platforms//cpu:x86_64']\n".as_slice(),
+                ),
+                (
+                    "platforms/host/BUILD.bazel",
+                    b"exports_files(['constraints.bzl'])\n".as_slice(),
+                ),
+            ] {
+                observations.push((
+                    demand(&path(name), PathObservationOperation::FileBytes),
+                    PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                        bytes,
+                    ))),
+                ));
+            }
+        }
         observations.push((
             demand(
                 &path("local/MODULE.bazel"),
@@ -394,12 +509,51 @@ ext=module_extension(implementation=impl)
             .unwrap(),
         )
         .unwrap();
+        let materializations = module
+            .contains("# builtin_graph")
+            .then(|| {
+                ["platforms+", "platforms"].map(|canonical_repo| {
+                    RepositoryMaterializationEpochEntry {
+                        request: Arc::new(RepositoryMaterializationRequest {
+                            id: RepositoryMaterializationRequestId {
+                                workspace: workspace.dupe(),
+                                canonical_repo: CanonicalRepoName::new(canonical_repo).unwrap(),
+                            },
+                            repo_spec: RepoSpec {
+                                rule_id: RepoRuleId {
+                                    bzl_file: CanonicalLabel::parse(
+                                        "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                                    )
+                                    .unwrap(),
+                                    rule_name: "local_repository".into(),
+                                },
+                                attributes: Arc::new(SmallMap::from_iter([(
+                                    CompactString::new("path"),
+                                    OverrideAttributeValue::String("platforms".into()),
+                                )])),
+                            },
+                            kind: RepositoryMaterializationKind::Local {
+                                logical_root: NormalizedAbsolutePath::new(format!(
+                                    "{WORKSPACE}/platforms"
+                                ))
+                                .unwrap(),
+                            },
+                        }),
+                        result: RepositoryMaterializationResult::Success(
+                            RepositoryMaterializationSuccess::Local,
+                        ),
+                    }
+                })
+            })
+            .into_iter()
+            .flatten();
         updater
             .changed_to(vec![(
                 RepositoryMaterializationResultEpochKey {
                     workspace: workspace.dupe(),
                 },
-                RepositoryMaterializationResultEpoch::new(workspace.dupe(), []).unwrap(),
+                RepositoryMaterializationResultEpoch::new(workspace.dupe(), materializations)
+                    .unwrap(),
             )])
             .unwrap();
         updater
@@ -706,16 +860,12 @@ ext=module_extension(implementation=impl)
     }
 
     #[tokio::test]
-    async fn builtin_route_is_direct_for_legacy_and_observed_without_source_activation() {
+    async fn builtin_route_uses_complete_selected_mapping_owner() {
         let tracker = Arc::new(LookupTracker::default());
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let updater = dice.updater_with_data(UserComputationData {
-            cycle_detector: Some(crate::bzl_load_cycle_detector()),
-            activation_tracker: Some(tracker.clone()),
-            ..Default::default()
-        });
-        let mut tx = updater.commit().await;
-        let workspace = NormalizedAbsolutePath::new("/builtin-canonical-route").unwrap();
+        let dice = builtin_graph_dice();
+        let module = builtin_graph_module();
+        let mut tx = transaction(&dice, &module, EXTENSION_A, true, Some(tracker.clone())).await;
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let canonical = CanonicalRepoName::new("bazel_tools").unwrap();
         let legacy_key = HostCanonicalRepositoryRouteKey::new(workspace.clone(), canonical.clone());
         let legacy = tx.compute(&legacy_key).await.unwrap();
@@ -728,6 +878,18 @@ ext=module_extension(implementation=impl)
         assert!(legacy_route.view().builtin_identity().is_some());
         assert!(legacy_route.view().repo_spec().is_none());
         assert!(legacy_route.view().generated_effect_seed().is_none());
+        assert_eq!(
+            legacy_route
+                .mapping_target(&ApparentRepoName::new("platforms").unwrap())
+                .unwrap()
+                .as_str(),
+            "platforms"
+        );
+        assert!(
+            legacy_route
+                .mapping_target(&ApparentRepoName::new("buildozer_binary").unwrap())
+                .is_some()
+        );
         assert!(
             legacy_route
                 .mapping_target(&ApparentRepoName::new("anything").unwrap())
@@ -740,27 +902,29 @@ ext=module_extension(implementation=impl)
             panic!("builtin observed route must complete directly")
         };
         assert_eq!(observed.result().as_ref().as_ref().unwrap(), legacy_route);
-        assert!(observed.observations().observations().is_empty());
+        assert!(!observed.observations().observations().is_empty());
         assert_eq!(
             activation_dependencies(&tracker, &legacy_key.to_string()),
-            Vec::<String>::new()
+            [HostBuiltinBazelToolsRepositoryMappingKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            )
+            .to_string()]
         );
         assert_eq!(
             activation_dependencies(&tracker, &observed_key.to_string()),
-            Vec::<String>::new()
+            [HostBuiltinBazelToolsRepositoryMappingObservationKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            )
+            .to_string()]
         );
         assert!(tracker.selected.lock().unwrap().is_empty());
         assert!(tracker.lookup.lock().unwrap().is_empty());
-        assert!(tracker.forbidden.lock().unwrap().is_empty());
         assert_activation_families_absent(
             &tracker,
             &[
                 "host-canonical-selected-module-definition:",
                 "host-generated-repository-definition:",
-                "host-selected-repository-file-effect:",
                 "repository-package-source:",
-                "repository-source-file:",
-                "host-repository-source-file:",
             ],
         );
     }

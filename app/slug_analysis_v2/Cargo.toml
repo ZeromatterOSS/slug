@@ -25,7 +25,7 @@ slug_loading_v2 = { workspace = true }
 slug_workspace_v2 = { workspace = true }
 starlark = { workspace = true }
 starlark_map = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
 slug_bzlmod_v2 = { workspace = true }
-tokio = { workspace = true }

@@ -1535,6 +1535,204 @@ pub(crate) struct HostSelectedRepositoryMapping {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct HostSelectedRepositoryMappingRoute {
+    entry: HostSelectedModuleEntry,
+    canonical_repo: CanonicalRepoName,
+    mapping: HostSelectedRepositoryMapping,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct HostSelectedRepositoryMappings {
+    entries: Arc<[HostSelectedRepositoryMappingRoute]>,
+    extension_projection: Arc<HostSelectedExtensionMappingProjection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct HostSelectedRepositoryMappingsKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl HostSelectedRepositoryMappingsKey {
+    fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for HostSelectedRepositoryMappingsKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "host-selected-repository-mappings:{}", self.workspace)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct HostSelectedRepositoryMappingsObservationKey(HostSelectedRepositoryMappingsKey);
+
+impl HostSelectedRepositoryMappingsObservationKey {
+    fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self(HostSelectedRepositoryMappingsKey::new(workspace))
+    }
+}
+
+impl fmt::Display for HostSelectedRepositoryMappingsObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+type SelectedMappingsResult =
+    Arc<Result<HostSelectedRepositoryMappings, HostSelectedModuleRoutesError>>;
+type SelectedMappingsOutcome = SourcePreparationOutcome<SelectedMappingsResult>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedHostSelectedRepositoryMappings {
+    result: SelectedMappingsResult,
+    observations: PathObservationEpoch,
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostBuiltinBazelToolsRepositoryMapping {
+    mapping: HostSelectedRepositoryMapping,
+}
+
+impl HostBuiltinBazelToolsRepositoryMapping {
+    pub fn mapping_target(&self, apparent: &ApparentRepoName) -> Option<&CanonicalRepoName> {
+        self.mapping.entries.get(apparent)
+    }
+
+    pub fn entries(&self) -> Arc<[(ApparentRepoName, CanonicalRepoName)]> {
+        self.iter()
+            .map(|(apparent, canonical)| (apparent.clone(), canonical.clone()))
+            .collect::<Vec<_>>()
+            .into()
+    }
+
+    pub(crate) fn iter(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (&ApparentRepoName, &CanonicalRepoName)> {
+        self.mapping.order.iter().map(|apparent| {
+            (
+                apparent,
+                self.mapping
+                    .entries
+                    .get(apparent)
+                    .expect("selected mapping order remains valid"),
+            )
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn testing() -> Self {
+        Self {
+            mapping: HostSelectedRepositoryMapping {
+                context_repo: CanonicalRepoName::new("bazel_tools").unwrap(),
+                order: Arc::new([]),
+                entries: Arc::new(SmallMap::new()),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum HostBuiltinBazelToolsRepositoryMappingErrorKind {
+    Mappings(HostSelectedModuleRoutesError),
+    MappingsCompute(CompactString),
+    Missing,
+    WrongKind,
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostBuiltinBazelToolsRepositoryMappingError {
+    workspace: NormalizedAbsolutePath,
+    kind: HostBuiltinBazelToolsRepositoryMappingErrorKind,
+}
+
+impl fmt::Display for HostBuiltinBazelToolsRepositoryMappingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "builtin bazel_tools repository mapping: {:?}", self.kind)
+    }
+}
+
+impl std::error::Error for HostBuiltinBazelToolsRepositoryMappingError {}
+
+#[doc(hidden)]
+pub type HostBuiltinBazelToolsRepositoryMappingOutcome = SourcePreparationOutcome<
+    Arc<
+        Result<HostBuiltinBazelToolsRepositoryMapping, HostBuiltinBazelToolsRepositoryMappingError>,
+    >,
+>;
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostBuiltinBazelToolsRepositoryMappingKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl HostBuiltinBazelToolsRepositoryMappingKey {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for HostBuiltinBazelToolsRepositoryMappingKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-builtin-bazel-tools-repository-mapping:{}",
+            self.workspace
+        )
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostBuiltinBazelToolsRepositoryMappingObservationKey(
+    HostBuiltinBazelToolsRepositoryMappingKey,
+);
+
+impl HostBuiltinBazelToolsRepositoryMappingObservationKey {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self(HostBuiltinBazelToolsRepositoryMappingKey::new(workspace))
+    }
+}
+
+impl fmt::Display for HostBuiltinBazelToolsRepositoryMappingObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedHostBuiltinBazelToolsRepositoryMapping {
+    result: Arc<
+        Result<HostBuiltinBazelToolsRepositoryMapping, HostBuiltinBazelToolsRepositoryMappingError>,
+    >,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostBuiltinBazelToolsRepositoryMapping {
+    pub fn result(
+        &self,
+    ) -> &Arc<
+        Result<HostBuiltinBazelToolsRepositoryMapping, HostBuiltinBazelToolsRepositoryMappingError>,
+    > {
+        &self.result
+    }
+
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct HostBuiltinBazelToolsRepositoryMappingObservationError(
+    HostSelectedRepositoryMappingsObservationError,
+);
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 struct HostSelectedModuleRoute {
     entry: HostSelectedModuleEntry,
     canonical_repo: CanonicalRepoName,
@@ -1545,6 +1743,7 @@ struct HostSelectedModuleRoute {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct HostSelectedModuleRoutes {
     entries: Arc<[HostSelectedModuleRoute]>,
+    extension_projection: Arc<HostSelectedExtensionMappingProjection>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -1638,6 +1837,7 @@ impl ObservedHostSelectedModuleRoutes {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
 enum RouteObservationStage {
     Graph,
@@ -1647,6 +1847,7 @@ enum RouteObservationStage {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 enum HostSelectedModuleRoutesObservationError {
     Graph(HostSelectedModuleGraphObservationError),
+    Mappings(HostSelectedRepositoryMappingsObservationError),
     RepoSpecs(HostSelectedRegistryRepoSpecsObservationError),
     Merge {
         stage: RouteObservationStage,
@@ -1731,12 +1932,13 @@ fn insert_mapping(
     Ok(())
 }
 
+#[cfg(test)]
 fn selected_routes(
     graph: &crate::selected_graph::HostSelectedModuleGraph,
     repo_specs: &HostSelectedRegistryRepoSpecs,
 ) -> Result<HostSelectedModuleRoutes, HostSelectedModuleRoutesError> {
-    let canonicals = canonical_lookup(graph.resolved.iter().map(|entry| &entry.key))?;
-    selected_routes_with_canonicals(graph, repo_specs, canonicals)
+    let mappings = selected_repository_mappings(graph, Arc::new([]))?;
+    selected_routes_from_mappings(&mappings, repo_specs)
 }
 
 fn canonical_lookup<'a>(
@@ -1765,24 +1967,11 @@ fn canonical_lookup<'a>(
     Ok(canonicals)
 }
 
-fn selected_routes_with_canonicals(
+fn selected_repository_mappings(
     graph: &crate::selected_graph::HostSelectedModuleGraph,
-    repo_specs: &HostSelectedRegistryRepoSpecs,
-    canonicals: SmallMap<HostGraphModuleKey, CanonicalRepoName>,
-) -> Result<HostSelectedModuleRoutes, HostSelectedModuleRoutesError> {
-    let mut selected_specs = SmallMap::<HostGraphModuleKey, HostSelectedRegistryRepoSpec>::new();
-    for spec in repo_specs.entries.iter() {
-        if selected_specs
-            .insert(spec.module.clone(), spec.clone())
-            .is_some()
-        {
-            return Err(HostSelectedModuleRoutesError::RegistryMismatch {
-                module: spec.module.clone(),
-                message: "duplicate selected registry RepoSpec".into(),
-            });
-        }
-    }
-
+    root_usages: Arc<[RootExtensionUsage]>,
+) -> Result<HostSelectedRepositoryMappings, HostSelectedModuleRoutesError> {
+    let canonicals = canonical_lookup(graph.resolved.iter().map(|entry| &entry.key))?;
     let mut routes = Vec::with_capacity(graph.resolved.len());
     for entry in graph.resolved.iter() {
         let canonical = canonicals
@@ -1815,15 +2004,54 @@ fn selected_routes_with_canonicals(
             insert_mapping(&entry.key, &mut mapping, apparent, target.clone())?;
         }
 
+        routes.push(HostSelectedRepositoryMappingRoute {
+            entry: entry.clone(),
+            canonical_repo: canonical.clone(),
+            mapping: HostSelectedRepositoryMapping {
+                context_repo: canonical,
+                order: mapping.keys().cloned().collect(),
+                entries: Arc::new(mapping),
+            },
+        });
+    }
+    let extension_projection = selected_extension_mapping_projection(&routes, root_usages)
+        .map_err(extension_mapping_route_error)?;
+    for (route, mapping) in routes.iter_mut().zip(extension_projection.mappings.iter()) {
+        route.mapping = mapping.clone();
+    }
+    Ok(HostSelectedRepositoryMappings {
+        entries: routes.into(),
+        extension_projection: Arc::new(extension_projection),
+    })
+}
+
+fn selected_routes_from_mappings(
+    mappings: &HostSelectedRepositoryMappings,
+    repo_specs: &HostSelectedRegistryRepoSpecs,
+) -> Result<HostSelectedModuleRoutes, HostSelectedModuleRoutesError> {
+    let mut selected_specs = SmallMap::<HostGraphModuleKey, HostSelectedRegistryRepoSpec>::new();
+    for spec in repo_specs.entries.iter() {
+        if selected_specs
+            .insert(spec.module.clone(), spec.clone())
+            .is_some()
+        {
+            return Err(HostSelectedModuleRoutesError::RegistryMismatch {
+                module: spec.module.clone(),
+                message: "duplicate selected registry RepoSpec".into(),
+            });
+        }
+    }
+    let mut routes = Vec::with_capacity(mappings.entries.len());
+    for mapped in mappings.entries.iter() {
         let is_registry = matches!(
-            &entry.source,
+            &mapped.entry.source,
             HostGraphModuleSource::Discovered(module)
                 if matches!(module.provenance, HostDiscoveredModuleProvenance::Registry { .. })
         );
-        let registry_repo_spec = selected_specs.shift_remove(&entry.key);
+        let registry_repo_spec = selected_specs.shift_remove(&mapped.entry.key);
         if is_registry != registry_repo_spec.is_some() {
             return Err(HostSelectedModuleRoutesError::RegistryMismatch {
-                module: entry.key.clone(),
+                module: mapped.entry.key.clone(),
                 message: if is_registry {
                     "selected registry module has no RepoSpec"
                 } else {
@@ -1833,13 +2061,9 @@ fn selected_routes_with_canonicals(
             });
         }
         routes.push(HostSelectedModuleRoute {
-            entry: entry.clone(),
-            canonical_repo: canonical.clone(),
-            mapping: HostSelectedRepositoryMapping {
-                context_repo: canonical,
-                order: mapping.keys().cloned().collect(),
-                entries: Arc::new(mapping),
-            },
+            entry: mapped.entry.clone(),
+            canonical_repo: mapped.canonical_repo.clone(),
+            mapping: mapped.mapping.clone(),
             registry_repo_spec,
         });
     }
@@ -1851,6 +2075,7 @@ fn selected_routes_with_canonicals(
     }
     Ok(HostSelectedModuleRoutes {
         entries: routes.into(),
+        extension_projection: mappings.extension_projection.clone(),
     })
 }
 
@@ -1929,6 +2154,7 @@ fn routes_complete(
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
 }
 
+#[cfg(test)]
 fn finish_route_graph_child(
     child: RepoSpecChild<
         HostSelectedModuleGraph,
@@ -1986,6 +2212,7 @@ fn finish_route_repo_specs_child(
     }
 }
 
+#[cfg(test)]
 fn finish_route_graph_semantic<'a>(
     result: &'a Result<HostSelectedModuleGraph, HostSelectedModuleGraphError>,
     observations: PathObservationEpoch,
@@ -1996,6 +2223,426 @@ fn finish_route_graph_semantic<'a>(
             observations,
         )
     })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct HostRootExtensionUsagesKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl HostRootExtensionUsagesKey {
+    fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for HostRootExtensionUsagesKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "host-root-extension-usages:{}", self.workspace)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct HostRootExtensionUsagesObservationKey(HostRootExtensionUsagesKey);
+
+impl HostRootExtensionUsagesObservationKey {
+    fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self(HostRootExtensionUsagesKey::new(workspace))
+    }
+}
+
+impl fmt::Display for HostRootExtensionUsagesObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+type RootExtensionUsagesResult = Arc<Result<Arc<[RootExtensionUsage]>, CompactString>>;
+type RootExtensionUsagesOutcome = SourcePreparationOutcome<RootExtensionUsagesResult>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedHostRootExtensionUsages {
+    result: RootExtensionUsagesResult,
+    observations: PathObservationEpoch,
+}
+
+#[async_trait]
+impl Key for HostRootExtensionUsagesKey {
+    type Value = RootExtensionUsagesOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let result = match ctx
+            .compute(&RootModuleFilesKey {
+                workspace: self.workspace.as_path().to_owned(),
+            })
+            .await
+        {
+            Ok(result) => match result.as_ref() {
+                Ok(files) => Ok(files.extension_usages.clone()),
+                Err(error) => Err(error.clone()),
+            },
+            Err(error) => Err(error.to_string().into()),
+        };
+        SourcePreparationOutcome::Complete(Arc::new(result))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostRootExtensionUsagesObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedHostRootExtensionUsages, ObservedPathFrontierError>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match ctx
+            .compute(&RootModuleFilesObservationKey::new(self.0.workspace.dupe()))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostRootExtensionUsages {
+                    result: Arc::new(match observed.result().as_ref() {
+                        Ok(files) => Ok(files.extension_usages.clone()),
+                        Err(error) => Err(error.clone()),
+                    }),
+                    observations: observed.observations().dupe(),
+                }))
+            }
+            Err(error) => SourcePreparationOutcome::Complete(Ok(ObservedHostRootExtensionUsages {
+                result: Arc::new(Err(error.to_string().into())),
+                observations: PathObservationEpoch::empty(),
+            })),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+enum HostSelectedRepositoryMappingsObservationError {
+    Graph(HostSelectedModuleGraphObservationError),
+    Root(ObservedPathFrontierError),
+    Merge(ObservedPathFrontierError),
+}
+
+type SelectedMappingsDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (SelectedMappingsResult, PathObservationEpoch),
+        HostSelectedRepositoryMappingsObservationError,
+    >,
+>;
+
+async fn drive_selected_repository_mappings(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryMappingsKey,
+    mode: RoutesMode,
+) -> SelectedMappingsDriverOutcome {
+    let child = match mode {
+        RoutesMode::Legacy => legacy_graph_child(ctx, &key.workspace).await,
+        RoutesMode::Observed => selected_graph_child(ctx, &key.workspace).await,
+    };
+    let (result, mut observations) = match child {
+        RepoSpecChild::Compute(message) => {
+            return SourcePreparationOutcome::Complete(Ok((
+                Arc::new(Err(HostSelectedModuleRoutesError::GraphCompute(message))),
+                PathObservationEpoch::empty(),
+            )));
+        }
+        RepoSpecChild::Need(need) => return SourcePreparationOutcome::Need(need),
+        RepoSpecChild::Outer(error) => {
+            return SourcePreparationOutcome::Complete(Err(
+                HostSelectedRepositoryMappingsObservationError::Graph(error),
+            ));
+        }
+        RepoSpecChild::Complete {
+            result,
+            observations,
+        } => (result, observations),
+    };
+    let graph = match result.as_ref() {
+        Ok(graph) => graph,
+        Err(error) => {
+            return SourcePreparationOutcome::Complete(Ok((
+                Arc::new(Err(HostSelectedModuleRoutesError::Graph(error.clone()))),
+                observations,
+            )));
+        }
+    };
+    let (root_result, root_observations) = match mode {
+        RoutesMode::Legacy => match ctx
+            .compute(&HostRootExtensionUsagesKey::new(key.workspace.dupe()))
+            .await
+        {
+            Err(error) => (
+                Arc::new(Err(error.to_string().into())),
+                PathObservationEpoch::empty(),
+            ),
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(result)) => {
+                (result, PathObservationEpoch::empty())
+            }
+        },
+        RoutesMode::Observed => match ctx
+            .compute(&HostRootExtensionUsagesObservationKey::new(
+                key.workspace.dupe(),
+            ))
+            .await
+        {
+            Err(error) => (
+                Arc::new(Err(error.to_string().into())),
+                PathObservationEpoch::empty(),
+            ),
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return SourcePreparationOutcome::Complete(Err(
+                    HostSelectedRepositoryMappingsObservationError::Root(error),
+                ));
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                (observed.result, observed.observations)
+            }
+        },
+    };
+    observations = match PathObservationEpoch::from_shared(
+        observations
+            .observations()
+            .iter()
+            .chain(root_observations.observations())
+            .map(|(demand, result)| (demand.dupe(), result.dupe())),
+    ) {
+        Ok(observations) => observations,
+        Err(error) => {
+            return SourcePreparationOutcome::Complete(Err(
+                HostSelectedRepositoryMappingsObservationError::Merge(
+                    ObservedPathFrontierError::from(error),
+                ),
+            ));
+        }
+    };
+    let value = match root_result.as_ref() {
+        Ok(root_usages) => selected_repository_mappings(graph, root_usages.clone()),
+        Err(error) => Err(route_invalid(
+            &HostGraphModuleKey::Root,
+            format!("root extension usages: {error}"),
+        )),
+    };
+    SourcePreparationOutcome::Complete(Ok((Arc::new(value), observations)))
+}
+
+fn project_legacy_selected_mappings(
+    outcome: SelectedMappingsDriverOutcome,
+) -> SelectedMappingsOutcome {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+            debug_assert!(observations.observations().is_empty());
+            SourcePreparationOutcome::Complete(result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy selected mappings have no observed frontier")
+        }
+    }
+}
+
+#[async_trait]
+impl Key for HostSelectedRepositoryMappingsKey {
+    type Value = SelectedMappingsOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        project_legacy_selected_mappings(
+            drive_selected_repository_mappings(ctx, self, RoutesMode::Legacy).await,
+        )
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostSelectedRepositoryMappingsObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostSelectedRepositoryMappings,
+            HostSelectedRepositoryMappingsObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match drive_selected_repository_mappings(ctx, &self.0, RoutesMode::Observed).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostSelectedRepositoryMappings {
+                    result,
+                    observations,
+                }))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+fn builtin_mapping(
+    workspace: &NormalizedAbsolutePath,
+    mappings: &Result<HostSelectedRepositoryMappings, HostSelectedModuleRoutesError>,
+) -> Result<HostBuiltinBazelToolsRepositoryMapping, HostBuiltinBazelToolsRepositoryMappingError> {
+    let mappings =
+        mappings
+            .as_ref()
+            .map_err(|error| HostBuiltinBazelToolsRepositoryMappingError {
+                workspace: workspace.dupe(),
+                kind: HostBuiltinBazelToolsRepositoryMappingErrorKind::Mappings(error.clone()),
+            })?;
+    let Some(route) = mappings
+        .entries
+        .iter()
+        .find(|route| route.canonical_repo.as_str() == "bazel_tools")
+    else {
+        return Err(HostBuiltinBazelToolsRepositoryMappingError {
+            workspace: workspace.dupe(),
+            kind: HostBuiltinBazelToolsRepositoryMappingErrorKind::Missing,
+        });
+    };
+    if !matches!(
+        &route.entry.source,
+        HostGraphModuleSource::Discovered(module)
+            if matches!(module.provenance, HostDiscoveredModuleProvenance::BuiltinBazelTools { .. })
+    ) || route.mapping.context_repo.as_str() != "bazel_tools"
+    {
+        return Err(HostBuiltinBazelToolsRepositoryMappingError {
+            workspace: workspace.dupe(),
+            kind: HostBuiltinBazelToolsRepositoryMappingErrorKind::WrongKind,
+        });
+    }
+    Ok(HostBuiltinBazelToolsRepositoryMapping {
+        mapping: route.mapping.clone(),
+    })
+}
+
+#[async_trait]
+impl Key for HostBuiltinBazelToolsRepositoryMappingKey {
+    type Value = HostBuiltinBazelToolsRepositoryMappingOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match ctx
+            .compute(&HostSelectedRepositoryMappingsKey::new(
+                self.workspace.dupe(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(result)) => SourcePreparationOutcome::Complete(
+                Arc::new(builtin_mapping(&self.workspace, result.as_ref())),
+            ),
+            Err(error) => SourcePreparationOutcome::Complete(Arc::new(Err(
+                HostBuiltinBazelToolsRepositoryMappingError {
+                    workspace: self.workspace.dupe(),
+                    kind: HostBuiltinBazelToolsRepositoryMappingErrorKind::MappingsCompute(
+                        error.to_string().into(),
+                    ),
+                },
+            ))),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostBuiltinBazelToolsRepositoryMappingObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostBuiltinBazelToolsRepositoryMapping,
+            HostBuiltinBazelToolsRepositoryMappingObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match ctx
+            .compute(&HostSelectedRepositoryMappingsObservationKey::new(
+                self.0.workspace.dupe(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                SourcePreparationOutcome::Complete(Err(
+                    HostBuiltinBazelToolsRepositoryMappingObservationError(error),
+                ))
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                SourcePreparationOutcome::Complete(Ok(
+                    ObservedHostBuiltinBazelToolsRepositoryMapping {
+                        result: Arc::new(builtin_mapping(
+                            &self.0.workspace,
+                            observed.result.as_ref(),
+                        )),
+                        observations: observed.observations,
+                    },
+                ))
+            }
+            Err(error) => SourcePreparationOutcome::Complete(Ok(
+                ObservedHostBuiltinBazelToolsRepositoryMapping {
+                    result: Arc::new(Err(HostBuiltinBazelToolsRepositoryMappingError {
+                        workspace: self.0.workspace.dupe(),
+                        kind: HostBuiltinBazelToolsRepositoryMappingErrorKind::MappingsCompute(
+                            error.to_string().into(),
+                        ),
+                    })),
+                    observations: PathObservationEpoch::empty(),
+                },
+            )),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
 }
 
 fn finish_route_repo_specs_semantic<'a>(
@@ -2015,19 +2662,62 @@ async fn drive_selected_module_routes(
     key: &HostSelectedModuleRoutesKey,
     mode: RoutesMode,
 ) -> RoutesDriverOutcome {
-    let graph_child = match mode {
-        RoutesMode::Legacy => legacy_graph_child(ctx, &key.workspace).await,
-        RoutesMode::Observed => selected_graph_child(ctx, &key.workspace).await,
+    let (mapping_result, mapping_observations) = match mode {
+        RoutesMode::Legacy => match ctx
+            .compute(&HostSelectedRepositoryMappingsKey::new(
+                key.workspace.dupe(),
+            ))
+            .await
+        {
+            Err(error) => {
+                return routes_complete(
+                    Err(HostSelectedModuleRoutesError::GraphCompute(
+                        error.to_string().into(),
+                    )),
+                    PathObservationEpoch::empty(),
+                );
+            }
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(result)) => {
+                (result, PathObservationEpoch::empty())
+            }
+        },
+        RoutesMode::Observed => match ctx
+            .compute(&HostSelectedRepositoryMappingsObservationKey::new(
+                key.workspace.dupe(),
+            ))
+            .await
+        {
+            Err(error) => {
+                return routes_complete(
+                    Err(HostSelectedModuleRoutesError::GraphCompute(
+                        error.to_string().into(),
+                    )),
+                    PathObservationEpoch::empty(),
+                );
+            }
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return SourcePreparationOutcome::Complete(Err(match error {
+                    HostSelectedRepositoryMappingsObservationError::Graph(error) => {
+                        HostSelectedModuleRoutesObservationError::Graph(error)
+                    }
+                    error => HostSelectedModuleRoutesObservationError::Mappings(error),
+                }));
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                (observed.result, observed.observations)
+            }
+        },
     };
-    let mut observations = PathObservationEpoch::empty();
-    let graph_result = match finish_route_graph_child(graph_child, &mut observations) {
-        Ok(result) => result,
-        Err(terminal) => return terminal,
-    };
-    let graph = match finish_route_graph_semantic(&graph_result, observations.dupe()) {
-        Ok(graph) => graph,
-        Err(terminal) => return terminal,
-    };
+    let mut observations = mapping_observations;
+    if let Err(error @ HostSelectedModuleRoutesError::Graph(_)) = mapping_result.as_ref() {
+        return routes_complete(Err(error.clone()), observations);
+    }
     let repo_specs = match finish_route_repo_specs_child(
         route_repo_specs_child(ctx, &key.workspace, mode).await,
         &mut observations,
@@ -2039,7 +2729,14 @@ async fn drive_selected_module_routes(
         Ok(repo_specs) => repo_specs,
         Err(terminal) => return terminal,
     };
-    routes_complete(selected_routes(graph, repo_specs), observations)
+    let mappings = match mapping_result.as_ref() {
+        Ok(mappings) => mappings,
+        Err(error) => return routes_complete(Err(error.clone()), observations),
+    };
+    routes_complete(
+        selected_routes_from_mappings(mappings, repo_specs),
+        observations,
+    )
 }
 
 fn project_legacy_routes(outcome: RoutesDriverOutcome) -> RoutesOutcome {
@@ -2506,6 +3203,15 @@ fn selected_routes_observation_frontier(
         HostSelectedModuleRoutesObservationError::Graph(error) => {
             selected_graph_observation_frontier(error)
         }
+        HostSelectedModuleRoutesObservationError::Mappings(error) => match error {
+            HostSelectedRepositoryMappingsObservationError::Graph(error) => {
+                selected_graph_observation_frontier(error)
+            }
+            HostSelectedRepositoryMappingsObservationError::Root(error)
+            | HostSelectedRepositoryMappingsObservationError::Merge(error) => {
+                crate::HostSelectedObservationFrontier::Path(error.clone())
+            }
+        },
         HostSelectedModuleRoutesObservationError::RepoSpecs(error) => match error {
             HostSelectedRegistryRepoSpecsObservationError::Graph(error) => {
                 selected_graph_observation_frontier(error)
@@ -2777,6 +3483,26 @@ struct HostSelectedExtensionOverride {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct HostSelectedExtensionMappingProjection {
+    root_usages: Arc<[RootExtensionUsage]>,
+    usages: Arc<[HostSelectedExtensionUsage]>,
+    overrides: Arc<[HostSelectedExtensionOverride]>,
+    base_mappings: Arc<[HostSelectedRepositoryMapping]>,
+    mappings: Arc<[HostSelectedRepositoryMapping]>,
+}
+
+#[cfg(test)]
+fn testing_extension_mapping_projection() -> Arc<HostSelectedExtensionMappingProjection> {
+    Arc::new(HostSelectedExtensionMappingProjection {
+        root_usages: Arc::new([]),
+        usages: Arc::new([]),
+        overrides: Arc::new([]),
+        base_mappings: Arc::new([]),
+        mappings: Arc::new([]),
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 struct HostSelectedExtensionMappings {
     routes: Arc<HostSelectedModuleRoutes>,
     root_usages: Arc<[RootExtensionUsage]>,
@@ -2786,6 +3512,7 @@ struct HostSelectedExtensionMappings {
     mappings: Arc<[HostSelectedRepositoryMapping]>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 enum HostSelectedExtensionMappingsError {
     Routes(HostSelectedModuleRoutesError),
@@ -2862,12 +3589,14 @@ impl ObservedHostSelectedExtensionMappings {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
 enum ExtensionMappingsObservationStage {
     Routes,
     RootFiles,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 enum ExtensionMappingsObservationError {
     Routes(HostSelectedModuleRoutesObservationError),
@@ -2889,6 +3618,20 @@ fn extension_invalid(
     HostSelectedExtensionMappingsError::Invalid {
         owner: owner.clone(),
         message: message.into(),
+    }
+}
+
+fn extension_mapping_route_error(
+    error: HostSelectedExtensionMappingsError,
+) -> HostSelectedModuleRoutesError {
+    match error {
+        HostSelectedExtensionMappingsError::Invalid { owner, message } => {
+            HostSelectedModuleRoutesError::Invalid {
+                module: owner,
+                message,
+            }
+        }
+        error => route_invalid(&HostGraphModuleKey::Root, error.to_string()),
     }
 }
 
@@ -2983,12 +3726,11 @@ fn extension_unique_candidate(id: &HostSelectedExtensionId, collision: usize) ->
     }
 }
 
-fn selected_extension_mappings(
-    routes: Arc<HostSelectedModuleRoutes>,
+fn selected_extension_mapping_projection(
+    routes: &[HostSelectedRepositoryMappingRoute],
     root_usages: Arc<[RootExtensionUsage]>,
-) -> Result<HostSelectedExtensionMappings, HostSelectedExtensionMappingsError> {
+) -> Result<HostSelectedExtensionMappingProjection, HostSelectedExtensionMappingsError> {
     let root_route = routes
-        .entries
         .iter()
         .find(|route| matches!(route.entry.key, HostGraphModuleKey::Root))
         .ok_or_else(|| extension_invalid(&HostGraphModuleKey::Root, "root route is absent"))?;
@@ -3007,7 +3749,7 @@ fn selected_extension_mappings(
             root: true,
         });
     }
-    for route in routes.entries.iter() {
+    for route in routes.iter() {
         let HostGraphModuleSource::Discovered(module) = &route.entry.source else {
             continue;
         };
@@ -3028,7 +3770,6 @@ fn selected_extension_mappings(
     }
 
     let route_by_owner = routes
-        .entries
         .iter()
         .map(|route| (route.entry.key.clone(), route))
         .collect::<SmallMap<_, _>>();
@@ -3037,7 +3778,6 @@ fn selected_extension_mappings(
     let mut usages = Vec::new();
     let mut pending_overrides = Vec::new();
     let mut no_overrides = routes
-        .entries
         .iter()
         .map(|route| (*route.mapping.entries).clone())
         .collect::<Vec<_>>();
@@ -3085,7 +3825,6 @@ fn selected_extension_mappings(
             unique
         };
         let route_index = routes
-            .entries
             .iter()
             .position(|candidate| candidate.entry.key == *input.owner)
             .expect("selected owner route index exists");
@@ -3150,7 +3889,6 @@ fn selected_extension_mappings(
     drop(route_by_owner);
 
     let root_index = routes
-        .entries
         .iter()
         .position(|route| matches!(route.entry.key, HostGraphModuleKey::Root))
         .expect("root route exists");
@@ -3184,7 +3922,6 @@ fn selected_extension_mappings(
         });
     }
     let base_mappings = routes
-        .entries
         .iter()
         .zip(no_overrides.iter())
         .map(|(route, entries)| HostSelectedRepositoryMapping {
@@ -3194,7 +3931,6 @@ fn selected_extension_mappings(
         })
         .collect::<Arc<_>>();
     let mappings = routes
-        .entries
         .iter()
         .zip(no_overrides)
         .map(|(route, mut entries)| {
@@ -3210,14 +3946,52 @@ fn selected_extension_mappings(
             }
         })
         .collect::<Arc<_>>();
-    Ok(HostSelectedExtensionMappings {
-        routes,
+    Ok(HostSelectedExtensionMappingProjection {
         root_usages,
         usages: usages.into(),
         overrides: overrides.into(),
         base_mappings,
         mappings,
     })
+}
+
+#[cfg(test)]
+fn selected_extension_mappings(
+    routes: Arc<HostSelectedModuleRoutes>,
+    root_usages: Arc<[RootExtensionUsage]>,
+) -> Result<HostSelectedExtensionMappings, HostSelectedExtensionMappingsError> {
+    let mapping_routes = routes
+        .entries
+        .iter()
+        .map(|route| HostSelectedRepositoryMappingRoute {
+            entry: route.entry.clone(),
+            canonical_repo: route.canonical_repo.clone(),
+            mapping: route.mapping.clone(),
+        })
+        .collect::<Vec<_>>();
+    let projection = selected_extension_mapping_projection(&mapping_routes, root_usages)?;
+    Ok(HostSelectedExtensionMappings {
+        routes,
+        root_usages: projection.root_usages,
+        usages: projection.usages,
+        overrides: projection.overrides,
+        base_mappings: projection.base_mappings,
+        mappings: projection.mappings,
+    })
+}
+
+fn selected_extension_mappings_from_projection(
+    routes: Arc<HostSelectedModuleRoutes>,
+) -> HostSelectedExtensionMappings {
+    let projection = routes.extension_projection.clone();
+    HostSelectedExtensionMappings {
+        routes,
+        root_usages: projection.root_usages.clone(),
+        usages: projection.usages.clone(),
+        overrides: projection.overrides.clone(),
+        base_mappings: projection.base_mappings.clone(),
+        mappings: projection.mappings.clone(),
+    }
 }
 
 fn extension_mappings_complete(
@@ -3295,43 +4069,6 @@ async fn extension_routes_child(
     }
 }
 
-async fn extension_root_files_child(
-    ctx: &mut DiceComputations<'_>,
-    workspace: &NormalizedAbsolutePath,
-    mode: RoutesMode,
-) -> RepoSpecChild<RootModuleFiles, CompactString> {
-    match mode {
-        RoutesMode::Legacy => {
-            match ctx
-                .compute(&RootModuleFilesKey {
-                    workspace: workspace.as_path().to_owned(),
-                })
-                .await
-            {
-                Err(error) => RepoSpecChild::Compute(error.to_string().into()),
-                Ok(result) => RepoSpecChild::Complete {
-                    result,
-                    observations: PathObservationEpoch::empty(),
-                },
-            }
-        }
-        RoutesMode::Observed => {
-            match ctx
-                .compute(&RootModuleFilesObservationKey::new(workspace.dupe()))
-                .await
-            {
-                Err(error) => RepoSpecChild::Compute(error.to_string().into()),
-                Ok(SourcePreparationOutcome::Need(need)) => RepoSpecChild::Need(need),
-                Ok(SourcePreparationOutcome::Complete(Err(error))) => RepoSpecChild::Outer(error),
-                Ok(SourcePreparationOutcome::Complete(Ok(observed))) => RepoSpecChild::Complete {
-                    result: observed.result().dupe(),
-                    observations: observed.observations().dupe(),
-                },
-            }
-        }
-    }
-}
-
 fn finish_extension_routes_child(
     child: RepoSpecChild<
         HostSelectedModuleRoutes,
@@ -3364,6 +4101,7 @@ fn finish_extension_routes_child(
     }
 }
 
+#[cfg(test)]
 fn finish_extension_root_files_child(
     child: RepoSpecChild<RootModuleFiles, CompactString>,
     observations: &mut PathObservationEpoch,
@@ -3409,6 +4147,7 @@ fn finish_extension_routes_semantic(
         })
 }
 
+#[cfg(test)]
 fn finish_extension_root_files_semantic(
     result: &Result<RootModuleFiles, CompactString>,
     observations: PathObservationEpoch,
@@ -3441,19 +4180,8 @@ async fn drive_selected_extension_mappings(
         Ok(routes) => routes,
         Err(terminal) => return terminal,
     };
-    let root_files = match finish_extension_root_files_child(
-        extension_root_files_child(ctx, &key.workspace, mode).await,
-        &mut observations,
-    ) {
-        Ok(result) => result,
-        Err(terminal) => return terminal,
-    };
-    let root_usages = match finish_extension_root_files_semantic(&root_files, observations.dupe()) {
-        Ok(usages) => usages,
-        Err(terminal) => return terminal,
-    };
     extension_mappings_complete(
-        selected_extension_mappings(routes, root_usages),
+        Ok(selected_extension_mappings_from_projection(routes)),
         observations,
     )
 }
@@ -7634,6 +8362,7 @@ mod tests {
             entries[0] = route;
             HostSelectedModuleRoutes {
                 entries: entries.into(),
+                extension_projection: routes.extension_projection.clone(),
             }
         };
         let mut route = routes.entries[0].clone();
@@ -7676,6 +8405,7 @@ mod tests {
         let reordered = outcome(
             HostSelectedModuleRoutes {
                 entries: reordered.into(),
+                extension_projection: routes.extension_projection.clone(),
             },
             1,
         );
@@ -7871,6 +8601,7 @@ mod tests {
             .rule_name = "changed".into();
         changed.routes = Arc::new(Ok(HostSelectedModuleRoutes {
             entries: entries.into(),
+            extension_projection: testing_extension_mapping_projection(),
         }));
         let changed = HostSelectedExtensionDefinitionSource::Selected {
             definition: changed,
@@ -8103,6 +8834,7 @@ mod tests {
             selected_extension_mappings(
                 Arc::new(HostSelectedModuleRoutes {
                     entries: Arc::from([]),
+                    extension_projection: testing_extension_mapping_projection(),
                 }),
                 Arc::from([]),
             ),
@@ -8578,6 +9310,79 @@ mod tests {
             )
         }));
         assert!(io.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn builtin_mapping_is_graph_only_and_retains_the_full_selected_mapping() {
+        const MODULE_URL: &str = "https://registry.invalid/modules/dep/1/MODULE.bazel";
+        let io = Arc::new(TrackingRegistryIo::new([(
+            MODULE_URL,
+            b"module(name='dep', version='1')\n" as &[u8],
+        )]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.clone());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let mut root = "module(name='root')\nbazel_dep(name='dep', version='1')\n".to_owned();
+        for name in LOCAL_MODULES {
+            root.push_str(&format!(
+                "local_path_override(module_name='{name}', path='{name}')\n\
+                 bazel_dep(name='{name}', version='1')\n"
+            ));
+        }
+        let tracker = Arc::new(RepoSpecTracker::default());
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostBuiltinBazelToolsRepositoryMappingObservationKey::new(workspace.dupe());
+        let mut tx =
+            real_transaction_with_tracker(&dice, &root, 1, &[], true, Some(tracker.dupe())).await;
+        let value = tx.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+            panic!("builtin mapping must complete without registry source metadata")
+        };
+        let mapping = observed.result().as_ref().as_ref().unwrap();
+        assert_eq!(
+            mapping
+                .mapping_target(&ApparentRepoName::new("platforms").unwrap())
+                .unwrap()
+                .as_str(),
+            "platforms"
+        );
+        assert!(
+            mapping
+                .mapping_target(&ApparentRepoName::new("buildozer_binary").unwrap())
+                .is_some(),
+            "complete builtin mapping retains graph-declared extension imports"
+        );
+        assert!(mapping.entries().len() > 2);
+        assert!(!observed.observations().observations().is_empty());
+        let (_, rows) = tracker.take();
+        assert_eq!(
+            repo_spec_row(&rows, &key.to_string()),
+            [HostSelectedRepositoryMappingsObservationKey::new(workspace.dupe()).to_string()]
+        );
+        assert_eq!(
+            repo_spec_row(
+                &rows,
+                &HostSelectedRepositoryMappingsObservationKey::new(workspace.dupe()).to_string(),
+            ),
+            [
+                HostSelectedModuleGraphObservationKey::new(workspace.dupe()).to_string(),
+                HostRootExtensionUsagesObservationKey::new(workspace.dupe()).to_string(),
+            ]
+        );
+        assert_eq!(
+            repo_spec_row(
+                &rows,
+                &HostRootExtensionUsagesObservationKey::new(workspace.dupe()).to_string(),
+            ),
+            [RootModuleFilesObservationKey::new(workspace).to_string()]
+        );
+        assert!(rows.iter().all(|(owner, dependencies)| {
+            !owner.starts_with("observed-host-selected-registry-repo-specs:")
+                && dependencies.iter().all(|dependency| {
+                    !dependency.starts_with("observed-host-selected-registry-repo-specs:")
+                })
+        }));
+        assert!(io.calls().iter().all(|url| !url.ends_with("/source.json")));
     }
 
     #[tokio::test]
@@ -9614,6 +10419,7 @@ repo(name="replacement")
                 .filter(|route| !matches!(route.entry.key, HostGraphModuleKey::Root))
                 .cloned()
                 .collect(),
+            extension_projection: testing_extension_mapping_projection(),
         });
         assert_eq!(
             root_mapping_ordinal(&missing),
@@ -9625,6 +10431,7 @@ repo(name="replacement")
         duplicate_routes.push(duplicate_routes[root].clone());
         duplicate.routes = Arc::new(HostSelectedModuleRoutes {
             entries: duplicate_routes.into(),
+            extension_projection: testing_extension_mapping_projection(),
         });
         assert_eq!(
             root_mapping_ordinal(&duplicate),
@@ -9778,6 +10585,7 @@ repo(name="replacement")
         let mut missing = original.clone();
         missing.routes = Arc::new(HostSelectedModuleRoutes {
             entries: Arc::from([]),
+            extension_projection: testing_extension_mapping_projection(),
         });
         let missing = Arc::new(Ok(missing));
         assert!(matches!(
@@ -9793,6 +10601,7 @@ repo(name="replacement")
         routes.push(routes[root].clone());
         duplicate.routes = Arc::new(HostSelectedModuleRoutes {
             entries: routes.into(),
+            extension_projection: testing_extension_mapping_projection(),
         });
         let duplicate = Arc::new(Ok(duplicate));
         assert!(matches!(
@@ -10795,6 +11604,22 @@ inject_repo(three, injected = "target")
         assert!(a_value.usages[1].id.bzl_file.to_string().contains(":b.bzl"));
         assert_eq!(a_value.usages[1].unique_name.as_str(), "+shared2");
         assert_eq!(a_value.usages[2].unique_name.as_str(), "local++shared");
+        assert!(Arc::ptr_eq(
+            &a_value.usages,
+            &a_value.routes.extension_projection.usages,
+        ));
+        assert!(Arc::ptr_eq(
+            &a_value.mappings,
+            &a_value.routes.extension_projection.mappings,
+        ));
+        assert!(
+            a_value
+                .routes
+                .entries
+                .iter()
+                .zip(a_value.mappings.iter())
+                .all(|(route, mapping)| &route.mapping == mapping)
+        );
         let local_mapping = a_value
             .mappings
             .iter()
@@ -11086,6 +11911,54 @@ inject_repo(three, injected = "target")
         ));
     }
 
+    #[tokio::test]
+    async fn selected_route_repo_spec_need_precedes_mapping_semantic_error() {
+        const SOURCE: &[u8] = br#"{"url":"https://origin.test/pkg.tgz","integrity":"sha256-pkg"}"#;
+        let io = Arc::new(TrackingRegistryIo::new([
+            (
+                "https://registry.invalid/modules/dep/1/MODULE.bazel",
+                b"module(name='dep', version='1')\nbazel_dep(name='platforms', version='2')\n"
+                    as &[u8],
+            ),
+            (
+                "https://registry.invalid/modules/platforms/1/MODULE.bazel",
+                b"module(name='platforms', version='1')\n" as &[u8],
+            ),
+            (
+                "https://registry.invalid/modules/platforms/2/MODULE.bazel",
+                b"module(name='platforms', version='2')\n" as &[u8],
+            ),
+        ]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.clone());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let root = "module(name='bazel_tools')\n\
+                    multiple_version_override(module_name='platforms', versions=['1', '2'])\n\
+                    bazel_dep(name='platforms', version='1')\n\
+                    bazel_dep(name='dep', version='1')\n";
+
+        let need = compute_real_routes(&dice, root, 3, &[], false).await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+
+        for path in [
+            "dep/1/source.json",
+            "platforms/1/source.json",
+            "platforms/2/source.json",
+        ] {
+            io.replace(&format!("https://registry.invalid/modules/{path}"), SOURCE);
+        }
+        let error = compute_real_routes(&dice, root, 4, &[], true).await;
+        assert!(matches!(
+            error,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostSelectedModuleRoutesError::CanonicalCollision { canonical_repo, .. })
+                        if canonical_repo.as_str() == "platforms"
+                )
+        ));
+    }
+
     #[test]
     fn observed_routes_identity_is_workspace_scoped() {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
@@ -11353,7 +12226,7 @@ inject_repo(three, injected = "target")
         assert_eq!(
             repo_spec_row(&observed_rows, &key.to_string()),
             [
-                HostSelectedModuleGraphObservationKey::new(workspace.dupe()).to_string(),
+                HostSelectedRepositoryMappingsObservationKey::new(workspace.dupe()).to_string(),
                 HostSelectedRegistryRepoSpecsObservationKey::new(workspace.dupe()).to_string(),
             ]
         );
@@ -11408,7 +12281,7 @@ inject_repo(three, injected = "target")
         assert_eq!(
             repo_spec_row(&legacy_rows, &legacy_key.to_string()),
             [
-                HostSelectedModuleGraphKey::new(workspace.dupe()).to_string(),
+                HostSelectedRepositoryMappingsKey::new(workspace.dupe()).to_string(),
                 HostSelectedRegistryRepoSpecsKey::new(workspace.dupe()).to_string(),
             ]
         );
@@ -12749,30 +13622,11 @@ inject_repo(three, injected = "target")
                 .await
                 .unwrap(),
         );
-        let root = transaction
-            .compute(&RootModuleFilesObservationKey::new(workspace.dupe()))
-            .await
-            .unwrap();
-        let SourcePreparationOutcome::Complete(Ok(root)) = root else {
-            panic!("root files must complete")
-        };
-        let expected = PathObservationEpoch::from_shared(
-            routes
-                .observations()
-                .observations()
-                .iter()
-                .chain(root.observations().observations())
-                .map(|(demand, result)| (demand.dupe(), result.dupe())),
-        )
-        .unwrap();
-        assert_exact_repo_epoch(&expected, observed.observations());
+        assert_exact_repo_epoch(routes.observations(), observed.observations());
         let (observed_activations, observed_rows) = tracker.take();
         assert_eq!(
             repo_spec_row(&observed_rows, &key.to_string()),
-            [
-                HostSelectedModuleRoutesObservationKey::new(workspace.dupe()).to_string(),
-                RootModuleFilesObservationKey::new(workspace.dupe()).to_string(),
-            ]
+            [HostSelectedModuleRoutesObservationKey::new(workspace.dupe()).to_string()]
         );
         let observed_events = observed_activations
             .iter()
@@ -12810,13 +13664,7 @@ inject_repo(three, injected = "target")
         let (legacy_activations, legacy_rows) = legacy_tracker.take();
         assert_eq!(
             repo_spec_row(&legacy_rows, &legacy_key.to_string()),
-            [
-                HostSelectedModuleRoutesKey::new(workspace.dupe()).to_string(),
-                RootModuleFilesKey {
-                    workspace: workspace.as_path().to_owned(),
-                }
-                .to_string(),
-            ]
+            [HostSelectedModuleRoutesKey::new(workspace.dupe()).to_string()]
         );
         let legacy_events = legacy_activations
             .iter()
@@ -12875,7 +13723,9 @@ inject_repo(three, injected = "target")
         assert!(
             matches!(
                 bad.result().as_ref(),
-                Err(HostSelectedExtensionMappingsError::Invalid { .. })
+                Err(HostSelectedExtensionMappingsError::Routes(
+                    HostSelectedModuleRoutesError::Invalid { .. }
+                ))
             ),
             "{:?}",
             bad.result()

@@ -34220,7 +34220,7 @@ async fn observed_repository_package_load_keeps_terminal_prefixes_and_error_batc
         ),
         (
             "postvalidation",
-            b"load(\":defs.bzl\", \"make_alias\")\nmake_alias(name = \"blocked\")\n",
+            b"load(\":defs.bzl\", \"make_suite\")\nmake_suite(name = \"blocked\")\n",
         ),
     ];
     for (variant, (name, build)) in cases.iter().enumerate() {
@@ -34228,7 +34228,7 @@ async fn observed_repository_package_load_keeps_terminal_prefixes_and_error_batc
         if *name == "postvalidation" {
             files.push((
                 "defs.bzl",
-                b"def make_alias(name):\n    native.alias(name = name, actual = \":missing\")\n",
+                b"def make_suite(name):\n    native.test_suite(name = name, tests = [])\n",
             ));
         }
         let dice = Dice::builder().build(DetectCycles::Enabled);
@@ -34604,17 +34604,17 @@ async fn repository_package_inventory_retains_targets_rejected_by_old_policy() {
             vec![
                 (
                     "BUILD.bazel",
-                    b"load(\":defs.bzl\", \"make_alias\")\nmake_alias(name = \"blocked\")\n"
+                    b"load(\":defs.bzl\", \"make_suite\")\nmake_suite(name = \"blocked\")\n"
                         .as_slice(),
                 ),
                 (
                     "defs.bzl",
-                    b"def make_alias(name):\n    native.alias(name = name, actual = \":missing\")\n"
+                    b"def make_suite(name):\n    native.test_suite(name = name, tests = [])\n"
                         .as_slice(),
                 ),
             ],
             "blocked",
-            "produced unsupported target `blocked` of kind alias",
+            "produced unsupported target `blocked` of kind test_suite",
         ),
         (
             782,
@@ -34929,11 +34929,11 @@ async fn repository_package_load_prevalidates_all_loads_and_gates_loaded_target_
             &[
                 (
                     "BUILD.bazel",
-                    b"load(\":defs.bzl\", \"make_alias\")\nmake_alias(name = \"blocked\")\n",
+                    b"load(\":defs.bzl\", \"make_suite\")\nmake_suite(name = \"blocked\")\n",
                 ),
                 (
                     "defs.bzl",
-                    b"def make_alias(name):\n    native.alias(name = name, actual = \":missing\")\n",
+                    b"def make_suite(name):\n    native.test_suite(name = name, tests = [])\n",
                 ),
             ],
             72,
@@ -34953,7 +34953,7 @@ async fn repository_package_load_prevalidates_all_loads_and_gates_loaded_target_
         .unwrap();
     assert!(
         repository_package_error(&rejected)
-            .contains("produced unsupported target `blocked` of kind alias")
+            .contains("produced unsupported target `blocked` of kind test_suite")
     );
 
     let mut native = transaction(

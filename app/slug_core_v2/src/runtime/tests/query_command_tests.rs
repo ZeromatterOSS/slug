@@ -461,19 +461,19 @@ use super::*;
             ),
             (
                 "filegroup(name = \"group\")\nfilegroup(name = \"files\", visibility = [\":group\"])\n",
-                "external repository visibility edges are deferred",
+                "external repository visibility wrong-kind group is deferred",
             ),
             (
                 "filegroup(name = \"group\")\nfilegroup(name = \"files\")\nalias(name = \"files_alias\", actual = \":files\", visibility = [\":group\"])\n",
-                "external repository visibility edges are deferred",
+                "external repository Restricted visibility is deferred for non-filegroup",
             ),
             (
                 "filegroup(name = \"group\")\nconfig_setting(name = \"is_k8\", values = {\"cpu\": \"k8\"}, visibility = [\":group\"])\n",
-                "external repository visibility edges are deferred",
+                "external repository Restricted visibility is deferred for non-filegroup",
             ),
             (
                 "filegroup(name = \"group\")\ntest_suite(name = \"suite\", visibility = [\":group\"])\n",
-                "external repository visibility edges are deferred",
+                "external repository Restricted visibility is deferred for non-filegroup",
             ),
             (
                 "filegroup(name = \"BUILD.bazel\")\n",
@@ -551,7 +551,7 @@ use super::*;
                 .as_ref()
                 .unwrap_err()
                 .to_string()
-                .contains("external repository dependency labels are not supported"),
+                .contains("no repository visible as '@other'"),
             "{named_repository:?}"
         );
         fs::write(

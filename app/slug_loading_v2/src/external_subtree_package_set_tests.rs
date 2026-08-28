@@ -18,7 +18,6 @@ use dupe::Dupe;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
-use slug_bzlmod_v2::HostCanonicalRepositoryRoute;
 use slug_bzlmod_v2::HostExternalPackageBoundaryKey;
 use slug_bzlmod_v2::HostExternalPackageBoundaryKind;
 use slug_bzlmod_v2::HostRepositoryDirectoryListingKey;
@@ -69,6 +68,12 @@ use super::ExternalSubtreePackageSetObservationKey;
 use super::child_packages;
 use super::listing_entries;
 use super::merge_observations;
+use crate::HostCanonicalRepositoryRouteObservationKey;
+use crate::canonical_repository_route_tests::tests::EXTENSION_A;
+use crate::canonical_repository_route_tests::tests::WORKSPACE;
+use crate::canonical_repository_route_tests::tests::builtin_graph_dice;
+use crate::canonical_repository_route_tests::tests::builtin_graph_module;
+use crate::canonical_repository_route_tests::tests::transaction;
 
 fn path(value: &str) -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new(value).unwrap()
@@ -134,24 +139,23 @@ impl DependencyTracker {
 
 #[tokio::test]
 async fn canonical_builtin_subtree_uses_shared_boundary_and_listing_owners() {
-    let workspace = path("/canonical-builtin-subtree");
-    let route = Arc::new(HostCanonicalRepositoryRoute::builtin(workspace.dupe()));
-    let input = host_canonical_repository_source_input(route, None).unwrap();
-    let dice = Dice::builder().build(DetectCycles::Enabled);
-    let mut updater = dice.updater();
-    inject_root_package_policy_inputs(
-        &mut updater,
-        RootPackagePolicyInputs::new(
+    let workspace = path(WORKSPACE);
+    let dice = builtin_graph_dice();
+    let module = builtin_graph_module();
+    let tracker = Arc::new(DependencyTracker::default());
+    let mut tx = transaction(&dice, &module, EXTENSION_A, true, Some(tracker.clone())).await;
+    let route = tx
+        .compute(&HostCanonicalRepositoryRouteObservationKey::new(
             workspace.dupe(),
-            Arc::from([workspace]),
-            std::iter::empty::<&str>(),
-            None,
-            Some("warning"),
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    let mut tx = updater.commit().await;
+            CanonicalRepoName::new("bazel_tools").unwrap(),
+        ))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(Ok(route)) = route else {
+        panic!("canonical built-in route must complete")
+    };
+    let route = Arc::new(route.result().as_ref().as_ref().unwrap().clone());
+    let input = host_canonical_repository_source_input(route, None).unwrap();
     let value = tx
         .compute(&ExternalSubtreePackageSetObservationKey::new_canonical(
             input,
@@ -759,8 +763,8 @@ async fn real_builtin_catalog_discovers_root_and_prefixed_package_sets() {
     let route = route.as_ref().as_ref().unwrap().clone();
 
     for (prefix, expected) in [
-        ("", vec!["src/conditions", "tools/test"]),
-        ("tools", vec!["tools/test"]),
+        ("", vec!["src/conditions", "tools", "tools/test"]),
+        ("tools", vec!["tools", "tools/test"]),
     ] {
         let prefix = package(prefix);
         let SourcePreparationOutcome::Complete(outcome) = transaction

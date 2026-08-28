@@ -23,6 +23,8 @@ struct ExpectedDescriptor {
 mod command_configuration_tests {
     use std::sync::Arc;
 
+    use slug_identity_v2::CanonicalLabel;
+
     use super::super::configuration::SlugConfiguration;
     use super::super::host::AutoCpuToken;
     use super::super::host::HostConversionInputs;
@@ -92,6 +94,25 @@ mod command_configuration_tests {
             unchanged.canonical_bytes().as_ptr(),
             base.canonical_bytes().as_ptr()
         );
+    }
+
+    #[test]
+    fn target_platform_falls_back_to_host_and_exec_projection_installs_selection() {
+        let target = configuration();
+        assert_eq!(
+            target.target_platform_label().unwrap().to_string(),
+            "@@bazel_tools//tools:host_platform"
+        );
+
+        let linux = CanonicalLabel::parse("@@platforms//host:host").unwrap();
+        let remote = CanonicalLabel::parse("@@platforms//host:remote").unwrap();
+        let exec = target.to_exec_for_platform(&linux).unwrap();
+        let other = target.to_exec_for_platform(&remote).unwrap();
+        assert_eq!(exec.target_platform_label().unwrap(), linux);
+        assert_ne!(exec.projection(), target.projection());
+        assert_ne!(exec.projection(), other.projection());
+        assert_eq!(exec, target.to_exec_for_platform(&linux).unwrap());
+        assert!(exec.to_exec_for_platform(&linux).is_err());
     }
 }
 

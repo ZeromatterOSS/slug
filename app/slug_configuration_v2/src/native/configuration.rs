@@ -17,6 +17,7 @@ use dupe::Dupe;
 use num_bigint::BigInt;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::OptionLabelContext;
+use slug_identity_v2::ResolvedOptionLabel;
 use slug_identity_v2::serialization::StableSerialize;
 use strong_hash::StrongHash;
 
@@ -28,6 +29,7 @@ use super::host::HostPathFlavor;
 use super::label_convert;
 use super::label_convert::LabelConvertError;
 use super::label_convert::LabelValue;
+use super::label_convert::LabelValues;
 use super::label_convert::MixedValue;
 use super::registry::NATIVE_OPTION_DESCRIPTORS;
 use super::registry::NativeOptionDescriptor;
@@ -38,6 +40,9 @@ use crate::CommandConfigurationOverlay;
 const PROJECTION_CONTEXT: &str = "slug.build/configuration-projection/v2";
 const PROJECTION_MAGIC: &[u8] = b"slugcfg\0";
 const PROJECTION_VERSION: u16 = 2;
+const PLATFORM_OPTIONS: &str = "com.google.devtools.build.lib.analysis.PlatformOptions";
+const HOST_PLATFORM: &str = "host_platform";
+const TARGET_PLATFORMS: &str = "platforms";
 
 /// The semantic role of a configuration.  Its byte spelling is Slug-native.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
@@ -306,6 +311,8 @@ pub enum SlugConfigurationError {
     UnknownNativeOption,
     InvalidCommandNativeOption { option: &'static str },
     UnexpectedNativeStringList { option: &'static str },
+    UnexpectedNativeLabel { option: &'static str },
+    NonVisibleNativeLabel { option: &'static str },
 }
 
 impl fmt::Display for SlugConfigurationError {
@@ -365,6 +372,15 @@ impl fmt::Display for SlugConfigurationError {
             }
             Self::UnexpectedNativeStringList { option } => {
                 write!(formatter, "native option {option} is not a string list")
+            }
+            Self::UnexpectedNativeLabel { option } => {
+                write!(formatter, "native option {option} is not a label value")
+            }
+            Self::NonVisibleNativeLabel { option } => {
+                write!(
+                    formatter,
+                    "native option {option} names a non-visible repository"
+                )
             }
         }
     }
@@ -500,6 +516,80 @@ impl SlugConfiguration {
         ))
     }
 
+    pub fn target_platform_label(&self) -> Result<CanonicalLabel, SlugConfigurationError> {
+        let platforms = self.native_label_value(TARGET_PLATFORMS)?;
+        let selected = match platforms {
+            LabelValue::Labels(values) => values.0.first().map(Ok).unwrap_or_else(|| match self
+                .native_label_value(HOST_PLATFORM)?
+            {
+                LabelValue::Label(label) => Ok(label),
+                _ => Err(SlugConfigurationError::UnexpectedNativeLabel {
+                    option: HOST_PLATFORM,
+                }),
+            })?,
+            _ => {
+                return Err(SlugConfigurationError::UnexpectedNativeLabel {
+                    option: TARGET_PLATFORMS,
+                });
+            }
+        };
+        selected
+            .canonical()
+            .ok_or(SlugConfigurationError::NonVisibleNativeLabel {
+                option: if matches!(platforms, LabelValue::Labels(values) if values.0.is_empty()) {
+                    HOST_PLATFORM
+                } else {
+                    TARGET_PLATFORMS
+                },
+            })
+    }
+
+    pub fn to_exec_for_platform(
+        &self,
+        platform: &CanonicalLabel,
+    ) -> Result<Self, SlugConfigurationError> {
+        if self.0.kind != SlugConfigurationKind::Target {
+            return Err(SlugConfigurationError::ExecProjectionRequiresTarget {
+                actual: self.0.kind,
+            });
+        }
+        let mut options = self.0.options.to_vec();
+        let record = options
+            .iter_mut()
+            .find(|record| {
+                record.class_name == PLATFORM_OPTIONS && record.canonical_name == TARGET_PLATFORMS
+            })
+            .ok_or(SlugConfigurationError::UnknownNativeOption)?;
+        record.value = OptionValue::Label(Some(LabelValue::Labels(LabelValues(Arc::from([
+            ResolvedOptionLabel::from_canonical(platform),
+        ])))));
+        Ok(finish_configuration(
+            SlugConfigurationKind::Exec,
+            options.into(),
+            self.0.starlark_options.to_exec()?,
+        ))
+    }
+
+    fn native_label_value(
+        &self,
+        canonical_name: &'static str,
+    ) -> Result<&LabelValue, SlugConfigurationError> {
+        let record = self
+            .0
+            .options
+            .iter()
+            .find(|record| {
+                record.class_name == PLATFORM_OPTIONS && record.canonical_name == canonical_name
+            })
+            .ok_or(SlugConfigurationError::UnknownNativeOption)?;
+        match &record.value {
+            OptionValue::Label(Some(value)) => Ok(value),
+            _ => Err(SlugConfigurationError::UnexpectedNativeLabel {
+                option: canonical_name,
+            }),
+        }
+    }
+
     pub fn starlark_options(&self) -> &StarlarkOptions {
         &self.0.starlark_options
     }
@@ -532,7 +622,6 @@ impl SlugConfiguration {
         &self,
         overlay: &CommandConfigurationOverlay,
     ) -> Result<PreparedCommandNativeOptions, SlugConfigurationError> {
-        const PLATFORM_OPTIONS: &str = "com.google.devtools.build.lib.analysis.PlatformOptions";
         const EXTRA_TOOLCHAINS: &str = "extra_toolchains";
         const EXTRA_EXECUTION_PLATFORMS: &str = "extra_execution_platforms";
 

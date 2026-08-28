@@ -757,6 +757,7 @@ mod tests {
         HostSelectedExtensionMappings {
             routes: Arc::new(HostSelectedModuleRoutes {
                 entries: Arc::from([]),
+                extension_projection: testing_extension_mapping_projection(),
             }),
             root_usages: Arc::from([]),
             usages: usages.into_iter().collect(),
@@ -894,6 +895,7 @@ mod tests {
                             registry_repo_spec: None,
                         },
                     ]),
+                    extension_projection: testing_extension_mapping_projection(),
                 }),
                 root_usages: Arc::from([root_usage]),
                 usages: Arc::from([
@@ -1044,6 +1046,7 @@ mod tests {
         routes[0].entry.source = HostGraphModuleSource::Root(Arc::new(root));
         invalid.routes = Arc::new(HostSelectedModuleRoutes {
             entries: routes.into(),
+            extension_projection: testing_extension_mapping_projection(),
         });
         assert!(matches!(
             owner_inputs(inputs.owner().dupe(), &invalid),
@@ -1095,6 +1098,7 @@ mod tests {
             Some(selected_registry_proof_spec(routes[1].entry.key.clone()));
         mappings.routes = Arc::new(HostSelectedModuleRoutes {
             entries: routes.into(),
+            extension_projection: testing_extension_mapping_projection(),
         });
 
         let expected = selected_extension_definition_source(

@@ -94,6 +94,18 @@ const CATALOG: &[CatalogEntry] = &[
         executable: true,
     },
     CatalogEntry {
+        path: "tools/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/BUILD"),
+        expected_sha256: "b0fbb2f8eb70acce9a307cca3d487a360f32a89d412e22a39c38346b979fc1a6",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs.bzl"),
+        expected_sha256: "d5f935c4e72a365438711f08a2640094cbf0a03392eebb06d8cecdc58b8ab19c",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/test/BUILD",
         bytes: include_bytes!("../builtin/bazel_tools/tools/test/BUILD"),
         expected_sha256: "81db88f41f7a9a07af246a42cfa7a8b6e118012b4f41830aaee9ffe4a4a9ee17",
@@ -637,7 +649,11 @@ mod tests {
         );
         assert_eq!(
             listing_rows("tools"),
-            [("test".to_owned(), PathDirectoryEntryKind::Directory)]
+            [
+                ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                ("build_defs.bzl".to_owned(), PathDirectoryEntryKind::File),
+                ("test".to_owned(), PathDirectoryEntryKind::Directory),
+            ]
         );
         assert_eq!(
             listing_rows("tools/test"),
@@ -700,7 +716,7 @@ mod tests {
             evaluate_builtin_module_source(BuiltinBazelToolsSnapshot::CURRENT, &source).unwrap();
         assert_eq!(
             hex::encode(value.route_identity.manifest_sha256()),
-            "95b4af7c011047d34f6c469d23efdd523c56ce4892791e49f9d2159353262897"
+            "0b7a4da7823e336384fc633e3e2964f01d5711c0a2b1a919a124bf629f9c599d"
         );
         assert_eq!(value.module_sha256, source.sha256());
         assert_eq!(

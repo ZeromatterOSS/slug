@@ -5493,9 +5493,10 @@ impl Key for RootPackageLoadObservationKey {
 
 fn loaded_external_target_kind(kind: &PackageTargetKind) -> Option<&'static str> {
     match kind {
-        PackageTargetKind::ExportedFile | PackageTargetKind::Filegroup { .. } => None,
-        PackageTargetKind::Alias { .. } => Some("alias"),
-        PackageTargetKind::ConfigSetting { .. } => Some("config_setting"),
+        PackageTargetKind::ExportedFile
+        | PackageTargetKind::Filegroup { .. }
+        | PackageTargetKind::Alias { .. }
+        | PackageTargetKind::ConfigSetting { .. } => None,
         // Native toolchain targets are retained as typed native targets even
         // when the external BUILD uses `load()`. The load gate only protects
         // target kinds whose loaded form is not yet represented.

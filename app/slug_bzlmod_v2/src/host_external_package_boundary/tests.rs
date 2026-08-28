@@ -28,6 +28,7 @@ use super::HostExternalPackageBoundaryError;
 use super::HostExternalPackageBoundaryKey;
 use super::HostExternalPackageBoundaryKind;
 use super::HostExternalPackageBoundaryObservationKey;
+use crate::HostBuiltinBazelToolsRepositoryMapping;
 use crate::HostCanonicalRepositoryRoute;
 use crate::HostRepositorySourceObservationEpochKey;
 use crate::HostRepositorySourceObservationView;
@@ -148,7 +149,10 @@ async fn real_builtin_boundary(
 async fn canonical_builtin_policy_stops_package_source_at_catalog_address() {
     let workspace = path("/workspace");
     let input = host_canonical_repository_source_input(
-        Arc::new(HostCanonicalRepositoryRoute::builtin(workspace.dupe())),
+        Arc::new(HostCanonicalRepositoryRoute::builtin(
+            workspace.dupe(),
+            HostBuiltinBazelToolsRepositoryMapping::testing(),
+        )),
         None,
     )
     .unwrap();

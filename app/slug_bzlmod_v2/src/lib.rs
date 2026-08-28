@@ -310,6 +310,18 @@ pub use root_bootstrap::RootModuleBootstrapCreateError;
 pub use root_bootstrap::RootModuleBootstrapRequest;
 pub use root_bootstrap::RootModuleBootstrapWarning;
 #[doc(hidden)]
+pub use selected_repo_spec::HostBuiltinBazelToolsRepositoryMapping;
+#[doc(hidden)]
+pub use selected_repo_spec::HostBuiltinBazelToolsRepositoryMappingError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostBuiltinBazelToolsRepositoryMappingKey;
+#[doc(hidden)]
+pub use selected_repo_spec::HostBuiltinBazelToolsRepositoryMappingObservationError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostBuiltinBazelToolsRepositoryMappingObservationKey;
+#[doc(hidden)]
+pub use selected_repo_spec::HostBuiltinBazelToolsRepositoryMappingOutcome;
+#[doc(hidden)]
 pub use selected_repo_spec::HostCanonicalSelectedModuleDefinition;
 #[doc(hidden)]
 pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionError;
@@ -426,6 +438,8 @@ pub use selected_repo_spec::HostSelectedExtensionOwnerInputsObservationError;
 pub use selected_repo_spec::HostSelectedExtensionOwnerInputsObservationKey;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionOwnerModuleInput;
+#[doc(hidden)]
+pub use selected_repo_spec::ObservedHostBuiltinBazelToolsRepositoryMapping;
 #[doc(hidden)]
 pub use selected_repo_spec::ObservedHostCanonicalSelectedModuleDefinition;
 #[doc(hidden)]

@@ -69,6 +69,7 @@ pub enum ConfiguredNodeKind {
     ConstraintValue,
     ConstraintSetting,
     ToolchainType,
+    ToolchainDeclaration,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -147,6 +148,46 @@ impl ConfiguredActionPlatformConstraint {
 
     pub fn constraint_setting(&self) -> &ConfiguredTargetKey {
         &self.1
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct ConfiguredPlatform {
+    requested: ConfiguredTargetKey,
+    actual: ConfiguredTargetKey,
+    fact: PlatformSemanticFact,
+    constraints: Arc<[ConfiguredActionPlatformConstraint]>,
+}
+
+impl ConfiguredPlatform {
+    pub(crate) fn new(
+        requested: ConfiguredTargetKey,
+        actual: ConfiguredTargetKey,
+        fact: PlatformSemanticFact,
+        constraints: Arc<[ConfiguredActionPlatformConstraint]>,
+    ) -> Self {
+        Self {
+            requested,
+            actual,
+            fact,
+            constraints,
+        }
+    }
+
+    pub fn requested(&self) -> &ConfiguredTargetKey {
+        &self.requested
+    }
+
+    pub fn actual(&self) -> &ConfiguredTargetKey {
+        &self.actual
+    }
+
+    pub fn fact(&self) -> &PlatformSemanticFact {
+        &self.fact
+    }
+
+    pub fn constraints(&self) -> &[ConfiguredActionPlatformConstraint] {
+        &self.constraints
     }
 }
 
@@ -465,6 +506,7 @@ impl ToolchainTopology {
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct ConfiguredNodeResult {
     key: ConfiguredNodeKey,
+    actual_configured_target: Option<ConfiguredTargetKey>,
     kind: ConfiguredNodeKind,
     providers: ProviderCollection,
     actions: Arc<[ConfiguredAction]>,
@@ -483,6 +525,7 @@ impl ConfiguredNodeResult {
         rule_capability: Option<RuleCapability>,
     ) -> Self {
         Self {
+            actual_configured_target: Some(key.clone()),
             key: key.into(),
             kind: ConfiguredNodeKind::Rule,
             providers,
@@ -507,8 +550,10 @@ impl ConfiguredNodeResult {
             ConfiguredNodeKind::Rule,
             "native nodes cannot be rules"
         );
+        let actual_configured_target = key.configured_target().cloned();
         Self {
             key,
+            actual_configured_target,
             kind,
             providers,
             actions: Arc::from([]),
@@ -529,6 +574,10 @@ impl ConfiguredNodeResult {
     }
     pub fn configured_target_key(&self) -> Option<&ConfiguredTargetKey> {
         self.key.configured_target()
+    }
+
+    pub fn actual_configured_target(&self) -> Option<&ConfiguredTargetKey> {
+        self.actual_configured_target.as_ref()
     }
 
     pub fn providers(&self) -> &ProviderCollection {
@@ -648,6 +697,12 @@ impl ConfiguredNodeResult {
 
     pub fn with_edges(mut self, edges: Vec<ConfiguredEdge>) -> Self {
         self.edges = edges.into();
+        self
+    }
+
+    pub(crate) fn with_actual_configured_target(mut self, actual: ConfiguredTargetKey) -> Self {
+        assert!(self.configured_target_key().is_some());
+        self.actual_configured_target = Some(actual);
         self
     }
 

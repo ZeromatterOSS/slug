@@ -22,6 +22,7 @@ use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeKind;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
+use slug_analysis_v2::analysis_cycle_detector;
 use slug_analysis_v2::key::StarlarkOption;
 use slug_analysis_v2::key::StarlarkOptionScope;
 use slug_analysis_v2::prepare_configured_node_analysis_observed;
@@ -49,7 +50,6 @@ use slug_loading_v2::HostPackageInventoryObservationError;
 use slug_loading_v2::HostPackageInventoryObservationKey;
 use slug_loading_v2::ModuleRegistrationExpansionKey;
 use slug_loading_v2::ModuleRegistrationExpansionObservationKey;
-use slug_loading_v2::bzl_load_cycle_detector;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathLstat;
@@ -369,7 +369,7 @@ async fn transaction(
     tracker: Arc<AnalysisTracker>,
 ) -> DiceTransaction {
     let mut user_data = UserComputationData {
-        cycle_detector: Some(bzl_load_cycle_detector()),
+        cycle_detector: Some(analysis_cycle_detector()),
         activation_tracker: Some(tracker as Arc<dyn ActivationTracker>),
         ..Default::default()
     };
@@ -977,6 +977,87 @@ async fn observed_outer_wins_need_and_semantic_while_semantic_error_publishes_on
     assert_eq!(
         analysis_batch(&tracker.take(), "@@//parent:missing").map(event_texts),
         Some(Vec::new())
+    );
+}
+
+#[tokio::test]
+async fn combined_detector_preserves_bzl_cycle_diagnostics() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisTracker::default());
+    let mut epoch = EpochBuilder::base("cycle-", &[], 41);
+    epoch.file(
+        "/workspace/rules/defs.bzl",
+        "load(\"//rules:other.bzl\", \"other\")\nleaf = other\nparent = other\n",
+        41,
+    );
+    epoch.file(
+        "/workspace/rules/other.bzl",
+        "load(\"//rules:defs.bzl\", \"leaf\")\nother = leaf\n",
+        41,
+    );
+    let mut transaction = transaction(&dice, epoch.build(), tracker).await;
+    let outcome = transaction.compute(&parent_key()).await.unwrap();
+    let AnalysisPreparationOutcome::Complete(result) = outcome else {
+        panic!("bzl cycle returned Need");
+    };
+    let error = result.as_ref().as_ref().unwrap_err().to_string();
+    assert!(
+        error.contains("cycle detected in extension files"),
+        "{error}"
+    );
+    assert!(error.contains("//rules:defs.bzl"), "{error}");
+    assert!(error.contains("//rules:other.bzl"), "{error}");
+}
+
+#[tokio::test]
+async fn legacy_alias_cycle_fails_and_same_graph_repair_recovers() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisTracker::default());
+    let mut cycle = EpochBuilder::base("cycle-", &[], 42);
+    cycle.file(
+        "/workspace/BUILD.bazel",
+        "alias(name = \"a\", actual = \":b\")\nalias(name = \"b\", actual = \":a\")\n",
+        42,
+    );
+    let key = ConfiguredNodeAnalysisKey::new(workspace(), configured("@@//:a")).unwrap();
+    let cycle = cycle.build();
+    let mut cancelled = transaction(&dice, cycle.dupe(), tracker.dupe()).await;
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(future);
+    drop(cancelled);
+    let mut cycle_transaction = transaction(&dice, cycle, tracker.dupe()).await;
+    let outcome = cycle_transaction.compute(&key).await.unwrap();
+    let AnalysisPreparationOutcome::Complete(result) = outcome else {
+        panic!("legacy alias cycle returned Need");
+    };
+    assert!(
+        result
+            .as_ref()
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("configured alias cycle")
+    );
+
+    let mut repaired = EpochBuilder::base("cycle-", &[], 43);
+    repaired.file(
+        "/workspace/BUILD.bazel",
+        "load(\"//rules:defs.bzl\", \"leaf\")\nleaf(name = \"good\")\nalias(name = \"a\", actual = \":good\")\n",
+        43,
+    );
+    let mut repaired_transaction = transaction(&dice, repaired.build(), tracker).await;
+    let result = repaired_transaction.compute(&key).await.unwrap();
+    let AnalysisPreparationOutcome::Complete(result) = result else {
+        panic!("repaired alias returned Need");
+    };
+    assert_eq!(
+        result.as_ref().as_ref().unwrap().kind(),
+        &ConfiguredNodeKind::Alias
     );
 }
 

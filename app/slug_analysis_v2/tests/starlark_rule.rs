@@ -45,7 +45,12 @@ use slug_analysis_v2::ConfiguredNodeAnalysisObservationKey;
 use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeKind;
 use slug_analysis_v2::ConfiguredNodeResult;
+use slug_analysis_v2::ConfiguredPlatform;
+use slug_analysis_v2::ConfiguredPlatformKey;
+use slug_analysis_v2::ConfiguredPlatformOutcome;
 use slug_analysis_v2::ConfiguredTargetKey;
+use slug_analysis_v2::ConfiguredTargetPlatformKey;
+use slug_analysis_v2::analysis_cycle_detector;
 use slug_analysis_v2::key::StarlarkOption;
 use slug_analysis_v2::key::StarlarkOptionScope;
 use slug_analysis_v2::key::StarlarkOptionValue;
@@ -728,6 +733,20 @@ async fn configured_condition_request_with_inputs(
     {
         AnalysisPreparationOutcome::Need(need) => {
             Err(format!("configured condition returned Needs: {need:?}"))
+        }
+        AnalysisPreparationOutcome::Complete(Err(error)) => Err(error.to_string()),
+        AnalysisPreparationOutcome::Complete(Ok(result)) => {
+            result.as_ref().clone().map_err(|error| error.to_string())
+        }
+    }
+}
+
+fn configured_platform_result(
+    outcome: ConfiguredPlatformOutcome,
+) -> Result<Arc<ConfiguredPlatform>, String> {
+    match outcome {
+        AnalysisPreparationOutcome::Need(need) => {
+            Err(format!("configured platform returned Needs: {need:?}"))
         }
         AnalysisPreparationOutcome::Complete(Err(error)) => Err(error.to_string()),
         AnalysisPreparationOutcome::Complete(Ok(result)) => {
@@ -1562,6 +1581,21 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
         .unwrap();
     let first_context = first.actions()[0].context();
     let first_selection = first.toolchain_topology().unwrap().selection().unwrap();
+    let target_configuration = test_configuration();
+    let exec_configuration = ConfigurationKey::from_slug(
+        target_configuration
+            .slug_configuration()
+            .unwrap()
+            .to_exec_for_platform(&CanonicalLabel::parse("@@//:first_platform").unwrap())
+            .unwrap(),
+    );
+    assert_eq!(
+        first_selection.execution_platform().configuration(),
+        &exec_configuration
+    );
+    let platform = topology_platform(&dice, &workspace, &exec_configuration)
+        .await
+        .unwrap();
     assert_eq!(
         first_selection.declaration().to_string(),
         "@@//:first_toolchain"
@@ -1609,17 +1643,6 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
         first
     );
 
-    let target_configuration = test_configuration();
-    let exec_configuration = ConfigurationKey::from_slug(
-        target_configuration
-            .slug_configuration()
-            .unwrap()
-            .to_exec()
-            .unwrap(),
-    );
-    let platform = topology_platform(&dice, &workspace, &exec_configuration)
-        .await
-        .unwrap();
     assert_eq!(platform.kind(), &ConfiguredNodeKind::Platform);
     assert_eq!(
         platform
@@ -1630,10 +1653,10 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
         &[("a".into(), "first".into()), ("z".into(), "last".into())]
     );
     assert_eq!(platform.edges().len(), 1);
-    assert!(Arc::ptr_eq(
-        &first_context.platform_fact().unwrap().exec_properties,
-        &platform.platform_semantic_fact().unwrap().exec_properties,
-    ));
+    assert_eq!(
+        first_context.platform_fact(),
+        platform.platform_semantic_fact()
+    );
     assert_eq!(first_context.toolchain().unwrap().marker(), "first");
     assert_eq!(first_context.platform_constraints().len(), 1);
     assert_eq!(
@@ -1719,17 +1742,17 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
             .unwrap(),
         first
     );
-    assert!(
-        root_target_request(&dice, &workspace, "@@//:first_platform", tracker())
-            .await
-            .unwrap_err()
-            .contains("incompatible with target configuration")
-    );
-    assert!(
+    let direct_platform = root_target_request(&dice, &workspace, "@@//:first_platform", tracker())
+        .await
+        .unwrap();
+    assert_eq!(direct_platform.kind(), &ConfiguredNodeKind::Platform);
+    let direct_toolchain =
         root_target_request(&dice, &workspace, "@@//:first_toolchain", tracker())
             .await
-            .unwrap_err()
-            .contains("toolchain declaration nodes are not supported")
+            .unwrap();
+    assert_eq!(
+        direct_toolchain.kind(),
+        &ConfiguredNodeKind::ToolchainDeclaration
     );
     let orphan_tracker = Arc::new(RootActivationTracker::with_loading());
     let orphan = root_target_request(&dice, &workspace, "@@//:orphan", orphan_tracker.clone())
@@ -3093,6 +3116,7 @@ config_setting(name = "wrong_flag", flag_values = {":ordinary": "x"})
 config_setting(name = "empty")
 constraint_setting(name = "constraint")
 constraint_value(name = "value", constraint_setting = ":constraint")
+platform(name = "condition_platform", constraint_values = [":value"])
 config_setting(name = "constraint_match", constraint_values = [":value"])
 
 config_setting(name = "bf_false", flag_values = {":boolean": "false"})
@@ -3193,7 +3217,6 @@ config_setting(name = "bt_y", flag_values = {":boolean": "y"})
         ("set_invalid", "single exact value"),
         ("wrong_flag", "not a Starlark build setting"),
         ("empty", "at least one non-empty predicate"),
-        ("constraint_match", "configured target-platform fact"),
     ] {
         let error = configured_condition_request(
             &dice,
@@ -3205,6 +3228,24 @@ config_setting(name = "bt_y", flag_values = {":boolean": "y"})
         .unwrap_err();
         assert!(error.contains(expected), "{target}: {error}");
     }
+    let constraint_configuration = ConfigurationKey::from_slug(
+        test_configuration()
+            .slug_configuration()
+            .unwrap()
+            .to_exec_for_platform(&CanonicalLabel::parse("@@//:condition_platform").unwrap())
+            .unwrap(),
+    );
+    assert_eq!(
+        configured_condition_request(
+            &dice,
+            &workspace,
+            "@@//:constraint_match",
+            constraint_configuration,
+        )
+        .await
+        .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
 
     let integer = CanonicalLabel::parse("@@//:integer").unwrap();
     let wrong_kind = test_configuration().with_starlark_option(StarlarkOption::string(
@@ -3227,6 +3268,263 @@ config_setting(name = "bt_y", flag_values = {":boolean": "y"})
     assert!(
         error.contains("scope instead of declaration scope"),
         "{error}"
+    );
+}
+
+#[tokio::test]
+async fn configured_platform_normalizes_aliases_reuses_arc_and_matches_constraints() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"
+constraint_setting(name = "setting")
+alias(name = "setting_alias", actual = ":setting")
+alias(name = "setting_alias_2", actual = ":setting_alias")
+constraint_value(name = "value", constraint_setting = ":setting_alias_2")
+constraint_value(name = "other_value", constraint_setting = ":setting")
+alias(name = "value_alias", actual = ":value")
+alias(name = "value_alias_2", actual = ":value_alias")
+constraint_setting(name = "extra_setting")
+constraint_value(name = "extra_value", constraint_setting = ":extra_setting")
+platform(name = "platform", constraint_values = [":value_alias_2", ":extra_value"], exec_properties = {"worker": "local"})
+alias(name = "platform_alias", actual = ":platform")
+alias(name = "platform_alias_2", actual = ":platform_alias")
+config_setting(name = "matches", constraint_values = [":value_alias_2"])
+config_setting(name = "does_not_match", constraint_values = [":other_value"])
+platform(name = "duplicate", constraint_values = [":value", ":value_alias_2"])
+constraint_setting(name = "defaulted", default_constraint_value = ":default_value")
+constraint_value(name = "default_value", constraint_setting = ":defaulted")
+platform(name = "default_platform", constraint_values = [":default_value"])
+platform(name = "wrong_platform", constraint_values = [":setting_alias"])
+alias(name = "cycle_a", actual = ":cycle_b")
+alias(name = "cycle_b", actual = ":cycle_a")
+"#,
+    )
+    .unwrap();
+    let selected = CanonicalLabel::parse("@@//:platform_alias_2").unwrap();
+    let configuration = ConfigurationKey::from_slug(
+        test_configuration()
+            .slug_configuration()
+            .unwrap()
+            .to_exec_for_platform(&selected)
+            .unwrap(),
+    );
+    let workspace_key = NormalizedAbsolutePath::new(workspace.clone()).unwrap();
+    let platform_key = ConfiguredPlatformKey::new(
+        workspace_key.dupe(),
+        ConfiguredTargetKey::new(selected.clone(), configuration.clone()),
+    )
+    .unwrap();
+    let target_platform_key =
+        ConfiguredTargetPlatformKey::new(workspace_key.dupe(), configuration.clone()).unwrap();
+    let condition_key = ConfiguredConditionKey::new(
+        workspace_key.dupe(),
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:matches").unwrap(),
+            configuration.clone(),
+        ),
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater_with_data(UserComputationData {
+        cycle_detector: Some(analysis_cycle_detector()),
+        ..Default::default()
+    });
+    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
+    let mut transaction = updater.commit().await;
+    let first =
+        configured_platform_result(transaction.compute(&platform_key).await.unwrap()).unwrap();
+    let second =
+        configured_platform_result(transaction.compute(&platform_key).await.unwrap()).unwrap();
+    let target =
+        configured_platform_result(transaction.compute(&target_platform_key).await.unwrap())
+            .unwrap();
+    assert!(Arc::ptr_eq(&first, &second));
+    assert!(Arc::ptr_eq(&first, &target));
+    assert_eq!(
+        first.requested().label().to_string(),
+        "@@//:platform_alias_2"
+    );
+    assert_eq!(first.actual().label().to_string(), "@@//:platform");
+    assert_eq!(
+        first.fact().exec_properties.as_ref(),
+        &[("worker".into(), "local".into())]
+    );
+    assert_eq!(first.constraints().len(), 2);
+    assert_eq!(
+        first.constraints()[0]
+            .constraint_value()
+            .label()
+            .to_string(),
+        "@@//:value"
+    );
+    assert_eq!(
+        first.constraints()[0]
+            .constraint_setting()
+            .label()
+            .to_string(),
+        "@@//:setting"
+    );
+    let condition = transaction.compute(&condition_key).await.unwrap();
+    assert!(
+        matches!(condition, AnalysisPreparationOutcome::Complete(Ok(result)) if result.as_ref() == &Ok(ConfiguredConditionMatch::Match))
+    );
+    let no_match_key = ConfiguredConditionKey::new(
+        workspace_key.dupe(),
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:does_not_match").unwrap(),
+            configuration.clone(),
+        ),
+    )
+    .unwrap();
+    let no_match = transaction.compute(&no_match_key).await.unwrap();
+    assert!(
+        matches!(no_match, AnalysisPreparationOutcome::Complete(Ok(result)) if result.as_ref() == &Ok(ConfiguredConditionMatch::NoMatch))
+    );
+    let target_key = ConfiguredPlatformKey::new(
+        workspace_key.dupe(),
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:platform").unwrap(),
+            test_configuration(),
+        ),
+    )
+    .unwrap();
+    let target_platform =
+        configured_platform_result(transaction.compute(&target_key).await.unwrap()).unwrap();
+    assert_eq!(
+        target_platform.actual().configuration().kind(),
+        slug_analysis_v2::ConfigurationKind::Target
+    );
+
+    for (target, expected) in [
+        ("duplicate", "duplicate constraint setting"),
+        ("default_platform", "defaults are unsupported"),
+        ("wrong_platform", "non-constraint value"),
+        ("cycle_a", "configured alias cycle"),
+    ] {
+        let key = ConfiguredPlatformKey::new(
+            workspace_key.dupe(),
+            ConfiguredTargetKey::new(
+                CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+                configuration.clone(),
+            ),
+        )
+        .unwrap();
+        let error =
+            configured_platform_result(transaction.compute(&key).await.unwrap()).unwrap_err();
+        assert!(error.contains(expected), "{target}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn default_host_platform_reaches_bcr_platform_through_exact_builtin_alias() {
+    let workspace = scratch();
+    let modules = [
+        ("rules_license", "1.0.0"),
+        ("buildozer", "8.5.1"),
+        ("platforms", "1.0.0"),
+        ("zlib", "1.3.1.bcr.5"),
+        ("bazel_features", "1.42.1"),
+        ("protobuf", "33.4"),
+        ("rules_java", "9.1.0"),
+        ("rules_cc", "0.2.17"),
+        ("rules_python", "1.7.0"),
+        ("rules_shell", "0.6.1"),
+        ("apple_support", "1.24.2"),
+        ("rules_apple", "4.1.0"),
+        ("rules_swift", "3.1.2"),
+        ("abseil-cpp", "20250814.1"),
+    ];
+    let mut root_module = "module(name = 'root')\n".to_owned();
+    for (name, version) in modules {
+        fs::create_dir_all(workspace.join(name)).unwrap();
+        fs::write(
+            workspace.join(name).join("MODULE.bazel"),
+            format!("module(name = '{name}', version = '{version}')\n"),
+        )
+        .unwrap();
+        root_module.push_str(&format!(
+            "local_path_override(module_name = '{name}', path = '{name}')\n"
+        ));
+        if matches!(
+            name,
+            "bazel_features" | "rules_apple" | "rules_swift" | "abseil-cpp"
+        ) {
+            root_module.push_str(&format!(
+                "bazel_dep(name = '{name}', version = '{version}')\n"
+            ));
+        }
+    }
+    fs::write(workspace.join("MODULE.bazel"), root_module).unwrap();
+    fs::write(workspace.join("platforms/REPO.bazel"), "").unwrap();
+    fs::write(workspace.join("platforms/.bazelignore"), "").unwrap();
+    fs::create_dir_all(workspace.join("platforms/host")).unwrap();
+    fs::create_dir_all(workspace.join("platforms/cpu")).unwrap();
+    fs::write(
+        workspace.join("platforms/host/constraints.bzl"),
+        "HOST_CONSTRAINTS = ['@platforms//cpu:x86_64']\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("platforms/host/BUILD.bazel"),
+        "load(':constraints.bzl', 'HOST_CONSTRAINTS')\nplatform(name = 'host', constraint_values = HOST_CONSTRAINTS)\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("platforms/cpu/BUILD.bazel"),
+        "constraint_setting(name = 'cpu')\nconstraint_value(name = 'x86_64', constraint_setting = ':cpu')\n",
+    )
+    .unwrap();
+
+    let repositories = [
+        ("rules_license+", "rules_license"),
+        ("buildozer+", "buildozer"),
+        ("platforms", "platforms"),
+        ("platforms+", "platforms"),
+        ("zlib+", "zlib"),
+        ("bazel_features+", "bazel_features"),
+        ("protobuf+", "protobuf"),
+        ("rules_java+", "rules_java"),
+        ("rules_cc+", "rules_cc"),
+        ("rules_python+", "rules_python"),
+        ("rules_shell+", "rules_shell"),
+        ("apple_support+", "apple_support"),
+        ("rules_apple+", "rules_apple"),
+        ("rules_swift+", "rules_swift"),
+        ("abseil-cpp+", "abseil-cpp"),
+    ];
+    let workspace_key = NormalizedAbsolutePath::new(workspace.clone()).unwrap();
+    let configuration = test_configuration();
+    let key = ConfiguredTargetPlatformKey::new(workspace_key, configuration).unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater_with_data(UserComputationData {
+        cycle_detector: Some(analysis_cycle_detector()),
+        ..Default::default()
+    });
+    inject_root_target_inputs(
+        &mut updater,
+        &workspace,
+        root_epoch(&workspace),
+        &repositories,
+    );
+    let platform =
+        configured_platform_result(updater.commit().await.compute(&key).await.unwrap()).unwrap();
+    assert_eq!(
+        platform.requested().label().to_string(),
+        "@@bazel_tools//tools:host_platform"
+    );
+    assert_eq!(
+        platform.actual().label().to_string(),
+        "@@platforms//host:host"
+    );
+    assert_eq!(platform.constraints().len(), 1);
+    assert_eq!(
+        platform.constraints()[0]
+            .constraint_value()
+            .label()
+            .to_string(),
+        "@@platforms//cpu:x86_64"
     );
 }
 

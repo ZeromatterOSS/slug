@@ -10,6 +10,7 @@
 
 mod build_setting;
 mod command_configuration;
+mod configured_analysis_cycle_detector;
 mod configured_attribute;
 pub mod configured_target;
 pub mod dice;
@@ -24,6 +25,7 @@ pub use command_configuration::CommandConfigurationPreparationOutcome;
 pub use command_configuration::CommandConfigurationPreparationOuterError;
 pub use command_configuration::ObservedCommandConfiguration;
 pub use command_configuration::ObservedCommandConfigurationPreparationOutcome;
+pub use configured_analysis_cycle_detector::analysis_cycle_detector;
 pub use configured_target::ConfiguredEdge;
 pub use configured_target::ConfiguredEdgeKind;
 pub use dice::AnalysisError;
@@ -34,6 +36,9 @@ pub use dice::ConfiguredConditionOutcome;
 pub use dice::ConfiguredNodeAnalysisKey;
 #[doc(hidden)]
 pub use dice::ConfiguredNodeAnalysisObservationKey;
+pub use dice::ConfiguredPlatformKey;
+pub use dice::ConfiguredPlatformOutcome;
+pub use dice::ConfiguredTargetPlatformKey;
 #[doc(hidden)]
 pub use dice::ObservedConfiguredNodeAnalysisPreparationOutcome;
 pub use dice::prepare_configured_node_analysis;
@@ -55,6 +60,7 @@ pub use result::ConfiguredActionToolchainContext;
 pub use result::ConfiguredActionView;
 pub use result::ConfiguredNodeKind;
 pub use result::ConfiguredNodeResult;
+pub use result::ConfiguredPlatform;
 pub use result::DiagnosticSeverity;
 pub use result::PlatformSemanticFact;
 pub use result::ToolchainSelection;

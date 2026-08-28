@@ -297,7 +297,7 @@ Every retained R4 baseline remains `cf91fe8de`; `ce38f0373`, `959cbd889` and
 | `app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs` | `3002f00320df7540b4c4905610f11e42534b4f7b` / 149 | +35 |
 | `app/slug_loading_v2/src/package.rs` | `bfc62b265d336a57a612e2f50def2ce3da587a2e` / 6,852 | +50 |
 | `app/slug_loading_v2/tests/build_file_loading.rs` | `fa35fbbedc839f49b701ffc98810554349d28629` / 3,559 | +55 |
-| `app/slug_loading_v2/src/external_subtree_package_set_tests.rs` | `d8e7477ae4f33c13e83c7edbadceaa85d6d0cbed` / 838 | +0; replace two rows |
+| `app/slug_loading_v2/src/external_subtree_package_set_tests.rs` | `d8e7477ae4f33c13e83c7edbadceaa85d6d0cbed` / 838 | +4; replace two rows with the graph-backed builtin route fixture |
 | `app/slug_analysis_v2/src/dice.rs` | `08711874e49e37b297b8a7eb989ba7a1c60d70e1` / 3,748 | +340 |
 | `app/slug_analysis_v2/src/result.rs` | `2d5fb57083c522ea5229610e1c033371065ad790` / 668 | +100 |
 | `app/slug_analysis_v2/src/lib.rs` | `777f01622c2051a3b54c2a697173e136072ac792` / 77 | +15 |
@@ -305,6 +305,7 @@ Every retained R4 baseline remains `cf91fe8de`; `ce38f0373`, `959cbd889` and
 | `app/slug_analysis_v2/tests/root_analysis.rs` | `b2fd28f8fda584b50ec597eb21018a24461b8167` / 1,123 | +100 |
 | `app/slug_core_v2/src/runtime/dice.rs` | `e0bf2cb329b63089ca51c039e82881c3188c8655` / 12,008 | +20 |
 | `app/slug_core_v2/src/runtime/tests/build_command_tests.rs` | `fd3f417977f417a0098decd36c34097d1d50d391` / 4,056 | +0; replace one token |
+| `app/slug_core_v2/src/runtime/tests/query_command_tests.rs` | `2017bbf52cd19967a8450450bc55a08603de4ecf` / 860 | +0; replace four visibility diagnostics and one named-repository error reached after generic alias/config-setting admission |
 | `app/slug_analysis_v2/Cargo.toml` | `36cd3ffd8e681d998d6f1bcd47f493e2496484e6` / 31 | +0; move Tokio row |
 
 R7 uses these `c2ec8481e` mapping-owner baselines:
@@ -320,6 +321,7 @@ R7 uses these `c2ec8481e` mapping-owner baselines:
 | `app/slug_loading_v2/src/canonical_repository_route_tests.rs` | `90c8c212ac33dfd6755fb907054d4bd413916b64` / 3,047 | +250 |
 | `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs` | `81a0d1ef364f40ecdb9da5c5a150361c5fe876a0` / 2,668 | +250 |
 | `app/slug_loading_v2/src/bzl_module.rs` | `f8f8182b2e3e62c834120fc610b0d186c93e16ef` / 10,576 | +20 |
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `7ef16a76ee16aa9b8156e859646e86f9a66f6eac` / 35,108 | +0; replace three stale alias-rejection fixtures with unsupported generic target kinds |
 
 The only new non-plan files remain the exact 50-line builtin `tools/BUILD`,
 the exact 106-line `tools/build_defs.bzl`, and the at-most-350-line configured

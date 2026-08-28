@@ -1119,7 +1119,9 @@ toolchain(
     );
     assert!(matches!(
         loaded.targets[0].kind,
-        PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintSetting)
+        PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintSetting {
+            default_constraint_value: None,
+        })
     ));
     assert!(matches!(
         &loaded.targets[1].kind,
@@ -1190,6 +1192,26 @@ toolchain(
             && !capability.executable
             && capability.test_kind.is_none()
     }));
+}
+
+#[test]
+fn constraint_setting_retains_default_value_presence() {
+    let workspace = scratch("constraint-setting-default");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join(BUILD_FILE_PRIMARY),
+        "constraint_setting(name = \"setting\", default_constraint_value = \":value\")\n\
+         constraint_value(name = \"value\", constraint_setting = \":setting\")\n",
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &workspace);
+    assert!(matches!(
+        &loaded.targets[0].kind,
+        PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintSetting {
+            default_constraint_value: Some(label),
+        }) if label == &CanonicalLabel::parse("@@//:value").unwrap()
+    ));
 }
 
 #[test]

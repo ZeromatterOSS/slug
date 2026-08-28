@@ -69,6 +69,7 @@ use starlark_map::small_set::SmallSet;
 use crate::build_setting::matches_expected_text;
 use crate::build_setting::resolve_candidate;
 use crate::build_setting::unpack_transition_value;
+use crate::configured_analysis_cycle_detector::ConfiguredAnalysisCycleGuard;
 use crate::configured_attribute::ConfiguredAttributeCondition;
 use crate::configured_attribute::ResolvedRuleAttribute;
 use crate::configured_attribute::resolve_configured_attribute;
@@ -85,6 +86,7 @@ use crate::result::ConfiguredActionPlatformConstraint;
 use crate::result::ConfiguredActionToolchainContext;
 use crate::result::ConfiguredNodeKind;
 use crate::result::ConfiguredNodeResult;
+use crate::result::ConfiguredPlatform;
 use crate::result::PlatformSemanticFact;
 use crate::result::ToolchainSelection;
 use crate::result::ToolchainTopology;
@@ -208,6 +210,12 @@ pub struct ConfiguredConditionKey {
     target: ConfiguredTargetKey,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+pub struct ConfiguredPlatformKey(NormalizedAbsolutePath, ConfiguredTargetKey);
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+pub struct ConfiguredTargetPlatformKey(NormalizedAbsolutePath, ConfigurationKey);
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative)]
 pub enum ConfiguredConditionMatch {
     Match,
@@ -216,6 +224,10 @@ pub enum ConfiguredConditionMatch {
 
 pub type ConfiguredConditionOutcome = LoadingPreparationOutcome<
     Result<Arc<Result<ConfiguredConditionMatch, AnalysisError>>, ObservedPathFrontierError>,
+>;
+
+pub type ConfiguredPlatformOutcome = LoadingPreparationOutcome<
+    Result<Arc<Result<Arc<ConfiguredPlatform>, AnalysisError>>, ObservedPathFrontierError>,
 >;
 
 impl ConfiguredConditionKey {
@@ -237,6 +249,34 @@ impl ConfiguredConditionKey {
 
     pub fn target(&self) -> &ConfiguredTargetKey {
         &self.target
+    }
+}
+
+impl ConfiguredPlatformKey {
+    pub fn new(
+        workspace: NormalizedAbsolutePath,
+        target: ConfiguredTargetKey,
+    ) -> Result<Self, AnalysisError> {
+        if target.configuration().slug_configuration().is_none() {
+            return Err(AnalysisError::message(
+                "configured-platform analysis requires a structural Slug configuration",
+            ));
+        }
+        Ok(Self(workspace, target))
+    }
+}
+
+impl ConfiguredTargetPlatformKey {
+    pub fn new(
+        workspace: NormalizedAbsolutePath,
+        configuration: ConfigurationKey,
+    ) -> Result<Self, AnalysisError> {
+        if configuration.slug_configuration().is_none() {
+            return Err(AnalysisError::message(
+                "target-platform analysis requires a structural Slug configuration",
+            ));
+        }
+        Ok(Self(workspace, configuration))
     }
 }
 
@@ -270,6 +310,21 @@ enum ConfiguredAnalysisMode {
 
 type AnalysisDriverOutcome<T> = LoadingPreparationOutcome<Result<T, ObservedPathFrontierError>>;
 type AnalysisSemanticOutcome<T> = AnalysisDriverOutcome<Result<T, AnalysisError>>;
+
+macro_rules! analysis_value {
+    ($outcome:expr) => {
+        match $outcome {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error))
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return analysis_semantic_complete(Err(error))
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
+        }
+    };
+}
 
 #[doc(hidden)]
 pub type ObservedConfiguredNodeAnalysisPreparationOutcome =
@@ -342,6 +397,98 @@ impl Key for ConfiguredConditionKey {
             value,
             LoadingPreparationOutcome::Complete(Ok(result)) if result.as_ref().is_ok()
         )
+    }
+}
+
+fn configured_platform_equality(
+    left: &ConfiguredPlatformOutcome,
+    right: &ConfiguredPlatformOutcome,
+) -> bool {
+    matches!(
+        (left, right),
+        (
+            LoadingPreparationOutcome::Complete(Ok(left)),
+            LoadingPreparationOutcome::Complete(Ok(right)),
+        ) if matches!((left.as_ref(), right.as_ref()), (Ok(left), Ok(right)) if left == right)
+    )
+}
+
+fn configured_platform_validity(value: &ConfiguredPlatformOutcome) -> bool {
+    matches!(
+        value,
+        LoadingPreparationOutcome::Complete(Ok(result)) if result.as_ref().is_ok()
+    )
+}
+
+#[async_trait]
+impl Key for ConfiguredPlatformKey {
+    type Value = ConfiguredPlatformOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match compute_configured_platform(ctx, self).await {
+            LoadingPreparationOutcome::Need(need) => LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                LoadingPreparationOutcome::Complete(Err(error))
+            }
+            LoadingPreparationOutcome::Complete(Ok(result)) => {
+                LoadingPreparationOutcome::Complete(Ok(Arc::new(result)))
+            }
+        }
+    }
+
+    fn equality(left: &Self::Value, right: &Self::Value) -> bool {
+        configured_platform_equality(left, right)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        configured_platform_validity(value)
+    }
+}
+
+#[async_trait]
+impl Key for ConfiguredTargetPlatformKey {
+    type Value = ConfiguredPlatformOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let structural = self
+            .1
+            .slug_configuration()
+            .expect("ConfiguredTargetPlatformKey validates structural configuration");
+        let label = match structural.target_platform_label() {
+            Ok(label) => label,
+            Err(error) => {
+                return LoadingPreparationOutcome::Complete(Ok(Arc::new(Err(
+                    AnalysisError::message(error.to_string()),
+                ))));
+            }
+        };
+        let key = ConfiguredPlatformKey::new(
+            self.0.dupe(),
+            ConfiguredTargetKey::new(label, self.1.clone()),
+        )
+        .expect("target platform inherits structural configuration");
+        match ctx.compute(&key).await {
+            Ok(value) => value,
+            Err(error) => LoadingPreparationOutcome::Complete(Ok(Arc::new(Err(
+                AnalysisError::message(format!("computing target platform through DICE: {error}")),
+            )))),
+        }
+    }
+
+    fn equality(left: &Self::Value, right: &Self::Value) -> bool {
+        configured_platform_equality(left, right)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        configured_platform_validity(value)
     }
 }
 
@@ -635,12 +782,6 @@ async fn compute_configured_condition(
             key.target.label()
         ))));
     }
-    if !declaration.constraint_values().value().is_empty() {
-        return analysis_semantic_complete(Err(AnalysisError::message(format!(
-            "config_setting {} uses constraint_values before the configured target-platform fact is available",
-            key.target.label()
-        ))));
-    }
     let configuration = key
         .target
         .configuration()
@@ -701,6 +842,79 @@ async fn compute_configured_condition(
             }
         }
     }
+    let mut constraint_match = true;
+    if !declaration.constraint_values().value().is_empty() {
+        let platform_key = ConfiguredTargetPlatformKey::new(
+            key.workspace.dupe(),
+            key.target.configuration().clone(),
+        )
+        .expect("configured condition has structural configuration");
+        let platform = match ctx.compute(&platform_key).await {
+            Ok(LoadingPreparationOutcome::Need(need)) => {
+                all_need = Some(all_need.map_or(need.clone(), |current| {
+                    current
+                        .try_union(&need)
+                        .expect("configured-condition Needs agree")
+                }));
+                None
+            }
+            Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
+                if first_outer.is_none() {
+                    first_outer = Some(error);
+                }
+                None
+            }
+            Ok(LoadingPreparationOutcome::Complete(Ok(result))) => match result.as_ref() {
+                Ok(platform) => Some(platform.dupe()),
+                Err(error) => {
+                    if first_error.is_none() {
+                        first_error = Some(error.clone());
+                    }
+                    None
+                }
+            },
+            Err(error) => {
+                if first_error.is_none() {
+                    first_error = Some(AnalysisError::message(format!(
+                        "computing target platform for {}: {error}",
+                        key.target.label()
+                    )));
+                }
+                None
+            }
+        };
+        for requested in declaration.constraint_values().value().iter() {
+            let requested =
+                ConfiguredTargetKey::new(requested.clone(), key.target.configuration().clone());
+            match compute_configured_constraint(ctx, &key.workspace, &requested).await {
+                LoadingPreparationOutcome::Need(need) => {
+                    all_need = Some(all_need.map_or(need.clone(), |current| {
+                        current
+                            .try_union(&need)
+                            .expect("configured-condition Needs agree")
+                    }));
+                }
+                LoadingPreparationOutcome::Complete(Err(error)) => {
+                    if first_outer.is_none() {
+                        first_outer = Some(error);
+                    }
+                }
+                LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                }
+                LoadingPreparationOutcome::Complete(Ok(Ok(constraint))) => {
+                    constraint_match &= platform.as_ref().is_some_and(|platform| {
+                        platform.constraints().iter().any(|candidate| {
+                            candidate.constraint_setting() == constraint.constraint_setting()
+                                && candidate.constraint_value() == constraint.constraint_value()
+                        })
+                    });
+                }
+            }
+        }
+    }
     if let Some(error) = first_outer {
         return LoadingPreparationOutcome::Complete(Err(error));
     }
@@ -710,7 +924,7 @@ async fn compute_configured_condition(
     if let Some(error) = first_error {
         return analysis_semantic_complete(Err(error));
     }
-    analysis_semantic_complete(Ok(if native_match && flag_match {
+    analysis_semantic_complete(Ok(if native_match && flag_match && constraint_match {
         ConfiguredConditionMatch::Match
     } else {
         ConfiguredConditionMatch::NoMatch
@@ -735,10 +949,37 @@ impl fmt::Display for ConfiguredConditionKey {
     }
 }
 
+impl fmt::Display for ConfiguredPlatformKey {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "configured-platform:{}", self.1)
+    }
+}
+
+impl fmt::Display for ConfiguredTargetPlatformKey {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "configured-target-platform:{}", self.1)
+    }
+}
+
 type RootAnalysisKeyValue =
     LoadingPreparationOutcome<Arc<Result<Arc<ConfiguredNodeResult>, AnalysisError>>>;
 type RootAnalysisDriverValue =
     AnalysisDriverOutcome<Arc<Result<Arc<ConfiguredNodeResult>, AnalysisError>>>;
+
+macro_rules! root_value {
+    ($outcome:expr) => {
+        match $outcome {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error))
+            }
+            LoadingPreparationOutcome::Complete(Ok(value)) => match value.as_ref() {
+                Ok(result) => result.dupe(),
+                Err(error) => return root_analysis_driver_complete(Err(error.clone())),
+            },
+        }
+    };
+}
 
 #[derive(Default)]
 struct AnalysisPrintCapture {
@@ -1559,6 +1800,159 @@ async fn compute_configured_child(
     }
 }
 
+async fn compute_actual_child(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: NormalizedAbsolutePath,
+    requested: Arc<ConfiguredNodeResult>,
+) -> RootAnalysisDriverValue {
+    let actual = requested
+        .actual_configured_target()
+        .expect("configured child publishes actual identity");
+    if requested.configured_target_key() == Some(actual) {
+        return LoadingPreparationOutcome::Complete(Ok(Arc::new(Ok(requested))));
+    }
+    compute_configured_child(
+        ctx,
+        mode,
+        workspace,
+        actual.label().clone(),
+        actual.configuration().clone(),
+    )
+    .await
+}
+
+async fn observed_configured_result(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    key: &ConfiguredTargetKey,
+) -> AnalysisSemanticOutcome<Arc<ConfiguredNodeResult>> {
+    let outcome = compute_configured_child(
+        ctx,
+        ConfiguredAnalysisMode::Observed,
+        workspace.dupe(),
+        key.label().clone(),
+        key.configuration().clone(),
+    )
+    .await;
+    match outcome {
+        LoadingPreparationOutcome::Need(need) => LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Complete(Err(error)) => {
+            LoadingPreparationOutcome::Complete(Err(error))
+        }
+        LoadingPreparationOutcome::Complete(Ok(value)) => match value.as_ref() {
+            Ok(result) => analysis_semantic_complete(Ok(result.dupe())),
+            Err(error) => analysis_semantic_complete(Err(error.clone())),
+        },
+    }
+}
+
+async fn observed_actual_result(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    requested: Arc<ConfiguredNodeResult>,
+) -> AnalysisSemanticOutcome<(ConfiguredTargetKey, Arc<ConfiguredNodeResult>)> {
+    let Some(actual) = requested.actual_configured_target().cloned() else {
+        return analysis_semantic_complete(Err(AnalysisError::message(
+            "configured platform dependency has no actual configured target",
+        )));
+    };
+    if requested.configured_target_key() == Some(&actual) {
+        return analysis_semantic_complete(Ok((actual, requested)));
+    }
+    let result = analysis_value!(observed_configured_result(ctx, workspace, &actual).await);
+    analysis_semantic_complete(Ok((actual, result)))
+}
+
+async fn compute_configured_constraint(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    requested: &ConfiguredTargetKey,
+) -> AnalysisSemanticOutcome<ConfiguredActionPlatformConstraint> {
+    let value = analysis_value!(observed_configured_result(ctx, workspace, requested).await);
+    let (actual_value, value) =
+        analysis_value!(observed_actual_result(ctx, workspace, value).await);
+    if value.kind() != &ConfiguredNodeKind::ConstraintValue {
+        return analysis_semantic_complete(Err(AnalysisError::message(format!(
+            "expected configured constraint value at {}",
+            requested.label()
+        ))));
+    }
+    let Some(setting_key) = value
+        .edges()
+        .first()
+        .and_then(|edge| edge.configured_target())
+        .cloned()
+    else {
+        return analysis_semantic_complete(Err(AnalysisError::message(
+            "constraint value has no configured setting edge",
+        )));
+    };
+    let setting = analysis_value!(observed_configured_result(ctx, workspace, &setting_key).await);
+    let (actual_setting, setting) =
+        analysis_value!(observed_actual_result(ctx, workspace, setting).await);
+    if setting.kind() != &ConfiguredNodeKind::ConstraintSetting {
+        return analysis_semantic_complete(Err(AnalysisError::message(
+            "constraint value references a non-constraint setting",
+        )));
+    }
+    analysis_semantic_complete(Ok(ConfiguredActionPlatformConstraint::new(
+        actual_value,
+        actual_setting,
+    )))
+}
+
+async fn compute_configured_platform(
+    ctx: &mut DiceComputations<'_>,
+    key: &ConfiguredPlatformKey,
+) -> AnalysisSemanticOutcome<Arc<ConfiguredPlatform>> {
+    let requested_result = analysis_value!(observed_configured_result(ctx, &key.0, &key.1).await);
+    let (actual, platform) =
+        analysis_value!(observed_actual_result(ctx, &key.0, requested_result).await);
+    if platform.kind() != &ConfiguredNodeKind::Platform || !platform.diagnostics().is_empty() {
+        return analysis_semantic_complete(Err(AnalysisError::message(format!(
+            "configured platform {} has invalid semantic shape",
+            key.1.label()
+        ))));
+    }
+    let Some(fact) = platform.platform_semantic_fact().cloned() else {
+        return analysis_semantic_complete(Err(AnalysisError::message(
+            "configured platform has no platform fact",
+        )));
+    };
+    let mut settings = SmallSet::with_capacity(platform.edges().len());
+    let mut constraints = Vec::with_capacity(platform.edges().len());
+    for edge in platform.edges() {
+        if !matches!(
+            edge.kind(),
+            crate::configured_target::ConfiguredEdgeKind::PlatformConstraint { .. }
+        ) {
+            return analysis_semantic_complete(Err(AnalysisError::message(
+                "configured platform has a non-constraint edge",
+            )));
+        }
+        let Some(value_key) = edge.configured_target().cloned() else {
+            return analysis_semantic_complete(Err(AnalysisError::message(
+                "configured platform constraint is not configured",
+            )));
+        };
+        let constraint =
+            analysis_value!(compute_configured_constraint(ctx, &key.0, &value_key).await);
+        if !settings.insert(constraint.constraint_setting().clone()) {
+            return analysis_semantic_complete(Err(AnalysisError::message(
+                "configured platform has a duplicate actual constraint setting",
+            )));
+        }
+        constraints.push(constraint);
+    }
+    analysis_semantic_complete(Ok(Arc::new(ConfiguredPlatform::new(
+        key.1.clone(),
+        actual,
+        fact,
+        constraints.into(),
+    ))))
+}
+
 fn root_analysis_success_eq(left: &RootAnalysisKeyValue, right: &RootAnalysisKeyValue) -> bool {
     match (left, right) {
         (LoadingPreparationOutcome::Complete(left), LoadingPreparationOutcome::Complete(right)) => {
@@ -1590,7 +1984,9 @@ fn require_supported_canonical_configured_target(
         (
             ConfiguredNodeKey::Configured(_),
             Some(slug_loading_v2::PackageTarget {
-                kind: PackageTargetKind::NativeToolchain(_),
+                kind: PackageTargetKind::Alias { .. }
+                    | PackageTargetKind::ConfigSetting { .. }
+                    | PackageTargetKind::NativeToolchain(_),
                 ..
             })
         )
@@ -1953,16 +2349,19 @@ fn rule_execution_platforms(
             "execution-platform topology requires a structural Slug configuration",
         ));
     };
-    let execution_configuration = match structural.to_exec() {
-        Ok(configuration) => ConfigurationKey::from_slug(configuration),
-        Err(error) => return Err(AnalysisError::new(error.to_string())),
-    };
     let platforms = registrations
         .execution_platforms()
         .iter()
         .cloned()
-        .map(|label| ConfiguredTargetKey::new(label, execution_configuration.clone()))
-        .collect();
+        .map(|label| {
+            structural
+                .to_exec_for_platform(&label)
+                .map(|configuration| {
+                    ConfiguredTargetKey::new(label, ConfigurationKey::from_slug(configuration))
+                })
+                .map_err(|error| AnalysisError::new(error.to_string()))
+        })
+        .collect::<Result<_, _>>()?;
     Ok(Some(platforms))
 }
 
@@ -2022,7 +2421,9 @@ fn constraint_value_setting(
     let setting = package_target(packages, constraint_setting)?;
     if !matches!(
         setting.kind,
-        PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintSetting)
+        PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintSetting {
+            default_constraint_value: None,
+        })
     ) {
         return Err(AnalysisError::new(format!(
             "constraint value {label} references a non-constraint setting {constraint_setting}"
@@ -2091,97 +2492,33 @@ struct PreparedExecutionPlatform {
 
 type PreparedExecutionPlatformOutcome = AnalysisSemanticOutcome<PreparedExecutionPlatform>;
 
-fn finish_execution_platform_analysis(
-    analysis: RootAnalysisDriverValue,
-) -> Result<Arc<ConfiguredNodeResult>, PreparedExecutionPlatformOutcome> {
-    match analysis {
-        LoadingPreparationOutcome::Need(need) => Err(LoadingPreparationOutcome::Need(need)),
-        LoadingPreparationOutcome::Complete(Err(error)) => {
-            Err(LoadingPreparationOutcome::Complete(Err(error)))
-        }
-        LoadingPreparationOutcome::Complete(Ok(value)) => match value.as_ref() {
-            Ok(value) => Ok(value.dupe()),
-            Err(error) => Err(analysis_semantic_complete(Err(error.clone()))),
-        },
-    }
-}
-
 async fn prepare_execution_platform(
     ctx: &mut DiceComputations<'_>,
-    mode: ConfiguredAnalysisMode,
+    _mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
-    packages: &ConfiguredPackages,
     key: ConfiguredTargetKey,
 ) -> PreparedExecutionPlatformOutcome {
-    let analysis_key = ConfiguredNodeAnalysisKey::new(workspace.dupe(), key.clone())
+    let platform_key = ConfiguredPlatformKey::new(workspace.dupe(), key)
         .expect("execution platform inherits structural exec configuration");
-    let analysis = compute_toolchain_analysis_input(
-        ctx,
-        mode,
-        analysis_key,
-        "analyzing selected execution platform through DICE",
-    )
-    .await;
-    let result = match finish_execution_platform_analysis(analysis) {
-        Ok(result) => result,
-        Err(terminal) => return terminal,
-    };
-    if result.configured_target_key() != Some(&key)
-        || result.kind() != &ConfiguredNodeKind::Platform
-        || !result.diagnostics().is_empty()
-        || result.platform_semantic_fact().is_none()
-    {
-        return analysis_semantic_complete(Err(AnalysisError::new(
-            "selected execution platform analysis has invalid semantic shape",
-        )));
-    }
-    let target = match package_target(packages, key.label()) {
-        Ok(target) => target,
-        Err(error) => return analysis_semantic_complete(Err(error)),
-    };
-    let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform { constraint_values }) =
-        &target.kind
-    else {
-        return analysis_semantic_complete(Err(AnalysisError::new(
-            "selected execution platform is not platform",
-        )));
-    };
-    if result.edges().len() != constraint_values.len() {
-        return analysis_semantic_complete(Err(AnalysisError::new(
-            "selected execution platform has mismatched constraint edges",
-        )));
-    }
-    let mut constraints = Vec::with_capacity(constraint_values.len());
-    for (index, (edge, value)) in result
-        .edges()
-        .iter()
-        .zip(constraint_values.iter())
-        .enumerate()
-    {
-        let value_key = ConfiguredTargetKey::new(value.clone(), key.configuration().clone());
-        if edge.target() != &ConfiguredNodeKey::configured(value_key.clone())
-            || !matches!(edge.kind(), crate::configured_target::ConfiguredEdgeKind::PlatformConstraint { index: edge_index } if edge_index == &u32::try_from(index).expect("constraint index fits u32"))
-        {
-            return analysis_semantic_complete(Err(AnalysisError::new(
-                "selected execution platform has unordered constraint edges",
-            )));
+    let platform = match ctx.compute(&platform_key).await {
+        Ok(LoadingPreparationOutcome::Need(need)) => return LoadingPreparationOutcome::Need(need),
+        Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
+            return LoadingPreparationOutcome::Complete(Err(error));
         }
-        let setting = match constraint_value_setting(packages, value) {
-            Ok(setting) => setting,
-            Err(error) => return analysis_semantic_complete(Err(error)),
-        };
-        constraints.push(ConfiguredActionPlatformConstraint::new(
-            value_key,
-            ConfiguredTargetKey::new(setting, key.configuration().clone()),
-        ));
-    }
+        Ok(LoadingPreparationOutcome::Complete(Ok(result))) => match result.as_ref() {
+            Ok(platform) => platform.dupe(),
+            Err(error) => return analysis_semantic_complete(Err(error.clone())),
+        },
+        Err(error) => {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "computing selected execution platform through DICE: {error}"
+            ))));
+        }
+    };
     analysis_semantic_complete(Ok(PreparedExecutionPlatform {
-        key,
-        fact: result
-            .platform_semantic_fact()
-            .expect("validated platform fact")
-            .clone(),
-        constraints,
+        key: platform.actual().clone(),
+        fact: platform.fact().clone(),
+        constraints: platform.constraints().to_vec(),
     }))
 }
 
@@ -2282,21 +2619,8 @@ async fn prepare_default_action_context(
                 .map_err(AnalysisError::new),
         );
     };
-    let mut labels = vec![platform_key.label().clone()];
-    let packages = match load_configured_native_packages(ctx, mode, workspace, &mut labels).await {
-        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
-        LoadingPreparationOutcome::Complete(Err(error)) => {
-            return LoadingPreparationOutcome::Complete(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-            return analysis_semantic_complete(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Ok(packages))) => packages,
-    };
     let platform =
-        match prepare_execution_platform(ctx, mode, workspace, &packages, platform_key.clone())
-            .await
-        {
+        match prepare_execution_platform(ctx, mode, workspace, platform_key.clone()).await {
             LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
             LoadingPreparationOutcome::Complete(Err(error)) => {
                 return LoadingPreparationOutcome::Complete(Err(error));
@@ -2823,8 +3147,7 @@ async fn resolve_root_toolchain(
         .find(|platform| platform.label() == &selected_platform)
         .expect("selected root platform retains its configured candidate identity")
         .clone();
-    let platform =
-        prepare_execution_platform(ctx, mode, workspace, &packages, selected_platform_key).await;
+    let platform = prepare_execution_platform(ctx, mode, workspace, selected_platform_key).await;
     let platform = match platform {
         LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
         LoadingPreparationOutcome::Complete(Err(error)) => {
@@ -2942,23 +3265,11 @@ mod tests {
             unreachable!()
         };
         assert!(Arc::ptr_eq(&semantic_arc, &projected));
-        assert!(matches!(
-            finish_execution_platform_analysis(semantic.clone()),
-            Err(LoadingPreparationOutcome::Complete(Ok(result))) if result.is_err()
-        ));
-
         let demand = slug_workspace_v2::PathObservationDemand::new(
             PathObservationNamespace::Host,
             NormalizedAbsolutePath::new("/outer").unwrap(),
             slug_workspace_v2::PathObservationOperation::Lstat,
         );
-        let need = LoadingPreparationNeeds::path(
-            slug_workspace_v2::NeedPathObservations::singleton(demand.dupe()),
-        );
-        assert!(matches!(
-            finish_execution_platform_analysis(LoadingPreparationOutcome::Need(need)),
-            Err(LoadingPreparationOutcome::Need(_))
-        ));
         let outer: RootAnalysisDriverValue =
             LoadingPreparationOutcome::Complete(Err(ObservedPathFrontierError::from(
                 slug_workspace_v2::PathObservationEpochError::DuplicateDemand(demand),
@@ -2966,10 +3277,6 @@ mod tests {
         assert!(ConfiguredNodeAnalysisObservationKey::validity(&outer));
         assert!(ConfiguredNodeAnalysisObservationKey::equality(
             &outer, &outer
-        ));
-        assert!(matches!(
-            finish_execution_platform_analysis(outer),
-            Err(LoadingPreparationOutcome::Complete(Err(_)))
         ));
     }
 }
@@ -3199,8 +3506,21 @@ impl ConfiguredNodeAnalysisKey {
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),
-                Some(PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintSetting)),
-            ) if configured_target.configuration().kind() == ConfigurationKind::Exec => {
+                Some(PackageTargetKind::NativeToolchain(
+                    NativeToolchainTarget::ConstraintSetting {
+                        default_constraint_value,
+                    },
+                )),
+            ) if matches!(
+                configured_target.configuration().kind(),
+                ConfigurationKind::Target | ConfigurationKind::Exec
+            ) =>
+            {
+                if default_constraint_value.is_some() {
+                    return root_analysis_driver_complete(Err(AnalysisError::new(format!(
+                        "constraint setting defaults are unsupported: {label}"
+                    ))));
+                }
                 return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
                     self.node.clone(),
                     ConfiguredNodeKind::ConstraintSetting,
@@ -3213,28 +3533,25 @@ impl ConfiguredNodeAnalysisKey {
                 Some(PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintValue {
                     constraint_setting,
                 })),
-            ) if configured_target.configuration().kind() == ConfigurationKind::Exec => {
-                let child = compute_configured_child(
-                    ctx,
-                    mode,
-                    self.workspace.dupe(),
-                    constraint_setting.clone(),
-                    configured_target.configuration().clone(),
-                )
-                .await;
-                let child = match child {
-                    LoadingPreparationOutcome::Need(need) => {
-                        return LoadingPreparationOutcome::Need(need);
-                    }
-                    LoadingPreparationOutcome::Complete(Err(error)) => {
-                        return LoadingPreparationOutcome::Complete(Err(error));
-                    }
-                    LoadingPreparationOutcome::Complete(Ok(value)) => match value.as_ref() {
-                        Ok(result) => result.dupe(),
-                        Err(error) => return root_analysis_driver_complete(Err(error.clone())),
-                    },
-                };
-                if child.kind() != &ConfiguredNodeKind::ConstraintSetting {
+            ) if matches!(
+                configured_target.configuration().kind(),
+                ConfigurationKind::Target | ConfigurationKind::Exec
+            ) =>
+            {
+                let child = root_value!(
+                    compute_configured_child(
+                        ctx,
+                        mode,
+                        self.workspace.dupe(),
+                        constraint_setting.clone(),
+                        configured_target.configuration().clone(),
+                    )
+                    .await
+                );
+                let actual = root_value!(
+                    compute_actual_child(ctx, mode, self.workspace.dupe(), child.dupe(),).await
+                );
+                if actual.kind() != &ConfiguredNodeKind::ConstraintSetting {
                     return root_analysis_driver_complete(Err(AnalysisError::new(format!(
                         "constraint value {label} references a non-constraint setting {constraint_setting}"
                     ))));
@@ -3255,7 +3572,11 @@ impl ConfiguredNodeAnalysisKey {
                 Some(PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform {
                     constraint_values,
                 })),
-            ) if configured_target.configuration().kind() == ConfigurationKind::Exec => {
+            ) if matches!(
+                configured_target.configuration().kind(),
+                ConfigurationKind::Target | ConfigurationKind::Exec
+            ) =>
+            {
                 let fact = match platform_semantic_fact(package, label.target().as_str(), label) {
                     Ok(fact) => fact,
                     Err(error) => return root_analysis_driver_complete(Err(error)),
@@ -3263,32 +3584,25 @@ impl ConfiguredNodeAnalysisKey {
                 let mut seen_settings = SmallSet::with_capacity(constraint_values.len());
                 let mut edges = Vec::with_capacity(constraint_values.len());
                 for (index, constraint_value) in constraint_values.iter().enumerate() {
-                    let child = compute_configured_child(
-                        ctx,
-                        mode,
-                        self.workspace.dupe(),
-                        constraint_value.clone(),
-                        configured_target.configuration().clone(),
-                    )
-                    .await;
-                    let child = match child {
-                        LoadingPreparationOutcome::Need(need) => {
-                            return LoadingPreparationOutcome::Need(need);
-                        }
-                        LoadingPreparationOutcome::Complete(Err(error)) => {
-                            return LoadingPreparationOutcome::Complete(Err(error));
-                        }
-                        LoadingPreparationOutcome::Complete(Ok(value)) => match value.as_ref() {
-                            Ok(result) => result.dupe(),
-                            Err(error) => return root_analysis_driver_complete(Err(error.clone())),
-                        },
-                    };
-                    if child.kind() != &ConfiguredNodeKind::ConstraintValue {
+                    let child = root_value!(
+                        compute_configured_child(
+                            ctx,
+                            mode,
+                            self.workspace.dupe(),
+                            constraint_value.clone(),
+                            configured_target.configuration().clone(),
+                        )
+                        .await
+                    );
+                    let actual = root_value!(
+                        compute_actual_child(ctx, mode, self.workspace.dupe(), child.dupe(),).await
+                    );
+                    if actual.kind() != &ConfiguredNodeKind::ConstraintValue {
                         return root_analysis_driver_complete(Err(AnalysisError::new(format!(
                             "platform {label} references a non-constraint value {constraint_value}"
                         ))));
                     }
-                    let Some(setting) = child.edges().first().map(|edge| edge.target().clone())
+                    let Some(setting) = actual.edges().first().map(|edge| edge.target().clone())
                     else {
                         return root_analysis_driver_complete(Err(AnalysisError::new(format!(
                             "constraint value {constraint_value} has no setting edge"
@@ -3328,14 +3642,17 @@ impl ConfiguredNodeAnalysisKey {
                 )));
             }
             (
-                ConfiguredNodeKey::Configured(_),
+                ConfiguredNodeKey::Configured(configured_target),
                 Some(PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
                     ..
                 })),
-            ) => {
-                return root_analysis_driver_complete(Err(AnalysisError::new(format!(
-                    "toolchain declaration nodes are not supported: {label}"
-                ))));
+            ) if configured_target.configuration().kind() == ConfigurationKind::Target => {
+                return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
+                    self.node.clone(),
+                    ConfiguredNodeKind::ToolchainDeclaration,
+                    native_empty_providers(),
+                    target.and_then(|target| target.rule_capability()).cloned(),
+                )));
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),
@@ -3351,25 +3668,29 @@ impl ConfiguredNodeAnalysisKey {
                 ConfiguredNodeKey::Configured(configured_target),
                 Some(PackageTargetKind::Alias { actual }),
             ) => {
-                let child = compute_configured_child(
+                let cycle_guard = ctx.cycle_guard::<ConfiguredAnalysisCycleGuard>();
+                let child_future = compute_configured_child(
                     ctx,
                     mode,
                     self.workspace.dupe(),
                     actual.clone(),
                     configured_target.configuration().clone(),
-                )
-                .await;
-                let child = match child {
-                    LoadingPreparationOutcome::Need(need) => {
-                        return LoadingPreparationOutcome::Need(need);
-                    }
-                    LoadingPreparationOutcome::Complete(Err(error)) => {
-                        return LoadingPreparationOutcome::Complete(Err(error));
-                    }
-                    LoadingPreparationOutcome::Complete(Ok(value)) => match value.as_ref() {
-                        Ok(result) => result.dupe(),
-                        Err(error) => return root_analysis_driver_complete(Err(error.clone())),
+                );
+                let child = match cycle_guard {
+                    Ok(Some(guard)) => match guard.guard_this(child_future).await {
+                        Ok(child) => root_value!(child),
+                        Err(cycle) => {
+                            return root_analysis_driver_complete(Err(AnalysisError::message(
+                                cycle.to_string(),
+                            )));
+                        }
                     },
+                    Ok(None) => root_value!(child_future.await),
+                    Err(error) => {
+                        return root_analysis_driver_complete(Err(AnalysisError::message(
+                            format!("reading configured-analysis cycle guard: {error}"),
+                        )));
+                    }
                 };
                 return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
                     self.node.clone(),
@@ -3380,7 +3701,13 @@ impl ConfiguredNodeAnalysisKey {
                 .with_edges(vec![crate::configured_target::ConfiguredEdge::new(
                     child.key().clone(),
                     crate::configured_target::ConfiguredEdgeKind::AliasActual,
-                )])));
+                )])
+                .with_actual_configured_target(
+                    child
+                        .actual_configured_target()
+                        .expect("configured alias child publishes actual identity")
+                        .clone(),
+                )));
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),
@@ -3392,26 +3719,16 @@ impl ConfiguredNodeAnalysisKey {
                     TargetName::parse(generating_rule.as_str())
                         .expect("loaded generated-file producer name remains a target name"),
                 );
-                let child = compute_configured_child(
-                    ctx,
-                    mode,
-                    self.workspace.dupe(),
-                    producer,
-                    configured_target.configuration().clone(),
-                )
-                .await;
-                let child = match child {
-                    LoadingPreparationOutcome::Need(need) => {
-                        return LoadingPreparationOutcome::Need(need);
-                    }
-                    LoadingPreparationOutcome::Complete(Err(error)) => {
-                        return LoadingPreparationOutcome::Complete(Err(error));
-                    }
-                    LoadingPreparationOutcome::Complete(Ok(value)) => match value.as_ref() {
-                        Ok(result) => result.dupe(),
-                        Err(error) => return root_analysis_driver_complete(Err(error.clone())),
-                    },
-                };
+                let child = root_value!(
+                    compute_configured_child(
+                        ctx,
+                        mode,
+                        self.workspace.dupe(),
+                        producer,
+                        configured_target.configuration().clone(),
+                    )
+                    .await
+                );
                 return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
                     self.node.clone(),
                     ConfiguredNodeKind::GeneratedFile,

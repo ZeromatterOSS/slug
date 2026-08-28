@@ -15,6 +15,10 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use slug_bzlmod_v2::HostBuiltinBazelToolsRepositoryMappingError;
+use slug_bzlmod_v2::HostBuiltinBazelToolsRepositoryMappingKey;
+use slug_bzlmod_v2::HostBuiltinBazelToolsRepositoryMappingObservationError;
+use slug_bzlmod_v2::HostBuiltinBazelToolsRepositoryMappingObservationKey;
 use slug_bzlmod_v2::HostCanonicalRepositoryRoute;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionError;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionErrorDisposition;
@@ -35,6 +39,8 @@ use crate::generated_repository_definition::HostGeneratedRepositoryDefinitionObs
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(super) enum HostCanonicalRepositoryRouteErrorKind {
+    Builtin(HostBuiltinBazelToolsRepositoryMappingError),
+    BuiltinCompute(Arc<str>),
     Selected(HostCanonicalSelectedModuleDefinitionError),
     SelectedCompute(Arc<str>),
     Generated {
@@ -151,6 +157,7 @@ impl ObservedHostCanonicalRepositoryRoute {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(super) enum CanonicalRepositoryRouteObservationError {
+    Builtin(HostBuiltinBazelToolsRepositoryMappingObservationError),
     Selected(HostCanonicalSelectedModuleDefinitionObservationError),
     Generated {
         selected_missing: HostCanonicalSelectedModuleDefinitionError,
@@ -213,10 +220,23 @@ async fn compute_canonical_repository_route(
     mode: CanonicalRepositoryRouteMode,
 ) -> CanonicalRepositoryRouteDriverOutcome {
     if key.canonical_repo.as_str() == "bazel_tools" {
-        return complete_route_driver(
-            Ok(HostCanonicalRepositoryRoute::builtin(key.workspace.clone())),
-            PathObservationEpoch::empty(),
-        );
+        let (mapping, observations) = match mode {
+            CanonicalRepositoryRouteMode::Legacy => match ctx.compute(&HostBuiltinBazelToolsRepositoryMappingKey::new(key.workspace.clone())).await {
+                Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+                Ok(SourcePreparationOutcome::Complete(result)) => (result, PathObservationEpoch::empty()),
+                Err(error) => return complete_route_driver(Err(HostCanonicalRepositoryRouteError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryRouteErrorKind::BuiltinCompute(error.to_string().into()) }), PathObservationEpoch::empty()),
+            },
+            CanonicalRepositoryRouteMode::Observed => match ctx.compute(&HostBuiltinBazelToolsRepositoryMappingObservationKey::new(key.workspace.clone())).await {
+                Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+                Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(CanonicalRepositoryRouteObservationError::Builtin(error))),
+                Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().clone(), observed.observations().clone()),
+                Err(error) => return complete_route_driver(Err(HostCanonicalRepositoryRouteError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryRouteErrorKind::BuiltinCompute(error.to_string().into()) }), PathObservationEpoch::empty()),
+            },
+        };
+        return match mapping.as_ref() {
+            Ok(mapping) => complete_route_driver(Ok(HostCanonicalRepositoryRoute::builtin(key.workspace.clone(), mapping.clone())), observations),
+            Err(error) => complete_route_driver(Err(HostCanonicalRepositoryRouteError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryRouteErrorKind::Builtin(error.clone()) }), observations),
+        };
     }
     let (selected, selected_observations) = match mode {
         CanonicalRepositoryRouteMode::Legacy => match ctx.compute(&HostCanonicalSelectedModuleDefinitionKey::new(key.workspace.clone(), key.canonical_repo.clone())).await {

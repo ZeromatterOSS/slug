@@ -94,6 +94,7 @@ mod tests {
     use super::super::HostCanonicalRepositoryRouteObservationKey;
     use super::super::HostSelectedRepositoryFileEffectObservationKey;
     use crate::ObservedRepositoryPackageLoad;
+    use crate::PackageTargetKind;
     use crate::RepositoryPackageLoadKey;
     use crate::RepositoryPackageLoadObservationKey;
     use crate::bzl_module::BzlLoadManifest;
@@ -108,6 +109,8 @@ mod tests {
     use crate::canonical_repository_route_tests::tests::EXTENSION_A;
     use crate::canonical_repository_route_tests::tests::MODULE;
     use crate::canonical_repository_route_tests::tests::WORKSPACE;
+    use crate::canonical_repository_route_tests::tests::builtin_graph_dice;
+    use crate::canonical_repository_route_tests::tests::builtin_graph_module;
     use crate::canonical_repository_route_tests::tests::names;
     use crate::canonical_repository_route_tests::tests::transaction;
     use crate::canonical_repository_route_tests::tests::validated;
@@ -776,37 +779,22 @@ mod tests {
     #[tokio::test]
     async fn builtin_route_source_and_listing_use_only_catalog_drivers() {
         let tracker = Arc::new(DependencyTrace::default());
-        let dice = Dice::builder().build(DetectCycles::Enabled);
-        let workspace = NormalizedAbsolutePath::new("/canonical-builtin").unwrap();
-        let mut updater = dice.updater_with_data(UserComputationData {
-            activation_tracker: Some(tracker.clone()),
-            ..Default::default()
-        });
-        inject_root_package_policy_inputs(
-            &mut updater,
-            RootPackagePolicyInputs::new(
-                workspace.clone(),
-                Arc::from([workspace.clone()]),
-                std::iter::empty::<&str>(),
-                None,
-                Some("warning"),
-            )
-            .unwrap(),
-        )
-        .unwrap();
-        let mut tx = updater.commit().await;
+        let dice = builtin_graph_dice();
+        let module = builtin_graph_module();
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let mut tx = transaction(&dice, &module, EXTENSION_A, true, Some(tracker.clone())).await;
         let canonical = CanonicalRepoName::new("bazel_tools").unwrap();
         let load_key = HostCanonicalRepositoryLoadRouteObservationKey::new(workspace, canonical);
         let load = tx.compute(&load_key).await.unwrap();
         let SourcePreparationOutcome::Complete(Ok(load)) = load else {
-            panic!("built-in load route must complete")
+            panic!("built-in load route must complete: {load:?}")
         };
         let route = load.result().as_ref().as_ref().unwrap();
         assert_eq!(
             route.route().view().kind(),
             HostCanonicalRepositoryRouteKind::Builtin
         );
-        assert!(load.observations().observations().is_empty());
+        assert!(!load.observations().observations().is_empty());
 
         let source_key = HostRepositorySourceObservationEpochKey::new_canonical(
             route.input().clone(),
@@ -839,6 +827,32 @@ mod tests {
             tracker.dependencies(&listing_key.to_string()),
             ["builtin-bazel-tools-directory-listing:"]
         );
+        let tools_key = RepositoryPackageLoadObservationKey::new_canonical(
+            route.input().clone(),
+            PackagePath::parse("tools").unwrap(),
+        );
+        let tools = tx.compute(&tools_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(tools)) = tools else {
+            panic!("built-in tools package must complete: {tools:?}")
+        };
+        let tools = tools.result().as_ref().as_ref().unwrap();
+        assert!(matches!(
+            &tools
+                .targets
+                .iter()
+                .find(|target| target.name == "host_platform")
+                .unwrap()
+                .kind,
+            PackageTargetKind::Alias { actual }
+                if actual == &CanonicalLabel::parse("@@platforms//host:host").unwrap()
+        ));
+        assert_eq!(
+            tools.direct_load_roots[0].label,
+            CanonicalLabel::parse("@@bazel_tools//tools:build_defs.bzl").unwrap()
+        );
+        assert!(tools.reachable_loads.iter().any(|load| {
+            load.label == CanonicalLabel::parse("@@platforms//host:constraints.bzl").unwrap()
+        }));
         let package_key = RepositoryPackageLoadObservationKey::new_canonical(
             route.input().clone(),
             PackagePath::parse("src/conditions").unwrap(),
@@ -2209,9 +2223,20 @@ ext=module_extension(implementation=impl)
     #[tokio::test]
     async fn constructor_fail_closed_and_hash_table_covers_keys_dispositions_and_effect_plan() {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let builtin = Arc::new(slug_bzlmod_v2::HostCanonicalRepositoryRoute::builtin(
-            workspace.clone(),
-        ));
+        let dice = builtin_graph_dice();
+        let module = builtin_graph_module();
+        let mut tx = transaction(&dice, &module, EXTENSION_A, true, None).await;
+        let builtin = tx
+            .compute(&super::super::HostCanonicalRepositoryRouteKey::new(
+                workspace.clone(),
+                CanonicalRepoName::new("bazel_tools").unwrap(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(builtin) = builtin else {
+            panic!("built-in route must complete")
+        };
+        let builtin = Arc::new(builtin.as_ref().as_ref().unwrap().clone());
         let builtin_input = host_canonical_repository_source_input(builtin.clone(), None).unwrap();
         let empty_plan = GeneratedRepositoryFileEffectPlan::build(std::iter::empty::<(
             CompactString,

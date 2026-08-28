@@ -72,6 +72,25 @@ impl<'a> OptionLabelContext<'a> {
 }
 
 impl ResolvedOptionLabel {
+    pub fn canonical(&self) -> Option<CanonicalLabel> {
+        let OptionRepository::Visible(repository) = &self.repository else {
+            return None;
+        };
+        Some(CanonicalLabel {
+            package: PackageIdentifier::new(repository.clone(), self.package.clone()),
+            target: self.target.clone(),
+            mapping_id: None,
+        })
+    }
+
+    pub fn from_canonical(label: &CanonicalLabel) -> Self {
+        Self {
+            repository: OptionRepository::Visible(label.package.repo().clone()),
+            package: label.package.package().clone(),
+            target: label.target.clone(),
+        }
+    }
+
     pub fn parse(value: &str, context: OptionLabelContext<'_>) -> Result<Self, String> {
         let value = match context {
             OptionLabelContext::FirstRoundCanonical | OptionLabelContext::MainRepository { .. }
@@ -522,7 +541,18 @@ mod tests {
             "canonical label destination repository must be nonroot"
         );
     }
-
+    #[test]
+    fn option_label_canonical_projection_preserves_nonvisible_state() {
+        let canonical = CanonicalLabel::parse("@@dep+//pkg:item").unwrap();
+        let option = crate::ResolvedOptionLabel::from_canonical(&canonical);
+        assert_eq!(option.canonical(), Some(canonical));
+        let mapping = RepositoryMapping::new(RepositoryMappingId::new("owner-map").unwrap());
+        let nonvisible = crate::OptionLabelContext::MainRepository { mapping: &mapping }
+            .parse("@missing//pkg:item")
+            .unwrap();
+        assert!(nonvisible.canonical().is_none());
+        assert!(nonvisible.to_string().contains("unknown repo 'missing'"));
+    }
     #[test]
     fn replacing_target_preserves_package_and_mapping_provenance() {
         let mapping = RepositoryMapping::new(RepositoryMappingId::new("root-map").unwrap());

@@ -20,6 +20,7 @@ use starlark_map::small_map::SmallMap;
 
 use crate::BuiltinBazelToolsRouteIdentity;
 use crate::BuiltinBazelToolsSnapshot;
+use crate::HostBuiltinBazelToolsRepositoryMapping;
 use crate::HostCanonicalSelectedModuleDefinition;
 use crate::HostCanonicalSelectedModuleKind;
 use crate::HostRepositoryLocalPathPolicy;
@@ -39,9 +40,15 @@ pub enum HostCanonicalRepositoryRouteKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 enum HostCanonicalRepositoryRouteSource {
-    Builtin(BuiltinBazelToolsRouteIdentity),
+    Builtin(HostCanonicalBuiltinRepositoryRoute),
     Selected(HostCanonicalSelectedModuleDefinition),
     Generated(HostCanonicalGeneratedRepositoryRoute),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct HostCanonicalBuiltinRepositoryRoute {
+    identity: BuiltinBazelToolsRouteIdentity,
+    mapping: HostBuiltinBazelToolsRepositoryMapping,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -102,13 +109,19 @@ impl HostCanonicalRepositoryRoute {
         }
     }
 
-    pub fn builtin(workspace: NormalizedAbsolutePath) -> Self {
+    pub fn builtin(
+        workspace: NormalizedAbsolutePath,
+        mapping: HostBuiltinBazelToolsRepositoryMapping,
+    ) -> Self {
         Self {
             workspace,
             canonical_repo: CanonicalRepoName::new("bazel_tools")
                 .expect("the pinned built-in canonical repository name is valid"),
             source: HostCanonicalRepositoryRouteSource::Builtin(
-                BuiltinBazelToolsSnapshot::CURRENT.route_identity(),
+                HostCanonicalBuiltinRepositoryRoute {
+                    identity: BuiltinBazelToolsSnapshot::CURRENT.route_identity(),
+                    mapping,
+                },
             ),
         }
     }
@@ -152,7 +165,9 @@ impl HostCanonicalRepositoryRoute {
 
     pub fn mapping_target(&self, apparent_repo: &ApparentRepoName) -> Option<&CanonicalRepoName> {
         match &self.source {
-            HostCanonicalRepositoryRouteSource::Builtin(_) => None,
+            HostCanonicalRepositoryRouteSource::Builtin(builtin) => {
+                builtin.mapping.mapping_target(apparent_repo)
+            }
             HostCanonicalRepositoryRouteSource::Selected(definition) => definition
                 .view()
                 .mapping()
@@ -167,7 +182,7 @@ impl HostCanonicalRepositoryRoute {
     #[doc(hidden)]
     pub fn bzl_repository_mapping(&self) -> Arc<[(ApparentRepoName, CanonicalRepoName)]> {
         match &self.source {
-            HostCanonicalRepositoryRouteSource::Builtin(_) => Arc::from([]),
+            HostCanonicalRepositoryRouteSource::Builtin(builtin) => builtin.mapping.entries(),
             HostCanonicalRepositoryRouteSource::Selected(definition) => definition
                 .view()
                 .mapping()
@@ -258,7 +273,7 @@ impl<'a> HostCanonicalRepositoryRouteView<'a> {
 
     pub fn builtin_identity(self) -> Option<BuiltinBazelToolsRouteIdentity> {
         match &self.route.source {
-            HostCanonicalRepositoryRouteSource::Builtin(identity) => Some(*identity),
+            HostCanonicalRepositoryRouteSource::Builtin(builtin) => Some(builtin.identity),
             _ => None,
         }
     }
@@ -336,7 +351,10 @@ impl Hash for HostCanonicalRepositoryRoute {
         self.canonical_repo.hash(state);
         self.view().kind().hash(state);
         match &self.source {
-            HostCanonicalRepositoryRouteSource::Builtin(identity) => identity.hash(state),
+            HostCanonicalRepositoryRouteSource::Builtin(builtin) => {
+                builtin.identity.hash(state);
+                hash_mapping(builtin.mapping.iter(), state);
+            }
             HostCanonicalRepositoryRouteSource::Selected(definition) => {
                 let view = definition.view();
                 view.local_path_policy().hash(state);
@@ -367,14 +385,22 @@ mod tests {
 
     use super::HostCanonicalRepositoryRoute;
     use super::HostCanonicalRepositoryRouteKind;
+    use crate::HostBuiltinBazelToolsRepositoryMapping;
 
     #[test]
     fn builtin_route_is_canonical_and_structural() {
         let workspace = NormalizedAbsolutePath::new("/canonical-route").unwrap();
-        let first = HostCanonicalRepositoryRoute::builtin(workspace.clone());
-        let warm = HostCanonicalRepositoryRoute::builtin(workspace.clone());
+        let first = HostCanonicalRepositoryRoute::builtin(
+            workspace.clone(),
+            HostBuiltinBazelToolsRepositoryMapping::testing(),
+        );
+        let warm = HostCanonicalRepositoryRoute::builtin(
+            workspace.clone(),
+            HostBuiltinBazelToolsRepositoryMapping::testing(),
+        );
         let other = HostCanonicalRepositoryRoute::builtin(
             NormalizedAbsolutePath::new("/other-canonical-route").unwrap(),
+            HostBuiltinBazelToolsRepositoryMapping::testing(),
         );
         assert_eq!(
             first.view().kind(),

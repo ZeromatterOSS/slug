@@ -59,6 +59,7 @@ use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeKind;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
+use slug_analysis_v2::analysis_cycle_detector;
 use slug_analysis_v2::prepare_configured_node_analysis;
 use slug_analysis_v2::prepare_configured_node_analysis_observed;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
@@ -114,6 +115,7 @@ use slug_loading_v2::RepositoryPackageLoadObservationKey;
 use slug_loading_v2::RootPackageLoadError;
 use slug_loading_v2::RootPackageLoadKey;
 use slug_loading_v2::RootPackageLoadObservationKey;
+#[cfg(test)]
 use slug_loading_v2::bzl_load_cycle_detector;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
@@ -5676,7 +5678,7 @@ impl WorkspaceRuntime {
         effects: Option<Arc<AttemptEffectTracker>>,
     ) -> Result<UserComputationData, CommandEffectError> {
         let mut data = UserComputationData {
-            cycle_detector: Some(bzl_load_cycle_detector()),
+            cycle_detector: Some(analysis_cycle_detector()),
             ..Default::default()
         };
         self.demand_owner.install(&self.dice, &mut data, effects)?;
@@ -11493,7 +11495,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         epoch: PathObservationEpoch,
     ) -> dice::DiceTransaction {
         let user_data = UserComputationData {
-            cycle_detector: Some(bzl_load_cycle_detector()),
+            cycle_detector: Some(analysis_cycle_detector()),
             ..Default::default()
         };
         build_root_transaction_with_data(dice, epoch, user_data).await
@@ -11533,7 +11535,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 }
             }
         }
-        user_data.cycle_detector = Some(bzl_load_cycle_detector());
+        user_data.cycle_detector = Some(analysis_cycle_detector());
         let mut updater = dice.updater_with_data(user_data);
         updater
             .changed_to(vec![(
