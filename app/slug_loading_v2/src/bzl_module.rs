@@ -2171,7 +2171,6 @@ pub(crate) struct ObservedRepositoryPackageInventory {
     observations: PathObservationEpoch,
 }
 
-#[allow(dead_code)] // Read by the registration expander selected as the next packet.
 impl ObservedRepositoryPackageInventory {
     pub(crate) fn result(&self) -> &Arc<Result<LoadedPackage, RepositoryPackageLoadError>> {
         &self.result
@@ -2256,7 +2255,6 @@ impl RepositoryPackageInventoryKey {
     }
 }
 
-#[allow(dead_code)] // Constructed directly by the next registration-expander packet.
 impl RepositoryPackageInventoryObservationKey {
     pub(crate) fn new(route: HostRepositorySourceRoute, package: PackagePath) -> Self {
         Self(RepositoryPackageInventoryKey::new(route, package))

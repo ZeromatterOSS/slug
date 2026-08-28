@@ -26,6 +26,9 @@ mod generated_repository_definition;
 pub mod glob;
 pub mod globals;
 mod host_glob;
+mod host_package_inventory;
+#[cfg(test)]
+mod host_package_inventory_tests;
 pub mod keys;
 pub mod load_label;
 mod module_extension;
@@ -129,6 +132,15 @@ pub use external_subtree_package_set::ExternalSubtreePackageSetObservationKey;
 pub use external_subtree_package_set::ObservedExternalSubtreePackageSet;
 pub use glob::GlobSpec;
 pub use glob::PackageListing;
+pub use host_package_inventory::HostPackageInventory;
+pub use host_package_inventory::HostPackageInventoryErrorRef;
+pub use host_package_inventory::HostPackageInventoryKey;
+#[doc(hidden)]
+pub use host_package_inventory::HostPackageInventoryObservationError;
+#[doc(hidden)]
+pub use host_package_inventory::HostPackageInventoryObservationKey;
+#[doc(hidden)]
+pub use host_package_inventory::ObservedHostPackageInventory;
 #[doc(hidden)]
 pub use module_extension_repository_file_effect::HostSelectedRepositoryFileEffect;
 #[doc(hidden)]
