@@ -19776,3 +19776,19 @@ Zabel remains peer guidance for separating repository-aware loaded facts from
 configuration/type selection, while Bazel 9.2 alone governs behavior. BCR
 Starlark still owns every rule including `cc_internal`; no C++ parser or Rust
 ruleset is authorized.
+
+### Repository-aware package carrier accepted; configured identity active (2026-08-27)
+
+Independent correction review returns `ACCEPT`, and commit `00f1453ef`
+accepts the general loading carrier. Full `PackageIdentifier` identity selects
+root versus canonical composition; successful and typed-error terminals retain
+the exact accepted child result `Arc`. Observed route and package epochs merge
+without replacing demand-result `Arc`s, contradictory epochs fail as a typed
+frontier outer error, and the wrapper owns no event batch.
+
+Activate only `WP-4-5-7A-repository-aware-configured-package-identity`.
+Converge the configured-analysis package input and retained package collection
+from `PackagePath` plus root-load errors to full `PackageIdentifier` plus the
+general carrier. Preserve today's root-only label admission and behavior. This
+is an identity/owner cutover prerequisite: it must not call the registration
+expander, admit canonical configured targets, or alter selection semantics.
