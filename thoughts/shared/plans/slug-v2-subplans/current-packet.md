@@ -1,18 +1,17 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-recursive-analysis-value-provider-architecture`
+Packet: `WP-4-5-7A-recursive-analysis-value-provider-implementation`
 
 Milestone: M7A category 5, one recursive retained analysis-value/provider
 boundary before selected toolchain implementation analysis.
 
-Base: `568b0c698`. Category 4 is accepted in that commit and this packet has
-made no Rust change. This packet is deliberately zero-Rust. Independent Sol
-pre-review returns `ACCEPT` after the bounded depset occurrence/type,
-hashability, semantic-immutability and publication-equality corrections below;
-the architecture must commit before an implementation packet is materialized.
+Base: `5ce967d55`, the independently accepted category-5 architecture. Implement
+only that frozen contract under the exact file/cap table below. A material
+identity, ownership, value-kind, hashability, semantic-immutability, depset or
+publication-equality change is `REPLAN`, not an implementation adjustment.
 
-Observable result: freeze one general, heap-independent provider-value
-architecture that can retain any number of named `ToolchainInfo` fields whose
+Observable result: implement and prove one general, heap-independent provider-
+value boundary that retains any number of named `ToolchainInfo` fields whose
 values belong to the admitted graph, user-provider fields and future builtin-
 provider payloads without a per-builtin value shape. No selected implementation
 is analyzed and `ctx.toolchains` is not cut over in this packet.
@@ -323,7 +322,7 @@ BCR-delivered Starlark owns all rule definitions and control flow, including
 of this representation, not parsers or Rust rule engines. The Buck2-derived
 parser/evaluator remains the language substrate.
 
-## Evidence and implementation packet after ACCEPT
+## Implementation evidence
 
 No new Bazel fixture is needed: the pinned source/tests above discriminate the
 representation contract, and category 6 owns the public selected-toolchain
@@ -357,31 +356,53 @@ oracle. The implementation packet must add focused Rust regressions for:
 - unchanged `DefaultInfo`, executable and marker-era direct dependents until
   category 6 deletes the marker bridge.
 
-The post-review implementation allowlist is frozen in principle but its exact
-blob/cap table is materialized only after this design commits:
+The exact allowlist and physical-growth caps at base `5ce967d55` are:
 
-- `app/slug_build_api_v2/{Cargo.toml,src/lib.rs,src/analysis_value.rs,src/providers/mod.rs}`;
-- `app/slug_loading_v2/src/provider.rs`;
-- `app/slug_analysis_v2/src/{key.rs,starlark_rule.rs}`;
-- focused build-api and analysis provider tests, plus only mechanical direct
-  constructor assertions demonstrated by compilation.
+| Path | Baseline blob / lines | Maximum physical growth |
+|---|---:|---:|
+| `app/slug_build_api_v2/Cargo.toml` | `da603e2a2a9468e18f67290332e2a9f6f4fb0574` / 15 | +5 |
+| `app/slug_build_api_v2/src/lib.rs` | `8091bec244d55c433a5179b8848a0f514a66d58a` / 50 | +20 |
+| `app/slug_build_api_v2/src/analysis_value.rs` | absent / 0 | +1,100 |
+| `app/slug_build_api_v2/src/providers/mod.rs` | `b191b11f8b9ee26f45a8558b257d90212c155c81` / 434 | +250 |
+| `app/slug_build_api_v2/tests/analysis_value.rs` | absent / 0 | +500 |
+| `app/slug_build_api_v2/tests/providers.rs` | `687ff27fee0b4d38fff286185206592a6ea1f872` / 209 | +120 |
+| `app/slug_loading_v2/src/provider.rs` | `ab9129d352ce93e68c6d622a892746e4421f67c4` / 1,066 | +350 |
+| `app/slug_loading_v2/src/host_package_load_tests.rs` | `42a057175e094bdc712288062cc3124cb927f15f` / 35,115 | +160 |
+| `app/slug_analysis_v2/src/key.rs` | `6a21efd96906bb843f229e3c39295028cf0013ae` / 270 | +35 |
+| `app/slug_analysis_v2/src/starlark_rule.rs` | `2d97b0e2c47ca6316890ef00520fc9564f392bc6` / 797 | +350 |
+| `app/slug_analysis_v2/src/dice.rs` | `28ae630557dcca41b31f6517050e07a17619c400` / 4,749 | +15 |
+| `app/slug_analysis_v2/tests/configured_target.rs` | `3bc8da1ea5f1332e86203c2e6acedb0d74d9c827` / 827 | +30 |
+| `app/slug_analysis_v2/tests/root_analysis.rs` | `4f2f443b2d5f2982128d0b6592b769cd1e5c8bc0` / 1,355 | +50 |
+| `app/slug_analysis_v2/tests/starlark_rule.rs` | `4791c4ad1294857bf8162f17f7ce27012a742cc6` / 6,988 | +250 |
 
-Expected caps are at most +1,800 net production lines and +1,000 proof lines;
-the implementation audit must reduce these after exact baselines. No touched
-production file currently exceeds 2,000 lines. The 35,115-line loading host
-test file and 6,988-line analysis integration test are proof-only; changes
-there are bounded to focused cases or mechanical API migration, with no new
-semantic owner. A new production file owns the recursive value abstraction so
-`providers/mod.rs` remains cohesive.
+Net production growth is capped at +1,800 lines and proof growth at +1,000.
+The new `analysis_value.rs` is the sole recursive retained-value owner;
+`providers/mod.rs` remains the collection/typed-builtin owner. The 35,115-line
+loading host test, 4,749-line analysis DICE owner and 6,988-line integration
+test cross complexity triggers, but their authority is respectively focused
+constructor/depset proof, at most the marker-bridge accessor migration, and
+focused direct-dependency/A/B/A proof. Splitting any of them would widen this
+packet without moving a semantic owner.
 
-Validation after implementation: formatting; `slug_build_api_v2` owner tests;
-full `slug_loading_v2` because both provider constructor families and the
-evaluator depset boundary change; full `slug_analysis_v2` including direct
-dependency/A-B-A proof; one direct `slug_core_v2` compile/test gate; rebuild
-`slug_cli_v2` before any binary smoke; `scripts/v2_archive_status.sh`; blob,
-allowlist, line-cap and `git diff --check` audits; then independent terminal
-review. Broad server validation belongs to category 6 unless category 5 changes
-an existing server-observable provider result.
+No other file may change. In particular, do not edit the existing generic
+`depset.rs`, loading package/global definitions, configuration representation,
+core/server/CLI/query/action code, starlark-rust, BCR content or Zabel. Direct
+consumer strings that already call `ToolchainInfo` require no fixture edit.
+Compilation-demonstrated constructor/accessor migration is confined to the
+listed proof files and the two listed analysis production consumers.
+
+Validation after implementation: `cargo fmt --all -- --check`;
+`cargo test -p slug_build_api_v2 --no-fail-fast`; full
+`cargo test -p slug_loading_v2 --no-fail-fast` because both provider
+constructor families and the evaluator depset boundary change; full
+`cargo test -p slug_analysis_v2 --no-fail-fast` including direct-dependency/
+A/B/A proof; and `cargo test -p slug_core_v2 --no-fail-fast` as the direct
+cross-crate gate. Run Cargo commands serially. Rebuild `slug_cli_v2` before any
+binary smoke; no smoke is required unless a changed result is server-observable.
+Then run `scripts/v2_archive_status.sh`, baseline-blob, allowlist, physical/net-
+line-cap and `git diff --check` audits and independent terminal review. Broad
+server validation belongs to category 6 unless category 5 changes an existing
+server-observable provider result.
 
 ## Stops and residual risk
 

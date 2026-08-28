@@ -36,19 +36,20 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-4-5-7A-recursive-analysis-value-provider-architecture](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-recursive-analysis-value-provider-implementation](./slug-v2-subplans/current-packet.md).
 
 The M7 status-table row's category-4 suffix is superseded by this link.
-Category 4 is terminally accepted in `568b0c698`. Category 5's zero-Rust
-retained provider-value design has passed independent Sol pre-review and must
-commit before its exact implementation packet is materialized; category 6
-then analyzes the selected implementation under its execution configuration
-and exposes the retained occurrence through `ctx.toolchains`.
+Category 4 is terminally accepted in `568b0c698`; category 5's retained
+provider-value design is independently accepted in `5ce967d55`. Implement its
+exact materialized file/cap packet now. Category 6 then analyzes the selected
+implementation under its execution configuration and exposes the retained
+occurrence through `ctx.toolchains`.
 
 ### M7 recursive analysis-value/provider architecture active (2026-08-28)
 
 Category 4 is complete. Activate only
-`WP-4-5-7A-recursive-analysis-value-provider-architecture`: freeze one opaque,
+`WP-4-5-7A-recursive-analysis-value-provider-implementation`: implement the
+accepted opaque,
 heap-independent recursive value handle, general provider occurrence keyed by
 builtin or authenticated Starlark definition identity, and distinct
 Bazel-visible versus DICE-publication equality domains. The admitted graph
@@ -67,9 +68,8 @@ Pinned Bazel 9.2 remains behavior authority. Buck2 and clean Zabel
 `0795445f...` are concept/optimization guidance only; neither evaluator heaps
 nor Zabel store/layout identity may be retained. BCR Starlark owns every rule
 and control path including `cc_internal`; `cc_common` is a generic host-ABI
-client. Do not begin Rust until independent Sol review returns `ACCEPT`.
-That pre-review now returns `ACCEPT`; the docs-only architecture commit is the
-remaining gate before implementation materialization.
+client. Independent Sol pre-review returns `ACCEPT` in `5ce967d55`; implement
+only its exact retained-value contract and materialized allowlist.
 
 ### M7 configured-selection server projection-proof REPLAN (2026-08-28)
 

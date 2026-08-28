@@ -20822,8 +20822,10 @@ ordinal, scheduler or claim. Language `set` remains evaluator-global and is
 not retained. BCR Starlark owns rule/control flow including `cc_internal`,
 while `cc_common` is only a generic future host-ABI client.
 
-Independent Sol pre-review returns `ACCEPT`; commit the docs-only architecture
-before materializing the Rust packet. STOP for evaluator-heap
+Independent Sol pre-review returns `ACCEPT` and commit `5ce967d55` freezes the
+architecture. Activate only
+`WP-4-5-7A-recursive-analysis-value-provider-implementation` under its exact
+materialized file/cap table. STOP for evaluator-heap
 retention, a global provider store/interner, flattened depsets, lossy numeric or
 configured identity, missing publication equality, a per-builtin payload
 shape, parser/ruleset control flow, Zabel authority, or a second material
