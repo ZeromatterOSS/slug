@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r5](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r6](./slug-v2-subplans/current-packet.md).
 
 ### Corrected target-platform prerequisite R5 active (2026-08-28)
 
@@ -58,7 +58,7 @@ default host alias: the canonical builtin route discards the selected
 `bazel_tools` module mapping before the eager `@platforms` load. R4 is not
 accepted. Commit `c2ec8481e` accepts the corrected graph-only mapping design.
 Activate only
-`WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r5`: retain the
+`WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r6`: retain the
 reviewed platform/cycle candidate, extract mapping ownership below
 RepoSpec/source metadata, project the full builtin mapping into the generic
 canonical route, and prove the default host alias through configured analysis.

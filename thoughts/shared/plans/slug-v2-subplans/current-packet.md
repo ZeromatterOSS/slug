@@ -1,22 +1,23 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r5`
+Packet: `WP-4-5-7A-target-platform-and-exec-configuration-prerequisite-r6`
 
 Milestone: M7A command/ruleset bootstrap closure feeding ordinary M8 Stage
 10.3 analysis.
 
 Base: `c2ec8481e`.
 
-Result: retain the independently reviewed R4 target-platform candidate, add
-the accepted graph-only Bzlmod selected-mapping owner and builtin projection,
-make the generic canonical route consume that mapping, and prove the default
-host platform end to end. Do not implement toolchain selection.
+Result: retain the independently reviewed R4 target-platform candidate and R5
+graph-only Bzlmod mapping architecture; make that owner include graph-declared
+module-extension imports, admit already-typed aliases through the generic
+external-package gate, and prove the default host platform end to end. Do not
+implement toolchain selection.
 
 Design commit `c2ec8481e` and independent Sol review: `ACCEPT`. The corrected graph-only owner is acyclic,
 keeps RepoSpec/source metadata out of mapping publication, and retains only the
 compact mapping carrier at the builtin boundary.
 
-## R4 and design replan record
+## R4, R5 and design replan record
 
 Independent terminal review returned `REPLAN`. The R4 candidate embeds exact
 Bazel 9.2 `tools/BUILD` and `tools/build_defs.bzl`, but
@@ -41,13 +42,23 @@ Needs/errors and an overbroad observed frontier. R2 instead extracts the
 mapping computation directly over the selected module graph, matching Bazel's
 `BazelDepGraphValue` dependency boundary.
 
+R5 implementation stopped at its mandated exact `tools/BUILD` composition
+proof. The selected dependency portion correctly published `platforms` without
+RepoSpec/source metadata, but the graph-only owner omitted non-root MODULE
+`use_repo` imports already present in the selected graph, so the exact BUILD
+could not resolve `@buildozer_binary`. The generic external package gate then
+rejected the now-typed `alias` target even though loading and configured
+analysis represent it. R6 corrects those two category-wide boundaries; it does
+not add a dependency-specific mapping or a C++ rule path.
+
 ## Learned facts and authority
 
 Pinned Bazel 9.2 commit
 `8220c6198837d5c13d53fea211cf3282aa12408a` is behavior authority:
 
 - `RepositoryMappingFunction#computeForBazelModuleRepo` publishes a module
-  repository's full mapping from the selected dependency graph;
+  repository's full mapping, including module-extension imports, from the
+  selected dependency graph;
 - `BzlLoadFunction#getRepositoryMapping` consumes that full mapping for normal
   `@bazel_tools` `.bzl` and BUILD evaluation after bootstrap;
 - `RepositoryMappingFunctionTest` covers selected dependency mappings; and
@@ -78,8 +89,11 @@ builtin projection family:
 
 - `HostSelectedRepositoryMappingsKey(workspace)` consumes only the existing
   selected module graph key. It owns canonical-name derivation and the complete
-  ordered mapping for every selected module. It does not request registry
-  RepoSpecs, source metadata, materialization or packages;
+  ordered mapping for every selected module. It also projects non-root
+  module-extension `use_repo` imports from graph-retained MODULE values by
+  reusing the existing pure extension namespace/mapping logic. It does not
+  evaluate extensions or request registry RepoSpecs, source metadata,
+  materialization, root visibility or packages;
 - its observed sibling consumes only the existing selected-graph observation
   key and forwards exactly that graph frontier;
 - `HostSelectedModuleRoutesKey` consumes that mapping owner plus its existing
@@ -103,6 +117,12 @@ generic label resolution and evaluator construction exactly like other route
 families. Route equality and hashing include the mapping; no consumer rereads
 MODULE, registry, lockfile or source state.
 
+The canonical external-package loaded-target gate must admit `alias` and
+`config_setting`, which are already typed loading values with generic
+configured consumers, just as it already admits filegroups and typed native
+platform/toolchain declarations. This is a representation-gate correction,
+not rule-specific behavior; unsupported target kinds remain fail-closed.
+
 This is the full builtin module mapping, not a hard-coded `platforms` pair.
 That keeps `tools/build_defs.bzl`, later autoloaded rule modules and all other
 BCR dependencies on one architecture and prevents one dependency-specific
@@ -111,7 +131,8 @@ repair from becoming permanent.
 ## Non-decisions and compatibility
 
 - **Exact:** selected full repository mapping for builtin `bazel_tools` on the
-  admitted Bzlmod graph; generic eager `@platforms` load resolution; exact
+  admitted Bzlmod graph, including graph-declared `use_repo` imports; generic
+  eager `@platforms` load resolution; exact
   `host_platform -> @@platforms//host:host` alias realization.
 - **Slug-native:** Rust/DICE keys, compact retained carriers, observed-frontier
   error wording and structural route identity.
@@ -151,7 +172,8 @@ The implementation packet must prove the composition, not its parts:
 
 1. Graph-only mapping tests publish complete ordered mappings for root,
    registry, nonregistry and builtin rows, including builtin self and
-   `platforms`; reject missing, duplicate and wrong-context rows; and prove
+   `platforms` plus its graph-declared `use_repo` imports; reject missing,
+   duplicate and wrong-context rows; and prove
    missing/erroring registry RepoSpec/source metadata cannot block mapping
    publication or enter its observed frontier.
 2. Legacy and observed canonical routes retain that exact mapping, mapping
@@ -247,22 +269,24 @@ Every retained R4 baseline remains `cf91fe8de`; `ce38f0373`, `959cbd889` and
 | `app/slug_core_v2/src/runtime/tests/build_command_tests.rs` | `fd3f417977f417a0098decd36c34097d1d50d391` / 4,056 | +0; replace one token |
 | `app/slug_analysis_v2/Cargo.toml` | `36cd3ffd8e681d998d6f1bcd47f493e2496484e6` / 31 | +0; move Tokio row |
 
-R5 adds only these `c2ec8481e` mapping-owner baselines:
+R6 uses these `c2ec8481e` mapping-owner baselines:
 
 | Path | Baseline blob / lines | Maximum physical growth |
 |---|---:|---:|
-| `app/slug_bzlmod_v2/src/selected_repo_spec.rs` | `286d9e1042f76fef1ca6f50c8c6df92c516f4352` / 14,538 | +350 |
+| `app/slug_bzlmod_v2/src/selected_repo_spec.rs` | `286d9e1042f76fef1ca6f50c8c6df92c516f4352` / 14,538 | +600 |
 | `app/slug_bzlmod_v2/src/lib.rs` | `279b4d8d98a8c534eca9a7112a57788e2c3f8326` / 539 | +20 |
 | `app/slug_bzlmod_v2/src/canonical_repository_route.rs` | `9aa6bc6ad89b754c23e5d0897a15011a07d3ffcd` / 415 | +80 |
 | `app/slug_loading_v2/src/canonical_repository_route.rs` | `86cd5e194fe4ce37fe5677a2ef7190472a081c68` / 326 | +160 |
 | `app/slug_loading_v2/src/canonical_repository_route_tests.rs` | `90c8c212ac33dfd6755fb907054d4bd413916b64` / 3,047 | +250 |
 | `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs` | `81a0d1ef364f40ecdb9da5c5a150361c5fe876a0` / 2,668 | +250 |
+| `app/slug_loading_v2/src/bzl_module.rs` | `f8f8182b2e3e62c834120fc610b0d186c93e16ef` / 10,576 | +20 |
 
 The only new non-plan files remain the exact 50-line builtin `tools/BUILD`,
 the exact 106-line `tools/build_defs.bzl`, and the at-most-350-line configured
 cycle detector. R4 caps remain 950 production, 700 proof and 1,750 total added
-Rust lines. Mapping-owner additions have separate caps of 500 production, 500
-proof and 1,000 total; combined R5 caps are 1,450/1,200/2,750. The large
+Rust lines. Mapping-owner and loaded-target-gate additions have separate caps
+of 900 production, 700 proof and 1,600 total; combined R6 caps are
+1,850/1,400/3,350. The large
 `selected_repo_spec.rs` owner remains cohesive because R5 extracts an existing
 mapping calculation beside its selected-graph/route keys; splitting would
 expose private graph internals without separating semantic responsibility.
@@ -287,5 +311,5 @@ derived from source spelling or root visibility; `platforms`-only injection;
 copied full graph/source/evaluator state; lost observations; changed
 root/selected/generated mapping semantics; an unguarded lock across DICE;
 live-registry or catalog expansion; Rust BCR/ruleset control flow;
-`cc_common` specialization; Zabel authority; cap breach; or a second material
-implementation correction.
+`cc_common` specialization; Zabel authority; cap breach; or any further
+material implementation correction.
