@@ -1572,7 +1572,12 @@ where
             }
         };
         dependencies.push(PreparedDependency {
-            key: result.result().key().clone(),
+            key: result
+                .result()
+                .actual_configured_target()
+                .cloned()
+                .map(ConfiguredNodeKey::configured)
+                .unwrap_or_else(|| result.result().key().clone()),
             providers: result.result().providers().clone(),
             attribute: dependency.attribute.clone(),
         });
@@ -2928,11 +2933,19 @@ async fn prepare_selected_toolchain(
             topology.candidate_execution_platforms() == candidates
                 && topology.selection().is_none()
         });
+    let marker = result
+        .providers()
+        .toolchain_info()
+        .and_then(|info| info.field("marker"))
+        .and_then(|value| match value.kind() {
+            slug_build_api_v2::AnalysisValueKind::String(value) => Some(value),
+            _ => None,
+        });
     if !topology_is_exact
         || !result.diagnostics().is_empty()
         || result.providers().len() != 2
         || result.providers().default_info().is_none()
-        || result.providers().toolchain_info().is_none()
+        || marker.is_none()
     {
         return toolchain_outcome(Err(AnalysisError::new(
             "selected toolchain implementation must return only DefaultInfo and ToolchainInfo with exact topology",
@@ -2945,12 +2958,7 @@ async fn prepare_selected_toolchain(
             ConfiguredTargetKey::new(required.clone(), configuration.clone()),
             ConfiguredTargetKey::new(implementation, configuration),
         ),
-        result
-            .providers()
-            .toolchain_info()
-            .expect("checked ToolchainInfo")
-            .marker
-            .clone(),
+        marker.expect("checked ToolchainInfo").into(),
     ));
     let context = ConfiguredActionOwnerContext::new(
         owner.clone(),

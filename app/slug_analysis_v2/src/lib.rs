@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+mod analysis_value;
 mod build_setting;
 mod command_configuration;
 mod configured_analysis_cycle_detector;

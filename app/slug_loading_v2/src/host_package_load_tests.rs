@@ -20,6 +20,7 @@ use dice::UserComputationData;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_build_api_v2::ProviderIdentity;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::HostRepositoryMaterializationDisposition;
@@ -82,11 +83,15 @@ use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
+use starlark::values::FrozenHeap;
 use starlark::values::ValueLike;
+use starlark::values::dict::AllocDict;
 use starlark::values::dict::DictRef;
 use starlark::values::list::FrozenListRef;
 use starlark::values::set::SetMut;
+use starlark::values::structs::AllocStruct;
 use starlark::values::structs::StructRef;
+use starlark::values::tuple::AllocTuple;
 use starlark::values::tuple::TupleRef;
 use starlark_map::small_map::SmallMap;
 
@@ -136,8 +141,11 @@ use crate::provider::FrozenUserProviderCallable;
 use crate::provider::OutputGroupInfo;
 use crate::provider::RunEnvironmentInfo;
 use crate::provider::StarlarkDepset;
-use crate::provider::StarlarkUserProvider;
+use crate::provider::StarlarkToolchainInfo;
+use crate::provider::alloc_starlark_user_provider;
 use crate::provider::loading_provider_id;
+use crate::provider::starlark_provider_identity;
+use crate::provider::starlark_user_provider_fields;
 use crate::starlark_label::StarlarkLabel;
 
 fn workspace() -> NormalizedAbsolutePath {
@@ -23398,7 +23406,7 @@ fn exact_rules_cc_helper_internal_freezes_complete_recursive_producer() {
     let categories = private("_artifact_categories");
     let categories = FrozenListRef::from_value(categories.value()).unwrap();
     assert_eq!(categories.len(), 22);
-    assert_eq!(categories[0].to_value().get_type(), "provider");
+    assert_eq!(categories[0].to_value().get_type(), "struct");
     let provider_id = loading_provider_id(categories[0].to_value());
     for category in categories.iter() {
         assert_eq!(loading_provider_id(category.to_value()), provider_id);
@@ -23501,7 +23509,7 @@ fn exact_rules_cc_extra_link_library_freezes_complete_recursive_producer() {
     }
     assert!(extra.get("_KeyInfo").is_err());
     let empty = private("_EMPTY");
-    assert_eq!(empty.value().get_type(), "provider");
+    assert_eq!(empty.value().get_type(), "struct");
     let empty_id = loading_provider_id(empty.value()).unwrap();
     assert_eq!(
         empty_id.source_label(),
@@ -23931,7 +23939,7 @@ fn exact_rules_cc_lto_compilation_context_freezes_complete_producer() {
         assert_eq!(lto.get(name).unwrap().value().get_type(), "function");
     }
     let empty = lto.get("EMPTY_LTO_COMPILATION_CONTEXT").unwrap();
-    assert_eq!(empty.value().get_type(), "provider");
+    assert_eq!(empty.value().get_type(), "struct");
     let id = loading_provider_id(empty.value()).unwrap();
     assert_eq!(
         id.source_label(),
@@ -24078,7 +24086,7 @@ fn assert_compilation_outputs_interfaces(
         assert!(outputs.get(name).is_err());
     }
     let unbound = private("_UNBOUND");
-    assert_eq!(unbound.value().get_type(), "provider");
+    assert_eq!(unbound.value().get_type(), "struct");
     let id = loading_provider_id(unbound.value()).unwrap();
     assert_eq!(
         id.source_label(),
@@ -24105,7 +24113,7 @@ fn assert_compilation_outputs_interfaces(
 }
 fn assert_empty_compilation_outputs_shape(outputs: &FrozenModule, lto: &FrozenModule) {
     let empty = outputs.get("EMPTY_COMPILATION_OUTPUTS").unwrap();
-    assert_eq!(empty.value().get_type(), "provider");
+    assert_eq!(empty.value().get_type(), "struct");
     let id = loading_provider_id(empty.value()).unwrap();
     assert_eq!(
         id.source_label(),
@@ -24466,7 +24474,7 @@ fn assert_compile_build_variables_interfaces(
         )
     );
     let unbound = private("_UNBOUND");
-    assert_eq!(unbound.value().get_type(), "provider");
+    assert_eq!(unbound.value().get_type(), "struct");
     let id = loading_provider_id(unbound.value()).unwrap();
     assert_eq!(
         (id.source_label(), id.exported_name()),
@@ -28311,7 +28319,7 @@ fn assert_rules_cc_private_cc_common_eager_values(module: &FrozenModule) {
         )
     );
     let unbound = private("_UNBOUND");
-    assert_eq!(unbound.value().get_type(), "provider");
+    assert_eq!(unbound.value().get_type(), "struct");
     assert_eq!(
         loading_provider_id(unbound.value()).unwrap(),
         provider.id().clone()
@@ -31888,6 +31896,173 @@ fn eval_bzl_with_identity_and_globals_and_visibility(
     Ok((module.freeze()?, context.bzl_load_visibility()))
 }
 
+fn assert_symmetric_equal_and_hash<'v>(
+    left: starlark::values::Value<'v>,
+    right: starlark::values::Value<'v>,
+) {
+    assert!(left.equals(right).unwrap());
+    assert!(right.equals(left).unwrap());
+    assert_eq!(
+        left.get_hashed().unwrap().hash(),
+        right.get_hashed().unwrap().hash()
+    );
+}
+
+#[test]
+fn provider_struct_and_toolchain_classes_share_equality_and_hash_domains() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@root//:provider_matrix.bzl").unwrap(),
+        workspace_path: PathBuf::from("/workspace/provider_matrix.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let source = r#"
+Info = provider(fields = ["value"])
+STRUCT_ONE = struct(value = "same")
+STRUCT_TWO = struct(value = "same")
+PROVIDER_ONE = Info(value = "same")
+PROVIDER_TWO = Info(value = "same")
+DEFAULT_CALLABLE = DefaultInfo
+TOOLCHAIN_CALLABLE = platform_common.ToolchainInfo
+OUTPUT_GROUP_CALLABLE = OutputGroupInfo
+RUN_ENVIRONMENT_CALLABLE = RunEnvironmentInfo
+"#;
+    let ast = AstModule::parse(
+        owner.workspace_path.to_str().unwrap(),
+        source.to_owned(),
+        &Dialect::Bazel,
+    )
+    .unwrap();
+    let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
+        root: owner.clone(),
+        direct_children: Arc::from([]),
+        reachable: Arc::from([owner.clone()]),
+        fingerprint: [0; 32],
+    });
+    let fresh_module = Module::new();
+    let mut evaluator = Evaluator::new(&fresh_module);
+    evaluator.extra = Some(&context);
+    evaluator.eval_module(ast, &loading_globals()).unwrap();
+    drop(evaluator);
+
+    let frozen_module = eval_bzl_with_identity(source, owner).unwrap();
+    for (binding, name) in [
+        ("DEFAULT_CALLABLE", "DefaultInfo"),
+        ("TOOLCHAIN_CALLABLE", "ToolchainInfo"),
+        ("OUTPUT_GROUP_CALLABLE", "OutputGroupInfo"),
+        ("RUN_ENVIRONMENT_CALLABLE", "RunEnvironmentInfo"),
+    ] {
+        assert!(
+            starlark_provider_identity(frozen_module.get(binding).unwrap().value())
+                .is_some_and(|identity| identity.is_builtin(name))
+        );
+    }
+    let frozen_heap = FrozenHeap::new();
+    let same = frozen_heap.alloc_str("same").to_frozen_value();
+    let rematerialized_struct = frozen_heap.alloc(AllocStruct([("value", same)]));
+    let provider_id = loading_provider_id(fresh_module.get("PROVIDER_ONE").unwrap()).unwrap();
+    let rematerialized_provider =
+        alloc_starlark_user_provider(&frozen_heap, provider_id, [("value".into(), same)]);
+
+    for (left, right) in [
+        (
+            fresh_module.get("STRUCT_ONE").unwrap(),
+            fresh_module.get("STRUCT_TWO").unwrap(),
+        ),
+        (
+            fresh_module.get("STRUCT_ONE").unwrap(),
+            frozen_module.get("STRUCT_ONE").unwrap().value(),
+        ),
+        (
+            frozen_module.get("STRUCT_ONE").unwrap().value(),
+            rematerialized_struct.to_value(),
+        ),
+        (
+            fresh_module.get("STRUCT_ONE").unwrap(),
+            rematerialized_struct.to_value(),
+        ),
+        (
+            fresh_module.get("PROVIDER_ONE").unwrap(),
+            fresh_module.get("PROVIDER_TWO").unwrap(),
+        ),
+        (
+            fresh_module.get("PROVIDER_ONE").unwrap(),
+            frozen_module.get("PROVIDER_ONE").unwrap().value(),
+        ),
+        (
+            frozen_module.get("PROVIDER_ONE").unwrap().value(),
+            rematerialized_provider.to_value(),
+        ),
+        (
+            fresh_module.get("PROVIDER_ONE").unwrap(),
+            rematerialized_provider.to_value(),
+        ),
+    ] {
+        assert_symmetric_equal_and_hash(left, right);
+    }
+
+    let fresh_toolchain_one = StarlarkToolchainInfo::alloc_value(
+        fresh_module.heap(),
+        [(
+            "value".into(),
+            fresh_module.heap().alloc_str("same").to_value(),
+        )],
+    );
+    let fresh_toolchain_two = StarlarkToolchainInfo::alloc_value(
+        fresh_module.heap(),
+        [(
+            "value".into(),
+            fresh_module.heap().alloc_str("same").to_value(),
+        )],
+    );
+    let frozen_toolchain = StarlarkToolchainInfo::alloc(&frozen_heap, [("value".into(), same)]);
+    let rematerialized_toolchain =
+        StarlarkToolchainInfo::alloc(&frozen_heap, [("value".into(), same)]);
+    for (left, right) in [
+        (fresh_toolchain_one, fresh_toolchain_two),
+        (fresh_toolchain_one, frozen_toolchain.to_value()),
+        (
+            frozen_toolchain.to_value(),
+            rematerialized_toolchain.to_value(),
+        ),
+        (fresh_toolchain_one, rematerialized_toolchain.to_value()),
+    ] {
+        assert!(left.equals(right).unwrap());
+        assert!(right.equals(left).unwrap());
+        assert!(left.get_hashed().is_err());
+        assert!(right.get_hashed().is_err());
+    }
+
+    let frozen_list = frozen_heap.alloc(vec![frozen_toolchain]);
+    let frozen_dict = frozen_heap.alloc(AllocDict([(
+        frozen_heap.alloc_str("toolchain").to_frozen_value(),
+        frozen_toolchain,
+    )]));
+    let struct_barrier =
+        frozen_heap.alloc(AllocStruct([("list", frozen_list), ("dict", frozen_dict)]));
+    let provider_barrier = alloc_starlark_user_provider(
+        &frozen_heap,
+        loading_provider_id(fresh_module.get("PROVIDER_ONE").unwrap()).unwrap(),
+        [("list".into(), frozen_list), ("dict".into(), frozen_dict)],
+    );
+    assert!(struct_barrier.to_value().get_hashed().is_ok());
+    assert!(provider_barrier.to_value().get_hashed().is_ok());
+    for rejected in [
+        frozen_toolchain,
+        frozen_heap.alloc(AllocTuple([frozen_toolchain])),
+        frozen_heap.alloc(AllocStruct([("value", frozen_toolchain)])),
+        alloc_starlark_user_provider(
+            &frozen_heap,
+            loading_provider_id(fresh_module.get("PROVIDER_ONE").unwrap()).unwrap(),
+            [("value".into(), frozen_toolchain)],
+        ),
+        frozen_list,
+        frozen_dict,
+        frozen_heap.alloc(AllocTuple([frozen_list])),
+    ] {
+        assert!(rejected.to_value().get_hashed().is_err());
+    }
+}
+
 #[test]
 fn bazel_cc_common_private_bridge_is_bzl_only_owner_checked_and_opaque() {
     let owner = |label: &str| BzlModuleIdentity {
@@ -32150,6 +32325,7 @@ ArtifactCategoryInfo, _new_aci = provider(
     fields = ["name", "default_prefix", "default_extension", "allowed_extensions"],
     init = _artifact_category_info_init,
 )
+RAW_CALLABLE = _new_aci
 STATIC = ArtifactCategoryInfo("STATIC_LIBRARY", "lib", ".a", ".lib")
 OMITTED = _new_aci(name = "OMITTED")
 CATEGORIES = [STATIC, OMITTED]
@@ -32199,8 +32375,24 @@ BYPASSED = _new_failing(name = "raw")
     let normal = normal.value();
     let raw = raw.value();
     assert_eq!(loading_provider_id(normal), loading_provider_id(raw));
-    assert!(StarlarkUserProvider::from_value(normal).is_none());
-    assert!(StarlarkUserProvider::from_value(raw).is_none());
+    assert!(starlark_user_provider_fields(normal).is_some());
+    assert!(starlark_user_provider_fields(raw).is_some());
+    let callable = module.get("ArtifactCategoryInfo").unwrap();
+    assert_eq!(
+        starlark_provider_identity(callable.value()),
+        loading_provider_id(normal).map(ProviderIdentity::user)
+    );
+    assert!(starlark_provider_identity(module.get("RAW_CALLABLE").unwrap().value()).is_none());
+    assert_eq!(normal.get_type(), "struct");
+    assert_eq!(
+        normal.dir_attr(),
+        [
+            "allowed_extensions",
+            "default_extension",
+            "default_prefix",
+            "name"
+        ]
+    );
 
     let failures = [
         "def init(): return {}\nX = provider('doc', fields = None, init = init)",
@@ -32288,7 +32480,7 @@ RAW_OMITS_CC_INFO = not hasattr(RAW, "cc_info")
         loading_provider_id(launcher.value()),
         loading_provider_id(raw.value())
     );
-    assert!(StarlarkUserProvider::from_value(launcher.value()).is_none());
+    assert!(starlark_user_provider_fields(launcher.value()).is_some());
 
     let failures = [
         "def init(): return {}\nInfo, raw = provider('doc', fields = {1: 'doc'}, init = init)",
@@ -32381,12 +32573,14 @@ OPTIONAL_OMITS_LIBRARIES = not hasattr(OPTIONAL, "libraries")
 
     let configured = module.get("CONFIGURED").unwrap();
     let configured = configured.value();
-    let configured = StarlarkUserProvider::from_value(configured).unwrap();
+    let (configured_id, configured_fields) = starlark_user_provider_fields(configured).unwrap();
     let loading = module.get("LOADING").unwrap();
     let loading = loading.value();
-    assert_eq!(loading_provider_id(loading), Some(configured.id().dupe()));
-    assert!(StarlarkUserProvider::from_value(loading).is_none());
-    assert!(StarlarkUserProvider::from_value(module.get("KEY").unwrap().value()).is_none());
+    assert_eq!(loading_provider_id(loading), Some(configured_id));
+    assert_eq!(configured_fields[0].0.as_str(), "value");
+    assert_eq!(configured_fields[0].1.unpack_str(), Some("configured"));
+    assert!(starlark_user_provider_fields(loading).is_some());
+    assert!(starlark_user_provider_fields(module.get("KEY").unwrap().value()).is_some());
 
     let failures = [
         "Info = provider(fields = ['same', 'same'])",
@@ -32934,13 +33128,20 @@ fn bazel_zero_argument_depset_freezes_empty_in_bzl_and_build_globals() {
         0
     );
     let globals = loading_globals();
-    for rejected in [
+    for accepted in [
         "X = depset(direct = [])",
         "X = depset(transitive = [])",
         "X = depset(order = \"default\")",
+        "A = depset([\"a\"], order = \"postorder\")\nX = depset(direct = [\"b\"], transitive = [A], order = \"postorder\")",
+    ] {
+        assert!(eval_global(accepted, &globals).is_ok(), "{accepted}");
+    }
+    for rejected in [
         "X = depset(unknown = [])",
         "X = depset(\"bad\")",
         "X = depset([], [])",
+        "X = depset([], direct = [])",
+        "X = depset(transitive = [1])",
     ] {
         assert!(eval_global(rejected, &globals).is_err(), "{rejected}");
     }

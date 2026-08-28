@@ -1257,6 +1257,8 @@ fn provider_value(result: &ConfiguredNodeResult, provider: &ProviderId) -> Strin
         .unwrap()
         .field("value")
         .unwrap()
+        .as_str()
+        .unwrap()
         .to_owned()
 }
 
@@ -1289,7 +1291,11 @@ def _request(ctx):
     print("REQUEST_LOCAL")
     out = ctx.actions.declare_file("request.out")
     ctx.actions.write(out, "configured action")
-    return [ConsumerInfo(value = ctx.toolchains["//:type"].marker), DefaultInfo(files = depset([out]))]
+    selected = ctx.toolchains["//:type"]
+    direct = platform_common.ToolchainInfo(marker = selected.marker)
+    if selected != direct or direct != selected:
+        fail("ctx.toolchains must use the shared ToolchainInfo class")
+    return [ConsumerInfo(value = selected.marker), DefaultInfo(files = depset([out]))]
 first_impl = rule(implementation = _first, attrs = {"marker": attr.string(mandatory = True)})
 second_impl = rule(implementation = _second, attrs = {"marker": attr.string(mandatory = True)})
 request = rule(implementation = _request, toolchains = ["//:type"])
@@ -2178,11 +2184,10 @@ async fn root_toolchain_resolution_rejects_leaf_provider_callable_and_context_es
         ("extra scalar", first_module.clone(), TOOLCHAIN_DEFS.replacen("{\"marker\": attr.string(mandatory = True)}", "{\"marker\": attr.string(mandatory = True), \"extra\": attr.string()}", 1), TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", extra = \"bad\")", 1), "marker leaf"),
         ("executable capability", first_module.clone(), TOOLCHAIN_DEFS.replacen("first_impl = rule(implementation = _first, attrs = {\"marker\": attr.string(mandatory = True)})", "first_impl = rule(implementation = _first, attrs = {\"marker\": attr.string(mandatory = True)}, executable = True)", 1), TOOLCHAIN_BUILD.to_owned(), "marker leaf"),
         ("test capability", first_module.clone(), TOOLCHAIN_DEFS.replace("first_impl", "first_impl_test").replacen("attrs = {\"marker\": attr.string(mandatory = True)})", "attrs = {\"marker\": attr.string(mandatory = True)}, test = True)", 1), TOOLCHAIN_BUILD.replace("first_impl", "first_impl_test"), "marker leaf"),
-        ("missing callable marker", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo()"), TOOLCHAIN_BUILD.to_owned(), "exactly one named"),
+        ("missing callable marker", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo()"), TOOLCHAIN_BUILD.to_owned(), "must return only"),
         ("positional callable marker", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(ctx.attr.marker)"), TOOLCHAIN_BUILD.to_owned(), "positional"),
-        ("typed callable marker", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(marker = 1)"), TOOLCHAIN_BUILD.to_owned(), "must be a string"),
-        ("wrong callable name", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(value = ctx.attr.marker)"), TOOLCHAIN_BUILD.to_owned(), "named argument `marker`"),
-        ("extra callable name", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(marker = ctx.attr.marker, extra = \"bad\")"), TOOLCHAIN_BUILD.to_owned(), "exactly one named"),
+        ("typed callable marker", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(marker = 1)"), TOOLCHAIN_BUILD.to_owned(), "must return only"),
+        ("wrong callable name", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(value = ctx.attr.marker)"), TOOLCHAIN_BUILD.to_owned(), "must return only"),
         ("context index", TOOLCHAIN_MODULE.to_owned(), TOOLCHAIN_DEFS.replace("ctx.toolchains[\"//:type\"]", "ctx.toolchains[\"//:missing\"]"), TOOLCHAIN_BUILD.to_owned(), "only contains //:type"),
 
         ("user ToolchainInfo", first_module.clone(), format!("ToolchainInfo = provider(fields = {{}})\n{}", TOOLCHAIN_DEFS.replacen("return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]", "return [platform_common.ToolchainInfo(marker = ctx.attr.marker), ToolchainInfo()]", 1)), TOOLCHAIN_BUILD.to_owned(), "must return only"),
@@ -5424,7 +5429,10 @@ async fn fixture_proven_delegating_nodes_retain_identity_edges_and_source_attrib
     fs::write(
         workspace.join("defs.bzl"),
         r#"SeenInfo = provider(fields = {"value": "observed source label"})
+ORDINARY = Label("//:ordinary")
 def _ordinary(ctx):
+    if ctx.label.name == "root" and (ctx.attr.aliased.label != ORDINARY or ctx.attr.aliased != ctx.attr.normal):
+        fail("alias dependency did not materialize its actual configured target")
     value = ctx.attr.src.label if ctx.label.name == "root" else ctx.label.name
     return [DefaultInfo(), SeenInfo(value = value)]
 ordinary_rule = rule(
@@ -5470,10 +5478,10 @@ ordinary_rule(
 
     assert_eq!(root.kind(), &ConfiguredNodeKind::Rule);
     let seen = ProviderId::new("//:defs.bzl", "SeenInfo").unwrap();
-    assert_eq!(
-        root.providers().user(&seen).unwrap().field("value"),
-        Some("@@//:source.txt")
-    );
+    assert!(matches!(
+        root.providers().user(&seen).unwrap().field("value").unwrap().kind(),
+        slug_build_api_v2::AnalysisValueKind::Label(label) if label.to_string() == "@@//:source.txt"
+    ));
     assert_eq!(root.edges().len(), 6);
     assert!(matches!(
         root.edges()[0].kind(),
@@ -6062,7 +6070,12 @@ async fn custom_only_starlark_rule_gets_implicit_empty_default_info() {
 
     let custom_id = ProviderId::new("//:defs.bzl", "CustomInfo").unwrap();
     assert_eq!(
-        result.providers().user(&custom_id).unwrap().field("value"),
+        result
+            .providers()
+            .user(&custom_id)
+            .unwrap()
+            .field("value")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str),
         Some("custom")
     );
     assert_eq!(
@@ -6071,6 +6084,455 @@ async fn custom_only_starlark_rule_gets_implicit_empty_default_info() {
     );
     assert!(result.declared_outputs().is_empty());
     assert!(result.actions().is_empty());
+}
+
+#[tokio::test]
+async fn recursive_provider_values_round_trip_dependencies_and_preserve_publication_order() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    let definitions = |reverse: bool| {
+        let entries = if reverse {
+            "\"a\": 1, \"b\": 2"
+        } else {
+            "\"b\": 2, \"a\": 1"
+        };
+        format!(
+            r#"PayloadInfo = provider()
+ResultInfo = provider()
+NestedInfo = provider()
+BarrierInfo = provider()
+ToolchainInfo = provider()
+def _initialize(value): return {{"value": value}}
+InitializedInfo, _RawInitializedInfo = provider("Initialized", fields = ["value"], init = _initialize)
+CONSTANT = Label("//:constant")
+FROZEN_STRUCTURE = struct(value = "struct")
+FROZEN_NESTED = NestedInfo(value = "nested")
+
+def _require_equal_and_hash(left, right, description):
+    if left != right or right != left:
+        fail("asymmetric %s equality" % description)
+    if {{left: "left"}}[right] != "left" or {{right: "right"}}[left] != "right":
+        fail("inconsistent %s hash" % description)
+
+def _topology_sets():
+    a = depset([1, 2], order = "topological")
+    b = depset([3, 4], order = "topological")
+    a_star = depset([1, 2], order = "topological")
+    rightmost = depset(transitive = [a, b, a_star], order = "topological")
+    shared = depset([0, 1], order = "topological")
+    left = depset([2], transitive = [shared], order = "topological")
+    right = depset([3], transitive = [shared], order = "topological")
+    diamond = depset([4], transitive = [left, right], order = "topological")
+    return rightmost, diamond
+
+def _leaf(ctx): return [NestedInfo(value = "leaf")]
+
+def _dep(ctx):
+    out = ctx.actions.declare_file("payload.txt")
+    ctx.actions.write(out, "payload")
+    child = depset(["child"], order = "postorder")
+    shared = depset(direct = ["root"], transitive = [child], order = "postorder")
+    topological_child = depset([2, 4, 6])
+    cross_order_child = depset(["a", "b"], order = "postorder")
+    cross_order = depset(transitive = [cross_order_child])
+    cross_order_direct = depset(["a", "b"])
+    topological = depset(
+        direct = [3, 4, 5],
+        transitive = [topological_child],
+        order = "topological",
+    )
+    rightmost, diamond = _topology_sets()
+    toolchain = platform_common.ToolchainInfo(alpha = "a", beta = ["b"])
+    return [PayloadInfo(
+        none = None, boolean = True, integer = 123456789012345678901234567890,
+        floating = 1.5, string = "text", label = CONSTANT, artifact = out,
+        list_value = ["list"], tuple_value = ("tuple",), mapping = {{{entries}}},
+        structure = struct(value = "struct"), nested = NestedInfo(value = "nested"),
+        barrier_structure = struct(list_value = [toolchain], dict_value = {{"x": toolchain}}),
+        barrier_provider = BarrierInfo(list_value = [toolchain], dict_value = {{"x": toolchain}}),
+        toolchain = toolchain, left = shared, right = shared, topological = topological,
+        cross_order_child = cross_order_child, cross_order = cross_order,
+        cross_order_direct = cross_order_direct,
+        provider_set = depset([NestedInfo(value = "dependency")]),
+        target_set = depset([ctx.attr.leaf]), rightmost = rightmost, diamond = diamond,
+        equal_shape_left = depset(["shape"]), equal_shape_right = depset(["shape"]),
+    ), toolchain, ToolchainInfo(value = "user"), InitializedInfo(value = "initialized")]
+
+def _parent(ctx):
+    target = ctx.attr.dep
+    if PayloadInfo not in target or DefaultInfo not in target:
+        fail("configured target omitted an admitted provider")
+    if platform_common.ToolchainInfo not in target or ToolchainInfo not in target:
+        fail("configured target omitted a ToolchainInfo identity")
+    if InitializedInfo not in target or _RawInitializedInfo in target:
+        fail("initialized provider callable identity was not authenticated")
+    payload = target[PayloadInfo]
+    if target[platform_common.ToolchainInfo].alpha != "a":
+        fail("builtin ToolchainInfo lookup used the wrong identity")
+    if target[ToolchainInfo].value != "user":
+        fail("printable-name collision changed provider lookup")
+    if target[InitializedInfo].value != "initialized":
+        fail("initialized provider lookup returned the wrong value")
+    default = target[DefaultInfo]
+    if type(target) != "Target" or type(payload.nested) != "struct":
+        fail("configured target or provider used the wrong canonical type")
+    if dir(payload.nested) != ["value"] or dir(payload.toolchain) != ["alpha", "beta"]:
+        fail("shared provider field discovery is incomplete")
+    if "files" not in dir(default) or default.files.to_list() != []:
+        fail("DefaultInfo projection is incomplete")
+    if payload.left != payload.right or payload.equal_shape_left == payload.equal_shape_right:
+        fail("depset occurrence identity was not preserved")
+    sole = depset(transitive = [payload.left], order = "postorder")
+    recomposed = depset(direct = ["parent"], transitive = [payload.left], order = "postorder")
+    if sole != payload.left or recomposed.to_list() != ["child", "root", "parent"]:
+        fail("dependency depset did not recompose lazily")
+    fresh_topological = depset(
+        direct = [3, 4, 5],
+        transitive = [depset([2, 4, 6])],
+        order = "topological",
+    )
+    if fresh_topological.to_list() != [3, 5, 6, 4, 2]:
+        fail("fresh topological depset order is wrong")
+    if payload.topological.to_list() != [3, 5, 6, 4, 2]:
+        fail("rematerialized topological depset order is wrong")
+    fresh_cross_order_child = depset(["a", "b"], order = "postorder")
+    fresh_cross_order = depset(transitive = [fresh_cross_order_child])
+    fresh_cross_order_direct = depset(["a", "b"])
+    if fresh_cross_order.to_list() != ["a", "b"] or payload.cross_order.to_list() != ["a", "b"]:
+        fail("sole different-order successor was not canonicalized")
+    provider_recomposed = depset(
+        direct = [NestedInfo(value = "fresh")], transitive = [payload.provider_set])
+    target_recomposed = depset(direct = [target], transitive = [payload.target_set])
+    if len(provider_recomposed.to_list()) != 2 or len(target_recomposed.to_list()) != 2:
+        fail("canonical provider or Target type did not survive depset recomposition")
+    fresh_rightmost, fresh_diamond = _topology_sets()
+    if fresh_rightmost.to_list() != [3, 4, 1, 2] or payload.rightmost.to_list() != [3, 4, 1, 2]:
+        fail("topological rightmost conflict is wrong")
+    expected_diamond = [4, 2, 3, 0, 1]
+    if fresh_diamond.to_list() != expected_diamond or payload.diamond.to_list() != expected_diamond:
+        fail("topological deep diamond is wrong")
+    fresh_structure = struct(value = "struct")
+    fresh_structure_two = struct(value = "struct")
+    _require_equal_and_hash(fresh_structure, fresh_structure_two, "fresh struct")
+    _require_equal_and_hash(fresh_structure, FROZEN_STRUCTURE, "frozen struct")
+    _require_equal_and_hash(FROZEN_STRUCTURE, payload.structure, "rematerialized struct")
+    _require_equal_and_hash(fresh_structure, payload.structure, "fresh rematerialized struct")
+    fresh_nested = NestedInfo(value = "nested")
+    fresh_nested_two = NestedInfo(value = "nested")
+    _require_equal_and_hash(fresh_nested, fresh_nested_two, "fresh provider")
+    _require_equal_and_hash(fresh_nested, FROZEN_NESTED, "frozen provider")
+    _require_equal_and_hash(FROZEN_NESTED, payload.nested, "rematerialized provider")
+    _require_equal_and_hash(fresh_nested, payload.nested, "fresh rematerialized provider")
+    fresh_toolchain = platform_common.ToolchainInfo(alpha = "a", beta = ["b"])
+    fresh_toolchain_two = platform_common.ToolchainInfo(alpha = "a", beta = ["b"])
+    if fresh_toolchain != fresh_toolchain_two or fresh_toolchain_two != fresh_toolchain:
+        fail("fresh ToolchainInfo equality is asymmetric")
+    if fresh_toolchain != payload.toolchain or payload.toolchain != fresh_toolchain:
+        fail("rematerialized ToolchainInfo equality is asymmetric")
+    keyed = {{payload.barrier_structure: "struct", payload.barrier_provider: "provider"}}
+    if keyed[payload.barrier_structure] != "struct" or keyed[payload.barrier_provider] != "provider":
+        fail("frozen container hash barrier was not preserved")
+    visible = "%s|%s|%s|%s|%s" % (
+        payload.artifact.path, payload.nested.value, payload.toolchain.alpha,
+        payload.structure.value, ",".join(payload.mapping.keys()),
+    )
+    return [ResultInfo(target = ctx.attr.dep, artifact = payload.artifact,
+        left = payload.left, right = payload.right, nested = payload,
+        mapping = payload.mapping, structure = payload.structure, visible = visible,
+        fresh_cross_order_child = fresh_cross_order_child,
+        fresh_cross_order = fresh_cross_order, fresh_cross_order_direct = fresh_cross_order_direct,
+        remat_cross_order_child = payload.cross_order_child,
+        remat_cross_order = payload.cross_order,
+        remat_cross_order_direct = payload.cross_order_direct)]
+
+leaf_rule = rule(implementation = _leaf)
+dep_rule = rule(implementation = _dep, attrs = {{"leaf": attr.label(mandatory = True)}})
+parent_rule = rule(implementation = _parent, attrs = {{"dep": attr.label(mandatory = True)}})
+"#
+        )
+    };
+    let defs = workspace.join("defs.bzl");
+    fs::write(&defs, definitions(false)).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), "load(\":defs.bzl\", \"dep_rule\", \"leaf_rule\", \"parent_rule\")\nleaf_rule(name = \"leaf\")\ndep_rule(name = \"dep\", leaf = \":leaf\")\nparent_rule(name = \"parent\", dep = \":dep\")\n").unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:parent").unwrap(),
+        test_configuration(),
+    );
+    let initial = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    let result_id = ProviderId::new("//:defs.bzl", "ResultInfo").unwrap();
+    let result = initial.providers().user(&result_id).unwrap();
+    assert_eq!(
+        result
+            .field("visible")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str),
+        Some("payload.txt|nested|a|struct|b,a")
+    );
+    match result.field("target").unwrap().kind() {
+        slug_build_api_v2::AnalysisValueKind::ConfiguredTarget(target) => {
+            assert_eq!(target.identity().label().to_string(), "@@//:dep")
+        }
+        other => panic!("expected target, got {other:?}"),
+    }
+    match result.field("artifact").unwrap().kind() {
+        slug_build_api_v2::AnalysisValueKind::Artifact(
+            slug_build_api_v2::AnalysisArtifact::Derived { output, .. },
+        ) => assert_eq!(output.path(), "payload.txt"),
+        other => panic!("expected artifact, got {other:?}"),
+    }
+    let depset = |name| match result.field(name).unwrap().kind() {
+        slug_build_api_v2::AnalysisValueKind::Depset(value) => value,
+        other => panic!("expected depset, got {other:?}"),
+    };
+    assert!(depset("left").shares_occurrence_with(depset("right")));
+    for (child_name, parent_name, direct_name) in [
+        (
+            "fresh_cross_order_child",
+            "fresh_cross_order",
+            "fresh_cross_order_direct",
+        ),
+        (
+            "remat_cross_order_child",
+            "remat_cross_order",
+            "remat_cross_order_direct",
+        ),
+    ] {
+        let child = depset(child_name);
+        let parent = depset(parent_name);
+        let direct = depset(direct_name);
+        assert_eq!(child.order(), slug_build_api_v2::DepsetOrder::Postorder);
+        assert_eq!(parent.order(), slug_build_api_v2::DepsetOrder::Default);
+        assert!(parent.shares_successors_with(child));
+        assert!(
+            slug_build_api_v2::AnalysisValue::depset(parent.clone())
+                .publication_eq(&slug_build_api_v2::AnalysisValue::depset(direct.clone()))
+        );
+    }
+    assert!(matches!(
+        result.field("nested").unwrap().kind(),
+        slug_build_api_v2::AnalysisValueKind::Provider(_)
+    ));
+    assert!(matches!(
+        result.field("structure").unwrap().kind(),
+        slug_build_api_v2::AnalysisValueKind::Struct(_)
+    ));
+
+    fs::write(&defs, definitions(true)).unwrap();
+    let reordered = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    fs::write(&defs, definitions(false)).unwrap();
+    let restored = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_ne!(initial, reordered);
+    assert_eq!(initial, restored);
+}
+
+#[tokio::test]
+async fn depset_and_structural_key_failures_happen_at_construction() {
+    let cases = [
+        (
+            "toolchain struct key",
+            "toolchain = platform_common.ToolchainInfo(value = 'x')\n    value = {struct(value = toolchain): 'bad'}",
+            "unhashable type: struct",
+        ),
+        (
+            "toolchain provider key",
+            "toolchain = platform_common.ToolchainInfo(value = 'x')\n    value = {KeyInfo(value = toolchain): 'bad'}",
+            "unhashable type: provider",
+        ),
+        (
+            "tuple toolchain struct key",
+            "toolchain = platform_common.ToolchainInfo(value = 'x')\n    value = {struct(value = (toolchain,)): 'bad'}",
+            "unhashable type: struct",
+        ),
+        (
+            "list key",
+            "key = ['x']\n    value = {key: 'bad'}",
+            "not hashable",
+        ),
+        (
+            "dict key",
+            "key = {'x': 1}\n    value = {key: 'bad'}",
+            "not hashable",
+        ),
+        (
+            "tuple-list key",
+            "key = (['x'],)\n    value = {key: 'bad'}",
+            "not hashable",
+        ),
+        (
+            "mutable depset element",
+            "value = depset(direct = [['x']])",
+            "depset elements must be immutable",
+        ),
+        (
+            "mixed direct type",
+            "value = depset(direct = [1, 'x'])",
+            "depset elements have incompatible types",
+        ),
+        (
+            "transitive type",
+            "value = depset(direct = [1], transitive = [depset(['x'])])",
+            "depset elements have incompatible types",
+        ),
+        (
+            "transitive order",
+            "value = depset(transitive = [depset(['x'], order = 'postorder')], order = 'preorder')",
+            "is incompatible with order",
+        ),
+        (
+            "maximum depth",
+            "value = depset([0])\n    for i in range(1, 3501):\n        value = depset(direct = [i], transitive = [value])",
+            "depset depth 3501 exceeds limit (3500)",
+        ),
+    ];
+    for (name, body, expected) in cases {
+        let workspace = scratch();
+        fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+        fs::write(
+            workspace.join("defs.bzl"),
+            format!("Info = provider()\nKeyInfo = provider()\ndef _impl(ctx):\n    {body}\n    return [Info(value = 'ok')]\nprobe = rule(implementation = _impl)\n"),
+        )
+        .unwrap();
+        fs::write(
+            workspace.join("BUILD.bazel"),
+            "load(':defs.bzl', 'probe')\nprobe(name = 'probe')\n",
+        )
+        .unwrap();
+        let key = ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:probe").unwrap(),
+            test_configuration(),
+        );
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let error = analyze_request(&dice, &workspace, &key, None, false)
+            .await
+            .unwrap_err();
+        assert!(error.contains(expected), "{name}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn recursive_provider_lowering_rejects_cycles_and_unsupported_values() {
+    for (body, expected) in [
+        ("value = []; value.append(value)", "cyclic analysis value"),
+        (
+            "value = set([1])",
+            "unsupported analysis value of type `set`",
+        ),
+        (
+            "value = _impl",
+            "unsupported analysis value of type `function`",
+        ),
+    ] {
+        let workspace = scratch();
+        fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+        fs::write(workspace.join("defs.bzl"), format!("Info = provider()\ndef _impl(ctx):\n    {body}\n    return [Info(value = value)]\nprobe = rule(implementation = _impl)\n")).unwrap();
+        fs::write(
+            workspace.join("BUILD.bazel"),
+            "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
+        )
+        .unwrap();
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let key = ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:probe").unwrap(),
+            test_configuration(),
+        );
+        let error = analyze_request(&dice, &workspace, &key, None, false)
+            .await
+            .unwrap_err();
+        assert!(error.contains(expected), "{error}");
+    }
+}
+
+#[tokio::test]
+async fn dependency_artifact_cannot_be_reused_as_the_current_actions_output() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"ArtifactInfo = provider(fields = ["file"])
+def _dep(ctx):
+    out = ctx.actions.declare_file("dep.txt")
+    ctx.actions.write(out, "dep")
+    return [ArtifactInfo(file = out)]
+def _parent(ctx):
+    ctx.actions.write(ctx.attr.dep[ArtifactInfo].file, "overwrite")
+    return []
+dep = rule(implementation = _dep)
+parent = rule(implementation = _parent, attrs = {"dep": attr.label()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(':defs.bzl', 'dep', 'parent')\ndep(name = 'dep')\nparent(name = 'parent', dep = ':dep')\n",
+    )
+    .unwrap();
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:parent").unwrap(),
+        test_configuration(),
+    );
+    let error = analyze_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        &key,
+        None,
+        false,
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        error.contains("ctx.actions.write requires a declared file"),
+        "{error}"
+    );
+}
+
+#[tokio::test]
+async fn rematerialized_multi_child_depset_preserves_depth_limit() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"DeepInfo = provider(fields = ["value"])
+def _dep(ctx):
+    value = depset(transitive = [depset([0]), depset([1])])
+    for i in range(2, 3500):
+        value = depset(direct = [i], transitive = [value])
+    return [DeepInfo(value = value)]
+def _parent(ctx):
+    depset(direct = [3500], transitive = [ctx.attr.dep[DeepInfo].value])
+    return []
+dep = rule(implementation = _dep)
+parent = rule(implementation = _parent, attrs = {"dep": attr.label()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(':defs.bzl', 'dep', 'parent')\ndep(name = 'dep')\nparent(name = 'parent', dep = ':dep')\n",
+    )
+    .unwrap();
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:parent").unwrap(),
+        test_configuration(),
+    );
+    let error = analyze_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        &key,
+        None,
+        false,
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        error.contains("depset depth 3501 exceeds limit (3500)"),
+        "{error}"
+    );
 }
 
 #[tokio::test]
@@ -6377,7 +6839,12 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     ));
     let parent_id = ProviderId::new("//rules:defs.bzl", "ParentInfo").unwrap();
     assert_eq!(
-        result.providers().user(&parent_id).unwrap().field("value"),
+        result
+            .providers()
+            .user(&parent_id)
+            .unwrap()
+            .field("value")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str),
         Some("second,first")
     );
     assert_eq!(result.declared_outputs(), ["parent/parent.txt"]);
@@ -6414,7 +6881,11 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     let leaf = leaf.as_ref().as_ref().unwrap();
     let leaf_id = ProviderId::new("//rules:defs.bzl", "LeafInfo").unwrap();
     assert_eq!(
-        leaf.providers().user(&leaf_id).unwrap().field("value"),
+        leaf.providers()
+            .user(&leaf_id)
+            .unwrap()
+            .field("value")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str),
         Some("second")
     );
     assert_eq!(leaf.actions().len(), 1);
@@ -6505,7 +6976,12 @@ parent(
     .unwrap();
     let parent_id = ProviderId::new("//rules:defs.bzl", "ParentInfo").unwrap();
     assert_eq!(
-        result.providers().user(&parent_id).unwrap().field("value"),
+        result
+            .providers()
+            .user(&parent_id)
+            .unwrap()
+            .field("value")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str),
         Some(
             "specific|tail|selected|mapped|reverse|True|grouped|parent/result.txt|parent/extra.txt"
         )
@@ -6889,7 +7365,8 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
             .providers()
             .user(&parent_id)
             .unwrap()
-            .field("value"),
+            .field("value")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str),
         Some("second,first")
     );
     assert_analysis_events(
@@ -6908,7 +7385,8 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
             .providers()
             .user(&parent_id)
             .unwrap()
-            .field("value"),
+            .field("value")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str),
         Some("second,first")
     );
     assert_analysis_events(&events, &[("@@//parent:parent", EventKind::Reused)]);
@@ -6921,7 +7399,8 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
             .providers()
             .user(&parent_id)
             .unwrap()
-            .field("value"),
+            .field("value")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str),
         Some("second,first")
     );
     assert_analysis_events(
@@ -6941,7 +7420,8 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
             .providers()
             .user(&parent_id)
             .unwrap()
-            .field("value"),
+            .field("value")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str),
         Some("edited-second,edited-first")
     );
     assert_analysis_events(
@@ -6974,7 +7454,8 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
             .providers()
             .user(&parent_id)
             .unwrap()
-            .field("value"),
+            .field("value")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str),
         Some("edited-second,edited-first")
     );
     assert_analysis_events(

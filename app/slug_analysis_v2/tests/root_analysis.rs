@@ -559,6 +559,8 @@ fn marker_value(
         .unwrap()
         .field("value")
         .unwrap()
+        .as_str()
+        .unwrap()
         .to_owned()
 }
 
@@ -616,6 +618,8 @@ fn observed_marker_value(
         .user(provider)
         .unwrap()
         .field("value")
+        .unwrap()
+        .as_str()
         .unwrap()
         .to_owned()
 }
@@ -992,7 +996,8 @@ async fn observed_toolchain_closure_depends_on_both_sources_and_families_once() 
             .providers()
             .user(&consumer)
             .unwrap()
-            .field("value"),
+            .field("value")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str),
         Some("selected")
     );
     let dependencies = tracker.dependencies(&key);

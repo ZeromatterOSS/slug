@@ -9,6 +9,7 @@
  */
 
 use std::fmt;
+use std::sync::Arc;
 
 use allocative::Allocative;
 use slug_configuration_v2::SlugConfiguration;
@@ -175,6 +176,34 @@ impl ConfigurationKey {
                 format!("{kind}:{checksum}")
             }
         }
+    }
+
+    /// Complete collision-free configured-target value identity. This is not
+    /// the display/checksum projection used by command and query rendering.
+    #[rustfmt::skip]
+    pub fn complete_identity_bytes(&self) -> Arc<[u8]> {
+        let ConfigurationIdentity::Legacy { kind, checksum, starlark_options } = &self.identity else { return Arc::from(self.slug_configuration().unwrap().canonical_bytes()); };
+        fn bytes(out: &mut Vec<u8>, value: &[u8]) { out.extend_from_slice(&(value.len() as u64).to_be_bytes()); out.extend_from_slice(value); }
+        let mut out = b"slug-legacy-config\0\x01".to_vec();
+        out.push(match kind { ConfigurationKind::Target => 0, ConfigurationKind::Exec => 1, ConfigurationKind::HostLike => 2 });
+        bytes(&mut out, checksum.as_str().as_bytes());
+        out.extend_from_slice(&(starlark_options.iter().len() as u64).to_be_bytes());
+        for option in starlark_options.iter() {
+            bytes(&mut out, option.label().stable_serialize().as_bytes());
+            out.push(match option.scope() { StarlarkOptionScope::Default => 0, StarlarkOptionScope::Universal => 1, StarlarkOptionScope::Target => 2, StarlarkOptionScope::Project => 3 });
+            match option.value() {
+                StarlarkOptionValue::Integer(value) => { out.push(0); bytes(&mut out, &value.to_signed_bytes_be()); }
+                StarlarkOptionValue::Boolean(value) => out.extend_from_slice(&[1, u8::from(*value)]),
+                StarlarkOptionValue::String(value) => { out.push(2); bytes(&mut out, value.as_bytes()); }
+                StarlarkOptionValue::StringList(values)
+                | StarlarkOptionValue::StringSet(values) => {
+                    out.push(if matches!(option.value(), StarlarkOptionValue::StringList(_)) { 3 } else { 4 });
+                    out.extend_from_slice(&(values.len() as u64).to_be_bytes());
+                    for value in values.iter() { bytes(&mut out, value.as_bytes()); }
+                }
+            }
+        }
+        out.into()
     }
 }
 

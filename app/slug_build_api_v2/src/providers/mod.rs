@@ -11,16 +11,16 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
-use std::hash::Hash;
-use std::hash::Hasher;
 use std::sync::Arc;
 
 use allocative::Allocative;
 use compact_str::CompactString;
 use dupe::Dupe;
-use starlark_map::Equivalent;
 use starlark_map::small_map::SmallMap;
 
+use crate::analysis_value::ProviderIdentity;
+use crate::analysis_value::ProviderOccurrence;
+use crate::analysis_value::PublicationEqState;
 use crate::depset::Depset;
 use crate::depset::DepsetOrder;
 
@@ -244,23 +244,6 @@ pub struct PlatformInfo {
     pub exec_properties: BTreeMap<String, String>,
 }
 
-/// The fixture-bounded builtin result of `platform_common.ToolchainInfo`.
-///
-/// This deliberately is not a user provider: ToolchainInfo has one native
-/// field in the first resolution vertical and must keep its builtin identity.
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-pub struct ToolchainInfo {
-    pub marker: CompactString,
-}
-
-impl ToolchainInfo {
-    pub fn new(marker: impl Into<CompactString>) -> Self {
-        Self {
-            marker: marker.into(),
-        }
-    }
-}
-
 impl PlatformInfo {
     pub fn new(label: impl Into<String>) -> Self {
         Self {
@@ -272,47 +255,13 @@ impl PlatformInfo {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-pub struct UserProvider {
-    pub id: ProviderId,
-    pub fields: SmallMap<CompactString, CompactString>,
-}
-
-impl UserProvider {
-    pub fn new(
-        name: impl Into<String>,
-        fields: BTreeMap<String, String>,
-    ) -> Result<Self, ProviderError> {
-        let id = ProviderId::unqualified(name.into())?;
-        Self::with_id(id, fields)
-    }
-
-    pub fn with_id(
-        id: ProviderId,
-        fields: impl IntoIterator<Item = (impl Into<CompactString>, impl Into<CompactString>)>,
-    ) -> Result<Self, ProviderError> {
-        Ok(Self {
-            id,
-            fields: fields
-                .into_iter()
-                .map(|(name, value)| (name.into(), value.into()))
-                .collect(),
-        })
-    }
-
-    pub fn field(&self, name: &str) -> Option<&str> {
-        self.fields.get(name).map(CompactString::as_str)
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum ProviderValue {
     DefaultInfo(DefaultInfo),
     OutputGroupInfo(OutputGroupInfo),
     RunEnvironmentInfo(RunEnvironmentInfo),
     FilesToRunProvider(FilesToRunProvider),
     PlatformInfo(PlatformInfo),
-    ToolchainInfo(ToolchainInfo),
-    User(UserProvider),
+    Occurrence(ProviderOccurrence),
 }
 
 impl ProviderValue {
@@ -323,48 +272,47 @@ impl ProviderValue {
             Self::RunEnvironmentInfo(_) => ProviderName("RunEnvironmentInfo".into()),
             Self::FilesToRunProvider(_) => ProviderName("FilesToRunProvider".into()),
             Self::PlatformInfo(_) => ProviderName("PlatformInfo".into()),
-            Self::ToolchainInfo(_) => ProviderName("ToolchainInfo".into()),
-            Self::User(provider) => ProviderName(provider.id.exported_name().into()),
+            Self::Occurrence(provider) => ProviderName(provider.identity().name().into()),
         }
     }
 
-    fn key(&self) -> ProviderKey {
+    fn identity(&self) -> ProviderIdentity {
         match self {
-            Self::User(provider) => ProviderKey::User(provider.id.dupe()),
-            _ => ProviderKey::Builtin(self.name()),
+            Self::DefaultInfo(_) => ProviderIdentity::builtin("DefaultInfo"),
+            Self::OutputGroupInfo(_) => ProviderIdentity::builtin("OutputGroupInfo"),
+            Self::RunEnvironmentInfo(_) => ProviderIdentity::builtin("RunEnvironmentInfo"),
+            Self::FilesToRunProvider(_) => ProviderIdentity::builtin("FilesToRunProvider"),
+            Self::PlatformInfo(_) => ProviderIdentity::builtin("PlatformInfo"),
+            Self::Occurrence(provider) => provider.identity().clone(),
+        }
+    }
+
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        match (self, other) {
+            (Self::DefaultInfo(left), Self::DefaultInfo(right)) => left == right,
+            (Self::OutputGroupInfo(left), Self::OutputGroupInfo(right)) => left == right,
+            (Self::RunEnvironmentInfo(left), Self::RunEnvironmentInfo(right)) => left == right,
+            (Self::FilesToRunProvider(left), Self::FilesToRunProvider(right)) => left == right,
+            (Self::PlatformInfo(left), Self::PlatformInfo(right)) => left == right,
+            (Self::Occurrence(left), Self::Occurrence(right)) => {
+                left.publication_eq_with(right, state)
+            }
+            _ => false,
         }
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-pub struct ProviderCollection {
-    providers: SmallMap<ProviderKey, ProviderValue>,
-}
+#[derive(Debug, Clone, Dupe, Allocative)]
+pub struct ProviderCollection(Arc<ProviderCollectionData>);
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-enum ProviderKey {
-    Builtin(ProviderName),
-    User(ProviderId),
-}
-
-impl Hash for ProviderKey {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            Self::Builtin(name) => name.hash(state),
-            Self::User(id) => id.hash(state),
-        }
-    }
-}
-
-impl Equivalent<ProviderKey> for ProviderId {
-    fn equivalent(&self, key: &ProviderKey) -> bool {
-        matches!(key, ProviderKey::User(id) if id == self)
-    }
+#[derive(Debug, Allocative)]
+struct ProviderCollectionData {
+    providers: SmallMap<ProviderIdentity, ProviderValue>,
 }
 
 impl ProviderCollection {
     pub fn len(&self) -> usize {
-        self.providers.len()
+        self.0.providers.len()
     }
 
     pub fn new(values: Vec<ProviderValue>) -> Result<Self, ProviderError> {
@@ -378,43 +326,53 @@ impl ProviderCollection {
         let mut providers = SmallMap::with_capacity(values.len());
         for value in values {
             let name = value.name();
-            if providers.insert(value.key(), value).is_some() {
+            if providers.insert(value.identity(), value).is_some() {
                 return Err(ProviderError::DuplicateProvider { name });
             }
         }
         if require_default_info
-            && !providers.keys().any(
-                |key| matches!(key, ProviderKey::Builtin(name) if name.as_str() == "DefaultInfo"),
-            )
+            && !providers.contains_key(&ProviderIdentity::builtin("DefaultInfo"))
         {
             return Err(ProviderError::MissingDefaultInfo);
         }
-        Ok(Self { providers })
+        Ok(Self(Arc::new(ProviderCollectionData { providers })))
     }
 
-    pub fn contains(&self, name: &ProviderName) -> bool {
-        self.providers.values().any(|value| value.name() == *name)
+    pub fn contains(&self, identity: &ProviderIdentity) -> bool {
+        self.0.providers.contains_key(identity)
     }
 
-    pub fn get(&self, name: &ProviderName) -> Option<&ProviderValue> {
-        self.providers.values().find(|value| value.name() == *name)
+    pub fn get(&self, identity: &ProviderIdentity) -> Option<&ProviderValue> {
+        self.0.providers.get(identity)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&ProviderIdentity, &ProviderValue)> {
+        self.0.providers.iter()
     }
 
     pub fn names(&self) -> impl Iterator<Item = ProviderName> + '_ {
-        self.providers.values().map(ProviderValue::name)
+        self.0.providers.values().map(ProviderValue::name)
     }
 
-    pub fn user(&self, id: &ProviderId) -> Option<&UserProvider> {
-        match self.providers.get(id) {
-            Some(ProviderValue::User(provider)) => Some(provider),
+    pub fn occurrences(&self) -> impl Iterator<Item = &ProviderOccurrence> {
+        self.0.providers.values().filter_map(|value| match value {
+            ProviderValue::Occurrence(occurrence) => Some(occurrence),
+            _ => None,
+        })
+    }
+
+    pub fn user(&self, id: &ProviderId) -> Option<&ProviderOccurrence> {
+        match self.0.providers.get(&ProviderIdentity::user(id.dupe())) {
+            Some(ProviderValue::Occurrence(provider)) => Some(provider),
             _ => None,
         }
     }
 
     pub fn default_info(&self) -> Option<&DefaultInfo> {
         match self
+            .0
             .providers
-            .get(&ProviderKey::Builtin(ProviderName("DefaultInfo".into())))
+            .get(&ProviderIdentity::builtin("DefaultInfo"))
         {
             Some(ProviderValue::DefaultInfo(info)) => Some(info),
             _ => None,
@@ -422,13 +380,33 @@ impl ProviderCollection {
     }
 
     /// Builtin-only lookup: user providers named `ToolchainInfo` never match.
-    pub fn toolchain_info(&self) -> Option<&ToolchainInfo> {
+    pub fn toolchain_info(&self) -> Option<&ProviderOccurrence> {
         match self
+            .0
             .providers
-            .get(&ProviderKey::Builtin(ProviderName("ToolchainInfo".into())))
+            .get(&ProviderIdentity::builtin("ToolchainInfo"))
         {
-            Some(ProviderValue::ToolchainInfo(info)) => Some(info),
+            Some(ProviderValue::Occurrence(info)) => Some(info),
             _ => None,
         }
     }
+
+    pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        self.0.providers.len() == other.0.providers.len()
+            && self.0.providers.iter().all(|(identity, value)| {
+                other
+                    .0
+                    .providers
+                    .get(identity)
+                    .is_some_and(|other| value.publication_eq_with(other, state))
+            })
+    }
 }
+
+impl PartialEq for ProviderCollection {
+    fn eq(&self, other: &Self) -> bool {
+        self.publication_eq_with(other, &mut PublicationEqState::default())
+    }
+}
+
+impl Eq for ProviderCollection {}

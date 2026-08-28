@@ -11,6 +11,7 @@
 use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetError;
 use slug_build_api_v2::DepsetOrder;
+use slug_build_api_v2::DepsetSuccessor;
 
 fn s(items: &[&str]) -> Vec<String> {
     items.iter().map(|item| item.to_string()).collect()
@@ -18,6 +19,13 @@ fn s(items: &[&str]) -> Vec<String> {
 
 fn leaf(order: DepsetOrder, item: &str) -> Depset<String> {
     Depset::from_direct(order, s(&[item])).unwrap()
+}
+
+fn transitive_child(value: &Depset<String>) -> &Depset<String> {
+    match &value.successors()[0] {
+        DepsetSuccessor::Transitive(child) => child,
+        DepsetSuccessor::Direct(_) => panic!("expected retained non-singleton child"),
+    }
 }
 
 #[test]
@@ -98,14 +106,97 @@ fn topological_order_delays_shared_dependencies() {
 }
 
 #[test]
+fn mixed_order_topological_matches_bazel_link_order() {
+    let child = Depset::from_direct(DepsetOrder::Default, s(&["2", "4", "6"])).unwrap();
+    let parent = Depset::new(DepsetOrder::Topological, s(&["3", "4", "5"]), vec![child]).unwrap();
+
+    assert_eq!(parent.to_list(), s(&["3", "5", "6", "4", "2"]));
+}
+
+#[test]
+fn sole_different_order_child_shares_canonical_successors() {
+    let child = Depset::from_direct(DepsetOrder::Default, s(&["a", "b"])).unwrap();
+    let parent = Depset::new(DepsetOrder::Topological, Vec::new(), vec![child.clone()]).unwrap();
+
+    assert_eq!(parent.order(), DepsetOrder::Topological);
+    assert_eq!(parent.depth(), child.depth());
+    assert!(!parent.shares_node_with(&child));
+    assert!(parent.shares_successors_with(&child));
+    assert_eq!(parent.to_list(), s(&["b", "a"]));
+}
+
+#[test]
+fn topological_reverses_before_deduplicating_transitive_nodes() {
+    let a = leaf(DepsetOrder::Topological, "a");
+    let a_star = leaf(DepsetOrder::Topological, "a");
+    let b = leaf(DepsetOrder::Topological, "b");
+    let parent = Depset::new(DepsetOrder::Topological, Vec::new(), vec![a, b, a_star]).unwrap();
+
+    assert_eq!(parent.to_list(), s(&["b", "a"]));
+}
+
+#[test]
+fn topological_deep_diamond_delays_one_shared_node() {
+    let shared = Depset::from_direct(DepsetOrder::Topological, s(&["s0", "s1"])).unwrap();
+    let left = Depset::new(DepsetOrder::Topological, s(&["left"]), vec![shared.clone()]).unwrap();
+    let right = Depset::new(DepsetOrder::Topological, s(&["right"]), vec![shared]).unwrap();
+    let root = Depset::new(DepsetOrder::Topological, s(&["root"]), vec![left, right]).unwrap();
+
+    assert_eq!(root.to_list(), s(&["root", "left", "right", "s0", "s1"]));
+}
+
+#[test]
 fn composition_retains_shared_child_nodes_without_recursive_cloning() {
-    let shared = leaf(DepsetOrder::Default, "shared");
+    let shared = Depset::from_direct(DepsetOrder::Default, s(&["shared-a", "shared-b"])).unwrap();
     let left = Depset::new(DepsetOrder::Default, s(&["left"]), vec![shared.clone()]).unwrap();
     let right = Depset::new(DepsetOrder::Default, s(&["right"]), vec![shared.clone()]).unwrap();
 
-    assert!(left.transitive()[0].shares_node_with(&shared));
-    assert!(right.transitive()[0].shares_node_with(&shared));
-    assert!(left.transitive()[0].shares_node_with(&right.transitive()[0]));
+    assert!(transitive_child(&left).shares_node_with(&shared));
+    assert!(transitive_child(&right).shares_node_with(&shared));
+    assert!(transitive_child(&left).shares_node_with(transitive_child(&right)));
+}
+
+#[test]
+fn singleton_hoisting_preserves_interleaved_successor_order() {
+    let nested = Depset::from_direct(DepsetOrder::Preorder, s(&["a", "b"])).unwrap();
+    let singleton = leaf(DepsetOrder::Preorder, "x");
+    let preorder = Depset::new(
+        DepsetOrder::Preorder,
+        s(&["d"]),
+        vec![nested.clone(), singleton],
+    )
+    .unwrap();
+    assert_eq!(preorder.to_list(), s(&["d", "a", "b", "x"]));
+    assert!(matches!(
+        preorder.successors(),
+        [
+            DepsetSuccessor::Direct(d),
+            DepsetSuccessor::Transitive(child),
+            DepsetSuccessor::Direct(x),
+        ] if d == "d" && child.shares_node_with(&nested) && x == "x"
+    ));
+
+    let nested = Depset::from_direct(DepsetOrder::Default, s(&["a", "b"])).unwrap();
+    let postorder = Depset::new(
+        DepsetOrder::Default,
+        s(&["d"]),
+        vec![
+            leaf(DepsetOrder::Default, "x"),
+            nested.clone(),
+            leaf(DepsetOrder::Default, "y"),
+        ],
+    )
+    .unwrap();
+    assert_eq!(postorder.to_list(), s(&["x", "a", "b", "y", "d"]));
+    assert!(matches!(
+        postorder.successors(),
+        [
+            DepsetSuccessor::Direct(x),
+            DepsetSuccessor::Transitive(child),
+            DepsetSuccessor::Direct(y),
+            DepsetSuccessor::Direct(d),
+        ] if x == "x" && child.shares_node_with(&nested) && y == "y" && d == "d"
+    ));
 }
 
 #[test]
@@ -155,7 +246,7 @@ fn incompatible_non_default_orders_are_rejected() {
 fn parents_without_direct_items_do_not_increase_depth() {
     let mut depset = Depset::from_direct(DepsetOrder::Default, s(&["0"])).unwrap();
     for index in 0..3499 {
-        let item = index.to_string();
+        let item = (index + 1).to_string();
         depset = Depset::new(DepsetOrder::Default, s(&[&item]), vec![depset]).unwrap();
     }
     assert_eq!(depset.depth(), 3500);
@@ -167,4 +258,42 @@ fn parents_without_direct_items_do_not_increase_depth() {
 
     let err = Depset::new(DepsetOrder::Default, s(&["overflow"]), vec![depset]).unwrap_err();
     assert_eq!(err.to_string(), "depset depth 3501 exceeds limit (3500)");
+}
+
+#[test]
+fn depth_matches_bazel_builder_hoisting_and_reuse() {
+    let empty = Depset::<String>::new(DepsetOrder::Default, Vec::new(), Vec::new()).unwrap();
+    let a = leaf(DepsetOrder::Default, "a");
+    let b = leaf(DepsetOrder::Default, "b");
+
+    assert_eq!(empty.depth(), 0);
+    assert_eq!(a.depth(), 1);
+    assert_eq!(b.depth(), 1);
+
+    let only_empty = Depset::new(
+        DepsetOrder::Default,
+        Vec::new(),
+        vec![empty.clone(), empty.clone()],
+    )
+    .unwrap();
+    assert_eq!(only_empty.depth(), 0);
+
+    let empty_and_a =
+        Depset::new(DepsetOrder::Default, Vec::new(), vec![empty, a.clone()]).unwrap();
+    assert_eq!(empty_and_a.depth(), 1);
+    assert!(empty_and_a.shares_node_with(&a));
+
+    let repeated_a =
+        Depset::new(DepsetOrder::Default, Vec::new(), vec![a.clone(), a.clone()]).unwrap();
+    assert_eq!(repeated_a.depth(), 1);
+    assert!(repeated_a.shares_node_with(&a));
+
+    let ab = Depset::new(DepsetOrder::Default, Vec::new(), vec![a.clone(), b.clone()]).unwrap();
+    assert_eq!(ab.depth(), 2);
+
+    let matching_direct = Depset::new(DepsetOrder::Default, s(&["a"]), vec![a.clone()]).unwrap();
+    assert!(matching_direct.shares_node_with(&a));
+
+    let direct_only = Depset::from_direct(DepsetOrder::Default, s(&["a", "b", "c"])).unwrap();
+    assert_eq!(direct_only.depth(), 2);
 }

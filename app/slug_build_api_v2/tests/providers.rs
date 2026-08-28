@@ -10,6 +10,7 @@
 
 use std::collections::BTreeMap;
 
+use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetOrder;
@@ -18,11 +19,11 @@ use slug_build_api_v2::PlatformInfo;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderError;
 use slug_build_api_v2::ProviderId;
+use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::ProviderName;
+use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::RunEnvironmentInfo;
-use slug_build_api_v2::UserProvider;
-use slug_build_api_v2::providers::ToolchainInfo;
 
 fn files(items: &[&str]) -> Depset<String> {
     Depset::from_direct(
@@ -32,10 +33,18 @@ fn files(items: &[&str]) -> Depset<String> {
     .unwrap()
 }
 
+fn user_provider(
+    id: ProviderId,
+    fields: impl IntoIterator<Item = (impl Into<compact_str::CompactString>, AnalysisValue)>,
+) -> ProviderValue {
+    ProviderValue::Occurrence(ProviderOccurrence::new(ProviderIdentity::user(id), fields))
+}
+
 #[test]
 fn provider_collection_requires_default_info_for_rules() {
-    let err = ProviderCollection::new(vec![ProviderValue::User(
-        UserProvider::new("MyInfo", BTreeMap::new()).unwrap(),
+    let err = ProviderCollection::new(vec![user_provider(
+        ProviderId::unqualified("MyInfo").unwrap(),
+        std::iter::empty::<(String, AnalysisValue)>(),
     )])
     .unwrap_err();
 
@@ -50,8 +59,14 @@ fn provider_collection_requires_default_info_for_rules() {
 fn provider_collection_rejects_duplicate_provider_keys() {
     let duplicate = ProviderCollection::new(vec![
         ProviderValue::DefaultInfo(DefaultInfo::empty()),
-        ProviderValue::User(UserProvider::new("MyInfo", BTreeMap::new()).unwrap()),
-        ProviderValue::User(UserProvider::new("MyInfo", BTreeMap::new()).unwrap()),
+        user_provider(
+            ProviderId::unqualified("MyInfo").unwrap(),
+            std::iter::empty::<(String, AnalysisValue)>(),
+        ),
+        user_provider(
+            ProviderId::unqualified("MyInfo").unwrap(),
+            std::iter::empty::<(String, AnalysisValue)>(),
+        ),
     ])
     .unwrap_err();
 
@@ -66,12 +81,12 @@ fn provider_collection_rejects_duplicate_provider_keys() {
 
 #[test]
 fn provider_collection_exposes_bazel_native_and_user_providers() {
-    let mut fields = BTreeMap::new();
-    fields.insert("value".to_owned(), "custom".to_owned());
-
     let collection = ProviderCollection::new(vec![
         ProviderValue::DefaultInfo(DefaultInfo::from_files(files(&["pkg/custom.txt"]))),
-        ProviderValue::User(UserProvider::new("MyInfo", fields).unwrap()),
+        user_provider(
+            ProviderId::unqualified("MyInfo").unwrap(),
+            [("value", AnalysisValue::string("custom"))],
+        ),
         ProviderValue::RunEnvironmentInfo(RunEnvironmentInfo::empty()),
         ProviderValue::PlatformInfo(PlatformInfo::new("@platforms//host:host")),
     ])
@@ -90,7 +105,9 @@ fn provider_collection_exposes_bazel_native_and_user_providers() {
             "PlatformInfo".to_owned(),
         ]
     );
-    assert!(collection.contains(&ProviderName::new("MyInfo").unwrap()));
+    assert!(collection.contains(&ProviderIdentity::user(
+        ProviderId::unqualified("MyInfo").unwrap()
+    )));
     assert_eq!(
         collection.default_info().unwrap().files.to_list(),
         vec!["pkg/custom.txt".to_owned()]
@@ -128,10 +145,7 @@ fn provider_collection_looks_up_user_providers_by_structural_export_identity() {
     let independently_reconstructed_id = ProviderId::new("//rules:defs.bzl", "MyInfo").unwrap();
     let collection = ProviderCollection::new(vec![
         ProviderValue::DefaultInfo(DefaultInfo::empty()),
-        ProviderValue::User(
-            UserProvider::with_id(constructor_id, [("value".to_owned(), "custom".to_owned())])
-                .unwrap(),
-        ),
+        user_provider(constructor_id, [("value", AnalysisValue::string("custom"))]),
     ])
     .unwrap();
 
@@ -141,7 +155,7 @@ fn provider_collection_looks_up_user_providers_by_structural_export_identity() {
             .user(&independently_reconstructed_id)
             .unwrap()
             .field("value"),
-        Some("custom")
+        Some(&AnalysisValue::string("custom"))
     );
     assert!(
         collection
@@ -154,17 +168,26 @@ fn provider_collection_looks_up_user_providers_by_structural_export_identity() {
 fn toolchain_info_uses_builtin_identity_not_a_user_provider_name() {
     let collection = ProviderCollection::new(vec![
         ProviderValue::DefaultInfo(DefaultInfo::empty()),
-        ProviderValue::User(UserProvider::new("DefaultInfo", BTreeMap::new()).unwrap()),
-        ProviderValue::User(UserProvider::new("ToolchainInfo", BTreeMap::new()).unwrap()),
-        ProviderValue::ToolchainInfo(ToolchainInfo::new("selected")),
+        user_provider(
+            ProviderId::unqualified("DefaultInfo").unwrap(),
+            std::iter::empty::<(String, AnalysisValue)>(),
+        ),
+        user_provider(
+            ProviderId::unqualified("ToolchainInfo").unwrap(),
+            std::iter::empty::<(String, AnalysisValue)>(),
+        ),
+        ProviderValue::Occurrence(ProviderOccurrence::new(
+            ProviderIdentity::builtin("ToolchainInfo"),
+            [("marker", AnalysisValue::string("selected"))],
+        )),
     ])
     .unwrap();
 
     assert_eq!(collection.len(), 4);
     assert_eq!(collection.default_info(), Some(&DefaultInfo::empty()));
     assert_eq!(
-        collection.toolchain_info().unwrap().marker.as_str(),
-        "selected"
+        collection.toolchain_info().unwrap().field("marker"),
+        Some(&AnalysisValue::string("selected"))
     );
     assert!(
         collection
@@ -191,7 +214,7 @@ fn output_group_info_keeps_named_file_depsets() {
     .unwrap();
 
     match collection
-        .get(&ProviderName::new("OutputGroupInfo").unwrap())
+        .get(&ProviderIdentity::builtin("OutputGroupInfo"))
         .unwrap()
     {
         ProviderValue::OutputGroupInfo(info) => {

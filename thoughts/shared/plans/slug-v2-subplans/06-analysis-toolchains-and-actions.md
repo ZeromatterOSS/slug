@@ -20896,3 +20896,33 @@ utilities remain leaf reuse and clean Zabel `0795445f...` remains concept-only
 peer guidance. BCR Starlark owns all rule/control paths including
 `cc_internal`; `cc_common` remains a generic host-ABI client. Independent
 architecture review is required before Rust resumes.
+
+#### Recursive evaluator adapter accepted; category-6 toolchain-context architecture active (2026-08-28)
+
+Terminal correction review accepts R3. The retained category-5 graph and its
+shared evaluator classes now round-trip every admitted recursive value without
+an evaluator heap, preserve occurrence and alias identity, authenticate all
+admitted provider callables, and implement pinned Bazel sole-successor depset
+canonicalization with shared physical successor identity. The vendored JSON
+assertion is restored unchanged. Focused build-api, loading and analysis suites
+pass; independently reproduced inherited vendor/core failures remain separate.
+
+Activate only the zero-Rust
+`WP-4-5-7A-selected-toolchain-context-cutover-architecture`. The live category-4
+resolution already owns an exec-configured selected platform plus ordered
+requested/actual mandatory/optional rows; category 6 must consume those rows,
+analyze selected implementations under that platform's exec configuration,
+retain their exact category-5 builtin `ToolchainInfo` occurrences, and expose
+one immutable multi-type context through `ctx.toolchains`. Delete the singular
+marker bridge and all target-configuration/provider-cardinality restrictions.
+
+Pinned Bazel 9.2 `ConfiguredTargetFunction`, `ResolvedToolchainContext`,
+`StarlarkRuleContext`, `StarlarkToolchainContext` and their mandatory/optional/
+alias tests are authority. Clean Zabel `0795445f...` contributes only the
+requested/post-alias row separation and caller-owned materialization concept;
+its layout, stores, scheduler and claims remain excluded. Loading owns the
+rule-definition label/mapping used for string lookup, configured analysis owns
+resolution/child/provider rows and DICE invalidation, and evaluator views are
+scratch. BCR Starlark still owns all rules including `cc_internal`; `cc_common`
+remains a generic host/provider-ABI client. Independent reserved-architecture
+review must accept the exact implementation manifest before Rust resumes.

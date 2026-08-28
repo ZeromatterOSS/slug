@@ -9,32 +9,28 @@
  */
 
 use std::fmt;
-use std::hash::Hash;
 use std::sync::Arc;
 use std::sync::Mutex;
 
 use allocative::Allocative;
 use compact_str::CompactString;
-use dupe::Dupe;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
+use slug_build_api_v2::AnalysisArtifact;
+use slug_build_api_v2::AnalysisConfiguredTargetKey;
+use slug_build_api_v2::AnalysisValueKind;
 use slug_build_api_v2::CtxActions;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderValue;
-use slug_build_api_v2::UserProvider;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::PackageTargetKind;
-use slug_loading_v2::provider::FrozenUserProviderCallable;
 use slug_loading_v2::provider::StarlarkDefaultInfo;
-use slug_loading_v2::provider::StarlarkDepset;
 use slug_loading_v2::provider::StarlarkToolchainInfo;
-use slug_loading_v2::provider::StarlarkUserProvider;
 use slug_loading_v2::provider::ToolchainInfoAnalysisContext;
 use starlark::PrintHandler;
 use starlark::any::ProvidesStaticType;
-use starlark::collections::StarlarkHasher;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
@@ -58,6 +54,9 @@ use starlark::values::list::ListRef;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 
+use crate::analysis_value::AnalysisArtifactValue;
+use crate::analysis_value::AnalysisValueLowerer;
+use crate::analysis_value::AnalysisValueMaterializer;
 use crate::build_setting;
 use crate::configured_attribute::ResolvedRuleAttribute;
 use crate::key::ConfiguredNodeKey;
@@ -97,9 +96,11 @@ impl fmt::Display for LoadedRuleError {
 struct AnalysisContextGen<V> {
     #[allocative(skip)]
     actions: Arc<Mutex<CtxActions>>,
-    target_name: String,
+    retained_owner: AnalysisConfiguredTargetKey,
+    target_label: slug_identity_v2::CanonicalLabel,
     package_path: String,
-    dependencies: Arc<[PreparedDependency]>,
+    #[trace(unsafe_ignore)]
+    dependencies: Arc<[AnalysisDependency]>,
     resolved_attributes: Arc<[ResolvedRuleAttribute]>,
     build_setting_value: Option<V>,
     toolchain: Option<PreparedToolchain>,
@@ -115,7 +116,8 @@ impl<'v> Freeze for AnalysisContext<'v> {
     fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
         Ok(AnalysisContextGen {
             actions: self.actions,
-            target_name: self.target_name,
+            retained_owner: self.retained_owner,
+            target_label: self.target_label,
             package_path: self.package_path,
             dependencies: self.dependencies,
             resolved_attributes: self.resolved_attributes,
@@ -141,12 +143,14 @@ where
 {
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "label" => Some(heap.alloc_simple(AnalysisLabel {
-                name: self.target_name.clone(),
-            })),
+            "label" => Some(slug_loading_v2::provider::alloc_starlark_label(
+                heap,
+                self.target_label.clone(),
+            )),
             "actions" => Some(heap.alloc_simple(AnalysisActions {
                 actions: self.actions.clone(),
                 package_path: self.package_path.clone(),
+                owner: self.retained_owner.clone(),
             })),
             "attr" => Some(heap.alloc_simple(AnalysisAttributes {
                 dependencies: self.dependencies.clone(),
@@ -155,6 +159,7 @@ where
             "outputs" => Some(heap.alloc_simple(AnalysisOutputs {
                 attributes: self.resolved_attributes.clone(),
                 package_path: self.package_path.clone(),
+                owner: self.retained_owner.clone(),
             })),
             "toolchains" => self
                 .toolchain
@@ -181,7 +186,7 @@ pub(crate) struct PreparedToolchain {
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct AnalysisAttributes {
-    dependencies: Arc<[PreparedDependency]>,
+    dependencies: Arc<[AnalysisDependency]>,
     attributes: Arc<[ResolvedRuleAttribute]>,
 }
 
@@ -215,6 +220,7 @@ impl<'v> StarlarkValue<'v> for AnalysisAttributes {
 struct AnalysisOutputs {
     attributes: Arc<[ResolvedRuleAttribute]>,
     package_path: String,
+    owner: AnalysisConfiguredTargetKey,
 }
 
 impl fmt::Display for AnalysisOutputs {
@@ -237,7 +243,7 @@ impl<'v> StarlarkValue<'v> for AnalysisOutputs {
                 Some(Value::new_none())
             }
             CoercedAttributeValue::Output(label) if attribute.kind == AttributeKind::Output => {
-                Some(heap.alloc_simple(predeclared_file(label, &self.package_path)))
+                Some(heap.alloc_simple(predeclared_file(label, &self.package_path, &self.owner)))
             }
             CoercedAttributeValue::OutputList(labels)
                 if attribute.kind == AttributeKind::OutputList =>
@@ -246,7 +252,7 @@ impl<'v> StarlarkValue<'v> for AnalysisOutputs {
                     heap.alloc(
                         labels
                             .iter()
-                            .map(|label| predeclared_file(label, &self.package_path))
+                            .map(|label| predeclared_file(label, &self.package_path, &self.owner))
                             .collect::<Vec<_>>(),
                     ),
                 )
@@ -256,21 +262,26 @@ impl<'v> StarlarkValue<'v> for AnalysisOutputs {
     }
 }
 
-fn predeclared_file(label: &slug_identity_v2::CanonicalLabel, package_path: &str) -> DeclaredFile {
+fn predeclared_file(
+    label: &slug_identity_v2::CanonicalLabel,
+    package_path: &str,
+    owner: &AnalysisConfiguredTargetKey,
+) -> AnalysisArtifactValue {
     let target = label.target().as_str();
     let path = if package_path.is_empty() {
         target.to_owned()
     } else {
         format!("{package_path}/{target}")
     };
-    DeclaredFile {
+    AnalysisArtifactValue::new(AnalysisArtifact::Derived {
+        owner: owner.clone(),
         output: ActionOutput::new(path, ActionOutputKind::File),
-    }
+    })
 }
 
 fn allocate_analysis_attribute<'v>(
     attribute: &ResolvedRuleAttribute,
-    dependencies: &[PreparedDependency],
+    dependencies: &[AnalysisDependency],
     heap: Heap<'v>,
 ) -> Result<Value<'v>, String> {
     let mut dependencies = dependencies
@@ -279,8 +290,7 @@ fn allocate_analysis_attribute<'v>(
     let mut dependency = || {
         dependencies
             .next()
-            .cloned()
-            .map(|dependency| heap.alloc_simple(AnalysisDependency(dependency)))
+            .map(|dependency| dependency.target.to_value())
             .ok_or_else(|| {
                 format!(
                     "resolved attribute `{}` is missing a prepared dependency",
@@ -394,101 +404,26 @@ impl<'v> StarlarkValue<'v> for AnalysisToolchains {
                 self.0.required_type
             )));
         }
-        Ok(heap.alloc_simple(AnalysisToolchainInfo(self.0.clone())))
-    }
-}
-
-#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct AnalysisToolchainInfo(PreparedToolchain);
-
-impl fmt::Display for AnalysisToolchainInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("ToolchainInfo(...)")
-    }
-}
-
-starlark::starlark_simple_value!(AnalysisToolchainInfo);
-
-#[starlark_value(type = "ToolchainInfo")]
-impl<'v> StarlarkValue<'v> for AnalysisToolchainInfo {
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        (attribute == "marker").then(|| {
-            heap.alloc_str(
+        let marker = heap
+            .alloc_str(
                 self.0
                     .action_context
                     .toolchain()
                     .expect("prepared toolchain context retains a toolchain")
                     .marker(),
             )
-            .to_value()
-        })
+            .to_value();
+        Ok(StarlarkToolchainInfo::alloc_value(
+            heap,
+            [(CompactString::new("marker"), marker)],
+        ))
     }
 }
 
-#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct AnalysisDependency(PreparedDependency);
-
-impl fmt::Display for AnalysisDependency {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.0.key, f)
-    }
-}
-
-starlark::starlark_simple_value!(AnalysisDependency);
-
-#[starlark_value(type = "configured_target")]
-impl<'v> StarlarkValue<'v> for AnalysisDependency {
-    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
-        self.0.key.hash(hasher);
-        Ok(())
-    }
-
-    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
-        Ok(Self::from_value(other).is_some_and(|other| self.0.key == other.0.key))
-    }
-
-    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let callable = FrozenUserProviderCallable::from_value(index).ok_or_else(|| {
-            starlark::Error::new_other(anyhow::anyhow!(
-                "dependency provider lookup requires an exported provider constructor"
-            ))
-        })?;
-        let provider = self.0.providers.user(callable.id()).ok_or_else(|| {
-            starlark::Error::new_other(anyhow::anyhow!(
-                "dependency {} does not provide {}",
-                self.0.key,
-                callable.id()
-            ))
-        })?;
-        Ok(heap.alloc_simple(StarlarkUserProvider::new(
-            provider.id.dupe(),
-            provider.fields.clone(),
-        )))
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        (attribute == "label").then(|| heap.alloc_str(&self.0.key.label().to_string()).to_value())
-    }
-}
-
-#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct AnalysisLabel {
-    name: String,
-}
-
-impl fmt::Display for AnalysisLabel {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.name)
-    }
-}
-
-starlark::starlark_simple_value!(AnalysisLabel);
-
-#[starlark_value(type = "label")]
-impl<'v> StarlarkValue<'v> for AnalysisLabel {
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        (attribute == "name").then(|| heap.alloc_str(&self.name).to_value())
-    }
+#[derive(Debug, Clone, Allocative)]
+struct AnalysisDependency {
+    attribute: CompactString,
+    target: FrozenValue,
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
@@ -496,6 +431,7 @@ struct AnalysisActions {
     #[allocative(skip)]
     actions: Arc<Mutex<CtxActions>>,
     package_path: String,
+    owner: AnalysisConfiguredTargetKey,
 }
 
 impl fmt::Display for AnalysisActions {
@@ -506,37 +442,9 @@ impl fmt::Display for AnalysisActions {
 
 starlark::starlark_simple_value!(AnalysisActions);
 
-#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct DeclaredFile {
-    output: ActionOutput,
-}
-
-impl fmt::Display for DeclaredFile {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.output.path())
-    }
-}
-
-starlark::starlark_simple_value!(DeclaredFile);
-
-#[starlark_value(type = "declared_file")]
-impl<'v> StarlarkValue<'v> for DeclaredFile {
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        if attribute == "path" {
-            Some(heap.alloc_str(self.output.path()).to_value())
-        } else {
-            None
-        }
-    }
-
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        attribute == "path"
-    }
-}
-
 #[starlark_module]
 fn analysis_actions_methods(builder: &mut MethodsBuilder) {
-    fn declare_file(this: Value, path: &str) -> anyhow::Result<DeclaredFile> {
+    fn declare_file(this: Value, path: &str) -> anyhow::Result<AnalysisArtifactValue> {
         let actions = AnalysisActions::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         let path = if actions.package_path.is_empty() {
@@ -550,7 +458,10 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
             .map_err(|_| anyhow::anyhow!("ctx.actions state lock is poisoned"))?
             .declare_file(path)
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-        Ok(DeclaredFile { output })
+        Ok(AnalysisArtifactValue::new(AnalysisArtifact::Derived {
+            owner: actions.owner.clone(),
+            output,
+        }))
     }
 
     fn write(
@@ -561,13 +472,16 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
     ) -> anyhow::Result<NoneType> {
         let actions = AnalysisActions::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
-        let output = DeclaredFile::from_value(output)
+        let output = AnalysisArtifactValue::from_value(output)
+            .ok_or_else(|| anyhow::anyhow!("ctx.actions.write requires a declared file"))?;
+        let output = output
+            .output_for_owner(&actions.owner)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions.write requires a declared file"))?;
         actions
             .actions
             .lock()
             .map_err(|_| anyhow::anyhow!("ctx.actions state lock is poisoned"))?
-            .write(output.output.clone(), content, is_executable)
+            .write(output.clone(), content, is_executable)
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         Ok(NoneType)
     }
@@ -586,10 +500,16 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
             .iterate(heap)
             .map_err(|error| anyhow::anyhow!(error.to_string()))?
         {
-            let file = DeclaredFile::from_value(item).ok_or_else(|| {
+            let file = AnalysisArtifactValue::from_value(item).ok_or_else(|| {
                 anyhow::anyhow!("ctx.actions.run_shell outputs must be declared files")
             })?;
-            declared.push(file.output.clone());
+            declared.push(
+                file.output_for_owner(&actions.owner)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("ctx.actions.run_shell outputs must be declared files")
+                    })?
+                    .clone(),
+            );
         }
         let output = declared
             .into_iter()
@@ -660,6 +580,24 @@ pub(crate) fn evaluate_loaded_rule(
     let action_contexts = vec![action_context];
     let actions = Arc::new(Mutex::new(CtxActions::new()));
     let module = Module::new();
+    let retained_owner = AnalysisConfiguredTargetKey::new(
+        key.label().clone(),
+        key.configuration().complete_identity_bytes(),
+    );
+    let dependencies = {
+        let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
+        dependencies
+            .into_iter()
+            .map(|dependency| {
+                let target =
+                    materializer.configured_dependency(&dependency.key, dependency.providers)?;
+                Ok(AnalysisDependency {
+                    attribute: dependency.attribute,
+                    target,
+                })
+            })
+            .collect::<Result<Arc<[_]>, String>>()?
+    };
     let returned = {
         let toolchain_info_context = ToolchainInfoAnalysisContext;
         let mut evaluator = Evaluator::new(&module);
@@ -674,9 +612,10 @@ pub(crate) fn evaluate_loaded_rule(
             .map_err(|error| error.to_string())?;
         let context = module.heap().alloc(AnalysisContextGen {
             actions: actions.clone(),
-            target_name: target.name.clone(),
+            retained_owner: retained_owner.clone(),
+            target_label: key.label().clone(),
             package_path: package_path.to_owned(),
-            dependencies: dependencies.into(),
+            dependencies,
             resolved_attributes: resolved_attributes.into(),
             build_setting_value,
             toolchain,
@@ -690,36 +629,40 @@ pub(crate) fn evaluate_loaded_rule(
 
     let returned = ListRef::from_value(returned)
         .ok_or_else(|| "rule implementation must return a list of providers".to_owned())?;
+    let mut lowerer = AnalysisValueLowerer::default();
     let mut provider_values = Vec::with_capacity(returned.len());
-    for value in returned.iter() {
+    for (index, value) in returned.iter().enumerate() {
         if let Some((files, executable)) = StarlarkDefaultInfo::fields_from_value(value) {
             let files = files
                 .map(|files| {
-                    let files = StarlarkDepset::direct_from_value(files).ok_or_else(|| {
-                        "DefaultInfo.files must be the result of depset([...])".to_owned()
-                    })?;
-                    let declared_outputs = files
-                        .iter()
-                        .map(|value| {
-                            DeclaredFile::from_value(*value)
-                                .map(|file| file.output.path().to_owned())
-                                .ok_or_else(|| {
-                                    "DefaultInfo.files depset must contain declared files"
-                                        .to_owned()
-                                })
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    slug_build_api_v2::Depset::from_direct(
-                        slug_build_api_v2::DepsetOrder::Default,
-                        declared_outputs,
-                    )
-                    .map_err(|error| error.to_string())
+                    let files = lowerer.lower(files, &format!("$[{index}].files"))?;
+                    let AnalysisValueKind::Depset(files) = files.kind() else {
+                        return Err(
+                            "DefaultInfo.files must be the result of depset([...])".to_owned()
+                        );
+                    };
+                    let declared_outputs =
+                        files
+                            .to_list()
+                            .into_iter()
+                            .map(|value| match value.kind() {
+                                AnalysisValueKind::Artifact(AnalysisArtifact::Derived {
+                                    output,
+                                    ..
+                                }) => Ok(output.path().to_owned()),
+                                _ => Err("DefaultInfo.files depset must contain declared files"
+                                    .to_owned()),
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                    slug_build_api_v2::Depset::from_direct(files.order(), declared_outputs)
+                        .map_err(|error| error.to_string())
                 })
                 .transpose()?;
             let executable = executable
                 .map(|executable| {
-                    DeclaredFile::from_value(executable)
-                        .map(|file| file.output.path().to_owned())
+                    AnalysisArtifactValue::from_value(executable)
+                        .and_then(|value| value.output_for_owner(&retained_owner))
+                        .map(|output| output.path().to_owned())
                         .ok_or_else(|| "DefaultInfo.executable must be a declared file".to_owned())
                 })
                 .transpose()?;
@@ -732,27 +675,16 @@ pub(crate) fn evaluate_loaded_rule(
                 ),
             };
             provider_values.push(ProviderValue::DefaultInfo(default_info));
-        } else if let Some(provider) = StarlarkUserProvider::from_value(value) {
-            provider_values.push(ProviderValue::User(
-                UserProvider::with_id(
-                    provider.id().dupe(),
-                    provider
-                        .fields()
-                        .iter()
-                        .map(|(name, value)| (name.clone(), value.clone())),
-                )
-                .map_err(|error| error.to_string())?,
-            ));
-        } else if let Some(info) = StarlarkToolchainInfo::from_value(value) {
-            provider_values.push(ProviderValue::ToolchainInfo(
-                slug_build_api_v2::providers::ToolchainInfo::new(info.marker()),
-            ));
         } else {
-            return Err(format!(
-                "rule implementation returned non-provider value `{}`",
-                value.to_repr()
-            )
-            .into());
+            let lowered = lowerer.lower(value, &format!("$[{index}]"))?;
+            let AnalysisValueKind::Provider(provider) = lowered.kind() else {
+                return Err(format!(
+                    "rule implementation returned non-provider value `{}`",
+                    value.to_repr()
+                )
+                .into());
+            };
+            provider_values.push(ProviderValue::Occurrence(provider.clone()));
         }
     }
     if !provider_values

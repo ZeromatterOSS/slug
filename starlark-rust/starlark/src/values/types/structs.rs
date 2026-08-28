@@ -43,3 +43,6 @@ pub(crate) mod value;
 pub use crate::values::types::structs::alloc::AllocStruct;
 pub use crate::values::types::structs::refs::FrozenStructRef;
 pub use crate::values::types::structs::refs::StructRef;
+pub use crate::values::types::structs::value::StarlarkStructuralValue;
+pub use crate::values::types::structs::value::starlark_structural_is_immutable;
+pub use crate::values::types::structs::value::write_starlark_structural_hash;

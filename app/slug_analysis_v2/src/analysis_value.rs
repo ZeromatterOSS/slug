@@ -1,0 +1,900 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the above-listed
+ * licenses.
+ */
+
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::fmt;
+use std::hash::Hash;
+
+use allocative::Allocative;
+use compact_str::CompactString;
+use dupe::Dupe;
+use num_bigint::BigInt;
+use num_bigint::Sign;
+use slug_build_api_v2::AnalysisArtifact;
+use slug_build_api_v2::AnalysisConfiguredTargetKey;
+use slug_build_api_v2::AnalysisDepset;
+use slug_build_api_v2::AnalysisDepsetInput;
+use slug_build_api_v2::AnalysisDepsetSuccessor;
+use slug_build_api_v2::AnalysisNumber;
+use slug_build_api_v2::AnalysisValue;
+use slug_build_api_v2::AnalysisValueKind;
+use slug_build_api_v2::ConfiguredTargetValue;
+use slug_build_api_v2::Depset;
+use slug_build_api_v2::ProviderCollection;
+use slug_build_api_v2::ProviderIdentity;
+use slug_build_api_v2::ProviderOccurrence;
+use slug_build_api_v2::ProviderValue;
+use slug_build_api_v2::Runfiles;
+use slug_loading_v2::provider::StarlarkDepset;
+use slug_loading_v2::provider::StarlarkDepsetSuccessorGen;
+use slug_loading_v2::provider::StarlarkToolchainInfo;
+use slug_loading_v2::provider::alloc_frozen_starlark_label;
+use slug_loading_v2::provider::alloc_starlark_depset;
+use slug_loading_v2::provider::alloc_starlark_depset_parts;
+use slug_loading_v2::provider::alloc_starlark_user_provider;
+use slug_loading_v2::provider::starlark_label;
+use slug_loading_v2::provider::starlark_provider_identity;
+use slug_loading_v2::provider::starlark_user_provider_fields;
+use starlark::any::ProvidesStaticType;
+use starlark::collections::StarlarkHasher;
+use starlark::values::FrozenHeap;
+use starlark::values::FrozenValue;
+use starlark::values::Heap;
+use starlark::values::NoSerialize;
+use starlark::values::StarlarkValue;
+use starlark::values::UnpackValue;
+use starlark::values::Value;
+use starlark::values::ValueIdentity;
+use starlark::values::ValueLike;
+use starlark::values::dict::AllocDict;
+use starlark::values::dict::DictRef;
+use starlark::values::float::StarlarkFloat;
+use starlark::values::list::ListRef;
+use starlark::values::starlark_value;
+use starlark::values::structs::AllocStruct;
+use starlark::values::structs::StructRef;
+use starlark::values::tuple::AllocTuple;
+use starlark::values::tuple::TupleRef;
+use starlark_map::small_map::SmallMap;
+
+use crate::key::ConfiguredNodeKey;
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+pub(crate) struct AnalysisArtifactValue {
+    artifact: AnalysisArtifact,
+}
+impl AnalysisArtifactValue {
+    pub(crate) fn new(artifact: AnalysisArtifact) -> Self {
+        Self { artifact }
+    }
+    pub(crate) fn output_for_owner(
+        &self,
+        expected: &AnalysisConfiguredTargetKey,
+    ) -> Option<&slug_build_api_v2::ActionOutput> {
+        match &self.artifact {
+            AnalysisArtifact::Derived { owner, output } if owner == expected => Some(output),
+            AnalysisArtifact::Source(_) => None,
+            AnalysisArtifact::Derived { .. } => None,
+        }
+    }
+    pub(crate) fn path(&self) -> String {
+        match &self.artifact {
+            AnalysisArtifact::Source(label) => {
+                let package = label.package().package().as_str();
+                if package.is_empty() {
+                    label.target().as_str().to_owned()
+                } else {
+                    format!("{package}/{}", label.target())
+                }
+            }
+            AnalysisArtifact::Derived { output, .. } => output.path().to_owned(),
+        }
+    }
+}
+impl fmt::Display for AnalysisArtifactValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.path())
+    }
+}
+starlark::starlark_simple_value!(AnalysisArtifactValue);
+#[starlark_value(type = "File")]
+impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.artifact.hash(hasher);
+        Ok(())
+    }
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(Self::from_value(other).is_some_and(|other| self.artifact == other.artifact))
+    }
+
+    fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match name {
+            "path" => Some(heap.alloc_str(&self.path()).to_value()),
+            "label" => Some(slug_loading_v2::provider::alloc_starlark_label(
+                heap,
+                match &self.artifact {
+                    AnalysisArtifact::Source(label) => label.clone(),
+                    AnalysisArtifact::Derived { owner, .. } => owner.label().clone(),
+                },
+            )),
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec!["label".to_owned(), "path".to_owned()]
+    }
+}
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct BuiltinProviderView {
+    identity: ProviderIdentity,
+    fields: SmallMap<CompactString, FrozenValue>,
+}
+
+impl fmt::Display for BuiltinProviderView {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}(...)", self.identity.name())
+    }
+}
+
+starlark::starlark_simple_value!(BuiltinProviderView);
+#[starlark_value(type = "provider")]
+impl<'v> StarlarkValue<'v> for BuiltinProviderView {
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        let Some(other) = Self::from_value(other) else {
+            return Ok(false);
+        };
+        if self.identity != other.identity || self.fields.len() != other.fields.len() {
+            return Ok(false);
+        }
+        for (name, value) in &self.fields {
+            let Some(other) = other.fields.get(name) else {
+                return Ok(false);
+            };
+            if !value.to_value().equals(other.to_value())? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    fn get_attr(&self, name: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        self.fields.get(name).map(|value| value.to_value())
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        let mut fields = self
+            .fields
+            .keys()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        fields.sort();
+        fields
+    }
+}
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub(crate) struct AnalysisConfiguredTargetValue {
+    retained: ConfiguredTargetValue,
+    providers: SmallMap<ProviderIdentity, FrozenValue>,
+}
+
+impl fmt::Display for AnalysisConfiguredTargetValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.retained.identity().label().fmt(f)
+    }
+}
+
+starlark::starlark_simple_value!(AnalysisConfiguredTargetValue);
+#[starlark_value(type = "Target")]
+impl<'v> StarlarkValue<'v> for AnalysisConfiguredTargetValue {
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.retained.identity().hash(hasher);
+        Ok(())
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(Self::from_value(other)
+            .is_some_and(|other| self.retained.identity() == other.retained.identity()))
+    }
+
+    fn at(&self, index: Value<'v>, _heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let identity = starlark_provider_identity(index).ok_or_else(|| {
+            starlark::Error::new_other(anyhow::anyhow!(
+                "provider lookup requires an exported provider constructor"
+            ))
+        })?;
+        self.providers
+            .get(&identity)
+            .map(|value| value.to_value())
+            .ok_or_else(|| {
+                starlark::Error::new_other(anyhow::anyhow!(
+                    "target does not provide {}",
+                    identity.name()
+                ))
+            })
+    }
+
+    fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(starlark_provider_identity(other)
+            .is_some_and(|identity| self.providers.contains_key(&identity)))
+    }
+
+    fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        (name == "label").then(|| {
+            slug_loading_v2::provider::alloc_starlark_label(
+                heap,
+                self.retained.identity().label().clone(),
+            )
+        })
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec!["label".to_owned()]
+    }
+}
+
+pub(crate) struct AnalysisValueMaterializer<'a> {
+    heap: &'a FrozenHeap,
+    depsets: HashMap<AnalysisDepset, FrozenValue>,
+    file_depsets: HashMap<usize, FrozenValue>,
+}
+
+impl<'a> AnalysisValueMaterializer<'a> {
+    pub(crate) fn new(heap: &'a FrozenHeap) -> Self {
+        Self {
+            heap,
+            depsets: HashMap::default(),
+            file_depsets: HashMap::default(),
+        }
+    }
+
+    fn provider(&mut self, occurrence: &ProviderOccurrence) -> Result<FrozenValue, String> {
+        let fields = occurrence
+            .fields()
+            .iter()
+            .map(|(name, value)| Ok((name.clone(), self.value(value)?)))
+            .collect::<Result<Vec<_>, String>>()?;
+        Ok(if occurrence.identity().is_builtin("ToolchainInfo") {
+            StarlarkToolchainInfo::alloc(self.heap, fields)
+        } else if let Some(id) = occurrence.identity().user_id() {
+            alloc_starlark_user_provider(self.heap, id.dupe(), fields)
+        } else {
+            self.heap.alloc(BuiltinProviderView {
+                identity: occurrence.identity().clone(),
+                fields: fields.into_iter().collect(),
+            })
+        })
+    }
+
+    fn string_option(&self, value: Option<&String>) -> FrozenValue {
+        value
+            .map(|value| self.heap.alloc_str(value).to_frozen_value())
+            .unwrap_or_else(FrozenValue::new_none)
+    }
+
+    fn string_map(&self, values: impl IntoIterator<Item = (String, String)>) -> FrozenValue {
+        self.heap
+            .alloc(AllocDict(values.into_iter().map(|(key, value)| {
+                (
+                    self.heap.alloc_str(&key).to_frozen_value(),
+                    self.heap.alloc_str(&value).to_frozen_value(),
+                )
+            })))
+    }
+
+    fn file_depset(&mut self, value: &Depset<String>) -> FrozenValue {
+        if let Some(found) = self.file_depsets.get(&value.node_key()) {
+            return *found;
+        }
+        let successors = value
+            .successors()
+            .iter()
+            .map(|successor| match successor {
+                slug_build_api_v2::DepsetSuccessor::Direct(value) => {
+                    StarlarkDepsetSuccessorGen::Direct(self.heap.alloc_str(value).to_frozen_value())
+                }
+                slug_build_api_v2::DepsetSuccessor::Transitive(value) => {
+                    StarlarkDepsetSuccessorGen::Transitive(self.file_depset(value))
+                }
+            })
+            .collect();
+        let empty = value
+            .is_empty()
+            .then(|| AnalysisDepset::empty(value.order()));
+        let result = alloc_starlark_depset_parts(
+            self.heap,
+            value.order(),
+            (!value.is_empty()).then(|| CompactString::new("string")),
+            empty
+                .as_ref()
+                .map(AnalysisDepset::occurrence)
+                .unwrap_or_default(),
+            empty,
+            value.depth(),
+            successors,
+        );
+        self.file_depsets.insert(value.node_key(), result);
+        result
+    }
+
+    fn runfiles(&mut self, value: &Runfiles) -> FrozenValue {
+        let mut fields = SmallMap::new();
+        fields.insert("files".into(), self.file_depset(&value.files));
+        fields.insert("symlinks".into(), self.string_map(value.symlinks.clone()));
+        fields.insert(
+            "empty_filenames".into(),
+            self.file_depset(&value.empty_filenames),
+        );
+        self.heap.alloc(BuiltinProviderView {
+            identity: ProviderIdentity::builtin("runfiles"),
+            fields,
+        })
+    }
+
+    fn files_to_run(&self, value: &slug_build_api_v2::FilesToRunProvider) -> FrozenValue {
+        self.heap.alloc(BuiltinProviderView {
+            identity: ProviderIdentity::builtin("FilesToRunProvider"),
+            fields: [
+                (
+                    CompactString::new("executable"),
+                    self.string_option(value.executable.as_ref()),
+                ),
+                (
+                    CompactString::new("runfiles_manifest"),
+                    self.string_option(value.runfiles_manifest.as_ref()),
+                ),
+                (
+                    CompactString::new("repo_mapping_manifest"),
+                    self.string_option(value.repo_mapping_manifest.as_ref()),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        })
+    }
+
+    fn builtin(&mut self, identity: &ProviderIdentity, value: &ProviderValue) -> FrozenValue {
+        let mut fields = SmallMap::new();
+        match value {
+            ProviderValue::DefaultInfo(info) => {
+                fields.insert("files".into(), self.file_depset(&info.files));
+                fields.insert(
+                    "default_runfiles".into(),
+                    self.runfiles(&info.default_runfiles),
+                );
+                fields.insert("data_runfiles".into(), self.runfiles(&info.data_runfiles));
+                fields.insert("files_to_run".into(), self.files_to_run(&info.files_to_run));
+            }
+            ProviderValue::OutputGroupInfo(info) => {
+                for (name, files) in &info.groups {
+                    fields.insert(name.as_str().into(), self.file_depset(files));
+                }
+            }
+            ProviderValue::RunEnvironmentInfo(info) => {
+                fields.insert(
+                    "environment".into(),
+                    self.string_map(info.environment.clone()),
+                );
+                fields.insert(
+                    "inherited_environment".into(),
+                    self.heap.alloc(
+                        info.inherited_environment
+                            .iter()
+                            .map(|value| self.heap.alloc_str(value).to_frozen_value())
+                            .collect::<Vec<_>>(),
+                    ),
+                );
+            }
+            ProviderValue::FilesToRunProvider(info) => {
+                return self.files_to_run(info);
+            }
+            ProviderValue::PlatformInfo(info) => {
+                fields.insert(
+                    "label".into(),
+                    self.heap.alloc_str(&info.label).to_frozen_value(),
+                );
+                fields.insert(
+                    "constraints".into(),
+                    self.string_map(info.constraints.clone()),
+                );
+                fields.insert(
+                    "exec_properties".into(),
+                    self.string_map(info.exec_properties.clone()),
+                );
+            }
+            ProviderValue::Occurrence(_) => unreachable!("occurrences use the shared classes"),
+        }
+        self.heap.alloc(BuiltinProviderView {
+            identity: identity.clone(),
+            fields,
+        })
+    }
+
+    fn target(&mut self, target: &ConfiguredTargetValue) -> Result<FrozenValue, String> {
+        let mut providers = SmallMap::new();
+        for (identity, provider) in target.providers().iter() {
+            let value = match provider {
+                ProviderValue::Occurrence(occurrence) => self.provider(occurrence)?,
+                provider => self.builtin(identity, provider),
+            };
+            providers.insert(identity.clone(), value);
+        }
+        Ok(self.heap.alloc(AnalysisConfiguredTargetValue {
+            retained: target.clone(),
+            providers,
+        }))
+    }
+
+    fn depset(&mut self, value: &AnalysisDepset) -> Result<FrozenValue, String> {
+        let mut stack = vec![(value.clone(), false)];
+        while let Some((current, exiting)) = stack.pop() {
+            if self.depsets.contains_key(&current) {
+                continue;
+            }
+            if !exiting {
+                stack.push((current.clone(), true));
+                for successor in current.successors() {
+                    if let AnalysisDepsetSuccessor::Transitive(child) = successor
+                        && !self.depsets.contains_key(&child)
+                    {
+                        stack.push((child, false));
+                    }
+                }
+                continue;
+            }
+            let successors = current
+                .successors()
+                .map(|successor| match successor {
+                    AnalysisDepsetSuccessor::Direct(value) => {
+                        self.value(value).map(StarlarkDepsetSuccessorGen::Direct)
+                    }
+                    AnalysisDepsetSuccessor::Transitive(child) => {
+                        Ok(StarlarkDepsetSuccessorGen::Transitive(
+                            *self.depsets.get(&child).expect("child materialized first"),
+                        ))
+                    }
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let result = alloc_starlark_depset(self.heap, current.clone(), successors);
+            self.depsets.insert(current, result);
+        }
+        Ok(*self.depsets.get(value).expect("root materialized"))
+    }
+
+    pub(crate) fn value(&mut self, value: &AnalysisValue) -> Result<FrozenValue, String> {
+        Ok(match value.kind() {
+            AnalysisValueKind::None => FrozenValue::new_none(),
+            AnalysisValueKind::Boolean(value) => FrozenValue::new_bool(value),
+            AnalysisValueKind::Number(AnalysisNumber::Integer(value)) => {
+                self.heap.alloc(BigInt::from_bytes_be(
+                    if value.is_negative() {
+                        Sign::Minus
+                    } else {
+                        Sign::Plus
+                    },
+                    value.magnitude(),
+                ))
+            }
+            AnalysisValueKind::Number(AnalysisNumber::Float(bits)) => {
+                self.heap.alloc(f64::from_bits(*bits))
+            }
+            AnalysisValueKind::String(value) => self.heap.alloc_str(value).to_frozen_value(),
+            AnalysisValueKind::Label(value) => {
+                alloc_frozen_starlark_label(self.heap, value.clone())
+            }
+            AnalysisValueKind::ConfiguredTarget(value) => self.target(value)?,
+            AnalysisValueKind::Artifact(value) => {
+                self.heap.alloc(AnalysisArtifactValue::new(value.clone()))
+            }
+            AnalysisValueKind::List(values) => self.heap.alloc(
+                values
+                    .iter()
+                    .map(|value| self.value(value))
+                    .collect::<Result<Vec<_>, _>>()?,
+            ),
+            AnalysisValueKind::Tuple(values) => self.heap.alloc(AllocTuple(
+                values
+                    .iter()
+                    .map(|value| self.value(value))
+                    .collect::<Result<Vec<_>, _>>()?,
+            )),
+            AnalysisValueKind::Dictionary(values) => self.heap.alloc(AllocDict(
+                values
+                    .iter()
+                    .map(|(key, value)| Ok((self.value(key)?, self.value(value)?)))
+                    .collect::<Result<Vec<_>, String>>()?,
+            )),
+            AnalysisValueKind::Struct(fields) => self.heap.alloc(AllocStruct(
+                fields
+                    .iter()
+                    .map(|(name, value)| Ok((name.to_string(), self.value(value)?)))
+                    .collect::<Result<Vec<_>, String>>()?,
+            )),
+            AnalysisValueKind::Provider(value) => self.provider(value)?,
+            AnalysisValueKind::Depset(value) => self.depset(value)?,
+        })
+    }
+
+    pub(crate) fn configured_dependency(
+        &mut self,
+        key: &ConfiguredNodeKey,
+        providers: ProviderCollection,
+    ) -> Result<FrozenValue, String> {
+        let Some(configured) = key.configured_target() else {
+            return Ok(self
+                .heap
+                .alloc(AnalysisArtifactValue::new(AnalysisArtifact::Source(
+                    key.label().clone(),
+                ))));
+        };
+        self.target(&ConfiguredTargetValue::new(
+            AnalysisConfiguredTargetKey::new(
+                configured.label().clone(),
+                configured.configuration().complete_identity_bytes(),
+            ),
+            providers,
+        ))
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct AnalysisValueLowerer<'v> {
+    visiting: HashSet<ValueIdentity<'v>>,
+    memo: HashMap<ValueIdentity<'v>, AnalysisValue>,
+}
+
+impl<'v> AnalysisValueLowerer<'v> {
+    pub(crate) fn lower(&mut self, value: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
+        if value.is_none() {
+            return Ok(AnalysisValue::none());
+        }
+        if let Some(value) = value.unpack_bool() {
+            return Ok(AnalysisValue::boolean(value));
+        }
+        if let Some(value) = value.unpack_str() {
+            return Ok(AnalysisValue::string(value));
+        }
+        if let Some(value) = value.downcast_ref::<StarlarkFloat>() {
+            return Ok(AnalysisValue::float(value.0));
+        }
+        if let Some(value) = BigInt::unpack_value(value).map_err(|error| error.to_string())? {
+            let (sign, magnitude) = value.to_bytes_be();
+            return Ok(AnalysisValue::integer_from_magnitude(
+                sign == Sign::Minus,
+                magnitude,
+            ));
+        }
+        if let Some(value) = starlark_label(value) {
+            return Ok(AnalysisValue::label(value));
+        }
+        if let Some(value) = AnalysisArtifactValue::from_value(value) {
+            return Ok(AnalysisValue::artifact(value.artifact.clone()));
+        }
+        if let Some(value) = AnalysisConfiguredTargetValue::from_value(value) {
+            return Ok(AnalysisValue::configured_target(value.retained.clone()));
+        }
+        if let Some((_, _, _, Some(retained), _, _)) = StarlarkDepset::parts_from_value(value) {
+            return Ok(AnalysisValue::depset(retained));
+        }
+
+        let identity = value.identity();
+        if let Some(value) = self.memo.get(&identity) {
+            return Ok(value.dupe());
+        }
+        if !self.visiting.insert(identity) {
+            return Err(format!("{path}: cyclic analysis value"));
+        }
+        let lowered = self.lower_recursive(value, path);
+        self.visiting.remove(&identity);
+        if let Ok(value) = &lowered {
+            self.memo.insert(identity, value.dupe());
+        }
+        lowered
+    }
+
+    fn lower_depset(&mut self, root: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
+        let root_identity = root.identity();
+        self.visiting.remove(&root_identity);
+        let mut stack = vec![(root, path.to_owned(), false)];
+        while let Some((value, path, exiting)) = stack.pop() {
+            let identity = value.identity();
+            if !exiting {
+                if self.memo.contains_key(&identity) {
+                    continue;
+                }
+                let (_, _, _, retained, _, successors) = StarlarkDepset::parts_from_value(value)
+                    .expect("depset lowering starts from a depset");
+                if let Some(retained) = retained {
+                    self.memo.insert(identity, AnalysisValue::depset(retained));
+                    continue;
+                }
+                if !self.visiting.insert(identity) {
+                    return Err(format!("{path}: cyclic analysis value"));
+                }
+                stack.push((value, path.clone(), true));
+                for (index, successor) in successors.into_iter().enumerate().rev() {
+                    if let StarlarkDepsetSuccessorGen::Transitive(child) = successor {
+                        stack.push((child, format!("{path}.successor[{index}]"), false));
+                    }
+                }
+                continue;
+            }
+            let (order, _, occurrence, _, depth, successors) =
+                StarlarkDepset::parts_from_value(value).expect("depset frame remains a depset");
+            let successors = successors
+                .into_iter()
+                .enumerate()
+                .map(|(index, successor)| match successor {
+                    StarlarkDepsetSuccessorGen::Direct(value) => self
+                        .lower(value, &format!("{path}.successor[{index}]"))
+                        .map(AnalysisDepsetInput::Direct),
+                    StarlarkDepsetSuccessorGen::Transitive(value) => self
+                        .memo
+                        .get(&value.identity())
+                        .and_then(|value| match value.kind() {
+                            AnalysisValueKind::Depset(value) => Some(value.clone()),
+                            _ => None,
+                        })
+                        .map(AnalysisDepsetInput::Transitive)
+                        .ok_or_else(|| format!("{path}: transitive item is not a depset")),
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let depset = match successors.as_slice() {
+                [AnalysisDepsetInput::Transitive(child)] if order != child.order() => {
+                    AnalysisDepset::from_dereferenced_child(occurrence, order, child)
+                        .map_err(|error| format!("{path}: {error}"))?
+                }
+                _ => {
+                    AnalysisDepset::from_canonical_successors(occurrence, order, depth, successors)
+                        .map_err(|error| format!("{path}: {error}"))?
+                }
+            };
+            self.visiting.remove(&identity);
+            self.memo.insert(identity, AnalysisValue::depset(depset));
+        }
+        Ok(self.memo.get(&root_identity).expect("root lowered").dupe())
+    }
+
+    fn lower_recursive(&mut self, value: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
+        if StarlarkDepset::parts_from_value(value).is_some() {
+            return self.lower_depset(value, path);
+        }
+        let provider = if let Some(fields) = StarlarkToolchainInfo::fields_from_value(value) {
+            Some((ProviderIdentity::builtin("ToolchainInfo"), fields))
+        } else {
+            starlark_user_provider_fields(value)
+                .map(|(id, fields)| (ProviderIdentity::user(id), fields))
+        };
+        if let Some((identity, fields)) = provider {
+            let fields = fields
+                .into_iter()
+                .map(|(name, value)| {
+                    Ok((name.clone(), self.lower(value, &format!("{path}.{name}"))?))
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            return Ok(AnalysisValue::provider(ProviderOccurrence::new(
+                identity, fields,
+            )));
+        }
+        if let Some(values) = ListRef::from_value(value) {
+            return values
+                .iter()
+                .enumerate()
+                .map(|(index, value)| self.lower(value, &format!("{path}[{index}]")))
+                .collect::<Result<Vec<_>, _>>()
+                .map(AnalysisValue::list);
+        }
+        if let Some(values) = TupleRef::from_value(value) {
+            return values
+                .iter()
+                .enumerate()
+                .map(|(index, value)| self.lower(value, &format!("{path}[{index}]")))
+                .collect::<Result<Vec<_>, _>>()
+                .map(AnalysisValue::tuple);
+        }
+        if let Some(values) = DictRef::from_value(value) {
+            let entries = values
+                .iter()
+                .enumerate()
+                .map(|(index, (key, value))| {
+                    Ok((
+                        self.lower(key, &format!("{path}.key[{index}]"))?,
+                        self.lower(value, &format!("{path}.value[{index}]"))?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            return AnalysisValue::dictionary(entries).map_err(|error| format!("{path}: {error}"));
+        }
+        if let Some(fields) = StructRef::from_value(value) {
+            let fields = fields
+                .iter()
+                .map(|(name, value)| {
+                    Ok((
+                        name.as_str().to_owned(),
+                        self.lower(value, &format!("{path}.{name}"))?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            return Ok(AnalysisValue::strukt(fields));
+        }
+        Err(format!(
+            "{path}: unsupported analysis value of type `{}`",
+            value.get_type()
+        ))
+    }
+}
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use slug_build_api_v2::DefaultInfo;
+    use slug_build_api_v2::FilesToRunProvider;
+    use slug_build_api_v2::OutputGroupInfo;
+    use slug_build_api_v2::PlatformInfo;
+    use slug_build_api_v2::ProviderId;
+    use slug_build_api_v2::RunEnvironmentInfo;
+    use slug_loading_v2::provider::alloc_starlark_provider_callable;
+    use starlark::values::list::ListRef;
+
+    use super::*;
+
+    fn builtin<'a>(
+        target: &'a AnalysisConfiguredTargetValue,
+        name: &str,
+    ) -> &'a BuiltinProviderView {
+        BuiltinProviderView::from_value(
+            target
+                .providers
+                .get(&ProviderIdentity::builtin(name))
+                .unwrap()
+                .to_value(),
+        )
+        .unwrap()
+    }
+
+    fn field<'a>(view: &'a BuiltinProviderView, name: &str) -> &'a FrozenValue {
+        view.fields.get(name).unwrap()
+    }
+
+    #[test]
+    fn complete_target_view_projects_every_retained_provider_variant() {
+        let user_id = ProviderId::new("//:defs.bzl", "Info").unwrap();
+        let user = ProviderOccurrence::new(
+            ProviderIdentity::user(user_id.dupe()),
+            [("value", AnalysisValue::string("user"))],
+        );
+        let toolchain = ProviderOccurrence::new(
+            ProviderIdentity::builtin("ToolchainInfo"),
+            [("marker", AnalysisValue::string("toolchain"))],
+        );
+        let providers = ProviderCollection::new(vec![
+            ProviderValue::DefaultInfo(DefaultInfo::from_executable("bin/tool".to_owned(), None)),
+            ProviderValue::OutputGroupInfo(OutputGroupInfo::new(BTreeMap::from([(
+                "validation".to_owned(),
+                Depset::from_direct(
+                    slug_build_api_v2::DepsetOrder::Default,
+                    vec!["pkg/validation.txt".to_owned()],
+                )
+                .unwrap(),
+            )]))),
+            ProviderValue::RunEnvironmentInfo(RunEnvironmentInfo {
+                environment: BTreeMap::from([("KEY".to_owned(), "value".to_owned())]),
+                inherited_environment: vec!["PATH".to_owned()],
+            }),
+            ProviderValue::FilesToRunProvider(FilesToRunProvider {
+                executable: Some("bin/tool".to_owned()),
+                runfiles_manifest: Some("bin/tool.runfiles_manifest".to_owned()),
+                repo_mapping_manifest: None,
+            }),
+            ProviderValue::PlatformInfo(PlatformInfo {
+                label: "@@platforms//:host".to_owned(),
+                constraints: BTreeMap::from([("cpu".to_owned(), "x86_64".to_owned())]),
+                exec_properties: BTreeMap::from([("pool".to_owned(), "linux".to_owned())]),
+            }),
+            ProviderValue::Occurrence(user),
+            ProviderValue::Occurrence(toolchain),
+        ])
+        .unwrap();
+        let retained = ConfiguredTargetValue::new(
+            AnalysisConfiguredTargetKey::new(
+                slug_identity_v2::CanonicalLabel::parse("@@//:target").unwrap(),
+                [1, 2, 3],
+            ),
+            providers,
+        );
+        let heap = FrozenHeap::new();
+        let value = AnalysisValueMaterializer::new(&heap)
+            .target(&retained)
+            .unwrap();
+        let target = AnalysisConfiguredTargetValue::from_value(value.to_value()).unwrap();
+        assert_eq!(target.providers.len(), 7);
+        for name in [
+            "DefaultInfo",
+            "ToolchainInfo",
+            "OutputGroupInfo",
+            "RunEnvironmentInfo",
+        ] {
+            let callable = alloc_starlark_provider_callable(&heap, name).unwrap();
+            assert!(target.is_in(callable.to_value()).unwrap(), "{name}");
+            let expected = target
+                .providers
+                .get(&ProviderIdentity::builtin(name))
+                .unwrap()
+                .to_value();
+            Heap::temp(|scratch| {
+                assert!(
+                    target
+                        .at(callable.to_value(), scratch)
+                        .unwrap()
+                        .ptr_eq(expected)
+                );
+            });
+        }
+
+        let default = builtin(target, "DefaultInfo");
+        assert_eq!(
+            default.dir_attr(),
+            ["data_runfiles", "default_runfiles", "files", "files_to_run"]
+        );
+        assert_eq!(
+            StarlarkDepset::direct_from_value(field(default, "files").to_value()).unwrap()[0]
+                .unpack_str(),
+            Some("bin/tool")
+        );
+        let files_to_run =
+            BuiltinProviderView::from_value(field(default, "files_to_run").to_value()).unwrap();
+        assert_eq!(
+            field(files_to_run, "executable").to_value().unpack_str(),
+            Some("bin/tool")
+        );
+        let output_groups = builtin(target, "OutputGroupInfo");
+        assert_eq!(output_groups.dir_attr(), ["validation"]);
+        assert_eq!(
+            StarlarkDepset::direct_from_value(field(output_groups, "validation").to_value())
+                .unwrap()[0]
+                .unpack_str(),
+            Some("pkg/validation.txt")
+        );
+        let run_environment = builtin(target, "RunEnvironmentInfo");
+        let environment =
+            DictRef::from_value(field(run_environment, "environment").to_value()).unwrap();
+        assert_eq!(environment.len(), 1);
+        let inherited =
+            ListRef::from_value(field(run_environment, "inherited_environment").to_value())
+                .unwrap();
+        assert_eq!(inherited[0].unpack_str(), Some("PATH"));
+
+        let files_to_run = builtin(target, "FilesToRunProvider");
+        assert_eq!(
+            field(files_to_run, "executable").to_value().unpack_str(),
+            Some("bin/tool")
+        );
+        assert!(field(files_to_run, "repo_mapping_manifest").is_none());
+        let platform = builtin(target, "PlatformInfo");
+        assert_eq!(
+            field(platform, "label").to_value().unpack_str(),
+            Some("@@platforms//:host")
+        );
+        assert_eq!(
+            DictRef::from_value(field(platform, "constraints").to_value())
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            DictRef::from_value(field(platform, "exec_properties").to_value())
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+}

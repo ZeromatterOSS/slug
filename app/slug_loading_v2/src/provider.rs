@@ -11,6 +11,7 @@
 use std::cell::OnceCell;
 use std::cell::RefCell;
 use std::fmt;
+use std::hash::Hash;
 #[cfg(test)]
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -18,12 +19,28 @@ use std::sync::Arc;
 use allocative::Allocative;
 use compact_str::CompactString;
 use dupe::Dupe;
+use slug_build_api_v2::AnalysisDepset;
+use slug_build_api_v2::AnalysisDepsetOccurrence;
+use slug_build_api_v2::AnalysisValueType;
+use slug_build_api_v2::DepsetBuild;
+use slug_build_api_v2::DepsetBuildError;
+use slug_build_api_v2::DepsetOrder;
+use slug_build_api_v2::DepsetSuccessor;
+use slug_build_api_v2::DepsetView;
 use slug_build_api_v2::ProviderId;
+use slug_build_api_v2::ProviderIdentity;
+use slug_build_api_v2::build_depset;
+use slug_build_api_v2::traverse_depset;
 use slug_identity_v2::CanonicalLabel;
 use starlark::any::ProvidesStaticType;
+use starlark::environment::Methods;
+use starlark::environment::MethodsBuilder;
+use starlark::environment::MethodsStatic;
 use starlark::eval::Arguments;
 use starlark::eval::Evaluator;
+use starlark::starlark_module;
 use starlark::values::AllocValue;
+use starlark::values::Demand;
 use starlark::values::Freeze;
 use starlark::values::FreezeError;
 use starlark::values::FreezeResult;
@@ -35,17 +52,40 @@ use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::UnpackValue;
 use starlark::values::Value;
+use starlark::values::ValueIdentity;
 use starlark::values::ValueLike;
 use starlark::values::dict::DictRef;
 use starlark::values::list::ListRef;
 use starlark::values::starlark_value;
+use starlark::values::structs::StarlarkStructuralValue;
+use starlark::values::structs::starlark_structural_is_immutable;
+use starlark::values::structs::write_starlark_structural_hash;
+use starlark::values::tuple::AllocTuple;
+use starlark::values::tuple::TupleRef;
 use starlark::values::typing::StarlarkCallable;
+use starlark_map::StarlarkHasher;
 use starlark_map::small_map::SmallMap;
 
 use crate::bzl_module::BzlLoadManifest;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::bzl_module::manifest_starlark_sources;
 use crate::bzl_visibility::BzlLoadVisibility;
+use crate::starlark_label::StarlarkLabel;
+
+pub fn starlark_label(value: Value<'_>) -> Option<CanonicalLabel> {
+    StarlarkLabel::from_value(value).map(|value| value.canonical().clone())
+}
+
+pub fn alloc_starlark_label<'v>(heap: Heap<'v>, label: CanonicalLabel) -> Value<'v> {
+    heap.alloc_simple(StarlarkLabel::new(label))
+}
+
+pub fn alloc_frozen_starlark_label(
+    heap: &starlark::values::FrozenHeap,
+    label: CanonicalLabel,
+) -> FrozenValue {
+    heap.alloc(StarlarkLabel::new(label))
+}
 
 /// Fixed `.bzl` declaration token; configured output-group values are deferred.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
@@ -255,10 +295,6 @@ impl UserProviderSchema {
             Self::Schemaless => None,
             Self::List(fields) | Self::Documented(fields) => Some(fields),
         }
-    }
-
-    fn supports_configured_strings(&self) -> bool {
-        matches!(self, Self::Documented(_))
     }
 }
 
@@ -619,6 +655,26 @@ pub(crate) struct LoadingStarlarkUserProviderGen<V> {
 pub(crate) type LoadingStarlarkUserProvider<'v> = LoadingStarlarkUserProviderGen<Value<'v>>;
 type FrozenLoadingStarlarkUserProvider = LoadingStarlarkUserProviderGen<FrozenValue>;
 starlark::starlark_complex_values!(LoadingStarlarkUserProvider);
+
+fn loading_provider_fields<'v, V: ValueLike<'v>>(
+    provider: &LoadingStarlarkUserProviderGen<V>,
+) -> Vec<(CompactString, Value<'v>)> {
+    let mut fields = match &provider.fields {
+        LoadingProviderFieldsGen::Schemaful { schema, values } => values
+            .iter()
+            .map(|(index, value)| (schema[*index as usize].clone(), value.to_value()))
+            .collect::<Vec<_>>(),
+        LoadingProviderFieldsGen::Schemaless(values) => values
+            .names
+            .iter()
+            .cloned()
+            .zip(values.values.iter().map(|value| value.to_value()))
+            .collect(),
+    };
+    fields.sort_by(|left, right| left.0.cmp(&right.0));
+    fields
+}
+
 #[cfg(test)]
 pub(crate) fn loading_provider_id(value: Value<'_>) -> Option<ProviderId> {
     match LoadingStarlarkUserProvider::from_value(value)? {
@@ -626,17 +682,80 @@ pub(crate) fn loading_provider_id(value: Value<'_>) -> Option<ProviderId> {
         starlark::__macro_refs::Either::Right(provider) => Some(provider.id.dupe()),
     }
 }
+
+pub fn starlark_user_provider_fields<'v>(
+    value: Value<'v>,
+) -> Option<(ProviderId, Vec<(CompactString, Value<'v>)>)> {
+    match LoadingStarlarkUserProvider::from_value(value)? {
+        starlark::__macro_refs::Either::Left(provider) => {
+            Some((provider.id.dupe(), loading_provider_fields(provider)))
+        }
+        starlark::__macro_refs::Either::Right(provider) => {
+            Some((provider.id.dupe(), loading_provider_fields(provider)))
+        }
+    }
+}
+
+pub fn alloc_starlark_user_provider(
+    heap: &starlark::values::FrozenHeap,
+    id: ProviderId,
+    fields: impl IntoIterator<Item = (CompactString, FrozenValue)>,
+) -> FrozenValue {
+    let mut fields = fields.into_iter().collect::<SmallMap<_, _>>();
+    fields.sort_keys();
+    let (names, values): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
+    heap.alloc(LoadingStarlarkUserProviderGen {
+        id,
+        fields: LoadingProviderFieldsGen::Schemaless(SchemalessLoadingFieldsGen {
+            names: names.into(),
+            values,
+        }),
+    })
+}
 impl<V> fmt::Display for LoadingStarlarkUserProviderGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}(...)", self.id.exported_name())
     }
 }
-#[starlark_value(type = "provider")]
+#[starlark_value(type = "struct")]
 impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for LoadingStarlarkUserProviderGen<V>
 where
     Self: ProvidesStaticType<'v>,
 {
     type Canonical = FrozenLoadingStarlarkUserProvider;
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        let Some((other_id, other_fields)) = starlark_user_provider_fields(other) else {
+            return Ok(false);
+        };
+        if self.id != other_id {
+            return Ok(false);
+        }
+        let fields = loading_provider_fields(self);
+        if fields.len() != other_fields.len() {
+            return Ok(false);
+        }
+        for ((name, value), (other_name, other_value)) in fields.iter().zip(&other_fields) {
+            if name != other_name || !value.equals(*other_value)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        if !self.is_structurally_immutable() {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "unhashable type: provider"
+            )));
+        }
+        self.write_structural_hash(hasher)
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn StarlarkStructuralValue>(self);
+    }
+
     fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         match &self.fields {
             LoadingProviderFieldsGen::Schemaful { schema, values } => {
@@ -654,6 +773,30 @@ where
                 Some(values.values[index].to_value())
             }
         }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        loading_provider_fields(self)
+            .into_iter()
+            .map(|(name, _)| name.to_string())
+            .collect()
+    }
+}
+
+impl<'v, V: ValueLike<'v>> StarlarkStructuralValue for LoadingStarlarkUserProviderGen<V> {
+    fn is_structurally_immutable(&self) -> bool {
+        loading_provider_fields(self)
+            .iter()
+            .all(|(_, value)| starlark_structural_is_immutable(*value))
+    }
+
+    fn write_structural_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.id.hash(hasher);
+        for (name, value) in loading_provider_fields(self) {
+            name.hash(hasher);
+            write_starlark_structural_hash(value, hasher)?;
+        }
+        Ok(())
     }
 }
 fn invoke_initialized_provider<'v>(
@@ -734,23 +877,6 @@ fn invoke_provider<'v>(
                 )));
             }
         }
-        if schema.supports_configured_strings() {
-            let configured: Option<SmallMap<CompactString, CompactString>> = fields
-                .iter()
-                .map(|field| {
-                    Some((
-                        field.clone(),
-                        CompactString::new(names.get(field.as_str())?.unpack_str()?),
-                    ))
-                })
-                .collect();
-            if let Some(fields) = configured {
-                return Ok(eval.heap().alloc_simple(StarlarkUserProvider {
-                    id: id.dupe(),
-                    fields,
-                }));
-            }
-        }
         return allocate_schemaful_loading_provider(
             id,
             fields,
@@ -772,46 +898,30 @@ fn invoke_provider<'v>(
     }))
 }
 
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct StarlarkUserProvider {
-    id: ProviderId,
-    fields: SmallMap<CompactString, CompactString>,
-}
-
-starlark::starlark_simple_value!(StarlarkUserProvider);
-
-impl StarlarkUserProvider {
-    pub fn new(id: ProviderId, fields: SmallMap<CompactString, CompactString>) -> Self {
-        Self { id, fields }
-    }
-
-    pub fn id(&self) -> &ProviderId {
-        &self.id
-    }
-
-    pub fn fields(&self) -> &SmallMap<CompactString, CompactString> {
-        &self.fields
-    }
-}
-
-impl fmt::Display for StarlarkUserProvider {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}(...)", self.id.exported_name())
-    }
-}
-
-#[starlark_value(type = "provider")]
-impl<'v> StarlarkValue<'v> for StarlarkUserProvider {
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        self.fields
-            .get(attribute)
-            .map(|value| heap.alloc_str(value).to_value())
-    }
+#[derive(Debug, Clone, Trace, Freeze, Allocative)]
+pub enum StarlarkDepsetSuccessorGen<V> {
+    Direct(V),
+    Transitive(V),
 }
 
 #[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct StarlarkDepsetGen<V> {
-    direct: Vec<V>,
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    order: DepsetOrder,
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    element_type: Option<CompactString>,
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    occurrence: AnalysisDepsetOccurrence,
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    retained: Option<AnalysisDepset>,
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    depth: usize,
+    successors: Vec<StarlarkDepsetSuccessorGen<V>>,
 }
 
 pub type StarlarkDepset<'v> = StarlarkDepsetGen<Value<'v>>;
@@ -819,20 +929,191 @@ type FrozenStarlarkDepset = StarlarkDepsetGen<FrozenValue>;
 starlark::starlark_complex_values!(StarlarkDepset);
 
 impl<'v> StarlarkDepset<'v> {
-    pub fn direct(&self) -> &[Value<'v>] {
-        &self.direct
+    pub fn direct_from_value(value: Value<'v>) -> Option<Vec<Value<'v>>> {
+        Self::parts_from_value(value).map(|(_, _, _, _, _, successors)| {
+            successors
+                .into_iter()
+                .filter_map(|successor| match successor {
+                    StarlarkDepsetSuccessorGen::Direct(value) => Some(value),
+                    StarlarkDepsetSuccessorGen::Transitive(_) => None,
+                })
+                .collect()
+        })
     }
 
-    pub fn direct_from_value(value: Value<'v>) -> Option<Vec<Value<'v>>> {
+    pub fn parts_from_value(
+        value: Value<'v>,
+    ) -> Option<(
+        DepsetOrder,
+        Option<CompactString>,
+        AnalysisDepsetOccurrence,
+        Option<AnalysisDepset>,
+        usize,
+        Vec<StarlarkDepsetSuccessorGen<Value<'v>>>,
+    )> {
+        fn parts<'v, V: ValueLike<'v>>(
+            value: &StarlarkDepsetGen<V>,
+        ) -> (
+            DepsetOrder,
+            Option<CompactString>,
+            AnalysisDepsetOccurrence,
+            Option<AnalysisDepset>,
+            usize,
+            Vec<StarlarkDepsetSuccessorGen<Value<'v>>>,
+        ) {
+            (
+                value.order,
+                value.element_type.clone(),
+                value.occurrence.dupe(),
+                value.retained.clone(),
+                value.depth,
+                value
+                    .successors
+                    .iter()
+                    .map(|successor| match successor {
+                        StarlarkDepsetSuccessorGen::Direct(value) => {
+                            StarlarkDepsetSuccessorGen::Direct(value.to_value())
+                        }
+                        StarlarkDepsetSuccessorGen::Transitive(value) => {
+                            StarlarkDepsetSuccessorGen::Transitive(value.to_value())
+                        }
+                    })
+                    .collect(),
+            )
+        }
         match Self::from_value(value)? {
-            starlark::__macro_refs::Either::Left(value) => {
-                Some(value.direct.iter().copied().collect())
-            }
-            starlark::__macro_refs::Either::Right(value) => {
-                Some(value.direct.iter().map(|value| value.to_value()).collect())
-            }
+            starlark::__macro_refs::Either::Left(value) => Some(parts(value)),
+            starlark::__macro_refs::Either::Right(value) => Some(parts(value)),
         }
     }
+
+    fn depth_from_value(value: Value<'v>) -> Option<usize> {
+        match Self::from_value(value)? {
+            starlark::__macro_refs::Either::Left(value) => Some(value.depth),
+            starlark::__macro_refs::Either::Right(value) => Some(value.depth),
+        }
+    }
+
+    fn order_from_value(value: Value<'v>) -> Option<DepsetOrder> {
+        match Self::from_value(value)? {
+            starlark::__macro_refs::Either::Left(value) => Some(value.order),
+            starlark::__macro_refs::Either::Right(value) => Some(value.order),
+        }
+    }
+
+    fn singleton_from_value(value: Value<'v>) -> Option<Value<'v>> {
+        fn singleton<'v, V: ValueLike<'v>>(value: &StarlarkDepsetGen<V>) -> Option<Value<'v>> {
+            match value.successors.as_slice() {
+                [StarlarkDepsetSuccessorGen::Direct(value)] => Some(value.to_value()),
+                _ => None,
+            }
+        }
+        match Self::from_value(value)? {
+            starlark::__macro_refs::Either::Left(value) => singleton(value),
+            starlark::__macro_refs::Either::Right(value) => singleton(value),
+        }
+    }
+
+    fn visit_successors_reverse<E>(
+        value: Value<'v>,
+        visitor: &mut impl FnMut(DepsetSuccessor<Value<'v>, EvaluatorDepset<'v>>) -> Result<(), E>,
+    ) -> Option<Result<(), E>> {
+        fn visit<'v, V: ValueLike<'v>, E>(
+            value: &StarlarkDepsetGen<V>,
+            visitor: &mut impl FnMut(DepsetSuccessor<Value<'v>, EvaluatorDepset<'v>>) -> Result<(), E>,
+        ) -> Result<(), E> {
+            for successor in value.successors.iter().rev() {
+                visitor(match successor {
+                    StarlarkDepsetSuccessorGen::Direct(value) => {
+                        DepsetSuccessor::Direct(value.to_value())
+                    }
+                    StarlarkDepsetSuccessorGen::Transitive(value) => {
+                        DepsetSuccessor::Transitive(EvaluatorDepset(value.to_value()))
+                    }
+                })?;
+            }
+            Ok(())
+        }
+        match Self::from_value(value)? {
+            starlark::__macro_refs::Either::Left(value) => Some(visit(value, visitor)),
+            starlark::__macro_refs::Either::Right(value) => Some(visit(value, visitor)),
+        }
+    }
+    fn flatten(value: Value<'v>) -> starlark::Result<Vec<Value<'v>>> {
+        traverse_depset(
+            &EvaluatorDepset(value),
+            |value| {
+                value
+                    .get_hashed()
+                    .map(|value| u64::from(value.hash().get()))
+            },
+            |left, right| left.equals(*right),
+        )
+    }
+}
+
+#[derive(Clone, Copy)]
+struct EvaluatorDepset<'v>(Value<'v>);
+
+impl<'v> DepsetView for EvaluatorDepset<'v> {
+    type Item = Value<'v>;
+    type NodeKey = ValueIdentity<'v>;
+    fn order(&self) -> DepsetOrder {
+        StarlarkDepset::order_from_value(self.0).expect("evaluator depset view wraps a depset")
+    }
+    fn depth(&self) -> usize {
+        StarlarkDepset::depth_from_value(self.0).expect("evaluator depset view wraps a depset")
+    }
+    fn node_key(&self) -> Self::NodeKey {
+        self.0.identity()
+    }
+    fn singleton_item(&self) -> Option<Self::Item> {
+        StarlarkDepset::singleton_from_value(self.0)
+    }
+
+    fn for_each_successor_reverse<E>(
+        &self,
+        mut visitor: impl FnMut(DepsetSuccessor<Self::Item, Self>) -> Result<(), E>,
+    ) -> Result<(), E> {
+        StarlarkDepset::visit_successors_reverse(self.0, &mut visitor)
+            .expect("evaluator depset view wraps a depset")
+    }
+}
+
+pub fn alloc_starlark_depset(
+    heap: &starlark::values::FrozenHeap,
+    retained: AnalysisDepset,
+    successors: Vec<StarlarkDepsetSuccessorGen<FrozenValue>>,
+) -> FrozenValue {
+    alloc_starlark_depset_parts(
+        heap,
+        retained.order(),
+        (retained.element_type() != AnalysisValueType::Empty)
+            .then(|| CompactString::new(retained.element_type().as_str())),
+        retained.occurrence(),
+        Some(retained.clone()),
+        retained.depth(),
+        successors,
+    )
+}
+
+pub fn alloc_starlark_depset_parts(
+    heap: &starlark::values::FrozenHeap,
+    order: DepsetOrder,
+    element_type: Option<CompactString>,
+    occurrence: AnalysisDepsetOccurrence,
+    retained: Option<AnalysisDepset>,
+    depth: usize,
+    successors: Vec<StarlarkDepsetSuccessorGen<FrozenValue>>,
+) -> FrozenValue {
+    heap.alloc(StarlarkDepsetGen {
+        order,
+        element_type,
+        occurrence,
+        retained,
+        depth,
+        successors,
+    })
 }
 
 impl<V> fmt::Display for StarlarkDepsetGen<V> {
@@ -847,6 +1128,46 @@ where
     Self: ProvidesStaticType<'v>,
 {
     type Canonical = FrozenStarlarkDepset;
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(StarlarkDepset::parts_from_value(other)
+            .is_some_and(|(_, _, occurrence, _, _, _)| self.occurrence == occurrence))
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.occurrence.hash(hasher);
+        Ok(())
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn StarlarkStructuralValue>(self);
+    }
+
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(starlark_depset_methods)
+    }
+}
+
+impl<'v, V: ValueLike<'v>> StarlarkStructuralValue for StarlarkDepsetGen<V> {
+    fn is_structurally_immutable(&self) -> bool {
+        true
+    }
+
+    fn write_structural_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.occurrence.hash(hasher);
+        Ok(())
+    }
+}
+
+#[starlark_module]
+fn starlark_depset_methods(builder: &mut MethodsBuilder) {
+    fn to_list<'v>(
+        this: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(eval.heap().alloc(StarlarkDepset::flatten(this)?))
+    }
 }
 
 #[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
@@ -896,29 +1217,129 @@ pub(crate) struct AnalysisBuiltinCallable {
 #[derive(Debug, ProvidesStaticType)]
 pub struct ToolchainInfoAnalysisContext;
 
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct StarlarkToolchainInfo {
-    marker: CompactString,
+#[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct StarlarkToolchainInfoGen<V> {
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    names: Arc<[CompactString]>,
+    values: Vec<V>,
 }
 
-starlark::starlark_simple_value!(StarlarkToolchainInfo);
+pub type StarlarkToolchainInfo<'v> = StarlarkToolchainInfoGen<Value<'v>>;
+type FrozenStarlarkToolchainInfo = StarlarkToolchainInfoGen<FrozenValue>;
+starlark::starlark_complex_values!(StarlarkToolchainInfo);
 
-impl StarlarkToolchainInfo {
-    pub fn marker(&self) -> &str {
-        &self.marker
+impl<'v> StarlarkToolchainInfo<'v> {
+    pub fn fields_from_value(value: Value<'v>) -> Option<Vec<(CompactString, Value<'v>)>> {
+        fn collect<'v, V: ValueLike<'v>>(
+            value: &StarlarkToolchainInfoGen<V>,
+        ) -> Vec<(CompactString, Value<'v>)> {
+            value
+                .names
+                .iter()
+                .cloned()
+                .zip(value.values.iter().map(|value| value.to_value()))
+                .collect()
+        }
+        match Self::from_value(value)? {
+            starlark::__macro_refs::Either::Left(value) => Some(collect(value)),
+            starlark::__macro_refs::Either::Right(value) => Some(collect(value)),
+        }
+    }
+
+    pub fn alloc_value(
+        heap: Heap<'v>,
+        fields: impl IntoIterator<Item = (CompactString, Value<'v>)>,
+    ) -> Value<'v> {
+        let mut fields = fields.into_iter().collect::<SmallMap<_, _>>();
+        fields.sort_keys();
+        let (names, values): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
+        heap.alloc_complex(StarlarkToolchainInfo {
+            names: names.into(),
+            values,
+        })
+    }
+
+    pub fn alloc<'a>(
+        heap: &'a starlark::values::FrozenHeap,
+        fields: impl IntoIterator<Item = (CompactString, FrozenValue)>,
+    ) -> FrozenValue {
+        let mut fields = fields.into_iter().collect::<SmallMap<_, _>>();
+        fields.sort_keys();
+        let (names, values): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
+        heap.alloc(StarlarkToolchainInfoGen {
+            names: names.into(),
+            values,
+        })
     }
 }
 
-impl fmt::Display for StarlarkToolchainInfo {
+impl<V> fmt::Display for StarlarkToolchainInfoGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("ToolchainInfo(...)")
     }
 }
 
 #[starlark_value(type = "ToolchainInfo")]
-impl<'v> StarlarkValue<'v> for StarlarkToolchainInfo {
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        (attribute == "marker").then(|| heap.alloc_str(&self.marker).to_value())
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for StarlarkToolchainInfoGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    type Canonical = FrozenStarlarkToolchainInfo;
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        let Some(other) = StarlarkToolchainInfo::fields_from_value(other) else {
+            return Ok(false);
+        };
+        if self.names.len() != other.len() {
+            return Ok(false);
+        }
+        for ((name, value), (other_name, other_value)) in self
+            .names
+            .iter()
+            .zip(&self.values)
+            .map(|(name, value)| (name, value.to_value()))
+            .zip(&other)
+        {
+            if name != other_name || !value.equals(*other_value)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    fn write_hash(&self, _hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        Err(starlark::Error::new_other(anyhow::anyhow!(
+            "unhashable type: ToolchainInfo"
+        )))
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn StarlarkStructuralValue>(self);
+    }
+
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        let index = self.names.iter().position(|name| name == attribute)?;
+        Some(self.values[index].to_value())
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        self.names.iter().map(ToString::to_string).collect()
+    }
+}
+
+impl<'v, V: ValueLike<'v>> StarlarkStructuralValue for StarlarkToolchainInfoGen<V> {
+    fn is_structurally_immutable(&self) -> bool {
+        false
+    }
+
+    fn write_structural_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "ToolchainInfo".hash(hasher);
+        for (name, value) in self.names.iter().zip(&self.values) {
+            name.hash(hasher);
+            write_starlark_structural_hash(value.to_value(), hasher)?;
+        }
+        Ok(())
     }
 }
 
@@ -926,6 +1347,93 @@ impl AnalysisBuiltinCallable {
     pub(crate) const fn new(name: &'static str) -> Self {
         Self { name }
     }
+}
+
+fn merge_evaluator_depset_type(
+    element_type: &RefCell<Option<CompactString>>,
+    candidate: Option<CompactString>,
+) -> starlark::Result<()> {
+    let Some(candidate) = candidate else {
+        return Ok(());
+    };
+    let mut element_type = element_type.borrow_mut();
+    if let Some(existing) = element_type.as_ref() {
+        if existing != &candidate {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "depset elements have incompatible types `{existing}` and `{candidate}`"
+            )));
+        }
+    } else {
+        *element_type = Some(candidate);
+    }
+    Ok(())
+}
+
+fn empty_evaluator_depset<'v>(order: DepsetOrder, eval: &mut Evaluator<'v, '_, '_>) -> Value<'v> {
+    let index = match order {
+        DepsetOrder::Default => 0,
+        DepsetOrder::Postorder => 1,
+        DepsetOrder::Preorder => 2,
+        DepsetOrder::Topological => 3,
+    };
+    if let Some(cache) = eval.module().extra_value().and_then(TupleRef::from_value) {
+        return cache.content()[index];
+    }
+    let values = [
+        DepsetOrder::Default,
+        DepsetOrder::Postorder,
+        DepsetOrder::Preorder,
+        DepsetOrder::Topological,
+    ]
+    .map(|order| {
+        let retained = AnalysisDepset::empty(order);
+        eval.heap().alloc_complex(StarlarkDepset {
+            order,
+            element_type: None,
+            occurrence: retained.occurrence(),
+            retained: Some(retained),
+            depth: 0,
+            successors: Vec::new(),
+        })
+    });
+    let value = values[index];
+    eval.module()
+        .set_extra_value(eval.heap().alloc(AllocTuple(values)));
+    value
+}
+
+pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> {
+    if let Some(callable) = FrozenUserProviderCallable::from_value(value) {
+        return Some(ProviderIdentity::user(callable.id().dupe()));
+    }
+    if let Some(callable) = FrozenInitializedUserProviderCallable::from_value(value) {
+        return Some(ProviderIdentity::user(callable.id.dupe()));
+    }
+    if let Some(callable) = AnalysisBuiltinCallable::from_value(value) {
+        return matches!(callable.name, "DefaultInfo" | "ToolchainInfo")
+            .then(|| ProviderIdentity::builtin(callable.name));
+    }
+    if OutputGroupInfo::from_value(value).is_some() {
+        return Some(ProviderIdentity::builtin("OutputGroupInfo"));
+    }
+    if RunEnvironmentInfo::from_value(value).is_some() {
+        return Some(ProviderIdentity::builtin("RunEnvironmentInfo"));
+    }
+    None
+}
+
+/// Allocates the existing loading-owned callable token for an admitted
+/// analysis provider without installing another evaluator global.
+pub fn alloc_starlark_provider_callable(
+    heap: &starlark::values::FrozenHeap,
+    name: &'static str,
+) -> Option<FrozenValue> {
+    Some(match name {
+        "DefaultInfo" | "ToolchainInfo" => heap.alloc(AnalysisBuiltinCallable::new(name)),
+        "OutputGroupInfo" => heap.alloc(OutputGroupInfo),
+        "RunEnvironmentInfo" => heap.alloc(RunEnvironmentInfo),
+        _ => return None,
+    })
 }
 
 impl fmt::Display for AnalysisBuiltinCallable {
@@ -946,22 +1454,142 @@ impl<'v> StarlarkValue<'v> for AnalysisBuiltinCallable {
     ) -> starlark::Result<Value<'v>> {
         match self.name {
             "depset" => {
-                let mut positions = args.positions(eval.heap())?;
-                let direct = match (positions.next(), positions.next()) {
-                    (None, None) => {
-                        args.no_named_args()?;
-                        return Ok(eval.heap().alloc(StarlarkDepset { direct: Vec::new() }));
+                let positions = args.positions(eval.heap())?.collect::<Vec<_>>();
+                if positions.len() > 2 {
+                    return Err(starlark::Error::new_other(anyhow::anyhow!(
+                        "depset accepts at most two positional arguments"
+                    )));
+                }
+                let names = args.names_map()?;
+                if names
+                    .keys()
+                    .any(|name| !matches!(name.as_str(), "direct" | "order" | "transitive"))
+                {
+                    return Err(starlark::Error::new_other(anyhow::anyhow!(
+                        "depset only supports `direct`, `order`, and `transitive`"
+                    )));
+                }
+                if !positions.is_empty() && names.contains_key("direct") {
+                    return Err(starlark::Error::new_other(anyhow::anyhow!(
+                        "depset direct specified twice"
+                    )));
+                }
+                if positions.len() == 2 && names.contains_key("order") {
+                    return Err(starlark::Error::new_other(anyhow::anyhow!(
+                        "depset order specified twice"
+                    )));
+                }
+                let list_values = |name: &str, value: Option<Value<'v>>| {
+                    let Some(value) = value.filter(|value| !value.is_none()) else {
+                        return Ok(Vec::new());
+                    };
+                    if let Some(list) = ListRef::from_value(value) {
+                        return Ok(list.iter().collect());
                     }
-                    (Some(direct), None) => direct,
-                    _ => args.positional1(eval.heap())?,
+                    if let Some(tuple) = TupleRef::from_value(value) {
+                        return Ok(tuple.iter().collect());
+                    }
+                    Err(starlark::Error::new_other(anyhow::anyhow!(
+                        "depset {name} elements must be a sequence"
+                    )))
                 };
-                let list = ListRef::from_value(direct).ok_or_else(|| {
-                    starlark::Error::new_other(anyhow::anyhow!(
-                        "depset direct elements must be a list"
-                    ))
+                let direct = list_values(
+                    "direct",
+                    positions
+                        .first()
+                        .copied()
+                        .or_else(|| names.get("direct").copied()),
+                )?;
+                let transitive = list_values("transitive", names.get("transitive").copied())?;
+                if transitive
+                    .iter()
+                    .any(|value| StarlarkDepset::from_value(*value).is_none())
+                {
+                    return Err(starlark::Error::new_other(anyhow::anyhow!(
+                        "depset transitive elements must be depsets"
+                    )));
+                }
+                let order = positions
+                    .get(1)
+                    .copied()
+                    .or_else(|| names.get("order").copied())
+                    .filter(|value| !value.is_none())
+                    .map(|value| {
+                        value
+                            .unpack_str()
+                            .ok_or_else(|| {
+                                starlark::Error::new_other(anyhow::anyhow!(
+                                    "depset order must be a string"
+                                ))
+                            })?
+                            .parse::<DepsetOrder>()
+                            .map_err(|error| starlark::Error::new_other(anyhow::anyhow!(error)))
+                    })
+                    .transpose()?
+                    .unwrap_or(DepsetOrder::Default);
+
+                let element_type = RefCell::new(None);
+                let built = build_depset(
+                    order,
+                    direct,
+                    transitive.into_iter().map(EvaluatorDepset).collect(),
+                    |value| value.get_hashed().map(|value| u64::from(value.hash().get())),
+                    |left, right| left.equals(*right),
+                    |value| {
+                        if ListRef::from_value(*value).is_some()
+                            || DictRef::from_value(*value).is_some()
+                            || !starlark_structural_is_immutable(*value)
+                        {
+                            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                                "depset elements must be immutable and may not be lists or dictionaries"
+                            )));
+                        }
+                        merge_evaluator_depset_type(
+                            &element_type,
+                            Some(CompactString::new(value.get_type())),
+                        )
+                    },
+                    |child| {
+                        let (_, child_type, ..) = StarlarkDepset::parts_from_value(child.0)
+                            .expect("transitive values were checked as depsets");
+                        merge_evaluator_depset_type(&element_type, child_type)
+                    },
+                )
+                .map_err(|error| match error {
+                    DepsetBuildError::Element(error) => error,
+                    DepsetBuildError::Depset(error) => {
+                        starlark::Error::new_other(anyhow::anyhow!(error))
+                    }
                 })?;
-                Ok(eval.heap().alloc(StarlarkDepset {
-                    direct: list.iter().collect(),
+                let (depth, successors) = match built {
+                    DepsetBuild::Empty => return Ok(empty_evaluator_depset(order, eval)),
+                    DepsetBuild::Reuse(value) => return Ok(value.0),
+                    DepsetBuild::Dereference(child) => (
+                        child.depth(),
+                        vec![StarlarkDepsetSuccessorGen::Transitive(child.0)],
+                    ),
+                    DepsetBuild::Node(successors, depth) => {
+                        let successors = successors
+                            .into_iter()
+                            .map(|successor| match successor {
+                                DepsetSuccessor::Direct(value) => {
+                                    StarlarkDepsetSuccessorGen::Direct(value)
+                                }
+                                DepsetSuccessor::Transitive(value) => {
+                                    StarlarkDepsetSuccessorGen::Transitive(value.0)
+                                }
+                            })
+                            .collect();
+                        (depth, successors)
+                    }
+                };
+                Ok(eval.heap().alloc_complex(StarlarkDepset {
+                    order,
+                    element_type: element_type.into_inner(),
+                    occurrence: AnalysisDepsetOccurrence::new(),
+                    retained: None,
+                    depth,
+                    successors,
                 }))
             }
             "DefaultInfo" => {
@@ -994,23 +1622,15 @@ impl<'v> StarlarkValue<'v> for AnalysisBuiltinCallable {
                 }
                 args.no_positional_args(eval.heap())?;
                 let names = args.names_map()?;
-                if names.len() != 1 {
-                    return Err(starlark::Error::new_other(anyhow::anyhow!(
-                        "ToolchainInfo requires exactly one named string `marker`"
-                    )));
-                }
-                let marker = names.get("marker").ok_or_else(|| {
-                    starlark::Error::new_other(anyhow::anyhow!(
-                        "ToolchainInfo requires named argument `marker`"
-                    ))
-                })?;
-                let marker = marker.unpack_str().ok_or_else(|| {
-                    starlark::Error::new_other(anyhow::anyhow!(
-                        "ToolchainInfo marker must be a string"
-                    ))
-                })?;
-                Ok(eval.heap().alloc_simple(StarlarkToolchainInfo {
-                    marker: marker.into(),
+                let mut fields = names
+                    .iter()
+                    .map(|(name, value)| (CompactString::new(name.as_str()), *value))
+                    .collect::<SmallMap<_, _>>();
+                fields.sort_keys();
+                let (names, values): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
+                Ok(eval.heap().alloc_complex(StarlarkToolchainInfo {
+                    names: names.into(),
+                    values,
                 }))
             }
             _ => Err(starlark::Error::new_other(anyhow::anyhow!(
@@ -1046,6 +1666,16 @@ mod tests {
         Ok((files.is_some(), executable.is_some()))
     }
 
+    fn evaluate_module(source: &str) -> Result<starlark::environment::FrozenModule, String> {
+        let ast = AstModule::parse("depset_test.bzl", source.to_owned(), &Dialect::Standard)
+            .map_err(|error| error.to_string())?;
+        let module = Module::new();
+        Evaluator::new(&module)
+            .eval_module(ast, &loading_globals())
+            .map_err(|error| error.to_string())?;
+        module.freeze().map_err(|error| format!("{error:?}"))
+    }
+
     #[test]
     fn default_info_omitted_and_none_arguments_are_equivalent() {
         assert_eq!(evaluate("result = DefaultInfo()").unwrap(), (false, false));
@@ -1062,5 +1692,25 @@ mod tests {
             error.contains("only supports optional named arguments"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn depset_sequences_positional_order_and_empty_interning_share_one_constructor() {
+        let module = evaluate_module("A=depset()\nB=depset(direct=())\nP=depset((), 'postorder')\nQ=depset(direct=[], order='postorder')\nCHILD=depset((1,), 'postorder')\nVALUES=depset((2,), 'postorder', transitive=(CHILD,)).to_list()\n").unwrap();
+        let a = module.get("A").unwrap();
+        let b = module.get("B").unwrap();
+        let p = module.get("P").unwrap();
+        let q = module.get("Q").unwrap();
+        assert!(a.value().ptr_eq(b.value()));
+        assert!(p.value().ptr_eq(q.value()));
+        assert!(!a.value().ptr_eq(p.value()));
+        assert_eq!(module.get("VALUES").unwrap().value().to_string(), "[1, 2]");
+
+        for source in [
+            "X = depset([], 'postorder', order = 'postorder')",
+            "X = depset([], 'postorder', [])",
+        ] {
+            assert!(evaluate_module(source).is_err(), "{source}");
+        }
     }
 }

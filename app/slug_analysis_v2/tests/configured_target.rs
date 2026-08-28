@@ -36,14 +36,17 @@ use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
+use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::ParamFile;
 use slug_build_api_v2::ParamFileFormat;
 use slug_build_api_v2::ProviderCollection;
+use slug_build_api_v2::ProviderId;
+use slug_build_api_v2::ProviderIdentity;
+use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
-use slug_build_api_v2::UserProvider;
 use slug_configuration_v2::SlugConfiguration;
 use slug_configuration_v2::native::host::AutoCpuToken;
 use slug_configuration_v2::native::host::HostConversionInputs;
@@ -371,12 +374,13 @@ fn configured_edges_preserve_transition_convergence_order_and_fixed_bits() {
 
 #[test]
 fn configured_node_result_keeps_provider_collection_outputs_and_diagnostics() {
-    let mut fields = BTreeMap::new();
-    fields.insert("value".to_owned(), "custom".to_owned());
     let files = Depset::from_direct(DepsetOrder::Default, vec!["pkg/out.txt".to_owned()]).unwrap();
     let providers = ProviderCollection::new(vec![
         ProviderValue::DefaultInfo(DefaultInfo::from_files(files)),
-        ProviderValue::User(UserProvider::new("MyInfo", fields).unwrap()),
+        ProviderValue::Occurrence(ProviderOccurrence::new(
+            ProviderIdentity::user(ProviderId::unqualified("MyInfo").unwrap()),
+            [("value", AnalysisValue::string("custom"))],
+        )),
     ])
     .unwrap();
 

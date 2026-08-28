@@ -42,6 +42,7 @@ use crate::starlark_complex_value;
 use crate::typing::Ty;
 use crate::typing::TyStruct;
 use crate::util::arc_str::ArcStr;
+use crate::values::Demand;
 use crate::values::FrozenStringValue;
 use crate::values::FrozenValue;
 use crate::values::Heap;
@@ -53,7 +54,87 @@ use crate::values::ValueError;
 use crate::values::ValueLike;
 use crate::values::comparison::compare_small_map;
 use crate::values::comparison::equals_small_map;
+use crate::values::dict::DictRef;
+use crate::values::list::FrozenListRef;
 use crate::values::structs::unordered_hasher::UnorderedHasher;
+use crate::values::tuple::TupleRef;
+
+/// Doc-hidden capability for values that participate in Bazel-compatible
+/// struct/provider immutability and total structural hashing.
+#[doc(hidden)]
+pub trait StarlarkStructuralValue {
+    fn is_structurally_immutable(&self) -> bool;
+    fn write_structural_hash(&self, hasher: &mut StarlarkHasher) -> crate::Result<()>;
+}
+
+unsafe impl<'v> ProvidesStaticType<'v> for &'v dyn StarlarkStructuralValue {
+    type StaticType = &'static dyn StarlarkStructuralValue;
+}
+
+#[doc(hidden)]
+pub fn starlark_structural_is_immutable(value: Value<'_>) -> bool {
+    if let Some(value) = value.request_value::<&dyn StarlarkStructuralValue>() {
+        return value.is_structurally_immutable();
+    }
+    if FrozenListRef::from_value(value).is_some()
+        || value
+            .unpack_frozen()
+            .and_then(crate::values::dict::FrozenDictRef::from_frozen_value)
+            .is_some()
+    {
+        return true;
+    }
+    if let Some(tuple) = TupleRef::from_value(value) {
+        return tuple.iter().all(starlark_structural_is_immutable);
+    }
+    value.write_hash(&mut StarlarkHasher::new()).is_ok()
+}
+
+/// Hash a value through Bazel's struct/provider frozen-container barrier.
+#[doc(hidden)]
+pub fn write_starlark_structural_hash(
+    value: Value<'_>,
+    hasher: &mut StarlarkHasher,
+) -> crate::Result<()> {
+    if let Some(value) = value.request_value::<&dyn StarlarkStructuralValue>() {
+        return value.write_structural_hash(hasher);
+    }
+    if let Some(list) = FrozenListRef::from_value(value) {
+        "list".hash(hasher);
+        list.len().hash(hasher);
+        for value in list.iter() {
+            write_starlark_structural_hash(value.to_value(), hasher)?;
+        }
+        return Ok(());
+    }
+    if value.unpack_frozen().is_some() {
+        if let Some(dict) = DictRef::from_value(value) {
+            "dict".hash(hasher);
+            dict.len().hash(hasher);
+            let mut entries = Vec::with_capacity(dict.len());
+            for (key, value) in dict.iter() {
+                let mut entry = StarlarkHasher::new();
+                write_starlark_structural_hash(key, &mut entry)?;
+                write_starlark_structural_hash(value, &mut entry)?;
+                entries.push(entry.finish());
+            }
+            entries.sort_unstable();
+            for entry in entries {
+                entry.hash(hasher);
+            }
+            return Ok(());
+        }
+    }
+    if let Some(tuple) = TupleRef::from_value(value) {
+        "tuple".hash(hasher);
+        tuple.len().hash(hasher);
+        for value in tuple.iter() {
+            write_starlark_structural_hash(value, hasher)?;
+        }
+        return Ok(());
+    }
+    value.write_hash(hasher)
+}
 
 impl<'v, V: ValueLike<'v>> StructGen<'v, V> {
     /// The result of calling `type()` on a struct.
@@ -157,22 +238,16 @@ where
     }
 
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> crate::Result<()> {
-        // Must use unordered hash because equality is unordered,
-        // and `a = b  =>  hash(a) = hash(b)`.
-        let mut unordered_hasher = UnorderedHasher::new();
-
-        for (k, v) in self.fields.iter_hashed() {
-            // Should hash key and value together, so two structs
-            // `a=1 b=2` and `a=2 b=1` would produce different hashes.
-            let mut entry_hasher = StarlarkHasher::new();
-            k.hash().hash(&mut entry_hasher);
-            v.write_hash(&mut entry_hasher)?;
-            unordered_hasher.write_hash(entry_hasher.finish());
+        if !self.is_structurally_immutable() {
+            return Err(crate::Error::new_other(anyhow::anyhow!(
+                "unhashable type: struct"
+            )));
         }
+        self.write_structural_hash(hasher)
+    }
 
-        hasher.write_u64(unordered_hasher.finish());
-
-        Ok(())
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn StarlarkStructuralValue>(self);
     }
 
     fn dir_attr(&self) -> Vec<String> {
@@ -194,6 +269,33 @@ where
 
     fn typechecker_ty(&self) -> Option<Ty> {
         Some(self.self_ty())
+    }
+}
+
+impl<'v, V: ValueLike<'v>> StarlarkStructuralValue for StructGen<'v, V> {
+    fn is_structurally_immutable(&self) -> bool {
+        self.fields
+            .values()
+            .all(|value| starlark_structural_is_immutable(value.to_value()))
+    }
+
+    fn write_structural_hash(&self, hasher: &mut StarlarkHasher) -> crate::Result<()> {
+        // Must use unordered hash because equality is unordered,
+        // and `a = b  =>  hash(a) = hash(b)`.
+        let mut unordered_hasher = UnorderedHasher::new();
+
+        for (k, v) in self.fields.iter_hashed() {
+            // Should hash key and value together, so two structs
+            // `a=1 b=2` and `a=2 b=1` would produce different hashes.
+            let mut entry_hasher = StarlarkHasher::new();
+            k.hash().hash(&mut entry_hasher);
+            write_starlark_structural_hash(v.to_value(), &mut entry_hasher)?;
+            unordered_hasher.write_hash(entry_hasher.finish());
+        }
+
+        hasher.write_u64(unordered_hasher.finish());
+
+        Ok(())
     }
 }
 
