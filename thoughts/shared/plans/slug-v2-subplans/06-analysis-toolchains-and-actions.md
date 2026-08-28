@@ -20830,3 +20830,43 @@ retention, a global provider store/interner, flattened depsets, lossy numeric or
 configured identity, missing publication equality, a per-builtin payload
 shape, parser/ruleset control flow, Zabel authority, or a second material
 contract correction after implementation starts.
+
+#### Recursive provider-value implementation adapter REPLAN; R2 selected (2026-08-28)
+
+The first implementation candidate preserves the accepted retained Arc graph,
+structural configured-target payload, two equality domains, dictionary order
+and deep depset publication comparison. Terminal review rejects only its
+evaluator adapter, but the miss is architectural: fresh providers,
+`ToolchainInfo` and depsets use different classes from rematerialized values;
+dependency depsets flatten eagerly and cannot compose transitively; validation
+is deferred; and configured targets hide typed/builtin providers. Per the
+correction limit, no candidate Rust is accepted or committed.
+
+Run only
+`WP-4-5-7A-recursive-analysis-evaluator-adapter-implementation-r2`. Loading is
+the natural owner of the one fresh/frozen/rematerialized evaluator class for
+each provider/depset family; analysis owns only heap-independent conversion and
+target/artifact views. Native `AllocStruct` supplies the one struct class, with
+a bounded vendored structural-hash correction for Bazel's frozen-container
+field exception. Depsets retain an opaque process-local occurrence token across
+lowering, compose the shared DAG without flattening, validate at construction
+and traverse only in `to_list()`. Configured targets authenticate every
+admitted callable identity and phase-materialize every already-retained typed
+provider variant without adding a DICE payload.
+
+The retained value kinds, complete configuration identity and publication
+equality from `5ce967d55` do not change. Buck2 compact maps/Arc/Dupe/Allocative
+remain leaf reuse. Clean Zabel `0795445f...` supplies concept-only evidence for
+canonical shared struct/provider classes, authoritative direct/rematerialized
+provider identity and external-reference depset DAGs; its layouts, ordinals,
+stores and hashes remain excluded. Bazel 9.2 alone owns compatibility, BCR
+Starlark owns `cc_internal`, and `cc_common` remains a generic host-ABI client.
+Independent architecture pre-review found that the generic build-api depset
+core, not the analysis wrapper, must also be corrected: pinned Bazel requires
+mixed-order topological `[3, 5, 6, 4, 2]` traversal and increments depth for two
+distinct depth-one children while eliminating empty/repeated/sole-child nodes.
+R2 therefore admits that sole shared owner and its regressions. It also deletes
+the marker-era `AnalysisToolchainInfo` value class in favor of the shared
+loading class and proves frozen-list plus frozen-dictionary structural-hash
+barriers containing `ToolchainInfo` without weakening direct/tuple rejection.
+Independent architecture review is required before resuming Rust.
