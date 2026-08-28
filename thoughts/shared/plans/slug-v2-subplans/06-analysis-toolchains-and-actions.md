@@ -20102,3 +20102,119 @@ query-only semantic store, flattened target-settings selector, text digest as
 configuration identity, raw command input inside the MODULE key, provider heap
 retention, per-builtin field structs, a bootstrap-only rule path, Rust
 `cc_internal`/ruleset control flow, Zabel authority, or a lock across DICE.
+
+### Typed build-setting and configured-condition architecture accepted (2026-08-27)
+
+Commit `d9df71392` completes category 1 above. The category-2 audit corrects
+two underspecified points in the earlier architecture before Rust begins.
+
+First, Bazel 9.2 `StarlarkConfig` defines five, not four, Starlark
+build-setting kinds: arbitrary-precision integer, Boolean, string,
+`string_list` and `string_set`. String settings may allow multiple values;
+list/set settings may be repeatable only when they are flags. One shared
+rule-level loading `BuildSettingDefinition` retains kind and
+flag/multiple/repeatable shape. A target-level declaration view combines it
+with the invocation's type-correct heap-independent default and magic `scope`
+observation. `config.string_set` joins the existing constructors through that
+owner. No build-setting kind gets a separate configured representation or
+analysis path. Bazel keeps integer declaration defaults in the signed 32-bit
+attribute range while command/transition overrides remain arbitrary-precision;
+the shared configured value type preserves that asymmetry without narrowing
+overrides or widening defaults.
+
+Bazel retains scope beside effective Starlark options and includes it in
+configuration identity. The target's ordinary attribute row remains its only
+loading owner: an omitted or absent string-typed `scope` means internal
+`DEFAULT` even if the rule schema has an ordinary `"universal"` default, while
+an explicitly set literal must be `universal`, `target` or `project`. A derived
+accessor validates that magic observation; configurable or wrong-typed forms
+fail closed. Do not add a second retained declaration or scope store.
+
+Second, configuration identity carries only typed effective overrides that
+differ from their declarations' defaults. Replace the singleton
+`RootStringSettingValue` with one sorted canonical-label-keyed immutable map.
+Each entry carries a kind tag, resolved scope and an arbitrary integer,
+Boolean, compact string, ordered string sequence or sorted unique string set.
+Absence selects the loaded declaration default; zero, false, empty
+string/list/set remain real typed values. Default-equal command/transition
+values remove their row and scope.
+Declaration defaults never get copied into configuration identity.
+For `allow_multiple` string settings, the scalar declaration default is
+interpreted as a singleton effective list for context access and row elision.
+
+Labels, kinds, scopes and values participate structurally in Slug configuration
+equality, hash, canonical bytes, display projection, exec projection and DICE
+invalidation. Keep one scoped-option map, not parallel value/scope maps.
+`target` scope is filtered and `universal` is carried into exec; `DEFAULT`
+follows the existing native exec-propagation policy, failing closed on a
+nondefault propagation option until its converter is admitted. `project`
+scope fails closed until its `PROJECT.scl` boundary owner exists. Bump the
+Slug-native grammar version and delete the singleton API in one owning
+migration; the prototype needs no shim. Preserve separate
+semantic configuration, display, Bazel checksum, ActionKey and REAPI/CAS
+domains. Use existing `num-bigint`, `Arc`, `CompactString`, canonical labels,
+`Dupe` and `Allocative`; retain no evaluator value, parallel map or text hash.
+
+Loading also replaces the `values`-only config-setting kind with one semantic
+declaration for canonically normalized `values`, `define_values`, canonical
+`flag_values` and ordered canonical `constraint_values`, while deriving the
+native RuleClass/query row. Flag and constraint labels become ordinary package
+dependencies. Wrong types and canonical duplicate keys fail before
+publication; an all-empty declaration loads and becomes a configured-condition
+error before matching.
+
+A configured build-setting target reads its override by canonical label and
+kind or uses its declaration default, then supplies that typed value to
+`ctx.build_setting_value`. This builtin context field stays separate from the
+ordinary user providers returned by the implementation. Transition outputs
+load and authenticate the referenced definitions and resolve scope before
+producing child configured keys; default-equal outputs remove rows/scopes and
+unrelated rows survive.
+Real command flag text and occurrence precedence remain category 3.
+
+One analysis DICE condition key, identified by workspace and fully configured
+canonical config-setting label, owns match/no-match/error. It demands the
+semantic predicate and referenced build-setting/native/constraint facts.
+`flag_values` converts expected text through the referenced setting kind and
+compares against override-or-default typed values. Native `values` and
+`define_values` reuse the existing native option metadata/converters.
+Constraint criteria require category 4's configured target-platform fact and
+fail closed until it exists. Alias keys, feature flags, flag aliases, groups
+and label-valued settings stay deferred to named owners.
+
+One pure recursive configured-value resolver consumes condition results for
+the existing `$config_dependencies` keys and resolves every admitted
+`CoercedAttributeValue` selector/concatenation. It owns default-only fallback,
+equal-value multiple matches, direct-config-setting specialization and
+ambiguity. Selector keys never become branch-value dependencies and map order
+never chooses a winner. A configured-target preparation owner batches each
+condition once and reuses the results for ordinary attributes. Native
+`toolchain.target_settings` first resolves its configurable label-list
+expression with the same resolver, then demands every resulting config-setting
+through the same condition owner and requires each to match.
+
+Run category 2 as five bounded packets: complete loading declarations; migrate
+the typed scoped-override map and exec projection; generalize configured
+build-setting/transition values;
+add direct native/define/flag condition matching; then add batched condition
+preparation plus shared selector resolution. Only after all five are accepted
+may category 3 command overlays begin. A split may become smaller after
+preflight but may not introduce another setting value, matcher or selector
+resolver.
+
+Pinned Bazel 9.2 `StarlarkConfig`, `BuildSetting`,
+`CoreOptionConverters.BUILD_SETTING_CONVERTERS`, `ConfigSetting`,
+`ConfigSettingTest`, `ConfigStringSetTest` and configurable-attribute tests are
+authority. Clean Zabel `0795445f…` supports only the separation between
+loading declarations, canonical Starlark options, typed condition inputs and
+configured matcher. Copy no Zig representation or claim.
+
+Activate only the zero-Rust
+`WP-4-5-7A-typed-build-setting-condition-architecture` review. STOP for copied
+defaults in configuration, i32 override narrowing or widened integer defaults,
+orderful set equality,
+text-only typed values, missing scope identity, a parallel scope map, a second
+value map/matcher/resolver/converter, flattened selectors, evaluator-heap
+retention, command or platform/toolchain selection,
+provider payload work, Rust BCR rule control flow, Zabel authority, or a lock
+across DICE.
