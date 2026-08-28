@@ -1,19 +1,60 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-provider-independent-configured-toolchain-selection`
+Packet: `WP-4-5-7A-provider-independent-configured-toolchain-selection-r2`
 
 Milestone: M7A provider-independent configured eligibility and selection,
 feeding ordinary M8 Stage 10.3 analysis.
 
 Base: `c8064b106`; commits through `76980a0b3` changed plans only.
 
-Design: commit `a2dbdb553` freezes this packet; independent terminal Sol
-review returned `ACCEPT`.
+Design: commit `a2dbdb553` froze the original nine-file packet. Downstream
+validation forced the bounded R2 authority correction below; independent Sol
+design review returns `ACCEPT` and implementation may resume within R2.
 
 Result: implement category 4 of the frozen M7A toolchain sequence as one
 provider-free configured-selection owner, then cut the configured rule path
 over to its selected execution platform while retaining the old marker payload
 only as a post-selection single-type bridge.
+
+## R2 downstream-proof authority correction
+
+The original implementation candidate passes its focused owner proofs, but
+full `slug_core_v2` validation reports 30 failures versus the two documented
+inherited core baselines. At least 28 new failures are the required consequence
+of the exact zero-type contract: ordinary configured rules now materialize the
+selected registered/host execution platform, retain its candidate-platform
+topology and replay the newly reached MODULE/platform event producers.
+
+Independent terminal Sol review returns `REPLAN`. Restoring the former core
+behavior would violate the exact contract below, while the original allowlist
+forbids the test fixture and expected-topology changes required by its own
+direct-dependent gate. R2 preserves every semantic owner, compatibility class,
+production cap and generic implementation boundary of the original packet. It
+adds only:
+
+- the `#[cfg(test)]` harness in core `runtime/dice.rs`, to install a hermetic
+  minimal command-overridden `bazel_tools` containing a direct host platform
+  for configured build/cquery fixtures without changing production's verbatim
+  builtin or default host label;
+- build and cquery proof expectations for the newly visible candidate-platform
+  nodes/edges and child-owned MODULE/platform events; and
+- focused proof that zero-type public action contexts select the test host
+  through the same generic resolution owner, with warm replay and A/B/A
+  behavior unchanged; and
+- the exact exec-scope correction demonstrated by pinned Bazel 9.2
+  `BuildConfigurationValueTest.starlarkFlagExecScopes`: default, universal and
+  project-scoped Starlark flags survive exec projection while target-scoped
+  flags are removed. Correct the existing configuration projection/regression
+  only; add no owner or representation.
+
+Do not edit core production behavior. The test-only override is fixture
+provenance, not a semantic fallback: it exists because these unit tests provide
+no registry/materializer capability for the real `@platforms` dependency. Its
+deletion condition is a core harness that supplies the complete verbatim
+builtin/BCR dependency graph hermetically; category 4 owns the fixture until
+then. A regression must continue to prove that production configuration
+defaults to `@@bazel_tools//tools:host_platform` and that the local override is
+installed only by the test helper.
 
 ## Accepted prerequisite and live audit
 
@@ -207,17 +248,23 @@ All baselines are the live `c8064b106` blobs:
 | `app/slug_analysis_v2/src/lib.rs` | `9a8e4bacb9c99d3a430602fa3282cf7a8249d02e` / 83 | +20 |
 | `app/slug_analysis_v2/tests/starlark_rule.rs` | `e53ead56097cd882c1ccc48f6a6a7afaef7275f9` / 6,602 | +900 |
 | `app/slug_analysis_v2/tests/root_analysis.rs` | `afab443f8ae51a78a38926cfdcfdea3796f4f797` / 1,204 | +300 |
+| `app/slug_core_v2/src/runtime/dice.rs` | `6ad6f61973f51dd3cbf94a9c0c01e257c231b1a0` / 12,010 | +300, test-only |
+| `app/slug_core_v2/src/runtime/tests/build_command_tests.rs` | `8f6eb8444539fd2a6b3efb5ff8233e5444e40ba8` / 4,056 | +250 |
+| `app/slug_core_v2/src/runtime/tests/cquery_command_tests.rs` | `749b1703c5ce6b8c8af909104f7b88495ebf5cb3` / 1,082 | +300 |
 
-Production additions are capped at 1,650 physical Rust lines, proof additions
-at 1,255, and total additions at 2,905. No new non-plan file is allowed. The
+Production additions remain capped at 1,650 physical Rust lines, proof
+additions are capped at 2,105, and total additions at 3,755. No new non-plan
+file is allowed. The
 existing large `dice.rs` remains cohesive because the new key reuses its
 private configured-package, condition, platform, alias and rule-driver
 helpers; exporting those internals into a new module would widen the ownership
 surface and cause more churn.
 
-No file beyond this table and writable plans/ledgers may change. No Cargo/BUILD,
-configuration/core/CLI/server, registration-expansion, Bzlmod/repository,
-fixture/asset, lockfile, oracle or generated-file change is authorized.
+No file beyond this table and writable plans/ledgers may change. Core
+`runtime/dice.rs` authority is confined to its `#[cfg(test)]` module; no core
+production owner or public API may change. No Cargo/BUILD, CLI/server,
+registration-expansion, Bzlmod/repository, fixture/asset, lockfile, oracle or
+generated-file change is authorized.
 
 ## Proof matrix
 
@@ -250,9 +297,13 @@ Run focused loading/analysis proofs; full `slug_loading_v2` and
 `slug_analysis_v2` suites serially; configuration/query/Bzlmod and core direct
 dependents; rebuild `slug_cli_v2`; rustfmt; `git diff --check`; source/blob/
 line/cap and packet/canonical audits; and `scripts/v2_archive_status.sh`.
-Report the two independently reproduced core baselines and three tracked-
-thoughts archive baseline distinctly. Completion requires independent Sol
-terminal review returning `ACCEPT`.
+Full core may reproduce only its two independently documented inherited
+failures—workspace-directory Lstat drift after lockfile publication and the
+stale external-query event replay expectation—with every selection-related
+regression closed.
+Report those two core baselines and the three tracked-thoughts archive baseline
+distinctly. Completion requires independent Sol terminal review returning
+`ACCEPT`.
 
 STOP and `REPLAN` for provider/evaluator data in the resolution value;
 implementation analysis inside selection; raw source/MODULE/display-label
@@ -262,3 +313,9 @@ platform alias first-wins; a selection error outranking outer/Need; lost
 observations; ruleset/`cc_common` specialization; Zabel authority; an
 unallowlisted file; cap breach; or any material implementation correction not
 already bounded above.
+
+R2 additionally stops on any production core edit, a test helper that changes
+ordinary command policy outside configured build/cquery fixtures, replacement
+of the verbatim builtin in production, suppression of candidate-platform
+topology/events merely to restore old expectations, or a third newly failing
+core baseline.

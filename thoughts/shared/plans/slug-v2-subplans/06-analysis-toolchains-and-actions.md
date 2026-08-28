@@ -20657,3 +20657,42 @@ their verified `c2ec8481e` blobs: four projection-initializer lines in
 in `host_external_package_boundary/tests.rs`. This changes no production
 owner, cap total, compatibility class or proof claim; independent review must
 accept the bookkeeping correction before implementation acceptance.
+
+#### Configured-selection downstream-proof authority REPLAN (2026-08-28)
+
+The provider-independent category-4 candidate reaches the frozen exact zero-
+type behavior: every structurally configured rule selects the first registered
+actual execution platform or appended host fallback, uses that actual platform
+for its action context and retains the existing candidate topology. Full core
+therefore reaches platform/Bzlmod work and topology/event rows absent from its
+old configured fixtures. It reports 30 failures versus the two documented
+inherited baselines.
+
+Independent Sol review returns `REPLAN`. The original packet simultaneously
+requires this behavior and core validation while forbidding all core proof
+files. No nine-file correction can preserve Bazel parity and old core output.
+Activate only
+`WP-4-5-7A-provider-independent-configured-toolchain-selection-r2`: retain the
+entire semantic candidate and add the exact three-file core test authority in
+the current manifest. Core `runtime/dice.rs` changes are `#[cfg(test)]` only and
+install a hermetic command-overridden minimal `bazel_tools` direct host
+platform for configured build/cquery fixtures. Build/cquery proofs admit the
+required candidate nodes/edges and child-owned event reachability. Production
+continues to use verbatim `@bazel_tools`, its BCR mapping and the default host
+label; no core production behavior or public API changes.
+
+Pinned Bazel 9.2 remains sole behavior authority. Clean Zabel
+`0795445f…` remains peer producer-ownership/compact-row guidance only. BCR
+Starlark still owns every rule/control path including `cc_internal`, and
+`cc_common` remains a generic host/provider-ABI client rather than a Rust C++
+rule engine. Independent Sol design review returns `ACCEPT`; resume only the
+bounded R2 implementation.
+
+The live category-4 candidate also disproves one prerequisite assumption.
+Pinned Bazel 9.2 `BuildConfigurationValueTest.starlarkFlagExecScopes` requires
+default, universal and project-scoped Starlark flags to survive the exec
+transition while target-scoped flags are removed. Correct only the existing
+configuration projection and its focused regression; this is an exact current
+semantic delta, not a retroactive claim about `84bda1971`. It creates no new
+configuration owner or representation and remains inside the original
+configuration file/cap authority.
