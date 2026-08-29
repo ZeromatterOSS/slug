@@ -85,13 +85,121 @@ const CATALOG: &[CatalogEntry] = &[
         path: "MODULE.bazel",
         bytes: include_bytes!("../builtin/bazel_tools/MODULE.bazel"),
         expected_sha256: "a51e647c77be3c7dcb861131e339f2b65301bb572d2a9ac3d7eef30ca5b8a523",
-        executable: true,
+        executable: false,
     },
     CatalogEntry {
         path: "src/conditions/BUILD",
         bytes: include_bytes!("../builtin/bazel_tools/src/conditions/BUILD"),
         expected_sha256: "7a2d956c2c38092b93276b6cb11492f0ef7ce401c879d68a57e40b45f9163f16",
-        executable: true,
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/BUILD"),
+        expected_sha256: "e1818f24f7603cf65cb8a85f7e41a80c82e5bdd805fe652f71d435c447af0e36",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/bash_launcher.cc",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/bash_launcher.cc"),
+        expected_sha256: "fdbd84b0563defe83f73ebf0eeda648cca47b560c6cb7149f681a01030242bf5",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/bash_launcher.h",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/bash_launcher.h"),
+        expected_sha256: "124b479382848c8d3ba41e986420e2487cd2d16e4c77c4256e133ba1e5d640f8",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/dummy.cc",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/dummy.cc"),
+        expected_sha256: "bd0b0d9441b8f60d1cd52a6f96db34da57210014491d7adc15af788e823c0567",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/java_launcher.cc",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/java_launcher.cc"),
+        expected_sha256: "23a8caa29f750241e239f34273a2673b5a1176587f696b71a53f7fdd780ae07e",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/java_launcher.h",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/java_launcher.h"),
+        expected_sha256: "9cac494d70d5c320305c1f20b8de8144101d1f2bf72b6cf3c751219e69a7e3dd",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/launcher.cc",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/launcher.cc"),
+        expected_sha256: "2643cc9044ef1cf2458127033b8283e6534ff09f8f97a869d82e1fb5613f7c7b",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/launcher.h",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/launcher.h"),
+        expected_sha256: "e052389698c0862fee610769945f749a70a2c6da08cbfe027383c25d8fd8acc8",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/launcher_main.cc",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/launcher_main.cc"),
+        expected_sha256: "09c7e588471adc7bf6047fcc339c175a538e2c267ebaadb053152978aa733d98",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/launcher_maker.cc",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/launcher_maker.cc"),
+        expected_sha256: "622320eddc3029ad7efc379edb8e4642a4a9539c73c7818dcbccd3f171b44f0f",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/launcher_maker_test.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/launcher_maker_test.bzl"),
+        expected_sha256: "95a2448e9b703697d8dbbd4e22bb6f10961d58def53ff4992f6766f39ef54de2",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/launcher_maker_test.cc",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/launcher_maker_test.cc"),
+        expected_sha256: "f462c72a1a1afcaa1cf1ecfcc96d3280bd31638bcbb94bef7f74eda88ada0d1b",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/python_launcher.cc",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/python_launcher.cc"),
+        expected_sha256: "1f2695479a7051c89df2539893b25e5092682f62d76b5d7864a4c7b93251d3c3",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/python_launcher.h",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/python_launcher.h"),
+        expected_sha256: "961a88392eff53fe40336a41bd2025b20b62e33c2f3f57b005febb8d5750f0d7",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/util/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/util/BUILD"),
+        expected_sha256: "d63b7a3415138b146544bd8668c85167f4c0fca07189fce6473cf9a9f0f80655",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/win_manifest.xml",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/win_manifest.xml"),
+        expected_sha256: "cc2f6dfeaac5395643f8056c098d2b4fd82c1352d35fcf77c0229d5d3aee7cd9",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/win_resources.rc",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/win_resources.rc"),
+        expected_sha256: "063baa5b722fde9a7ac1d086a02994286950c490acfd5119bc2eb78f56c5acc2",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "src/tools/launcher/win_rules.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/src/tools/launcher/win_rules.bzl"),
+        expected_sha256: "04e42889b0b7a9f12685def9e12bfa182aca513ffcc5707d1da14dd507a9e186",
+        executable: false,
     },
     CatalogEntry {
         path: "tools/BUILD",
@@ -106,16 +214,64 @@ const CATALOG: &[CatalogEntry] = &[
         executable: false,
     },
     CatalogEntry {
+        path: "tools/cpp/cc_configure.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/cc_configure.bzl"),
+        expected_sha256: "f1264cd4a6552eba7368729212aba64031ecd4330923d2bef61a20791ee2b4c5",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/cpp/windows_cc_configure.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/windows_cc_configure.bzl"),
+        expected_sha256: "7d1b13bdc2b1f5b8cbfded820664fa7265087ac58909a7df33dad6878ace0bf3",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/launcher/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/launcher/BUILD"),
+        expected_sha256: "aa1b943956b6a7c3044f73583f5bc972bfc658607f7a3b745d51c7e7d016aab7",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/launcher/empty.sh",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/launcher/empty.sh"),
+        expected_sha256: "f3840c1e7a239cca9e5b2967c5e4a32e1c34c51a6f23f3cbafae08313e6ff55c",
+        executable: true,
+    },
+    CatalogEntry {
+        path: "tools/res/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/res/BUILD"),
+        expected_sha256: "bef477365d864eab46fcfe73c635bafd11a7300e4e47c158abe20d269e07e8ac",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/res/win_res.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/res/win_res.bzl"),
+        expected_sha256: "d78b202e5609bc322f99990897a8e5e01a44e645b0f4e1c19b4677a3ea1bc275",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/res/winsdk_configure.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/res/winsdk_configure.bzl"),
+        expected_sha256: "f6463d7e0a136ffff7e9099532f11f9fe7db91bd93e423b5e7101b104d035375",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/res/winsdk_toolchain.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/res/winsdk_toolchain.bzl"),
+        expected_sha256: "a19f04238ee0b76dcbaa7aed4d4356fa03db805b6cf7ace179bc358a4cd63938",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/test/BUILD",
         bytes: include_bytes!("../builtin/bazel_tools/tools/test/BUILD"),
         expected_sha256: "81db88f41f7a9a07af246a42cfa7a8b6e118012b4f41830aaee9ffe4a4a9ee17",
-        executable: true,
+        executable: false,
     },
     CatalogEntry {
         path: "tools/test/default_test_toolchain.bzl",
         bytes: include_bytes!("../builtin/bazel_tools/tools/test/default_test_toolchain.bzl"),
         expected_sha256: "c013158dde96f9b4699af24806fab64e4574e398fe94f612e25a16b1fa4f16f6",
-        executable: true,
+        executable: false,
     },
     CatalogEntry {
         path: "tools/test/dummy.sh",
@@ -147,15 +303,27 @@ fn frame(hasher: &mut Sha256, bytes: &[u8]) {
 }
 
 fn manifest_sha256(snapshot: BuiltinBazelToolsSnapshot) -> [u8; 32] {
+    manifest_sha256_for(
+        snapshot,
+        CATALOG
+            .iter()
+            .map(|entry| (entry.path, entry.bytes, entry.executable)),
+    )
+}
+
+fn manifest_sha256_for<'a>(
+    snapshot: BuiltinBazelToolsSnapshot,
+    entries: impl ExactSizeIterator<Item = (&'a str, &'a [u8], bool)>,
+) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(MANIFEST_DOMAIN);
     frame(&mut hasher, snapshot.tag().as_bytes());
-    hasher.update((CATALOG.len() as u64).to_be_bytes());
-    for entry in CATALOG {
-        frame(&mut hasher, entry.path.as_bytes());
-        hasher.update(file_sha256(entry.bytes));
-        hasher.update([u8::from(entry.executable)]);
-        hasher.update((entry.bytes.len() as u64).to_be_bytes());
+    hasher.update((entries.len() as u64).to_be_bytes());
+    for (path, bytes, executable) in entries {
+        frame(&mut hasher, path.as_bytes());
+        hasher.update(file_sha256(bytes));
+        hasher.update([u8::from(executable)]);
+        hasher.update((bytes.len() as u64).to_be_bytes());
     }
     hasher.finalize().into()
 }
@@ -652,8 +820,79 @@ mod tests {
             [
                 ("BUILD".to_owned(), PathDirectoryEntryKind::File),
                 ("build_defs.bzl".to_owned(), PathDirectoryEntryKind::File),
+                ("cpp".to_owned(), PathDirectoryEntryKind::Directory),
+                ("launcher".to_owned(), PathDirectoryEntryKind::Directory),
+                ("res".to_owned(), PathDirectoryEntryKind::Directory),
                 ("test".to_owned(), PathDirectoryEntryKind::Directory),
             ]
+        );
+        assert_eq!(
+            listing_rows("tools/cpp"),
+            [
+                ("cc_configure.bzl".to_owned(), PathDirectoryEntryKind::File,),
+                (
+                    "windows_cc_configure.bzl".to_owned(),
+                    PathDirectoryEntryKind::File,
+                ),
+            ]
+        );
+        assert_eq!(
+            listing_rows("tools/launcher"),
+            [
+                ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                ("empty.sh".to_owned(), PathDirectoryEntryKind::File),
+            ]
+        );
+        assert_eq!(
+            listing_rows("tools/res"),
+            [
+                ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                ("win_res.bzl".to_owned(), PathDirectoryEntryKind::File),
+                (
+                    "winsdk_configure.bzl".to_owned(),
+                    PathDirectoryEntryKind::File,
+                ),
+                (
+                    "winsdk_toolchain.bzl".to_owned(),
+                    PathDirectoryEntryKind::File,
+                ),
+            ]
+        );
+        assert_eq!(
+            listing_rows("src/tools/launcher"),
+            [
+                ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                ("bash_launcher.cc".to_owned(), PathDirectoryEntryKind::File,),
+                ("bash_launcher.h".to_owned(), PathDirectoryEntryKind::File,),
+                ("dummy.cc".to_owned(), PathDirectoryEntryKind::File),
+                ("java_launcher.cc".to_owned(), PathDirectoryEntryKind::File,),
+                ("java_launcher.h".to_owned(), PathDirectoryEntryKind::File,),
+                ("launcher.cc".to_owned(), PathDirectoryEntryKind::File),
+                ("launcher.h".to_owned(), PathDirectoryEntryKind::File),
+                ("launcher_main.cc".to_owned(), PathDirectoryEntryKind::File,),
+                ("launcher_maker.cc".to_owned(), PathDirectoryEntryKind::File,),
+                (
+                    "launcher_maker_test.bzl".to_owned(),
+                    PathDirectoryEntryKind::File,
+                ),
+                (
+                    "launcher_maker_test.cc".to_owned(),
+                    PathDirectoryEntryKind::File,
+                ),
+                (
+                    "python_launcher.cc".to_owned(),
+                    PathDirectoryEntryKind::File,
+                ),
+                ("python_launcher.h".to_owned(), PathDirectoryEntryKind::File,),
+                ("util".to_owned(), PathDirectoryEntryKind::Directory),
+                ("win_manifest.xml".to_owned(), PathDirectoryEntryKind::File,),
+                ("win_resources.rc".to_owned(), PathDirectoryEntryKind::File,),
+                ("win_rules.bzl".to_owned(), PathDirectoryEntryKind::File),
+            ]
+        );
+        assert_eq!(
+            listing_rows("src/tools/launcher/util"),
+            [("BUILD".to_owned(), PathDirectoryEntryKind::File)]
         );
         assert_eq!(
             listing_rows("tools/test"),
@@ -704,19 +943,57 @@ mod tests {
     }
 
     #[test]
+    fn manifest_identity_discriminates_bytes_and_executable_mode() {
+        let snapshot = BuiltinBazelToolsSnapshot::CURRENT;
+        let original = manifest_sha256(snapshot);
+        let changed_bytes = manifest_sha256_for(
+            snapshot,
+            CATALOG.iter().enumerate().map(|(index, entry)| {
+                (
+                    entry.path,
+                    if index == 0 {
+                        b"changed".as_slice()
+                    } else {
+                        entry.bytes
+                    },
+                    entry.executable,
+                )
+            }),
+        );
+        let changed_mode = manifest_sha256_for(
+            snapshot,
+            CATALOG.iter().enumerate().map(|(index, entry)| {
+                (
+                    entry.path,
+                    entry.bytes,
+                    if index == 0 {
+                        !entry.executable
+                    } else {
+                        entry.executable
+                    },
+                )
+            }),
+        );
+
+        assert_ne!(changed_bytes, original);
+        assert_ne!(changed_mode, original);
+        assert_ne!(changed_bytes, changed_mode);
+    }
+
+    #[test]
     fn builtin_bazel_tools_module_retains_the_complete_pinned_value() {
         let source = module_source();
         assert_eq!(
             hex::encode(source.sha256()),
             "a51e647c77be3c7dcb861131e339f2b65301bb572d2a9ac3d7eef30ca5b8a523"
         );
-        assert!(source.executable());
+        assert!(!source.executable());
 
         let value =
             evaluate_builtin_module_source(BuiltinBazelToolsSnapshot::CURRENT, &source).unwrap();
         assert_eq!(
             hex::encode(value.route_identity.manifest_sha256()),
-            "0b7a4da7823e336384fc633e3e2964f01d5711c0a2b1a919a124bf629f9c599d"
+            "f999235edbaf1c8c0a46c4ac8a1e370f8f1eb6ea122c23905dc34ee8890e3a0a"
         );
         assert_eq!(value.module_sha256, source.sha256());
         assert_eq!(

@@ -11,12 +11,102 @@ const FILES: &[(&str, &str, bool)] = &[
     (
         "MODULE.bazel",
         "a51e647c77be3c7dcb861131e339f2b65301bb572d2a9ac3d7eef30ca5b8a523",
-        true,
+        false,
     ),
     (
         "src/conditions/BUILD",
         "7a2d956c2c38092b93276b6cb11492f0ef7ce401c879d68a57e40b45f9163f16",
-        true,
+        false,
+    ),
+    (
+        "src/tools/launcher/BUILD",
+        "e1818f24f7603cf65cb8a85f7e41a80c82e5bdd805fe652f71d435c447af0e36",
+        false,
+    ),
+    (
+        "src/tools/launcher/bash_launcher.cc",
+        "fdbd84b0563defe83f73ebf0eeda648cca47b560c6cb7149f681a01030242bf5",
+        false,
+    ),
+    (
+        "src/tools/launcher/bash_launcher.h",
+        "124b479382848c8d3ba41e986420e2487cd2d16e4c77c4256e133ba1e5d640f8",
+        false,
+    ),
+    (
+        "src/tools/launcher/dummy.cc",
+        "bd0b0d9441b8f60d1cd52a6f96db34da57210014491d7adc15af788e823c0567",
+        false,
+    ),
+    (
+        "src/tools/launcher/java_launcher.cc",
+        "23a8caa29f750241e239f34273a2673b5a1176587f696b71a53f7fdd780ae07e",
+        false,
+    ),
+    (
+        "src/tools/launcher/java_launcher.h",
+        "9cac494d70d5c320305c1f20b8de8144101d1f2bf72b6cf3c751219e69a7e3dd",
+        false,
+    ),
+    (
+        "src/tools/launcher/launcher.cc",
+        "2643cc9044ef1cf2458127033b8283e6534ff09f8f97a869d82e1fb5613f7c7b",
+        false,
+    ),
+    (
+        "src/tools/launcher/launcher.h",
+        "e052389698c0862fee610769945f749a70a2c6da08cbfe027383c25d8fd8acc8",
+        false,
+    ),
+    (
+        "src/tools/launcher/launcher_main.cc",
+        "09c7e588471adc7bf6047fcc339c175a538e2c267ebaadb053152978aa733d98",
+        false,
+    ),
+    (
+        "src/tools/launcher/launcher_maker.cc",
+        "622320eddc3029ad7efc379edb8e4642a4a9539c73c7818dcbccd3f171b44f0f",
+        false,
+    ),
+    (
+        "src/tools/launcher/launcher_maker_test.bzl",
+        "95a2448e9b703697d8dbbd4e22bb6f10961d58def53ff4992f6766f39ef54de2",
+        false,
+    ),
+    (
+        "src/tools/launcher/launcher_maker_test.cc",
+        "f462c72a1a1afcaa1cf1ecfcc96d3280bd31638bcbb94bef7f74eda88ada0d1b",
+        false,
+    ),
+    (
+        "src/tools/launcher/python_launcher.cc",
+        "1f2695479a7051c89df2539893b25e5092682f62d76b5d7864a4c7b93251d3c3",
+        false,
+    ),
+    (
+        "src/tools/launcher/python_launcher.h",
+        "961a88392eff53fe40336a41bd2025b20b62e33c2f3f57b005febb8d5750f0d7",
+        false,
+    ),
+    (
+        "src/tools/launcher/util/BUILD",
+        "d63b7a3415138b146544bd8668c85167f4c0fca07189fce6473cf9a9f0f80655",
+        false,
+    ),
+    (
+        "src/tools/launcher/win_manifest.xml",
+        "cc2f6dfeaac5395643f8056c098d2b4fd82c1352d35fcf77c0229d5d3aee7cd9",
+        false,
+    ),
+    (
+        "src/tools/launcher/win_resources.rc",
+        "063baa5b722fde9a7ac1d086a02994286950c490acfd5119bc2eb78f56c5acc2",
+        false,
+    ),
+    (
+        "src/tools/launcher/win_rules.bzl",
+        "04e42889b0b7a9f12685def9e12bfa182aca513ffcc5707d1da14dd507a9e186",
+        false,
     ),
     (
         "tools/BUILD",
@@ -29,14 +119,54 @@ const FILES: &[(&str, &str, bool)] = &[
         false,
     ),
     (
+        "tools/cpp/cc_configure.bzl",
+        "f1264cd4a6552eba7368729212aba64031ecd4330923d2bef61a20791ee2b4c5",
+        false,
+    ),
+    (
+        "tools/cpp/windows_cc_configure.bzl",
+        "7d1b13bdc2b1f5b8cbfded820664fa7265087ac58909a7df33dad6878ace0bf3",
+        false,
+    ),
+    (
+        "tools/launcher/BUILD",
+        "aa1b943956b6a7c3044f73583f5bc972bfc658607f7a3b745d51c7e7d016aab7",
+        false,
+    ),
+    (
+        "tools/launcher/empty.sh",
+        "f3840c1e7a239cca9e5b2967c5e4a32e1c34c51a6f23f3cbafae08313e6ff55c",
+        true,
+    ),
+    (
+        "tools/res/BUILD",
+        "bef477365d864eab46fcfe73c635bafd11a7300e4e47c158abe20d269e07e8ac",
+        false,
+    ),
+    (
+        "tools/res/win_res.bzl",
+        "d78b202e5609bc322f99990897a8e5e01a44e645b0f4e1c19b4677a3ea1bc275",
+        false,
+    ),
+    (
+        "tools/res/winsdk_configure.bzl",
+        "f6463d7e0a136ffff7e9099532f11f9fe7db91bd93e423b5e7101b104d035375",
+        false,
+    ),
+    (
+        "tools/res/winsdk_toolchain.bzl",
+        "a19f04238ee0b76dcbaa7aed4d4356fa03db805b6cf7ace179bc358a4cd63938",
+        false,
+    ),
+    (
         "tools/test/BUILD",
         "81db88f41f7a9a07af246a42cfa7a8b6e118012b4f41830aaee9ffe4a4a9ee17",
-        true,
+        false,
     ),
     (
         "tools/test/default_test_toolchain.bzl",
         "c013158dde96f9b4699af24806fab64e4574e398fe94f612e25a16b1fa4f16f6",
-        true,
+        false,
     ),
     (
         "tools/test/dummy.sh",
@@ -129,7 +259,7 @@ async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions(
     assert_eq!(identity.snapshot(), BuiltinBazelToolsSnapshot::Bazel9_2);
     assert_eq!(
         hex::encode(identity.manifest_sha256()),
-        "0b7a4da7823e336384fc633e3e2964f01d5711c0a2b1a919a124bf629f9c599d"
+        "f999235edbaf1c8c0a46c4ac8a1e370f8f1eb6ea122c23905dc34ee8890e3a0a"
     );
 }
 

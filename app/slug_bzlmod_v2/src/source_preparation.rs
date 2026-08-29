@@ -9560,7 +9560,7 @@ mod tests {
             Sha256::digest(value.bytes()).as_slice()
         );
         assert!(!value.bytes().is_empty());
-        assert!(value.executable());
+        assert!(!value.executable());
         assert!(HostRepositorySourceObservationKey::equality(
             &tx.compute(&key).await.unwrap(),
             &outcome,
