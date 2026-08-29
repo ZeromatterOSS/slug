@@ -21293,3 +21293,14 @@ alone injects and loading alone consumes them. The composed core-lifecycle and
 loading-real-effect proof is frozen, system-generated diagnostics redact values
 without rewriting deliberate Starlark output, and terminal rereview is
 `ACCEPT`. Activate only the first frozen implementation successor.
+
+#### Effective repository Host-input architecture accepted; implementation active (2026-08-28)
+
+Commit `3dbd937a4` records R5 terminal `ACCEPT`. Activate only
+`WP-4-5-7A-effective-repository-host-input-implementation`: add the lower shared
+environment/platform InjectedKey ABI and typed environment Need, category-wide
+direct command parsing, one client capture, canonical daemon transport, and
+core-owned attempt/acceptance/restoration injection. Repository evaluation,
+context capabilities, winsdk realization, registration proof and selected
+configured analysis remain stopped. The current manifest owns exact blobs,
+caps, lifecycle/redaction proof and stop conditions.
