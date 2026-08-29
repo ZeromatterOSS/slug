@@ -20930,3 +20930,276 @@ review accepts the corrected exact implementation manifest, including one
 shared publication-equality state for the complete retained context and its
 parent DICE cutoff A/B/A proof. Rust may now proceed only within its allowlist
 and caps.
+
+#### Selected-context R2 exposes the built-in registered-toolchain closure (2026-08-28)
+
+The selected-context R2 corrections are locally sound. Actual-type
+canonicalization gives two requested aliases of one actual toolchain type the
+same `FrozenValue` pointer, the configured-target regression again compares
+the complete stable serialization and identity bytes, and the REAPI proof
+lawfully supplies the selected `platforms` module. The focused pointer and
+multi-alias tests pass. The REAPI proof then reaches the first real
+`@bazel_tools` module registration and stops at
+`NoBuildFile @@bazel_tools//tools/launcher`.
+
+This is a production prerequisite, not another selected-context correction.
+Pinned Bazel 9.2 `src/MODULE.tools` registers these patterns in order:
+
+| row | exact pattern | non-Windows expanded declarations | current first gap |
+| ---: | --- | --- | --- |
+| 1 | `//tools/launcher:all` | `2_source_launcher_maker_toolchain`, `2_source_launcher_toolchain`, `3_no_launcher_maker_toolchain`, `3_no_launcher_toolchain`, sorted by target name | built-in catalog has no `tools/launcher/BUILD` |
+| 2 | `//tools/test:all` | `default_test_toolchain`, `legacy_test_toolchain`, `legacy_test_toolchain_use_target_platform_for_tests`, sorted by target name | package BUILD exists, but its ordinary `@rules_shell//shell:sh_binary.bzl` BCR load must be realized |
+| 3 | `@local_config_winsdk//:all` | none: the repository rule writes an empty BUILD on non-Windows | canonical `use_repo_rule` execution, declared environment, host OS and `repository_ctx.os.name` are not owned |
+| 4 | `//tools/res:empty_rc_toolchain` | the named `empty_rc_toolchain` declaration | built-in catalog has no `tools/res/BUILD` or `winsdk_toolchain.bzl` |
+
+Rows 1, 2 and 4 resolve in mapping context `@@bazel_tools`; row 3's apparent
+repository maps through the selected direct-repository-rule usage to
+`@@bazel_tools+winsdk_configure+local_config_winsdk` (the no-collision
+canonical name). That generated identity is already retained by the selected
+mapping and generated-route owners; the missing work is definition loading,
+Host inputs and effect execution, not naming.
+
+`ModuleRegistrationExpansionKey` is already the correct loading-owned ordered
+pattern-expansion owner. It resolves each row with the selected module's
+canonical repository and mapping, loads `RepositoryPackageInventoryKey`,
+filters wildcard results to native `toolchain()` targets and sorts within a
+wildcard by target name. `ConfiguredToolchainResolutionKey` merges command
+then module registrations, recursively loads every native declaration
+reference, analyzes declaration/type identities, tests constraints and only
+then selects a declaration. It therefore loads the source-launcher package
+even when its Windows-constrained declarations cannot win on a non-Windows
+target. Filtering unrelated built-in rows would not be Bazel-compatible.
+
+The complete non-Windows load path is:
+
+```text
+selected bazel_tools MODULE and mapping
+  -> ModuleRegistrationExpansionKey, rows 1..4
+  -> exact embedded package or generated local_config_winsdk route
+  -> RepositoryPackageInventoryKey and ordinary .bzl load closure
+  -> ConfiguredToolchainResolutionKey declaration/reference packages
+  -> chosen user declaration
+  -> retained selected-context R2 implementation analysis under Exec
+```
+
+The built-in source route and mapping already have DICE identities derived
+from the exact catalog manifest and selected module graph. Normal `platforms`,
+`rules_shell` and `rules_cc` remain selected BCR repositories with their
+existing source observation/materialization owners. The generated repository
+route already authenticates its selected `use_repo_rule` call, owner ordinal,
+mapping and file-effect plan, but the current effect leaf accepts only root
+defining labels and only `repository_ctx.file`. It has no effective repository
+environment or host-OS input. `repository_rule()` also rejects nonempty
+`environ` and true `local`/`configure` instead of retaining their declaration
+metadata. These are separate generic repository-rule gaps; none belongs in
+configured analysis.
+
+##### Exact embedded file inventory
+
+`src/create_embedded_tools.py` is the packaging authority: `src/MODULE.tools`
+becomes `MODULE.bazel`, `BUILD.tools` wins over a sibling BUILD and becomes
+BUILD, `.bzl.tools` loses the suffix, archive paths are sorted, and source
+execute bits become archive mode 0755 versus 0644. The registration closure
+adds the following exact catalog groups. All unmarked files are mode 0644;
+`tools/launcher/empty.sh` is 0755.
+
+| embedded path | upstream path / SHA-256 |
+| --- | --- |
+| `tools/launcher/BUILD` | `tools/launcher/BUILD.tools` / `aa1b943956b6a7c3044f73583f5bc972bfc658607f7a3b745d51c7e7d016aab7` |
+| `tools/launcher/empty.sh` | same / `f3840c1e7a239cca9e5b2967c5e4a32e1c34c51a6f23f3cbafae08313e6ff55c` |
+| `tools/res/BUILD` | same / `bef477365d864eab46fcfe73c635bafd11a7300e4e47c158abe20d269e07e8ac` |
+| `tools/res/win_res.bzl` | same / `d78b202e5609bc322f99990897a8e5e01a44e645b0f4e1c19b4677a3ea1bc275` |
+| `tools/res/winsdk_configure.bzl` | same / `f6463d7e0a136ffff7e9099532f11f9fe7db91bd93e423b5e7101b104d035375` |
+| `tools/res/winsdk_toolchain.bzl` | same / `a19f04238ee0b76dcbaa7aed4d4356fa03db805b6cf7ace179bc358a4cd63938` |
+| `tools/cpp/cc_configure.bzl` | same / `f1264cd4a6552eba7368729212aba64031ecd4330923d2bef61a20791ee2b4c5` |
+| `tools/cpp/windows_cc_configure.bzl` | same / `7d1b13bdc2b1f5b8cbfded820664fa7265087ac58909a7df33dad6878ace0bf3` |
+Loading `//src/tools/launcher` executes a BUILD-level `glob(["**"])`; exact
+package publication therefore requires every direct source path plus the
+`util/BUILD` subpackage marker, even though incompatible implementation
+analysis is not selected. The frozen paths and hashes are:
+
+| path | SHA-256 |
+| --- | --- |
+| `src/tools/launcher/BUILD` | `e1818f24f7603cf65cb8a85f7e41a80c82e5bdd805fe652f71d435c447af0e36` |
+| `src/tools/launcher/launcher_maker_test.bzl` | `95a2448e9b703697d8dbbd4e22bb6f10961d58def53ff4992f6766f39ef54de2` |
+| `src/tools/launcher/win_rules.bzl` | `04e42889b0b7a9f12685def9e12bfa182aca513ffcc5707d1da14dd507a9e186` |
+| `src/tools/launcher/bash_launcher.cc` | `fdbd84b0563defe83f73ebf0eeda648cca47b560c6cb7149f681a01030242bf5` |
+| `src/tools/launcher/bash_launcher.h` | `124b479382848c8d3ba41e986420e2487cd2d16e4c77c4256e133ba1e5d640f8` |
+| `src/tools/launcher/dummy.cc` | `bd0b0d9441b8f60d1cd52a6f96db34da57210014491d7adc15af788e823c0567` |
+| `src/tools/launcher/java_launcher.cc` | `23a8caa29f750241e239f34273a2673b5a1176587f696b71a53f7fdd780ae07e` |
+| `src/tools/launcher/java_launcher.h` | `9cac494d70d5c320305c1f20b8de8144101d1f2bf72b6cf3c751219e69a7e3dd` |
+| `src/tools/launcher/launcher.cc` | `2643cc9044ef1cf2458127033b8283e6534ff09f8f97a869d82e1fb5613f7c7b` |
+| `src/tools/launcher/launcher.h` | `e052389698c0862fee610769945f749a70a2c6da08cbfe027383c25d8fd8acc8` |
+| `src/tools/launcher/launcher_main.cc` | `09c7e588471adc7bf6047fcc339c175a538e2c267ebaadb053152978aa733d98` |
+| `src/tools/launcher/launcher_maker.cc` | `622320eddc3029ad7efc379edb8e4642a4a9539c73c7818dcbccd3f171b44f0f` |
+| `src/tools/launcher/launcher_maker_test.cc` | `f462c72a1a1afcaa1cf1ecfcc96d3280bd31638bcbb94bef7f74eda88ada0d1b` |
+| `src/tools/launcher/python_launcher.cc` | `1f2695479a7051c89df2539893b25e5092682f62d76b5d7864a4c7b93251d3c3` |
+| `src/tools/launcher/python_launcher.h` | `961a88392eff53fe40336a41bd2025b20b62e33c2f3f57b005febb8d5750f0d7` |
+| `src/tools/launcher/win_manifest.xml` | `cc2f6dfeaac5395643f8056c098d2b4fd82c1352d35fcf77c0229d5d3aee7cd9` |
+| `src/tools/launcher/win_resources.rc` | `063baa5b722fde9a7ac1d086a02994286950c490acfd5119bc2eb78f56c5acc2` |
+| `src/tools/launcher/util/BUILD` | `d63b7a3415138b146544bd8668c85167f4c0fca07189fce6473cf9a9f0f80655` |
+
+The audit also finds four existing catalog mode errors: upstream packager
+modes for `MODULE.bazel`, `src/conditions/BUILD`, `tools/test/BUILD` and
+`tools/test/default_test_toolchain.bzl` are 0644, while Slug currently marks
+them executable. Their bytes and hashes are already exact; the first catalog
+packet must correct the modes and prove the manifest identity changes.
+
+`tools/launcher/BUILD.bootstrap` is embedded upstream but is not selected as a
+BUILD file, loaded, globbed or otherwise demanded by these registrations; it
+remains outside this bounded catalog slice. Windows-only generated
+`launcher.exe` and `launcher_maker.exe` are Bazel-distribution outputs rather
+than pinned source bytes, so this packet makes no exact cross-distribution
+claim for them. The currently uncataloged test-package coverage scripts and
+`extensions.bzl` are likewise not read by registration expansion or native
+declaration resolution; their labels remain exact in the already-cataloged
+BUILD, but their source bytes stay deferred until an action or extension
+actually demands them.
+
+##### External and generated closure
+
+The launcher BUILD loads `@platforms//host:constraints.bzl` and existing exact
+`//tools:build_defs.bzl`. Its source implementation package loads
+`@rules_cc//cc:cc_binary.bzl`, `//tools/res:win_res.bzl`, and its two local
+`.bzl` files. Those local files load rules_cc `cc_binary.bzl`,
+`cc_library.bzl` and `cc_test.bzl`; `win_res.bzl` loads rules_cc
+`cc_common.bzl` and `cc_info.bzl`.
+`winsdk_configure.bzl` loads the two embedded `tools/cpp` wrappers; those load
+`@rules_cc//cc/private/toolchain:cc_configure.bzl` and
+`@rules_cc//cc/toolchains:toolchain_config_utils.bzl`. The test BUILD loads
+`@rules_shell//shell:sh_binary.bzl`. These are ordinary selected BCR sources,
+not embedded bytes or substitutes. The closure proof must use their pinned
+BCR versions and authenticated source archive identities; a local path may be
+test transport, but its contents may not be a semantic stub.
+
+On non-Windows, `winsdk_configure` still declares
+`repository_rule(local=True, environ=list(MSVC_ENVVARS))`, observes
+`repository_ctx.os.name`, and writes empty `BUILD` plus a `toolchains.bzl`
+whose function body is `pass`. Bazel treats the declared environment names as
+invalidation inputs even when the implementation returns before consulting
+them. Slug has no effective repository-environment owner, and the current
+file-effect leaf accepts only root-defined rules. Directly special-casing
+`local_config_winsdk` would violate the generic repository-rule architecture.
+
+Windows additionally requires `find_vc_path`, effective repository
+environment access, path handles/existence, SDK discovery, wrapper file modes
+and one generated toolchain per discovered architecture. That is a valid
+future Rust-native Host-observation implementation but is unsupported/deferred
+until the generic capability owner exists. Non-Windows closure must fail
+closed on an actual Windows host rather than publish an empty repository.
+
+##### Dependency-safe packet sequence
+
+The audit ends in `REPLAN`, with this sequence:
+
+1. `WP-4-5-7A-builtin-bazel-tools-registered-toolchain-catalog-implementation`:
+   import only the exact manifest above, correct the four existing modes, and
+   prove rename/hash/mode/directory/glob identity. The exact mutable Rust
+   allowlist is `app/slug_bzlmod_v2/src/builtin_repository.rs` (current/base
+   blob `f12f821fe4ab867deebb8a83ac11b975feb50abc`) and
+   `app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs`
+   (`d3bcb244113b7546251c77f88f617c77edf26fbe`). The asset allowlist is exactly
+   the new paths in both inventory tables plus mode-only changes to
+   `MODULE.bazel`, `src/conditions/BUILD`, `tools/test/BUILD`, and
+   `tools/test/default_test_toolchain.bzl`; every other asset is forbidden.
+   Cap 300 production Rust, 450 proof Rust, 2,900 verbatim asset lines and
+   3,650 total additions. No registration, repository-rule or analysis
+   behavior.
+2. `WP-4-5-7A-repository-rule-declaration-metadata-implementation`: retain
+   `local`, `configure` and deduplicated declaration-order `environ` in the
+   generic frozen/projection/instantiation identity and prove invalidation
+   metadata survives reloading. Its exact four-file allowlist and current
+   blobs are `package.rs` (`a4dcb97585cc5463d820040930d6fae5fa3bdd45`),
+   `module_extension_repository_rule.rs`
+   (`c3e81f5a150911abf1dd945742175977153f6937`),
+   `module_extension_repository_instantiation.rs`
+   (`da82d97e7787136a621145a85998a5073b200b37`), and
+   `module_extension.rs` (`02a00cf7b97e9815d34f1f1333488b5f622b18c4`),
+   all under `app/slug_loading_v2/src/`; tests must remain module-private in
+   those files. Cap 420 production, 650 proof and 1,070 total Rust lines. Do
+   not execute or read environment values.
+3. `WP-4-5-7A-effective-repository-host-input-architecture`: zero Rust. Design
+   one command/session effective repository environment plus host-OS carrier,
+   its injection boundary, exact declared-name invalidation, `--repo_env`
+   precedence and observed DICE ownership. It must not read ambient state from
+   configured analysis or hide values in evaluator scratch. Its exact
+   allowlist is documentation only: the canonical plan, current-packet
+   manifest, this Stage 6 plan and routing log/history; cap 700 net added
+   documentation lines.
+
+Only those three packets are schedulable from this audit. Packet 3 must freeze
+the exact path/blob allowlist, caps and discriminating tests for a later
+canonical repository-rule effect implementation before any such Rust packet
+is activated. That future implementation must route a canonical defining
+`.bzl` through the existing canonical load owner, authenticate the same
+exported rule/projection, expose only the reviewed OS/environment and
+`repository_ctx.file` capabilities, and realize the non-Windows
+`local_config_winsdk` outputs; Windows discovery stays unsupported/deferred.
+Its terminal design must likewise freeze a separate proof-only packet with
+exact pinned BCR source fixtures and assertions for the four source rows,
+declaration order, empty non-Windows row 3, no demanded `UnsupportedCatalog`,
+and unchanged selected custom implementation/context/REAPI output. Only after
+that proof passes may the retained selected-context R2 candidate return to
+terminal review.
+
+The first two packets are bounded independent prerequisites; packet 3 is the
+first unresolved ownership design and blocks repository execution, not the
+catalog imports. Clean Zabel `0795445f...` supports this split only as peer
+guidance: its bzlmod layer owns generated identity, its repository layer owns
+observations/effects, declaration metadata retains `local`/`configure`/
+`environ`, and an invocation-local capability object copies Host observations
+into the evaluator. Slug does not copy Zabel's Zig layouts, stores, scheduler
+or compatibility claims.
+
+Compatibility remains **exact** for embedded bytes/modes, graph mapping,
+registration order/expansion and normal BCR semantics; **Slug-native** for the
+eventual Rust Host environment/OS observation and structural DICE identity;
+and **unsupported/deferred** for Windows SDK discovery and distribution-built
+launcher binaries until separately admitted. Bazel 9 BCR Starlark still owns
+all rules including `cc_internal`; `cc_common` remains a generic
+host/provider ABI, and no C++ parser or Rust rules engine is introduced.
+
+Independent terminal design review first returned `REPLAN` because the draft
+named post-Host effect/proof packets without exact manifests. The corrected
+design makes only the exact catalog implementation, exact four-file
+declaration-metadata implementation, and docs-only Host-input architecture
+packet schedulable; later packets cannot be named until that design fixes
+their owners. Rereview returns `ACCEPT`. Activate only
+`WP-4-5-7A-builtin-bazel-tools-registered-toolchain-catalog-implementation`
+under its exact path/blob/hash/mode manifest and caps.
+
+The R1 catalog candidate passes focused proofs and exact byte/mode/cap checks.
+Full Bzlmod reaches 577 passes and two stale test-only expectations outside the
+allowlist: the old manifest hash in `host_module.rs` and the formerly
+executable MODULE mode in `source_preparation.rs`. `REPLAN` only the allowlist
+to R2 with those exact assertions and blobs; production/catalog/assets/caps
+remain unchanged. Independent correction review is required before editing
+either proof.
+
+#### Exact registered-toolchain catalog accepted; declaration metadata active (2026-08-28)
+
+Commit `87d332cf6` terminally accepts the R2 catalog. It imports all and only
+the frozen launcher, resource, C++ wrapper and source-launcher paths, preserves
+the upstream bytes, hashes and archive modes, corrects the four pre-existing
+mode errors, and retains one manifest whose identity independently changes for
+a byte or executable-bit change. Exact sorted direct listings cover
+`tools/cpp`, `tools/launcher`, `tools/res`, `src/tools/launcher` and its `util`
+subpackage. Unknown neighboring paths remain `UnsupportedCatalog`.
+
+Focused catalog proof passes 4/4; the final full Bzlmod run passes 580 unit
+tests and every integration binary. Exact upstream `cmp`, physical-mode,
+scope, cap, formatting, diff and archive-baseline gates pass. Terminal review
+first requested exhaustive source/cpp listings and independent byte/mode
+manifest discrimination; the proof-only correction passes 27 focused tests
+and correction rereview returns `ACCEPT`. The accepted compatibility class is
+**exact** for catalog bytes/modes/listings and **Slug-native** only for the
+collision-safe manifest/route identity.
+
+Activate only
+`WP-4-5-7A-repository-rule-declaration-metadata-implementation` under the
+four-file blobs and caps frozen above. `package_globals::repository_rule` is
+the natural capture owner; immutable definition/projection/call/instantiation
+values retain `local`, `configure` and first-occurrence-deduplicated
+`environ`. This packet records metadata only: environment and Host OS reads,
+repository execution/effects and selected-context work remain stopped. Bazel
+9.2 is authority; clean Zabel remains peer ownership guidance only.
