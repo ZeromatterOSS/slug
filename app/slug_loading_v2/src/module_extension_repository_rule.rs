@@ -28,6 +28,7 @@ use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
 use starlark::values::starlark_value;
+use starlark_map::small_set::SmallSet;
 
 use crate::attrs::AttributeKind;
 use crate::attrs::CoercedAttributeValue;
@@ -46,6 +47,9 @@ pub(crate) struct RepositoryRuleDefinitionProjection {
     pub(crate) defining_label: CanonicalLabel,
     pub(crate) exported_name: CompactString,
     pub(crate) attributes: Arc<[RepositoryRuleAttribute]>,
+    pub(crate) local: bool,
+    pub(crate) configure: bool,
+    pub(crate) environment: Arc<SmallSet<CompactString>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -129,6 +133,12 @@ pub(crate) struct RepositoryRuleDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     attributes: Arc<[RepositoryRuleAttribute]>,
     #[trace(unsafe_ignore)]
+    local: bool,
+    #[trace(unsafe_ignore)]
+    configure: bool,
+    #[trace(unsafe_ignore)]
+    environment: Arc<SmallSet<CompactString>>,
+    #[trace(unsafe_ignore)]
     exported_name: OnceCell<CompactString>,
 }
 
@@ -141,6 +151,9 @@ pub(crate) struct FrozenRepositoryRuleDefinition {
     implementation: FrozenValue,
     defining_label: CanonicalLabel,
     attributes: Arc<[RepositoryRuleAttribute]>,
+    local: bool,
+    configure: bool,
+    environment: Arc<SmallSet<CompactString>>,
     exported_name: Option<CompactString>,
 }
 
@@ -151,11 +164,17 @@ impl<'v> RepositoryRuleDefinition<'v> {
         implementation: Value<'v>,
         defining_label: CanonicalLabel,
         attributes: Arc<[RepositoryRuleAttribute]>,
+        local: bool,
+        configure: bool,
+        environment: Arc<SmallSet<CompactString>>,
     ) -> Self {
         Self {
             implementation,
             defining_label,
             attributes,
+            local,
+            configure,
+            environment,
             exported_name: OnceCell::new(),
         }
     }
@@ -187,6 +206,9 @@ impl FrozenRepositoryRuleDefinition {
                 defining_label: self.defining_label.clone(),
                 exported_name: exported_name.clone(),
                 attributes: self.attributes.clone(),
+                local: self.local,
+                configure: self.configure,
+                environment: self.environment.clone(),
             })
     }
 
@@ -203,6 +225,9 @@ impl<'v> Freeze for RepositoryRuleDefinition<'v> {
             implementation: self.implementation.freeze(freezer)?,
             defining_label: self.defining_label,
             attributes: self.attributes,
+            local: self.local,
+            configure: self.configure,
+            environment: self.environment,
             exported_name: self.exported_name.into_inner(),
         })
     }
@@ -304,6 +329,9 @@ impl<'v> StarlarkValue<'v> for FrozenRepositoryRuleDefinition {
                 defining_label: self.defining_label.clone(),
                 exported_name: exported_name.clone(),
                 attributes: self.attributes.clone(),
+                local: self.local,
+                configure: self.configure,
+                environment: self.environment.clone(),
             },
             name: name.into(),
             kwargs: kwargs.into(),
@@ -403,6 +431,16 @@ mod tests {
             .map_err(|error| error.to_string());
         drop(evaluator);
         (result, state.records())
+    }
+
+    fn projection(loaded: &FrozenModule, name: &str) -> RepositoryRuleDefinitionProjection {
+        loaded
+            .get(name)
+            .unwrap()
+            .downcast::<FrozenRepositoryRuleDefinition>()
+            .unwrap()
+            .projection()
+            .unwrap()
     }
 
     const BASE: &str = r#"
@@ -573,10 +611,72 @@ _repo = repository_rule(
     }
 
     #[test]
-    fn definition_surface_accepts_defaults_and_rejects_deferred_families() {
+    fn declaration_metadata_survives_freeze_export_and_repeated_calls() {
+        let defaults = load(
+            "def impl(ctx): pass\nr=repository_rule(impl)\ndef run():\n  r(name='one')\n  r(name='two')\n",
+        )
+        .unwrap();
+        let default_projection = projection(&defaults, "r");
+        assert!(!default_projection.local);
+        assert!(!default_projection.configure);
+        assert!(default_projection.environment.is_empty());
+        assert_eq!(
+            projection(
+                &load(
+                    "def impl(ctx): pass\nr=repository_rule(impl, local=False, configure=False, environ=[])\n"
+                )
+                .unwrap(),
+                "r"
+            ),
+            default_projection
+        );
+
+        let full = load(
+            "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['B','A','B'])\ndef run():\n  r(name='one')\n  r(name='two')\n",
+        )
+        .unwrap();
+        let full_projection = projection(&full, "r");
+        assert!(full_projection.local);
+        assert!(full_projection.configure);
+        assert_eq!(
+            full_projection
+                .environment
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            ["B", "A"]
+        );
+        let (result, calls) = invoke(&full, "run", |_| Vec::new());
+        assert_eq!(result.unwrap(), "None");
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[0].definition, full_projection);
+        assert_eq!(calls[1].definition, full_projection);
+        assert!(Arc::ptr_eq(
+            &calls[0].definition.environment,
+            &calls[1].definition.environment
+        ));
+
+        for source in [
+            "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['B','A'])\n",
+            "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['A','B'])\n",
+        ] {
+            assert_eq!(projection(&load(source).unwrap(), "r"), full_projection);
+        }
+        for source in [
+            "def impl(ctx): pass\nr=repository_rule(impl, local=False, configure=True, environ=['A','B'])\n",
+            "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=False, environ=['A','B'])\n",
+            "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['A','C'])\n",
+        ] {
+            assert_ne!(projection(&load(source).unwrap(), "r"), full_projection);
+        }
+    }
+
+    #[test]
+    fn definition_surface_accepts_metadata_and_rejects_deferred_families() {
         for source in [
             "def impl(ctx): pass\nr=repository_rule(impl)\n",
             "def impl(ctx): pass\nr=repository_rule(implementation=impl, attrs=None, local=False, configure=False, environ=[], doc=None)\n",
+            "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['B','A','B'])\n",
         ] {
             load(source).unwrap();
         }
@@ -586,16 +686,8 @@ _repo = repository_rule(
                 "repository_rule implementation must be callable",
             ),
             (
-                "def impl(ctx): pass\nr=repository_rule(impl, local=True)\n",
-                "unsupported repository_rule option",
-            ),
-            (
-                "def impl(ctx): pass\nr=repository_rule(impl, configure=True)\n",
-                "unsupported repository_rule option",
-            ),
-            (
-                "def impl(ctx): pass\nr=repository_rule(impl, environ=['X'])\n",
-                "unsupported repository_rule option",
+                "def impl(ctx): pass\nr=repository_rule(impl, environ=['X', 1])\n",
+                "list[str]",
             ),
             (
                 "def impl(ctx): pass\nr=repository_rule(impl, doc='x')\n",

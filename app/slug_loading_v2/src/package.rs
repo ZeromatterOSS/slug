@@ -5584,13 +5584,19 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         if callable.is_none() {
             anyhow::bail!("repository_rule implementation must be callable");
         }
-        if local.unwrap_or(false)
-            || configure.unwrap_or(false)
-            || !environ.unwrap_or_default().items.is_empty()
-            || doc.is_some_and(|value| !value.is_none())
-        {
+        if doc.is_some_and(|value| !value.is_none()) {
             anyhow::bail!("unsupported repository_rule option in the admitted capture slice");
         }
+        let local = local.unwrap_or(false);
+        let configure = configure.unwrap_or(false);
+        let environment = Arc::new(
+            environ
+                .unwrap_or_default()
+                .items
+                .into_iter()
+                .map(CompactString::new)
+                .collect::<SmallSet<_>>(),
+        );
         let context = BzlEvaluationContext::from_evaluator(eval)
             .map_err(|_| anyhow::anyhow!("repository_rule may only be called in a .bzl module"))?;
         let defining_label = CanonicalLabel::parse(&format!("@@{}", context.source_label()))
@@ -5666,6 +5672,9 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             implementation,
             defining_label,
             attributes.into(),
+            local,
+            configure,
+            environment,
         ))
     }
 

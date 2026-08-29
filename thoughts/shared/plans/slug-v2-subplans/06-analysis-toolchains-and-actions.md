@@ -21203,3 +21203,13 @@ values retain `local`, `configure` and first-occurrence-deduplicated
 `environ`. This packet records metadata only: environment and Host OS reads,
 repository execution/effects and selected-context work remain stopped. Bazel
 9.2 is authority; clean Zabel remains peer ownership guidance only.
+
+The R1 metadata candidate passes focused definition, invocation,
+instantiation and A-B-A proof. Full loading reaches 411/412 and reproduces one
+stale exact package-list assertion at the packet base: the accepted catalog
+now contributes `src/tools/launcher`, its `util` subpackage, `tools/launcher`
+and `tools/res`. `REPLAN` only the proof allowlist to
+`WP-4-5-7A-repository-rule-declaration-metadata-implementation-r2`, admitting
+the current/base `external_subtree_package_set_tests.rs` blob
+`85d1c8467018a903ead7dbd5a124726ca5f7c9cc` and only its root/tools expected
+vectors. Metadata scope, representation, caps and stops remain unchanged.

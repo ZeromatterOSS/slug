@@ -1,12 +1,18 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-repository-rule-declaration-metadata-implementation`
+Packet: `WP-4-5-7A-repository-rule-declaration-metadata-implementation-r2`
 
 Milestone: M7A category 6 generated-repository prerequisite.
 
 Base: catalog acceptance commit `87d332cf6`, retaining the dirty selected-
 context R2 candidate unchanged. The exact Bazel 9.2 registered-toolchain
 catalog packet is terminally `ACCEPT`.
+
+R1's focused metadata proofs pass. Its required full loading suite reaches
+411/412 and exposes one stale catalog-only expectation already present at this
+packet's base: the built-in subtree test still names only the three packages
+from before commit `87d332cf6`. R2 admits only that exact proof vector; the
+metadata implementation, representation, behavior and Rust caps do not change.
 
 ## Observable result
 
@@ -102,8 +108,16 @@ Only these Rust files may change; tests stay module-private in them:
 - `app/slug_loading_v2/src/module_extension.rs`, current blob
   `02a00cf7b97e9815d34f1f1333488b5f622b18c4`.
 
+R2 proof-only correction:
+
+- `app/slug_loading_v2/src/external_subtree_package_set_tests.rs`, current/base
+  blob `85d1c8467018a903ead7dbd5a124726ca5f7c9cc`; only the two exact expected
+  package vectors in
+  `real_builtin_catalog_discovers_root_and_prefixed_package_sets` may change to
+  include the packages imported by `87d332cf6`.
+
 Completion documentation may update only this manifest, the canonical plan,
-Stage 6 and routing log/history. No Cargo manifest, lockfile, fixture, external
+Stage 6 and routing log/history. No Cargo manifest, lockfile, fixture, other
 test, DICE key, repository effect, analysis or command file is allowed.
 
 ## Implementation and proof

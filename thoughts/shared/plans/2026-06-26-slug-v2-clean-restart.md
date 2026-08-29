@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-4-5-7A-repository-rule-declaration-metadata-implementation](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-repository-rule-declaration-metadata-implementation-r2](./slug-v2-subplans/current-packet.md).
 
 Category 4 is terminally accepted in `568b0c698`; category 5's retained value
 graph is independently accepted in `5ce967d55`, and its R3 evaluator adapter is

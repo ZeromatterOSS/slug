@@ -763,8 +763,22 @@ async fn real_builtin_catalog_discovers_root_and_prefixed_package_sets() {
     let route = route.as_ref().as_ref().unwrap().clone();
 
     for (prefix, expected) in [
-        ("", vec!["src/conditions", "tools", "tools/test"]),
-        ("tools", vec!["tools", "tools/test"]),
+        (
+            "",
+            vec![
+                "src/conditions",
+                "src/tools/launcher",
+                "src/tools/launcher/util",
+                "tools",
+                "tools/launcher",
+                "tools/res",
+                "tools/test",
+            ],
+        ),
+        (
+            "tools",
+            vec!["tools", "tools/launcher", "tools/res", "tools/test"],
+        ),
     ] {
         let prefix = package(prefix);
         let SourcePreparationOutcome::Complete(outcome) = transaction

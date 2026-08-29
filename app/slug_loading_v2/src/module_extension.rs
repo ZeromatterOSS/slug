@@ -2383,6 +2383,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn repository_rule_declaration_metadata_reloads_and_restores_a_b_a() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        let source = |local: bool, configure: bool, environment: &str| {
+            format!(
+                "repo=repository_rule(lambda ctx: None, local={local}, configure={configure}, environ={environment})\n\
+                 def impl(ctx):\n    repo(name='generated')\n\
+                 ext=module_extension(implementation=impl)\n",
+                local = if local { "True" } else { "False" },
+                configure = if configure { "True" } else { "False" },
+            )
+        };
+        let a_source = source(true, true, "['B','A','B']");
+        let a = compute_repository_rule_case(&dice, module, &a_source, true, None).await;
+        let warm = compute_repository_rule_case(&dice, module, &a_source, true, None).await;
+        assert!(HostPureModuleExtensionInvocationsKey::equality(&a, &warm));
+        let SourcePreparationOutcome::Complete(a_value) = &a else {
+            panic!("repository-rule invocation must complete")
+        };
+        let definition =
+            &a_value.as_ref().as_ref().unwrap().invoked[0].repository_rule_calls[0].definition;
+        assert!(definition.local);
+        assert!(definition.configure);
+        assert_eq!(
+            definition
+                .environment
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            ["B", "A"]
+        );
+
+        for changed_source in [
+            source(false, true, "['B','A']"),
+            source(true, false, "['B','A']"),
+            source(true, true, "['B','C']"),
+        ] {
+            let changed =
+                compute_repository_rule_case(&dice, module, &changed_source, true, None).await;
+            assert!(!HostPureModuleExtensionInvocationsKey::equality(
+                &a, &changed
+            ));
+            let restored = compute_repository_rule_case(&dice, module, &a_source, true, None).await;
+            assert!(HostPureModuleExtensionInvocationsKey::equality(
+                &a, &restored
+            ));
+        }
+    }
+
+    #[tokio::test]
     async fn real_repository_rule_failure_retains_completed_and_current_prefixes() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nb=use_extension('//:ext.bzl','second')\n";

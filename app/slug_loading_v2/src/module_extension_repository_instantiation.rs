@@ -28,6 +28,8 @@ use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathObservationEpoch;
 use starlark_map::small_map::SmallMap;
+#[cfg(test)]
+use starlark_map::small_set::SmallSet;
 
 use crate::attrs::AttributeKind;
 use crate::attrs::CoercedAttributeValue;
@@ -768,6 +770,9 @@ pub(crate) mod tests {
                     defining_label: CanonicalLabel::parse("@@//defs:repo.bzl").unwrap(),
                     exported_name: "repo".into(),
                     attributes: schema.into_iter().collect(),
+                    local: false,
+                    configure: false,
+                    environment: Arc::new(SmallSet::new()),
                 },
             name: "generated".into(),
             kwargs: kwargs
@@ -1369,7 +1374,7 @@ pub(crate) mod tests {
         };
         let source = |value: &str| {
             format!(
-                r#"repo=repository_rule(lambda ctx: None, attrs={{'text':attr.string(mandatory=True),'target':attr.label(),'peer':attr.label()}})
+                r#"repo=repository_rule(lambda ctx: None, attrs={{'text':attr.string(mandatory=True),'target':attr.label(),'peer':attr.label()}}, local=True, configure=True, environ=['B','A','B'])
 def impl(ctx):
     repo(name='first', text='{value}')
     repo(name='second', text='two', target='@second//:item', peer='@first//:item')
@@ -1392,6 +1397,22 @@ ext=module_extension(implementation=impl)
         assert_eq!(rows[0].generated_name, "first");
         assert_eq!(rows[0].canonical_name.as_str(), "+ext+first");
         assert_eq!(rows[1].canonical_name.as_str(), "+ext+second");
+        assert!(rows[0].call().definition.local);
+        assert!(rows[0].call().definition.configure);
+        assert_eq!(
+            rows[0]
+                .call()
+                .definition
+                .environment
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            ["B", "A"]
+        );
+        assert!(Arc::ptr_eq(
+            &rows[0].call().definition.environment,
+            &rows[1].call().definition.environment
+        ));
         let replacement = a_value.extensions[0].request.namespace_parts().3[0]
             .parts()
             .1
