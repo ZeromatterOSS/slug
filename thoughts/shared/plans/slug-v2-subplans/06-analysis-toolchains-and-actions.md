@@ -20897,7 +20897,7 @@ peer guidance. BCR Starlark owns all rule/control paths including
 `cc_internal`; `cc_common` remains a generic host-ABI client. Independent
 architecture review is required before Rust resumes.
 
-#### Recursive evaluator adapter accepted; category-6 toolchain-context architecture active (2026-08-28)
+#### Recursive evaluator adapter accepted; category-6 implementation active (2026-08-28)
 
 Terminal correction review accepts R3. The retained category-5 graph and its
 shared evaluator classes now round-trip every admitted recursive value without
@@ -20907,10 +20907,11 @@ canonicalization with shared physical successor identity. The vendored JSON
 assertion is restored unchanged. Focused build-api, loading and analysis suites
 pass; independently reproduced inherited vendor/core failures remain separate.
 
-Activate only the zero-Rust
-`WP-4-5-7A-selected-toolchain-context-cutover-architecture`. The live category-4
-resolution already owns an exec-configured selected platform plus ordered
-requested/actual mandatory/optional rows; category 6 must consume those rows,
+Activate only
+`WP-4-5-7A-selected-toolchain-context-cutover-implementation`. Its zero-Rust
+manifest records the cutover from the live category-4 resolution's exec-
+configured selected platform and ordered requested/actual mandatory/optional
+rows; category 6 must consume those rows,
 analyze selected implementations under that platform's exec configuration,
 retain their exact category-5 builtin `ToolchainInfo` occurrences, and expose
 one immutable multi-type context through `ctx.toolchains`. Delete the singular
@@ -20925,4 +20926,7 @@ rule-definition label/mapping used for string lookup, configured analysis owns
 resolution/child/provider rows and DICE invalidation, and evaluator views are
 scratch. BCR Starlark still owns all rules including `cc_internal`; `cc_common`
 remains a generic host/provider-ABI client. Independent reserved-architecture
-review must accept the exact implementation manifest before Rust resumes.
+review accepts the corrected exact implementation manifest, including one
+shared publication-equality state for the complete retained context and its
+parent DICE cutoff A/B/A proof. Rust may now proceed only within its allowlist
+and caps.
