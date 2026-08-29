@@ -4666,7 +4666,7 @@ fn bzlmod_environment_is_captured_per_one_shot_and_daemon_build_child() {
 
 #[cfg(unix)]
 #[test]
-fn non_unicode_bzlmod_environment_is_rejected_before_one_shot_evaluation() {
+fn non_unicode_client_environment_is_rejected_before_one_shot_evaluation() {
     use std::os::unix::ffi::OsStringExt;
 
     let workspace = scratch("bzlmod-env-non-unicode");
@@ -4686,10 +4686,8 @@ fn non_unicode_bzlmod_environment_is_rejected_before_one_shot_evaluation() {
         .unwrap();
     assert_eq!(output.status.code(), Some(2), "{output:?}");
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(
-        stderr.contains("environment value is not valid Unicode"),
-        "{stderr}"
-    );
+    assert!(stderr.contains("client environment entry #"), "{stderr}");
+    assert!(stderr.contains("value is not valid Unicode"), "{stderr}");
 }
 
 #[test]
@@ -5348,4 +5346,68 @@ fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
         .output()
         .unwrap();
     assert!(!subdirectory.status.success(), "{subdirectory:?}");
+}
+
+#[test]
+fn repository_environment_capture_and_transport_never_echo_values() {
+    let workspace = scratch("repository-environment-redaction");
+    let output_base = scratch("repository-environment-redaction-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"probe\")\n",
+    );
+    let explicit_secret = "sentinel-explicit-repository-environment-secret";
+    let ambient_secret = "sentinel-ambient-repository-environment-secret";
+    let repo_env = format!("--repo_env=EXPLICIT_SENTINEL={explicit_secret}");
+    let output_base_arg = format!("--output_base={}", output_base.display());
+
+    for (name, args, success) in [
+        (
+            "one-shot-build",
+            vec!["build", repo_env.as_str(), "//pkg:probe"],
+            false,
+        ),
+        (
+            "one-shot-query",
+            vec!["query", repo_env.as_str(), "//pkg:probe"],
+            true,
+        ),
+        (
+            "daemon-build",
+            vec![
+                output_base_arg.as_str(),
+                "build",
+                repo_env.as_str(),
+                "//pkg:probe",
+            ],
+            false,
+        ),
+        (
+            "daemon-query",
+            vec![
+                output_base_arg.as_str(),
+                "query",
+                repo_env.as_str(),
+                "//pkg:probe",
+            ],
+            true,
+        ),
+    ] {
+        let output = slug()
+            .current_dir(&workspace)
+            .env("AMBIENT_REPOSITORY_SENTINEL", ambient_secret)
+            .args(args)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.success(), success, "{name}: {output:?}");
+        let generated = format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!generated.contains(explicit_secret), "{name}: {generated}");
+        assert!(!generated.contains(ambient_secret), "{name}: {generated}");
+    }
 }

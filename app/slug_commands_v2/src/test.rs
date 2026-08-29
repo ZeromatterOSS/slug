@@ -16,9 +16,11 @@ use crate::common::CommandKind;
 use crate::common::CommandParseError;
 use crate::common::CommandPlaceholderError;
 use crate::common::ParsedFlag;
+use crate::common::RepositoryEnvironmentOverride;
 use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_lockfile_mode;
 use crate::common::parse_target_patterns;
+use crate::common::repository_environment_overrides;
 use crate::common::split_args;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,6 +29,7 @@ pub struct TestRequest {
     pub flags: Vec<ParsedFlag>,
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
+    pub repository_environment_overrides: Vec<RepositoryEnvironmentOverride>,
 }
 
 impl TestRequest {
@@ -34,11 +37,13 @@ impl TestRequest {
         let parsed = split_args(args);
         let bzlmod_policy = bzlmod_command_policy(&parsed.flags)?;
         let lockfile_mode = bzlmod_lockfile_mode(&parsed.flags)?;
+        let repository_environment_overrides = repository_environment_overrides(&parsed.flags)?;
         Ok(Self {
             targets: parse_target_patterns(CommandKind::Test, &parsed.positionals)?,
             flags: parsed.flags,
             bzlmod_policy,
             lockfile_mode,
+            repository_environment_overrides,
         })
     }
 

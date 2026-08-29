@@ -13,6 +13,7 @@ pub mod build;
 pub mod cquery;
 pub mod help;
 pub mod query;
+mod repository_environment;
 pub mod run;
 pub mod test;
 pub mod version;
@@ -108,6 +109,7 @@ fn emit_result(
 fn planned(error: CommandPlaceholderError, argv: Vec<String>) -> i32 {
     let argv = argv
         .iter()
+        .map(|arg| slug_commands_v2::redact_repository_environment_arg(arg))
         .map(|arg| format!("\"{}\"", json_escape(arg)))
         .collect::<Vec<_>>()
         .join(",");

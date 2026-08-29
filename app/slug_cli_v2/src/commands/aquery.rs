@@ -13,7 +13,7 @@ use slug_commands_v2::aquery::AqueryRequest;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::TerminalOutput;
-use slug_core_v2::runtime::evaluate_workspace_build_command_with_bzlmod_inputs;
+use slug_core_v2::runtime::evaluate_workspace_build_command_with_repository_environment;
 use slug_core_v2::runtime::format_file_write_aquery_text_output_for_scope;
 use slug_server_v2::AqueryRequest as DaemonAqueryRequest;
 
@@ -24,6 +24,13 @@ pub fn run(argv: Vec<String>) -> i32 {
     };
     let request = match AqueryRequest::parse_at_workspace(&argv, &workspace) {
         Ok(request) => request,
+        Err(error) => return super::emit_result(CommandKind::Aquery, argv, Err(error)),
+    };
+    let repository_environment = match super::repository_environment::capture_repository_environment(
+        &workspace,
+        &request.repository_environment_overrides,
+    ) {
+        Ok(snapshot) => snapshot,
         Err(error) => return super::emit_result(CommandKind::Aquery, argv, Err(error)),
     };
     let environment_value = match super::build::capture_bzlmod_allow_yanked_versions() {
@@ -42,16 +49,21 @@ pub fn run(argv: Vec<String>) -> i32 {
             &request.lockfile_mode,
             &request.registry_urls,
         );
-        return run_daemon(&output_base, request, bzlmod);
+        let repository_environment =
+            slug_server_v2::RepositoryEnvironmentRequestInputs::from_normalized(
+                &repository_environment,
+            );
+        return run_daemon(&output_base, request, bzlmod, repository_environment);
     }
 
-    let accepted = match evaluate_workspace_build_command_with_bzlmod_inputs(
+    let accepted = match evaluate_workspace_build_command_with_repository_environment(
         &workspace,
         std::slice::from_ref(&request.target),
         request.bzlmod_policy,
         environment_policy,
         request.lockfile_mode,
         &request.registry_urls,
+        repository_environment,
         Default::default(),
     ) {
         Ok(accepted) => accepted,
@@ -90,6 +102,7 @@ fn run_daemon(
     output_base: &str,
     request: AqueryRequest,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
+    repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
 ) -> i32 {
     let output_base = std::path::Path::new(output_base);
     if let Err(error) = std::fs::create_dir_all(output_base) {
@@ -106,6 +119,7 @@ fn run_daemon(
         &DaemonAqueryRequest {
             expression: request.expression,
             bzlmod,
+            repository_environment,
         },
     ) {
         Ok(response) => {

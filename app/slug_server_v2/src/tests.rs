@@ -42,6 +42,8 @@ use crate::Daemon;
 use crate::DaemonRequest;
 use crate::DaemonResponse;
 use crate::QueryRequest;
+use crate::RepositoryEnvironmentRequestInputs;
+use crate::RepositoryEnvironmentWireEntry;
 use crate::server::handle_request;
 
 fn scratch(name: &str) -> PathBuf {
@@ -59,6 +61,146 @@ fn write(path: &Path, content: &str) {
         fs::create_dir_all(parent).unwrap();
     }
     fs::write(path, content).unwrap();
+}
+
+#[test]
+fn repository_environment_wire_is_canonical_redacted_and_never_falls_back() {
+    let workspace = scratch("repository-environment-wire");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &workspace.join("BUILD.bazel"),
+        "filegroup(name = \"probe\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let secret = "sentinel-repository-environment-secret";
+
+    let request = |entries: Vec<RepositoryEnvironmentWireEntry>| {
+        DaemonRequest::Build(BuildRequest {
+            targets: vec!["//:probe".to_owned()],
+            configuration_overlay: Default::default(),
+            executor: None,
+            default_exec_properties: Vec::new(),
+            bzlmod: Default::default(),
+            repository_environment: RepositoryEnvironmentRequestInputs { entries },
+        })
+    };
+
+    let entries = vec![
+        RepositoryEnvironmentWireEntry {
+            name: "A".to_owned(),
+            value: secret.to_owned(),
+        },
+        RepositoryEnvironmentWireEntry {
+            name: "B".to_owned(),
+            value: String::new(),
+        },
+    ];
+    let build = BuildRequest {
+        targets: vec!["//:probe".to_owned()],
+        configuration_overlay: Default::default(),
+        executor: None,
+        default_exec_properties: Vec::new(),
+        bzlmod: Default::default(),
+        repository_environment: RepositoryEnvironmentRequestInputs {
+            entries: entries.clone(),
+        },
+    };
+    let active_requests = [
+        ("build", DaemonRequest::Build(build.clone())),
+        ("run", DaemonRequest::Run(build)),
+        (
+            "query",
+            DaemonRequest::Query(QueryRequest {
+                expression: "//:probe".to_owned(),
+                order_output: "auto".to_owned(),
+                output: "label".to_owned(),
+                graph_factored: true,
+                strict_test_suite: false,
+                bzlmod: Default::default(),
+                repository_environment: RepositoryEnvironmentRequestInputs {
+                    entries: entries.clone(),
+                },
+            }),
+        ),
+        (
+            "aquery",
+            DaemonRequest::Aquery(AqueryRequest {
+                expression: "//:probe".to_owned(),
+                bzlmod: Default::default(),
+                repository_environment: RepositoryEnvironmentRequestInputs {
+                    entries: entries.clone(),
+                },
+            }),
+        ),
+        (
+            "cquery",
+            DaemonRequest::Cquery(CqueryRequest {
+                expression: "//:probe".to_owned(),
+                include_implicit: true,
+                include_tool: true,
+                output: CqueryOutput::Label,
+                configuration_overlay: Default::default(),
+                bzlmod: Default::default(),
+                repository_environment: RepositoryEnvironmentRequestInputs { entries },
+            }),
+        ),
+    ];
+    for (command, valid) in active_requests {
+        assert!(!format!("{valid:?}").contains(secret));
+        let response = handle_request(&mut daemon, &serde_json::to_string(&valid).unwrap());
+        assert!(!response.stderr.contains(secret));
+        let forwarded = daemon.take_forwarded_repository_environments_for_test();
+        assert_eq!(forwarded.len(), 1, "{command}: {response:?}");
+        assert_eq!(forwarded[0].get("A").unwrap().as_ref(), secret);
+        assert_eq!(forwarded[0].get("B").unwrap().as_ref(), "");
+    }
+
+    let empty = request(Vec::new());
+    let response = handle_request(&mut daemon, &serde_json::to_string(&empty).unwrap());
+    assert!(!response.stderr.contains(secret));
+    let forwarded = daemon.take_forwarded_repository_environments_for_test();
+    assert_eq!(forwarded.len(), 1);
+    assert!(forwarded[0].is_empty());
+
+    for invalid in [
+        vec![
+            RepositoryEnvironmentWireEntry {
+                name: "B".to_owned(),
+                value: secret.to_owned(),
+            },
+            RepositoryEnvironmentWireEntry {
+                name: "A".to_owned(),
+                value: secret.to_owned(),
+            },
+        ],
+        vec![
+            RepositoryEnvironmentWireEntry {
+                name: "A".to_owned(),
+                value: secret.to_owned(),
+            },
+            RepositoryEnvironmentWireEntry {
+                name: "A".to_owned(),
+                value: secret.to_owned(),
+            },
+        ],
+    ] {
+        let response = handle_request(
+            &mut daemon,
+            &serde_json::to_string(&request(invalid)).unwrap(),
+        );
+        assert_eq!(response.exit_code, 2);
+        assert!(
+            response
+                .stderr
+                .contains("repository_environment_request_error")
+        );
+        assert!(!response.stderr.contains(secret));
+        assert!(
+            daemon
+                .take_forwarded_repository_environments_for_test()
+                .is_empty()
+        );
+    }
 }
 
 fn write_configured_module(workspace: &Path, source: &str) {
@@ -219,6 +361,7 @@ fn aquery_wire_revalidates_the_raw_expression_scope() {
         serde_json::to_string(&DaemonRequest::Aquery(AqueryRequest {
             expression: expression.to_owned(),
             bzlmod: BzlmodRequestInputs::default(),
+            repository_environment: Default::default(),
         }))
         .unwrap()
     };
@@ -264,6 +407,30 @@ fn first_build_invalidates_zero_files() {
     let result = daemon.build(&[target("//pkg:probe")], &remote_disabled(), &[]);
     assert_eq!(result.invalidated_files, 0);
     assert!(result.stderr.contains("\"invalidated_files\":0"));
+}
+
+#[test]
+fn daemon_analysis_boundary_redacts_repository_environment_argv() {
+    let workspace = scratch("repository-environment-argv-redaction");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"probe\", srcs = [])\n",
+    );
+
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let secret = "sentinel-repository-environment-argv-secret";
+    let result = daemon.build(
+        &[target("//pkg:probe")],
+        &remote_disabled(),
+        &[format!("--repo_env=TOKEN={secret}")],
+    );
+    assert_eq!(result.exit_code, 2, "{result:?}");
+    assert!(!result.stderr.contains(secret), "{result:?}");
+    assert!(
+        result.stderr.contains("--repo_env=<redacted>"),
+        "{result:?}"
+    );
 }
 
 #[test]
@@ -578,6 +745,7 @@ fn tagged_query_protocol_carries_output_and_preserves_old_request_defaults() {
         graph_factored: false,
         strict_test_suite: true,
         bzlmod: BzlmodRequestInputs::default(),
+        repository_environment: Default::default(),
     });
     let json = serde_json::to_value(request).unwrap();
     assert_eq!(json["kind"], "query");
@@ -586,7 +754,7 @@ fn tagged_query_protocol_carries_output_and_preserves_old_request_defaults() {
     assert_eq!(json["request"]["output"], "graph");
     assert_eq!(json["request"]["graph_factored"], false);
     assert_eq!(json["request"]["strict_test_suite"], true);
-    assert_eq!(json["request"].as_object().unwrap().len(), 6);
+    assert_eq!(json["request"].as_object().unwrap().len(), 7);
 
     let old: DaemonRequest = serde_json::from_str(
         r#"{"kind":"query","request":{"expression":"//pkg:bin","order_output":"auto"}}"#,
@@ -860,6 +1028,7 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
             ("os".to_owned(), "linux".to_owned()),
         ],
         bzlmod: BzlmodRequestInputs::default(),
+        repository_environment: Default::default(),
     });
     let json = serde_json::to_string(&request).unwrap();
     let round_trip: DaemonRequest = serde_json::from_str(&json).unwrap();
@@ -903,6 +1072,7 @@ fn run_wire_carries_only_build_inputs_and_bounded_launch_authorization() {
         executor: Some("grpc://executor".to_owned()),
         default_exec_properties: vec![("cpu".to_owned(), "x86_64".to_owned())],
         bzlmod: BzlmodRequestInputs::default(),
+        repository_environment: Default::default(),
     });
     let json = serde_json::to_string(&request).unwrap();
     assert!(json.contains("\"kind\":\"run\""));
@@ -958,6 +1128,7 @@ fn tagged_cquery_protocol_is_narrow_and_round_trips() {
             output,
             configuration_overlay: root_setting_overlay(Some("Gr\u{00fc}\u{00df}e")),
             bzlmod: BzlmodRequestInputs::default(),
+            repository_environment: Default::default(),
         });
         let json = serde_json::to_string(&request).unwrap();
         assert!(!json.contains("order_output"));

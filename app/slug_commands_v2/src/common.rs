@@ -34,12 +34,70 @@ pub enum FlagDisposition {
     Planned,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ParsedFlag {
     pub raw: String,
     pub name: String,
     pub value: Option<String>,
     pub disposition: FlagDisposition,
+}
+
+impl fmt::Debug for ParsedFlag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let repository_environment = self.name == "repo_env";
+        let raw = if repository_environment {
+            "--repo_env=<redacted>"
+        } else {
+            self.raw.as_str()
+        };
+        let value = if repository_environment {
+            self.value.as_ref().map(|_| "<redacted>")
+        } else {
+            self.value.as_deref()
+        };
+        f.debug_struct("ParsedFlag")
+            .field("raw", &raw)
+            .field("name", &self.name)
+            .field("value", &value)
+            .field("disposition", &self.disposition)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub enum RepositoryEnvironmentOverride {
+    Set { name: String, value: String },
+    Inherit { name: String },
+    Unset { name: String },
+}
+
+impl fmt::Debug for RepositoryEnvironmentOverride {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Set { name, .. } => f
+                .debug_struct("Set")
+                .field("name", name)
+                .field("value", &"<redacted>")
+                .finish(),
+            Self::Inherit { name } => f.debug_struct("Inherit").field("name", name).finish(),
+            Self::Unset { name } => f.debug_struct("Unset").field("name", name).finish(),
+        }
+    }
+}
+
+impl RepositoryEnvironmentOverride {
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Set { name, .. } | Self::Inherit { name } | Self::Unset { name } => name,
+        }
+    }
+
+    pub fn set_value(&self) -> Option<&str> {
+        match self {
+            Self::Set { value, .. } => Some(value),
+            Self::Inherit { .. } | Self::Unset { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -358,6 +416,56 @@ pub(crate) fn bzlmod_registry_urls(flags: &[ParsedFlag]) -> Result<Vec<String>, 
         .collect()
 }
 
+pub(crate) fn repository_environment_overrides(
+    flags: &[ParsedFlag],
+) -> Result<Vec<RepositoryEnvironmentOverride>, CommandParseError> {
+    flags
+        .iter()
+        .filter(|flag| flag.name == "repo_env")
+        .map(|flag| {
+            let value = flag.value.as_deref().ok_or_else(|| {
+                invalid_repository_environment_flag(
+                    "expected joined --repo_env=NAME=VALUE, --repo_env=NAME, or --repo_env==NAME",
+                )
+            })?;
+            if value.is_empty() || value == "=" {
+                return Err(invalid_repository_environment_flag(
+                    "variable definition must be NAME=VALUE, NAME, or =NAME",
+                ));
+            }
+            if let Some(name) = value.strip_prefix('=') {
+                return Ok(RepositoryEnvironmentOverride::Unset {
+                    name: name.to_owned(),
+                });
+            }
+            if let Some((name, value)) = value.split_once('=') {
+                return Ok(RepositoryEnvironmentOverride::Set {
+                    name: name.to_owned(),
+                    value: value.to_owned(),
+                });
+            }
+            Ok(RepositoryEnvironmentOverride::Inherit {
+                name: value.to_owned(),
+            })
+        })
+        .collect()
+}
+
+fn invalid_repository_environment_flag(message: &str) -> CommandParseError {
+    CommandParseError::InvalidFlagValue {
+        flag: "--repo_env=<redacted>".to_owned(),
+        message: message.to_owned(),
+    }
+}
+
+pub fn redact_repository_environment_arg(arg: &str) -> &str {
+    if arg.starts_with("--repo_env=") {
+        "--repo_env=<redacted>"
+    } else {
+        arg
+    }
+}
+
 /// Normalize the value captured from `BZLMOD_ALLOW_YANKED_VERSIONS`.
 ///
 /// Environment access belongs to the CLI request boundary; this function is
@@ -497,7 +605,8 @@ fn classify_flag(name: &str) -> FlagDisposition {
         | "noignore_dev_dependency"
         | "lockfile_mode"
         | "override_module"
-        | "registry" => FlagDisposition::ParseOnly,
+        | "registry"
+        | "repo_env" => FlagDisposition::ParseOnly,
         "color" | "show_progress" | "noshow_progress" | "keep_going" => {
             FlagDisposition::IgnoredCompatible
         }

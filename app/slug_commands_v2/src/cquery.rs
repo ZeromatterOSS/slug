@@ -19,12 +19,14 @@ use slug_query_v2::validate_cquery_query;
 
 use crate::common::CommandKind;
 use crate::common::CommandParseError;
+use crate::common::RepositoryEnvironmentOverride;
 use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_command_policy_for_workspace;
 use crate::common::bzlmod_lockfile_mode;
 use crate::common::bzlmod_registry_urls;
 use crate::common::command_configuration_occurrence;
 use crate::common::parse_bool_flag;
+use crate::common::repository_environment_overrides;
 use crate::common::split_args;
 
 const LABEL_EXPRESSION: &str = "str(target.label)";
@@ -48,6 +50,7 @@ pub struct CqueryRequest {
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
     pub registry_urls: Vec<String>,
+    pub repository_environment_overrides: Vec<RepositoryEnvironmentOverride>,
 }
 
 impl CqueryRequest {
@@ -140,7 +143,8 @@ impl CqueryRequest {
                 | "noignore_dev_dependency"
                 | "lockfile_mode"
                 | "override_module"
-                | "registry" => {}
+                | "registry"
+                | "repo_env" => {}
                 _ => {
                     return Err(unsupported(&format!(
                         "{} is not supported by this cquery",
@@ -190,6 +194,7 @@ impl CqueryRequest {
         };
         let lockfile_mode = bzlmod_lockfile_mode(&parsed.flags)?;
         let registry_urls = bzlmod_registry_urls(&parsed.flags)?;
+        let repository_environment_overrides = repository_environment_overrides(&parsed.flags)?;
         Ok(Self {
             expression: cquery_expression,
             output_mode,
@@ -200,6 +205,7 @@ impl CqueryRequest {
             bzlmod_policy,
             lockfile_mode,
             registry_urls,
+            repository_environment_overrides,
         })
     }
 }

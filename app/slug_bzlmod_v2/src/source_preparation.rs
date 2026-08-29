@@ -173,6 +173,7 @@ impl<T> SourcePreparationOutcome<T> {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct SourcePreparationNeeds {
     root_module_bootstrap: Option<RootModuleBootstrapRequest>,
+    repository_environment: Option<crate::NeedRepositoryEnvironmentNames>,
     path_observations: Option<NeedPathObservations>,
     repository_materializations:
         Arc<SmallMap<RepositoryMaterializationRequestId, Arc<RepositoryMaterializationRequest>>>,
@@ -181,6 +182,7 @@ pub struct SourcePreparationNeeds {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum SourcePreparationNeedsError {
     ConflictingRootModuleBootstrap,
+    RepositoryEnvironment(crate::RepositoryEnvironmentCanonicalError),
     ConflictingRepositoryRequest { canonical_repo: CanonicalRepoName },
 }
 
@@ -188,6 +190,7 @@ impl SourcePreparationNeeds {
     pub fn root_module_bootstrap(request: RootModuleBootstrapRequest) -> Self {
         Self {
             root_module_bootstrap: Some(request),
+            repository_environment: None,
             path_observations: None,
             repository_materializations: Arc::new(SmallMap::new()),
         }
@@ -196,6 +199,7 @@ impl SourcePreparationNeeds {
     pub fn path(need: NeedPathObservations) -> Self {
         Self {
             root_module_bootstrap: None,
+            repository_environment: None,
             path_observations: Some(need),
             repository_materializations: Arc::new(SmallMap::new()),
         }
@@ -206,6 +210,7 @@ impl SourcePreparationNeeds {
         repository_materializations.insert(request.id.clone(), Arc::new(request));
         Self {
             root_module_bootstrap: None,
+            repository_environment: None,
             path_observations: None,
             repository_materializations: Arc::new(repository_materializations),
         }
@@ -213,6 +218,19 @@ impl SourcePreparationNeeds {
 
     pub fn root_module_bootstrap_request(&self) -> Option<&RootModuleBootstrapRequest> {
         self.root_module_bootstrap.as_ref()
+    }
+
+    pub fn repository_environment(&self) -> Option<&crate::NeedRepositoryEnvironmentNames> {
+        self.repository_environment.as_ref()
+    }
+
+    pub fn environment(request: crate::NeedRepositoryEnvironmentNames) -> Self {
+        Self {
+            root_module_bootstrap: None,
+            repository_environment: Some(request),
+            path_observations: None,
+            repository_materializations: Arc::new(SmallMap::new()),
+        }
     }
 
     pub fn path_observations(&self) -> Option<&NeedPathObservations> {
@@ -226,6 +244,15 @@ impl SourcePreparationNeeds {
     }
 
     pub fn try_union(&self, other: &Self) -> Result<Self, SourcePreparationNeedsError> {
+        let repository_environment =
+            match (&self.repository_environment, &other.repository_environment) {
+                (Some(left), Some(right)) => Some(
+                    left.try_union(right)
+                        .map_err(SourcePreparationNeedsError::RepositoryEnvironment)?,
+                ),
+                (Some(need), None) | (None, Some(need)) => Some(need.dupe()),
+                (None, None) => None,
+            };
         let path_observations = match (&self.path_observations, &other.path_observations) {
             (Some(left), Some(right)) => Some(left.union(right)),
             (Some(need), None) | (None, Some(need)) => Some(need.dupe()),
@@ -255,10 +282,14 @@ impl SourcePreparationNeeds {
                 (None, None) => None,
             };
         debug_assert!(
-            root_module_bootstrap.is_some() || path_observations.is_some() || !requests.is_empty()
+            root_module_bootstrap.is_some()
+                || repository_environment.is_some()
+                || path_observations.is_some()
+                || !requests.is_empty()
         );
         Ok(Self {
             root_module_bootstrap,
+            repository_environment,
             path_observations,
             repository_materializations: Arc::new(requests),
         })
@@ -8511,6 +8542,56 @@ mod tests {
     use crate::RootRepositoryRouteKey;
     use crate::inject_root_module_request_inputs;
     use crate::inject_root_package_policy_inputs;
+
+    #[test]
+    fn source_preparation_needs_union_environment_names_by_workspace() {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let first = SourcePreparationNeeds::environment(
+            crate::NeedRepositoryEnvironmentNames::new(
+                workspace.clone(),
+                crate::RepositoryEnvironmentNameFrontier::from_unsorted([
+                    CompactString::new("B"),
+                    CompactString::new("A"),
+                ]),
+            )
+            .unwrap(),
+        );
+        let second = SourcePreparationNeeds::environment(
+            crate::NeedRepositoryEnvironmentNames::new(
+                workspace,
+                crate::RepositoryEnvironmentNameFrontier::from_unsorted([
+                    CompactString::new("C"),
+                    CompactString::new("B"),
+                ]),
+            )
+            .unwrap(),
+        );
+        let union = first.try_union(&second).unwrap();
+        assert_eq!(
+            union
+                .repository_environment()
+                .unwrap()
+                .names()
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            ["A", "B", "C"]
+        );
+
+        let foreign = SourcePreparationNeeds::environment(
+            crate::NeedRepositoryEnvironmentNames::new(
+                NormalizedAbsolutePath::new("/foreign").unwrap(),
+                crate::RepositoryEnvironmentNameFrontier::from_unsorted([CompactString::new("A")]),
+            )
+            .unwrap(),
+        );
+        assert!(matches!(
+            union.try_union(&foreign),
+            Err(SourcePreparationNeedsError::RepositoryEnvironment(
+                crate::RepositoryEnvironmentCanonicalError::ConflictingNeedWorkspace { .. }
+            ))
+        ));
+    }
 
     fn union_direct_local_fragment_needs(
         outcomes: &SmallMap<PathBuf, Result<<HostRepositorySourceFileKey as Key>::Value, Arc<str>>>,

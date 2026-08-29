@@ -23,6 +23,7 @@ mod registry_io;
 mod repository_archive;
 mod repository_archive_http;
 mod repository_archive_realize;
+mod repository_host_input;
 mod repository_io;
 mod request_revision;
 mod root_apparent_repository_definition;
@@ -95,6 +96,32 @@ pub fn evaluate_workspace_build_command_with_bzlmod_inputs(
     )
 }
 
+pub fn evaluate_workspace_build_command_with_repository_environment(
+    workspace: &std::path::Path,
+    targets: &[slug_identity_v2::TargetPattern],
+    command_policy: slug_bzlmod_v2::BzlmodCommandPolicyKey,
+    environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
+    lockfile_mode: slug_bzlmod_v2::LockfileMode,
+    registry_urls: &[String],
+    repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+    configuration_overlay: slug_configuration_v2::CommandConfigurationOverlay,
+) -> Result<
+    AcceptedCommand<std::sync::Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+    BuildCommandError,
+> {
+    let runtime = WorkspaceRuntime::new(workspace.to_path_buf(), ProcessHostOwner::native())
+        .map_err(BuildCommandError::infrastructure)?;
+    runtime.build_command_with_repository_environment(
+        targets,
+        command_policy,
+        environment_policy,
+        lockfile_mode,
+        registry_urls,
+        repository_environment,
+        configuration_overlay,
+    )
+}
+
 pub fn evaluate_workspace_cquery_command_with_bzlmod_inputs(
     workspace: &std::path::Path,
     expression: &str,
@@ -119,6 +146,36 @@ pub fn evaluate_workspace_cquery_command_with_bzlmod_inputs(
         environment_policy,
         lockfile_mode,
         registry_urls,
+        configuration_overlay,
+    )
+}
+
+pub fn evaluate_workspace_cquery_command_with_repository_environment(
+    workspace: &std::path::Path,
+    expression: &str,
+    include_implicit: bool,
+    include_tool: bool,
+    command_policy: slug_bzlmod_v2::BzlmodCommandPolicyKey,
+    environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
+    lockfile_mode: slug_bzlmod_v2::LockfileMode,
+    registry_urls: &[String],
+    repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+    configuration_overlay: slug_configuration_v2::CommandConfigurationOverlay,
+) -> Result<
+    AcceptedCommand<std::sync::Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
+    CqueryCommandError,
+> {
+    let runtime = WorkspaceRuntime::new(workspace.to_path_buf(), ProcessHostOwner::native())
+        .map_err(CqueryCommandError::infrastructure)?;
+    runtime.cquery_command_with_repository_environment(
+        expression,
+        include_implicit,
+        include_tool,
+        command_policy,
+        environment_policy,
+        lockfile_mode,
+        registry_urls,
+        repository_environment,
         configuration_overlay,
     )
 }
@@ -149,6 +206,36 @@ pub fn evaluate_workspace_query_command_with_policy_and_bzlmod_inputs_and_output
         environment_policy,
         lockfile_mode,
         registry_urls,
+        completion,
+    )
+}
+
+pub fn evaluate_workspace_query_command_with_repository_environment(
+    workspace: &std::path::Path,
+    expression: &str,
+    order: slug_query_v2::QueryOrder,
+    policy: slug_query_v2::QueryPolicy,
+    command_policy: slug_bzlmod_v2::BzlmodCommandPolicyKey,
+    environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
+    lockfile_mode: slug_bzlmod_v2::LockfileMode,
+    registry_urls: &[String],
+    repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+    completion: slug_query_v2::QueryOutputCompletion,
+) -> Result<
+    AcceptedCommand<std::sync::Arc<Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError>>>,
+    slug_query_v2::QueryError,
+> {
+    let runtime = WorkspaceRuntime::new(workspace.to_path_buf(), ProcessHostOwner::native())
+        .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
+    runtime.query_command_with_repository_environment(
+        expression,
+        order,
+        policy,
+        command_policy,
+        environment_policy,
+        lockfile_mode,
+        registry_urls,
+        repository_environment,
         completion,
     )
 }

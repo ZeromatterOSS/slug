@@ -15,7 +15,7 @@ use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::BuildCommandEvaluation;
 use slug_core_v2::runtime::TerminalOutput;
-use slug_core_v2::runtime::evaluate_workspace_build_command_with_bzlmod_inputs;
+use slug_core_v2::runtime::evaluate_workspace_build_command_with_repository_environment;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
 
@@ -32,6 +32,13 @@ pub fn run(argv: Vec<String>) -> i32 {
     };
     let request = match BuildRequest::parse_at_workspace(&argv, &workspace) {
         Ok(request) => request,
+        Err(error) => return super::emit_result(CommandKind::Build, argv, Err(error)),
+    };
+    let repository_environment = match super::repository_environment::capture_repository_environment(
+        &workspace,
+        &request.repository_environment_overrides,
+    ) {
+        Ok(snapshot) => snapshot,
         Err(error) => return super::emit_result(CommandKind::Build, argv, Err(error)),
     };
     let environment_value = match capture_bzlmod_allow_yanked_versions() {
@@ -53,16 +60,21 @@ pub fn run(argv: Vec<String>) -> i32 {
             &request.lockfile_mode,
             &request.registry_urls,
         );
-        return run_daemon_build(&argv, &output_base, request, bzlmod);
+        let repository_environment =
+            slug_server_v2::RepositoryEnvironmentRequestInputs::from_normalized(
+                &repository_environment,
+            );
+        return run_daemon_build(&argv, &output_base, request, bzlmod, repository_environment);
     }
 
-    let accepted = match evaluate_workspace_build_command_with_bzlmod_inputs(
+    let accepted = match evaluate_workspace_build_command_with_repository_environment(
         &workspace,
         &request.targets,
         request.bzlmod_policy.clone(),
         environment_policy,
         request.lockfile_mode.clone(),
         &request.registry_urls,
+        repository_environment,
         request.configuration_overlay.clone(),
     ) {
         Ok(accepted) => accepted,
@@ -92,8 +104,8 @@ pub fn run(argv: Vec<String>) -> i32 {
                     "{\"success\":true,\"command\":\"build\",\"target_count\":1,\"loaded_package_count\":1,\"analyzed_target_count\":0,\"declared_action_count\":0,\"runtime_mode\":\"one-shot\",\"completed_boundary\":\"dice_exported_source_file\"}\n".to_owned(),
                 );
             }
-            let argv_json = argv
-                .iter()
+            let argv_json = super::repository_environment::redacted_repository_environment_argv(&argv)
+                .into_iter()
                 .map(|arg| format!("\"{}\"", json_escape(arg)))
                 .collect::<Vec<_>>()
                 .join(",");
@@ -373,6 +385,7 @@ fn run_daemon_build(
     output_base: &str,
     request: BuildRequest,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
+    repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
 ) -> i32 {
     let output_base_path = std::path::Path::new(output_base);
     let _ = std::fs::create_dir_all(output_base_path);
@@ -411,6 +424,7 @@ fn run_daemon_build(
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect(),
         bzlmod,
+        repository_environment,
     };
 
     match slug_server_v2::send_build_request(&socket, &daemon_request) {

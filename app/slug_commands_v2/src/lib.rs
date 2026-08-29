@@ -22,7 +22,11 @@ pub use common::CommandPlaceholderError;
 pub use common::FlagDisposition;
 pub use common::ParsedFlag;
 pub use common::QueryOutputFormat;
+pub use common::RepositoryEnvironmentOverride;
 pub use common::normalize_bzlmod_environment_value;
+pub use common::redact_repository_environment_arg;
+pub use slug_bzlmod_v2::RepositoryEnvironmentEntry;
+pub use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
 pub use slug_configuration_v2::CommandConfigurationOccurrence;
 pub use slug_configuration_v2::CommandConfigurationOverlay;
 

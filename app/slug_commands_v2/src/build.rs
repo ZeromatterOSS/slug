@@ -19,12 +19,14 @@ use crate::common::CommandKind;
 use crate::common::CommandParseError;
 use crate::common::CommandPlaceholderError;
 use crate::common::ParsedFlag;
+use crate::common::RepositoryEnvironmentOverride;
 use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_command_policy_for_workspace;
 use crate::common::bzlmod_lockfile_mode;
 use crate::common::bzlmod_registry_urls;
 use crate::common::command_configuration_occurrence;
 use crate::common::parse_target_patterns;
+use crate::common::repository_environment_overrides;
 use crate::common::split_args;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,6 +37,7 @@ pub struct BuildRequest {
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
     pub registry_urls: Vec<String>,
+    pub repository_environment_overrides: Vec<RepositoryEnvironmentOverride>,
 }
 
 impl BuildRequest {
@@ -60,6 +63,7 @@ impl BuildRequest {
         };
         let lockfile_mode = bzlmod_lockfile_mode(&parsed.flags)?;
         let registry_urls = bzlmod_registry_urls(&parsed.flags)?;
+        let repository_environment_overrides = repository_environment_overrides(&parsed.flags)?;
         let configuration_overlay = build_flag_admission(&parsed.flags)?;
         Ok(Self {
             targets: parse_target_patterns(CommandKind::Build, &parsed.positionals)?,
@@ -68,6 +72,7 @@ impl BuildRequest {
             bzlmod_policy,
             lockfile_mode,
             registry_urls,
+            repository_environment_overrides,
         })
     }
 
@@ -120,6 +125,7 @@ fn admitted_build_flag(name: &str) -> bool {
             | "lockfile_mode"
             | "override_module"
             | "registry"
+            | "repo_env"
             // UI and output-base controls.
             | "color"
             | "show_progress"

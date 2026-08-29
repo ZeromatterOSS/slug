@@ -886,6 +886,36 @@ impl ProcessHostOwner {
             .map_err(|error| format!("reading Rust-native Host configuration inputs: {error:?}"))
     }
 
+    pub(super) fn repository_platform(&self) -> Result<slug_bzlmod_v2::RepositoryPlatform, String> {
+        let os_name = match self
+            .os()
+            .map_err(|error| format!("reading Rust-native repository Host OS: {error:?}"))?
+        {
+            HostOs::Linux => "linux",
+            HostOs::Windows => "windows",
+            HostOs::Macos => "mac os x",
+            HostOs::Freebsd => "freebsd",
+            HostOs::Openbsd => "openbsd",
+            HostOs::Unknown => return Err("unsupported Rust-native repository Host OS".to_owned()),
+        };
+        let arch = match self.cpu().map_err(|error| {
+            format!("reading Rust-native repository Host architecture: {error:?}")
+        })? {
+            HostCpu::X86_32 => "x86",
+            HostCpu::X86_64 => "x86_64",
+            HostCpu::Ppc => "ppc",
+            HostCpu::Arm => "arm",
+            HostCpu::Aarch64 => "aarch64",
+            HostCpu::S390x => "s390x",
+            HostCpu::Mips64 => "mips64",
+            HostCpu::Riscv64 => "riscv64",
+            HostCpu::Unknown => {
+                return Err("unsupported Rust-native repository Host architecture".to_owned());
+            }
+        };
+        Ok(slug_bzlmod_v2::RepositoryPlatform::new(os_name, arch))
+    }
+
     fn default_configuration_inputs_inner(
         &self,
     ) -> Result<slug_configuration_v2::native::host::HostConversionInputs, ProcessHostError> {

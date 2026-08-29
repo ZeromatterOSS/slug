@@ -19,6 +19,7 @@ use crate::common::CommandKind;
 use crate::common::CommandParseError;
 use crate::common::ParsedFlag;
 use crate::common::QueryOutputFormat;
+use crate::common::RepositoryEnvironmentOverride;
 use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_command_policy_for_workspace;
 use crate::common::bzlmod_lockfile_mode;
@@ -26,6 +27,7 @@ use crate::common::bzlmod_registry_urls;
 use crate::common::output_format;
 use crate::common::parse_bool_flag;
 use crate::common::parse_query_expression_for;
+use crate::common::repository_environment_overrides;
 use crate::common::split_args;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,6 +41,7 @@ pub struct QueryRequest {
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
     pub registry_urls: Vec<String>,
+    pub repository_environment_overrides: Vec<RepositoryEnvironmentOverride>,
 }
 
 impl QueryRequest {
@@ -60,6 +63,7 @@ pub(crate) fn parse_query_like(
     workspace: Option<&Path>,
 ) -> Result<QueryRequest, CommandParseError> {
     let parsed = split_args(args);
+    let repository_environment_overrides = repository_environment_overrides(&parsed.flags)?;
     let expression = parse_query_expression_for(command, &parsed.positionals)?;
     let output = output_format(&parsed.flags);
     let (order, graph_factored, policy, bzlmod_policy, lockfile_mode, registry_urls) = if command
@@ -97,6 +101,7 @@ pub(crate) fn parse_query_like(
         bzlmod_policy,
         lockfile_mode,
         registry_urls,
+        repository_environment_overrides,
     })
 }
 
@@ -145,6 +150,7 @@ fn validate_query_flags(
             "registry" => {
                 required_query_flag_value(flag, "a non-empty registry URL")?;
             }
+            "repo_env" => {}
             "override_module" => {
                 flag.value
                     .as_deref()

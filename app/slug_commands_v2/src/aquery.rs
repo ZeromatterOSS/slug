@@ -20,11 +20,13 @@ use slug_query_v2::aquery_expression_spec;
 use crate::common::CommandKind;
 use crate::common::CommandParseError;
 use crate::common::ParsedFlag;
+use crate::common::RepositoryEnvironmentOverride;
 use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_command_policy_for_workspace;
 use crate::common::bzlmod_lockfile_mode;
 use crate::common::bzlmod_registry_urls;
 use crate::common::parse_query_expression_for;
+use crate::common::repository_environment_overrides;
 use crate::common::split_args;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,6 +38,7 @@ pub struct AqueryRequest {
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
     pub registry_urls: Vec<String>,
+    pub repository_environment_overrides: Vec<RepositoryEnvironmentOverride>,
 }
 
 impl AqueryRequest {
@@ -106,7 +109,8 @@ impl AqueryRequest {
                 | "noignore_dev_dependency"
                 | "lockfile_mode"
                 | "override_module"
-                | "registry" => {}
+                | "registry"
+                | "repo_env" => {}
                 _ => {
                     return Err(unsupported(&format!(
                         "{} is not supported by this aquery",
@@ -116,6 +120,7 @@ impl AqueryRequest {
             }
         }
 
+        let repository_environment_overrides = repository_environment_overrides(&parsed.flags)?;
         Ok(Self {
             expression,
             target,
@@ -127,6 +132,7 @@ impl AqueryRequest {
             },
             lockfile_mode: bzlmod_lockfile_mode(&parsed.flags)?,
             registry_urls: bzlmod_registry_urls(&parsed.flags)?,
+            repository_environment_overrides,
         })
     }
 }

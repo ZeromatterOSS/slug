@@ -20,7 +20,7 @@ use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_commands_v2::run::RunRequest;
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::TerminalOutput;
-use slug_core_v2::runtime::evaluate_workspace_build_command_with_bzlmod_inputs;
+use slug_core_v2::runtime::evaluate_workspace_build_command_with_repository_environment;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
 use slug_server_v2::RUN_ENVIRONMENT_TO_CLEAR;
@@ -33,6 +33,13 @@ pub fn run(argv: Vec<String>) -> i32 {
     };
     let request = match parse_run_at_workspace(&argv, &workspace) {
         Ok(request) => request,
+        Err(error) => return super::emit_result(CommandKind::Run, argv, Err(error)),
+    };
+    let repository_environment = match super::repository_environment::capture_repository_environment(
+        &workspace,
+        &request.repository_environment_overrides,
+    ) {
+        Ok(snapshot) => snapshot,
         Err(error) => return super::emit_result(CommandKind::Run, argv, Err(error)),
     };
     let environment = match super::build::capture_bzlmod_allow_yanked_versions()
@@ -57,15 +64,26 @@ pub fn run(argv: Vec<String>) -> i32 {
             &environment,
             &request.lockfile_mode,
         );
-        return run_daemon(&output_base, request, bzlmod, remote);
+        let repository_environment =
+            slug_server_v2::RepositoryEnvironmentRequestInputs::from_normalized(
+                &repository_environment,
+            );
+        return run_daemon(
+            &output_base,
+            request,
+            bzlmod,
+            repository_environment,
+            remote,
+        );
     }
-    let accepted = match evaluate_workspace_build_command_with_bzlmod_inputs(
+    let accepted = match evaluate_workspace_build_command_with_repository_environment(
         &workspace,
         std::slice::from_ref(&request.target),
         request.bzlmod_policy,
         environment,
         request.lockfile_mode,
         &[],
+        repository_environment,
         Default::default(),
     ) {
         Ok(accepted) => accepted,
@@ -112,6 +130,7 @@ fn run_daemon(
     output_base: &str,
     request: RunRequest,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
+    repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
     remote: RemoteConfig,
 ) -> i32 {
     let output_base = Path::new(output_base);
@@ -130,6 +149,7 @@ fn run_daemon(
         executor: remote.executor,
         default_exec_properties: remote.default_exec_properties.into_iter().collect(),
         bzlmod,
+        repository_environment,
     };
     match slug_server_v2::send_run_request(&socket, &daemon_request) {
         Ok(response) => finish_build(

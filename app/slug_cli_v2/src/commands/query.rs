@@ -16,7 +16,7 @@ use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::QueryError;
 use slug_core_v2::runtime::QueryOutputCompletion;
 use slug_core_v2::runtime::TerminalOutput;
-use slug_core_v2::runtime::evaluate_workspace_query_command_with_policy_and_bzlmod_inputs_and_output_completion;
+use slug_core_v2::runtime::evaluate_workspace_query_command_with_repository_environment;
 
 pub fn run(argv: Vec<String>) -> i32 {
     let workspace = match std::env::current_dir() {
@@ -25,6 +25,13 @@ pub fn run(argv: Vec<String>) -> i32 {
     };
     let request = match QueryRequest::parse_at_workspace(&argv, &workspace) {
         Ok(request) => request,
+        Err(error) => return super::emit_result(CommandKind::Query, argv, Err(error)),
+    };
+    let repository_environment = match super::repository_environment::capture_repository_environment(
+        &workspace,
+        &request.repository_environment_overrides,
+    ) {
+        Ok(snapshot) => snapshot,
         Err(error) => return super::emit_result(CommandKind::Query, argv, Err(error)),
     };
     let environment_value = match super::build::capture_bzlmod_allow_yanked_versions() {
@@ -43,28 +50,32 @@ pub fn run(argv: Vec<String>) -> i32 {
             &request.lockfile_mode,
             &request.registry_urls,
         );
-        return run_daemon_query(&output_base, request, bzlmod);
+        let repository_environment =
+            slug_server_v2::RepositoryEnvironmentRequestInputs::from_normalized(
+                &repository_environment,
+            );
+        return run_daemon_query(&output_base, request, bzlmod, repository_environment);
     }
     let completion = if request.output == QueryOutputFormat::LabelKind {
         QueryOutputCompletion::LabelKind
     } else {
         QueryOutputCompletion::Standard
     };
-    let accepted =
-        match evaluate_workspace_query_command_with_policy_and_bzlmod_inputs_and_output_completion(
-            &workspace,
-            &request.expression,
-            request.order,
-            request.policy,
-            request.bzlmod_policy,
-            environment_policy,
-            request.lockfile_mode,
-            &request.registry_urls,
-            completion,
-        ) {
-            Ok(accepted) => accepted,
-            Err(error) => return emit_query_error(&error, "one-shot"),
-        };
+    let accepted = match evaluate_workspace_query_command_with_repository_environment(
+        &workspace,
+        &request.expression,
+        request.order,
+        request.policy,
+        request.bzlmod_policy,
+        environment_policy,
+        request.lockfile_mode,
+        &request.registry_urls,
+        repository_environment,
+        completion,
+    ) {
+        Ok(accepted) => accepted,
+        Err(error) => return emit_query_error(&error, "one-shot"),
+    };
     let published = accepted
         .project(|terminal| match terminal.as_ref() {
             Ok(output) => {
@@ -100,6 +111,7 @@ fn run_daemon_query(
     output_base: &str,
     request: QueryRequest,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
+    repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
 ) -> i32 {
     let output_base = std::path::Path::new(output_base);
     if let Err(error) = std::fs::create_dir_all(output_base) {
@@ -118,6 +130,7 @@ fn run_daemon_query(
         graph_factored: request.graph_factored,
         strict_test_suite: request.policy.strict_test_suite,
         bzlmod,
+        repository_environment,
     };
     match slug_server_v2::send_query_request(&socket, &request) {
         Ok(response) => {

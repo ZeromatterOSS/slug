@@ -13,6 +13,7 @@ use slug_commands_v2::CommandConfigurationOccurrence;
 use slug_commands_v2::FlagDisposition;
 use slug_commands_v2::HELP_SUMMARY;
 use slug_commands_v2::QueryOutputFormat;
+use slug_commands_v2::RepositoryEnvironmentOverride;
 use slug_commands_v2::aquery::AqueryRequest;
 use slug_commands_v2::build::BuildRequest;
 use slug_commands_v2::cquery::CqueryOutputMode;
@@ -1175,4 +1176,72 @@ fn command_module_override_errors_follow_raw_argv_order() {
             .to_string()
             .contains("workspace-owned command path")
     );
+}
+
+#[test]
+fn repository_environment_overrides_are_ordered_category_wide_and_redacted() {
+    let args = [
+        "--repo_env=B=first=tail",
+        "--repo_env=A",
+        "--repo_env==B",
+        "--repo_env=B=",
+        "//pkg:bin",
+    ];
+    let expected = vec![
+        RepositoryEnvironmentOverride::Set {
+            name: "B".to_owned(),
+            value: "first=tail".to_owned(),
+        },
+        RepositoryEnvironmentOverride::Inherit {
+            name: "A".to_owned(),
+        },
+        RepositoryEnvironmentOverride::Unset {
+            name: "B".to_owned(),
+        },
+        RepositoryEnvironmentOverride::Set {
+            name: "B".to_owned(),
+            value: String::new(),
+        },
+    ];
+    let build = BuildRequest::parse(&args).unwrap();
+    assert_eq!(build.repository_environment_overrides, expected);
+    assert!(!format!("{:?}", build.repository_environment_overrides).contains("first=tail"));
+    let debug = format!("{build:?}");
+    assert!(!debug.contains("first=tail"), "{debug}");
+    assert!(debug.contains("--repo_env=<redacted>"), "{debug}");
+
+    let category_debug = [
+        format!(
+            "{:?}",
+            QueryRequest::parse(&["--repo_env=A=category-secret", "//pkg:bin"]).unwrap()
+        ),
+        format!(
+            "{:?}",
+            AqueryRequest::parse(&["--repo_env=A=category-secret", "//pkg:bin"]).unwrap()
+        ),
+        format!(
+            "{:?}",
+            CqueryRequest::parse(&["--repo_env=A=category-secret", "//pkg:bin"]).unwrap()
+        ),
+        format!(
+            "{:?}",
+            RunRequest::parse(&["--repo_env=A=category-secret", "//pkg:bin"]).unwrap()
+        ),
+        format!(
+            "{:?}",
+            TestRequest::parse(&["--repo_env=A=category-secret", "//pkg:test"]).unwrap()
+        ),
+    ];
+    for debug in category_debug {
+        assert!(!debug.contains("category-secret"), "{debug}");
+        assert!(debug.contains("<redacted>"), "{debug}");
+    }
+
+    for malformed in ["--repo_env", "--repo_env=", "--repo_env=="] {
+        let error = BuildRequest::parse(&[malformed, "//pkg:bin"])
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("--repo_env=<redacted>"), "{error}");
+        assert!(!error.contains("sentinel-secret"), "{error}");
+    }
 }

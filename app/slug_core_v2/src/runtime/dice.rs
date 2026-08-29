@@ -678,6 +678,7 @@ struct NativeDemandRequestInputBundle {
     environment_policy: BzlmodEnvironmentPolicyKey,
     lockfile_mode: LockfileMode,
     registry_urls: RegistryUrls,
+    repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
 }
 
 #[allow(dead_code)]
@@ -697,6 +698,7 @@ impl NativeDemandRequestInputBundle {
                 .expect("default bzlmod environment policy is valid"),
             lockfile_mode: LockfileMode::Update,
             registry_urls: RegistryUrls::default_bazel_registry(),
+            repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
         }
     }
 }
@@ -738,6 +740,7 @@ struct AcceptedNativeDemandSnapshot {
     inputs: NativeDemandInputBundle,
     repository_results: RepositoryMaterializationResultEpoch,
     path_observations: PathObservationEpoch,
+    repository_environment_frontier: slug_bzlmod_v2::RepositoryEnvironmentNameFrontier,
     selected: SelectedWorkspaceDemands,
     events: AcceptedEventEpoch,
 }
@@ -782,6 +785,11 @@ enum NativeDemandSessionError {
     Repository(super::repository_io::RepositorySessionError),
     ConflictingRepository(slug_identity_v2::CanonicalRepoName),
     RepositoryInternalNonProgress,
+    EnvironmentInternalNonProgress,
+    ForeignEnvironmentWorkspace {
+        expected: NormalizedAbsolutePath,
+        actual: NormalizedAbsolutePath,
+    },
     PathInternalNonProgress,
     RevisionInternalNonProgress,
     Revision(RequestRevisionError),
@@ -808,6 +816,13 @@ impl fmt::Display for NativeDemandSessionError {
             Self::RepositoryInternalNonProgress => {
                 f.write_str("repository preparation made no progress")
             }
+            Self::EnvironmentInternalNonProgress => {
+                f.write_str("repository environment preparation made no progress")
+            }
+            Self::ForeignEnvironmentWorkspace { expected, actual } => write!(
+                f,
+                "repository environment need belongs to {actual}, expected {expected}"
+            ),
             Self::PathInternalNonProgress => f.write_str("path preparation made no progress"),
             Self::RevisionInternalNonProgress => {
                 f.write_str("request revision made no bounded progress")
@@ -849,6 +864,7 @@ impl std::error::Error for NativeDemandSessionError {}
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum NativeDemandProgress {
     Repositories,
+    Environment,
     Paths,
 }
 
@@ -866,6 +882,9 @@ struct NativeDemandCommand<'a> {
         SmallMap<RepositoryMaterializationRequestId, Arc<RepositoryMaterializationRequest>>,
     repository_results: RepositoryMaterializationResultEpoch,
     path_observations: PathObservationEpoch,
+    repository_environment_frontier: slug_bzlmod_v2::RepositoryEnvironmentNameFrontier,
+    #[cfg(test)]
+    restoration_host_inputs: Option<slug_bzlmod_v2::RepositoryHostInputTransaction>,
 }
 
 #[allow(dead_code)]
@@ -1084,6 +1103,39 @@ enum NativeDemandTestTrace {
     OutputBufferMoved,
     LeaseClosed,
     AttemptTransactionDroppedBeforeAbort,
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Allocative)]
+struct RepositoryHostRestorationProbeKey(u64);
+
+#[cfg(test)]
+impl fmt::Display for RepositoryHostRestorationProbeKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "repository-host-restoration-probe:{}", self.0)
+    }
+}
+
+#[cfg(test)]
+#[async_trait]
+impl Key for RepositoryHostRestorationProbeKey {
+    type Value = slug_bzlmod_v2::RepositoryHostInputTransaction;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        ctx.per_transaction_data()
+            .data
+            .get::<slug_bzlmod_v2::RepositoryHostInputTransaction>()
+            .expect("every core transaction installs repository Host inputs")
+            .clone()
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
 }
 
 macro_rules! impl_synthetic_root_identity {
@@ -2184,6 +2236,8 @@ impl NativeDemandSessionOwner {
                     repository_results: RepositoryMaterializationResultEpoch::new(workspace, [])
                         .expect("empty repository epoch is valid"),
                     path_observations: PathObservationEpoch::empty(),
+                    repository_environment_frontier:
+                        slug_bzlmod_v2::RepositoryEnvironmentNameFrontier::empty(),
                     selected: SelectedWorkspaceDemands::empty(),
                     events: AcceptedEventEpoch::empty(),
                 },
@@ -5682,6 +5736,11 @@ impl WorkspaceRuntime {
             ..Default::default()
         };
         self.demand_owner.install(&self.dice, &mut data, effects)?;
+        super::repository_host_input::install_repository_host_input_transaction(
+            &mut data,
+            slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
+            slug_bzlmod_v2::RepositoryEnvironmentNameFrontier::empty(),
+        );
         #[cfg(test)]
         if let Some(audit) = &self.activation_audit {
             let runtime = data
@@ -5693,6 +5752,19 @@ impl WorkspaceRuntime {
                 audit: audit.dupe(),
             }));
         }
+        Ok(data)
+    }
+
+    fn user_computation_data_with_repository_host_inputs(
+        &self,
+        effects: Option<Arc<AttemptEffectTracker>>,
+        snapshot: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        frontier: slug_bzlmod_v2::RepositoryEnvironmentNameFrontier,
+    ) -> Result<UserComputationData, CommandEffectError> {
+        let mut data = self.user_computation_data(effects)?;
+        super::repository_host_input::install_repository_host_input_transaction(
+            &mut data, snapshot, frontier,
+        );
         Ok(data)
     }
 
@@ -5765,6 +5837,11 @@ impl WorkspaceRuntime {
             &prior.path_observations,
             preflight.path_observations(),
         );
+        let repository_environment_frontier =
+            super::repository_host_input::initial_repository_environment_frontier(
+                &inputs.request.repository_environment,
+                &prior.repository_environment_frontier,
+            );
         Ok(NativeDemandPreflight {
             command: NativeDemandCommand {
                 runtime: self,
@@ -5781,6 +5858,9 @@ impl WorkspaceRuntime {
                 issued_requests: SmallMap::new(),
                 repository_results: preflight.repository_results().clone(),
                 path_observations,
+                repository_environment_frontier,
+                #[cfg(test)]
+                restoration_host_inputs: None,
             },
         })
     }
@@ -6058,6 +6138,30 @@ impl WorkspaceRuntime {
         AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
         BuildCommandError,
     > {
+        self.build_command_with_repository_environment(
+            targets,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
+            configuration_overlay,
+        )
+    }
+
+    pub fn build_command_with_repository_environment(
+        &self,
+        targets: &[TargetPattern],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+    ) -> Result<
+        AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+        BuildCommandError,
+    > {
         let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
             .map_err(BuildCommandError::infrastructure)?;
         let host = self
@@ -6079,6 +6183,7 @@ impl WorkspaceRuntime {
             environment_policy,
             lockfile_mode,
             registry_urls,
+            repository_environment,
         };
         let accepted = if let Some(observed) = BuildCommandRootObservationKey::new(root.clone()) {
             self.drive_command(request, observed)
@@ -6136,6 +6241,34 @@ impl WorkspaceRuntime {
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
         registry_urls: &[String],
+        configuration_overlay: CommandConfigurationOverlay,
+    ) -> Result<
+        AcceptedCommand<Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
+        CqueryCommandError,
+    > {
+        self.cquery_command_with_repository_environment(
+            expression,
+            include_implicit,
+            include_tool,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
+            configuration_overlay,
+        )
+    }
+
+    pub fn cquery_command_with_repository_environment(
+        &self,
+        expression: &str,
+        include_implicit: bool,
+        include_tool: bool,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
         configuration_overlay: CommandConfigurationOverlay,
     ) -> Result<
         AcceptedCommand<Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
@@ -6210,6 +6343,7 @@ impl WorkspaceRuntime {
             environment_policy,
             lockfile_mode,
             registry_urls,
+            repository_environment,
         };
         let driven = self.drive_command(request, root).map_err(|error| {
             CqueryCommandError::infrastructure(format!("typed cquery command failed: {error}"))
@@ -6249,6 +6383,31 @@ impl WorkspaceRuntime {
         registry_urls: &[String],
         completion: QueryOutputCompletion,
     ) -> Result<AcceptedCommand<Arc<Result<QueryOutput, QueryError>>>, QueryError> {
+        self.query_command_with_repository_environment(
+            expression,
+            order,
+            policy,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
+            completion,
+        )
+    }
+
+    pub fn query_command_with_repository_environment(
+        &self,
+        expression: &str,
+        order: QueryOrder,
+        policy: QueryPolicy,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        completion: QueryOutputCompletion,
+    ) -> Result<AcceptedCommand<Arc<Result<QueryOutput, QueryError>>>, QueryError> {
         let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
             .map_err(|error| QueryError::evaluation(error.to_string()))?;
         let root = RootQueryCommandObservationKey::new(
@@ -6264,6 +6423,7 @@ impl WorkspaceRuntime {
             environment_policy,
             lockfile_mode,
             registry_urls,
+            repository_environment,
         };
         self.drive_command(request, root)
             .map(|result| {
@@ -6867,7 +7027,11 @@ impl NativeDemandCommand<'_> {
             return Err(NativeDemandSessionError::ForeignEffects);
         }
         self.runtime
-            .user_computation_data(Some(attempt.tracker.clone()))
+            .user_computation_data_with_repository_host_inputs(
+                Some(attempt.tracker.clone()),
+                self.inputs.request.repository_environment.clone(),
+                self.repository_environment_frontier.clone(),
+            )
             .map_err(NativeDemandSessionError::Effect)
     }
 
@@ -6881,6 +7045,8 @@ impl NativeDemandCommand<'_> {
             &self.inputs,
             self.repository_results.clone(),
             self.path_observations.clone(),
+            &self.repository_environment_frontier,
+            &self.prior.repository_environment_frontier,
         )
         .map_err(NativeDemandSessionError::Injection)
     }
@@ -6947,6 +7113,31 @@ impl NativeDemandCommand<'_> {
             return Ok(NativeDemandProgress::Repositories);
         }
 
+        if let Some(environment_need) = needs.repository_environment() {
+            let expected =
+                NormalizedAbsolutePath::new(self.runtime.workspace.clone()).map_err(|error| {
+                    NativeDemandSessionError::Injection(anyhow::anyhow!(error.to_string()))
+                })?;
+            if environment_need.workspace() != &expected {
+                return Err(NativeDemandSessionError::ForeignEnvironmentWorkspace {
+                    expected,
+                    actual: environment_need.workspace().clone(),
+                });
+            }
+            if environment_need
+                .names()
+                .difference(&self.repository_environment_frontier)
+                .next()
+                .is_none()
+            {
+                return Err(NativeDemandSessionError::EnvironmentInternalNonProgress);
+            }
+            self.repository_environment_frontier = self
+                .repository_environment_frontier
+                .union(environment_need.names());
+            return Ok(NativeDemandProgress::Environment);
+        }
+
         let Some(path_needs) = needs.path_observations() else {
             return Err(NativeDemandSessionError::PathInternalNonProgress);
         };
@@ -7003,9 +7194,15 @@ impl NativeDemandCommand<'_> {
         let prior = self.prior.clone();
         self.runtime.runtime.block_on(async {
             let mut updater = self.runtime.dice.updater_with_data(
-                self.runtime.user_computation_data(None).map_err(|error| {
-                    NativeDemandSessionError::Restoration(anyhow::anyhow!(error.to_string()))
-                })?,
+                self.runtime
+                    .user_computation_data_with_repository_host_inputs(
+                        None,
+                        prior.inputs.request.repository_environment.clone(),
+                        prior.repository_environment_frontier.clone(),
+                    )
+                    .map_err(|error| {
+                        NativeDemandSessionError::Restoration(anyhow::anyhow!(error.to_string()))
+                    })?,
             );
             inject_native_demand_snapshot(
                 &mut updater,
@@ -7013,9 +7210,25 @@ impl NativeDemandCommand<'_> {
                 &prior.inputs,
                 prior.repository_results,
                 prior.path_observations,
+                &prior.repository_environment_frontier,
+                &self.repository_environment_frontier,
             )
             .map_err(NativeDemandSessionError::Restoration)?;
-            let transaction = self.runtime.request_revision.commit(updater).await;
+            #[allow(unused_mut)]
+            let mut transaction = self.runtime.request_revision.commit(updater).await;
+            #[cfg(test)]
+            {
+                self.restoration_host_inputs = Some(
+                    transaction
+                        .compute(&RepositoryHostRestorationProbeKey(self.lease.0))
+                        .await
+                        .map_err(|error| {
+                            NativeDemandSessionError::Restoration(anyhow::anyhow!(
+                                error.to_string()
+                            ))
+                        })?,
+                );
+            }
             drop(transaction);
             Ok::<_, NativeDemandSessionError>(())
         })?;
@@ -7105,6 +7318,7 @@ impl NativeDemandCommand<'_> {
                 inputs: self.inputs.clone(),
                 repository_results,
                 path_observations,
+                repository_environment_frontier: self.repository_environment_frontier.clone(),
                 selected,
                 events: self.prior.events.dupe(),
             },
@@ -7370,7 +7584,9 @@ impl<'a> NativeDemandAbortGuard<'a> {
     }
 
     #[cfg(test)]
-    fn discard(&mut self) -> Result<(), NativeDemandSessionError> {
+    fn discard(
+        &mut self,
+    ) -> Result<slug_bzlmod_v2::RepositoryHostInputTransaction, NativeDemandSessionError> {
         let suppression = self.suppress_attempt();
         let restoration = self
             .command
@@ -7383,9 +7599,17 @@ impl<'a> NativeDemandAbortGuard<'a> {
                 Err(error)
             }
             Ok(()) => {
+                let restoration_host_inputs = self
+                    .command
+                    .as_mut()
+                    .expect("restored native-demand guard owns its command")
+                    .restoration_host_inputs
+                    .take()
+                    .expect("test restoration transaction was probed");
                 self.phase = NativeDemandAbortPhase::Closed;
                 self.command = None;
-                suppression
+                suppression?;
+                Ok(restoration_host_inputs)
             }
         }
     }
@@ -7670,7 +7894,11 @@ fn prepare_selected_native_demand_snapshot(
     let mut updater = command.runtime.dice.updater_with_data(
         command
             .runtime
-            .user_computation_data(None)
+            .user_computation_data_with_repository_host_inputs(
+                None,
+                snapshot.inputs.request.repository_environment.clone(),
+                snapshot.repository_environment_frontier.clone(),
+            )
             .map_err(|error| {
                 NativeDemandSessionError::Injection(anyhow::anyhow!(error.to_string()))
             })?,
@@ -7681,6 +7909,8 @@ fn prepare_selected_native_demand_snapshot(
         &snapshot.inputs,
         snapshot.repository_results.clone(),
         snapshot.path_observations.clone(),
+        &snapshot.repository_environment_frontier,
+        &command.prior.repository_environment_frontier,
     )
     .map_err(NativeDemandSessionError::Injection)?;
     // Keep the provisional terminal alive until its prepared updater reaches
@@ -7714,6 +7944,8 @@ fn inject_native_demand_snapshot(
     inputs: &NativeDemandInputBundle,
     repository_results: RepositoryMaterializationResultEpoch,
     path_observations: PathObservationEpoch,
+    repository_environment_frontier: &slug_bzlmod_v2::RepositoryEnvironmentNameFrontier,
+    replaced_repository_environment_frontier: &slug_bzlmod_v2::RepositoryEnvironmentNameFrontier,
 ) -> anyhow::Result<()> {
     let workspace = NormalizedAbsolutePath::new(runtime.workspace.clone())
         .context("normalizing native-demand workspace")?;
@@ -7744,6 +7976,19 @@ fn inject_native_demand_snapshot(
         inputs.generations.registry,
     )
     .context("injecting fixed registry request inputs")?;
+    super::repository_host_input::inject_repository_host_inputs(
+        updater,
+        &workspace,
+        runtime
+            .process_host
+            .repository_platform()
+            .map_err(anyhow::Error::msg)?,
+        &inputs.request.repository_environment,
+        repository_environment_frontier,
+        replaced_repository_environment_frontier,
+    )
+    .map_err(anyhow::Error::msg)
+    .context("injecting fixed repository Host inputs")?;
     updater
         .changed_to(vec![(
             RepositoryMaterializationGenerationKey {
@@ -9730,6 +9975,11 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
     mod cquery_command_tests {
         include!("tests/cquery_command_tests.rs");
     }
+
+    mod repository_host_input_tests {
+        include!("tests/repository_host_input_tests.rs");
+    }
+
     fn accepted_native_snapshot(runtime: &WorkspaceRuntime) -> AcceptedNativeDemandSnapshot {
         runtime
             .native_demand_sessions
@@ -9748,6 +9998,10 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         assert_eq!(retained.inputs, expected.inputs);
         assert_eq!(retained.repository_results, expected.repository_results);
         assert_eq!(retained.path_observations, expected.path_observations);
+        assert_eq!(
+            retained.repository_environment_frontier,
+            expected.repository_environment_frontier
+        );
         assert_eq!(retained.selected, expected.selected);
         assert_eq!(retained.events, expected.events);
         runtime.runtime.block_on(async {
@@ -10097,6 +10351,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             .unwrap(),
             lockfile_mode: LockfileMode::Refresh,
             registry_urls: RegistryUrls::new(["https://accepted.example/"]),
+            repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
         };
         let accepted_plan = synthetic_plan(
             120,
@@ -10127,6 +10382,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .unwrap(),
             lockfile_mode: LockfileMode::Off,
             registry_urls: RegistryUrls::new(["https://rejected.example/"]),
+            repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
         };
         let mut panic_plan = synthetic_plan(
             121,
@@ -10260,6 +10516,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             .unwrap(),
             lockfile_mode: LockfileMode::Refresh,
             registry_urls: RegistryUrls::new(["https://accepted.example/"]),
+            repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
         };
         let accepted_plan = synthetic_plan(
             125,

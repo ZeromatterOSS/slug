@@ -11,6 +11,7 @@
 //! build request, and receives a JSON build response. The daemon process
 //! persists across requests so DICE state survives between builds.
 
+use std::fmt;
 use std::io::BufRead;
 use std::io::Write;
 use std::os::unix::net::UnixListener;
@@ -24,6 +25,8 @@ use serde::Serialize;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::RepositoryEnvironmentEntry;
+use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
 use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_identity_v2::TargetPattern;
@@ -41,6 +44,8 @@ pub struct BuildRequest {
     pub default_exec_properties: Vec<(String, String)>,
     #[serde(default)]
     pub bzlmod: BzlmodRequestInputs,
+    #[serde(default)]
+    pub repository_environment: RepositoryEnvironmentRequestInputs,
 }
 
 /// A loading query request sent over the same daemon protocol.
@@ -56,6 +61,8 @@ pub struct QueryRequest {
     pub strict_test_suite: bool,
     #[serde(default)]
     pub bzlmod: BzlmodRequestInputs,
+    #[serde(default)]
+    pub repository_environment: RepositoryEnvironmentRequestInputs,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -63,6 +70,8 @@ pub struct AqueryRequest {
     pub expression: String,
     #[serde(default)]
     pub bzlmod: BzlmodRequestInputs,
+    #[serde(default)]
+    pub repository_environment: RepositoryEnvironmentRequestInputs,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -77,6 +86,65 @@ pub struct CqueryRequest {
     pub configuration_overlay: CommandConfigurationOverlay,
     #[serde(default)]
     pub bzlmod: BzlmodRequestInputs,
+    #[serde(default)]
+    pub repository_environment: RepositoryEnvironmentRequestInputs,
+}
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepositoryEnvironmentWireEntry {
+    pub name: String,
+    pub value: String,
+}
+
+impl fmt::Debug for RepositoryEnvironmentWireEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RepositoryEnvironmentWireEntry")
+            .field("name", &self.name)
+            .field("value", &"<redacted>")
+            .finish()
+    }
+}
+
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepositoryEnvironmentRequestInputs {
+    pub entries: Vec<RepositoryEnvironmentWireEntry>,
+}
+
+impl fmt::Debug for RepositoryEnvironmentRequestInputs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RepositoryEnvironmentRequestInputs")
+            .field("entries", &self.entries)
+            .finish()
+    }
+}
+
+impl RepositoryEnvironmentRequestInputs {
+    pub fn from_normalized(snapshot: &RepositoryEnvironmentSnapshot) -> Self {
+        Self {
+            entries: snapshot
+                .iter()
+                .map(|entry| RepositoryEnvironmentWireEntry {
+                    name: entry.name().to_owned(),
+                    value: entry.value().to_string(),
+                })
+                .collect(),
+        }
+    }
+
+    fn normalize(&self) -> Result<RepositoryEnvironmentSnapshot, String> {
+        RepositoryEnvironmentSnapshot::from_canonical(std::sync::Arc::from(
+            self.entries
+                .iter()
+                .map(|entry| {
+                    RepositoryEnvironmentEntry::new(
+                        entry.name.clone(),
+                        std::sync::Arc::<str>::from(entry.value.as_str()),
+                    )
+                })
+                .collect::<Vec<_>>(),
+        ))
+        .map_err(|error| error.to_string())
+    }
 }
 
 /// The complete daemon-wire output surface admitted by configured query.
@@ -310,13 +378,17 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     Ok(inputs) => inputs,
                     Err(error) => return malformed_bzlmod_response(error),
                 };
+            let repository_environment = match request.repository_environment.normalize() {
+                Ok(inputs) => inputs,
+                Err(error) => return malformed_repository_environment_response(error),
+            };
             let targets: Vec<TargetPattern> = request
                 .targets
                 .iter()
                 .filter_map(|t| TargetPattern::parse(t).ok())
                 .collect();
             let remote = build_remote_config(&request);
-            let result = daemon.build_with_bzlmod_inputs(
+            let result = daemon.build_with_repository_environment(
                 &targets,
                 &remote,
                 &[],
@@ -324,6 +396,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 environment_policy,
                 lockfile_mode,
                 registry_urls,
+                repository_environment,
                 request.configuration_overlay.clone(),
             );
             DaemonResponse {
@@ -340,6 +413,10 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     Ok(inputs) => inputs,
                     Err(error) => return malformed_bzlmod_response(error),
                 };
+            let repository_environment = match request.repository_environment.normalize() {
+                Ok(inputs) => inputs,
+                Err(error) => return malformed_repository_environment_response(error),
+            };
             let [target] = request.targets.as_slice() else {
                 return run_request_error("run requires exactly one target");
             };
@@ -353,13 +430,14 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 return run_request_error("run command configuration is unsupported");
             }
             let remote = build_remote_config(&request);
-            let (result, executable) = daemon.run_with_bzlmod_inputs(
+            let (result, executable) = daemon.run_with_repository_environment(
                 &[target],
                 &remote,
                 command_policy,
                 environment_policy,
                 lockfile_mode,
                 registry_urls,
+                repository_environment,
             );
             let run_launch_plan = executable.map(|path| RunLaunchPlan {
                 executable_path: path.display().to_string(),
@@ -386,6 +464,10 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     Ok(inputs) => inputs,
                     Err(error) => return malformed_bzlmod_response(error),
                 };
+            let repository_environment = match request.repository_environment.normalize() {
+                Ok(inputs) => inputs,
+                Err(error) => return malformed_repository_environment_response(error),
+            };
             let order = match slug_query_v2::QueryOrder::parse(&request.order_output) {
                 Ok(order) => order,
                 Err(error) => {
@@ -398,7 +480,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     };
                 }
             };
-            let result = daemon.query_with_output_policy_and_bzlmod_inputs(
+            let result = daemon.query_with_repository_environment(
                 &request.expression,
                 order,
                 &request.output,
@@ -410,6 +492,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 environment_policy,
                 lockfile_mode,
                 registry_urls,
+                repository_environment,
             );
             DaemonResponse {
                 exit_code: result.exit_code,
@@ -425,6 +508,10 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     Ok(inputs) => inputs,
                     Err(error) => return malformed_bzlmod_response(error),
                 };
+            let repository_environment = match request.repository_environment.normalize() {
+                Ok(inputs) => inputs,
+                Err(error) => return malformed_repository_environment_response(error),
+            };
             let (target, scope) = match validate_aquery_expression(&request.expression) {
                 Ok(validated) => validated,
                 Err(error) => {
@@ -440,13 +527,14 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     };
                 }
             };
-            let result = daemon.aquery_with_bzlmod_inputs(
+            let result = daemon.aquery_with_repository_environment(
                 &target,
                 scope,
                 command_policy,
                 environment_policy,
                 lockfile_mode,
                 registry_urls,
+                repository_environment,
             );
             DaemonResponse {
                 exit_code: result.exit_code,
@@ -462,6 +550,10 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     Ok(inputs) => inputs,
                     Err(error) => return malformed_bzlmod_response(error),
                 };
+            let repository_environment = match request.repository_environment.normalize() {
+                Ok(inputs) => inputs,
+                Err(error) => return malformed_repository_environment_response(error),
+            };
             if let Err(error) = validate_cquery_expression(
                 &request.expression,
                 request.include_implicit,
@@ -478,7 +570,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     run_launch_plan: None,
                 };
             }
-            let result = daemon.cquery_with_bzlmod_inputs(
+            let result = daemon.cquery_with_repository_environment(
                 &request.expression,
                 request.include_implicit,
                 request.include_tool,
@@ -487,6 +579,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 environment_policy,
                 lockfile_mode,
                 registry_urls,
+                repository_environment,
                 request.configuration_overlay.clone(),
             );
             DaemonResponse {
@@ -573,6 +666,19 @@ fn malformed_bzlmod_response(error: String) -> DaemonResponse {
     }
 }
 
+fn malformed_repository_environment_response(error: String) -> DaemonResponse {
+    DaemonResponse {
+        exit_code: 2,
+        stdout: String::new(),
+        stderr: format!(
+            "{{\"error\":\"repository_environment_request_error\",\"message\":\"{}\"}}",
+            slug_core_v2::error::json_escape(&error)
+        ),
+        invalidated_files: 0,
+        run_launch_plan: None,
+    }
+}
+
 fn build_remote_config(request: &BuildRequest) -> RemoteConfig {
     let mut config = RemoteConfig {
         executor: None,
@@ -643,6 +749,7 @@ pub fn send_query_request(
         graph_factored: request.graph_factored,
         strict_test_suite: request.strict_test_suite,
         bzlmod: request.bzlmod.clone(),
+        repository_environment: request.repository_environment.clone(),
     }))
     .context("serializing query request for daemon")?;
     write!(stream, "{json}\n").context("sending query request to daemon")?;
@@ -659,6 +766,7 @@ pub fn send_aquery_request(
     let json = serde_json::to_string(&DaemonRequest::Aquery(AqueryRequest {
         expression: request.expression.clone(),
         bzlmod: request.bzlmod.clone(),
+        repository_environment: request.repository_environment.clone(),
     }))
     .context("serializing aquery request for daemon")?;
     write!(stream, "{json}\n").context("sending aquery request to daemon")?;
@@ -679,6 +787,7 @@ pub fn send_cquery_request(
         output: request.output,
         configuration_overlay: request.configuration_overlay.clone(),
         bzlmod: request.bzlmod.clone(),
+        repository_environment: request.repository_environment.clone(),
     }))
     .context("serializing cquery request for daemon")?;
     write!(stream, "{json}\n").context("sending cquery request to daemon")?;

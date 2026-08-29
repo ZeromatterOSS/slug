@@ -48,6 +48,8 @@ pub struct Daemon {
     #[cfg(test)]
     forwarded_bzlmod_inputs: Vec<crate::server::BzlmodRequestInputs>,
     #[cfg(test)]
+    forwarded_repository_environments: Vec<slug_bzlmod_v2::RepositoryEnvironmentSnapshot>,
+    #[cfg(test)]
     process_host_for_test: std::sync::Arc<ProcessHostOwner>,
 }
 
@@ -68,6 +70,8 @@ impl Daemon {
             observations: FilesystemObservationAdapter::default(),
             #[cfg(test)]
             forwarded_bzlmod_inputs: Vec::new(),
+            #[cfg(test)]
+            forwarded_repository_environments: Vec::new(),
         })
     }
     pub fn workspace(&self) -> &Path {
@@ -107,6 +111,31 @@ impl Daemon {
         registry_urls: Vec<String>,
         configuration_overlay: CommandConfigurationOverlay,
     ) -> BuildResult {
+        self.build_with_repository_environment(
+            targets,
+            remote,
+            argv,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
+            configuration_overlay,
+        )
+    }
+
+    pub fn build_with_repository_environment(
+        &mut self,
+        targets: &[TargetPattern],
+        remote: &RemoteConfig,
+        argv: &[String],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+    ) -> BuildResult {
         self.build_or_run_with_bzlmod_inputs(
             targets,
             remote,
@@ -115,6 +144,7 @@ impl Daemon {
             environment_policy,
             lockfile_mode,
             registry_urls,
+            repository_environment,
             configuration_overlay,
             false,
         )
@@ -130,6 +160,27 @@ impl Daemon {
         lockfile_mode: LockfileMode,
         registry_urls: Vec<String>,
     ) -> (BuildResult, Option<PathBuf>) {
+        self.run_with_repository_environment(
+            targets,
+            remote,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
+        )
+    }
+
+    pub fn run_with_repository_environment(
+        &mut self,
+        targets: &[TargetPattern],
+        remote: &RemoteConfig,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+    ) -> (BuildResult, Option<PathBuf>) {
         self.build_or_run_with_bzlmod_inputs(
             targets,
             remote,
@@ -138,6 +189,7 @@ impl Daemon {
             environment_policy,
             lockfile_mode,
             registry_urls,
+            repository_environment,
             CommandConfigurationOverlay::default(),
             true,
         )
@@ -152,6 +204,7 @@ impl Daemon {
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
         registry_urls: Vec<String>,
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
         configuration_overlay: CommandConfigurationOverlay,
         run: bool,
     ) -> (BuildResult, Option<PathBuf>) {
@@ -173,12 +226,16 @@ impl Daemon {
                 &registry_urls,
             ),
         );
-        let accepted = match self.runtime.build_command_with_bzlmod_inputs(
+        #[cfg(test)]
+        self.forwarded_repository_environments
+            .push(repository_environment.clone());
+        let accepted = match self.runtime.build_command_with_repository_environment(
             targets,
             command_policy,
             environment_policy,
             lockfile_mode,
             &registry_urls,
+            repository_environment,
             configuration_overlay,
         ) {
             Ok(accepted) => accepted,
@@ -242,7 +299,10 @@ impl Daemon {
                     } else {
                         let argv_json = argv
                             .iter()
-                            .map(|arg| format!("\"{}\"", json_escape(arg)))
+                            .map(|arg| {
+                                let arg = redact_repository_environment_arg(arg);
+                                format!("\"{}\"", json_escape(arg))
+                            })
                             .collect::<Vec<_>>()
                             .join(",");
                         let completed_boundary = if analyzed_target_count == 0 {
@@ -347,6 +407,33 @@ impl Daemon {
         lockfile_mode: LockfileMode,
         registry_urls: Vec<String>,
     ) -> QueryResult {
+        self.query_with_repository_environment(
+            expression,
+            order,
+            output_format,
+            graph_factored,
+            policy,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
+        )
+    }
+
+    pub fn query_with_repository_environment(
+        &mut self,
+        expression: &str,
+        order: QueryOrder,
+        output_format: &str,
+        graph_factored: bool,
+        policy: QueryPolicy,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+    ) -> QueryResult {
         let completion = match output_format {
             "text" | "label" | "graph" | "package" => QueryOutputCompletion::Standard,
             "label_kind" => QueryOutputCompletion::LabelKind,
@@ -372,18 +459,20 @@ impl Daemon {
                 &registry_urls,
             ),
         );
-        let accepted = match self
-            .runtime
-            .query_command_with_policy_and_bzlmod_inputs_and_output_completion(
-                expression,
-                order,
-                policy,
-                command_policy,
-                environment_policy,
-                lockfile_mode,
-                &registry_urls,
-                completion,
-            ) {
+        #[cfg(test)]
+        self.forwarded_repository_environments
+            .push(repository_environment.clone());
+        let accepted = match self.runtime.query_command_with_repository_environment(
+            expression,
+            order,
+            policy,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            &registry_urls,
+            repository_environment,
+            completion,
+        ) {
             Ok(accepted) => accepted,
             Err(error) => return QueryResult::query_error(&error, invalidated),
         };
@@ -427,6 +516,33 @@ impl Daemon {
         registry_urls: Vec<String>,
         configuration_overlay: CommandConfigurationOverlay,
     ) -> QueryResult {
+        self.cquery_with_repository_environment(
+            expression,
+            include_implicit,
+            include_tool,
+            output,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
+            configuration_overlay,
+        )
+    }
+
+    pub fn cquery_with_repository_environment(
+        &mut self,
+        expression: &str,
+        include_implicit: bool,
+        include_tool: bool,
+        output: crate::server::CqueryOutput,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+    ) -> QueryResult {
         let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => return cquery_error_result(&error.to_string(), 0),
@@ -440,7 +556,10 @@ impl Daemon {
                 &registry_urls,
             ),
         );
-        let accepted = match self.runtime.cquery_command_with_bzlmod_inputs(
+        #[cfg(test)]
+        self.forwarded_repository_environments
+            .push(repository_environment.clone());
+        let accepted = match self.runtime.cquery_command_with_repository_environment(
             expression,
             include_implicit,
             include_tool,
@@ -448,6 +567,7 @@ impl Daemon {
             environment_policy,
             lockfile_mode,
             &registry_urls,
+            repository_environment,
             configuration_overlay,
         ) {
             Ok(accepted) => accepted,
@@ -504,6 +624,27 @@ impl Daemon {
         lockfile_mode: LockfileMode,
         registry_urls: Vec<String>,
     ) -> QueryResult {
+        self.aquery_with_repository_environment(
+            target,
+            scope,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
+        )
+    }
+
+    pub fn aquery_with_repository_environment(
+        &mut self,
+        target: &TargetPattern,
+        scope: AqueryScope,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+    ) -> QueryResult {
         let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => return aquery_error_result(2, &error.to_string(), 0),
@@ -517,12 +658,16 @@ impl Daemon {
                 &registry_urls,
             ),
         );
-        let accepted = match self.runtime.build_command_with_bzlmod_inputs(
+        #[cfg(test)]
+        self.forwarded_repository_environments
+            .push(repository_environment.clone());
+        let accepted = match self.runtime.build_command_with_repository_environment(
             &[target.clone()],
             command_policy,
             environment_policy,
             lockfile_mode,
             &registry_urls,
+            repository_environment,
             CommandConfigurationOverlay::default(),
         ) {
             Ok(accepted) => accepted,
@@ -567,6 +712,21 @@ impl Daemon {
     #[cfg(test)]
     fn take_forwarded_bzlmod_inputs_for_test(&mut self) -> Vec<crate::server::BzlmodRequestInputs> {
         std::mem::take(&mut self.forwarded_bzlmod_inputs)
+    }
+
+    #[cfg(test)]
+    fn take_forwarded_repository_environments_for_test(
+        &mut self,
+    ) -> Vec<slug_bzlmod_v2::RepositoryEnvironmentSnapshot> {
+        std::mem::take(&mut self.forwarded_repository_environments)
+    }
+}
+
+fn redact_repository_environment_arg(arg: &str) -> &str {
+    if arg.starts_with("--repo_env=") {
+        "--repo_env=<redacted>"
+    } else {
+        arg
     }
 }
 
@@ -751,6 +911,8 @@ pub use server::DaemonRequest;
 pub use server::DaemonResponse;
 pub use server::QueryRequest;
 pub use server::RUN_ENVIRONMENT_TO_CLEAR;
+pub use server::RepositoryEnvironmentRequestInputs;
+pub use server::RepositoryEnvironmentWireEntry;
 pub use server::RunLaunchPlan;
 pub use server::pid_path;
 pub use server::send_aquery_request;

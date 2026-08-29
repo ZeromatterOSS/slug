@@ -34,6 +34,7 @@ pub mod parser;
 pub mod registry;
 pub mod registry_dice;
 mod repo_file;
+mod repository_host_input;
 mod repository_ignore;
 pub mod resolution;
 mod root_bootstrap;
@@ -288,6 +289,26 @@ pub use registry_dice::RootModuleRegistryUrls;
 pub use registry_dice::RootModuleRegistryUrlsKey;
 pub use registry_dice::inject_registry_request_inputs;
 pub use registry_dice::install_registry_io;
+#[doc(hidden)]
+pub use repository_host_input::NeedRepositoryEnvironmentNames;
+#[doc(hidden)]
+pub use repository_host_input::RepositoryEnvironmentCanonicalError;
+#[doc(hidden)]
+pub use repository_host_input::RepositoryEnvironmentCell;
+#[doc(hidden)]
+pub use repository_host_input::RepositoryEnvironmentCellKey;
+#[doc(hidden)]
+pub use repository_host_input::RepositoryEnvironmentEntry;
+#[doc(hidden)]
+pub use repository_host_input::RepositoryEnvironmentNameFrontier;
+#[doc(hidden)]
+pub use repository_host_input::RepositoryEnvironmentSnapshot;
+#[doc(hidden)]
+pub use repository_host_input::RepositoryHostInputTransaction;
+#[doc(hidden)]
+pub use repository_host_input::RepositoryPlatform;
+#[doc(hidden)]
+pub use repository_host_input::RepositoryPlatformKey;
 pub use resolution::DevDependencyMode;
 pub use resolution::ModuleDirectiveOwner;
 pub use resolution::ModuleKey;
