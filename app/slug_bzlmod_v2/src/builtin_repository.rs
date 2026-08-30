@@ -214,6 +214,24 @@ const CATALOG: &[CatalogEntry] = &[
         executable: false,
     },
     CatalogEntry {
+        path: "tools/build_defs/cc/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/cc/BUILD"),
+        expected_sha256: "a24f1afcd5bfaaf9fc88ae3455213c83d61988bac5a80e58dd9f954281f6009d",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/cc/action_names.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/cc/action_names.bzl"),
+        expected_sha256: "ede4d3bd51a2a772180a0f3a47cf083e898d4104ec8de27f30ca36a5b8c13951",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/cc/cc_import.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/cc/cc_import.bzl"),
+        expected_sha256: "a11736b1cf82a1216b62b6c8af280d739721c6dde470ff83cd939112a0a84093",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/cpp/cc_configure.bzl",
         bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/cc_configure.bzl"),
         expected_sha256: "f1264cd4a6552eba7368729212aba64031ecd4330923d2bef61a20791ee2b4c5",
@@ -819,11 +837,20 @@ mod tests {
             listing_rows("tools"),
             [
                 ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                ("build_defs".to_owned(), PathDirectoryEntryKind::Directory),
                 ("build_defs.bzl".to_owned(), PathDirectoryEntryKind::File),
                 ("cpp".to_owned(), PathDirectoryEntryKind::Directory),
                 ("launcher".to_owned(), PathDirectoryEntryKind::Directory),
                 ("res".to_owned(), PathDirectoryEntryKind::Directory),
                 ("test".to_owned(), PathDirectoryEntryKind::Directory),
+            ]
+        );
+        assert_eq!(
+            listing_rows("tools/build_defs/cc"),
+            [
+                ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                ("action_names.bzl".to_owned(), PathDirectoryEntryKind::File,),
+                ("cc_import.bzl".to_owned(), PathDirectoryEntryKind::File),
             ]
         );
         assert_eq!(
@@ -993,7 +1020,7 @@ mod tests {
             evaluate_builtin_module_source(BuiltinBazelToolsSnapshot::CURRENT, &source).unwrap();
         assert_eq!(
             hex::encode(value.route_identity.manifest_sha256()),
-            "f999235edbaf1c8c0a46c4ac8a1e370f8f1eb6ea122c23905dc34ee8890e3a0a"
+            "6001b11da394fc0571eb9e943a8a650bfb8a746e460fc9b1c0960d925cd2986c"
         );
         assert_eq!(value.module_sha256, source.sha256());
         assert_eq!(

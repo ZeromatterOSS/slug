@@ -119,6 +119,21 @@ const FILES: &[(&str, &str, bool)] = &[
         false,
     ),
     (
+        "tools/build_defs/cc/BUILD",
+        "a24f1afcd5bfaaf9fc88ae3455213c83d61988bac5a80e58dd9f954281f6009d",
+        false,
+    ),
+    (
+        "tools/build_defs/cc/action_names.bzl",
+        "ede4d3bd51a2a772180a0f3a47cf083e898d4104ec8de27f30ca36a5b8c13951",
+        false,
+    ),
+    (
+        "tools/build_defs/cc/cc_import.bzl",
+        "a11736b1cf82a1216b62b6c8af280d739721c6dde470ff83cd939112a0a84093",
+        false,
+    ),
+    (
         "tools/cpp/cc_configure.bzl",
         "f1264cd4a6552eba7368729212aba64031ecd4330923d2bef61a20791ee2b4c5",
         false,
@@ -259,7 +274,7 @@ async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions(
     assert_eq!(identity.snapshot(), BuiltinBazelToolsSnapshot::Bazel9_2);
     assert_eq!(
         hex::encode(identity.manifest_sha256()),
-        "f999235edbaf1c8c0a46c4ac8a1e370f8f1eb6ea122c23905dc34ee8890e3a0a"
+        "6001b11da394fc0571eb9e943a8a650bfb8a746e460fc9b1c0960d925cd2986c"
     );
 }
 

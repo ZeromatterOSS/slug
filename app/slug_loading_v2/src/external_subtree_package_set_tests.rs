@@ -770,6 +770,7 @@ async fn real_builtin_catalog_discovers_root_and_prefixed_package_sets() {
                 "src/tools/launcher",
                 "src/tools/launcher/util",
                 "tools",
+                "tools/build_defs/cc",
                 "tools/launcher",
                 "tools/res",
                 "tools/test",
@@ -777,7 +778,13 @@ async fn real_builtin_catalog_discovers_root_and_prefixed_package_sets() {
         ),
         (
             "tools",
-            vec!["tools", "tools/launcher", "tools/res", "tools/test"],
+            vec![
+                "tools",
+                "tools/build_defs/cc",
+                "tools/launcher",
+                "tools/res",
+                "tools/test",
+            ],
         ),
     ] {
         let prefix = package(prefix);
