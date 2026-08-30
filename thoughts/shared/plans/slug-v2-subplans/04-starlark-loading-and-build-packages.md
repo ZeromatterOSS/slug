@@ -80,13 +80,22 @@ review. Bazel 9.2 commit `8220c619…` alone defines semantics. Clean Zabel
 and borrowed context lifetime only; `cc_common`/`cc_internal` remain generic
 downstream BCR Starlark discriminators, never parser or Rust C++ rule targets.
 
-Run only `WP-4-5-7A-subrule-loading-declaration-and-late-bound-carrier` next.
-Add `.bzl` declaration/export identity, the eight admitted typed FDO
-`configuration_field` producers, rule attachment, and ordered sparse hidden
-rows plus set-semantic authorization identity under the frozen five-file
-allowlist and caps. The authenticated declaration/attachment must freeze; stop
-configured analysis before hidden late-bound resolution or any invocation/
-action. Do not activate later context, fragment, toolchain, or action packets.
+Commit `965cfde5e` terminally accepts the corrected loading successor after the
+full live/index-only loading gates and focused independent rereview. It retains
+separate direct/transitive identities and callable routes, canonical provider
+predicates, ten typed `cpp` fields, ordinary late-bound rows, and persistent
+`TemplateVariableInfo`, then fails closed before configured hidden resolution.
+
+Configured hidden-dependency R2 preserved the correct pre-call and deferred-XML
+boundaries, but independent review returned `REPLAN`: no accepted command path
+could yet produce the non-default native states needed to prove its ten exact
+`cpp` projections. Run only
+`WP-4-5-7A-effective-native-command-fdo-closure-prerequisite-r1` next. Admit the
+nine field inputs, three suppressors, and implicit repeated `copt` through the
+shared CLI carrier, DICE-owned root mapping, pinned descriptor converters, and
+sole structural configuration owner. Add no generic raw mutator or subrule/
+query behavior. After acceptance, resume hidden dependency resolution as R3
+with R2's call/XML corrections intact.
 
 ## Accepted `.bzl` load-visibility design; implementation activated (2026-08-27)
 

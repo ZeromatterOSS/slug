@@ -1,348 +1,239 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-subrule-loading-declaration-and-late-bound-carrier`
+Packet: `WP-4-5-7A-effective-native-command-fdo-closure-prerequisite-r1`
 
 Milestone: M7A bootstrap-critical generic Starlark/ruleset closure.
 
-Base: accepted six-name category architecture `368ef9296`, symbolic-macro and
-provider loading `e34cfdc7a`, configured macro namespace enforcement
-`541fcfaf2`, accepted subrule lifecycle architecture `4900ce46b`, and the live
-loading owners. All unrelated dirty Rust work remains parked and read-only.
+Base: accepted subrule loading successor `965cfde5e`. Unrelated dirty
+analysis/toolchain and loading work remains parked; implementation must stage
+and validate only packet hunks.
+
+## Why this prerequisite exists
+
+Independent review returned `REPLAN` on the configured-subrule R2 packet. Its
+ten exact `cpp` `configuration_field` projections require non-default native
+configuration states, but Slug currently captures only Starlark build settings,
+`extra_toolchains`, and `extra_execution_platforms`. A public/test-only raw
+mutator would bypass command capture, repository mapping, descriptor conversion,
+implicit requirements, and DICE ownership.
+
+Admit the bounded native command closure below through the real command and
+configuration owners. Then resume
+`WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r3` on the accepted
+producer. This packet does not edit loading, subrule, query, or configured-rule
+dependency code.
 
 ## Observable result
 
-Implement the accepted first Bazel 9.2 rule-side `subrule` vertical: `.bzl`
-declaration/export identity, typed admitted `configuration_field` values,
-rule attachment, and deterministic sparse hidden rows/spans. The authenticated
-rules_cc FDO declaration and `cc_toolchain` attachment must load and freeze,
-then configured analysis must fail closed before hidden late-bound resolution
-or any subrule call/action.
+Joined build and cquery flags for the admitted FDO closure are captured in raw
+order before one-shot/daemon selection, resolved with the root repository
+mapping through the existing command-configuration DICE key, converted by the
+pinned Bazel 9.2 descriptors, and published once through the sole structural
+`SlugConfiguration` owner. Repetition, last-wins, boolean no-form, label
+mapping, and the `fdo_instrument`/`cs_fdo_instrument` implicit `copt` rows
+invalidate and restabilize A/B/A in one retained daemon graph.
 
-This packet implements only successor one of the accepted six-part lifecycle.
-Configured hidden dependencies, call/context execution, nesting, fragments,
-automatic-exec-group toolchains, and broader actions remain inactive.
+The packet exposes no generic native-option mutation API and invokes no
+subrule or C++ rule implementation.
 
-## Learned facts and authority
+## Authority and compatibility
 
-Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is sole semantic
-authority:
+Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is the
+sole semantic authority:
 
-- `StarlarkRuleFunctionsApi.java:1090-1162` and
-  `StarlarkRuleClassFunctions.java:2159-2252` define the declaration ABI,
-  descriptor validation, set conversion, at-most-one toolchain check, and
-  label-deduplicated strictest toolchain requirements;
-- `StarlarkLateBoundDefault.java:50-243`, `BazelBuildApiGlobals.java:97-107`,
-  and `BzlInitThreadContext.java:30-142` show that `configuration_field`
-  resolves a typed fragment class and is cached by fragment class plus tools
-  repository, then selects the annotated field name. The calling/defining
-  `.bzl` module is not part of identity;
-- `StarlarkSubrule.java:74-590` defines export identity, descriptor-order
-  hidden lifting, set-semantic transitive discovery/authentication, hidden-name
-  source prefixes, context locking/restoration/invalidation, and the exact
-  `subrule_ctx` surface;
-- `RuleClass.java:715,1364,1892,2420` retains declaration-order input while the
-  final attached rule-class subrule collection is set-semantic; and
-- `StarlarkSubruleTest` plus `src/test/shell/integration/subrules_test.sh`
-  define public declaration, dependency, context, nesting, fragment,
-  toolchain, query XML, and invisibility observations.
+- `CppOptions.java:350-430,632-758` defines the FDO values, label converters,
+  and both `--copt=-Wno-error` implicit requirements;
+- `CoreOptions.java:567-580` defines `collect_code_coverage`;
+- `OptionsParserImpl.java:382-430,640-712` records a valued option before
+  parsing its implicit child-priority requirements;
+- `OptionValueDescription.java:446-493` proves that an explicitly supplied
+  default still expands implicit requirements; and
+- the pinned 341-row Slug descriptor registry is the source regression for
+  names, types, converters, repeatability, old names, and implicit rows.
 
-The first authenticated BCR consumer is rules_cc
-`cc/private/rules_impl/fdo/fdo_context.bzl` (SHA-256
-`91b7b46c515b4773d5a241e699027212f679ab93160cc79218bd687eac51d5b7`).
-It declares `create_fdo_context` with fragment `cpp` and eight private
-`attr.label` defaults from `configuration_field`; `cc_toolchain.bzl` (SHA-256
-`6a460affdf52e39bcc2ab1d4f7f5f6c135eaae24912a1d1a92f2b5b285321168`)
-attaches it through `rule(subrules = [create_fdo_context])`. The authenticated
-toolchain rule additionally declares ordinary `_libc_top` and `_zipper`
-`attr.label` defaults from the annotated `cpp` fields `libc_top` and `zipper`,
-and aliases `platform_common.TemplateVariableInfo` before constructing the
-rule. `CppConfiguration.java:309,756` proves both additional typed fields;
-`PlatformCommon.java` and `TemplateVariableInfo.java` own the load-capable
-provider constructor. The implementation also uses `ctx.label`,
-`ctx.fragments.cpp`,
-`ctx.actions.declare_file/args/run/symlink`, and
-`cc_common.absolute_symlink`.
+**Exact:** the admitted joined `--name=value` spellings; bare and joined
+boolean plus `--nocollect_code_coverage`; raw direct-occurrence order;
+descriptor conversion; main-repository apparent-label mapping; last-wins for
+single options; ordered accumulation for `copt`; direct-then-implicit order;
+explicit-default implicit expansion; and the resulting structural
+configuration facts.
 
-Therefore a token-only global does not cross real loading, while successful
-declaration/loading still does not imply complete FDO invocation. The first
-successor stops before configured hidden-dependency resolution or any subrule
-call.
+**Slug-native:** structural configuration bytes/identity, Rust diagnostics not
+fixed by a discriminator, and compact typed command carriers.
 
-## Compatibility decision
+**Unsupported/deferred:** space-separated native values; rc/`--config`,
+invocation-policy and mixed-priority expansion; every other native flag;
+generic descriptor admission; configuration transitions that write native
+options; exact Bazel checksum/output paths; C++ fragment projection; configured
+hidden dependencies; and every invocation/action effect.
 
-**Exact:** `.bzl`-only declaration; Starlark-function implementation; export,
-repr, and exported equality identity; private label/label-list descriptors;
-target/exec cfg validation; required defaults; descriptor-order lifting;
-definition-relative literal defaults; `$` ordinary and `:` late-bound hidden
-names; typed admitted `configuration_field` producer identity; direct and
-transitive rule-side authorization; declaration and structural retention of
-the two authenticated ordinary rule-side late-bound defaults; configured
-dependency arguments; exact
-`subrule_ctx` lifetime and admitted members; declared fragment views; zero/one
-toolchain with automatic exec groups; and enclosing-target action ownership.
+## Exact admitted closure
 
-**Slug-native:** structural Rust identities and equality, evaluator/context
-wrappers, valid-Unicode strings, diagnostics not frozen by a discriminating
-test, and compact collection/layout choices.
+Retain one `NativeCommandOption` enum with these thirteen values and no stringly
+open set:
 
-**Unsupported/deferred:** aspect-owned/configured-aspect subrules; rule
-inheritance and `ctx.super()` rows; native fragment/field producers other than
-explicitly admitted typed rows; finalizer macros; multiple toolchains (invalid
-in Bazel 9.2); and complete rules_cc FDO invocation until its action and
-`cc_common.absolute_symlink` families are independently admitted. No C++ rule,
-parser, or evaluator shortcut is authorized.
+1. field inputs: `fdo_optimize`, `xbinary_fdo`, `fdo_profile`,
+   `cs_fdo_profile`, `fdo_prefetch_hints`, `propeller_optimize`,
+   `memprof_profile`, `proto_profile_path`, and `grte_top` (the producer for the
+   Starlark `libc_top` field);
+2. suppressors: `fdo_instrument`, `cs_fdo_instrument`, and
+   `collect_code_coverage`; and
+3. the implicit/repetition closure: `copt`.
 
-## Natural owners and retained representation
+`zipper` has no independent command row: the later configuration-field packet
+derives it from the admitted FDO state and its typed tools-repository identity.
+No rules_cc-specific name or dependency path is introduced.
 
-### Loading definition and attachment
+## Architecture
 
-Add a focused `subrule.rs` loading leaf beside `package.rs`. Its transient and
-frozen `SubruleDefinition` owns the implementation function, definition/export
-identity, ordered private descriptors, requested fragment set, direct nested
-subrule set, and zero/one toolchain requirement. Before export, equality is
-evaluator object identity; after export it is canonical extension label plus
-exported name. Frozen module lifetime owns executable code.
+### Raw command carrier and capture
 
-The existing `FrozenRuleDefinition` converts the ordered direct attachment
-input into three distinct facts:
+Extend `CommandConfigurationOccurrence` with one typed native row containing
+`NativeCommandOption`, the unconverted joined value when present, and boolean
+negation. The existing immutable `Arc<[...]>` overlay remains the only retained
+command sequence and participates in its existing equality/hash/serde identity.
+Every new retained type derives `Allocative` and serde traits.
 
-1. a set-semantic direct-root identity collection for rule-level call
-   authorization and equality;
-2. a separate set-semantic transitive definition collection for
-   authorization, deduplication, equality, fragments, nested subrules, and
-   toolchain publication; and
-3. a deterministic ordered sparse suffix of hidden attribute descriptors plus
-   per-subrule spans for lifting/query presentation.
+`slug_commands_v2::common` recognizes only the thirteen typed names. Nonboolean
+options require joined values. `collect_code_coverage` accepts bare, joined
+boolean, and no-form spellings and rejects a valued no-form. Build and cquery
+already call this common capture before rejecting unsupported flags; do not add
+a parallel parser or change their request owners.
 
-It also retains one frozen callable route per sorted transitive definition.
-Those values stay in their owning frozen module heaps and are addressable from
-the instantiated target for later invocation; their heap addresses never
-participate in package equality. No registry, reload, or second definition
-representation is permitted.
+### Descriptor-driven preparation
 
-Descriptor order follows each definition's `attrs` insertion order. Transitive
-discovery is deterministic first encounter over direct declaration order, but
-duplicates do not change semantic authorization or publish duplicate hidden
-rows. Reordering direct/nested inputs changes deterministic lifted-row
-presentation when first-encounter order changes, but it must not change the
-authorization/publication set. Ordinary rule schemas retain their current
-representation. A separate sparse immutable slice on the frozen rule
-definition and instantiated rule target owns only ordinary attributes whose
-default is an admitted typed `configuration_field`; each row stores the
-attribute name and shared producer identity. It participates in rule/package
-equality and is the sole future configured-resolution input, avoiding a large
-optional field on every ordinary schema. Hidden rows reuse current
-descriptor/default/coercion
-machinery, remain absent from `ctx.attr`, macro inheritance, and
-`native.existing_rules`, and retain `$` versus `:` value-source identity.
-The existing shared `ProviderIdentity` represents label-attribute provider
-predicates. Both conjunction members and alternative conjunctions are
-canonical set-semantic projections; any empty alternative canonicalizes to no
-restriction. `repository_rule`, `tag_class`, and symbolic-macro consumers fail
-closed on late-bound or computed defaults rather than projecting them as
-ordinary `None`.
+Generalize `PreparedCommandNativeOptions` from native-only values to opaque
+complete option-row replacements. It remains phase scratch and publishes no
+partial configuration.
 
-### Typed late-bound producer
+For each raw occurrence in order:
 
-`configuration_field(fragment, name)` returns a frozen loading value with:
+1. select the exact pinned descriptor through the typed enum's class/name;
+2. validate the occurrence shape against the typed option;
+3. convert text/boolean/list rows through the existing native converter and
+   label rows through the existing label converter with the supplied root
+   `OptionLabelContext`;
+4. apply single-option last-wins or append an allow-multiple occurrence to the
+   current scratch value; and
+5. after the direct row, parse and apply that descriptor's pinned implicit
+   requirements at child order through the same typed descriptor path.
 
-- an admitted typed fragment producer ID corresponding to Bazel's fragment
-  class, not a stringly/global lookup;
-- the annotated field name; and
-- canonical tools-repository identity, because annotation default labels may
-  be tools-repository relative.
+Both instrumentation descriptors must obtain `--copt=-Wno-error` from their
+registry metadata, not a second semantic table. Explicit null/default values
+still expand. Preserve duplicates and exact order in `copt`; do not reuse the
+dedupe behavior of registration-pattern flags.
 
-The defining or calling `.bzl` module is deliberately absent. Two modules that
-request the same typed producer, field, and tools repository compare equal;
-changing the tools repository or field does not. The first successor admits
-the eight pinned `cpp` FDO producer rows plus the authenticated `libc_top` and
-`zipper` rows required by the attaching `cc_toolchain` declaration, and fails
-closed for every other fragment/field pair. Later producer additions extend
-the same finite typed table with Bazel-source/oracle proof; they do not add a
-registry or change the carrier.
+Conversion must process every occurrence in raw order before the one existing
+`with_prepared_command_configuration` publication. Errors publish no
+configuration. The empty overlay retains the base allocation.
 
-Configured structural configuration owns the eventual optional canonical
-label and invalidation. A producer value edit leaves package/loading identity
-unchanged and must produce A/B/A configured-dependency/result restoration.
-The loading carrier is not a label and is never canonicalized/stringified
-through the literal-label path.
+### DICE-owned root mapping
 
-### Configured invocation and exact member ledger
+Move native preparation in `slug_analysis_v2::command_configuration` after its
+existing optional root-mapping acquisition. Any admitted label-valued native
+row requests that same mapping input; Starlark and native rows share one
+mapping result, observation epoch, Need union, and error ordering. Root-local
+and apparent-external labels use `OptionLabelContext::MainRepository`.
 
-The existing configured rule analysis key resolves hidden rows through the
-ordinary selector/transition/dependency pipeline and publishes them only as
-arguments to the owning subrule. `SubruleContext` is phase scratch borrowing
-the enclosing rule context, action accumulator, configured owner, and target
-label. It is never frozen, DICE-retained, cached, or shared. Entry locks the
-enclosing rule context; nested entry saves the caller; every success/error exit
-invalidates the callee and restores the caller.
+Do not create a native-option DICE key, mapping cache, label side table, or
+second publication path. The complete structural configuration remains the
+existing command-preparation result and therefore its DICE equality and
+invalidation identity.
 
-The exact Bazel `subrule_ctx` member ledger is only `label`, `actions`,
-`fragments`, and `toolchains`, plus its repr. It does not expose `attr`,
-`outputs`, `build_setting_value`, or the enclosing rule's undeclared fragment/
-toolchain views. Action ownership remains the enclosing configured target.
+## Proof contract
 
-The first call packet admits only action members Slug already owns exactly:
-`declare_file` and `write`; `run_shell` remains available to ordinary rule
-contexts but is not silently claimed for a subrule test that asks for Bazel
-`run`. Bazel `args`, `run`, and `symlink`, the subrule-specific rejection of
-explicit `toolchain`/`exec_group`, and `cc_common.absolute_symlink` require
-their named action-family packets. A subrule FDO replay must stop before the
-first unavailable member and may not be reported as complete invocation.
+Only these exact proof paths are authorized:
 
-## Ordered implementation series and upstream ledger
+- `app/slug_configuration_v2/src/native/tests.rs`, base blob
+  `27b61e8a76dafc4b0e3dd78332988dc59ee019ac`;
+- `app/slug_commands_v2/tests/commands.rs`, base blob
+  `56124af3e9b41f4f0d66649ad5530cddbc9d3e11`; and
+- `app/slug_server_v2/src/tests.rs`, base blob
+  `af68f3a8801c63ed40813672f366905d53f2a9da`.
 
-1. **Loading declaration and late-bound carrier.** Global visibility,
-   instantiation/export/repr/equality, declaration validation, typed FDO
-   `configuration_field` values, rule attachment, hidden rows/spans, and
-   loading equality. Covers `testSubruleFunctionSymbol_*`,
-   `testSubruleInstantiation_*`, attr-length tests, the six declaration
-   validation tests at lines 725-800, invalid-fragment declaration,
-   at-most-one-toolchain declaration, rule-private-API gating, and exact
-   hidden names. No subrule call executes.
-2. **Configured hidden dependencies/query.** Literal and admitted late-bound
-   label/list defaults, target/exec cfg, providers, single-file/executable
-   materialization, override rejection, invisibility from `ctx.attr`, and the
-   three rule-side shell query observations. Covers the rule variants at lines
-   801-1219; aspect variants remain deferred. Prove configured producer-value
-   A/B/A in one DICE graph independently of the loading carrier's stable
-   fragment/field/tools-repository identity.
-3. **Direct call and base context.** Rule declaration authentication, context
-   positional argument, label, `declare_file`/`write`, return values, lock,
-   invalidation, and error restoration. Covers rule-side tests at lines
-   90-133, 423-593, 658-724. It explicitly excludes Bazel `run` rows.
-4. **Nested calls and fragments.** Set-semantic direct/transitive auth,
-   duplicate/shared-diamond discovery, arbitrary chains, caller locking/
-   restoration, and declared fragment visibility. Covers rule-side tests at
-   lines 1452-1899, excluding inheritance rows 199-341.
-5. **Automatic-exec-group toolchain view.** Label-deduplicated strictest
-   requirements and rule-side zero/one toolchain resolution/action defaulting.
-   Covers rule variants at lines 1225-1451 only after automatic exec groups
-   have an exact owner. Aspect rows stay deferred.
-6. **Action-family integration.** Admit `args`, `run`, `symlink`, explicit
-   `toolchain`/`exec_group` rejection, and `cc_common.absolute_symlink` in their
-   natural shared action/cc-common packets. Only then run and claim the full
-   rules_cc FDO invocation terminal.
+Persist compact regressions for:
 
-Reorder, duplicate-direct, duplicate-nested, and shared-diamond proofs must
-separately assert ordered hidden-row presentation and set-semantic
-authorization/publication. A new side registry or duplicated dependency/action
-pipeline is `REPLAN`.
+- build and cquery capture of all thirteen typed rows in exact order, all
+  admitted boolean forms, and rejection of missing/malformed joined values;
+- all nine direct field inputs plus all three suppressors, root/apparent-
+  external label mapping, empty-to-null label behavior, and `grte_top`
+  conversion;
+- single-value last-wins, ordered repeated `copt`, both instrumentation
+  expansions, repeated expansions, explicit-default expansion, and direct/
+  implicit precedence in both orders;
+- no partial publication on a late bad occurrence, empty-overlay allocation
+  reuse, and structural A/B/A bytes;
+- one retained daemon A/B/A discriminator using existing `config_setting`/
+  selector analysis for representative text, label, boolean, and implicit
+  `copt` facts, with no source invalidation; and
+- serde/request round-trip retaining the typed overlay and raw order before
+  daemon analysis.
 
-## First successor frozen contract
+The tests must cite the pinned Bazel source behavior above. Do not use a public
+raw mutator, a test-only production constructor, or configured-subrule code to
+manufacture the states.
 
-This packet is the active
-`WP-4-5-7A-subrule-loading-declaration-and-late-bound-carrier` successor.
+## Frozen implementation envelope
 
-Allowed files and frozen baselines at `541fcfaf2`:
+Allowed production paths at base `965cfde5e`:
 
-- new `app/slug_loading_v2/src/subrule.rs` (absent at base);
-- `app/slug_loading_v2/src/lib.rs`, HEAD/worktree blob
-  `c124cef749503f362c8e38a6d7df8c09dab7d0e6`;
-- `app/slug_loading_v2/src/host_package_load_tests.rs`, proof-only HEAD/worktree
-  blob `c7441748c76a50a6007a24c379c579788f3c84db`, limited to replacing the four
-  stale absence/provider-shape assertions exposed by the full owner gate and
-  adapting existing provider-identity assertions to the shared structural
-  enum retained by the terminal correction;
-- `app/slug_loading_v2/src/package.rs`, HEAD blob
-  `22a2d01bdb317a2bcc5dd9f6c7ba66a451aa457a`, with the pre-existing
-  28-line worktree blob `13bfe7cbc70427baf0dadfa53471c68098eb1599`
-  excluded from the packet and retained unstaged;
-- new `app/slug_loading_v2/tests/subrule_loading.rs` (absent at base); and
-- `app/slug_loading_v2/tests/bzl_invalidation.rs`, HEAD/worktree blob
-  `6874ee9341a1b945be9ac6d7c4a7b9c2ee31bf19`.
+- `app/slug_configuration_v2/src/command.rs`, blob
+  `86c5bfd822430ac4ada8a2b52d6918ad1c03a954`;
+- `app/slug_configuration_v2/src/lib.rs`, blob
+  `2f85f37d7ecd3518eb2b53c8504f49a9258e44a4`;
+- `app/slug_configuration_v2/src/native/configuration.rs`, blob
+  `f62eabe1132452035599a2ea12f9bcce65da0d77`;
+- `app/slug_commands_v2/src/common.rs`, blob
+  `dbb0594a3a20e2f2090d74357acf6243b5b9dec3`; and
+- `app/slug_analysis_v2/src/command_configuration.rs`, blob
+  `99e57d733691fb485aabf2c4a82b06af27739618`.
 
-All other paths are read-only, especially the dirty analysis work,
-`registration_expansion_tests.rs`, and `tests/build_file_loading.rs`. Stage
-exact hunks; validate an index-isolated candidate before acceptance. Caps are
-1,250 production additions, 1,100 proof additions, 2,350 aggregate additions,
-and no touched production function above 150 added lines. `package.rs` is over
-the 2,000-line trigger, so reusable definition/value/validation/lifting logic
-belongs in `subrule.rs`; `package.rs` may contain only global/rule-schema and
-evaluation-owner integration.
+The registry, native/label converters, build/cquery request owners, loading,
+query, configured-rule driver, and every dirty path are read-only inputs.
 
-The successor proves: BUILD exclusion and `.bzl` visibility; export/repr/
-cross-module identity plus pre-export reflexive/distinct-object equality; all
-admitted declaration failures, including repository/tag deferred-default
-rejection; `$`/`:` names; direct-root versus transitive-callable retention;
-descriptor order versus duplicate/reorder/shared-diamond set identity; same
-typed field equality across defining modules; tools-repository/field
-discrimination; canonical provider order/duplicate/empty-alternative equality;
-package semantic A/B/A for descriptor, direct attachment, provider predicate,
-and typed producer edits; exact freeze of the authenticated eight-field FDO declaration;
-and exact freeze of its `cc_toolchain` attachment with the two ordinary
-late-bound fields and an asserted `platform_common.TemplateVariableInfo`
-loading token. Reuse the
-authenticated BCR bytes for a manual source replay; persist only compact
-synthesized regressions, so no new oracle fixture or `fixture.toml` is needed.
+Caps: 800 production additions, 750 proof additions, 1,550 aggregate additions,
+and no new production function above 130 lines. `NativeCommandOption` must fit
+in one byte; the occurrence and overlay retained-size assertions must remain
+bounded. No benchmark is required without a measured regression.
 
-The first deterministic replay stop is configured analysis of a rule carrying
-the attached FDO subrule: it must fail closed at unsupported hidden
-late-bound-dependency resolution before invoking `create_fdo_context` or
-publishing actions. Any earlier missing-`subrule`, missing-
-`configuration_field`, rule-attachment, hidden-name, or package-loading failure
-rejects the packet.
+## Validation and review
 
-Validation: focused new integration test, `bzl_invalidation`, full
-`slug_loading_v2 --tests`, formatting, `git diff --check`, isolated staged-tree
-test, the authenticated FDO/attachment replay, and one rebuilt-CLI ruleset
-replay if the loading binary path changes. No parallel Cargo commands; clean
-stale `slugd` around CLI smokes.
+Run serially:
 
-## DICE, request, lifetime, and performance
+1. focused configuration command tests;
+2. focused commands capture tests;
+3. focused retained-daemon native A/B/A test;
+4. full tests for `slug_configuration_v2`, `slug_commands_v2`,
+   `slug_analysis_v2`, and `slug_server_v2`;
+5. named build/cquery/command-configuration dependents;
+6. `cargo check` for the four affected crates;
+7. formatting, `git diff --check`, forbidden-surface grep, retained-size checks,
+   caps, archive checker, and scheduling consistency; and
+8. an index-only archive repeat containing only this packet and excluding all
+   parked hunks.
 
-No new DICE key, request overlay, asynchronous task, service cache, or fallback
-is authorized. Frozen definitions live with their modules; attached identities
-and hidden rows live with package/rule equality; callable routes remain frozen
-module values but are excluded from semantic equality; configured labels live with
-existing analysis; the sparse ordinary late-bound slice is shared from frozen
-definition to instantiated rule and participates in package equality; call
-contexts are evaluator scratch. Existing package/Bzl
-source observations drive invalidation, and no lock crosses a DICE compute.
+Independent terminal review must check the exact thirteen-row closure,
+descriptor-owned implicit expansion, root-mapping/DICE ownership, error and
+publication ordering, CLI/daemon A/B/A proof, dirty-hunk isolation, caps, and
+the absence of any generic raw mutator.
 
-This changes retained rule/package structures, so every implementation packet
-must use the Buck2-utility reuse skill, measure retained per-rule/per-package
-rows, share definitions/identities, and retain sparse spans. Correctness and
-exact output precede optimization; no benchmark is required without a measured
-hot-path regression.
+Stop and `REPLAN` for an untyped/open native name, public or test-only raw
+mutator, hard-coded duplicate implicit semantic table, missing copt ordering,
+mapping outside the existing DICE owner, partial configuration publication,
+new DICE key/cache/side registry, configured-subrule or query work, an edit
+outside the envelope, unisolatable parked changes, cap overflow, Java helper/
+runtime code, or a rules_cc-specific shortcut.
 
 ## Zabel peer guidance
 
-Clean Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is concept/test
-and optimization guidance only. Useful ideas are sparse hidden suffixes with
-per-subrule spans, definition-relative canonicalization, typed late-bound
-producers, and a subrule context borrowing its enclosing action owner. Copy no
-Zig code, layout, allowlist, diagnostics, or parity claims. Bazel 9.2 remains
-the only authority.
+Zabel's separation of raw invocation capture from effective configuration is
+useful peer guidance. Slug keeps that separation while using its existing typed
+descriptor registry and sole structural option vector. Copy no Zig code,
+allowlist, layout, diagnostic, or parity claim. Bazel 9.2 remains authoritative.
 
-## Review and stops
+## Immediate successor
 
-Independent implementation review must check typed producer identity,
-cross-module and pre-export equality, direct/transitive/callable retention,
-provider-predicate canonicalization, deferred-default consumer rejection,
-ordered-versus-set representation and graph-shape
-proofs, exact dirty-hunk isolation, retained-size accounting, the authenticated
-FDO declaration/attachment freeze, and the configured fail-closed stop. Run the
-full validation contract above plus archive and scheduling consistency checks.
-
-Terminal status: the first review returned `REPLAN` for five representation and
-proof gaps; the bounded correction closes all five. Full live and index-only
-loading gates pass, the rebuilt CLI reaches the unchanged later positional-
-`module_extension` frontier, and focused independent rereview returns `ACCEPT`.
-
-Stop and `REPLAN` for an edit outside the frozen allowlist, cap overflow,
-unisolatable parked hunks, an untyped/global configuration lookup, defining-
-module late-bound identity, a side registry, duplicate rule/dependency/action
-pipeline, evaluator values retained outside frozen module ownership, context
-escape, Java/Bazel runtime dependency, or any claim of complete FDO/C++
-semantics before its named action families are accepted.
-
-## Immediate predecessor
-
-Commit `4900ce46b` accepts the corrected six-part subrule lifecycle
-architecture after independent rereview. It uses typed fragment-class/field/
-tools-repository identity, separates ordered hidden lifting from set-semantic
-authorization/publication, freezes this successor's paths/blobs/caps/proofs,
-and defers unavailable FDO action families honestly. `set` stays
-starlark-rust, while `cc_common`/`cc_internal` are generic downstream BCR
-Starlark consumers.
+After terminal acceptance and commit, re-freeze
+`WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r3`. It must consume
+only this real structural producer, retain the corrected pre-call boundary and
+deferred XML classification from R2, and freeze exact proof paths/base blobs.
