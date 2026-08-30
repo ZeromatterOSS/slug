@@ -94,6 +94,12 @@ Use only the accepted `BuiltinBazelToolsSnapshot::Bazel9_2` catalog:
 5. update the exact route-manifest assertion to the identity derived by the
    unchanged manifest algorithm.
 
+Activation preflight exposed two mechanically coupled proof rows outside the
+initial five-file allowlist: the Root-route capability test separately pins
+the same manifest identity, and the real built-in subtree test separately pins
+the discovered package set. R2 admits only those assertions; neither file may
+change production behavior.
+
 Do not add a source key, cache, parser path, evaluator special case, repository
 name/path branch, fallback, copied-byte adapter, or physical materialization.
 The existing catalog key remains the sole source owner, validates each file
@@ -114,6 +120,12 @@ Implement only this packet with exactly:
   `5b18c39f037ca59d372d9dc31848d390c3e9c7ce`;
 - `app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs` blob
   `6215a27fe725e0df8e4d2fe9ee1ce3ada28cb5e3`;
+- `app/slug_bzlmod_v2/src/host_module.rs` blob
+  `c06420c3d9239501430d9085be1a4353bcaa4b2e`, only its exact manifest
+  assertion;
+- `app/slug_loading_v2/src/external_subtree_package_set_tests.rs` blob
+  `5059540351309945a3c451ee97a883017149bb7c`, only the two exact package-set
+  vectors;
 - new exact asset
   `app/slug_bzlmod_v2/builtin/bazel_tools/tools/build_defs/cc/BUILD`;
 - new exact asset
@@ -122,14 +134,15 @@ Implement only this packet with exactly:
 - new exact asset
   `app/slug_bzlmod_v2/builtin/bazel_tools/tools/build_defs/cc/cc_import.bzl`.
 
-Cap additions at 40 production Rust lines, 60 proof Rust lines, 230 exact asset
+Cap additions at 40 production Rust lines, 70 proof Rust lines, 230 exact asset
 lines/7,200 asset bytes, and 330 aggregate Rust-plus-asset lines. Existing file
 size is not permission to refactor the catalog owner or test ledger.
 
-No loading, package, registration, analysis, command, core, REAPI, Cargo,
-parser, starlark-rust, `set`, `cc_common`, or `cc_internal` file may
-change. The thirteen pre-existing dirty files and all parked proof/selected-
-context hunks remain byte-for-byte unstaged.
+No loading file except the named package-set proof, and no package,
+registration, analysis, command, core, REAPI, Cargo, parser, starlark-rust,
+`set`, `cc_common`, or `cc_internal` file may change. The thirteen
+pre-existing dirty files and all parked proof/selected-context hunks remain
+byte-for-byte unstaged.
 
 ## Required proof and validation
 
