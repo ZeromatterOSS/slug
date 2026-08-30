@@ -21523,3 +21523,52 @@ Independent R4 correction review returns `ACCEPT`. Resume only
 `WP-6-7A-testing-bootstrap-loading-implementation-r4` with exactly four
 explicit user-provider projections and the unchanged category, file, context,
 identity, invocation and 500/700/1,200 boundaries.
+
+#### TestingBootstrap accepted; external `.bzl` source-owner cutover active (2026-08-30)
+
+Commit `ecee4aca5` terminally accepts the full five-binding TestingBootstrap
+loading category, exact member/provider identity, context exclusion and
+fail-closed invocation boundary. Focused proofs, complete serial loading and
+analysis suites, the parked four-row registration test and independent terminal
+review pass. Two daemon-clean fresh-root rules_rust cqueries clear every
+TestingBootstrap lookup and stop identically at
+`@@bazel_tools//tools/build_defs/cc:action_names.bzl` because the root-apparent
+external-module source branch still uses the legacy Host file key rather than
+the accepted immutable observation owner.
+
+Activate only
+`WP-4-5-7A-external-bzl-source-observation-cutover-design`. Freeze a pure
+cross-crate projection from the existing `HostRepositorySourceRoute` to its
+Legacy/Observed source-observation keys, then converge the complete external
+`.bzl` consumer without a built-in name/path special case, copied bytes or
+physical embedded-tools root. Exact Root request and Canonical behavior must
+remain unchanged. Clean Zabel `0795445f...` is peer guidance for authenticated
+content-only reads and deferred physical materialization; pinned Bazel 9.2 is
+the sole behavior/content authority.
+
+Pinned Bazel's embedded-tools dependency graph proves that the later catalog
+boundary is the complete direct `tools/build_defs/cc` package—`BUILD`,
+`action_names.bzl`, and `cc_import.bzl`—with `tests` and `whitelists` as
+separate subpackages. Do not add only the demanded file in this packet. BCR
+Starlark remains the complete rules owner including `cc_internal`,
+`cc_common` remains a generic Host/provider-ABI consumer, and Buck2-derived
+starlark-rust remains the language/`set` owner.
+
+Independent R1 review returns `REPLAN`. Accepted `79a36c580` deliberately keeps
+Root-request external `.bzl` reads on `HostRepositorySourceFileKey` and its
+observed sibling with exact dependency identity/order; converging every Root
+read on the shared observation owner would silently weaken that slice.
+
+Activate corrected
+`WP-4-5-7A-external-bzl-source-observation-cutover-design-r2`. The route owner
+must publish a typed Legacy/Observed child projection: Root request retains the
+existing legacy key, while Root built-in and Canonical use the shared
+observation key. Loading matches only that projection and cannot inspect
+repository names, paths or dispositions. Add exact before/after Root-request
+dependency rows beside the Root-built-in catalog-key/no-legacy-key proof. The
+ordered complete `tools/build_defs/cc` category remains unchanged.
+
+Independent R2 correction review returns `ACCEPT`. Implement only
+`WP-4-5-7A-external-bzl-source-observation-cutover-implementation` under the
+four-file 260/320/580 contract. Root-request direct/downstream key rows are an
+exact gate; do not reinterpret their activation graph as Slug-native.

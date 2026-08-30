@@ -1,294 +1,251 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-testing-bootstrap-loading-implementation-r4`
+Packet: `WP-4-5-7A-external-bzl-source-observation-cutover-implementation`
 
-Milestone: M7A category 6 registered-toolchain closure prerequisite.
+Milestone: M7A registered-toolchain closure prerequisite.
 
-Base: accepted selected-BCR archive realization `1599d730c`, accepted ordered
-transform identity `01f2802f0`, accepted exec-configured loading `831e574e6`,
-accepted canonical repository Host capabilities `26a68d61c`, and parked
-proof-only registration base `20ad71ffa`. The passing four-row proof draft and
-retained selected-context R2 candidate remain dirty and read-only.
+Base: accepted Root/Canonical source-observation owner `9764f8a4f`, accepted
+canonical policy convergence `fa896aca4`, accepted canonical loading adaptation
+`79a36c580`, accepted selected-BCR realization `1599d730c`, and accepted
+TestingBootstrap loading ABI `ecee4aca5`. The proof-only registration and
+selected-context candidates remain dirty, parked, and read-only.
 
-## Why this corrected implementation packet is active
+## Observable boundary
 
-The selected-BCR archive owner is terminally accepted. Its 32 focused rows
-pass, the full core run adds no packet-related failure, and two fresh-root real
-REAPI replays consume the authenticated rules_shell global PAX comment,
-strip-prefix, ordered patch and registry MODULE before loading three nested
-rules_shell modules. Both then stop at the same next boundary:
+Two fresh-workspace/fresh-output-root rules_rust cqueries now clear the complete
+TestingBootstrap lookup and stop identically while loading
+`@@bazel_tools//tools/build_defs/cc:action_names.bzl`:
 
 ```text
-@@rules_shell+//shell/private:sh_executable.bzl:89:31
-Variable `coverage_common` not found
+built-in bazel_tools source requires its immutable source owner
 ```
 
-This is not an archive, parser, `set`, `cc_common`, C++ rule or REAPI defect.
-`coverage_common` is one member of Bazel 9.2's fixed testing-support bootstrap.
-The user requires category architecture rather than a one-symbol patch, so this
-packet audits and freezes the complete `TestingBootstrap` loading/Host-ABI
-category before any Rust edit.
+`ExternalBzlModuleEvalKey` already retains the accepted
+`HostRepositorySourceRoute::{Root, Canonical}` carrier. Canonical source reads
+use `HostRepositorySourceObservationKey`, but the Root branch still uses the
+legacy `HostRepositorySourceFileKey`. A root-apparent load resolved to the
+built-in bazel_tools route therefore bypasses `BuiltinBazelToolsSourceFileKey`
+and reaches the old physical-materialization guard. This is a generic
+external-`.bzl` source-consumer defect, not a missing parser feature,
+`action_names` special case, C++ rule engine, or TestingBootstrap failure.
 
-Independent R2 review accepts the category, identity, context and callability
-architecture, but finds one mechanical implementation-allowlist omission. The
-generic advertised-provider carrier change also reaches three existing clean
-assertions in `host_package_load_tests.rs` that render user-provider identities.
-R3 admits only those assertions and requires explicit `.user_id()` projection;
-it does not add `Display` to `ProviderIdentity` or widen runtime behavior.
-Independent correction review returns `ACCEPT`; the architecture and bounded
-implementation successor below are now frozen.
+R1 proposed making both Root and Canonical external `.bzl` routes use the
+shared observation owner. Independent review returned `REPLAN`: accepted commit
+`79a36c580` makes Root-request use of `HostRepositorySourceFileKey` and its
+observed sibling—including their dependency identity/order—exact. Full
+convergence would silently weaken that slice.
 
-The first R3 compile exposes one additional assertion in the same clean test
-file and carrier-fallout category: a two-element `.map(ToString::to_string)` at
-the advertised-provider deduplication proof. R3 explicitly authorized exactly
-three assertions, so the candidate stops unstaged. R4 adds only that fourth
-explicit user-provider projection; no production contract or cap changes.
-Independent R4 correction review returns `ACCEPT`.
+R2 freezes one disposition-aware consumer projection. Root requests keep their
+legacy source-file keys exactly; Root built-ins and all Canonical routes use the
+shared observation owner. The expected next replay boundary is the catalog's
+exact `UnsupportedCatalog` result for `action_names.bzl`; importing the complete
+direct `tools/build_defs/cc` package is a separate ordered category packet and
+is forbidden here.
 
-## Authority and learned facts
+## Learned facts and authority
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-is sole semantic authority:
+is sole behavior and content authority:
 
-- `TestingSupportRules.init()` installs one `TestingBootstrap` containing
-  `testing`, `coverage_common`, `InstrumentedFilesInfo`,
-  `AnalysisFailureInfo`, and `AnalysisTestResultInfo`;
-- `TestingModuleApi` exposes `ExecutionInfo`, deprecated `TestEnvironment`,
-  and `analysis_test` on `testing`;
-- `CoverageCommonApi` exposes `instrumented_files_info` with the complete Bazel
-  9 signature, including source/dependency attributes, coverage support and
-  environment, extensions, metadata, reported-to-actual sources, and baseline
-  coverage files;
-- `CoverageCommon` performs typed validation, derives `InstrumentedFilesInfo`
-  from the rule context and dependency/provider graph, and restricts its
-  internal-only arguments; and
-- `BazelStarlarkEnvironment` installs bootstrap objects as stable predeclared
-  bindings for ordinary `.bzl` loading. A function body may retain these
-  identities during loading without invoking analysis semantics.
+- `src/create_embedded_tools.py`, `src/BUILD`, `tools/BUILD`, and
+  `tools/build_defs/BUILD` establish the immutable `@bazel_tools` embedded
+  repository and select `//tools/build_defs/cc:srcs` into it;
+- `tools/build_defs/cc/BUILD` defines one direct package whose complete direct
+  file set is `BUILD`, `action_names.bzl`, and `cc_import.bzl`; its `tests` and
+  two `whitelists` directories are distinct subpackages/categories;
+- pinned `action_names.bzl` is 5,400 bytes/135 lines with SHA-256
+  `ede4d3bd51a2a772180a0f3a47cf083e898d4104ec8de27f30ca36a5b8c13951`;
+  pinned direct-package `BUILD` is
+  `a24f1afcd5bfaaf9fc88ae3455213c83d61988bac5a80e58dd9f954281f6009d`
+  and `cc_import.bzl` is
+  `a11736b1cf82a1216b62b6c8af280d739721c6dde470ff83cd939112a0a84093`;
+  and
+- Bazel reads these files as ordinary Starlark sources from the immutable
+  built-in repository. Slug must port their bytes verbatim in the later
+  category packet; no generated substitute is lawful.
 
-The authenticated rules_shell 0.6.1 source calls
-`coverage_common.instrumented_files_info(ctx, source_attributes = ["srcs"],
-dependency_attributes = ["deps", "_runfiles_dep", "data"])` inside the lazy
-`_sh_executable_impl`; module evaluation needs the predeclared namespace, while
-configured analysis later needs the real Host/provider operation.
+The accepted Slug architecture already owns the needed semantics:
 
-Slug already centralizes the exact Rust Starlark language universe in
-`slug_starlark_v2`; its Buck2-derived `SetType` owns `set` semantics and is not
-part of this packet. Loading already has distinct context overlays and retained
-Host/provider callables for `platform_common`, `DefaultInfo`,
-`RunEnvironmentInfo`, `OutputGroupInfo`, `cc_common`, and `depset`, but it has
-no testing-bootstrap category owner.
+- `BuiltinBazelToolsSourceFileKey` authenticates one catalog-relative file
+  against the versioned snapshot and manifest identity;
+- `HostRepositorySourceObservationKey` and its observed sibling accept Root or
+  Canonical source input and retain the existing zero-copy
+  `HostRepositorySourceObservation::{Builtin, Request}` result;
+- `HostRepositorySourceRoute` already projects source keys inside Bzlmod
+  policy consumers; and
+- `ExternalBzlModuleEvalKey` already retains that route carrier, canonical
+  label identity, request-local evaluator scratch, and observed frontier.
+
+The relevant upstream embedded-tools dependency shell test is not copied: it
+guards Bazel's source dependency inventory rather than Slug's DICE consumer
+selection. Existing Slug source-observation tests and the real pinned BCR
+dependent provide the stronger discriminating evidence for this cutover.
 
 Clean `../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a`
-is peer design/optimization guidance only. Its
-`generic_rule_loading_namespaces.zig` separates reusable stable namespace
-identities from invocation-local analysis capabilities, and its loading runtime
-publishes testing/coverage bindings through a shared predeclared table. Slug
-may learn from that ownership split, but must not copy Zig code, accept its
-compatibility claims, or omit Bazel 9.2 members/arguments merely because Zabel
-does.
+is concept/optimization guidance only. Its
+`session_repository_file_source.zig` retains immutable producer bytes and
+manifest identity behind one repository/source-root/path key;
+`embedded_io.zig` supplies scoped authenticated reads; and
+`session_intrinsic_source_physical_materialization.zig` materializes only for
+consumers that require an OS-visible path. Slug follows that ownership lesson
+through its already-accepted Rust owners, not Zabel's layout, scheduler, or
+compatibility claims.
 
 ## Compatibility classification
 
-- **Exact:** the complete Bazel 9.2 `TestingBootstrap` top-level name set;
-  complete `testing` and `coverage_common` member inventories; process-stable
-  top-level namespace/provider identity across admitted ordinary `.bzl`
-  loading contexts; builtin provider-key identity through `provides` and
-  analysis rematerialization; exact provider type/repr/callability; and
-  fail-closed invocation of every lawfully callable operation whose analysis
-  semantics are not yet admitted. This successor is exact for loading and
-  declaration identity, not for configured coverage or analysis-test effects.
-- **Slug-native:** Rust retained-value representation, collision-safe provider
-  identity, static frozen allocation for member callables, structural
-  configuration/action identity, memory accounting, and unsupported-invocation
-  diagnostics. Stable member-method pointer identity is not an exact claim.
-- **Unsupported/deferred:** invocation of callable `testing.ExecutionInfo`,
-  `AnalysisTestResultInfo`, `testing.TestEnvironment`,
-  `testing.analysis_test`, and
-  `coverage_common.instrumented_files_info`; all resulting provider values,
-  target-graph and action effects; Java/HotSpot state; `@_builtins` `.bzl`
-  loading; and every non-testing language module. `InstrumentedFilesInfo` and
-  `AnalysisFailureInfo` are exact noncallable provider keys, not unsupported
-  callable placeholders.
+- **Exact:** existing root-request external `.bzl` values, source names,
+  diagnostics, load/cycle behavior and observation epochs remain unchanged;
+  built-in external `.bzl` reads use exact catalog bytes and canonical label
+  presentation; missing catalog paths return the existing exact typed catalog
+  error. This packet makes no new content-completeness claim.
+- **Slug-native:** the typed access-projection enum names/layout and the
+  Root/Canonical route carrier. Existing Root-request and shared-observation
+  key identities, activation order, hashing and equality remain unchanged.
+- **Unsupported/deferred:** uncataloged `tools/build_defs/cc` content, physical
+  materialization of embedded tools, configured testing/coverage invocation,
+  Windows-only repository discovery, exact Java/HotSpot state, and all later
+  action families.
 
 ## Frozen architecture
 
-### Complete category and context boundary
+### Natural owner and typed consumer projection
 
-One new loading-owned `testing_bootstrap` module publishes the complete fixed
-Bazel 9.2 category in one operation. Its exact top-level names are
-`testing`, `coverage_common`, `InstrumentedFilesInfo`, `AnalysisFailureInfo`,
-and `AnalysisTestResultInfo`. `dir(testing)` contains exactly
-`ExecutionInfo`, `TestEnvironment`, and `analysis_test`; `dir(coverage_common)`
-contains exactly `instrumented_files_info`.
+Add two doc-hidden public scratch enums beside `HostRepositorySourceRoute`:
 
-Install the category only in `complete_loading_globals(true)`, the shared
-ordinary `.bzl` overlay used for admitted BUILD- and MODULE-loaded modules. Do
-not add it to BUILD files, MODULE.bazel, REPO.bazel, core evaluation or
-`slug_starlark_v2::populate_universe`. Bazel's `createBuiltinsBzlEnv` also
-excludes `registeredBzlToplevels`; Slug does not yet own a distinct
-`@_builtins` loading context, so that pseudo-repository remains unsupported
-rather than inheriting this exact ordinary-`.bzl` claim.
+- one Legacy read projection containing either
+  `RootRequest(HostRepositorySourceFileKey)` or
+  `Observation(HostRepositorySourceObservationKey)`; and
+- one Observed read projection containing either
+  `RootRequest(HostRepositorySourceFileObservationKey)` or
+  `Observation(HostRepositorySourceObservationEpochKey)`.
 
-### Stable namespace and provider identity
+Pure `HostRepositorySourceRoute` methods construct them from one typed relative
+path. Root with a request disposition returns the existing Root-request key;
+Root with the built-in disposition converts its already-complete source
+capability to `HostRepositorySourceInput` and returns the shared observation
+key; Canonical reuses its retained `HostCanonicalRepositorySourceInput` and
+returns the shared observation key. Re-export only these doc-hidden typed
+projections. Loading must match them and may not inspect repository names,
+paths, built-in identity, or materialization disposition.
 
-Use `GlobalsStatic` plus static frozen values so repeated construction of Slug
-loading globals reuses the same top-level namespace and provider identities.
-Represent the four provider keys—three top-level constructors plus
-`testing.ExecutionInfo`—with loading-owned typed builtin-provider tokens, not
-`struct`, `None`, display-text lookup or per-module allocation. Preserve Bazel
-observable `Provider` type, `<function Name>` repr and exact `dir()`
-inventories. `ExecutionInfo` and `AnalysisTestResultInfo` are callable
-providers; `InstrumentedFilesInfo` and `AnalysisFailureInfo` expose no invoke
-path.
+`compute_external_bzl_source` constructs the relative path once and computes
+the projected child for Legacy or Observed mode. Keep its existing Root result
+branch and Canonical/shared-observation result branch: Root-request values,
+errors and dependencies therefore do not change, while Root built-ins reuse the
+same zero-copy observation finishing and canonical-label presentation already
+accepted for Canonical built-ins. Built-in bytes retain their catalog `Arc`;
+requested bytes retain their current producer `Arc`.
 
-Extend `declaration_provider_id` and every advertised-provider carrier from
-user-only `ProviderId` to the already shared `ProviderIdentity`; user providers
-remain `ProviderIdentity::User` and builtin tokens become
-`ProviderIdentity::Builtin`. Extend the existing
-`starlark_provider_identity` and `alloc_starlark_provider_callable` owners for
-the four fixed builtin keys. Identity then flows through rule/aspect
-`provides`, immutable package declarations and actual analysis
-rematerialization without a parallel registry or digest stand-in. Required-
-provider constraints remain outside this successor because the exposed path is
-`provides`; broadening them requires its own discriminating consumer evidence.
-Existing `SmallMap`/`CompactString` provider storage remains sole retained
-representation.
+Preserve presentation at the final consumer boundary:
 
-Every namespace operation is a callable token. Calling one in this successor,
-or either lawfully callable provider constructor, returns an explicit
-unsupported-analysis error before producing a value or effect. Attempting to
-call either noncallable provider follows ordinary Starlark noncallable
-behavior. Merely compiling/freezing a lazy function that names a token is exact
-and side-effect free. The later invocation successor must replace barriers
-with an evaluator-local composite analysis capability; it may not use a global
-callback or overload the current one-purpose `ToolchainInfo` marker.
+- Root request values use their existing producer `logical_path` for evaluator
+  source name and presentation path;
+- Canonical request and all built-in values use the canonical label, never a
+  fabricated Host/output-base path;
+- absent values remain `ExternalBzlModuleError::Absent`;
+- Root request source errors preserve the existing `Source`/`SourceCompute`
+  public shape without translation; canonical and built-in observation errors retain
+  `SourceObservation`; and
+- parse, load-label, child, cycle, evaluation and freeze behavior does not
+  change.
 
-This deliberate split is required by the live path: rules_shell loading only
-retains `coverage_common.instrumented_files_info`, while Bazel's real call
-collects context attributes, transitive `InstrumentedFilesInfo` providers and
-coverage artifacts. Implementing that call without its configured provider
-graph would be a semantic stub. The entire declared bootstrap category lands
-together now; configured invocation remains one separately bounded category.
+### DICE, revision, and lifetime behavior
 
-### Retained-cost boundary
+The route's full existing structural input plus typed relative path is the
+immutable request projection. Root requests preserve their exact direct
+dependency on `HostRepositorySourceFileKey` or its observed sibling and that
+key's existing path-before-materialization/file dependency order. Built-in
+observations depend only on the versioned catalog file key and have an empty
+Host-path epoch. Canonical requested sources retain the accepted shared
+observation materialization, resolved-path and file-byte dependencies. Observed
+mode propagates the same frontier into the external module; Legacy mode remains
+frontier-free. Overlapping requests share only immutable DICE values and retain
+their existing transaction inputs.
 
-All top-level fixed values live once in static frozen heaps. Member callables
-may use the same static allocation as a Slug-native optimization, but equality
-does not rely on pointer stability. Per-`Globals` population copies only frozen
-handles; per-module evaluation retains ordinary references already owned by
-starlark-rust. No DICE key, lock, hash owner, background task, dynamic string
-registry, clone-heavy side table or memory-accounting exemption is added.
+There is no new key, lock, cache, retry loop, background task or filesystem
+fallback. Retained memory remains the existing DICE-owned route/input,
+catalog/materialized `Arc<[u8]>`, and frozen module. Relative-path conversion,
+source-name selection and parsing are compute/evaluator scratch. Publication,
+equality cutoff, invalidation, cancellation and shutdown remain owned by the
+existing keys.
 
-## Active implementation boundary
+## Frozen implementation successor
 
-Implement only `WP-6-7A-testing-bootstrap-loading-implementation-r4` against:
+Independent R2 design review returns `ACCEPT`. Implement only
+`WP-4-5-7A-external-bzl-source-observation-cutover-implementation` with exactly:
 
-- `app/slug_loading_v2/src/lib.rs` blob
-  `0cd03c1d18a8bff96a9e7b8f8ff8bce1d65ad777`;
-- `app/slug_loading_v2/src/package.rs` clean blob
-  `a35c3274fc2e010a8fc54e223fc97f250e8c910e`, allowing only the advertised-
-  provider `ProviderIdentity` carrier/parser hunks and one category-population
-  hook beside `complete_loading_globals(true)`; its existing selected-context
-  diff, currently SHA-256
-  `0295ce524e14da9f5a2ee6e623111177f32620462ffa3590eb1e2dca448e3128`,
-  remains read-only and unstaged;
-- `app/slug_loading_v2/src/provider.rs` blob
-  `410e007296f5d3e1894b18442f2a53e598f3f816`;
-- new `app/slug_loading_v2/src/testing_bootstrap.rs`; and
-- new `app/slug_loading_v2/src/testing_bootstrap_tests.rs`; plus the isolated
-  builtin-rematerialization proof in
-  `app/slug_analysis_v2/src/analysis_value.rs` blob
-  `e0f314611e2165f40915c7eaf7d5baaf4d3e325f`; and
-- exactly four user-provider rendering assertions in clean
-  `app/slug_loading_v2/src/host_package_load_tests.rs` blob
-  `16a046d63baa4eaf94a6abea8b63a5a0cb002b16`: the two-element mapped rendering
-  at the advertised-provider deduplication proof plus the three scalar
-  assertions already named by R3. Each must use explicit `.user_id()`
-  projection after the carrier conversion; adding a generic `Display`
-  implementation for `ProviderIdentity` is forbidden.
+- `app/slug_bzlmod_v2/src/source_preparation/canonical_repository_source.rs`
+  blob `257bfbffeb0367fb8bae7c789df43068c52e4ca8`;
+- `app/slug_bzlmod_v2/src/lib.rs` blob
+  `be4a0f2df037b2d5980718d4a9fbd6d939f7f428`;
+- `app/slug_loading_v2/src/bzl_module.rs` blob
+  `8309f65c379a12e66fcd53eccfc49cd9f53cb889`; and
+- `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs` blob
+  `359e6527d23e5b5f6adea2311cc95754a5b0724c`.
 
-Cap additions at 500 production, 700 proof and 1,200 aggregate Rust lines.
-`package.rs` already exceeds the authoring split trigger, so it receives only
-the typed-carrier correction and composition hook; all category behavior and
-most proof stay in the two new cohesive modules. `provider.rs` remains below
-2,000 lines, and `analysis_value.rs` receives proof only. No analysis
-production, core, BCR, registration, command, REAPI, Cargo, fixture or
-starlark-rust file may change.
+Cap additions at 260 production, 320 proof and 580 aggregate Rust lines. The
+10,577-line `bzl_module.rs` exceeds the physical-size trigger but remains the
+cohesive owner of external-module source finishing; this packet must shrink or
+locally simplify its duplicated source branch and may not add a new
+responsibility. The 2,706-line test module already owns Root/Canonical route,
+source, listing and external-module parity; one bounded discriminating proof is
+more cohesive than another crate-level test module.
 
-Proof must cover exact top-level/member inventories and context exclusion;
-process-stable top-level pointer identity across repeated globals, module
-freezing and imports; exact `ProviderIdentity` retention in rule/aspect
-`provides` and rematerialization for all four keys; exact provider type/repr/
-callability; unsupported invocation for every lawful callable; absence of side
-effects; context exclusion including BUILD and an explicit unsupported
-`@_builtins` statement; and a rules_shell-shaped lazy function that freezes
-without executing its coverage call.
+No catalog Rust/asset, package/loading declaration, registration, analysis,
+command, core, REAPI, Cargo, parser, starlark-rust, `set`, `cc_common`, or
+`cc_internal` file may change. The thirteen pre-existing dirty files and all
+parked proof/selected-context hunks remain byte-for-byte unstaged.
 
-Run focused new tests, the full serial `slug_loading_v2` and
-`slug_analysis_v2` suites, the parked registration-row test, and the real REAPI
-dependent twice from fresh roots. Rebuild `slug_cli_v2` before tests using
-`SLUG_V2_BIN`; clean stale `slugd` before and after. Then run fmt, diff/scope/
-blob/cap/dirty-isolation audits and `scripts/v2_archive_status.sh`. The real
-dependent may expose a later missing category or admitted invocation boundary;
-it must at least clear every testing-bootstrap loading lookup consistently.
+## Required proof and validation
 
-## Terminal implementation evidence
+Add two focused proofs. A Root-request external `.bzl` proof must record the
+exact direct Legacy dependency row on `HostRepositorySourceFileKey` and the
+exact Observed row on `HostRepositorySourceFileObservationKey`, plus their
+existing downstream dependency order, source presentation and frontier; these
+rows must be identical to the pre-cutover baseline. A root-apparent built-in
+proof using existing cataloged `@@bazel_tools//tools:build_defs.bzl` must cover
+both Legacy and Observed external-module keys, exact canonical module/source
+presentation, empty built-in Host observations, a direct dependency on
+`BuiltinBazelToolsSourceFileKey`, and absence of both legacy Host repository
+source-file keys. Existing Root error/cycle and Canonical mapping/source/error/
+lifecycle tests remain protected.
 
-The bounded R4 implementation is terminally `ACCEPT` after independent review.
-Its cached diff is confined to the seven authorized Rust files and adds 287
-production, 381 proof and 668 aggregate lines. The existing selected-context
-`package.rs` candidate reconstructs to its recorded SHA-256
-`0295ce524e14da9f5a2ee6e623111177f32620462ffa3590eb1e2dca448e3128`
-and remains unstaged byte-for-byte.
+Run:
 
-Focused TestingBootstrap loading and shared-provider rematerialization proofs
-pass, as do the complete serial `slug_loading_v2` and `slug_analysis_v2`
-suites and the parked four-registration-row proof. `slug_cli_v2` rebuilds
-successfully. Two daemon-clean fresh-workspace/fresh-output-root
-`rules-rust-073-toolchain-owner` cqueries both clear every testing-bootstrap
-lookup and stop identically at the next independent boundary while reading
-`@@bazel_tools//tools/build_defs/cc:action_names.bzl`: its built-in source lacks
-the required immutable source owner. This is not a bootstrap inventory,
-identity, context or invocation failure.
+1. the focused Root-request and Root-built-in tests plus existing canonical
+   external-source/error tests;
+2. complete serial `slug_bzlmod_v2` and `slug_loading_v2` tests;
+3. the parked four-registration-row proof;
+4. `cargo build -p slug_cli_v2`, then two daemon-clean real rules_rust cqueries
+   from fresh workspace/output roots; both must clear the immutable-owner error
+   and stop consistently at the next independent boundary;
+5. formatting, `git diff --check`, allowlist/blob/cap and dirty-isolation
+   audits; and
+6. `scripts/v2_archive_status.sh`, admitting only its already recorded retained
+   documentation exceptions.
 
-Formatting, diff, blob, allowlist, cap, dirty-isolation and archive checks pass
-apart from the archive checker's three already tracked retained-document
-exceptions. Independent terminal review confirms the exact inventories,
-static top-level identity, builtin-provider carrier/rematerialization,
-callable/noncallable barriers, user-only required-provider constraints, lack
-of `ProviderIdentity: Display`, and absence of new retained hot-path state.
+Independent terminal review is mandatory because this adds a cross-crate typed
+DICE-child projection. Residual risk is an unprotected Root request diagnostic
+or dependency-order change; any such change is a `REPLAN`, not an accepted
+Slug-native divergence.
 
-## Implementation evidence and exclusions
+## Stops and ordered successor
 
-The R3 candidate remained unstaged during correction review. Production and
-proof edits are now authorized only in the frozen implementation allowlist
-above. Scheduling status may additionally change only in:
+`REPLAN` for loading-side disposition/name/path inspection; a new DICE key,
+cache, physical materialization or copied source bytes; changed Root request or
+Canonical behavior; catalog asset edits; an `action_names`, rules_rust,
+TestingBootstrap, C++ or OS special case; parser/`set` changes; Rust-defined
+rules; work outside the allowlist/caps; or inability to isolate the parked
+dirty state.
 
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`;
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`;
-- `.codex/skills/slug-agent-orchestration/references/routing-log.md`; and
-- its bounded monthly history file when log rotation requires it.
+At terminal `ACCEPT`, replay first. If it reaches exact `UnsupportedCatalog`
+for `tools/build_defs/cc/action_names.bzl`, freeze the complete direct
+`tools/build_defs/cc` package category—`BUILD`, `action_names.bzl`, and
+`cc_import.bzl`, exact pinned bytes/modes/listing/manifest identity—in one
+separate catalog packet. Do not import only the demanded file. After that
+category clears, re-run the unchanged four-row registration proof and classify
+the next actual dependent boundary before returning to selected-context work.
 
-The terminal design must name exact implementation blobs/baselines, production
-and proof caps, focused/full/direct-dependent validation, dirty-state
-isolation, and explicit `REPLAN` stops. Independent architecture review is
-mandatory before implementation.
-
-## Stops and successor
-
-`REPLAN` for a `coverage_common = struct()` or rules_shell-only token; partial
-TestingBootstrap inventory; provider identity derived from display text;
-invocation without configured context ownership; loading-time execution of a
-lazy rule implementation; analysis behavior delegated to Bazel/Java; global
-mutable callbacks; universal-environment widening; `set`, parser, `cc_common`
-or `cc_internal` work; or implementation outside the accepted R4 allowlist.
-
-BCR Starlark remains the complete rule/control-flow owner, including
-`cc_internal`; `cc_common` is only another consumer of the generic Host/provider
-ABI. After the accepted implementation successor clears the complete
-testing-bootstrap loading lookup in both fresh-root real dependents, classify
-the next boundary: resume the unchanged proof-only four-registration-row
-closure if it passes, or freeze one new generic category packet if it does not.
-The retained selected-context R2 review remains after that closure.
+BCR Starlark remains the complete rules/control-flow owner, including
+`cc_internal`; `cc_common` remains only a consumer of the generic Host/provider
+ABI. Buck2-derived starlark-rust remains the `set` and language owner.
