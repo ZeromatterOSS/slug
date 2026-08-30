@@ -66,6 +66,7 @@ mod tests {
     use slug_bzlmod_v2::SourcePreparationOutcome;
     use slug_bzlmod_v2::host_canonical_repository_source_input;
     use slug_bzlmod_v2::host_repository_relative_path;
+    use slug_bzlmod_v2::host_repository_source_input;
     use slug_bzlmod_v2::inject_root_package_policy_inputs;
     use slug_identity_v2::ApparentRepoName;
     use slug_identity_v2::CanonicalLabel;
@@ -787,6 +788,159 @@ mod tests {
             .as_ref()
             .unwrap_or_else(|error| panic!("root alias {apparent} rejected: {error:?}"))
             .clone()
+    }
+
+    fn external_label(package: &str, target: &str) -> RepositoryBzlLabel {
+        RepositoryBzlLabel::new(
+            if package.is_empty() {
+                PackagePath::root()
+            } else {
+                PackagePath::parse(package).unwrap()
+            },
+            RootPackageBzlTarget::parse(target).unwrap(),
+        )
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn root_request_external_bzl_preserves_exact_source_children() {
+        let dice = registry_dice(LEAF_MAPPING_A, SOURCE_A);
+        let mut root_tx = transaction(&dice, ROOT_MODULE, EXTENSION_A, true, None).await;
+        let route = admitted_root_route(&mut root_tx, "parent_alias").await;
+        let input = host_repository_source_input(route.source_capability()).unwrap();
+        let HostRepositorySourceInputDispositionView::Request(request) = input.view().disposition()
+        else {
+            panic!("selected root route must retain a source request")
+        };
+        let tracker = Arc::new(DependencyTrace::default());
+        let instance = PathObservationInstanceId::new(76);
+        let mut tx = request_transaction_with_observations(
+            &dice,
+            request.clone(),
+            tracker.clone(),
+            RepositoryMaterializationSuccess::Immutable {
+                source_identity: Arc::from("root-request-bzl-source"),
+                generation_root: PathBuf::from("/registry-parent"),
+                observation_instance: instance,
+            },
+            bzl_source_epoch(
+                PathObservationNamespace::Materialization(instance),
+                "/registry-parent",
+                &[("defs.bzl", Some(b"VALUE = 1\n"))],
+            ),
+        )
+        .await;
+        let label = external_label("", "defs.bzl");
+        let legacy_key = ExternalBzlModuleEvalKey::new(route.clone(), label.clone());
+        let observed_key = ExternalBzlModuleObservationKey::new(route, label);
+
+        let SourcePreparationOutcome::Complete(legacy) = tx.compute(&legacy_key).await.unwrap()
+        else {
+            panic!("root request legacy module must complete")
+        };
+        let legacy = legacy.as_ref().as_ref().unwrap();
+        assert_eq!(
+            legacy.manifest.root.workspace_path,
+            PathBuf::from("/registry-parent/defs.bzl")
+        );
+        let SourcePreparationOutcome::Complete(Ok(observed)) =
+            tx.compute(&observed_key).await.unwrap()
+        else {
+            panic!("root request observed module must complete")
+        };
+        let observed_module = observed.result().as_ref().as_ref().unwrap();
+        assert_eq!(observed_module.manifest.root, legacy.manifest.root);
+        assert!(!observed.observations().observations().is_empty());
+
+        let source_key = "host-repository-source-file:@@parent+:defs.bzl";
+        let observed_source_key = "observed-host-repository-source-file:@@parent+:defs.bzl";
+        assert_eq!(
+            tracker.dependencies(&legacy_key.to_string()),
+            [source_key.to_owned()]
+        );
+        assert_eq!(
+            tracker.dependencies(&observed_key.to_string()),
+            [observed_source_key.to_owned()]
+        );
+        assert_eq!(
+            tracker.dependencies(source_key),
+            [
+                "host-repository-path:@@parent+:defs.bzl".to_owned(),
+                "repository-materialization-result:@@parent+".to_owned(),
+                "path-observation:Materialization(PathObservationInstanceId { value: 76 }):\"/registry-parent/defs.bzl\":FileBytes".to_owned(),
+            ]
+        );
+        assert_eq!(
+            tracker.dependencies(observed_source_key),
+            [
+                "observed-host-repository-path:@@parent+:defs.bzl".to_owned(),
+                "repository-materialization-result:@@parent+".to_owned(),
+                "path-observation:Materialization(PathObservationInstanceId { value: 76 }):\"/registry-parent/defs.bzl\":FileBytes".to_owned(),
+            ]
+        );
+        assert!(tracker.all_keys().iter().all(|key| {
+            !(key.starts_with("host-repository-source-observation:") && key.contains("parent+"))
+                && !(key.starts_with("observed-host-repository-source-observation:")
+                    && key.contains("parent+"))
+        }));
+    }
+
+    #[tokio::test]
+    async fn root_builtin_external_bzl_uses_only_catalog_source_children() {
+        let tracker = Arc::new(DependencyTrace::default());
+        let dice = builtin_graph_dice();
+        let module = builtin_graph_module();
+        let mut tx = transaction(&dice, &module, EXTENSION_A, true, Some(tracker.clone())).await;
+        let route = admitted_root_route(&mut tx, "bazel_tools").await;
+        let label = external_label("tools", "build_defs.bzl");
+        let canonical = "@@bazel_tools//tools:build_defs.bzl";
+        let legacy_key = ExternalBzlModuleEvalKey::new(route.clone(), label.clone());
+        let observed_key = ExternalBzlModuleObservationKey::new(route, label);
+
+        let SourcePreparationOutcome::Complete(legacy) = tx.compute(&legacy_key).await.unwrap()
+        else {
+            panic!("root built-in legacy module must complete")
+        };
+        let legacy_error = legacy.as_ref().as_ref().unwrap_err();
+        assert!(matches!(
+            legacy_error,
+            ExternalBzlModuleError::LoadLabel { source, .. }
+                if source.to_string() == canonical
+        ));
+        let SourcePreparationOutcome::Complete(Ok(observed)) =
+            tx.compute(&observed_key).await.unwrap()
+        else {
+            panic!("root built-in observed module must complete")
+        };
+        let observed_error = observed.result().as_ref().as_ref().unwrap_err();
+        assert_eq!(observed_error, legacy_error);
+        assert!(observed.observations().observations().is_empty());
+
+        let source_key = "host-repository-source-observation:@@bazel_tools:tools/build_defs.bzl";
+        let observed_source_key =
+            "observed-host-repository-source-observation:@@bazel_tools:tools/build_defs.bzl";
+        assert_eq!(
+            tracker.dependencies(&legacy_key.to_string()),
+            [source_key.to_owned()]
+        );
+        assert_eq!(
+            tracker.dependencies(&observed_key.to_string()),
+            [observed_source_key.to_owned()]
+        );
+        assert_eq!(
+            tracker.dependencies(source_key),
+            ["builtin-bazel-tools-source-file:tools/build_defs.bzl".to_owned()]
+        );
+        assert_eq!(
+            tracker.dependencies(observed_source_key),
+            ["builtin-bazel-tools-source-file:tools/build_defs.bzl".to_owned()]
+        );
+        assert!(tracker.all_keys().iter().all(|key| {
+            !(key.starts_with("host-repository-source-file:") && key.contains("bazel_tools"))
+                && !(key.starts_with("observed-host-repository-source-file:")
+                    && key.contains("bazel_tools"))
+                && !key.contains("repository-materialization-result:@@bazel_tools")
+        }));
     }
 
     #[tokio::test]

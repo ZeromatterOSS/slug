@@ -539,6 +539,10 @@ pub use source_preparation::HostRepositorySourceObservationResult;
 #[doc(hidden)]
 pub use source_preparation::HostRepositorySourceObservationView;
 #[doc(hidden)]
+pub use source_preparation::HostRepositorySourceReadKey;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceReadObservationKey;
+#[doc(hidden)]
 pub use source_preparation::HostRepositorySourceRoute;
 #[doc(hidden)]
 pub use source_preparation::HostSelectedObservationFrontier;

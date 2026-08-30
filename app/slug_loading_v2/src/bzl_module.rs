@@ -31,13 +31,11 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
-use slug_bzlmod_v2::HostRepositorySourceFileKey;
-use slug_bzlmod_v2::HostRepositorySourceFileObservationKey;
 use slug_bzlmod_v2::HostRepositorySourceFileValue;
 use slug_bzlmod_v2::HostRepositorySourceObservation;
-use slug_bzlmod_v2::HostRepositorySourceObservationEpochKey;
 use slug_bzlmod_v2::HostRepositorySourceObservationError;
-use slug_bzlmod_v2::HostRepositorySourceObservationKey;
+use slug_bzlmod_v2::HostRepositorySourceReadKey;
+use slug_bzlmod_v2::HostRepositorySourceReadObservationKey;
 use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequest;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequests;
@@ -3955,7 +3953,7 @@ enum ExternalBzlSourceChild {
         Result<HostRepositorySourceFileValue, RepositorySourceFileError>,
         PathObservationEpoch,
     ),
-    Canonical(
+    Observation(
         Arc<Result<HostRepositorySourceObservation, HostRepositorySourceObservationError>>,
         PathObservationEpoch,
     ),
@@ -3998,7 +3996,7 @@ fn finish_external_bzl_source(
         ExternalBzlSourceChild::Root(result, observations) => {
             finish_root_external_bzl_source(result, label, observations)
         }
-        ExternalBzlSourceChild::Canonical(result, observations) => {
+        ExternalBzlSourceChild::Observation(result, observations) => {
             let source_name = label.to_string();
             let presentation_path = PathBuf::from(&source_name);
             match result.as_ref() {
@@ -4076,105 +4074,80 @@ async fn compute_external_bzl_source(
     mode: ExternalBzlModuleMode,
 ) -> SourcePreparationOutcome<Result<ExternalBzlSourceChild, ObservedPathFrontierError>> {
     let source_path = key.label.repository_relative_path();
-    let HostRepositorySourceRoute::Root(route) = &key.route else {
-        let HostRepositorySourceRoute::Canonical(input) = &key.route else {
-            unreachable!()
-        };
-        let relative = host_repository_relative_path(source_path)
-            .expect("typed external bzl labels form repository-relative paths");
-        return match mode {
-            ExternalBzlModuleMode::Legacy => match ctx
-                .compute(&HostRepositorySourceObservationKey::new_canonical(
-                    input.clone(),
-                    relative,
-                ))
-                .await
-            {
-                Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
-                Ok(SourcePreparationOutcome::Complete(result)) => {
-                    SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Canonical(
-                        result,
-                        PathObservationEpoch::empty(),
-                    )))
-                }
-                Err(error) => SourcePreparationOutcome::Complete(Ok(
-                    ExternalBzlSourceChild::Compute(Arc::from(error.to_string())),
-                )),
-            },
-            ExternalBzlModuleMode::Observed => match ctx
-                .compute(&HostRepositorySourceObservationEpochKey::new_canonical(
-                    input.clone(),
-                    relative,
-                ))
-                .await
-            {
-                Ok(outcome) => match external_bzl_observed_child(outcome) {
-                    ControlFlow::Continue(source) => {
-                        SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Canonical(
-                            source.result().dupe(),
-                            source.observations().dupe(),
-                        )))
-                    }
-                    ControlFlow::Break(SourcePreparationOutcome::Need(need)) => {
+    let relative = host_repository_relative_path(source_path)
+        .expect("typed external bzl labels form repository-relative paths");
+    match mode {
+        ExternalBzlModuleMode::Legacy => match key.route.source_read_key(relative) {
+            HostRepositorySourceReadKey::RootRequest(source_key) => {
+                match ctx.compute(&source_key).await {
+                    Ok(SourcePreparationOutcome::Need(need)) => {
                         SourcePreparationOutcome::Need(need)
                     }
-                    ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error))) => {
-                        SourcePreparationOutcome::Complete(Err(error))
+                    Ok(SourcePreparationOutcome::Complete(result)) => {
+                        SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Root(
+                            result,
+                            PathObservationEpoch::empty(),
+                        )))
                     }
-                    ControlFlow::Break(SourcePreparationOutcome::Complete(Ok(()))) => {
-                        unreachable!()
-                    }
-                },
-                Err(error) => SourcePreparationOutcome::Complete(Ok(
-                    ExternalBzlSourceChild::Compute(Arc::from(error.to_string())),
-                )),
-            },
-        };
-    };
-    match mode {
-        ExternalBzlModuleMode::Legacy => match ctx
-            .compute(&HostRepositorySourceFileKey::new(
-                route.clone(),
-                source_path,
-            ))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(result)) => {
-                SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Root(
-                    result,
-                    PathObservationEpoch::empty(),
-                )))
+                    Err(error) => SourcePreparationOutcome::Complete(Ok(
+                        ExternalBzlSourceChild::Compute(Arc::from(error.to_string())),
+                    )),
+                }
             }
-            Err(error) => SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Compute(
-                Arc::from(error.to_string()),
-            ))),
+            HostRepositorySourceReadKey::Observation(source_key) => {
+                match ctx.compute(&source_key).await {
+                    Ok(SourcePreparationOutcome::Need(need)) => {
+                        SourcePreparationOutcome::Need(need)
+                    }
+                    Ok(SourcePreparationOutcome::Complete(result)) => {
+                        SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Observation(
+                            result,
+                            PathObservationEpoch::empty(),
+                        )))
+                    }
+                    Err(error) => SourcePreparationOutcome::Complete(Ok(
+                        ExternalBzlSourceChild::Compute(Arc::from(error.to_string())),
+                    )),
+                }
+            }
         },
-        ExternalBzlModuleMode::Observed => match ctx
-            .compute(&HostRepositorySourceFileObservationKey::new(
-                route.clone(),
-                source_path,
-            ))
-            .await
-        {
-            Ok(outcome) => match external_bzl_observed_child(outcome) {
-                ControlFlow::Continue(source) => {
-                    SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Root(
-                        source.result().as_ref().clone(),
-                        source.observations().dupe(),
-                    )))
+        ExternalBzlModuleMode::Observed => match key.route.source_read_observation_key(relative) {
+            HostRepositorySourceReadObservationKey::RootRequest(source_key) => {
+                match ctx.compute(&source_key).await {
+                    Ok(outcome) => match external_bzl_observed_child(outcome) {
+                        ControlFlow::Continue(source) => {
+                            SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Root(
+                                source.result().as_ref().clone(),
+                                source.observations().dupe(),
+                            )))
+                        }
+                        ControlFlow::Break(outcome) => {
+                            outcome.map(|result| result.map(|()| unreachable!()))
+                        }
+                    },
+                    Err(error) => SourcePreparationOutcome::Complete(Ok(
+                        ExternalBzlSourceChild::Compute(Arc::from(error.to_string())),
+                    )),
                 }
-                ControlFlow::Break(SourcePreparationOutcome::Need(need)) => {
-                    SourcePreparationOutcome::Need(need)
+            }
+            HostRepositorySourceReadObservationKey::Observation(source_key) => {
+                match ctx.compute(&source_key).await {
+                    Ok(outcome) => match external_bzl_observed_child(outcome) {
+                        ControlFlow::Continue(source) => SourcePreparationOutcome::Complete(Ok(
+                            ExternalBzlSourceChild::Observation(
+                                source.result().dupe(),
+                                source.observations().dupe(),
+                            ),
+                        )),
+                        ControlFlow::Break(outcome) => {
+                            outcome.map(|result| result.map(|()| unreachable!()))
+                        }
+                    },
+                    Err(error) => SourcePreparationOutcome::Complete(Ok(
+                        ExternalBzlSourceChild::Compute(Arc::from(error.to_string())),
+                    )),
                 }
-                ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error))) => {
-                    SourcePreparationOutcome::Complete(Err(error))
-                }
-                ControlFlow::Break(SourcePreparationOutcome::Complete(Ok(()))) => unreachable!(),
-            },
-            Err(error) => SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Compute(
-                Arc::from(error.to_string()),
-            ))),
+            }
         },
     }
 }

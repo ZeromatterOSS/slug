@@ -149,6 +149,23 @@ pub enum HostRepositorySourceRoute {
     Canonical(HostCanonicalRepositorySourceInput),
 }
 
+/// The existing source child selected for an unobserved repository read.
+///
+/// Root requests retain their exact apparent-route owner. Built-in and
+/// canonical routes use the shared zero-copy source-observation owner.
+#[doc(hidden)]
+pub enum HostRepositorySourceReadKey {
+    RootRequest(HostRepositorySourceFileKey),
+    Observation(HostRepositorySourceObservationKey),
+}
+
+/// The existing source child selected for an observed repository read.
+#[doc(hidden)]
+pub enum HostRepositorySourceReadObservationKey {
+    RootRequest(HostRepositorySourceFileObservationKey),
+    Observation(HostRepositorySourceObservationEpochKey),
+}
+
 impl HostRepositorySourceRoute {
     pub fn root(route: RootRepositoryRoute) -> Self {
         Self::Root(route)
@@ -169,6 +186,46 @@ impl HostRepositorySourceRoute {
         match self {
             Self::Root(route) => route.canonical_repo(),
             Self::Canonical(input) => input.route.view().canonical_repo(),
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn source_read_key(
+        &self,
+        relative_path: HostRepositoryRelativePath,
+    ) -> HostRepositorySourceReadKey {
+        match self {
+            Self::Root(route) if !route.is_builtin_bazel_tools() => {
+                HostRepositorySourceReadKey::RootRequest(HostRepositorySourceFileKey::new(
+                    route.clone(),
+                    relative_path.as_path().to_path_buf(),
+                ))
+            }
+            Self::Root(_) | Self::Canonical(_) => {
+                HostRepositorySourceReadKey::Observation(self.source_observation_key(relative_path))
+            }
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn source_read_observation_key(
+        &self,
+        relative_path: HostRepositoryRelativePath,
+    ) -> HostRepositorySourceReadObservationKey {
+        match self {
+            Self::Root(route) if !route.is_builtin_bazel_tools() => {
+                HostRepositorySourceReadObservationKey::RootRequest(
+                    HostRepositorySourceFileObservationKey::new(
+                        route.clone(),
+                        relative_path.as_path().to_path_buf(),
+                    ),
+                )
+            }
+            Self::Root(_) | Self::Canonical(_) => {
+                HostRepositorySourceReadObservationKey::Observation(
+                    self.source_observation_epoch_key(relative_path),
+                )
+            }
         }
     }
 
