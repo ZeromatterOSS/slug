@@ -2,6 +2,8 @@
 
 Archived terminal packet records displaced from the bounded live routing log.
 
+| 2026-08-26 | M7A complete compile-variable acceptance and action-template frontier audit | Root exact native/producer proof, full serial validation, alias tightening and independent review; recursive compile/proxy/toolchain source trace; clean Zabel peer guidance only | proof-only complete compile variables; next proof-only complete action templates | `97faa6e71` accepts native alias, all producer eager identities and ordered set; all six children of `compile_action_templates.bzl` are accepted and its eager surface is imports plus lazy functions | `ACCEPT`; implement only `WP-4-7A-rules-cc-compile-action-templates-complete-loading-proof` under 0/600/600 and invoke nothing |
+
 | Date | Packet | Route | Wall time | Evidence | Review/rework | Result and next-use note |
 |------|--------|-------|-----------|----------|---------------|--------------------------|
 | 2026-08-26 | M0/M7A post-universe archive-gate stop | Root ran the required clean-root archive checker after integrating `cb71a302d`; no implementation candidate | checker-only admission of the accepted `app/slug_starlark_v2/**` path | the exact 16-file universe packet could not update the checker's explicit app allowlist, so all three new crate files are falsely classified non-V2; longstanding thoughts rows are unchanged | `REPLAN`; run only `WP-0-4-5-slug-starlark-archive-whitelist-correction` under 0/3/3, then resume the unchanged helper retry |
