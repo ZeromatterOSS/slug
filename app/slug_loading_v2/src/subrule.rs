@@ -16,6 +16,8 @@ use std::sync::Arc;
 use allocative::Allocative;
 use compact_str::CompactString;
 use slug_build_api_v2::ProviderIdentity;
+use slug_configuration_v2::ConfigurationField;
+use slug_configuration_v2::ConfigurationFieldIdentity;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
@@ -40,63 +42,15 @@ use starlark_map::small_set::SmallSet;
 
 use crate::attrs::AllowSingleFile;
 use crate::attrs::AllowedAttributeValues;
+use crate::attrs::AttributeDependencyConfiguration;
 use crate::attrs::AttributeKind;
+use crate::attrs::AttributeSchema;
 use crate::attrs::CoercedAttributeValue;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::package::ToolchainTypeRequirement;
 use crate::package::subrule_attribute_from_value;
 use crate::package::subrule_toolchain_requirements;
 use crate::provider::BzlEvaluationContext;
-
-/// A Rust-owned identity for one admitted Bazel native configuration-field
-/// producer. The string passed by Starlark is validated at construction and
-/// never becomes the semantic identity itself.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
-pub(crate) enum ConfigurationFragmentProducer {
-    Cpp,
-}
-
-impl ConfigurationFragmentProducer {
-    fn from_starlark_name(name: &str) -> anyhow::Result<Self> {
-        match name {
-            "cpp" => Ok(Self::Cpp),
-            _ => anyhow::bail!("invalid configuration fragment name '{name}'"),
-        }
-    }
-
-    fn starlark_name(self) -> &'static str {
-        match self {
-            Self::Cpp => "cpp",
-        }
-    }
-
-    fn admits_field(self, name: &str) -> bool {
-        match self {
-            Self::Cpp => matches!(
-                name,
-                "fdo_optimize"
-                    | "xbinary_fdo"
-                    | "fdo_profile"
-                    | "cs_fdo_profile"
-                    | "fdo_prefetch_hints"
-                    | "propeller_optimize"
-                    | "memprof_profile"
-                    | "proto_profile_path"
-                    | "libc_top"
-                    | "zipper"
-            ),
-        }
-    }
-}
-
-/// Bazel's cache/equality inputs are fragment class, tools repository and
-/// annotated field name. The defining `.bzl` module is intentionally absent.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
-pub(crate) struct ConfigurationFieldIdentity {
-    pub(crate) producer: ConfigurationFragmentProducer,
-    pub(crate) field: CompactString,
-    pub(crate) tools_repository: CanonicalRepoName,
-}
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct ConfigurationFieldValue(ConfigurationFieldIdentity);
@@ -145,19 +99,20 @@ pub(crate) fn configuration_field_global<'v>(
     name: &str,
     eval: &Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<ConfigurationFieldValue> {
-    let producer = ConfigurationFragmentProducer::from_starlark_name(fragment)?;
-    if !producer.admits_field(name) {
+    if fragment != "cpp" {
+        anyhow::bail!("invalid configuration fragment name '{fragment}'");
+    }
+    let Some(field) = ConfigurationField::from_starlark_names(fragment, name) else {
         anyhow::bail!(
             "invalid configuration field name '{name}' on fragment '{}'",
-            producer.starlark_name()
+            fragment
         );
-    }
+    };
     let source = BzlEvaluationContext::from_evaluator(eval)?.source_identity_for_call(eval)?;
-    Ok(ConfigurationFieldValue(ConfigurationFieldIdentity {
-        producer,
-        field: name.into(),
-        tools_repository: tools_repository(source),
-    }))
+    Ok(ConfigurationFieldValue(ConfigurationFieldIdentity::new(
+        field,
+        tools_repository(source),
+    )))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -275,8 +230,111 @@ pub(crate) struct AttachedSubrules {
 /// slice is the sole future configured-resolution input.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct LateBoundRuleAttribute {
-    pub(crate) name: CompactString,
+    pub(crate) schema_index: u32,
     pub(crate) identity: ConfigurationFieldIdentity,
+    pub(crate) required_providers: Arc<[Arc<[ProviderIdentity]>]>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum ConfiguredDependencyDefault<'a> {
+    Literal(&'a CoercedAttributeValue),
+    ConfigurationField(&'a ConfigurationFieldIdentity),
+}
+
+/// Borrowed view over an ordinary late-bound or lifted hidden dependency.
+#[derive(Clone, Copy, Debug)]
+pub struct ConfiguredDependencyAttribute<'a> {
+    name: &'a str,
+    user_name: Option<&'a str>,
+    kind: AttributeKind,
+    default: ConfiguredDependencyDefault<'a>,
+    allow_files: bool,
+    allow_single_file: Option<&'a AllowSingleFile>,
+    executable: bool,
+    exec_configuration: bool,
+    required_providers: &'a [Arc<[ProviderIdentity]>],
+}
+
+impl<'a> ConfiguredDependencyAttribute<'a> {
+    pub(crate) fn from_ordinary(
+        attribute: &'a LateBoundRuleAttribute,
+        schema: &'a AttributeSchema,
+    ) -> Self {
+        Self {
+            name: schema.declaration_name(),
+            user_name: None,
+            kind: schema.kind(),
+            default: ConfiguredDependencyDefault::ConfigurationField(&attribute.identity),
+            allow_files: schema.allow_files(),
+            allow_single_file: schema.allow_single_file(),
+            executable: schema.executable(),
+            exec_configuration: matches!(
+                schema.dependency_configuration(),
+                AttributeDependencyConfiguration::Exec
+            ),
+            required_providers: &attribute.required_providers,
+        }
+    }
+
+    pub(crate) fn from_hidden(attribute: &'a LiftedSubruleAttribute) -> Self {
+        let default = match &attribute.default {
+            SubruleAttributeDefault::Literal(value) => ConfiguredDependencyDefault::Literal(value),
+            SubruleAttributeDefault::ConfigurationField(identity) => {
+                ConfiguredDependencyDefault::ConfigurationField(identity)
+            }
+        };
+        Self {
+            name: attribute.rule_name.as_str(),
+            user_name: Some(attribute.user_name.as_str()),
+            kind: attribute.kind,
+            default,
+            allow_files: attribute.allow_files,
+            allow_single_file: attribute.allow_single_file.as_ref(),
+            executable: attribute.executable,
+            exec_configuration: attribute.exec_configuration,
+            required_providers: &attribute.required_providers,
+        }
+    }
+
+    pub fn name(self) -> &'a str {
+        self.name
+    }
+
+    pub fn user_name(self) -> Option<&'a str> {
+        self.user_name
+    }
+
+    pub fn kind(self) -> AttributeKind {
+        self.kind
+    }
+
+    pub fn default(self) -> ConfiguredDependencyDefault<'a> {
+        self.default
+    }
+
+    pub fn allow_files(self) -> bool {
+        self.allow_files
+    }
+
+    pub fn allow_single_file(self) -> Option<&'a AllowSingleFile> {
+        self.allow_single_file
+    }
+
+    pub fn executable(self) -> bool {
+        self.executable
+    }
+
+    pub fn exec_configuration(self) -> bool {
+        self.exec_configuration
+    }
+
+    pub fn required_providers(self) -> &'a [Arc<[ProviderIdentity]>] {
+        self.required_providers
+    }
+
+    pub fn is_hidden(self) -> bool {
+        self.user_name.is_some()
+    }
 }
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
@@ -306,10 +364,10 @@ impl<'v> StarlarkValue<'v> for DeferredSubruleRuleImplementation {
         let _lifetime_only = self.implementation;
         let message = match &self.first_subrule {
             Some(subrule) => format!(
-                "configured analysis of subrule '{subrule}' does not yet support hidden late-bound dependency resolution"
+                "configured analysis of subrule '{subrule}' reached the deferred invocation boundary"
             ),
             None => format!(
-                "configured analysis of rule attribute '{}' does not yet support late-bound dependency resolution",
+                "configured analysis of rule attribute '{}' reached the deferred late-bound value materialization boundary",
                 self.first_late_bound_attribute
                     .as_deref()
                     .expect("the wrapper retains one deferred semantic")
@@ -323,14 +381,14 @@ pub(crate) fn fail_closed_rule_implementation(
     freezer: &Freezer,
     implementation: FrozenValue,
     attached: &AttachedSubrules,
-    late_bound_attributes: &[LateBoundRuleAttribute],
+    first_late_bound_attribute: Option<CompactString>,
 ) -> FrozenValue {
-    match (attached.definitions.first(), late_bound_attributes.first()) {
+    match (attached.definitions.first(), first_late_bound_attribute) {
         (None, None) => implementation,
         (definition, attribute) => freezer.alloc(DeferredSubruleRuleImplementation {
             implementation,
             first_subrule: definition.map(|definition| definition.identity.exported_name.clone()),
-            first_late_bound_attribute: attribute.map(|attribute| attribute.name.clone()),
+            first_late_bound_attribute: attribute,
         }),
     }
 }
@@ -712,11 +770,10 @@ mod tests {
     }
 
     fn field(source: &BzlModuleIdentity, name: &str) -> ConfigurationFieldIdentity {
-        ConfigurationFieldIdentity {
-            producer: ConfigurationFragmentProducer::Cpp,
-            field: name.into(),
-            tools_repository: tools_repository(source),
-        }
+        ConfigurationFieldIdentity::new(
+            ConfigurationField::from_starlark_names("cpp", name).unwrap(),
+            tools_repository(source),
+        )
     }
 
     #[test]

@@ -88,25 +88,22 @@ predicates, ten typed `cpp` fields, ordinary late-bound rows, and persistent
 
 Configured hidden-dependency R2 preserved the correct pre-call and deferred-XML
 boundaries, but independent review returned `REPLAN` until a real non-default
-native producer existed. Commit `4425d3bfb` now accepts that bounded
-thirteen-option CLI-to-DICE closure. The R4 packet-only gate then proved that
-configured Exec rule children depend on the still-parked generic selected-
-toolchain/action-context cutover: broad Exec resolution deadlocks the accepted
-injected-platform terminal, while zero-toolchain Exec analysis otherwise
-reaches the base Target-owner rejection. Run only
-`WP-4-5-7A-selected-toolchain-context-cutover-implementation-r3`, preserving
-the requester's exact structural Target-or-Exec configuration and selected
-implementation Exec configuration. R2's one-shot REAPI proof advanced into
-unrelated deferred rules_shell attribute and embedded recursive-glob loading;
-R3 instead proves the unchanged REAPI planner against a genuine validated
-configured-action semantic view without claiming that BCR command closure.
-After its acceptance, resume
-`WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r4` unchanged:
+native producer existed. Commit `4425d3bfb` accepts that bounded thirteen-option
+CLI-to-DICE closure. The R4 packet-only gate then proved that configured Exec
+rule children require the generic selected-toolchain/action-context cutover.
+Commit `ebd19e3b1` now accepts that prerequisite with the requester's exact
+structural Target-or-Exec configuration, selected implementation Exec
+configuration and bounded direct REAPI semantic-consumer proof. R4 terminal
+review rejected its Target-before-Exec partition and split one-shot cycle-guard
+ownership. Run only the revised
+`WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r5`:
 share one typed configuration-field identity, resolve literal and ten `cpp`
 projections through the accepted target/selected-Exec child pipeline, validate
-provider/file/executable shape, and publish root loading-query facts. Stop
-before Starlark value materialization or invocation; XML/aspects remain
-deferred and no rules_cc/C++ special case is permitted.
+provider/file/executable shape, preserve one interleaved descriptor-order
+stream, guard selected-toolchain and declared-child analysis as one parent
+operation, and publish root loading-query facts. Stop before Starlark value
+materialization or invocation; XML/aspects remain deferred and no rules_cc/C++
+special case is permitted.
 
 ## Accepted `.bzl` load-visibility design; implementation activated (2026-08-27)
 

@@ -1,5 +1,6 @@
 mod cache_grammar;
 mod configuration;
+mod configuration_field;
 mod convert;
 mod defaults;
 pub mod host;
@@ -23,6 +24,9 @@ pub use configuration::StarlarkOption;
 pub use configuration::StarlarkOptionScope;
 pub use configuration::StarlarkOptionValue;
 pub use configuration::StarlarkOptions;
+pub use configuration_field::ConfigurationField;
+pub use configuration_field::ConfigurationFieldIdentity;
+pub use configuration_field::CppConfigurationField;
 pub use matching::NativeConfigSettingMatchError;
 pub use registry::NATIVE_OPTION_DESCRIPTORS;
 pub use registry::NativeOptionDescriptor;

@@ -21,6 +21,8 @@ use slug_identity_v2::ResolvedOptionLabel;
 use slug_identity_v2::serialization::StableSerialize;
 use strong_hash::StrongHash;
 
+use super::configuration_field::ConfigurationFieldIdentity;
+use super::configuration_field::CppConfigurationField;
 use super::convert::ConvertError;
 use super::defaults::materialize_default;
 use super::host::AutoCpuToken;
@@ -42,6 +44,8 @@ const PROJECTION_CONTEXT: &str = "slug.build/configuration-projection/v2";
 const PROJECTION_MAGIC: &[u8] = b"slugcfg\0";
 const PROJECTION_VERSION: u16 = 2;
 const PLATFORM_OPTIONS: &str = "com.google.devtools.build.lib.analysis.PlatformOptions";
+const CPP_OPTIONS: &str = "com.google.devtools.build.lib.rules.cpp.CppOptions";
+const CORE_OPTIONS: &str = "com.google.devtools.build.lib.analysis.config.CoreOptions";
 const HOST_PLATFORM: &str = "host_platform";
 const TARGET_PLATFORMS: &str = "platforms";
 
@@ -312,6 +316,7 @@ pub enum SlugConfigurationError {
     UnexpectedNativeStringList { option: &'static str },
     UnexpectedNativeLabel { option: &'static str },
     NonVisibleNativeLabel { option: &'static str },
+    InvalidCppConfiguration { reason: &'static str },
 }
 
 impl fmt::Display for SlugConfigurationError {
@@ -378,6 +383,9 @@ impl fmt::Display for SlugConfigurationError {
                     formatter,
                     "native option {option} names a non-visible repository"
                 )
+            }
+            Self::InvalidCppConfiguration { reason } => {
+                write!(formatter, "invalid C++ configuration: {reason}")
             }
         }
     }
@@ -845,6 +853,51 @@ impl SlugConfiguration {
         Ok(NativeStringListOption { values })
     }
 
+    /// Project one admitted Bazel 9.2 configuration field from the sole
+    /// structural native option vector.
+    pub fn configuration_field_label(
+        &self,
+        identity: &ConfigurationFieldIdentity,
+    ) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
+        let field = identity.field().cpp_field();
+        self.validate_cpp_field_state()?;
+        match field {
+            CppConfigurationField::FdoOptimize => self.cpp_fdo_optimize_label(),
+            CppConfigurationField::XbinaryFdo => self.effective_xbinary_label(),
+            CppConfigurationField::FdoProfile => self.cpp_label("fdo_profile"),
+            CppConfigurationField::CsFdoProfile => self.cpp_label("cs_fdo_profile"),
+            CppConfigurationField::FdoPrefetchHints => self.cpp_label("fdo_prefetch_hints"),
+            CppConfigurationField::PropellerOptimize => {
+                if self.cpp_text_present("fdo_instrument")?
+                    || self.cpp_text_present("cs_fdo_instrument")?
+                {
+                    Ok(None)
+                } else {
+                    self.cpp_label("propeller_optimize")
+                }
+            }
+            CppConfigurationField::MemprofProfile => self.cpp_label("memprof_profile"),
+            CppConfigurationField::ProtoProfilePath => self.cpp_label("proto_profile_path"),
+            CppConfigurationField::LibcTop => self.cpp_label("grte_top"),
+            CppConfigurationField::Zipper => {
+                if self.cpp_fdo_optimize_label()?.is_some()
+                    || self.cpp_label("fdo_profile")?.is_some()
+                    || self.cpp_label("memprof_profile")?.is_some()
+                    || self.effective_xbinary_label()?.is_some()
+                {
+                    let spelling = format!("{}//tools/zip:unzip_fdo", identity.tools_repository());
+                    CanonicalLabel::parse(&spelling).map(Some).map_err(|_| {
+                        SlugConfigurationError::InvalidCppConfiguration {
+                            reason: "tools repository does not form the FDO zipper label",
+                        }
+                    })
+                } else {
+                    Ok(None)
+                }
+            }
+        }
+    }
+
     pub fn projection(&self) -> SlugConfigurationProjection {
         self.0.projection
     }
@@ -873,6 +926,102 @@ impl SlugConfiguration {
     ) -> Result<bool, super::matching::NativeConfigSettingMatchError> {
         super::matching::matches(&self.0.options, values, define_values)
     }
+
+    fn validate_cpp_field_state(&self) -> Result<(), SlugConfigurationError> {
+        let optimize = self.cpp_text("fdo_optimize")?;
+        if optimize.is_some_and(|value| !value.starts_with("//")) {
+            return Err(SlugConfigurationError::InvalidCppConfiguration {
+                reason: "fdo_optimize must be a // label while absolute profiles are disabled",
+            });
+        }
+        let profile = self.cpp_label("fdo_profile")?.is_some();
+        if optimize.is_some() && profile {
+            return Err(SlugConfigurationError::InvalidCppConfiguration {
+                reason: "fdo_optimize and fdo_profile may not both be set",
+            });
+        }
+        if self.cpp_text_present("fdo_instrument")? && (optimize.is_some() || profile) {
+            return Err(SlugConfigurationError::InvalidCppConfiguration {
+                reason: "fdo_instrument may not be combined with FDO optimization",
+            });
+        }
+        Ok(())
+    }
+
+    fn cpp_fdo_optimize_label(&self) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
+        self.cpp_text("fdo_optimize")?
+            .map(|value| CanonicalLabel::parse(&format!("@@{value}")))
+            .transpose()
+            .map_err(|_| SlugConfigurationError::InvalidCppConfiguration {
+                reason: "fdo_optimize is not a valid // label",
+            })
+    }
+
+    fn effective_xbinary_label(&self) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
+        if self.cpp_text_present("fdo_optimize")?
+            || self.cpp_text_present("fdo_instrument")?
+            || self.cpp_label("fdo_profile")?.is_some()
+            || self.core_bool("collect_code_coverage")?
+        {
+            Ok(None)
+        } else {
+            self.cpp_label("xbinary_fdo")
+        }
+    }
+
+    fn cpp_text(&self, name: &'static str) -> Result<Option<&str>, SlugConfigurationError> {
+        match self.option_value(CPP_OPTIONS, name)? {
+            OptionValue::Native(NativeOccurrence::Absent) => Ok(None),
+            OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Text(value))) => {
+                Ok(Some(value.as_str()))
+            }
+            _ => Err(SlugConfigurationError::InvalidCppConfiguration {
+                reason: "a C++ text option has an invalid retained value",
+            }),
+        }
+    }
+
+    fn cpp_text_present(&self, name: &'static str) -> Result<bool, SlugConfigurationError> {
+        self.cpp_text(name).map(|value| value.is_some())
+    }
+
+    fn cpp_label(
+        &self,
+        name: &'static str,
+    ) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
+        match self.option_value(CPP_OPTIONS, name)? {
+            OptionValue::Label(None) => Ok(None),
+            OptionValue::Label(Some(LabelValue::Label(value))) => value
+                .canonical()
+                .ok_or(SlugConfigurationError::NonVisibleNativeLabel { option: name })
+                .map(Some),
+            _ => Err(SlugConfigurationError::UnexpectedNativeLabel { option: name }),
+        }
+    }
+
+    fn core_bool(&self, name: &'static str) -> Result<bool, SlugConfigurationError> {
+        match self.option_value(CORE_OPTIONS, name)? {
+            OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Bool(value))) => Ok(*value),
+            _ => Err(SlugConfigurationError::InvalidCppConfiguration {
+                reason: "a C++ suppressor has an invalid retained value",
+            }),
+        }
+    }
+
+    fn option_value(
+        &self,
+        class_name: &'static str,
+        canonical_name: &'static str,
+    ) -> Result<&OptionValue, SlugConfigurationError> {
+        self.0
+            .options
+            .iter()
+            .find(|record| {
+                record.class_name == class_name && record.canonical_name == canonical_name
+            })
+            .map(|record| &record.value)
+            .ok_or(SlugConfigurationError::UnknownNativeOption)
+    }
 }
 
 fn command_native_descriptor(
@@ -891,8 +1040,6 @@ fn command_native_descriptor(
 fn typed_native_command_descriptor(
     option: NativeCommandOption,
 ) -> Result<(usize, &'static NativeOptionDescriptor), SlugConfigurationError> {
-    const CPP_OPTIONS: &str = "com.google.devtools.build.lib.rules.cpp.CppOptions";
-    const CORE_OPTIONS: &str = "com.google.devtools.build.lib.analysis.config.CoreOptions";
     let class_name = if option == NativeCommandOption::CollectCodeCoverage {
         CORE_OPTIONS
     } else {

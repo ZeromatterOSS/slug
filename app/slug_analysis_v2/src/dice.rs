@@ -98,6 +98,9 @@ use crate::starlark_rule::LoadedRuleError;
 use crate::starlark_rule::PreparedDependency;
 use crate::starlark_rule::PreparedToolchain;
 use crate::starlark_rule::evaluate_loaded_rule;
+use crate::subrule::DeclaredDependencyKey;
+use crate::subrule::configured_dependency_rows;
+use crate::subrule::validate_configured_dependency;
 
 fn without_starlark_option(
     configuration: &ConfigurationKey,
@@ -723,6 +726,25 @@ async fn prepare_configured_node_analysis_driver(
     requested: CanonicalLabel,
     configuration: ConfigurationKey,
 ) -> AnalysisSemanticOutcome<ConfiguredNodeAnalysisKey> {
+    prepare_configured_node_analysis_driver_with_source_admission(
+        ctx,
+        mode,
+        workspace,
+        requested,
+        configuration,
+        false,
+    )
+    .await
+}
+
+async fn prepare_configured_node_analysis_driver_with_source_admission(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: NormalizedAbsolutePath,
+    requested: CanonicalLabel,
+    configuration: ConfigurationKey,
+    source_admitted: bool,
+) -> AnalysisSemanticOutcome<ConfiguredNodeAnalysisKey> {
     if configuration.slug_configuration().is_none() {
         return analysis_semantic_complete(Err(AnalysisError::message(
             "production configured-node analysis requires a structural Slug configuration",
@@ -779,20 +801,23 @@ async fn prepare_configured_node_analysis_driver(
         Ok(package) => package,
         Err(error) => return analysis_semantic_complete(Err(package_inventory_error(error))),
     };
-    let Some(_target) = package
+    let target = package
         .targets
         .iter()
-        .find(|target| target.name == requested.target().as_str())
-    else {
+        .find(|target| target.name == requested.target().as_str());
+    let node = if (target.is_none() && source_admitted)
+        || target.is_some_and(|target| matches!(target.kind, PackageTargetKind::ExportedFile))
+    {
+        ConfiguredNodeKey::null(requested)
+    } else if target.is_none() {
         return analysis_semantic_complete(Err(AnalysisError::target_not_found(
             requested,
             package.build_file.clone(),
         )));
+    } else {
+        ConfiguredNodeKey::configured(ConfiguredTargetKey::new(requested, configuration))
     };
-    analysis_semantic_complete(ConfiguredNodeAnalysisKey::new(
-        workspace,
-        ConfiguredTargetKey::new(requested, configuration),
-    ))
+    analysis_semantic_complete(ConfiguredNodeAnalysisKey::new(workspace, node))
 }
 
 async fn build_setting_declaration(
@@ -1471,6 +1496,17 @@ async fn root_declared_dependency_keys(
                     .expect("attribute dependency index fits u32"),
                 node,
                 transition_output: transition_output.clone(),
+                hidden: false,
+                exec_configuration: false,
+                source_admitted: schema.allow_files()
+                    || matches!(
+                        schema.allow_single_file(),
+                        Some(
+                            slug_loading_v2::AllowSingleFile::True
+                                | slug_loading_v2::AllowSingleFile::Extensions(_)
+                        )
+                    ),
+                validation: None,
             });
         }
     }
@@ -1537,12 +1573,96 @@ async fn configured_dependency_configuration(
     })();
     analysis_semantic_complete(resolved.map(|configuration| (configuration, Some(output_label))))
 }
-#[derive(Debug, Clone)]
-struct DeclaredDependencyKey {
-    attribute: CompactString,
-    attribute_index: u32,
-    node: ConfiguredNodeKey,
-    transition_output: Option<CanonicalLabel>,
+
+async fn prepare_declared_dependency_keys(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    dependencies: &mut [DeclaredDependencyKey],
+) -> AnalysisSemanticOutcome<SmallMap<ConfiguredNodeKey, ConfiguredNodeAnalysisKey>> {
+    let mut unique = SmallMap::with_capacity(dependencies.len());
+    for dependency in dependencies.iter() {
+        if let Some(source_admitted) = unique.get_mut(&dependency.node) {
+            *source_admitted |= dependency.source_admitted;
+        } else {
+            unique.insert(dependency.node.clone(), dependency.source_admitted);
+        }
+    }
+    let preparations = ctx
+        .compute_join(unique, |ctx, (node, source_admitted)| {
+            Box::pin(async move {
+                let prepared = match &node {
+                    ConfiguredNodeKey::Configured(configured_target) => {
+                        prepare_configured_node_analysis_driver_with_source_admission(
+                            ctx,
+                            mode,
+                            workspace.dupe(),
+                            configured_target.label().clone(),
+                            configured_target.configuration().clone(),
+                            source_admitted,
+                        )
+                        .await
+                    }
+                    ConfiguredNodeKey::Null(_) => analysis_semantic_complete(
+                        ConfiguredNodeAnalysisKey::new(workspace.dupe(), node.clone()),
+                    ),
+                };
+                (node, prepared)
+            })
+        })
+        .await;
+    let mut all_need: Option<LoadingPreparationNeeds> = None;
+    let mut first_outer = None;
+    let mut first_error = None;
+    let mut normalizations = SmallMap::with_capacity(preparations.len());
+    let mut prepared = SmallMap::with_capacity(preparations.len());
+    for (requested, outcome) in preparations {
+        match outcome {
+            LoadingPreparationOutcome::Need(need) => {
+                all_need = Some(match all_need {
+                    Some(current) => current.try_union(&need).unwrap_or_else(|error| {
+                        panic!(
+                            "root analysis dependency preparation Needs must be structurally compatible: \
+                             {error:?}"
+                        )
+                    }),
+                    None => need,
+                });
+            }
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                if first_outer.is_none() {
+                    first_outer = Some(error);
+                }
+            }
+            LoadingPreparationOutcome::Complete(Ok(value)) => match value {
+                Ok(key) => {
+                    let normalized = key.node.clone();
+                    normalizations.insert(requested, normalized.clone());
+                    prepared.insert(normalized, key);
+                }
+                Err(error) => {
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                }
+            },
+        }
+    }
+    if let Some(error) = first_outer {
+        return LoadingPreparationOutcome::Complete(Err(error));
+    }
+    if let Some(need) = all_need {
+        return LoadingPreparationOutcome::Need(need);
+    }
+    if let Some(error) = first_error {
+        return analysis_semantic_complete(Err(error));
+    }
+    for dependency in dependencies {
+        if let Some(normalized) = normalizations.get(&dependency.node) {
+            dependency.node = normalized.clone();
+        }
+    }
+    analysis_semantic_complete(Ok(prepared))
 }
 
 trait ComputedAnalysis {
@@ -1591,6 +1711,18 @@ where
     let mut dependencies = Vec::new();
     let mut edges = Vec::with_capacity(declared_dependency_keys.len() + visibility_labels.len());
     for dependency in declared_dependency_keys {
+        let result = computed.get(&dependency.node).ok_or_else(|| {
+            AnalysisError::new(format!(
+                "internal error: dependency result missing for `{}`",
+                dependency.node
+            ))
+        })?;
+        validate_configured_dependency(dependency, result.result())?;
+    }
+    for dependency in declared_dependency_keys {
+        if dependency.hidden {
+            continue;
+        }
         let result = computed.get(&dependency.node).ok_or_else(|| {
             AnalysisError::new(format!(
                 "internal error: dependency result missing for `{}`",
@@ -2800,8 +2932,7 @@ async fn prepare_selected_toolchain_context(
     let outcomes = if inputs.is_empty() {
         Vec::new()
     } else {
-        let cycle_guard = ctx.cycle_guard::<ConfiguredAnalysisCycleGuard>();
-        let child_future = ctx.compute_join(inputs, |ctx, (index, key)| {
+        ctx.compute_join(inputs, |ctx, (index, key)| {
             Box::pin(async move {
                 (
                     index,
@@ -2814,21 +2945,8 @@ async fn prepare_selected_toolchain_context(
                     .await,
                 )
             })
-        });
-        match cycle_guard {
-            Ok(Some(guard)) => match guard.guard_this(child_future).await {
-                Ok(outcomes) => outcomes,
-                Err(cycle) => {
-                    return toolchain_outcome(Err(AnalysisError::message(cycle.to_string())));
-                }
-            },
-            Ok(None) => child_future.await,
-            Err(error) => {
-                return toolchain_outcome(Err(AnalysisError::message(format!(
-                    "reading configured-analysis cycle guard: {error}"
-                ))));
-            }
-        }
+        })
+        .await
     };
 
     let mut all_need: Option<LoadingPreparationNeeds> = None;
@@ -4016,7 +4134,10 @@ impl ConfiguredNodeAnalysisKey {
             return root_analysis_driver_complete(Err(error));
         }
         match (&self.node, target.map(|target| &target.kind)) {
-            (ConfiguredNodeKey::Null(_), None) if package_declares_source_label(package, label) => {
+            (ConfiguredNodeKey::Null(_), source_kind)
+                if matches!(source_kind, Some(PackageTargetKind::ExportedFile))
+                    || (source_kind.is_none() && package_declares_source_label(package, label)) =>
+            {
                 let source_path = source_path(&self.workspace, label);
                 let resolved = match resolve_source_input(ctx, mode, source_path, label).await {
                     LoadingPreparationOutcome::Need(need) => {
@@ -4368,12 +4489,18 @@ impl ConfiguredNodeAnalysisKey {
             Ok(implementation) => implementation,
             Err(error) => return root_analysis_driver_complete(Err(error)),
         };
+        let configured_dependency_names = implementation
+            .configured_dependency_attributes()
+            .filter(|attribute| !attribute.is_hidden())
+            .map(|attribute| attribute.name())
+            .collect::<SmallSet<_>>();
         if let Some(schema) = implementation.schema().iter().find(|schema| {
-            schema.executable()
+            (schema.executable()
                 || matches!(
                     schema.dependency_configuration(),
                     AttributeDependencyConfiguration::Exec
-                )
+                ))
+                && !configured_dependency_names.contains(schema.declaration_name())
         }) {
             return root_analysis_driver_complete(Err(
                 AnalysisError::unsupported_configured_attribute(
@@ -4407,7 +4534,7 @@ impl ConfiguredNodeAnalysisKey {
             }
             LoadingPreparationOutcome::Complete(Ok(Ok(values))) => values,
         };
-        let declared_dependency_keys = match root_declared_dependency_keys(
+        let mut declared_dependency_keys = match root_declared_dependency_keys(
             ctx,
             mode,
             &self.workspace,
@@ -4429,75 +4556,49 @@ impl ConfiguredNodeAnalysisKey {
             LoadingPreparationOutcome::Complete(Ok(Ok(keys))) => keys,
         };
 
-        let mut unique = SmallSet::with_capacity(declared_dependency_keys.len());
-        for dependency in &declared_dependency_keys {
-            unique.insert(dependency.node.clone());
-        }
-        let workspace = &self.workspace;
-        let preparations = ctx
-            .compute_join(unique.into_iter(), |ctx, node| {
-                Box::pin(async move {
-                    let prepared = match &node {
-                        ConfiguredNodeKey::Configured(configured_target) => {
-                            prepare_configured_node_analysis_driver(
-                                ctx,
-                                mode,
-                                workspace.dupe(),
-                                configured_target.label().clone(),
-                                configured_target.configuration().clone(),
-                            )
-                            .await
-                        }
-                        ConfiguredNodeKey::Null(_) => analysis_semantic_complete(
-                            ConfiguredNodeAnalysisKey::new(workspace.dupe(), node.clone()),
-                        ),
-                    };
-                    (node, prepared)
-                })
-            })
-            .await;
-
-        let mut all_need: Option<LoadingPreparationNeeds> = None;
-        let mut first_outer = None;
-        let mut first_error = None;
-        let mut prepared = Vec::with_capacity(preparations.len());
-        for (node, outcome) in preparations {
-            match outcome {
-                LoadingPreparationOutcome::Need(need) => {
-                    all_need = Some(match all_need {
-                        Some(current) => current.try_union(&need).unwrap_or_else(|error| {
-                            panic!(
-                                "root analysis dependency preparation Needs must be structurally compatible: \
-                                 {error:?}"
-                            )
-                        }),
-                        None => need,
-                    });
-                }
-                LoadingPreparationOutcome::Complete(Err(error)) => {
-                    if first_outer.is_none() {
-                        first_outer = Some(error);
-                    }
-                }
-                LoadingPreparationOutcome::Complete(Ok(value)) => match value {
-                    Ok(key) => prepared.push((node, key)),
-                    Err(error) => {
-                        if first_error.is_none() {
-                            first_error = Some(error);
-                        }
-                    }
-                },
+        let structural_configuration = configured_target
+            .configuration()
+            .slug_configuration()
+            .expect("production analysis retains structural configuration");
+        let mut configured_rows =
+            match configured_dependency_rows(implementation, structural_configuration) {
+                Ok(rows) => rows,
+                Err(error) => return root_analysis_driver_complete(Err(error)),
+            };
+        let has_exec_dependency = configured_rows.iter().any(|row| row.exec_configuration);
+        let target_only_prepared = if has_exec_dependency {
+            None
+        } else {
+            for row in configured_rows.drain(..) {
+                declared_dependency_keys.extend(row.into_keys(|label, _| {
+                    ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
+                        label,
+                        configured_target.configuration().clone(),
+                    ))
+                }));
             }
-        }
-        if let Some(error) = first_outer {
-            return LoadingPreparationOutcome::Complete(Err(error));
-        }
-        if let Some(need) = all_need {
-            return LoadingPreparationOutcome::Need(need);
-        }
-        if let Some(error) = first_error {
-            return root_analysis_driver_complete(Err(error));
-        }
+            Some(
+                match prepare_declared_dependency_keys(
+                    ctx,
+                    mode,
+                    &self.workspace,
+                    &mut declared_dependency_keys,
+                )
+                .await
+                {
+                    LoadingPreparationOutcome::Need(need) => {
+                        return LoadingPreparationOutcome::Need(need);
+                    }
+                    LoadingPreparationOutcome::Complete(Err(error)) => {
+                        return LoadingPreparationOutcome::Complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                        return root_analysis_driver_complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Ok(prepared))) => prepared,
+                },
+            )
+        };
         let requirements = match starlark_rule_implementation(package, configured_target) {
             Ok(rule) => Arc::from(rule.required_toolchains()),
             Err(error) => return root_analysis_driver_complete(Err(error)),
@@ -4566,15 +4667,35 @@ impl ConfiguredNodeAnalysisKey {
             }
             LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
         };
-        let prepared_toolchain = if resolution.rows().is_empty() {
-            None
-        } else {
-            match prepare_selected_toolchain_context(
+        let selected_platform = resolution.execution_platform();
+        let prepared = if has_exec_dependency {
+            let exec_configuration = match structural_configuration
+                .to_exec_for_platform(selected_platform.actual().label())
+            {
+                Ok(configuration) => ConfigurationKey::from_slug(configuration),
+                Err(error) => {
+                    return root_analysis_driver_complete(Err(AnalysisError::message(format!(
+                        "projecting configured dependency Exec configuration: {error}"
+                    ))));
+                }
+            };
+            for row in configured_rows {
+                declared_dependency_keys.extend(row.into_keys(|label, exec| {
+                    ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
+                        label,
+                        if exec {
+                            exec_configuration.clone()
+                        } else {
+                            configured_target.configuration().clone()
+                        },
+                    ))
+                }));
+            }
+            match prepare_declared_dependency_keys(
                 ctx,
                 mode,
                 &self.workspace,
-                configured_target,
-                &resolution,
+                &mut declared_dependency_keys,
             )
             .await
             {
@@ -4587,10 +4708,100 @@ impl ConfiguredNodeAnalysisKey {
                 LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
                     return root_analysis_driver_complete(Err(error));
                 }
-                LoadingPreparationOutcome::Complete(Ok(Ok(value))) => Some(value),
+                LoadingPreparationOutcome::Complete(Ok(Ok(prepared))) => prepared,
+            }
+        } else {
+            target_only_prepared.expect("target-only dependencies were prepared before resolution")
+        };
+        let cycle_guard = ctx.cycle_guard::<ConfiguredAnalysisCycleGuard>();
+        let child_future = async {
+            let prepared_toolchain = if resolution.rows().is_empty() {
+                None
+            } else {
+                match prepare_selected_toolchain_context(
+                    ctx,
+                    mode,
+                    &self.workspace,
+                    configured_target,
+                    &resolution,
+                )
+                .await
+                {
+                    LoadingPreparationOutcome::Need(need) => {
+                        return LoadingPreparationOutcome::Need(need);
+                    }
+                    LoadingPreparationOutcome::Complete(Err(error)) => {
+                        return LoadingPreparationOutcome::Complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                        return analysis_semantic_complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Ok(value))) => Some(value),
+                }
+            };
+            let outcomes = ctx
+                .compute_join(prepared, |ctx, (node, key)| {
+                    Box::pin(async move {
+                        let result = match mode {
+                            ConfiguredAnalysisMode::Legacy => match ctx.compute(&key).await {
+                                Ok(LoadingPreparationOutcome::Need(need)) => {
+                                    LoadingPreparationOutcome::Need(need)
+                                }
+                                Ok(LoadingPreparationOutcome::Complete(value)) => {
+                                    LoadingPreparationOutcome::Complete(Ok(value))
+                                }
+                                Err(error) => {
+                                    root_analysis_driver_complete(Err(AnalysisError::new(format!(
+                                        "computing dependency `{node}` through DICE: {error}"
+                                    ))))
+                                }
+                            },
+                            ConfiguredAnalysisMode::Observed => match ctx
+                                .compute(&ConfiguredNodeAnalysisObservationKey(key))
+                                .await
+                            {
+                                Ok(value) => value,
+                                Err(error) => {
+                                    root_analysis_driver_complete(Err(AnalysisError::new(format!(
+                                        "computing dependency `{node}` through DICE: {error}"
+                                    ))))
+                                }
+                            },
+                        };
+                        (node, result)
+                    })
+                })
+                .await;
+            analysis_semantic_complete(Ok((prepared_toolchain, outcomes)))
+        };
+        let children = match cycle_guard {
+            Ok(Some(guard)) => match guard.guard_this(child_future).await {
+                Ok(children) => children,
+                Err(cycle) => {
+                    return root_analysis_driver_complete(Err(AnalysisError::message(
+                        cycle.to_string(),
+                    )));
+                }
+            },
+            Ok(None) => child_future.await,
+            Err(error) => {
+                return root_analysis_driver_complete(Err(AnalysisError::message(format!(
+                    "reading configured-analysis cycle guard: {error}"
+                ))));
             }
         };
-        let selected_platform = resolution.execution_platform();
+        let (prepared_toolchain, outcomes) = match children {
+            LoadingPreparationOutcome::Need(need) => {
+                return LoadingPreparationOutcome::Need(need);
+            }
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return root_analysis_driver_complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(children))) => children,
+        };
         let action_context = if let Some(toolchain) = &prepared_toolchain {
             toolchain.action_context.clone()
         } else {
@@ -4612,35 +4823,6 @@ impl ConfiguredNodeAnalysisKey {
             }
         };
         let candidate_execution_platforms = Some(candidate_execution_platforms);
-        let outcomes = ctx
-            .compute_join(prepared, |ctx, (node, key)| {
-                Box::pin(async move {
-                    let result = match mode {
-                        ConfiguredAnalysisMode::Legacy => match ctx.compute(&key).await {
-                            Ok(LoadingPreparationOutcome::Need(need)) => {
-                                LoadingPreparationOutcome::Need(need)
-                            }
-                            Ok(LoadingPreparationOutcome::Complete(value)) => {
-                                LoadingPreparationOutcome::Complete(Ok(value))
-                            }
-                            Err(error) => root_analysis_driver_complete(Err(AnalysisError::new(
-                                format!("computing dependency `{node}` through DICE: {error}"),
-                            ))),
-                        },
-                        ConfiguredAnalysisMode::Observed => match ctx
-                            .compute(&ConfiguredNodeAnalysisObservationKey(key))
-                            .await
-                        {
-                            Ok(value) => value,
-                            Err(error) => root_analysis_driver_complete(Err(AnalysisError::new(
-                                format!("computing dependency `{node}` through DICE: {error}"),
-                            ))),
-                        },
-                    };
-                    (node, result)
-                })
-            })
-            .await;
         let mut all_need: Option<LoadingPreparationNeeds> = None;
         let mut first_outer = None;
         let mut first_error = None;

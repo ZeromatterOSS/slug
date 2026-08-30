@@ -18,6 +18,7 @@ pub mod dice;
 pub mod key;
 pub mod result;
 pub mod starlark_rule;
+mod subrule;
 pub mod toolchains;
 
 pub use command_configuration::CommandConfigurationPreparationKey;

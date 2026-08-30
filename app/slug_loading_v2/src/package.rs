@@ -112,6 +112,7 @@ use crate::starlark_label::label_globals;
 use crate::starlark_label::resolve_label;
 use crate::subrule::AttachedSubrules;
 use crate::subrule::ConfigurationFieldValue;
+use crate::subrule::ConfiguredDependencyAttribute;
 use crate::subrule::LateBoundRuleAttribute;
 use crate::subrule::SubruleAttribute;
 use crate::subrule::SubruleAttributeDefault;
@@ -866,9 +867,32 @@ impl StarlarkRuleImplementation {
     }
 
     pub fn late_bound_rule_attributes(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.late_bound_attributes.iter().map(|attribute| {
+            let schema = &self.schema[attribute.schema_index as usize];
+            (
+                schema.declaration_name(),
+                attribute.identity.field().field_name(),
+            )
+        })
+    }
+
+    pub fn configured_dependency_attributes(
+        &self,
+    ) -> impl Iterator<Item = ConfiguredDependencyAttribute<'_>> {
         self.late_bound_attributes
             .iter()
-            .map(|attribute| (attribute.name.as_str(), attribute.identity.field.as_str()))
+            .map(|attribute| {
+                ConfiguredDependencyAttribute::from_ordinary(
+                    attribute,
+                    &self.schema[attribute.schema_index as usize],
+                )
+            })
+            .chain(
+                self.attached_subrules
+                    .lifted_attributes
+                    .iter()
+                    .map(ConfiguredDependencyAttribute::from_hidden),
+            )
     }
 
     pub fn schema(&self) -> &[AttributeSchema] {
@@ -3717,11 +3741,15 @@ impl<'v> Freeze for RuleDefinition<'v> {
             ));
         };
         let implementation = self.implementation.freeze(freezer)?;
+        let first_late_bound_attribute = self
+            .late_bound_attributes
+            .first()
+            .map(|attribute| self.schema[attribute.schema_index as usize].name.clone());
         let implementation = fail_closed_rule_implementation(
             freezer,
             implementation,
             &self.attached_subrules,
-            &self.late_bound_attributes,
+            first_late_bound_attribute,
         );
         let subrule_callables = self
             .subrule_callables
@@ -4805,7 +4833,7 @@ struct AttributeDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     default: Option<CoercedAttributeValue>,
     #[trace(unsafe_ignore)]
-    late_bound_default: Option<crate::subrule::ConfigurationFieldIdentity>,
+    late_bound_default: Option<slug_configuration_v2::ConfigurationFieldIdentity>,
     #[trace(unsafe_ignore)]
     computed_default: bool,
     #[trace(unsafe_ignore)]
@@ -7495,10 +7523,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                     );
                 }
                 if let Some(identity) = &definition.late_bound_default {
-                    late_bound_attributes.push(LateBoundRuleAttribute {
-                        name: name.as_str().into(),
-                        identity: identity.clone(),
-                    });
+                    late_bound_attributes.push((
+                        u32::try_from(user_schema.len()).expect("rule attribute count fits in u32"),
+                        identity.clone(),
+                        definition.required_providers.clone(),
+                    ));
                 }
                 user_schema.push(declared_attribute_schema(name, &definition));
             }
@@ -7506,7 +7535,20 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         let has_transition = user_schema.iter().any(|schema| schema.transition.is_some());
         let mut schema =
             starlark_builtin_schema(executable, test, build_setting_definition, has_transition);
+        let builtin_count = u32::try_from(schema.len()).expect("built-in attribute count fits u32");
         schema.extend(user_schema);
+        let late_bound_attributes = late_bound_attributes
+            .into_iter()
+            .map(
+                |(user_index, identity, required_providers)| LateBoundRuleAttribute {
+                    schema_index: builtin_count
+                        .checked_add(user_index)
+                        .expect("rule attribute count fits u32"),
+                    identity,
+                    required_providers,
+                },
+            )
+            .collect::<Vec<_>>();
         let (attached_subrules, subrule_callables) = attached_subrules(subrules)?;
         Ok(RuleDefinition {
             implementation,

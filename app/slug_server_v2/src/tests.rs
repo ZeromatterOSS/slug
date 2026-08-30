@@ -567,6 +567,83 @@ fn retained_daemon_native_fdo_overlay_restores_a_b_a_without_source_invalidation
 }
 
 #[test]
+fn retained_daemon_subrule_dependency_error_precedence_restores_a_b_a() {
+    let workspace = scratch("subrule-dependency-a-b-a");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    write(
+        &workspace.join("pkg/defs.bzl"),
+        r#"ProfileInfo = provider()
+def _sub(ctx, **kwargs): fail("subrule implementation ran")
+probe = subrule(
+    implementation = _sub,
+    attrs = {
+        "_profile": attr.label(
+            default = configuration_field(fragment = "cpp", name = "fdo_profile"),
+            providers = [ProfileInfo],
+        ),
+    },
+)
+def _rule(ctx): fail("rule implementation ran")
+subject = rule(implementation = _rule, subrules = [probe])
+"#,
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(':defs.bzl', 'subject')\nsubject(name = 'subject')\n",
+    );
+    write(
+        &workspace.join("profiles/BUILD.bazel"),
+        "exports_files(['profile'])\n",
+    );
+    write(&workspace.join("profiles/profile"), "profile\n");
+    let changed: CommandConfigurationOverlay = vec![CommandConfigurationOccurrence::native(
+        NativeCommandOption::FdoProfile,
+        Some("//profiles:profile"),
+        false,
+    )]
+    .into();
+    let request = |configuration_overlay| {
+        DaemonRequest::Cquery(CqueryRequest {
+            expression: "//pkg:subject".to_owned(),
+            include_implicit: true,
+            include_tool: true,
+            output: CqueryOutput::Label,
+            configuration_overlay,
+            bzlmod: BzlmodRequestInputs::default(),
+            repository_environment: RepositoryEnvironmentRequestInputs::default(),
+        })
+    };
+    let run = |daemon: &mut Daemon, overlay| {
+        handle_request(daemon, &serde_json::to_string(&request(overlay)).unwrap())
+    };
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let initial = run(&mut daemon, CommandConfigurationOverlay::default());
+    let selected = run(&mut daemon, changed);
+    let restored = run(&mut daemon, CommandConfigurationOverlay::default());
+
+    for result in [&initial, &selected, &restored] {
+        assert_ne!(result.exit_code, 0, "{result:?}");
+        assert_eq!(result.invalidated_files, 0, "{result:?}");
+        assert!(!result.stderr.contains("implementation ran"), "{result:?}");
+        assert!(result.stdout.is_empty(), "{result:?}");
+    }
+    assert!(
+        initial
+            .stderr
+            .contains("reached the deferred invocation boundary"),
+        "{initial:?}"
+    );
+    assert!(
+        selected
+            .stderr
+            .contains("does not provide any admitted provider alternative"),
+        "{selected:?}"
+    );
+    assert!(!selected.stderr.contains("deferred invocation boundary"));
+    assert_eq!(restored.stderr, initial.stderr);
+}
+
+#[test]
 fn reapi_materialization_uses_distinct_and_restored_structural_configuration_roots() {
     let workspace = scratch("configuration-materialization-roots");
     let host = HostConversionInputs::new(

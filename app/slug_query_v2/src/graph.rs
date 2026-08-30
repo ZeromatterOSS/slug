@@ -34,6 +34,7 @@ use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::AttributeQueryValue;
+use slug_loading_v2::ConfiguredDependencyDefault;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::LoadingPreparationOutcome;
 use slug_loading_v2::PackageGroupContents;
@@ -295,6 +296,7 @@ pub enum QueryEdgeKind {
     GeneratingRule,
     VisibilityNodep,
     Ordinary,
+    Implicit,
     PackageGroupInclude,
 }
 
@@ -1034,11 +1036,21 @@ fn package_graph_from_loaded(
                     kind: QueryEdgeKind::Ordinary,
                     target,
                 }));
+                let hidden = project_literal_hidden_attributes(implementation);
+                edges.extend(hidden.iter().flat_map(|attribute| {
+                    attribute.labels.iter().cloned().map(|target| QueryEdge {
+                        kind: QueryEdgeKind::Implicit,
+                        target,
+                    })
+                }));
+                let mut attributes =
+                    project_attributes(implementation, raw_visibility(&target.visibility), None)?
+                        .to_vec();
+                attributes.extend(hidden);
                 (
                     QueryNodeKind::Rule(CompactString::new("rule")),
                     edges,
-                    project_attributes(implementation, raw_visibility(&target.visibility), None)?
-                        .to_vec(),
+                    attributes,
                 )
             }
             PackageTargetKind::GeneratedFile {
@@ -1119,7 +1131,7 @@ fn package_graph_from_loaded(
     let referenced_sources = nodes
         .values()
         .flat_map(|node| node.edges.iter())
-        .filter(|edge| edge.kind == QueryEdgeKind::Ordinary)
+        .filter(|edge| matches!(edge.kind, QueryEdgeKind::Ordinary | QueryEdgeKind::Implicit))
         .map(|edge| &edge.target)
         .filter(|label| label.is_root_repository() && label.package() == package_name)
         .filter(|label| nodes.get(*label).is_none())
@@ -2033,6 +2045,36 @@ fn project_attributes(
         .map(Into::into)
 }
 
+fn project_literal_hidden_attributes(
+    implementation: &StarlarkRuleImplementation,
+) -> Vec<QueryAttribute> {
+    implementation
+        .configured_dependency_attributes()
+        .filter(|attribute| attribute.is_hidden())
+        .filter_map(|attribute| {
+            let ConfiguredDependencyDefault::Literal(value) = attribute.default() else {
+                return None;
+            };
+            let mut labels = Vec::new();
+            value.labels(&mut labels);
+            Some(QueryAttribute {
+                name: attribute.name().into(),
+                labels: labels
+                    .into_iter()
+                    .map(QueryLabel::from_canonical)
+                    .collect::<Vec<_>>()
+                    .into(),
+                explicit: false,
+                value: Some(AttributeQueryValue {
+                    kind: attribute.kind(),
+                    provenance: AttributeProvenance::Implicit,
+                    value: value.clone(),
+                }),
+            })
+        })
+        .collect()
+}
+
 fn project_native_attributes(
     attributes: &slug_loading_v2::NativeRuleAttributes,
     raw_visibility: &[CanonicalLabel],
@@ -2307,6 +2349,169 @@ mod graph_tests {
             CoercedAttributeValue::StringKeyedLabelDict(values)
                 if values.as_ref() == [("first".into(), CanonicalLabel::parse("@@//pkg:dep").unwrap())]
         ));
+    }
+
+    #[tokio::test]
+    async fn root_subrule_literals_project_implicit_attributes_edges_and_sources() {
+        static NEXT_WORKSPACE: AtomicU64 = AtomicU64::new(0);
+        let nanos = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let serial = NEXT_WORKSPACE.fetch_add(1, Ordering::Relaxed);
+        let workspace = std::env::temp_dir().join(format!("slug-subrule-query-{nanos}-{serial}"));
+        fs::create_dir_all(&workspace).unwrap();
+        let module = workspace.join("MODULE.bazel");
+        let build = workspace.join("BUILD.bazel");
+        let defs = workspace.join("defs.bzl");
+        let module_source = "module(name = 'root')\n";
+        let build_source = "load(':defs.bzl', 'subject')\nsubject(name = 'subject')\n";
+        let defs_source = r#"
+def _sub(ctx, **kwargs): pass
+probe = subrule(
+    implementation = _sub,
+    attrs = {
+        "_literal": attr.label(default = ":implicit.txt", allow_files = True),
+        "_list": attr.label_list(default = [":one.txt", ":two.txt"], allow_files = True),
+        "_late": attr.label(default = configuration_field(fragment = "cpp", name = "fdo_profile")),
+    },
+)
+subject = rule(implementation = lambda ctx: [], subrules = [probe])
+"#;
+        fs::write(&module, module_source).unwrap();
+        fs::write(&build, build_source).unwrap();
+        fs::write(&defs, defs_source).unwrap();
+        let files = [
+            (module.clone(), module_source),
+            (build.clone(), build_source),
+            (defs.clone(), defs_source),
+        ];
+        let text = Arc::new(WorkspaceSnapshot {
+            files: Arc::new(
+                files
+                    .iter()
+                    .map(|(path, source)| {
+                        (
+                            path.clone(),
+                            WorkspaceFileValue::Present(Arc::new((*source).to_owned())),
+                        )
+                    })
+                    .collect(),
+            ),
+        });
+        let raw = Arc::new(WorkspaceRawSnapshot {
+            files: Arc::new(
+                files
+                    .iter()
+                    .map(|(path, source)| {
+                        (
+                            path.clone(),
+                            WorkspaceRawFileValue::Present(Arc::from(source.as_bytes())),
+                        )
+                    })
+                    .collect(),
+            ),
+        });
+        let directories = Arc::new(WorkspaceDirectorySnapshot {
+            directories: Arc::new(
+                [(
+                    workspace.clone(),
+                    WorkspaceDirectoryValue::present(
+                        ["MODULE.bazel", "BUILD.bazel", "defs.bzl"]
+                            .into_iter()
+                            .map(|name| WorkspaceDirectoryEntry {
+                                name: name.into(),
+                                kind: WorkspaceDirectoryEntryKind::RegularFile,
+                            })
+                            .collect(),
+                    ),
+                )]
+                .into_iter()
+                .collect(),
+            ),
+        });
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: workspace.clone(),
+                },
+                text,
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceRawSnapshotKey {
+                    workspace: workspace.clone(),
+                },
+                raw,
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceDirectorySnapshotKey {
+                    workspace: workspace.clone(),
+                },
+                directories,
+            )])
+            .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            &workspace,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        let loaded = BzlModuleEvaluator::new(&workspace)
+            .unwrap()
+            .evaluate_package(&mut transaction, &workspace)
+            .await
+            .unwrap();
+        let graph = super::package_graph_from_loaded(&workspace, Path::new(""), &loaded).unwrap();
+        let subject = graph
+            .nodes
+            .get(&QueryLabel::parse_root("//:subject").unwrap())
+            .unwrap();
+        let implicit = subject
+            .edges
+            .iter()
+            .filter(|edge| edge.kind == QueryEdgeKind::Implicit)
+            .map(|edge| edge.target.output_label())
+            .collect::<Vec<_>>();
+        assert_eq!(implicit, ["//:implicit.txt", "//:one.txt", "//:two.txt"]);
+        let hidden = subject
+            .attributes
+            .iter()
+            .filter(|attribute| attribute.name.contains("%probe%"))
+            .collect::<Vec<_>>();
+        assert_eq!(hidden.len(), 2);
+        assert!(hidden.iter().all(|attribute| !attribute.explicit));
+        assert!(hidden.iter().all(|attribute| {
+            attribute
+                .value
+                .as_ref()
+                .is_some_and(|value| value.provenance == AttributeProvenance::Implicit)
+        }));
+        assert!(
+            subject
+                .attributes
+                .iter()
+                .all(|attribute| !attribute.name.ends_with("_late"))
+        );
+        for source in ["implicit.txt", "one.txt", "two.txt"] {
+            assert_eq!(
+                graph
+                    .nodes
+                    .get(&QueryLabel::parse_root(&format!("//:{source}")).unwrap())
+                    .unwrap()
+                    .kind,
+                QueryNodeKind::SourceFile
+            );
+        }
+        fs::remove_dir_all(&workspace).unwrap();
     }
 
     #[test]

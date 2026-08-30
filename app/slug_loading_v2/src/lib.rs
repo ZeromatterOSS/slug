@@ -227,6 +227,8 @@ pub use root_subtree_package_set::RootSubtreePackageSetKey;
 pub use root_subtree_package_set::RootSubtreePackageSetObservationKey;
 pub use slug_bzlmod_v2::SourcePreparationNeeds as LoadingPreparationNeeds;
 pub use slug_bzlmod_v2::SourcePreparationOutcome as LoadingPreparationOutcome;
+pub use subrule::ConfiguredDependencyAttribute;
+pub use subrule::ConfiguredDependencyDefault;
 pub use visibility::PackageGroupContents;
 pub use visibility::RestrictedVisibility;
 pub use visibility::RuleVisibility;

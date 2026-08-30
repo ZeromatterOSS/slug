@@ -11,7 +11,10 @@ use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
+use slug_loading_v2::AllowSingleFile;
+use slug_loading_v2::AttributeKind;
 use slug_loading_v2::BzlModuleEvaluator;
+use slug_loading_v2::ConfiguredDependencyDefault;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::bzl_load_cycle_detector;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
@@ -256,6 +259,23 @@ my_rule = rule(implementation = _rule_impl, subrules = [my_subrule])
         rule.subrule_attribute_spans().collect::<Vec<_>>(),
         [("my_subrule", 0, 2)]
     );
+    let configured = rule.configured_dependency_attributes().collect::<Vec<_>>();
+    assert_eq!(configured.len(), 2);
+    assert_eq!(configured[0].user_name(), Some("_literal"));
+    assert_eq!(configured[0].kind(), AttributeKind::Label);
+    assert!(configured[0].is_hidden());
+    let ConfiguredDependencyDefault::Literal(literal) = configured[0].default() else {
+        panic!("literal hidden row lost its retained default")
+    };
+    let mut labels = Vec::new();
+    literal.labels(&mut labels);
+    assert_eq!(labels[0].to_string(), "@@//tools:literal");
+    assert_eq!(configured[1].user_name(), Some("_late"));
+    let ConfiguredDependencyDefault::ConfigurationField(field) = configured[1].default() else {
+        panic!("late-bound hidden row lost its typed default")
+    };
+    assert_eq!(field.field().fragment_name(), "cpp");
+    assert_eq!(field.field().field_name(), "fdo_optimize");
 
     let build_only = workspace.join("build_only");
     write(
@@ -518,6 +538,47 @@ ordinary_only = rule(
         rule.late_bound_rule_attributes().collect::<Vec<_>>(),
         [("_libc_top", "libc_top"), ("_zipper", "zipper")]
     );
+    let configured = rule.configured_dependency_attributes().collect::<Vec<_>>();
+    assert_eq!(configured.len(), 10);
+    assert_eq!(configured[0].name(), "_libc_top");
+    assert_eq!(configured[0].user_name(), None);
+    assert!(!configured[0].is_hidden());
+    assert!(!configured[0].exec_configuration());
+    assert!(!configured[0].executable());
+    assert!(configured[0].required_providers().is_empty());
+    let ConfiguredDependencyDefault::ConfigurationField(libc) = configured[0].default() else {
+        panic!("ordinary libc row lost its typed default")
+    };
+    assert_eq!(libc.field().field_name(), "libc_top");
+    assert_eq!(configured[1].name(), "_zipper");
+    assert!(configured[1].exec_configuration());
+    assert!(configured[1].executable());
+    let proto = configured
+        .iter()
+        .copied()
+        .find(|attribute| attribute.user_name() == Some("_proto_profile"))
+        .unwrap();
+    assert_eq!(proto.kind(), AttributeKind::Label);
+    assert!(matches!(
+        proto.allow_single_file(),
+        Some(AllowSingleFile::True)
+    ));
+    let fdo = configured
+        .iter()
+        .copied()
+        .find(|attribute| attribute.user_name() == Some("_fdo_optimize"))
+        .unwrap();
+    assert!(fdo.allow_files());
+    assert_eq!(
+        fdo.required_providers()
+            .iter()
+            .map(|alternative| alternative
+                .iter()
+                .map(|provider| provider.name())
+                .collect::<Vec<_>>())
+            .collect::<Vec<_>>(),
+        [vec!["DefaultInfo"], vec!["FdoProfileInfo"]]
+    );
 
     let module = Module::new();
     let mut evaluator = Evaluator::new(&module);
@@ -527,7 +588,7 @@ ordinary_only = rule(
         .to_string();
     assert!(
         error.contains(
-            "configured analysis of subrule 'create_fdo_context' does not yet support hidden late-bound dependency resolution"
+            "configured analysis of subrule 'create_fdo_context' reached the deferred invocation boundary"
         ),
         "{error}"
     );
@@ -548,7 +609,7 @@ ordinary_only = rule(
         .to_string();
     assert!(
         error.contains(
-            "configured analysis of rule attribute '_zipper' does not yet support late-bound dependency resolution"
+            "configured analysis of rule attribute '_zipper' reached the deferred late-bound value materialization boundary"
         ),
         "{error}"
     );

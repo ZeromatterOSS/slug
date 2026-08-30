@@ -41,7 +41,11 @@ mod command_configuration_tests {
     use super::super::value::NativeValue;
     use crate::CommandConfigurationOccurrence;
     use crate::CommandConfigurationOverlay;
+    use crate::ConfigurationField;
+    use crate::ConfigurationFieldIdentity;
+    use crate::CppConfigurationField;
     use crate::NativeCommandOption;
+    use crate::StarlarkOptions;
 
     const PLATFORM_OPTIONS: &str = "com.google.devtools.build.lib.analysis.PlatformOptions";
 
@@ -66,6 +70,13 @@ mod command_configuration_tests {
             CanonicalRepoName::new("mapped+1.0").unwrap(),
         );
         mapping
+    }
+
+    fn cpp_field(field: CppConfigurationField) -> ConfigurationFieldIdentity {
+        ConfigurationFieldIdentity::new(
+            ConfigurationField::cpp(field),
+            CanonicalRepoName::new("tools+9.2").unwrap(),
+        )
     }
 
     fn native(
@@ -375,6 +386,232 @@ mod command_configuration_tests {
             "overlay size: {}",
             size_of::<CommandConfigurationOverlay>()
         );
+    }
+
+    #[test]
+    fn cpp_configuration_fields_project_the_ten_pinned_bazel_labels() {
+        // Bazel 9.2 CppConfiguration's @StarlarkConfigurationField methods
+        // borrow the converted CppOptions values; Slug does the same through
+        // the sole structural option vector.
+        for (option, raw, field, expected) in [
+            (
+                NativeCommandOption::FdoOptimize,
+                "//profiles:opt",
+                CppConfigurationField::FdoOptimize,
+                "@@//profiles:opt",
+            ),
+            (
+                NativeCommandOption::XbinaryFdo,
+                "//profiles:xbinary",
+                CppConfigurationField::XbinaryFdo,
+                "@@//profiles:xbinary",
+            ),
+            (
+                NativeCommandOption::FdoProfile,
+                "//profiles:fdo",
+                CppConfigurationField::FdoProfile,
+                "@@//profiles:fdo",
+            ),
+            (
+                NativeCommandOption::CsFdoProfile,
+                "//profiles:cs",
+                CppConfigurationField::CsFdoProfile,
+                "@@//profiles:cs",
+            ),
+            (
+                NativeCommandOption::FdoPrefetchHints,
+                "//profiles:prefetch",
+                CppConfigurationField::FdoPrefetchHints,
+                "@@//profiles:prefetch",
+            ),
+            (
+                NativeCommandOption::PropellerOptimize,
+                "//profiles:propeller",
+                CppConfigurationField::PropellerOptimize,
+                "@@//profiles:propeller",
+            ),
+            (
+                NativeCommandOption::MemprofProfile,
+                "//profiles:memprof",
+                CppConfigurationField::MemprofProfile,
+                "@@//profiles:memprof",
+            ),
+            (
+                NativeCommandOption::ProtoProfilePath,
+                "//profiles:proto",
+                CppConfigurationField::ProtoProfilePath,
+                "@@//profiles:proto",
+            ),
+            (
+                NativeCommandOption::GrteTop,
+                "//libc",
+                CppConfigurationField::LibcTop,
+                "@@//libc:everything",
+            ),
+        ] {
+            let configured = configuration()
+                .with_command_configuration(
+                    StarlarkOptions::default(),
+                    &vec![native(option, raw)].into(),
+                )
+                .unwrap();
+            assert_eq!(
+                configured
+                    .configuration_field_label(&cpp_field(field))
+                    .unwrap()
+                    .as_ref()
+                    .map(ToString::to_string)
+                    .as_deref(),
+                Some(expected),
+                "{}",
+                field.starlark_name()
+            );
+        }
+
+        let empty = configuration();
+        for name in [
+            "fdo_optimize",
+            "xbinary_fdo",
+            "fdo_profile",
+            "cs_fdo_profile",
+            "fdo_prefetch_hints",
+            "propeller_optimize",
+            "memprof_profile",
+            "proto_profile_path",
+            "libc_top",
+            "zipper",
+        ] {
+            let field = ConfigurationField::from_starlark_names("cpp", name).unwrap();
+            assert!(
+                empty
+                    .configuration_field_label(&ConfigurationFieldIdentity::new(
+                        field,
+                        CanonicalRepoName::new("tools+9.2").unwrap(),
+                    ))
+                    .unwrap()
+                    .is_none(),
+                "{name}"
+            );
+        }
+        assert_eq!(size_of::<CppConfigurationField>(), 1);
+        assert_eq!(size_of::<ConfigurationField>(), 1);
+    }
+
+    #[test]
+    fn cpp_configuration_fields_apply_suppression_zipper_and_invalid_state() {
+        let zipper = cpp_field(CppConfigurationField::Zipper);
+        for option in [
+            NativeCommandOption::FdoOptimize,
+            NativeCommandOption::FdoProfile,
+            NativeCommandOption::MemprofProfile,
+            NativeCommandOption::XbinaryFdo,
+        ] {
+            let configured = configuration()
+                .with_command_configuration(
+                    StarlarkOptions::default(),
+                    &vec![native(option, "//profiles:active")].into(),
+                )
+                .unwrap();
+            assert_eq!(
+                configured
+                    .configuration_field_label(&zipper)
+                    .unwrap()
+                    .unwrap()
+                    .to_string(),
+                "@@tools+9.2//tools/zip:unzip_fdo"
+            );
+        }
+        let cs_only = configuration()
+            .with_command_configuration(
+                StarlarkOptions::default(),
+                &vec![native(NativeCommandOption::CsFdoProfile, "//profiles:cs")].into(),
+            )
+            .unwrap();
+        assert!(
+            cs_only
+                .configuration_field_label(&zipper)
+                .unwrap()
+                .is_none()
+        );
+
+        let suppressed_xbinary = configuration()
+            .with_command_configuration(
+                StarlarkOptions::default(),
+                &vec![
+                    native(NativeCommandOption::XbinaryFdo, "//profiles:x"),
+                    native(NativeCommandOption::FdoInstrument, "instrument"),
+                ]
+                .into(),
+            )
+            .unwrap();
+        assert!(
+            suppressed_xbinary
+                .configuration_field_label(&cpp_field(CppConfigurationField::XbinaryFdo))
+                .unwrap()
+                .is_none()
+        );
+        let suppressed_propeller = configuration()
+            .with_command_configuration(
+                StarlarkOptions::default(),
+                &vec![
+                    native(
+                        NativeCommandOption::PropellerOptimize,
+                        "//profiles:propeller",
+                    ),
+                    native(NativeCommandOption::CsFdoInstrument, "instrument"),
+                ]
+                .into(),
+            )
+            .unwrap();
+        assert!(
+            suppressed_propeller
+                .configuration_field_label(&cpp_field(CppConfigurationField::PropellerOptimize,))
+                .unwrap()
+                .is_none()
+        );
+
+        for raw in [
+            "@repo//profiles:bad",
+            "@@repo//profiles:bad",
+            "relative",
+            "/abs",
+        ] {
+            let invalid = configuration()
+                .with_command_configuration(
+                    StarlarkOptions::default(),
+                    &vec![native(NativeCommandOption::FdoOptimize, raw)].into(),
+                )
+                .unwrap();
+            assert!(
+                invalid
+                    .configuration_field_label(&cpp_field(CppConfigurationField::FdoProfile))
+                    .unwrap_err()
+                    .to_string()
+                    .contains("fdo_optimize must be a // label"),
+                "{raw}"
+            );
+        }
+        for invalid in [
+            vec![
+                native(NativeCommandOption::FdoOptimize, "//profiles:opt"),
+                native(NativeCommandOption::FdoProfile, "//profiles:fdo"),
+            ],
+            vec![
+                native(NativeCommandOption::FdoInstrument, "instrument"),
+                native(NativeCommandOption::FdoProfile, "//profiles:fdo"),
+            ],
+        ] {
+            let configured = configuration()
+                .with_command_configuration(StarlarkOptions::default(), &invalid.into())
+                .unwrap();
+            assert!(
+                configured
+                    .configuration_field_label(&zipper)
+                    .unwrap_err()
+                    .to_string()
+                    .contains("invalid C++ configuration")
+            );
+        }
     }
 }
 
@@ -2437,6 +2674,9 @@ mod retry7_private_kernel_contract {
                 "pub use configuration::StarlarkOptionScope;",
                 "pub use configuration::StarlarkOptionValue;",
                 "pub use configuration::StarlarkOptions;",
+                "pub use configuration_field::ConfigurationField;",
+                "pub use configuration_field::ConfigurationFieldIdentity;",
+                "pub use configuration_field::CppConfigurationField;",
                 "pub use matching::NativeConfigSettingMatchError;",
                 "pub use registry::NATIVE_OPTION_DESCRIPTORS;",
                 "pub use registry::NativeOptionDescriptor;",
