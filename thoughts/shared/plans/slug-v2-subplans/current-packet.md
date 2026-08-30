@@ -1,211 +1,221 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-builtin-bazel-tools-repo-package-catalog-implementation`
+Packet: `WP-4-5-7A-repository-rule-attribute-family-architecture`
 
 Milestone: M7A bootstrap-critical repository/ruleset closure.
 
-Base: accepted generated-repository `.bzl` routing and canonical extension-owner
-projection `f747507f6`. The proof-only registration and selected-context
-candidates remain dirty, parked, and read-only.
+Base: accepted complete direct Bazel 9.2 `tools/build_defs/repo` catalog
+`3023718a0` and accepted generated-repository route/owner `f747507f6`.
+Selected-context, configured-analysis, registration, and REAPI candidates remain
+dirty, parked, and read-only.
 
 ## Immediate predecessor
 
-Commit `f747507f6` terminally accepts the generic Root/Canonical child-route
-handoff and canonical definition-host owner projection. Full Bzlmod and loading
-suites, direct CLI compilation, and independent terminal review passed. Two
-fresh-workspace/fresh-output-root rules_rust cqueries then produced the same
-result: the selected rules_cc parent resolved
-`rules_cc++compatibility_proxy+cc_compatibility_proxy`, authenticated owner
-`@@rules_cc+//cc:extensions.bzl % compatibility_proxy`, evaluated the generated
-repository, and next stopped at:
+Commit `3023718a0` imports the complete direct embedded
+`tools/build_defs/repo` package: `BUILD.repo` as `BUILD` plus all eight sibling
+`.bzl` files, 2,513 exact lines/96,027 bytes at mode 0644. Exact hashes,
+checked-in inventory, direct listing, package-set visibility, manifest identity
+`de4c7231…`, 592 Bzlmod tests, 430 loading tests, all integrations, CLI build,
+two cold replays, and independent architecture/terminal reviews pass.
+
+Both cold replays now advance beyond `utils.bzl` and stop identically while
+loading `@@bazel_features+//private:globals_repo.bzl`:
 
 ```text
-UnsupportedCatalog { path: "tools/build_defs/repo/utils.bzl" }
+unsupported repository_rule attribute schema 'globals'
+globals = attr.string_list_dict(mandatory = True)
 ```
 
-The outer context still names `@cc_compatibility_proxy`, but the retained route,
-owner, mapping, and source observations prove that the predecessor boundary is
-closed. This packet owns only the newly exposed exact built-in content boundary.
+This is unrelated to `cc_common`, `cc_internal`, C++ rules, the parser, or
+Starlark `set`. It is the first live discriminator for Slug's deliberately
+scalar-only repository-rule attribute bridge.
 
-## Observable boundary and category
+## Design question and category boundary
 
-Slug's immutable `@bazel_tools` catalog has no
-`tools/build_defs/repo` package. The real rules_cc extension transitively loads
-`utils.bzl`; Bazel's embedded-tools archive supplies that file as one member of
-one complete direct package, not as an isolated bootstrap artifact.
-
-The packet imports the complete package category at once:
+Freeze one generic architecture for the complete repository-rule attribute
+value family already exposed by Slug's shared `attr` module, rather than adding
+a `globals` or `string_list_dict` special case. The family is all thirteen
+Bazel 9.2 public descriptor kinds:
 
 ```text
-tools/build_defs/repo/BUILD          <- pinned BUILD.repo
-tools/build_defs/repo/cache.bzl
-tools/build_defs/repo/git.bzl
-tools/build_defs/repo/git_worker.bzl
-tools/build_defs/repo/http.bzl
-tools/build_defs/repo/java.bzl
-tools/build_defs/repo/jvm.bzl
-tools/build_defs/repo/local.bzl
-tools/build_defs/repo/utils.bzl
+bool, int, string, label, output,
+string_list, label_list, output_list,
+string_dict, string_list_dict,
+string_keyed_label_dict, label_keyed_string_dict, label_list_dict
 ```
 
-This avoids repeated manifest and package-inventory churn as repository
-builtins load sibling helpers. It does not admit the upstream documentation
-templates, generated Markdown, development `BUILD`, or any other
-`@bazel_tools` package.
+The architecture must make later descriptor-policy breadth additive without
+changing the retained raw-call or RepoSpec value representation. It must keep
+ordinary module-extension calls and innate `use_repo_rule` calls on the same
+coercion and publication semantics.
+
+This packet is docs/evidence/design only. It authorizes no Rust or fixture
+change. Its terminal output is an independently reviewed implementation packet
+or `REPLAN`.
 
 ## Learned facts and authority
 
-Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is the sole
-content and behavior authority:
+Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is sole
+semantic authority:
 
-- `tools/build_defs/repo/BUILD` declares `embedded_tools` as every direct
-  `*.bzl` plus `BUILD.repo`.
-- `src/create_embedded_tools.py` maps `BUILD.repo` to the archive path
-  `tools/build_defs/repo/BUILD`; all direct `.bzl` paths are preserved.
-- The embedded set is exactly the nine files above, 2,513 text lines and
-  96,027 bytes. Every member is nonexecutable.
-- The pinned SHA-256 values are:
+- `StarlarkRepositoryModule.repositoryRule` casts every `attrs` value to a
+  standard `Descriptor` and passes `Descriptor.build(attrName)` directly to the
+  `RepoRule` builder. It does not define a scalar-only repository schema.
+- `RepoRule.instantiate` runs the common `AttributeUtils.typeCheckAttrValues`,
+  preserves only explicitly supplied non-None attributes in `RepoSpec`, and
+  resolves labels through the definition's repository mapping.
+- `StarlarkAttrModuleApi` defines exactly the thirteen public kinds above.
+- A disposable Bazel 9.2 oracle instantiated one repository rule with an
+  explicit nonempty value for every kind and successfully queried its generated
+  `@probe//:x`. No oracle workspace or copied output is retained.
 
-| Output path | Pinned source | SHA-256 |
-|---|---|---|
-| `BUILD` | `BUILD.repo` | `58fc51781cf26bfbcbd2c615f4cd0bd64892c3f7332e403eb1a885fea27ff3ca` |
-| `cache.bzl` | same | `119c3fb281fcb02ce8aa0cd2f4fa315830ab160b483e4e041986422d2294d15b` |
-| `git.bzl` | same | `c4f89658b4465dc4e42f87312b74d549fb434197bf0ade88fc4276550f68811b` |
-| `git_worker.bzl` | same | `0bf607d50370d151bba1b541e8023ff040527f50f8fa8884157002ed9c63c339` |
-| `http.bzl` | same | `9e908b9d6491cb950a9713d8b758b7b6f83871adbc768eb4997ca12e06ac240a` |
-| `java.bzl` | same | `94fa09f776bb93a5ed3de1fccdb3a8f22c8792d01e5d7df6d588817b2cf02d7d` |
-| `jvm.bzl` | same | `b3e2ff70d3706171123636248d7175dcb0046bbedea776016d49befc7a810309` |
-| `local.bzl` | same | `f41d310ee3fcef8a637ddff5b21eb05724ad377bbb1b679d146327478613e4db` |
-| `utils.bzl` | same | `902f228e729bb7ee86f86a3d434ccbddd9350bb5c7c869fa2f5fda90361605db` |
+The live Slug audit establishes:
 
-No additional Bazel oracle is required: pinned source bytes, Bazel's own
-embedded-tools membership rule, and the existing exact catalog regression are
-stronger and more direct evidence for this content-only change. Evaluation may
-expose a later language or Host-ABI gap; that observation selects a successor
-and does not widen this packet.
+1. `AttributeKind`, `AttributeDefinition`, and `CoercedAttributeValue` already
+   represent all thirteen kinds and preserve ordered nested values.
+2. `repository_rule()` nevertheless accepts only String/Boolean/Integer/Label
+   definitions and scalar-compatible defaults.
+3. `RepositoryRuleCallValue` captures only None/bool/i32/string/canonical label;
+   ordinary extension list/dict/tuple values therefore fail before type
+   coercion.
+4. innate `use_repo_rule` values already retain list, tuple, dict, string-key,
+   and label-key structure in `NonrootAttributeValue`, but its bridge rejects
+   every collection.
+5. `OverrideAttributeValue` and `OverrideAttributeKey` already provide the
+   complete heap-independent recursive iterable/map/label RepoSpec carrier.
+   Their `SmallMap` structural equality and the three RepoSpec hash owners are
+   intentionally membership-based, while `RepoSpecPublicationIdentity`
+   currently restores observable map order only for the built-in
+   `http_archive`/`git_repository` `remote_patches` attribute. The retained
+   carrier is complete, but its generic recursive publication projection is
+   not.
 
-Clean Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is
-**concept/optimization guidance only**. Its authenticated embedded roots retain
-repository-relative paths, whole-source digests, file bytes, and explicit
-executable modes. Slug already has the analogous immutable catalog shape, so
-reuse the idea, not Zabel code, source selection, scheduler, store, or semantic
-claims. Do not use Zabel as authority for membership or bytes.
+Clean Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` remains
+**concept/test only** guidance. Its repository declaration/execution path uses
+one complete typed attribute family, including `string_list_dict`, and avoids a
+per-ruleset adapter. Use that completeness and test shape as guidance only; do
+not reuse Zabel code, scheduler, store, tokens, fingerprints, or semantics.
 
-## Decision and compatibility
+## Required architecture decision
 
-Add all nine verbatim archive members to the existing versioned
-`BuiltinBazelToolsSnapshot::Bazel9_2` catalog. Extend its derived directory
-listing, package-set proof, exact checked-in-assets ledger, and immutable
-manifest expectations. Do not add a new repository source, key, evaluator
-branch, path fallback, materialization, or special case for rules_cc,
-`cc_common`, `cc_internal`, or `utils.bzl`.
+The design must freeze:
 
-- **Exact:** archive-relative paths; `BUILD.repo` to `BUILD` transform; all
-  file bytes, SHA-256 values, nonexecutable modes, direct directory entries,
-  package-marker visibility, and resulting catalog manifest identity for the
-  admitted snapshot.
-- **Slug-native:** Rust static catalog representation, manifest framing,
-  DICE key/type names, `Arc` storage, error types, and package-set carrier.
-- **Unsupported/deferred:** all other embedded-tools packages; repository-rule
-  execution not already admitted; any newly exposed Starlark builtin or Host
-  ABI; physical built-in materialization; exact JVM/HotSpot state; C++ rule or
-  action semantics; and later bootstrap action/input-tree/REAPI breadth.
+- one heap-independent recursive raw-call carrier for None, bool, i32, string,
+  canonical label, sequence, and string/canonical-label-keyed map values;
+- list and tuple acceptance with one post-coercion sequence identity, ordered
+  dictionary values, cycle rejection, i32 bounds, and fail-closed unsupported
+  keys/values;
+- one kind-directed coercer from that carrier into existing
+  `OverrideAttributeValue`, including mapping-relative labels at every nested
+  position and output-label behavior;
+- one generic `RepoSpecPublicationIdentity` projection which keeps top-level
+  attributes name-addressed but compares and hashes every nested map's key
+  order and recursively projected values in insertion order; replace the
+  `remote_patches` ruleset special case, preserve existing membership equality,
+  and update all three RepoSpec hash owners through the shared projection;
+- shared ordinary-extension and innate-call conversion, without raw Starlark
+  heap values escaping evaluation;
+- complete default-kind validation for the thirteen kinds while retaining
+  Bazel's rule that only explicit non-None call attributes enter RepoSpec;
+- exact error/order behavior for unknown, mandatory, wrong-kind, bad label,
+  missing mapping, duplicate repository name, and cyclic raw values; and
+- a descriptor-policy ledger distinguishing metadata supported in this packet
+  from explicit `configurable`, transition/cfg, executable, allow-files,
+  allow-single-file, provider, allowed-values, `remotable`, and other policy
+  breadth. Unsupported policy must continue to fail closed, but the retained
+  value carrier must not need redesign when it is later admitted.
 
-Non-decisions: no parser or `set` work; no Rust-defined rule implementation;
-no change to the Buck2-derived Starlark engine; no repository function
-semantics; no docs/templates; no fallback scan of `../bazel-9.2.0`; no runtime
-dependency on the Bazel checkout; and no Java/JVM component.
+Prefer the existing `OverrideAttributeValue` recursive shape or a bounded
+loading-private isomorphic carrier only after reviewing ownership and stage
+meaning. Do not duplicate thirteen bespoke stored variants when the recursive
+carrier can preserve exact values compactly. Do not widen tag-class attributes,
+configured rule attributes, root module parsing, or repository execution Host
+methods merely because they reuse `attr` syntax.
 
-## Ownership, request, revision, and memory
+## Compatibility and ownership
 
-The existing `CATALOG` in `builtin_repository.rs` remains the sole producer of
-file bytes, modes, directory listings, and the versioned manifest. Existing
-`BuiltinBazelToolsSourceFileKey` and repository source-observation/load keys
-consume that immutable snapshot without new dependencies. Package discovery
-continues to derive markers from the same catalog listing.
+- **Exact target:** accepted descriptor kinds; explicit-value type coercion;
+  list/tuple equivalence after coercion; dictionary order/content; nested label
+  resolution; intrinsic/explicit defaults; mandatory and unknown handling;
+  explicit non-None RepoSpec publication; ordinary/innate parity; and stable
+  errors/order demonstrated by Bazel 9.2 source or oracle.
+- **Slug-native:** Rust recursive carrier types, `Arc`/`SmallMap` layout, DICE
+  key names, error enums, membership equality, and the conservative recursive
+  publication-equality/hash projection that prevents an order-observable map
+  change from being cut off. This projection is semantic identity, not a claim
+  about Bazel Java `Dict` equality or fingerprint bytes.
+- **Unsupported/deferred:** descriptor policy not admitted by the frozen ledger;
+  `remotable`; additional repository_ctx Host methods; repository action or
+  download breadth; other Starlark builtin categories; parser/set work; C++
+  rule/action semantics; exact JVM/HotSpot state; and later bootstrap families.
 
-The snapshot is compile-time static service memory; source values retain
-existing shared immutable byte storage. There is no command overlay, mutable
-host read, cache, lock, background task, async transfer, cancellation path, or
-shutdown obligation. All requests and overlapping DICE transactions observe
-the same structural route identity. The changed manifest intentionally
-invalidates prior catalog-derived routes once; A/B/A within the built binary
-remains stable.
+Natural owners remain the loading-owned repository-rule definition/call and
+instantiation pipeline plus the existing Bzlmod `RepoSpec`. No new DICE key,
+global registry, side cache, command repair, physical source lookup, or fallback
+is permitted. Calls are evaluator/phase scratch until copied into existing
+heap-independent invocation receipts; RepoSpecs remain DICE-retained semantic
+values. No retained value may borrow a Starlark heap.
 
-No DICE key, equality implementation, or lock changes. The existing source key
-still owns invalid/wrong-kind/unsupported separation and `Need` behavior. No
-retained value borrows evaluator or command scratch.
+## Evidence and implementation-plan deliverable
 
-## Proof matrix
+The design must cite the exact Bazel source/test/oracle rows for all thirteen
+kinds and at least these discriminators:
 
-Repository-owned tests must prove:
+1. empty/nonempty list and tuple inputs normalize to the same typed value;
+2. ordered string and label dictionaries retain key/value association;
+3. labels resolve correctly as strings and `Label()` objects at scalar, list,
+   key, and nested-list positions;
+4. defaults of every kind validate without being published when omitted;
+5. explicit None is omitted; mandatory, wrong-kind, invalid key, cycle, large
+   integer, missing mapping, and unknown attribute fail at the natural stage;
+6. ordinary and innate calls publish equal RepoSpecs for equal semantics;
+7. A/B/A value/mapping changes restore structural identity; and
+8. the real `bazel_features` globals repository advances in two fresh replays.
 
-1. all nine checked-in files equal the pinned Bazel sources byte-for-byte,
-   have the recorded SHA-256 values, and are nonexecutable;
-2. checked-in built-in assets are exactly the reviewed catalog—no unlisted
-   payload or omitted member;
-3. `tools/build_defs/repo` lists `BUILD` plus all eight `.bzl` files in lexical
-   direct-child order and is discovered as a package under both root and
-   `tools` subtree queries;
-4. ordinary built-in source reads return `utils.bzl` and at least one sibling
-   through the existing immutable owner, while invalid/wrong-kind/unsupported
-   errors remain distinct;
-5. manifest identity is identical across DICE instances/transactions and the
-   previously admitted `tools/build_defs/cc` package remains exact; and
-6. two fresh rules_rust cqueries advance beyond `UnsupportedCatalog` for
-   `tools/build_defs/repo/utils.bzl` and stop identically at the next authentic
-   boundary or succeed. Do not repair that successor in this packet.
+The A/B/A matrix must include reordered dictionary entries with unchanged
+membership for both ordinary and innate calls. It must prove the recursively
+ordered publication projection changes and restores, while ordinary structural
+membership equality remains unchanged. Audit `RepoSpec::eq` and every live
+RepoSpec hash owner together so equality/hash contracts remain coherent.
 
-No new fixture is admitted. Reuse the existing real rules_rust workspace and
-fresh temporary output roots. The upstream documentation and repository-rule
-tests are skipped because they test evaluation semantics outside this
-content/catalog change; existing Slug loading suites cover the admitted read,
-listing, marker, and package-set behavior.
+Reuse existing synthetic extension/innate/mapping/DICE scaffolding and the real
+rules_rust fixture. Add no checked-in oracle fixture unless pinned source plus a
+disposable probe cannot discriminate a required behavior; if one is necessary,
+freeze its provenance before implementation.
 
-## Allowlist, caps, validation, and stops
+The implementation packet must name exact live blobs and hunks. Its Bzlmod
+allowlist must include the retained projection owner in `module_eval.rs`, both
+route/request hash owners in `canonical_repository_route.rs` and
+`host_module.rs`, and the existing publication-identity proof in
+`selected_repo_spec.rs`; no additional RepoSpec equality/hash owner may remain
+unaudited. In particular,
+`app/slug_loading_v2/src/package.rs` is already dirty with unrelated
+definition-source work; any later packet must freeze its live blob, permit only
+the repository-rule schema hunk, preserve the parked changes byte-for-byte, and
+stage only packet-owned hunks. It must set production/test caps, complexity
+decisions for `package.rs` and the 2,249-line instantiation owner, serial crate
+and direct-dependent validation, two clean replays, and independent terminal
+review.
 
-Frozen existing-file blobs at `f747507f6`:
+## Allowlist and stops
 
-- `app/slug_bzlmod_v2/src/builtin_repository.rs`
-  `df1550cc7f31bd206eb56c1599c706d1c2535193`;
-- `app/slug_bzlmod_v2/src/host_module.rs`
-  `0546ea5dc3a03823fe65bce175b6cbb1ea1ce518`;
-- `app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs`
-  `bb8768af72d3995f3d873d6afb07b29f7b664429`; and
-- `app/slug_loading_v2/src/external_subtree_package_set_tests.rs`
-  `3f390d3320dfc3945838dfbc9f0b01bb19acf6f4`.
+Only these scheduling documents may change in this design packet:
 
-Only those four existing files, the nine new files beneath
-`app/slug_bzlmod_v2/builtin/bazel_tools/tools/build_defs/repo/`, and scheduling
-documents may differ from the base. Copied exact-source growth is fixed at
-2,513 lines/96,027 bytes. Cap net Rust production growth at 75 lines and net
-Rust test growth at 100 lines. No new crate, dependency, key, fixture, unsafe
-code, task, lock, cache, fallback, public stability shim, or executable asset.
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`;
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`; and
+- the orchestration routing log only if review returns `REPLAN` or a reusable
+  unusual routing lesson.
 
-`host_module.rs` exceeds the 2,000-line review trigger, but its only permitted
-change is the separately pinned manifest digest assertion; catalog ownership
-does not move there. No touched function may gain a new responsibility or
-cross 150 lines. This is immutable content breadth, not a changed retained
-representation or demonstrated hot path, so no Buck2 utility or performance
-experiment applies.
+Validate source anchors, disposable oracle result, dirty isolation, canonical/
+manifest packet-ID consistency, `git diff --check`, and independent architecture
+review. No Cargo build/test is required because Rust is unchanged.
 
-Validation:
-
-1. source-vs-pinned byte/hash/mode inventory check;
-2. focused built-in catalog, listing, source-read, and package-set tests;
-3. complete `cargo test -p slug_bzlmod_v2` and
-   `cargo test -p slug_loading_v2` serially;
-4. `cargo build -p slug_cli_v2`;
-5. clean stale `slugd`, then two fresh-workspace/fresh-output-root real
-   rules_rust cqueries and clean stale `slugd` afterward;
-6. `cargo fmt --all -- --check`, `git diff --check`, allowlist/cap and dirty-
-   isolation checks; and
-7. independent terminal patch review.
-
-`REPLAN` before implementation if pinned membership or the `BUILD.repo`
-transform differs; if any new production owner, source kind, key, dependency,
-fallback, materializer, parser/builtin, Host ABI, repository execution, or rule
-semantics must change; if a file outside the allowlist is required; if copied
-bytes cannot remain verbatim; if existing cc catalog behavior regresses; or if
-caps are exceeded. After implementation, a new authentic evaluation terminal
-is successor evidence, not permission to broaden this packet.
+`REPLAN` if exact semantics require a new public cross-crate value or DICE owner;
+if the thirteen kinds cannot share one recursive raw carrier and kind-directed
+coercer; if ordinary and innate calls require different RepoSpec semantics; if
+the dirty `package.rs` work cannot be isolated; if descriptor policy cannot be
+bounded without silently claiming parity; if any parser, set, C++ rule,
+ruleset-specific, filesystem, materialization, JVM, or fallback path is needed;
+if generic recursively ordered publication identity cannot replace the current
+ruleset-specific `remote_patches` projection without widening storage; or if a
+second material architecture correction is required after review.
