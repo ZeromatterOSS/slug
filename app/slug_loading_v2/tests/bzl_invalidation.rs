@@ -1893,6 +1893,133 @@ fn toolchain_requirements_have_definition_lifecycle_and_semantic_equality() {
 }
 
 #[test]
+fn same_dice_subrule_descriptor_attachment_and_typed_producer_restore_semantics() {
+    let workspace = scratch("subrule-loading-semantics");
+    let package = workspace.join("pkg");
+    let defs = package.join("defs.bzl");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    write(
+        &package.join("BUILD.bazel"),
+        "load(':defs.bzl', 'probe')\nprobe(name = 'subject')\n",
+    );
+    let definitions = |literal: &str,
+                       field: &str,
+                       attached: &str,
+                       rule_field: &str,
+                       providers: &str| {
+        format!(
+            r#"
+P = provider()
+Q = provider()
+
+def _subrule_impl(ctx, **kwargs):
+    return None
+
+left = subrule(
+    implementation = _subrule_impl,
+    attrs = {{
+        "_literal": attr.label(default = "{literal}", providers = {providers}),
+        "_late": attr.label(default = configuration_field(fragment = "cpp", name = "{field}")),
+    }},
+)
+right = subrule(
+    implementation = _subrule_impl,
+    attrs = {{"_literal": attr.label(default = "//dep:one")}},
+    subrules = [left],
+)
+
+def _rule_impl(ctx):
+    return []
+
+probe = rule(
+    implementation = _rule_impl,
+    attrs = {{"_ordinary_late": attr.label(default = configuration_field(fragment = "cpp", name = "{rule_field}"))}},
+    subrules = [{attached}],
+)
+"#
+        )
+    };
+    let source_a = definitions("//dep:one", "fdo_optimize", "left", "libc_top", "[P, Q]");
+    write(&defs, &source_a);
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let load_rule = || {
+        let loaded = load_package(
+            &dice,
+            &runtime,
+            &workspace,
+            &package,
+            std::slice::from_ref(&defs),
+        )
+        .unwrap();
+        loaded
+            .targets
+            .iter()
+            .find_map(|target| match &target.kind {
+                PackageTargetKind::StarlarkRule(rule) if target.name == "subject" => {
+                    Some(rule.clone())
+                }
+                _ => None,
+            })
+            .expect("subject retains its Starlark rule")
+    };
+
+    let initial = load_rule();
+    for changed_source in [
+        definitions("//dep:two", "fdo_optimize", "left", "libc_top", "[P, Q]"),
+        definitions("//dep:one", "fdo_optimize", "right", "libc_top", "[P, Q]"),
+        definitions("//dep:one", "fdo_profile", "left", "libc_top", "[P, Q]"),
+        definitions("//dep:one", "fdo_optimize", "left", "zipper", "[P, Q]"),
+        definitions("//dep:one", "fdo_optimize", "left", "libc_top", "[P]"),
+    ] {
+        write(&defs, &changed_source);
+        assert_ne!(initial, load_rule(), "{changed_source}");
+        write(&defs, &source_a);
+        assert_eq!(initial, load_rule(), "{changed_source}");
+    }
+
+    let one_direct_root = definitions("//dep:one", "fdo_optimize", "right", "libc_top", "[P, Q]");
+    write(&defs, &one_direct_root);
+    let one_direct_root = load_rule();
+    let two_direct_roots = definitions(
+        "//dep:one",
+        "fdo_optimize",
+        "right, left",
+        "libc_top",
+        "[P, Q]",
+    );
+    write(&defs, &two_direct_roots);
+    assert_ne!(one_direct_root, load_rule());
+    write(
+        &defs,
+        &definitions("//dep:one", "fdo_optimize", "right", "libc_top", "[P, Q]"),
+    );
+    assert_eq!(one_direct_root, load_rule());
+
+    for equivalent_providers in ["[Q, P]", "[[P, Q], [Q, P]]"] {
+        let equivalent = definitions(
+            "//dep:one",
+            "fdo_optimize",
+            "left",
+            "libc_top",
+            equivalent_providers,
+        );
+        write(&defs, &equivalent);
+        assert_eq!(initial, load_rule(), "{equivalent_providers}");
+    }
+
+    let unrestricted = definitions("//dep:one", "fdo_optimize", "left", "libc_top", "[]");
+    write(&defs, &unrestricted);
+    let unrestricted = load_rule();
+    let empty_alternative = definitions("//dep:one", "fdo_optimize", "left", "libc_top", "[[]]");
+    write(&defs, &empty_alternative);
+    assert_eq!(unrestricted, load_rule());
+}
+
+#[test]
 fn same_dice_attribute_metadata_edits_are_semantic_and_recreate_cleanly() {
     let workspace = scratch("attribute-metadata-transitions");
     let package = workspace.join("pkg");

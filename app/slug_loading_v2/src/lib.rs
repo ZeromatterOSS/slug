@@ -47,6 +47,7 @@ mod registration_expansion_tests;
 pub mod repository_rule_context;
 mod root_subtree_package_set;
 mod starlark_label;
+mod subrule;
 mod testing_bootstrap;
 #[cfg(test)]
 mod testing_bootstrap_tests;

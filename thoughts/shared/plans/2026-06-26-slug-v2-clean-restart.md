@@ -30,7 +30,7 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, and subrule architecture accepted; subrule loading active** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected typed/set-ordered subrule architecture in `4900ce46b`; real starlark-rust `set` in `cb71a302d` | two fresh rules_rust replays stop at missing `subrule`; the first rules_cc declaration requires eight typed `configuration_field` label defaults and hidden rule attachment before later configured invocation/actions | implement only the frozen subrule loading/declaration/late-bound carrier successor and stop before configured resolution or invocation |
+| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, and subrule architecture accepted; subrule loading active** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected typed/set-ordered subrule architecture in `4900ce46b`; real starlark-rust `set` in `cb71a302d` | two fresh rules_rust replays stop at missing `subrule`; authenticated rules_cc requires eight subrule and two ordinary typed `configuration_field` label defaults, hidden attachment, and `TemplateVariableInfo` before later configured invocation/actions | implement the corrected frozen subrule loading/declaration/late-bound carrier successor and stop before configured resolution or invocation |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
@@ -66,7 +66,11 @@ Two fresh authenticated rules_rust 0.73.0 replays contain no missing-`macro`
 failure and both stop at `subrule` in generated `bazel_features_globals`.
 The source audit shows that the first authentic rules_cc subrule is not a token-
 only declaration: it owns eight `configuration_field` label defaults, `cpp`
-fragment access, hidden rule attachment, and later actions. Architecture R1
+fragment access, hidden rule attachment, and later actions. Authenticated
+`cc_toolchain.bzl` additionally requires the annotated `cpp` fields `libc_top`
+and `zipper` on ordinary rule attributes plus
+`platform_common.TemplateVariableInfo`; the first implementation replay caught
+that the original eight-row frozen ledger omitted them. Architecture R1
 was replanned because it incorrectly included defining-module identity in the
 late-bound carrier, conflated ordered lifting with set-semantic authorization,
 left the first successor unbounded, and implied complete FDO invocation. R2
@@ -84,6 +88,29 @@ declaration/export, typed FDO `configuration_field` carriers, rule attachment,
 ordered sparse hidden rows and set-semantic identity. The deterministic stop is
 configured hidden late-bound resolution before invocation or action
 publication.
+
+Implementation replay `REPLAN` keeps that architecture and corrects only its
+authenticated source ledger: admit ten finite typed `cpp` fields, retain the
+two ordinary defaults in one sparse shared rule-owned slice, and load
+`TemplateVariableInfo`. Do not resolve any configured late-bound dependency or
+claim FDO/C++ invocation.
+
+Terminal implementation review then returned `REPLAN`: the first candidate
+flattened away direct attachment roots, retained no addressable frozen callable
+route, projected provider predicates with order-sensitive/empty-alternative
+semantics, leaked deferred defaults through repository/tag consumers, made
+pre-export subrule equality non-reflexive, and omitted persistent
+`TemplateVariableInfo` proof. The bounded correction retains separate direct
+and transitive semantic sets plus frozen callable routes, canonicalizes the
+shared provider identity at both set levels, rejects those consumer leaks, and
+adds the missing equality/source regressions without entering configured
+resolution or invocation.
+
+The corrected candidate passes 454 library tests, every loading integration
+group, an index-only repeat, formatting, cap/isolation checks, and the rebuilt
+CLI replay to the unchanged later positional-`module_extension` frontier.
+Focused independent rereview returns `ACCEPT`; commit this loading-only packet,
+then activate configured hidden-dependency resolution.
 
 ### M7 complete repository definitions built-in package accepted (2026-08-30)
 

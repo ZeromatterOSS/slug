@@ -52,8 +52,14 @@ The first authenticated BCR consumer is rules_cc
 It declares `create_fdo_context` with fragment `cpp` and eight private
 `attr.label` defaults from `configuration_field`; `cc_toolchain.bzl` (SHA-256
 `6a460affdf52e39bcc2ab1d4f7f5f6c135eaae24912a1d1a92f2b5b285321168`)
-attaches it through `rule(subrules = [create_fdo_context])`. The implementation
-also uses `ctx.label`, `ctx.fragments.cpp`,
+attaches it through `rule(subrules = [create_fdo_context])`. The authenticated
+toolchain rule additionally declares ordinary `_libc_top` and `_zipper`
+`attr.label` defaults from the annotated `cpp` fields `libc_top` and `zipper`,
+and aliases `platform_common.TemplateVariableInfo` before constructing the
+rule. `CppConfiguration.java:309,756` proves both additional typed fields;
+`PlatformCommon.java` and `TemplateVariableInfo.java` own the load-capable
+provider constructor. The implementation also uses `ctx.label`,
+`ctx.fragments.cpp`,
 `ctx.actions.declare_file/args/run/symlink`, and
 `cc_common.absolute_symlink`.
 
@@ -69,7 +75,9 @@ repr, and exported equality identity; private label/label-list descriptors;
 target/exec cfg validation; required defaults; descriptor-order lifting;
 definition-relative literal defaults; `$` ordinary and `:` late-bound hidden
 names; typed admitted `configuration_field` producer identity; direct and
-transitive rule-side authorization; configured dependency arguments; exact
+transitive rule-side authorization; declaration and structural retention of
+the two authenticated ordinary rule-side late-bound defaults; configured
+dependency arguments; exact
 `subrule_ctx` lifetime and admitted members; declared fragment views; zero/one
 toolchain with automatic exec groups; and enclosing-target action ownership.
 
@@ -95,24 +103,44 @@ subrule set, and zero/one toolchain requirement. Before export, equality is
 evaluator object identity; after export it is canonical extension label plus
 exported name. Frozen module lifetime owns executable code.
 
-The existing `FrozenRuleDefinition` retains an ordered direct attachment input
-only long enough to produce two distinct facts:
+The existing `FrozenRuleDefinition` converts the ordered direct attachment
+input into three distinct facts:
 
-1. a set-semantic direct/transitive subrule identity collection for
+1. a set-semantic direct-root identity collection for rule-level call
+   authorization and equality;
+2. a separate set-semantic transitive definition collection for
    authorization, deduplication, equality, fragments, nested subrules, and
    toolchain publication; and
-2. a deterministic ordered sparse suffix of hidden attribute descriptors plus
+3. a deterministic ordered sparse suffix of hidden attribute descriptors plus
    per-subrule spans for lifting/query presentation.
+
+It also retains one frozen callable route per sorted transitive definition.
+Those values stay in their owning frozen module heaps and are addressable from
+the instantiated target for later invocation; their heap addresses never
+participate in package equality. No registry, reload, or second definition
+representation is permitted.
 
 Descriptor order follows each definition's `attrs` insertion order. Transitive
 discovery is deterministic first encounter over direct declaration order, but
 duplicates do not change semantic authorization or publish duplicate hidden
 rows. Reordering direct/nested inputs changes deterministic lifted-row
 presentation when first-encounter order changes, but it must not change the
-authorization/publication set. Ordinary rule attributes retain their current
-representation. Hidden rows reuse current descriptor/default/coercion
+authorization/publication set. Ordinary rule schemas retain their current
+representation. A separate sparse immutable slice on the frozen rule
+definition and instantiated rule target owns only ordinary attributes whose
+default is an admitted typed `configuration_field`; each row stores the
+attribute name and shared producer identity. It participates in rule/package
+equality and is the sole future configured-resolution input, avoiding a large
+optional field on every ordinary schema. Hidden rows reuse current
+descriptor/default/coercion
 machinery, remain absent from `ctx.attr`, macro inheritance, and
 `native.existing_rules`, and retain `$` versus `:` value-source identity.
+The existing shared `ProviderIdentity` represents label-attribute provider
+predicates. Both conjunction members and alternative conjunctions are
+canonical set-semantic projections; any empty alternative canonicalizes to no
+restriction. `repository_rule`, `tag_class`, and symbolic-macro consumers fail
+closed on late-bound or computed defaults rather than projecting them as
+ordinary `None`.
 
 ### Typed late-bound producer
 
@@ -127,10 +155,11 @@ machinery, remain absent from `ctx.attr`, macro inheritance, and
 The defining or calling `.bzl` module is deliberately absent. Two modules that
 request the same typed producer, field, and tools repository compare equal;
 changing the tools repository or field does not. The first successor admits
-only the eight pinned `cpp` FDO producer rows and fails closed for unknown
-fragment/field pairs. Later producer additions extend the same finite typed
-table with Bazel-source/oracle proof; they do not add a registry or change the
-carrier.
+the eight pinned `cpp` FDO producer rows plus the authenticated `libc_top` and
+`zipper` rows required by the attaching `cc_toolchain` declaration, and fails
+closed for every other fragment/field pair. Later producer additions extend
+the same finite typed table with Bazel-source/oracle proof; they do not add a
+registry or change the carrier.
 
 Configured structural configuration owns the eventual optional canonical
 label and invalidation. A producer value edit leaves package/loading identity
@@ -210,6 +239,11 @@ Allowed files and frozen baselines at `541fcfaf2`:
 - new `app/slug_loading_v2/src/subrule.rs` (absent at base);
 - `app/slug_loading_v2/src/lib.rs`, HEAD/worktree blob
   `c124cef749503f362c8e38a6d7df8c09dab7d0e6`;
+- `app/slug_loading_v2/src/host_package_load_tests.rs`, proof-only HEAD/worktree
+  blob `c7441748c76a50a6007a24c379c579788f3c84db`, limited to replacing the four
+  stale absence/provider-shape assertions exposed by the full owner gate and
+  adapting existing provider-identity assertions to the shared structural
+  enum retained by the terminal correction;
 - `app/slug_loading_v2/src/package.rs`, HEAD blob
   `22a2d01bdb317a2bcc5dd9f6c7ba66a451aa457a`, with the pre-existing
   28-line worktree blob `13bfe7cbc70427baf0dadfa53471c68098eb1599`
@@ -228,14 +262,19 @@ belongs in `subrule.rs`; `package.rs` may contain only global/rule-schema and
 evaluation-owner integration.
 
 The successor proves: BUILD exclusion and `.bzl` visibility; export/repr/
-cross-module identity; all admitted declaration failures; `$`/`:` names;
+cross-module identity plus pre-export reflexive/distinct-object equality; all
+admitted declaration failures, including repository/tag deferred-default
+rejection; `$`/`:` names; direct-root versus transitive-callable retention;
 descriptor order versus duplicate/reorder/shared-diamond set identity; same
 typed field equality across defining modules; tools-repository/field
-discrimination; package semantic A/B/A for descriptor, attachment, and typed
-producer edits; and exact freeze of the authenticated eight-field FDO
-declaration plus `cc_toolchain` attachment. Reuse the authenticated BCR bytes
-for a manual source replay; persist only compact synthesized regressions, so no
-new oracle fixture or `fixture.toml` is needed.
+discrimination; canonical provider order/duplicate/empty-alternative equality;
+package semantic A/B/A for descriptor, direct attachment, provider predicate,
+and typed producer edits; exact freeze of the authenticated eight-field FDO declaration;
+and exact freeze of its `cc_toolchain` attachment with the two ordinary
+late-bound fields and an asserted `platform_common.TemplateVariableInfo`
+loading token. Reuse the
+authenticated BCR bytes for a manual source replay; persist only compact
+synthesized regressions, so no new oracle fixture or `fixture.toml` is needed.
 
 The first deterministic replay stop is configured analysis of a rule carrying
 the attached FDO subrule: it must fail closed at unsupported hidden
@@ -254,8 +293,11 @@ stale `slugd` around CLI smokes.
 
 No new DICE key, request overlay, asynchronous task, service cache, or fallback
 is authorized. Frozen definitions live with their modules; attached identities
-and hidden rows live with package/rule equality; configured labels live with
-existing analysis; call contexts are evaluator scratch. Existing package/Bzl
+and hidden rows live with package/rule equality; callable routes remain frozen
+module values but are excluded from semantic equality; configured labels live with
+existing analysis; the sparse ordinary late-bound slice is shared from frozen
+definition to instantiated rule and participates in package equality; call
+contexts are evaluator scratch. Existing package/Bzl
 source observations drive invalidation, and no lock crosses a DICE compute.
 
 This changes retained rule/package structures, so every implementation packet
@@ -276,10 +318,17 @@ the only authority.
 ## Review and stops
 
 Independent implementation review must check typed producer identity,
-cross-module equality, ordered-versus-set representation and graph-shape
+cross-module and pre-export equality, direct/transitive/callable retention,
+provider-predicate canonicalization, deferred-default consumer rejection,
+ordered-versus-set representation and graph-shape
 proofs, exact dirty-hunk isolation, retained-size accounting, the authenticated
 FDO declaration/attachment freeze, and the configured fail-closed stop. Run the
 full validation contract above plus archive and scheduling consistency checks.
+
+Terminal status: the first review returned `REPLAN` for five representation and
+proof gaps; the bounded correction closes all five. Full live and index-only
+loading gates pass, the rebuilt CLI reaches the unchanged later positional-
+`module_extension` frontier, and focused independent rereview returns `ACCEPT`.
 
 Stop and `REPLAN` for an edit outside the frozen allowlist, cap overflow,
 unisolatable parked hunks, an untyped/global configuration lookup, defining-

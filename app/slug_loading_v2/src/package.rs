@@ -110,6 +110,15 @@ use crate::provider::user_provider_from_arguments;
 use crate::starlark_label::StarlarkLabel;
 use crate::starlark_label::label_globals;
 use crate::starlark_label::resolve_label;
+use crate::subrule::AttachedSubrules;
+use crate::subrule::ConfigurationFieldValue;
+use crate::subrule::LateBoundRuleAttribute;
+use crate::subrule::SubruleAttribute;
+use crate::subrule::SubruleAttributeDefault;
+use crate::subrule::attached_subrules;
+use crate::subrule::configuration_field_global;
+use crate::subrule::fail_closed_rule_implementation;
+use crate::subrule::subrule_global;
 use crate::testing_bootstrap::testing_bootstrap_globals;
 use crate::visibility::PackageGroupContents;
 use crate::visibility::RuleVisibility;
@@ -746,6 +755,10 @@ pub struct StarlarkRuleImplementation {
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     advertised_providers: Arc<[ProviderIdentity]>,
     required_fragments: Arc<[CompactString]>,
+    attached_subrules: AttachedSubrules,
+    #[allocative(skip)]
+    subrule_callables: Arc<[FrozenValue]>,
+    late_bound_attributes: Arc<[LateBoundRuleAttribute]>,
     schema: Arc<[AttributeSchema]>,
     values: Arc<[AttributeValue]>,
     capability: Arc<RuleCapability>,
@@ -754,12 +767,14 @@ pub struct StarlarkRuleImplementation {
 
 impl PartialEq for StarlarkRuleImplementation {
     fn eq(&self, other: &Self) -> bool {
-        // The frozen function is retained for Stage 6 lifetime only. Its heap
-        // address is not package semantics and must not defeat DICE equality.
+        // Frozen callable addresses are retained for Stage 6 lifetime only.
+        // The semantic attachment projection below owns package equality.
         self.dependencies == other.dependencies
             && self.required_toolchains == other.required_toolchains
             && self.advertised_providers == other.advertised_providers
             && self.required_fragments == other.required_fragments
+            && self.attached_subrules == other.attached_subrules
+            && self.late_bound_attributes == other.late_bound_attributes
             && self.schema == other.schema
             && self.values == other.values
             && self.capability == other.capability
@@ -790,6 +805,64 @@ impl StarlarkRuleImplementation {
 
     pub fn required_fragments(&self) -> &[CompactString] {
         &self.required_fragments
+    }
+
+    pub fn attached_subrule_count(&self) -> usize {
+        self.attached_subrules.definition_count()
+    }
+
+    pub fn subrule_hidden_attribute_names(&self) -> impl Iterator<Item = &str> {
+        self.attached_subrules.hidden_attribute_names()
+    }
+
+    pub fn subrule_definition_names(&self) -> impl Iterator<Item = &str> {
+        self.attached_subrules
+            .definitions
+            .iter()
+            .map(|definition| definition.identity.exported_name.as_str())
+    }
+
+    pub fn direct_subrule_names(&self) -> impl Iterator<Item = &str> {
+        self.attached_subrules
+            .direct
+            .iter()
+            .map(|identity| identity.exported_name.as_str())
+    }
+
+    pub fn subrule_callables(
+        &self,
+    ) -> impl Iterator<Item = (&CanonicalLabel, &str, FrozenValue)> + '_ {
+        self.attached_subrules
+            .definitions
+            .iter()
+            .zip(self.subrule_callables.iter().copied())
+            .map(|(definition, callable)| {
+                (
+                    &definition.identity.defining_label,
+                    definition.identity.exported_name.as_str(),
+                    callable,
+                )
+            })
+    }
+
+    pub fn subrule_attribute_spans(&self) -> impl Iterator<Item = (&str, u32, u32)> {
+        self.attached_subrules
+            .spans
+            .iter()
+            .map(|span| (span.owner.exported_name.as_str(), span.start, span.len))
+    }
+
+    pub fn subrule_fragments(&self) -> impl Iterator<Item = &str> {
+        self.attached_subrules
+            .definitions
+            .iter()
+            .flat_map(|definition| definition.fragments.iter().map(CompactString::as_str))
+    }
+
+    pub fn late_bound_rule_attributes(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.late_bound_attributes
+            .iter()
+            .map(|attribute| (attribute.name.as_str(), attribute.identity.field.as_str()))
     }
 
     pub fn schema(&self) -> &[AttributeSchema] {
@@ -1429,6 +1502,9 @@ impl PackageRecorder {
         required_toolchains: Arc<[ToolchainTypeRequirement]>,
         advertised_providers: Arc<[ProviderIdentity]>,
         required_fragments: Arc<[CompactString]>,
+        attached_subrules: AttachedSubrules,
+        subrule_callables: Arc<[FrozenValue]>,
+        late_bound_attributes: Arc<[LateBoundRuleAttribute]>,
         capability: Arc<RuleCapability>,
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
@@ -1461,6 +1537,9 @@ impl PackageRecorder {
                 required_toolchains,
                 advertised_providers,
                 required_fragments,
+                attached_subrules,
+                subrule_callables,
+                late_bound_attributes,
                 schema,
                 values,
                 capability,
@@ -2617,6 +2696,45 @@ fn toolchain_requirements(
     Ok(requirements.into())
 }
 
+pub(crate) fn subrule_toolchain_requirements(
+    value: Option<Value>,
+    eval: &Evaluator<'_, '_, '_>,
+) -> anyhow::Result<Arc<[ToolchainTypeRequirement]>> {
+    let Some(value) = value else {
+        return Ok(Arc::from([]));
+    };
+    let values = if let Some(values) = ListRef::from_value(value) {
+        values.iter().collect::<Vec<_>>()
+    } else if let Some(values) = TupleRef::from_value(value) {
+        values.iter().collect::<Vec<_>>()
+    } else {
+        anyhow::bail!("toolchains requires a sequence")
+    };
+    let context = BzlEvaluationContext::from_evaluator(eval)?;
+    let source = context.source_identity_for_call(eval)?;
+    let mut requirements = Vec::<ToolchainTypeRequirement>::new();
+    for value in values {
+        let requirement = if let Some(value) = StarlarkToolchainTypeRequirement::from_value(value) {
+            value.0.clone()
+        } else if let Some(value) = StarlarkLabel::from_value(value) {
+            ToolchainTypeRequirement::new(value.canonical().clone(), true)
+        } else if let Some(value) = value.unpack_str() {
+            ToolchainTypeRequirement::new(direct_toolchain_label(value, source)?, true)
+        } else {
+            anyhow::bail!("toolchains entries must be Strings, Labels, or toolchain_type values");
+        };
+        if let Some(existing) = requirements
+            .iter_mut()
+            .find(|existing| existing.label == requirement.label)
+        {
+            existing.mandatory |= requirement.mandatory;
+        } else {
+            requirements.push(requirement);
+        }
+    }
+    Ok(requirements.into())
+}
+
 fn package_global(
     default_visibility: Option<UnpackVisibility>,
     default_deprecation: Option<&str>,
@@ -3282,6 +3400,11 @@ struct RuleDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     required_fragments: Arc<[CompactString]>,
     #[trace(unsafe_ignore)]
+    attached_subrules: AttachedSubrules,
+    subrule_callables: Vec<V>,
+    #[trace(unsafe_ignore)]
+    late_bound_attributes: Arc<[LateBoundRuleAttribute]>,
+    #[trace(unsafe_ignore)]
     schema: Arc<[RuleAttributeSchemaGen<V>]>,
     executable: bool,
     test: bool,
@@ -3298,6 +3421,10 @@ pub(crate) struct FrozenRuleDefinition {
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     advertised_providers: Arc<[ProviderIdentity]>,
     required_fragments: Arc<[CompactString]>,
+    attached_subrules: AttachedSubrules,
+    #[allocative(skip)]
+    subrule_callables: Arc<[FrozenValue]>,
+    late_bound_attributes: Arc<[LateBoundRuleAttribute]>,
     pub(crate) schema: Arc<[FrozenRuleAttributeSchema]>,
     capability: Arc<RuleCapability>,
     pub(crate) build_setting_definition: Option<BuildSettingDefinition>,
@@ -3318,7 +3445,9 @@ struct MacroAttributeSchema {
 
 impl MacroAttributeSchema {
     fn from_definition(name: &str, definition: &AttributeDefinition<'_>) -> anyhow::Result<Self> {
-        if definition.attached_aspect.is_some()
+        if definition.late_bound_default.is_some()
+            || definition.computed_default
+            || definition.attached_aspect.is_some()
             || definition.transition.is_some()
             || !definition.required_providers.is_empty()
         {
@@ -3567,11 +3696,27 @@ impl<'v> Freeze for RuleDefinition<'v> {
                 "the result of rule() must be assigned to a top-level variable".to_owned(),
             ));
         };
+        let implementation = self.implementation.freeze(freezer)?;
+        let implementation = fail_closed_rule_implementation(
+            freezer,
+            implementation,
+            &self.attached_subrules,
+            &self.late_bound_attributes,
+        );
+        let subrule_callables = self
+            .subrule_callables
+            .into_iter()
+            .map(|value| value.freeze(freezer))
+            .collect::<FreezeResult<Vec<_>>>()?
+            .into();
         Ok(FrozenRuleDefinition {
-            implementation: self.implementation.freeze(freezer)?,
+            implementation,
             required_toolchains: self.required_toolchains,
             advertised_providers: self.advertised_providers,
             required_fragments: self.required_fragments,
+            attached_subrules: self.attached_subrules,
+            subrule_callables,
+            late_bound_attributes: self.late_bound_attributes,
             schema: self
                 .schema
                 .iter()
@@ -3819,31 +3964,101 @@ fn aspect_required_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>>
     Ok(Some(*required))
 }
 
-fn label_list_required_providers(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[ProviderId]>]>> {
-    let explicit = value.is_some();
-    let providers = aspect_required_providers(value)?;
-    if explicit && providers[0] == providers[1] {
-        anyhow::bail!("label_list provider alternatives must be distinct");
+/// Canonical disjunction of conjunctions over the shared provider identity.
+/// Both levels are set-semantic; one empty conjunction means no restriction.
+fn attribute_required_providers(
+    value: Option<Value>,
+) -> anyhow::Result<Arc<[Arc<[ProviderIdentity]>]>> {
+    fn sequence(value: Value) -> Option<Vec<Value>> {
+        if let Some(values) = ListRef::from_value(value) {
+            Some(values.iter().collect())
+        } else {
+            TupleRef::from_value(value).map(|values| values.iter().collect())
+        }
     }
-    Ok(providers)
-}
 
-fn label_required_provider(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[ProviderId]>]>> {
+    fn is_provider(value: Value) -> bool {
+        value.downcast_ref::<UserProviderCallable>().is_some()
+            || starlark_provider_identity(value).is_some()
+    }
+
     let Some(value) = value else {
         return Ok(Arc::from([]));
     };
-    let providers = ListRef::from_value(value)
-        .ok_or_else(|| anyhow::anyhow!("label providers must be a list"))?;
-    if providers.is_empty() {
+    let outer = sequence(value).ok_or_else(|| anyhow::anyhow!("label providers must be a list"))?;
+    if outer.is_empty() {
         return Ok(Arc::from([]));
     }
-    let [provider] = providers.content() else {
-        anyhow::bail!("label providers supports exactly one exported provider");
+
+    let alternatives = if outer.iter().copied().all(is_provider) {
+        vec![outer]
+    } else {
+        outer
+            .into_iter()
+            .map(|alternative| {
+                sequence(alternative).ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "attribute providers must contain either providers or lists of providers, but not both"
+                        )
+                    })
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?
     };
-    Ok(Arc::from([Arc::from([declaration_user_provider_id(
-        *provider,
-        "attribute providers",
-    )?])]))
+
+    let mut normalized = alternatives
+        .into_iter()
+        .map(|providers| {
+            let mut result = providers
+                .into_iter()
+                .map(|provider| declaration_provider_identity(provider, "attribute providers"))
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            result.sort_by(provider_identity_cmp);
+            result.dedup();
+            Ok(result)
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    if normalized.iter().any(Vec::is_empty) {
+        return Ok(Arc::from([]));
+    }
+    normalized.sort_by(|left, right| provider_identity_slice_cmp(left, right));
+    normalized.dedup();
+    Ok(normalized
+        .into_iter()
+        .map(Arc::from)
+        .collect::<Vec<_>>()
+        .into())
+}
+
+fn provider_identity_cmp(left: &ProviderIdentity, right: &ProviderIdentity) -> std::cmp::Ordering {
+    match (left, right) {
+        (ProviderIdentity::Builtin(left), ProviderIdentity::Builtin(right)) => left.cmp(right),
+        (ProviderIdentity::Builtin(_), ProviderIdentity::User(_)) => std::cmp::Ordering::Less,
+        (ProviderIdentity::User(_), ProviderIdentity::Builtin(_)) => std::cmp::Ordering::Greater,
+        (ProviderIdentity::User(left), ProviderIdentity::User(right)) => left.cmp(right),
+    }
+}
+
+fn provider_identity_slice_cmp(
+    left: &[ProviderIdentity],
+    right: &[ProviderIdentity],
+) -> std::cmp::Ordering {
+    for (left, right) in left.iter().zip(right) {
+        let ordering = provider_identity_cmp(left, right);
+        if ordering != std::cmp::Ordering::Equal {
+            return ordering;
+        }
+    }
+    left.len().cmp(&right.len())
+}
+
+fn label_list_required_providers(
+    value: Option<Value>,
+) -> anyhow::Result<Arc<[Arc<[ProviderIdentity]>]>> {
+    attribute_required_providers(value)
+}
+
+fn label_required_provider(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[ProviderIdentity]>]>> {
+    attribute_required_providers(value)
 }
 
 fn label_list_attached_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>> {
@@ -4046,7 +4261,7 @@ pub(crate) struct RuleAttributeSchemaGen<V> {
     #[trace(unsafe_ignore)]
     pub(crate) exec_configuration: bool,
     #[trace(unsafe_ignore)]
-    pub(crate) required_providers: Arc<[Arc<[ProviderId]>]>,
+    pub(crate) required_providers: Arc<[Arc<[ProviderIdentity]>]>,
     pub(crate) attached_aspect: Option<V>,
 }
 type RuleAttributeSchema<'v> = RuleAttributeSchemaGen<Value<'v>>;
@@ -4569,11 +4784,15 @@ struct AttributeDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     default: Option<CoercedAttributeValue>,
     #[trace(unsafe_ignore)]
+    late_bound_default: Option<crate::subrule::ConfigurationFieldIdentity>,
+    #[trace(unsafe_ignore)]
+    computed_default: bool,
+    #[trace(unsafe_ignore)]
     executable: bool,
     #[trace(unsafe_ignore)]
     exec_configuration: bool,
     #[trace(unsafe_ignore)]
-    required_providers: Arc<[Arc<[ProviderId]>]>,
+    required_providers: Arc<[Arc<[ProviderIdentity]>]>,
     attached_aspect: Option<V>,
     transition: Option<TransitionDefinitionGen<V>>,
 }
@@ -4598,6 +4817,8 @@ fn rule_attribute_definition_from_value<'v>(value: Value<'v>) -> Option<Attribut
                 allow_single_file: value.allow_single_file.clone(),
                 allowed_values: value.allowed_values.clone(),
                 default: value.default.clone(),
+                late_bound_default: value.late_bound_default.clone(),
+                computed_default: value.computed_default,
                 executable: value.executable,
                 exec_configuration: value.exec_configuration,
                 required_providers: value.required_providers.clone(),
@@ -4608,6 +4829,83 @@ fn rule_attribute_definition_from_value<'v>(value: Value<'v>) -> Option<Attribut
         starlark::__macro_refs::Either::Right(_) => None,
     }
 }
+
+pub(crate) fn subrule_attribute_from_value<'v>(
+    name: String,
+    value: Value<'v>,
+) -> anyhow::Result<SubruleAttribute> {
+    fn valid_identifier(name: &str) -> bool {
+        let mut chars = name.chars();
+        chars
+            .next()
+            .is_some_and(|first| first == '_' || first.is_ascii_alphabetic())
+            && chars.all(|character| character == '_' || character.is_ascii_alphanumeric())
+    }
+
+    fn convert<V>(
+        name: String,
+        definition: &AttributeDefinitionGen<V>,
+    ) -> anyhow::Result<SubruleAttribute> {
+        if !valid_identifier(&name) {
+            anyhow::bail!("attribute name `{name}` is not a valid identifier.");
+        }
+        if name.len() > 128 {
+            anyhow::bail!("attribute {name}: name is too long ({} > 128)", name.len());
+        }
+        if definition.transition.is_some() {
+            anyhow::bail!(
+                "bad cfg for attribute '{name}': subrules may only have target/exec attributes."
+            );
+        }
+        if !name.starts_with('_') {
+            anyhow::bail!(
+                "illegal attribute name '{name}': subrules may only define private attributes (whose names begin with '_')."
+            );
+        }
+        if definition.computed_default {
+            anyhow::bail!(
+                "illegal default value for attribute '{name}': subrules cannot define computed defaults."
+            );
+        }
+        let default = match (&definition.default, &definition.late_bound_default) {
+            (Some(default), None) => SubruleAttributeDefault::Literal(default.clone()),
+            (None, Some(default)) => SubruleAttributeDefault::ConfigurationField(default.clone()),
+            (None, None) => anyhow::bail!("for attribute '{name}': no default value specified"),
+            (Some(_), Some(_)) => unreachable!("one default source is retained"),
+        };
+        if !matches!(
+            definition.kind,
+            AttributeKind::Label | AttributeKind::LabelList
+        ) {
+            anyhow::bail!(
+                "bad type for attribute '{name}': subrule attributes may only be label or lists of labels."
+            );
+        }
+        if definition.attached_aspect.is_some() {
+            anyhow::bail!("subrule attribute '{name}' uses a deferred attached aspect");
+        }
+        Ok(SubruleAttribute {
+            user_name: name.into(),
+            kind: definition.kind,
+            configurable: definition.configurable,
+            default,
+            allow_files: definition.allow_files,
+            allow_single_file: definition.allow_single_file.clone(),
+            allowed_values: definition.allowed_values.clone(),
+            executable: definition.executable,
+            exec_configuration: definition.exec_configuration,
+            required_providers: definition.required_providers.clone(),
+        })
+    }
+
+    match AttributeDefinition::from_value(value)
+        .ok_or_else(|| anyhow::anyhow!("subrule attribute '{name}' must use attr.*()"))?
+    {
+        starlark::__macro_refs::Either::Left(definition) => convert(name, definition),
+        starlark::__macro_refs::Either::Right(definition) => convert(name, definition),
+    }
+}
+
 impl<V> fmt::Display for AttributeDefinitionGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "attr.{:?}()", self.kind)
@@ -4633,6 +4931,8 @@ impl<'v> Freeze for AttributeDefinition<'v> {
             allow_single_file: self.allow_single_file,
             allowed_values: self.allowed_values,
             default: self.default,
+            late_bound_default: self.late_bound_default,
+            computed_default: self.computed_default,
             executable: self.executable,
             exec_configuration: self.exec_configuration,
             required_providers: self.required_providers,
@@ -5122,15 +5422,28 @@ fn attribute_definition<'v>(
     if executable && !cfg.as_ref().is_some_and(|value| !value.is_none()) {
         anyhow::bail!("cfg parameter is mandatory when executable=True is provided");
     }
+    let mut late_bound_default = None;
+    let mut computed_default = false;
     let default = default
         .map(|value| {
+            if let Some(value) = ConfigurationFieldValue::from_value(value) {
+                if kind != AttributeKind::Label {
+                    anyhow::bail!("configuration_field may only be the default of attr.label");
+                }
+                late_bound_default = Some(value.identity().clone());
+                return Ok(None);
+            }
+            if value.parameters_spec().is_some() {
+                computed_default = true;
+                return Ok(None);
+            }
             if value.is_none() && kind == AttributeKind::Label {
-                return Ok(CoercedAttributeValue::None);
+                return Ok(Some(CoercedAttributeValue::None));
             }
             let context = BzlEvaluationContext::from_evaluator(eval)?;
             if kind == AttributeKind::Label {
                 let source = context.source_identity_for_call(eval)?;
-                return coerce_label_default(value, source);
+                return coerce_label_default(value, source).map(Some);
             }
             let raw = raw_attribute_value(value)?;
             let source = context.source_label_for_call(eval)?;
@@ -5139,8 +5452,10 @@ fn attribute_definition<'v>(
                 kind,
                 &raw,
             )
+            .map(Some)
         })
-        .transpose()?;
+        .transpose()?
+        .flatten();
     let mut exec_configuration = false;
     let transition = cfg
         .map(|value| {
@@ -5174,6 +5489,8 @@ fn attribute_definition<'v>(
         allow_single_file,
         allowed_values: AllowedAttributeValues::None,
         default,
+        late_bound_default,
+        computed_default,
         executable,
         exec_configuration,
         required_providers: Arc::from([]),
@@ -5791,8 +6108,15 @@ starlark::starlark_simple_value!(PlatformCommonModule);
 #[starlark_value(type = "platform_common")]
 impl<'v> StarlarkValue<'v> for PlatformCommonModule {
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        (attribute == "ToolchainInfo")
-            .then(|| heap.alloc_simple(AnalysisBuiltinCallable::new("ToolchainInfo")))
+        match attribute {
+            "ToolchainInfo" => {
+                Some(heap.alloc_simple(AnalysisBuiltinCallable::new("ToolchainInfo")))
+            }
+            "TemplateVariableInfo" => {
+                Some(heap.alloc_simple(AnalysisBuiltinCallable::new("TemplateVariableInfo")))
+            }
+            _ => None,
+        }
     }
 }
 
@@ -5839,6 +6163,9 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         let required_toolchains = self.required_toolchains.clone();
         let advertised_providers = self.advertised_providers.clone();
         let required_fragments = self.required_fragments.clone();
+        let attached_subrules = self.attached_subrules.clone();
+        let subrule_callables = self.subrule_callables.clone();
+        let late_bound_attributes = self.late_bound_attributes.clone();
         let capability = self.capability.clone();
         let heap = eval.heap();
         PackageRecorder::from_evaluator(eval)
@@ -6052,6 +6379,9 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     required_toolchains,
                     advertised_providers,
                     required_fragments,
+                    attached_subrules,
+                    subrule_callables,
+                    late_bound_attributes,
                     capability,
                     schema,
                     values,
@@ -6709,6 +7039,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                     anyhow::anyhow!("repository attribute '{name}' must use attr.*()")
                 })?;
             if definition.configurable_set
+                || definition.late_bound_default.is_some()
+                || definition.computed_default
                 || definition.transition.is_some()
                 || definition.executable
                 || definition.exec_configuration
@@ -6763,6 +7095,9 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 anyhow::bail!(
                     "tag attribute `{name}` does not support explicit configurable policy"
                 );
+            }
+            if definition.late_bound_default.is_some() || definition.computed_default {
+                anyhow::bail!("tag attribute `{name}` does not support deferred defaults");
             }
             if definition.allow_files {
                 anyhow::bail!("tag attribute `{name}` does not support allow_files");
@@ -7073,6 +7408,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         build_setting: Option<Value<'v>>,
         toolchains: Option<Value<'v>>,
         fragments: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] subrules: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] provides: Option<Value<'v>>,
         #[starlark(default = false)] executable: bool,
@@ -7114,6 +7450,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         let declared_builtin_names =
             starlark_builtin_schema::<Value<'v>>(executable, test, build_setting_definition, true);
         let mut user_schema = Vec::new();
+        let mut late_bound_attributes = Vec::new();
         if let Some(attrs) = attrs {
             for (name, value) in attrs {
                 if declared_builtin_names
@@ -7129,6 +7466,17 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                         "attribute '{name}' has the 'configurable' argument set, which is not allowed in rule definitions"
                     );
                 }
+                if definition.computed_default {
+                    anyhow::bail!(
+                        "rule attribute `{name}` uses a default form deferred outside this packet"
+                    );
+                }
+                if let Some(identity) = &definition.late_bound_default {
+                    late_bound_attributes.push(LateBoundRuleAttribute {
+                        name: name.as_str().into(),
+                        identity: identity.clone(),
+                    });
+                }
                 user_schema.push(declared_attribute_schema(name, &definition));
             }
         }
@@ -7136,11 +7484,15 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         let mut schema =
             starlark_builtin_schema(executable, test, build_setting_definition, has_transition);
         schema.extend(user_schema);
+        let (attached_subrules, subrule_callables) = attached_subrules(subrules)?;
         Ok(RuleDefinition {
             implementation,
             required_toolchains: toolchain_requirements(toolchains, eval)?,
             advertised_providers: advertised_provider_ids(provides, "rule provides")?,
             required_fragments: required_configuration_fragments(fragments),
+            attached_subrules,
+            subrule_callables,
+            late_bound_attributes: late_bound_attributes.into(),
             schema: schema.into(),
             executable,
             test,
@@ -7605,9 +7957,23 @@ fn bzl_only_globals(builder: &mut GlobalsBuilder) {
         symbolic_macro_global(implementation, attrs, inherit_attrs, finalizer, doc, eval)
     }
 
-    fn configuration_field(fragment: &str, name: &str) -> anyhow::Result<NoneType> {
-        let _ = (fragment, name);
-        anyhow::bail!("configuration_field is unsupported in Slug loading")
+    fn subrule<'v>(
+        #[starlark(require = named)] implementation: Value<'v>,
+        #[starlark(require = named)] attrs: Option<SmallMap<String, Value<'v>>>,
+        #[starlark(require = named)] toolchains: Option<Value<'v>>,
+        #[starlark(require = named)] fragments: Option<Value<'v>>,
+        #[starlark(require = named)] subrules: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<crate::subrule::SubruleDefinition<'v>> {
+        subrule_global(implementation, attrs, toolchains, fragments, subrules, eval)
+    }
+
+    fn configuration_field<'v>(
+        fragment: &str,
+        name: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<ConfigurationFieldValue> {
+        configuration_field_global(fragment, name, eval)
     }
 }
 

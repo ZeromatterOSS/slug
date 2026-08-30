@@ -153,6 +153,13 @@ use crate::provider::starlark_user_provider_fields;
 use crate::starlark_label::StarlarkLabel;
 use crate::visibility::RuleVisibility;
 
+fn provider_identity_text(identity: &ProviderIdentity) -> String {
+    match identity {
+        ProviderIdentity::Builtin(name) => name.to_string(),
+        ProviderIdentity::User(id) => id.to_string(),
+    }
+}
+
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
 }
@@ -29394,7 +29401,7 @@ fn assert_rules_rust_allocator_declarations(module: &FrozenModule) {
         assert_eq!(attribute.kind, AttributeKind::Label);
         assert_eq!(attribute.required_providers.len(), 1);
         assert_eq!(
-            attribute.required_providers[0][0].to_string(),
+            provider_identity_text(&attribute.required_providers[0][0]),
             "@@rules_rust+//rust/private:providers.bzl%AllocatorLibrariesImplInfo"
         );
     }
@@ -30602,8 +30609,8 @@ load("//rust/private:providers.bzl", "CaptureClippyOutputInfo", "ClippyInfo", "C
     assert_eq!(declared[..4].iter().map(|attribute| attribute.kind).collect::<Vec<_>>(), [AttributeKind::Label, AttributeKind::Boolean, AttributeKind::Label, AttributeKind::Label]);
     assert!(declared[0].default.is_none() && matches!(declared[1].default, Some(CoercedAttributeValue::Boolean(false))) && matches!(declared[2].default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == "@@bazel_tools+//tools/allowlists/function_transition_allowlist:function_transition_allowlist") && declared[3].executable && declared[3].exec_configuration && matches!(declared[3].default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == "@@rules_rust+//rust/private/lint_test_runner:lint_test_runner"));
     let targets = &declared[4];
-    assert_eq!(targets.required_providers[0][0].to_string(), "@@rules_rust+//rust/private:providers.bzl%CrateInfo");
-    assert_eq!(targets.required_providers[1][0].to_string(), "@@rules_rust+//rust/private:providers.bzl%TestCrateInfo");
+    assert_eq!(provider_identity_text(&targets.required_providers[0][0]), "@@rules_rust+//rust/private:providers.bzl%CrateInfo");
+    assert_eq!(provider_identity_text(&targets.required_providers[1][0]), "@@rules_rust+//rust/private:providers.bzl%TestCrateInfo");
     assert!(targets.attached_aspect.unwrap().to_value().ptr_eq(aspect_value.value()));
     let transition = targets.transition.as_ref().unwrap();
     assert!(transition.implementation().to_value().ptr_eq(lint.get("TRANSITION_IMPL").unwrap().value()));
@@ -30792,11 +30799,11 @@ fn clippy_aspect_freezes_complete_source_declaration() {
     assert!(!deps.executable && !deps.exec_configuration && deps.transition.is_none());
     assert_eq!(deps.required_providers.len(), 2);
     assert_eq!(
-        deps.required_providers[0][0].to_string(),
+        provider_identity_text(&deps.required_providers[0][0]),
         "@@rules_rust+//rust/private:clippy.bzl%CrateInfo"
     );
     assert_eq!(
-        deps.required_providers[1][0].to_string(),
+        provider_identity_text(&deps.required_providers[1][0]),
         "@@rules_rust+//rust/private:clippy.bzl%TestCrateInfo"
     );
     let attached_value = deps.attached_aspect.unwrap();
@@ -30978,7 +30985,7 @@ fn assert_frozen_rustfmt_test_rule(rule: &FrozenRuleDefinition) {
         attribute.required_providers.is_empty() && attribute.attached_aspect.is_none()
     }));
     assert_eq!(
-        declared[4].required_providers[0][0].to_string(),
+        provider_identity_text(&declared[4].required_providers[0][0]),
         "@@dep+//rust/private:providers.bzl%CrateInfo"
     );
     let targets = &declared[5];
@@ -30987,11 +30994,11 @@ fn assert_frozen_rustfmt_test_rule(rule: &FrozenRuleDefinition) {
     assert!(targets.default.is_none() && targets.allow_single_file.is_none());
     assert_eq!(targets.required_providers.len(), 2);
     assert_eq!(
-        targets.required_providers[0][0].to_string(),
+        provider_identity_text(&targets.required_providers[0][0]),
         "@@dep+//rust/private:providers.bzl%CrateInfo"
     );
     assert_eq!(
-        targets.required_providers[1][0].to_string(),
+        provider_identity_text(&targets.required_providers[1][0]),
         "@@dep+//rust/private:providers.bzl%TestCrateInfo"
     );
     assert_eq!(
@@ -31193,19 +31200,23 @@ fn rustfmt_test_aspect_rejects_invalid_provides_shapes() {
 }
 
 #[test]
-fn rustfmt_test_rule_rejects_unadmitted_dependency_schemas() {
+fn rustfmt_test_rule_validates_admitted_dependency_schemas() {
     eval_global(
         "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(doc=None)})",
         &loading_globals(),
     )
     .unwrap();
     for source in [
-        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(doc=1)})",
         "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[])})",
         "P=provider()\nQ=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[P, Q])})",
         "P=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[P], [P]])})",
         "P=provider()\nQ=provider()\nS=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[P], [Q], [S]])})",
         "P=provider()\nQ=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[P, Q], [P]])})",
+    ] {
+        eval_global(source, &loading_globals()).unwrap_or_else(|error| panic!("{source}: {error}"));
+    }
+    for source in [
+        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(doc=1)})",
         "P=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[P], [1]])})",
         "def make_provider(): return provider()\nQ=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[make_provider()], [Q]])})",
         "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[])})",
@@ -31670,16 +31681,17 @@ rust_toolchain = rule(implementation = _impl, attrs = {
     let lto = provider_snapshot("LABEL_PROVIDERS_ONE", "x");
     assert_eq!(lto.len(), 1);
     assert_eq!(
-        lto[0][0].to_string(),
+        provider_identity_text(&lto[0][0]),
         "@@rules_rust+//rust/private:toolchain.bzl%RustLtoInfo"
     );
     assert_eq!(provider_snapshot("rust_toolchain", "lto"), lto);
     assert_eq!(
-        provider_snapshot(
-            "rust_toolchain",
-            "_experimental_use_allocator_libraries_with_mangled_symbols_setting"
-        )[0][0]
-            .to_string(),
+        provider_identity_text(
+            &provider_snapshot(
+                "rust_toolchain",
+                "_experimental_use_allocator_libraries_with_mangled_symbols_setting"
+            )[0][0]
+        ),
         "@@rules_rust+//rust/private:toolchain.bzl%BuildSettingInfo"
     );
     let rust_toolchain = module
@@ -31720,14 +31732,12 @@ rust_toolchain = rule(implementation = _impl, attrs = {
     ] {
         assert!(eval_bzl_with_identity(conflict, owner.clone()).is_err());
     }
-    for invalid in [
-        "None",
-        "1",
-        "['provider']",
-        "[P, Q]",
-        "[[P]]",
-        "[provider()]",
-    ] {
+    for valid in ["[P, Q]", "[[P]]"] {
+        let source = format!("P=provider()\nQ=provider()\nX=attr.label(providers={valid})");
+        eval_bzl_with_identity(&source, owner.clone())
+            .unwrap_or_else(|error| panic!("{valid}: {error}"));
+    }
+    for invalid in ["None", "1", "['provider']", "[P, [Q]]", "[provider()]"] {
         let source = format!("P=provider()\nQ=provider()\nX=attr.label(providers={invalid})");
         assert!(
             eval_bzl_with_identity(&source, owner.clone()).is_err(),
@@ -33169,7 +33179,7 @@ fn bazel_configuration_field_is_bzl_only_and_fails_closed() {
     ] {
         assert_eq!(
             diagnostic(source),
-            "error: configuration_field is unsupported in Slug loading"
+            "error: invalid configuration fragment name 'f'"
         );
     }
     let owner = BzlModuleIdentity {
@@ -33314,10 +33324,11 @@ fn bazel_category_six_globals_and_provider_key_are_exactly_partitioned() {
             "RunEnvironmentInfo",
             "set",
             "DefaultInfo",
+            "subrule",
+            "configuration_field",
         ] {
             assert!(names.contains(&present), "missing {present}");
         }
-        assert!(!names.contains(&"subrule"));
     }
     let build_names = build.names().map(|name| name.as_str()).collect::<Vec<_>>();
     assert!(build_names.contains(&"set"));
@@ -33327,6 +33338,7 @@ fn bazel_category_six_globals_and_provider_key_are_exactly_partitioned() {
         "RunEnvironmentInfo",
         "DefaultInfo",
         "subrule",
+        "configuration_field",
     ] {
         assert!(!build_names.contains(&absent), "BUILD leaked {absent}");
     }
