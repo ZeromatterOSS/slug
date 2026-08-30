@@ -8026,7 +8026,7 @@ mod tests {
                 ("z".to_owned(), OverrideAttributeValue::Int(1)),
             ]),
         );
-        assert_eq!(
+        assert_ne!(
             repo_spec(
                 "@@bazel_tools//tools/build_defs/repo:http.bzl",
                 "http_archive",
@@ -8054,7 +8054,7 @@ mod tests {
                     ("z".to_owned(), OverrideAttributeValue::Int(1)),
                 ]),
             )]);
-        assert_eq!(
+        assert_ne!(
             repo_spec(
                 "@@other//tools/build_defs/repo:http.bzl",
                 "http_archive",
@@ -8066,7 +8066,7 @@ mod tests {
                 remote_patches_b.clone(),
             )
         );
-        assert_eq!(
+        assert_ne!(
             repo_spec(
                 "@@bazel_tools//tools/build_defs/repo:http.bzl",
                 "other_rule",
@@ -8078,6 +8078,68 @@ mod tests {
                 remote_patches_b,
             )
         );
+
+        let nested = |reversed| {
+            let entries = if reversed {
+                [
+                    ("a", OverrideAttributeValue::Int(1)),
+                    ("z", OverrideAttributeValue::Int(2)),
+                ]
+            } else {
+                [
+                    ("z", OverrideAttributeValue::Int(2)),
+                    ("a", OverrideAttributeValue::Int(1)),
+                ]
+            };
+            repo_spec(
+                "@@other//defs:repo.bzl",
+                "repo",
+                SmallMap::from_iter([(
+                    CompactString::new("nested"),
+                    OverrideAttributeValue::Iterable(Arc::from([attrs_map(
+                        entries
+                            .into_iter()
+                            .map(|(key, value)| (key.to_owned(), value)),
+                    )])),
+                )]),
+            )
+        };
+        let nested_a = nested(false);
+        let nested_b = nested(true);
+        assert_eq!(nested_a.attributes, nested_b.attributes);
+        assert_ne!(nested_a, nested_b);
+        assert_eq!(nested_a, nested(false));
+
+        let top_a = repo_spec(
+            "@@other//defs:repo.bzl",
+            "repo",
+            SmallMap::from_iter([
+                (
+                    CompactString::new("one"),
+                    OverrideAttributeValue::String("1".into()),
+                ),
+                (
+                    CompactString::new("two"),
+                    OverrideAttributeValue::String("2".into()),
+                ),
+            ]),
+        );
+        let top_b = repo_spec(
+            "@@other//defs:repo.bzl",
+            "repo",
+            SmallMap::from_iter([
+                (
+                    CompactString::new("two"),
+                    OverrideAttributeValue::String("2".into()),
+                ),
+                (
+                    CompactString::new("one"),
+                    OverrideAttributeValue::String("1".into()),
+                ),
+            ]),
+        );
+        assert_eq!(top_a, top_b);
+        assert_eq!(identity_hash(&top_a), identity_hash(&top_b));
 
         let git_a = git_repo_spec(
             &source(source_a.replace("a.tgz", "repo").as_str()),
@@ -8213,6 +8275,34 @@ mod tests {
         assert_eq!(root_request(a.clone()), root_request(restored.clone()));
         assert_ne!(canonical_request(a.clone()), canonical_request(b));
         assert_eq!(canonical_request(a), canonical_request(restored));
+
+        let top_spec = |reversed| {
+            let spec = archive_spec(source_a);
+            let mut attributes = spec
+                .attributes
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect::<Vec<_>>();
+            if reversed {
+                attributes.reverse();
+            }
+            RepoSpec {
+                rule_id: spec.rule_id,
+                attributes: Arc::new(attributes.into_iter().collect()),
+            }
+        };
+        let top_a = definition(top_spec(false));
+        let top_b = definition(top_spec(true));
+        assert_eq!(
+            identity_hash(&root_route(top_a.clone())),
+            identity_hash(&root_route(top_b.clone()))
+        );
+        assert_eq!(
+            identity_hash(&canonical_route(top_a.clone())),
+            identity_hash(&canonical_route(top_b.clone()))
+        );
+        assert_eq!(root_request(top_a.clone()), root_request(top_b.clone()));
+        assert_eq!(canonical_request(top_a), canonical_request(top_b));
     }
 
     #[test]

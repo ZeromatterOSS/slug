@@ -19,6 +19,7 @@ use dupe::Dupe;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequest;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionOverride;
 use slug_bzlmod_v2::HostSelectedInnateRepositoryOwnerInputs;
+use slug_bzlmod_v2::OverrideAttributeKey;
 use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::RepoRuleId;
 use slug_bzlmod_v2::RepoSpec;
@@ -42,6 +43,7 @@ use crate::module_extension::HostPureModuleExtensionInvocationsKey;
 use crate::module_extension::HostPureModuleExtensionInvocationsObservationError;
 use crate::module_extension::HostPureModuleExtensionInvocationsObservationKey;
 use crate::module_extension_repository_rule::RepositoryRuleAttribute;
+use crate::module_extension_repository_rule::RepositoryRuleCallKey;
 use crate::module_extension_repository_rule::RepositoryRuleCallRecord;
 use crate::module_extension_repository_rule::RepositoryRuleCallValue;
 
@@ -665,29 +667,157 @@ fn convert_supplied(
         Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     ),
 ) -> Result<OverrideAttributeValue, CompactString> {
-    match (attribute.kind, raw) {
-        (AttributeKind::String, RepositoryRuleCallValue::String(value)) => {
-            Ok(OverrideAttributeValue::String(value.clone()))
+    coerce_value(attribute.kind, raw, defining_label, mapping)
+}
+
+fn coerce_value(
+    kind: AttributeKind,
+    raw: &RepositoryRuleCallValue,
+    base: &CanonicalLabel,
+    mapping: &(
+        CanonicalRepoName,
+        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
+    ),
+) -> Result<OverrideAttributeValue, CompactString> {
+    match kind {
+        AttributeKind::String => string_value(raw),
+        AttributeKind::Boolean => bool_value(raw),
+        AttributeKind::Integer => int_value(raw),
+        AttributeKind::Label => label_value(raw, base, mapping, false),
+        AttributeKind::Output => label_value(raw, base, mapping, true),
+        AttributeKind::StringList => sequence_value(raw, |value| string_value(value)),
+        AttributeKind::LabelList => {
+            sequence_value(raw, |value| label_value(value, base, mapping, false))
         }
-        (AttributeKind::Boolean, RepositoryRuleCallValue::Bool(value)) => {
-            Ok(OverrideAttributeValue::Bool(*value))
+        AttributeKind::OutputList => {
+            sequence_value(raw, |value| label_value(value, base, mapping, true))
         }
-        (AttributeKind::Integer, RepositoryRuleCallValue::Int(value)) => {
-            Ok(OverrideAttributeValue::Int(*value))
+        AttributeKind::StringDict => {
+            map_value(raw, |key| string_key(key), |value| string_value(value))
         }
-        (AttributeKind::Label, RepositoryRuleCallValue::String(value)) => {
-            resolve_label(value, defining_label, mapping).map(OverrideAttributeValue::Label)
-        }
-        (AttributeKind::Label, RepositoryRuleCallValue::Label(value)) => {
-            ensure_visible(value, defining_label, mapping)?;
-            Ok(OverrideAttributeValue::Label(value.clone()))
-        }
-        _ => Err(format!(
-            "unsupported value for repository-rule {:?} attribute",
-            attribute.kind
-        )
-        .into()),
+        AttributeKind::StringListDict => map_value(
+            raw,
+            |key| string_key(key),
+            |value| sequence_value(value, |value| string_value(value)),
+        ),
+        AttributeKind::StringKeyedLabelDict => map_value(
+            raw,
+            |key| string_key(key),
+            |value| label_value(value, base, mapping, false),
+        ),
+        AttributeKind::LabelKeyedStringDict => map_value(
+            raw,
+            |key| label_key(key, base, mapping),
+            |value| string_value(value),
+        ),
+        AttributeKind::LabelListDict => map_value(
+            raw,
+            |key| string_key(key),
+            |value| sequence_value(value, |value| label_value(value, base, mapping, false)),
+        ),
     }
+}
+
+fn string_value(raw: &RepositoryRuleCallValue) -> Result<OverrideAttributeValue, CompactString> {
+    match raw {
+        RepositoryRuleCallValue::String(value) => Ok(OverrideAttributeValue::String(value.clone())),
+        _ => repository_value_error(),
+    }
+}
+
+fn bool_value(raw: &RepositoryRuleCallValue) -> Result<OverrideAttributeValue, CompactString> {
+    match raw {
+        RepositoryRuleCallValue::Bool(value) => Ok(OverrideAttributeValue::Bool(*value)),
+        _ => repository_value_error(),
+    }
+}
+
+fn int_value(raw: &RepositoryRuleCallValue) -> Result<OverrideAttributeValue, CompactString> {
+    match raw {
+        RepositoryRuleCallValue::Int(value) => Ok(OverrideAttributeValue::Int(*value)),
+        _ => repository_value_error(),
+    }
+}
+
+fn label_value(
+    raw: &RepositoryRuleCallValue,
+    base: &CanonicalLabel,
+    mapping: &(
+        CanonicalRepoName,
+        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
+    ),
+    output: bool,
+) -> Result<OverrideAttributeValue, CompactString> {
+    let label = match raw {
+        RepositoryRuleCallValue::String(value) => resolve_label(value, base, mapping)?,
+        RepositoryRuleCallValue::Label(value) => {
+            ensure_visible(value, base, mapping)?;
+            value.clone()
+        }
+        _ => return repository_value_error(),
+    };
+    if output && label.package() != base.package() {
+        return Err(format!("label '{label}' is not in the current package").into());
+    }
+    Ok(OverrideAttributeValue::Label(label))
+}
+
+fn sequence_value(
+    raw: &RepositoryRuleCallValue,
+    convert: impl Fn(&RepositoryRuleCallValue) -> Result<OverrideAttributeValue, CompactString>,
+) -> Result<OverrideAttributeValue, CompactString> {
+    let RepositoryRuleCallValue::Sequence(values) = raw else {
+        return repository_value_error();
+    };
+    values
+        .iter()
+        .map(convert)
+        .collect::<Result<Vec<_>, _>>()
+        .map(|values| OverrideAttributeValue::Iterable(values.into()))
+}
+
+fn map_value(
+    raw: &RepositoryRuleCallValue,
+    key: impl Fn(&RepositoryRuleCallKey) -> Result<OverrideAttributeKey, CompactString>,
+    value: impl Fn(&RepositoryRuleCallValue) -> Result<OverrideAttributeValue, CompactString>,
+) -> Result<OverrideAttributeValue, CompactString> {
+    let RepositoryRuleCallValue::Map(values) = raw else {
+        return repository_value_error();
+    };
+    values
+        .iter()
+        .map(|(raw_key, raw_value)| Ok((key(raw_key)?, value(raw_value)?)))
+        .collect::<Result<SmallMap<_, _>, CompactString>>()
+        .map(|values| OverrideAttributeValue::Map(Arc::new(values)))
+}
+
+fn string_key(raw: &RepositoryRuleCallKey) -> Result<OverrideAttributeKey, CompactString> {
+    match raw {
+        RepositoryRuleCallKey::String(value) => Ok(OverrideAttributeKey::String(value.clone())),
+        RepositoryRuleCallKey::Label(_) => repository_value_error(),
+    }
+}
+
+fn label_key(
+    raw: &RepositoryRuleCallKey,
+    base: &CanonicalLabel,
+    mapping: &(
+        CanonicalRepoName,
+        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
+    ),
+) -> Result<OverrideAttributeKey, CompactString> {
+    let value = match raw {
+        RepositoryRuleCallKey::String(value) => resolve_label(value, base, mapping)?,
+        RepositoryRuleCallKey::Label(value) => {
+            ensure_visible(value, base, mapping)?;
+            value.clone()
+        }
+    };
+    Ok(OverrideAttributeKey::Label(value))
+}
+
+fn repository_value_error<T>() -> Result<T, CompactString> {
+    Err("unsupported value for repository-rule attribute".into())
 }
 
 fn validate_default(
@@ -699,20 +829,88 @@ fn validate_default(
         Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     ),
 ) -> Result<(), CompactString> {
-    match (attribute.kind, default) {
-        (AttributeKind::String, CoercedAttributeValue::String(_))
-        | (AttributeKind::Boolean, CoercedAttributeValue::Boolean(_))
-        | (AttributeKind::Integer, CoercedAttributeValue::Integer(_))
-        | (AttributeKind::Label, CoercedAttributeValue::None) => Ok(()),
-        (AttributeKind::Label, CoercedAttributeValue::Label(label)) => {
-            ensure_visible(label, defining_label, mapping)
-        }
-        _ => Err(format!(
+    if matches!(
+        (attribute.kind, default),
+        (AttributeKind::Label, CoercedAttributeValue::None)
+    ) {
+        return Ok(());
+    }
+    let default = default_call_value(default).ok_or_else(|| {
+        CompactString::from(format!(
             "default for repository-rule attribute '{}' has the wrong kind",
             attribute.name
-        )
-        .into()),
-    }
+        ))
+    })?;
+    coerce_value(attribute.kind, &default, defining_label, mapping).map(|_| ())
+}
+
+fn default_call_value(value: &CoercedAttributeValue) -> Option<RepositoryRuleCallValue> {
+    Some(match value {
+        CoercedAttributeValue::None => RepositoryRuleCallValue::None,
+        CoercedAttributeValue::Boolean(value) => RepositoryRuleCallValue::Bool(*value),
+        CoercedAttributeValue::Integer(value) => RepositoryRuleCallValue::Int(*value),
+        CoercedAttributeValue::String(value) => RepositoryRuleCallValue::String(value.clone()),
+        CoercedAttributeValue::Label(value) | CoercedAttributeValue::Output(value) => {
+            RepositoryRuleCallValue::Label(value.clone())
+        }
+        CoercedAttributeValue::StringList(values) => {
+            sequence_call(values.iter().cloned().map(RepositoryRuleCallValue::String))
+        }
+        CoercedAttributeValue::LabelList(values) | CoercedAttributeValue::OutputList(values) => {
+            sequence_call(values.iter().cloned().map(RepositoryRuleCallValue::Label))
+        }
+        CoercedAttributeValue::StringDict(values) => map_call(values.iter().map(|(key, value)| {
+            (
+                RepositoryRuleCallKey::String(key.clone()),
+                RepositoryRuleCallValue::String(value.clone()),
+            )
+        })),
+        CoercedAttributeValue::StringListDict(values) => {
+            map_call(values.iter().map(|(key, values)| {
+                (
+                    RepositoryRuleCallKey::String(key.clone()),
+                    sequence_call(values.iter().cloned().map(RepositoryRuleCallValue::String)),
+                )
+            }))
+        }
+        CoercedAttributeValue::StringKeyedLabelDict(values) => {
+            map_call(values.iter().map(|(key, value)| {
+                (
+                    RepositoryRuleCallKey::String(key.clone()),
+                    RepositoryRuleCallValue::Label(value.clone()),
+                )
+            }))
+        }
+        CoercedAttributeValue::LabelKeyedStringDict(values) => {
+            map_call(values.iter().map(|(key, value)| {
+                (
+                    RepositoryRuleCallKey::Label(key.clone()),
+                    RepositoryRuleCallValue::String(value.clone()),
+                )
+            }))
+        }
+        CoercedAttributeValue::LabelListDict(values) => {
+            map_call(values.iter().map(|(key, values)| {
+                (
+                    RepositoryRuleCallKey::String(key.clone()),
+                    sequence_call(values.iter().cloned().map(RepositoryRuleCallValue::Label)),
+                )
+            }))
+        }
+        CoercedAttributeValue::Selector { .. } | CoercedAttributeValue::Concatenation(_, _) => {
+            return None;
+        }
+    })
+}
+
+fn sequence_call(values: impl Iterator<Item = RepositoryRuleCallValue>) -> RepositoryRuleCallValue {
+    RepositoryRuleCallValue::Sequence(values.collect::<Vec<_>>().into())
+}
+
+fn map_call(
+    values: impl Iterator<Item = (RepositoryRuleCallKey, RepositoryRuleCallValue)>,
+) -> RepositoryRuleCallValue {
+    RepositoryRuleCallValue::Map(values.collect::<Vec<_>>().into())
 }
 
 fn resolve_label(
@@ -797,6 +995,8 @@ pub(crate) mod tests {
     use slug_bzlmod_v2::BzlmodCommandPolicyKey;
     use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
     use slug_bzlmod_v2::LockfileMode;
+    use slug_bzlmod_v2::NonrootAttributeKey;
+    use slug_bzlmod_v2::NonrootAttributeValue;
     use slug_bzlmod_v2::RegistryRequestGeneration;
     use slug_bzlmod_v2::RegistryUrls;
     use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
@@ -822,6 +1022,7 @@ pub(crate) mod tests {
     use crate::module_extension::HostPureModuleExtensionInvocationsObservationError;
     use crate::module_extension::HostPureModuleExtensionInvocationsObservationKey;
     use crate::module_extension::ObservedHostPureModuleExtensionInvocations;
+    use crate::module_extension_innate_repository::call_value_for_test;
     use crate::module_extension_repository_validation::HostValidatedModuleExtensionRepositoriesKey;
 
     #[test]
@@ -897,7 +1098,7 @@ pub(crate) mod tests {
 
     #[test]
     fn pure_instantiation_stores_only_explicit_values_in_raw_order() {
-        let call = call(
+        let record = call(
             [
                 schema("text", AttributeKind::String, true, None),
                 schema(
@@ -927,7 +1128,7 @@ pub(crate) mod tests {
                 ("tags", RepositoryRuleCallValue::String("ignored".into())),
             ],
         );
-        let spec = instantiate_call(&call, &mapping()).unwrap();
+        let spec = instantiate_call(&record, &mapping()).unwrap();
         assert_eq!(spec.rule_id.bzl_file.to_string(), "@@//defs:repo.bzl");
         assert_eq!(spec.rule_id.rule_name, "repo");
         assert_eq!(
@@ -948,6 +1149,621 @@ pub(crate) mod tests {
         assert!(!spec.attributes.contains_key("name"));
         assert!(!spec.attributes.contains_key("enabled"));
         assert!(!spec.attributes.contains_key("target"));
+    }
+
+    #[test]
+    fn complete_repository_attribute_family_coerces_recursively() {
+        let sequence = |values| RepositoryRuleCallValue::Sequence(Arc::from(values));
+        let map = |values| RepositoryRuleCallValue::Map(Arc::from(values));
+        let local = CanonicalLabel::parse("@@//defs:l").unwrap();
+        let output = CanonicalLabel::parse("@@//defs:o").unwrap();
+        let dep = CanonicalLabel::parse("@@dep+//p:l").unwrap();
+        let call = call(
+            [
+                schema("b", AttributeKind::Boolean, false, None),
+                schema("i", AttributeKind::Integer, false, None),
+                schema("s", AttributeKind::String, false, None),
+                schema("l", AttributeKind::Label, false, None),
+                schema("o", AttributeKind::Output, false, None),
+                schema("sl", AttributeKind::StringList, false, None),
+                schema("ll", AttributeKind::LabelList, false, None),
+                schema("ol", AttributeKind::OutputList, false, None),
+                schema("sd", AttributeKind::StringDict, false, None),
+                schema("sld", AttributeKind::StringListDict, false, None),
+                schema("skld", AttributeKind::StringKeyedLabelDict, false, None),
+                schema("lksd", AttributeKind::LabelKeyedStringDict, false, None),
+                schema("lld", AttributeKind::LabelListDict, false, None),
+            ],
+            [
+                ("name", RepositoryRuleCallValue::String("generated".into())),
+                ("b", RepositoryRuleCallValue::Bool(true)),
+                ("i", RepositoryRuleCallValue::Int(7)),
+                ("s", RepositoryRuleCallValue::String("s".into())),
+                ("l", RepositoryRuleCallValue::Label(dep.clone())),
+                ("o", RepositoryRuleCallValue::Label(output.clone())),
+                (
+                    "sl",
+                    sequence([RepositoryRuleCallValue::String("s".into())]),
+                ),
+                (
+                    "ll",
+                    sequence([RepositoryRuleCallValue::Label(local.clone())]),
+                ),
+                (
+                    "ol",
+                    sequence([RepositoryRuleCallValue::Label(output.clone())]),
+                ),
+                (
+                    "sd",
+                    map([(
+                        RepositoryRuleCallKey::String("k".into()),
+                        RepositoryRuleCallValue::String("v".into()),
+                    )]),
+                ),
+                (
+                    "sld",
+                    map([(
+                        RepositoryRuleCallKey::String("k".into()),
+                        sequence([RepositoryRuleCallValue::String("v".into())]),
+                    )]),
+                ),
+                (
+                    "skld",
+                    map([(
+                        RepositoryRuleCallKey::String("k".into()),
+                        RepositoryRuleCallValue::Label(local.clone()),
+                    )]),
+                ),
+                (
+                    "lksd",
+                    map([(
+                        RepositoryRuleCallKey::Label(local.clone()),
+                        RepositoryRuleCallValue::String("v".into()),
+                    )]),
+                ),
+                (
+                    "lld",
+                    map([(
+                        RepositoryRuleCallKey::String("k".into()),
+                        sequence([RepositoryRuleCallValue::Label(local.clone())]),
+                    )]),
+                ),
+            ],
+        );
+        let spec = instantiate_call(&call, &mapping()).unwrap();
+        assert_eq!(spec.attributes.len(), 13);
+        assert_eq!(
+            spec.attributes.get("b"),
+            Some(&OverrideAttributeValue::Bool(true))
+        );
+        assert_eq!(
+            spec.attributes.get("i"),
+            Some(&OverrideAttributeValue::Int(7))
+        );
+        assert_eq!(
+            spec.attributes.get("s"),
+            Some(&OverrideAttributeValue::String("s".into()))
+        );
+        assert_eq!(
+            spec.attributes.get("l"),
+            Some(&OverrideAttributeValue::Label(dep))
+        );
+        assert_eq!(
+            spec.attributes.get("o"),
+            Some(&OverrideAttributeValue::Label(output.clone()))
+        );
+        assert_eq!(
+            spec.attributes.get("sl"),
+            Some(&OverrideAttributeValue::Iterable(Arc::from([
+                OverrideAttributeValue::String("s".into())
+            ])))
+        );
+        assert_eq!(
+            spec.attributes.get("ll"),
+            Some(&OverrideAttributeValue::Iterable(Arc::from([
+                OverrideAttributeValue::Label(local.clone())
+            ])))
+        );
+        assert_eq!(
+            spec.attributes.get("ol"),
+            Some(&OverrideAttributeValue::Iterable(Arc::from([
+                OverrideAttributeValue::Label(output)
+            ])))
+        );
+        let expected_map =
+            |key, value| OverrideAttributeValue::Map(Arc::new(SmallMap::from_iter([(key, value)])));
+        assert_eq!(
+            spec.attributes.get("sd"),
+            Some(&expected_map(
+                OverrideAttributeKey::String("k".into()),
+                OverrideAttributeValue::String("v".into())
+            ))
+        );
+        assert_eq!(
+            spec.attributes.get("sld"),
+            Some(&expected_map(
+                OverrideAttributeKey::String("k".into()),
+                OverrideAttributeValue::Iterable(Arc::from([OverrideAttributeValue::String(
+                    "v".into()
+                )]))
+            ))
+        );
+        assert_eq!(
+            spec.attributes.get("skld"),
+            Some(&expected_map(
+                OverrideAttributeKey::String("k".into()),
+                OverrideAttributeValue::Label(local.clone())
+            ))
+        );
+        assert_eq!(
+            spec.attributes.get("lksd"),
+            Some(&expected_map(
+                OverrideAttributeKey::Label(local.clone()),
+                OverrideAttributeValue::String("v".into())
+            ))
+        );
+        assert_eq!(
+            spec.attributes.get("lld"),
+            Some(&expected_map(
+                OverrideAttributeKey::String("k".into()),
+                OverrideAttributeValue::Iterable(Arc::from([OverrideAttributeValue::Label(local)]))
+            ))
+        );
+    }
+
+    #[test]
+    fn nested_label_positions_accept_raw_and_authenticated_forms() {
+        let sequence = |values: Vec<_>| RepositoryRuleCallValue::Sequence(values.into());
+        let map = |values: Vec<_>| RepositoryRuleCallValue::Map(values.into());
+        let dep_typed = CanonicalLabel::parse("@@dep+//p:typed").unwrap();
+        let dep_key = CanonicalLabel::parse("@@dep+//p:key_typed").unwrap();
+        let local_output = CanonicalLabel::parse("@@//defs:typed.out").unwrap();
+        let record = call(
+            [
+                schema("ll", AttributeKind::LabelList, false, None),
+                schema("ol", AttributeKind::OutputList, false, None),
+                schema("skld", AttributeKind::StringKeyedLabelDict, false, None),
+                schema("lksd", AttributeKind::LabelKeyedStringDict, false, None),
+                schema("lld", AttributeKind::LabelListDict, false, None),
+            ],
+            [
+                ("name", RepositoryRuleCallValue::String("generated".into())),
+                (
+                    "ll",
+                    sequence(vec![
+                        RepositoryRuleCallValue::String("@dep//p:raw".into()),
+                        RepositoryRuleCallValue::Label(dep_typed.clone()),
+                    ]),
+                ),
+                (
+                    "ol",
+                    sequence(vec![
+                        RepositoryRuleCallValue::String(":raw.out".into()),
+                        RepositoryRuleCallValue::Label(local_output.clone()),
+                    ]),
+                ),
+                (
+                    "skld",
+                    map(vec![
+                        (
+                            RepositoryRuleCallKey::String("raw".into()),
+                            RepositoryRuleCallValue::String("@dep//p:value_raw".into()),
+                        ),
+                        (
+                            RepositoryRuleCallKey::String("typed".into()),
+                            RepositoryRuleCallValue::Label(dep_typed.clone()),
+                        ),
+                    ]),
+                ),
+                (
+                    "lksd",
+                    map(vec![
+                        (
+                            RepositoryRuleCallKey::String("@dep//p:key_raw".into()),
+                            RepositoryRuleCallValue::String("raw".into()),
+                        ),
+                        (
+                            RepositoryRuleCallKey::Label(dep_key.clone()),
+                            RepositoryRuleCallValue::String("typed".into()),
+                        ),
+                    ]),
+                ),
+                (
+                    "lld",
+                    map(vec![(
+                        RepositoryRuleCallKey::String("group".into()),
+                        sequence(vec![
+                            RepositoryRuleCallValue::String("@dep//p:nested_raw".into()),
+                            RepositoryRuleCallValue::Label(dep_typed.clone()),
+                        ]),
+                    )]),
+                ),
+            ],
+        );
+        let spec = instantiate_call(&record, &mapping()).unwrap();
+        assert_eq!(
+            spec.attributes.get("ll"),
+            Some(&OverrideAttributeValue::Iterable(Arc::from([
+                OverrideAttributeValue::Label(CanonicalLabel::parse("@@dep+//p:raw").unwrap()),
+                OverrideAttributeValue::Label(dep_typed.clone()),
+            ])))
+        );
+        assert_eq!(
+            spec.attributes.get("ol"),
+            Some(&OverrideAttributeValue::Iterable(Arc::from([
+                OverrideAttributeValue::Label(CanonicalLabel::parse("@@//defs:raw.out").unwrap()),
+                OverrideAttributeValue::Label(local_output),
+            ])))
+        );
+        assert_eq!(
+            spec.attributes.get("lksd"),
+            Some(&OverrideAttributeValue::Map(Arc::new(SmallMap::from_iter(
+                [
+                    (
+                        OverrideAttributeKey::Label(
+                            CanonicalLabel::parse("@@dep+//p:key_raw").unwrap()
+                        ),
+                        OverrideAttributeValue::String("raw".into()),
+                    ),
+                    (
+                        OverrideAttributeKey::Label(dep_key),
+                        OverrideAttributeValue::String("typed".into()),
+                    ),
+                ]
+            ))))
+        );
+        assert!(matches!(
+            spec.attributes.get("skld"),
+            Some(OverrideAttributeValue::Map(values))
+                if matches!(values.get(&OverrideAttributeKey::String("raw".into())), Some(OverrideAttributeValue::Label(label)) if label.to_string() == "@@dep+//p:value_raw")
+                    && matches!(values.get(&OverrideAttributeKey::String("typed".into())), Some(OverrideAttributeValue::Label(label)) if label == &dep_typed)
+        ));
+        assert!(matches!(
+            spec.attributes.get("lld"),
+            Some(OverrideAttributeValue::Map(values))
+                if matches!(values.get(&OverrideAttributeKey::String("group".into())), Some(OverrideAttributeValue::Iterable(labels))
+                    if matches!(labels.as_ref(), [OverrideAttributeValue::Label(raw), OverrideAttributeValue::Label(typed)]
+                        if raw.to_string() == "@@dep+//p:nested_raw" && typed == &dep_typed))
+        ));
+
+        for invalid in [
+            call(
+                [schema(
+                    "value",
+                    AttributeKind::StringKeyedLabelDict,
+                    false,
+                    None,
+                )],
+                [
+                    ("name", RepositoryRuleCallValue::String("generated".into())),
+                    (
+                        "value",
+                        map(vec![(
+                            RepositoryRuleCallKey::String("k".into()),
+                            RepositoryRuleCallValue::String("@missing//:x".into()),
+                        )]),
+                    ),
+                ],
+            ),
+            call(
+                [schema(
+                    "value",
+                    AttributeKind::LabelKeyedStringDict,
+                    false,
+                    None,
+                )],
+                [
+                    ("name", RepositoryRuleCallValue::String("generated".into())),
+                    (
+                        "value",
+                        map(vec![(
+                            RepositoryRuleCallKey::Label(
+                                CanonicalLabel::parse("@@hidden+//:x").unwrap(),
+                            ),
+                            RepositoryRuleCallValue::String("v".into()),
+                        )]),
+                    ),
+                ],
+            ),
+        ] {
+            assert!(
+                instantiate_call(&invalid, &mapping())
+                    .unwrap_err()
+                    .contains("no repository visible")
+            );
+        }
+    }
+
+    #[test]
+    fn ordinary_and_innate_collections_publish_equal_repo_specs() {
+        let innate = NonrootAttributeValue::Tuple(Arc::from([
+            NonrootAttributeValue::String("first".into()),
+            NonrootAttributeValue::Dict(Arc::new(SmallMap::from_iter([
+                (
+                    NonrootAttributeKey::String("z".into()),
+                    NonrootAttributeValue::List(Arc::from([
+                        NonrootAttributeValue::String("one".into()),
+                        NonrootAttributeValue::String("two".into()),
+                    ])),
+                ),
+                (
+                    NonrootAttributeKey::String("a".into()),
+                    NonrootAttributeValue::List(Arc::from([NonrootAttributeValue::String(
+                        "three".into(),
+                    )])),
+                ),
+            ]))),
+        ]));
+        let innate = call_value_for_test(&innate).unwrap();
+        let RepositoryRuleCallValue::Sequence(innate_values) = &innate else {
+            panic!("innate tuple must normalize to the shared sequence carrier")
+        };
+        let ordinary = RepositoryRuleCallValue::Sequence(Arc::from([
+            RepositoryRuleCallValue::String("first".into()),
+            RepositoryRuleCallValue::Map(Arc::from([
+                (
+                    RepositoryRuleCallKey::String("z".into()),
+                    RepositoryRuleCallValue::Sequence(Arc::from([
+                        RepositoryRuleCallValue::String("one".into()),
+                        RepositoryRuleCallValue::String("two".into()),
+                    ])),
+                ),
+                (
+                    RepositoryRuleCallKey::String("a".into()),
+                    RepositoryRuleCallValue::Sequence(Arc::from([
+                        RepositoryRuleCallValue::String("three".into()),
+                    ])),
+                ),
+            ])),
+        ]));
+        assert_eq!(innate, ordinary);
+        assert_eq!(innate_values.len(), 2);
+
+        let parity_schema = [
+            schema("words", AttributeKind::StringList, false, None),
+            schema("groups", AttributeKind::StringListDict, false, None),
+        ];
+        let split = |raw: RepositoryRuleCallValue| {
+            let RepositoryRuleCallValue::Sequence(values) = raw else {
+                unreachable!()
+            };
+            call(
+                parity_schema.clone(),
+                [
+                    ("name", RepositoryRuleCallValue::String("generated".into())),
+                    (
+                        "words",
+                        RepositoryRuleCallValue::Sequence(Arc::from([values[0].clone()])),
+                    ),
+                    ("groups", values[1].clone()),
+                ],
+            )
+        };
+        let ordinary_spec = instantiate_call(&split(ordinary), &mapping()).unwrap();
+        let innate_spec = instantiate_call(&split(innate), &mapping()).unwrap();
+        assert_eq!(ordinary_spec, innate_spec);
+        assert_eq!(
+            ordinary_spec.attributes.keys().collect::<Vec<_>>(),
+            innate_spec.attributes.keys().collect::<Vec<_>>()
+        );
+
+        let innate_labels = NonrootAttributeValue::Dict(Arc::new(SmallMap::from_iter([
+            (
+                NonrootAttributeKey::Label("@@dep+//p:key".into()),
+                NonrootAttributeValue::Label("@@dep+//p:value".into()),
+            ),
+            (
+                NonrootAttributeKey::String("raw".into()),
+                NonrootAttributeValue::String("@dep//p:raw".into()),
+            ),
+        ])));
+        assert_eq!(
+            call_value_for_test(&innate_labels).unwrap(),
+            RepositoryRuleCallValue::Map(Arc::from([
+                (
+                    RepositoryRuleCallKey::Label(CanonicalLabel::parse("@@dep+//p:key").unwrap()),
+                    RepositoryRuleCallValue::Label(
+                        CanonicalLabel::parse("@@dep+//p:value").unwrap()
+                    ),
+                ),
+                (
+                    RepositoryRuleCallKey::String("raw".into()),
+                    RepositoryRuleCallValue::String("@dep//p:raw".into()),
+                ),
+            ]))
+        );
+        assert!(
+            call_value_for_test(&NonrootAttributeValue::Label(
+                "@dep//p:not_canonical".into()
+            ))
+            .is_err()
+        );
+        assert!(
+            call_value_for_test(&NonrootAttributeValue::Dict(Arc::new(SmallMap::from_iter(
+                [(
+                    NonrootAttributeKey::Label("@dep//p:not_canonical".into()),
+                    NonrootAttributeValue::String("value".into()),
+                ),]
+            ))))
+            .is_err()
+        );
+
+        let ordered_innate = |reversed| {
+            let entries = if reversed {
+                [("a", "one"), ("z", "two")]
+            } else {
+                [("z", "two"), ("a", "one")]
+            };
+            NonrootAttributeValue::Dict(Arc::new(SmallMap::from_iter(entries.map(
+                |(key, value)| {
+                    (
+                        NonrootAttributeKey::String(key.into()),
+                        NonrootAttributeValue::String(value.into()),
+                    )
+                },
+            ))))
+        };
+        let ordered_ordinary = |reversed| {
+            let entries = if reversed {
+                [("a", "one"), ("z", "two")]
+            } else {
+                [("z", "two"), ("a", "one")]
+            };
+            RepositoryRuleCallValue::Map(Arc::from(entries.map(|(key, value)| {
+                (
+                    RepositoryRuleCallKey::String(key.into()),
+                    RepositoryRuleCallValue::String(value.into()),
+                )
+            })))
+        };
+        let ordered_spec = |value| {
+            instantiate_call(
+                &call(
+                    [schema("values", AttributeKind::StringDict, false, None)],
+                    [
+                        ("name", RepositoryRuleCallValue::String("generated".into())),
+                        ("values", value),
+                    ],
+                ),
+                &mapping(),
+            )
+            .unwrap()
+        };
+        let ordinary_a = ordered_spec(ordered_ordinary(false));
+        let ordinary_b = ordered_spec(ordered_ordinary(true));
+        let ordinary_restored = ordered_spec(ordered_ordinary(false));
+        let innate_a = ordered_spec(call_value_for_test(&ordered_innate(false)).unwrap());
+        let innate_b = ordered_spec(call_value_for_test(&ordered_innate(true)).unwrap());
+        let innate_restored = ordered_spec(call_value_for_test(&ordered_innate(false)).unwrap());
+        assert_eq!(ordinary_a, innate_a);
+        assert_eq!(ordinary_b, innate_b);
+        assert_eq!(ordinary_restored, innate_restored);
+        assert_ne!(ordinary_a, ordinary_b);
+        assert_eq!(ordinary_a, ordinary_restored);
+    }
+
+    #[test]
+    fn omitted_all_kinds_and_defaults_validate_without_publication() {
+        let omitted = call(
+            [
+                schema("b", AttributeKind::Boolean, false, None),
+                schema("i", AttributeKind::Integer, false, None),
+                schema("s", AttributeKind::String, false, None),
+                schema("l", AttributeKind::Label, false, None),
+                schema("o", AttributeKind::Output, false, None),
+                schema("sl", AttributeKind::StringList, false, None),
+                schema("ll", AttributeKind::LabelList, false, None),
+                schema("ol", AttributeKind::OutputList, false, None),
+                schema("sd", AttributeKind::StringDict, false, None),
+                schema("sld", AttributeKind::StringListDict, false, None),
+                schema("skld", AttributeKind::StringKeyedLabelDict, false, None),
+                schema("lksd", AttributeKind::LabelKeyedStringDict, false, None),
+                schema("lld", AttributeKind::LabelListDict, false, None),
+            ],
+            [("name", RepositoryRuleCallValue::String("generated".into()))],
+        );
+        assert!(
+            instantiate_call(&omitted, &mapping())
+                .unwrap()
+                .attributes
+                .is_empty()
+        );
+
+        let label = CanonicalLabel::parse("@@//defs:l").unwrap();
+        let defaults = call(
+            [
+                schema(
+                    "b",
+                    AttributeKind::Boolean,
+                    false,
+                    Some(CoercedAttributeValue::Boolean(true)),
+                ),
+                schema(
+                    "i",
+                    AttributeKind::Integer,
+                    false,
+                    Some(CoercedAttributeValue::Integer(1)),
+                ),
+                schema(
+                    "s",
+                    AttributeKind::String,
+                    false,
+                    Some(CoercedAttributeValue::String("s".into())),
+                ),
+                schema(
+                    "l",
+                    AttributeKind::Label,
+                    false,
+                    Some(CoercedAttributeValue::Label(label.clone())),
+                ),
+                schema(
+                    "sl",
+                    AttributeKind::StringList,
+                    false,
+                    Some(CoercedAttributeValue::StringList(Arc::from([
+                        CompactString::new("s"),
+                    ]))),
+                ),
+                schema(
+                    "ll",
+                    AttributeKind::LabelList,
+                    false,
+                    Some(CoercedAttributeValue::LabelList(Arc::from([label.clone()]))),
+                ),
+                schema(
+                    "sd",
+                    AttributeKind::StringDict,
+                    false,
+                    Some(CoercedAttributeValue::StringDict(Arc::from([(
+                        "k".into(),
+                        "v".into(),
+                    )]))),
+                ),
+                schema(
+                    "sld",
+                    AttributeKind::StringListDict,
+                    false,
+                    Some(CoercedAttributeValue::StringListDict(Arc::from([(
+                        "k".into(),
+                        Arc::from(["v".into()]),
+                    )]))),
+                ),
+                schema(
+                    "skld",
+                    AttributeKind::StringKeyedLabelDict,
+                    false,
+                    Some(CoercedAttributeValue::StringKeyedLabelDict(Arc::from([(
+                        "k".into(),
+                        label.clone(),
+                    )]))),
+                ),
+                schema(
+                    "lksd",
+                    AttributeKind::LabelKeyedStringDict,
+                    false,
+                    Some(CoercedAttributeValue::LabelKeyedStringDict(Arc::from([(
+                        label.clone(),
+                        "v".into(),
+                    )]))),
+                ),
+                schema(
+                    "lld",
+                    AttributeKind::LabelListDict,
+                    false,
+                    Some(CoercedAttributeValue::LabelListDict(Arc::from([(
+                        "k".into(),
+                        Arc::from([label]),
+                    )]))),
+                ),
+            ],
+            [("name", RepositoryRuleCallValue::String("generated".into()))],
+        );
+        assert!(
+            instantiate_call(&defaults, &mapping())
+                .unwrap()
+                .attributes
+                .is_empty()
+        );
     }
 
     #[test]
@@ -1068,6 +1884,44 @@ pub(crate) mod tests {
             ],
         );
         assert!(instantiate_call(&canonical, &mapping()).is_ok());
+
+        for (kind, value, expected) in [
+            (
+                AttributeKind::Label,
+                RepositoryRuleCallValue::String("@missing//:x".into()),
+                "no repository visible",
+            ),
+            (
+                AttributeKind::Label,
+                RepositoryRuleCallValue::Label(CanonicalLabel::parse("@@hidden+//:x").unwrap()),
+                "no repository visible",
+            ),
+            (
+                AttributeKind::Output,
+                RepositoryRuleCallValue::String("//other:x".into()),
+                "not in the current package",
+            ),
+            (
+                AttributeKind::OutputList,
+                RepositoryRuleCallValue::Sequence(Arc::from([RepositoryRuleCallValue::String(
+                    "//other:x".into(),
+                )])),
+                "not in the current package",
+            ),
+        ] {
+            let invalid = call(
+                [schema("value", kind, false, None)],
+                [
+                    ("name", RepositoryRuleCallValue::String("generated".into())),
+                    ("value", value),
+                ],
+            );
+            assert!(
+                instantiate_call(&invalid, &mapping())
+                    .unwrap_err()
+                    .contains(expected)
+            );
+        }
 
         let invisible_default = call(
             [

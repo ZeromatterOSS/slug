@@ -24,9 +24,11 @@ use slug_bzlmod_v2::HostSelectedInnateRepositoryOwnerInputsError;
 use slug_bzlmod_v2::HostSelectedInnateRepositoryOwnerInputsKey;
 use slug_bzlmod_v2::HostSelectedInnateRepositoryOwnerInputsObservationError;
 use slug_bzlmod_v2::HostSelectedInnateRepositoryOwnerInputsObservationKey;
+use slug_bzlmod_v2::NonrootAttributeKey;
 use slug_bzlmod_v2::NonrootAttributeValue;
 use slug_bzlmod_v2::RootPackageBzlTarget;
 use slug_bzlmod_v2::SourcePreparationOutcome;
+use slug_identity_v2::CanonicalLabel;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathObservationEpoch;
@@ -46,6 +48,7 @@ use crate::bzl_module::HostRootBzlLabel;
 use crate::bzl_module::RepositoryBzlLabel;
 use crate::module_extension_repository_rule::FrozenRepositoryRuleDefinition;
 use crate::module_extension_repository_rule::RepositoryRuleCallFrame;
+use crate::module_extension_repository_rule::RepositoryRuleCallKey;
 use crate::module_extension_repository_rule::RepositoryRuleCallRecord;
 use crate::module_extension_repository_rule::RepositoryRuleCallSpan;
 use crate::module_extension_repository_rule::RepositoryRuleCallValue;
@@ -397,10 +400,49 @@ fn call_value(value: &NonrootAttributeValue) -> Result<RepositoryRuleCallValue, 
             .as_i32()
             .map(RepositoryRuleCallValue::Int)
             .ok_or_else(|| "repository-rule integer is outside i32".into()),
-        NonrootAttributeValue::String(value) | NonrootAttributeValue::Label(value) => {
-            Ok(RepositoryRuleCallValue::String(value.clone()))
+        NonrootAttributeValue::String(value) => Ok(RepositoryRuleCallValue::String(value.clone())),
+        NonrootAttributeValue::Label(value) => CanonicalLabel::parse(value)
+            .map(RepositoryRuleCallValue::Label)
+            .map_err(|error| {
+                format!("invalid retained repository-rule Label '{value}': {error}").into()
+            }),
+        NonrootAttributeValue::List(values) | NonrootAttributeValue::Tuple(values) => values
+            .iter()
+            .map(call_value)
+            .collect::<Result<Vec<_>, _>>()
+            .map(|values| RepositoryRuleCallValue::Sequence(values.into())),
+        NonrootAttributeValue::Dict(values) => values
+            .iter()
+            .map(|(key, value)| Ok((call_key(key)?, call_value(value)?)))
+            .collect::<Result<Vec<_>, CompactString>>()
+            .map(|values| RepositoryRuleCallValue::Map(values.into())),
+        NonrootAttributeValue::Float314
+        | NonrootAttributeValue::BuiltinPrint
+        | NonrootAttributeValue::ExtensionProxy
+        | NonrootAttributeValue::SelfList => {
+            Err("unsupported innate repository-rule attribute value".into())
         }
-        _ => Err("unsupported innate repository-rule attribute value".into()),
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn call_value_for_test(
+    value: &NonrootAttributeValue,
+) -> Result<RepositoryRuleCallValue, CompactString> {
+    call_value(value)
+}
+
+fn call_key(value: &NonrootAttributeKey) -> Result<RepositoryRuleCallKey, CompactString> {
+    match value {
+        NonrootAttributeKey::String(value) => Ok(RepositoryRuleCallKey::String(value.clone())),
+        NonrootAttributeKey::Label(value) => CanonicalLabel::parse(value)
+            .map(RepositoryRuleCallKey::Label)
+            .map_err(|error| {
+                format!("invalid retained repository-rule Label key '{value}': {error}").into()
+            }),
+        NonrootAttributeKey::DeferredFloat314 => {
+            Err("unsupported innate repository-rule dictionary key".into())
+        }
     }
 }
 
@@ -984,7 +1026,7 @@ mod tests {
                 "repo=repository_rule(lambda ctx: None, attrs={'value':attr.string()})\n",
                 "repo",
                 "repo(name='out', value=['unsupported'])",
-                "call",
+                "captured",
             ),
         ] {
             let dice = builtin_graph_dice();
@@ -1004,14 +1046,15 @@ mod tests {
             let SourcePreparationOutcome::Complete(Ok(result)) = result else {
                 panic!("innate failure must be terminal: {result:?}");
             };
-            assert!(
-                matches!(
-                    (expected, result.result().as_ref()),
-                    ("export", Err(HostPureInnateRepositoryOwnerError::Export(_)))
-                        | ("call", Err(HostPureInnateRepositoryOwnerError::Call(_)))
+            let accepted = match (expected, result.result().as_ref()) {
+                ("export", Err(HostPureInnateRepositoryOwnerError::Export(_))) => true,
+                ("captured", Ok(value)) => matches!(
+                    value.repository_rule_calls[0].kwargs[0].1,
+                    RepositoryRuleCallValue::Sequence(_)
                 ),
-                "unexpected {expected} result: {result:?}"
-            );
+                _ => false,
+            };
+            assert!(accepted, "unexpected {expected} result: {result:?}");
         }
     }
 

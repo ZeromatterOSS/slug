@@ -27,7 +27,11 @@ use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
+use starlark::values::ValueIdentity;
+use starlark::values::dict::DictRef;
+use starlark::values::list::ListRef;
 use starlark::values::starlark_value;
+use starlark::values::tuple::TupleRef;
 use starlark_map::small_set::SmallSet;
 
 use crate::attrs::AttributeKind;
@@ -57,6 +61,14 @@ pub(crate) enum RepositoryRuleCallValue {
     None,
     Bool(bool),
     Int(i32),
+    String(CompactString),
+    Label(CanonicalLabel),
+    Sequence(Arc<[RepositoryRuleCallValue]>),
+    Map(Arc<[(RepositoryRuleCallKey, RepositoryRuleCallValue)]>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum RepositoryRuleCallKey {
     String(CompactString),
     Label(CanonicalLabel),
 }
@@ -354,6 +366,13 @@ fn project_span(span: &starlark::codemap::FileSpan) -> anyhow::Result<Repository
 }
 
 fn project_call_value(value: Value<'_>) -> anyhow::Result<RepositoryRuleCallValue> {
+    project_call_value_inner(value, &mut Vec::new())
+}
+
+fn project_call_value_inner<'v>(
+    value: Value<'v>,
+    active: &mut Vec<ValueIdentity<'v>>,
+) -> anyhow::Result<RepositoryRuleCallValue> {
     if value.is_none() {
         return Ok(RepositoryRuleCallValue::None);
     }
@@ -369,11 +388,75 @@ fn project_call_value(value: Value<'_>) -> anyhow::Result<RepositoryRuleCallValu
     if let Some(label) = StarlarkLabel::from_value(value) {
         return Ok(RepositoryRuleCallValue::Label(label.canonical().clone()));
     }
+    if let Some(values) = ListRef::from_value(value) {
+        return project_call_sequence(value, values.iter(), active);
+    }
+    if let Some(values) = TupleRef::from_value(value) {
+        return values
+            .iter()
+            .map(|value| project_call_value_inner(value, active))
+            .collect::<anyhow::Result<Vec<_>>>()
+            .map(|values| RepositoryRuleCallValue::Sequence(values.into()));
+    }
+    if let Some(values) = DictRef::from_value(value) {
+        return project_call_map(value, values.iter(), active);
+    }
     anyhow::bail!(
         "unexpected Starlark value: {} (of type {})",
         value.to_repr(),
         value.get_type()
     )
+}
+
+fn project_call_sequence<'v>(
+    value: Value<'v>,
+    values: impl Iterator<Item = Value<'v>>,
+    active: &mut Vec<ValueIdentity<'v>>,
+) -> anyhow::Result<RepositoryRuleCallValue> {
+    let identity = value.identity();
+    if active.contains(&identity) {
+        anyhow::bail!("unexpected cyclic Starlark container")
+    }
+    active.push(identity);
+    let result = values
+        .map(|value| project_call_value_inner(value, active))
+        .collect::<anyhow::Result<Vec<_>>>()
+        .map(|values| RepositoryRuleCallValue::Sequence(values.into()));
+    active.pop();
+    result
+}
+
+fn project_call_map<'v>(
+    value: Value<'v>,
+    values: impl Iterator<Item = (Value<'v>, Value<'v>)>,
+    active: &mut Vec<ValueIdentity<'v>>,
+) -> anyhow::Result<RepositoryRuleCallValue> {
+    let identity = value.identity();
+    if active.contains(&identity) {
+        anyhow::bail!("unexpected cyclic Starlark container")
+    }
+    active.push(identity);
+    let result = values
+        .map(|(key, value)| {
+            Ok((
+                project_call_key(key)?,
+                project_call_value_inner(value, active)?,
+            ))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()
+        .map(|values| RepositoryRuleCallValue::Map(values.into()));
+    active.pop();
+    result
+}
+
+fn project_call_key(value: Value<'_>) -> anyhow::Result<RepositoryRuleCallKey> {
+    if let Some(value) = value.unpack_str() {
+        return Ok(RepositoryRuleCallKey::String(value.into()));
+    }
+    if let Some(label) = StarlarkLabel::from_value(value) {
+        return Ok(RepositoryRuleCallKey::Label(label.canonical().clone()));
+    }
+    anyhow::bail!("repository-rule dictionary keys must be strings or Labels")
 }
 
 fn validate_repository_name(name: &str) -> anyhow::Result<()> {
@@ -545,7 +628,7 @@ _repo = repository_rule(
     #[test]
     fn context_export_name_and_values_fail_in_pinned_order() {
         let loaded = load(&format!(
-            "{BASE}\ndef positional():\n    _repo('x')\n\ndef missing():\n    _repo()\n\ndef typed():\n    _repo(name=1)\n\ndef bad_name():\n    _repo(name='+bad')\n\ndef bad_value():\n    _repo(name='valid', bad=[])\n"
+            "{BASE}\ndef positional():\n    _repo('x')\n\ndef missing():\n    _repo()\n\ndef typed():\n    _repo(name=1)\n\ndef bad_name():\n    _repo(name='+bad')\n\ndef bad_value():\n    _repo(name='valid', bad=set())\n"
         ))
         .unwrap();
         for (function, expected) in [
@@ -595,11 +678,7 @@ _repo = repository_rule(
             "{BASE}\ndef run():\n    value=lambda: None\n    _repo(name='valid', bad=value)\n"
         ))
         .unwrap();
-        for source in [
-            "def run():\n  _repo(name='valid', bad=(1,))\n",
-            "def run():\n  _repo(name='valid', bad={'x':1})\n",
-            "def run():\n  _repo(name='valid', bad=123456789012345678901234567890)\n",
-        ] {
+        for source in ["def run():\n  _repo(name='valid', bad=123456789012345678901234567890)\n"] {
             let loaded = load(&format!("{BASE}\n{source}")).unwrap();
             let (error, records) = invoke(&loaded, "run", |_| Vec::new());
             assert!(error.unwrap_err().contains("unexpected Starlark value"));
@@ -677,6 +756,7 @@ _repo = repository_rule(
             "def impl(ctx): pass\nr=repository_rule(impl)\n",
             "def impl(ctx): pass\nr=repository_rule(implementation=impl, attrs=None, local=False, configure=False, environ=[], doc=None)\n",
             "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['B','A','B'])\n",
+            "def impl(ctx): pass\nr=repository_rule(impl, attrs={'b':attr.bool(default=True), 'i':attr.int(default=1), 's':attr.string(default='s'), 'l':attr.label(default=':l'), 'o':attr.output(), 'sl':attr.string_list(default=['s']), 'll':attr.label_list(default=[':l']), 'ol':attr.output_list(), 'sd':attr.string_dict(default={'k':'v'}), 'sld':attr.string_list_dict(default={'k':['v']}), 'skld':attr.string_keyed_label_dict(default={'k':':l'}), 'lksd':attr.label_keyed_string_dict(default={':l':'v'}), 'lld':attr.label_list_dict(default={'k':[':l']})})\n",
         ] {
             load(source).unwrap();
         }
@@ -722,10 +802,6 @@ _repo = repository_rule(
                 "unsupported repository_rule attribute name",
             ),
             (
-                "def impl(ctx): pass\nr=repository_rule(impl, attrs={'xs':attr.string_list()})\n",
-                "unsupported repository_rule attribute schema",
-            ),
-            (
                 "def impl(ctx): pass\nr=repository_rule(impl, attrs={'x':attr.string(configurable=False)})\n",
                 "unsupported repository_rule attribute schema",
             ),
@@ -736,6 +812,64 @@ _repo = repository_rule(
         ] {
             let error = load(source).unwrap_err();
             assert!(error.contains(expected), "{error}");
+        }
+    }
+
+    #[test]
+    fn recursive_capture_normalizes_sequences_maps_and_rejects_cycles() {
+        let loaded = load(
+            "def impl(ctx): pass\nr=repository_rule(impl)\ndef run(label):\n  r(name='ok', xs=(None, True, 7, 's', label, ['nested'], {'z':['a'], label:{'a':'b'}}))\n",
+        )
+        .unwrap();
+        let (result, records) = invoke(&loaded, "run", |module| {
+            vec![module.heap().alloc_simple(StarlarkLabel::new(
+                CanonicalLabel::parse("@@dep+//p:t").unwrap(),
+            ))]
+        });
+        assert_eq!(result.unwrap(), "None");
+        let RepositoryRuleCallValue::Sequence(values) = &records[0].kwargs[1].1 else {
+            panic!("tuple must normalize to a sequence")
+        };
+        assert!(matches!(values[4], RepositoryRuleCallValue::Label(_)));
+        assert!(matches!(values[5], RepositoryRuleCallValue::Sequence(_)));
+        assert!(matches!(values[6], RepositoryRuleCallValue::Map(_)));
+
+        let copied = load(
+            "def impl(ctx): pass\nr=repository_rule(impl)\ndef run():\n  inner=['before']\n  nested={'inner':inner}\n  r(name='copied', value=nested)\n  inner.append('after')\n  nested['late']='added'\n",
+        )
+        .unwrap();
+        let (result, records) = invoke(&copied, "run", |_| Vec::new());
+        assert_eq!(result.unwrap(), "None");
+        let RepositoryRuleCallValue::Map(entries) = &records[0].kwargs[1].1 else {
+            panic!("dictionary must be copied into the map carrier")
+        };
+        assert_eq!(entries.len(), 1, "post-call dictionary mutation leaked");
+        assert!(matches!(
+            &entries[0],
+            (
+                RepositoryRuleCallKey::String(key),
+                RepositoryRuleCallValue::Sequence(values)
+            ) if key == "inner"
+                && matches!(values.as_ref(), [RepositoryRuleCallValue::String(value)] if value == "before")
+        ));
+
+        let cyclic = load(
+            "def impl(ctx): pass\nr=repository_rule(impl)\ndef run():\n  value=[]\n  value.append(value)\n  r(name='bad', value=value)\n",
+        )
+        .unwrap();
+        let (error, records) = invoke(&cyclic, "run", |_| Vec::new());
+        assert!(error.unwrap_err().contains("cyclic"));
+        assert!(records.is_empty());
+
+        for source in [
+            "def impl(ctx): pass\nr=repository_rule(impl)\ndef run():\n  r(name='bad', value={1:'x'})\n",
+            "def impl(ctx): pass\nr=repository_rule(impl)\ndef run():\n  r(name='bad', value=set())\n",
+            "def impl(ctx): pass\nr=repository_rule(impl)\ndef run():\n  r(name='bad', value=lambda: None)\n",
+        ] {
+            let loaded = load(source).unwrap();
+            let (error, records) = invoke(&loaded, "run", |_| Vec::new());
+            assert!(error.is_err());
+            assert!(records.is_empty());
         }
     }
 }

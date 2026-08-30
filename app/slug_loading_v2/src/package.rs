@@ -5585,6 +5585,52 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
     }
 }
 
+fn repository_rule_default_matches(kind: AttributeKind, value: &CoercedAttributeValue) -> bool {
+    matches!(
+        (kind, value),
+        (AttributeKind::String, CoercedAttributeValue::String(_))
+            | (AttributeKind::Boolean, CoercedAttributeValue::Boolean(_))
+            | (AttributeKind::Integer, CoercedAttributeValue::Integer(_))
+            | (
+                AttributeKind::Label,
+                CoercedAttributeValue::Label(_) | CoercedAttributeValue::None
+            )
+            | (AttributeKind::Output, CoercedAttributeValue::Output(_))
+            | (
+                AttributeKind::StringList,
+                CoercedAttributeValue::StringList(_)
+            )
+            | (
+                AttributeKind::LabelList,
+                CoercedAttributeValue::LabelList(_)
+            )
+            | (
+                AttributeKind::OutputList,
+                CoercedAttributeValue::OutputList(_)
+            )
+            | (
+                AttributeKind::StringDict,
+                CoercedAttributeValue::StringDict(_)
+            )
+            | (
+                AttributeKind::StringListDict,
+                CoercedAttributeValue::StringListDict(_)
+            )
+            | (
+                AttributeKind::StringKeyedLabelDict,
+                CoercedAttributeValue::StringKeyedLabelDict(_)
+            )
+            | (
+                AttributeKind::LabelKeyedStringDict,
+                CoercedAttributeValue::LabelKeyedStringDict(_)
+            )
+            | (
+                AttributeKind::LabelListDict,
+                CoercedAttributeValue::LabelListDict(_)
+            )
+    )
+}
+
 #[starlark_module]
 pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn repository_rule<'v>(
@@ -5663,13 +5709,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 .ok_or_else(|| {
                     anyhow::anyhow!("repository attribute '{name}' must use attr.*()")
                 })?;
-            if !matches!(
-                definition.kind,
-                AttributeKind::String
-                    | AttributeKind::Boolean
-                    | AttributeKind::Integer
-                    | AttributeKind::Label
-            ) || definition.configurable_set
+            if definition.configurable_set
                 || definition.transition.is_some()
                 || definition.executable
                 || definition.exec_configuration
@@ -5680,7 +5720,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 || definition
                     .default
                     .as_ref()
-                    .is_some_and(|value| !module_extension_default_matches(definition.kind, value))
+                    .is_some_and(|value| !repository_rule_default_matches(definition.kind, value))
             {
                 anyhow::bail!("unsupported repository_rule attribute schema '{name}'");
             }

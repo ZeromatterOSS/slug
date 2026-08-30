@@ -799,26 +799,22 @@ pub struct RepoSpec {
     pub attributes: Arc<SmallMap<CompactString, OverrideAttributeValue>>,
 }
 
-/// Equality identity for repository attributes whose iteration order changes
-/// repository semantics. Ordinary attribute maps keep membership equality.
+/// Equality identity for recursive repository values whose nested dictionary
+/// iteration order is observable. Top-level attribute membership stays named.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct RepoSpecPublicationIdentity<'a> {
-    ordered_remote_patches: Option<&'a SmallMap<OverrideAttributeKey, OverrideAttributeValue>>,
+    attributes: &'a SmallMap<CompactString, OverrideAttributeValue>,
 }
 
 impl PartialEq for RepoSpecPublicationIdentity<'_> {
     fn eq(&self, other: &Self) -> bool {
-        match (self.ordered_remote_patches, other.ordered_remote_patches) {
-            (None, None) => true,
-            (Some(left), Some(right)) => {
-                left.len() == right.len()
-                    && left
-                        .keys()
-                        .zip(right.keys())
-                        .all(|(left, right)| left == right)
-            }
-            (None, Some(_)) | (Some(_), None) => false,
-        }
+        self.attributes.len() == other.attributes.len()
+            && self.attributes.iter().all(|(name, value)| {
+                other
+                    .attributes
+                    .get(name)
+                    .is_some_and(|other| publication_value_eq(value, other))
+            })
     }
 }
 
@@ -826,50 +822,71 @@ impl Eq for RepoSpecPublicationIdentity<'_> {}
 
 impl Hash for RepoSpecPublicationIdentity<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        match self.ordered_remote_patches {
-            None => false.hash(state),
-            Some(patches) => {
-                true.hash(state);
-                patches.len().hash(state);
-                for key in patches.keys() {
-                    key.hash(state);
-                }
-            }
-        }
+        let mut entries = self
+            .attributes
+            .iter()
+            .map(|(name, value)| {
+                let mut entry = std::collections::hash_map::DefaultHasher::new();
+                name.hash(&mut entry);
+                hash_publication_value(value, &mut entry);
+                entry.finish()
+            })
+            .collect::<Vec<_>>();
+        entries.sort_unstable();
+        entries.hash(state);
     }
 }
 
 impl RepoSpec {
     pub(crate) fn publication_identity(&self) -> RepoSpecPublicationIdentity<'_> {
-        let bzl_file = &self.rule_id.bzl_file;
-        let has_ordered_remote_patches = matches!(
-            (
-                bzl_file.package().repo().as_str(),
-                bzl_file.package().package().as_str(),
-                bzl_file.target().as_str(),
-                self.rule_id.rule_name.as_str()
-            ),
-            (
-                "bazel_tools",
-                "tools/build_defs/repo",
-                "http.bzl",
-                "http_archive"
-            ) | (
-                "bazel_tools",
-                "tools/build_defs/repo",
-                "git.bzl",
-                "git_repository"
-            )
-        );
-        let ordered_remote_patches = has_ordered_remote_patches
-            .then(|| self.attributes.get("remote_patches"))
-            .flatten()
-            .and_then(|value| match value {
-                OverrideAttributeValue::Map(values) => Some(values.as_ref()),
-                _ => None,
-            });
         RepoSpecPublicationIdentity {
-            ordered_remote_patches,
+            attributes: self.attributes.as_ref(),
+        }
+    }
+}
+
+fn publication_value_eq(left: &OverrideAttributeValue, right: &OverrideAttributeValue) -> bool {
+    match (left, right) {
+        (OverrideAttributeValue::Iterable(left), OverrideAttributeValue::Iterable(right)) => {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .zip(right.iter())
+                    .all(|(left, right)| publication_value_eq(left, right))
+        }
+        (OverrideAttributeValue::Map(left), OverrideAttributeValue::Map(right)) => {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .zip(right.iter())
+                    .all(|((left_key, left), (right_key, right))| {
+                        left_key == right_key && publication_value_eq(left, right)
+                    })
+        }
+        _ => left == right,
+    }
+}
+
+fn hash_publication_value<H: Hasher>(value: &OverrideAttributeValue, state: &mut H) {
+    std::mem::discriminant(value).hash(state);
+    match value {
+        OverrideAttributeValue::None => {}
+        OverrideAttributeValue::Bool(value) => value.hash(state),
+        OverrideAttributeValue::Int(value) => value.hash(state),
+        OverrideAttributeValue::String(value) => value.hash(state),
+        OverrideAttributeValue::Label(value) => value.hash(state),
+        OverrideAttributeValue::Iterable(values) => {
+            values.len().hash(state);
+            for value in values.iter() {
+                hash_publication_value(value, state);
+            }
+        }
+        OverrideAttributeValue::Map(values) => {
+            values.len().hash(state);
+            for (key, value) in values.iter() {
+                key.hash(state);
+                hash_publication_value(value, state);
+            }
         }
     }
 }
