@@ -169,6 +169,19 @@ Only these existing files may change, at their exact current/base blobs:
 - `app/slug_loading_v2/src/lib.rs`
   `2f614c604b52456943d5353c84cefc486804f9ed`.
 
+Full-suite validation demonstrated that the pre-Host synthetic generated-route
+fixtures construct isolated DICE transactions without the now-required Host
+bundle. The bounded proof-fixture correction may also change only:
+
+- `app/slug_loading_v2/src/canonical_repository_route_tests.rs`
+  `7f096b814767ad4925106eba82bf8f9d86f022f2`; and
+- `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs`
+  `2ca63c4595768513cfec9ecc0946082e0ac9c402`.
+
+Those test-only owners may install an explicit empty snapshot/frontier and a
+`linux`/`x86_64` platform in their synthetic transactions. They gain no
+production fallback, semantic branch, fixture behavior, or other edit.
+
 The only new production file is
 `app/slug_loading_v2/src/repository_rule_context.rs`. The only new separate
 proof file is
@@ -177,8 +190,8 @@ proof file is
 Maximum additions: 650 production Rust, 900 proof Rust and 1,550 aggregate
 Rust lines. No Cargo manifest/lockfile, asset, fixture, command, server, core,
 Bzlmod, analysis, selected-context, action, REAPI, or other loading file may
-change. Preserve the dirty selected-context candidate exactly and stage/commit
-only packet deltas.
+change. The two newly admitted route-test edits count as proof. Preserve the
+dirty selected-context candidate exactly and stage/commit only packet deltas.
 
 `bzl_module.rs` receives only a thin canonical-route reuse surface. The effect
 file remains cohesive as the existing async DICE/effect owner; context

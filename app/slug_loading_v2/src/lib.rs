@@ -43,6 +43,8 @@ pub mod provider;
 mod registration_expansion;
 #[cfg(test)]
 mod registration_expansion_tests;
+#[doc(hidden)]
+pub mod repository_rule_context;
 mod root_subtree_package_set;
 mod starlark_label;
 pub mod visibility;

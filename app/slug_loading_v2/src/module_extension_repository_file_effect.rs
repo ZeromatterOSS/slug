@@ -19,10 +19,15 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
-use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlanBuilder;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlanError;
 use slug_bzlmod_v2::HostSelectedExtensionOwner;
+use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
+use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
+use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
+use slug_bzlmod_v2::RepositoryHostInputTransaction;
+use slug_bzlmod_v2::RepositoryPlatformKey;
 use slug_bzlmod_v2::RootPackageBzlTarget;
+use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
@@ -34,23 +39,16 @@ use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathObservationEpoch;
 use starlark::PrintHandler;
 use starlark::PrintLocation;
-use starlark::any::ProvidesStaticType;
-use starlark::environment::Methods;
-use starlark::environment::MethodsBuilder;
-use starlark::environment::MethodsStatic;
-use starlark::environment::Module;
-use starlark::eval::Evaluator;
-use starlark::starlark_module;
-use starlark::values::NoSerialize;
-use starlark::values::StarlarkValue;
-use starlark::values::Value;
-use starlark::values::none::NoneType;
-use starlark::values::starlark_value;
 
-use crate::bzl_module::HostBzlModuleError;
+use crate::HostCanonicalRepositoryLoadRouteKey;
+use crate::HostCanonicalRepositoryLoadRouteObservationError;
+use crate::HostCanonicalRepositoryLoadRouteObservationKey;
+use crate::bzl_module::ExternalBzlModuleEvalKey;
+use crate::bzl_module::ExternalBzlModuleObservationKey;
 use crate::bzl_module::HostBzlModuleEvalKey;
 use crate::bzl_module::HostBzlModuleObservationKey;
 use crate::bzl_module::HostRootBzlLabel;
+use crate::bzl_module::RepositoryBzlLabel;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepository;
 use crate::module_extension_repository_rule::FrozenRepositoryRuleDefinition;
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificate;
@@ -58,12 +56,16 @@ use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCer
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateKey;
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationError;
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationKey;
+use crate::repository_rule_context::RepositoryRuleHostObservation;
+use crate::repository_rule_context::RepositoryRuleInvocationError;
+use crate::repository_rule_context::invoke_repository_rule;
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct HostSelectedRepositoryFileEffect {
     certificate: Arc<HostSelectedExtensionOwnerCertificate>,
     ordinal: usize,
+    host: RepositoryRuleHostObservation,
     plan: GeneratedRepositoryFileEffectPlan,
 }
 
@@ -71,11 +73,21 @@ impl HostSelectedRepositoryFileEffect {
     pub fn plan(&self) -> &GeneratedRepositoryFileEffectPlan {
         &self.plan
     }
+
+    pub fn host(&self) -> &RepositoryRuleHostObservation {
+        &self.host
+    }
 }
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct HostSelectedRepositoryFileEffectHostBzlError(HostBzlModuleError);
+pub struct HostSelectedRepositoryFileEffectHostBzlError(CompactString);
+
+impl HostSelectedRepositoryFileEffectHostBzlError {
+    fn new(error: impl fmt::Display) -> Self {
+        Self(error.to_string().into())
+    }
+}
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -97,6 +109,11 @@ pub enum HostSelectedRepositoryFileEffectError {
         error: HostSelectedRepositoryFileEffectHostBzlError,
     },
     Projection {
+        certificate: Arc<HostSelectedExtensionOwnerCertificate>,
+        ordinal: usize,
+        message: CompactString,
+    },
+    HostInput {
         certificate: Arc<HostSelectedExtensionOwnerCertificate>,
         ordinal: usize,
         message: CompactString,
@@ -204,6 +221,11 @@ impl ObservedHostSelectedRepositoryFileEffect {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub enum HostSelectedRepositoryFileEffectObservationError {
     Certificate(HostSelectedExtensionOwnerCertificateObservationError),
+    CanonicalRoute {
+        certificate: Arc<HostSelectedExtensionOwnerCertificate>,
+        ordinal: usize,
+        error: Arc<HostCanonicalRepositoryLoadRouteObservationError>,
+    },
     HostBzl {
         certificate: Arc<HostSelectedExtensionOwnerCertificate>,
         ordinal: usize,
@@ -225,6 +247,30 @@ enum EffectMode {
 type EffectDriver = SourcePreparationOutcome<
     Result<(EffectResult, PathObservationEpoch), HostSelectedRepositoryFileEffectObservationError>,
 >;
+
+#[rustfmt::skip]
+fn complete_effect_error(error: HostSelectedRepositoryFileEffectError, observations: PathObservationEpoch) -> EffectDriver { SourcePreparationOutcome::Complete(Ok((Arc::new(Err(error)), observations))) }
+
+fn merge_definition_observations(
+    mode: EffectMode,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    ordinal: usize,
+    current: PathObservationEpoch,
+    incoming: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, EffectDriver> {
+    if matches!(mode, EffectMode::Legacy) {
+        return Ok(current);
+    }
+    merge_observations(&current, incoming).map_err(|error| {
+        SourcePreparationOutcome::Complete(Err(
+            HostSelectedRepositoryFileEffectObservationError::Merge {
+                certificate: certificate.clone(),
+                ordinal,
+                error,
+            },
+        ))
+    })
+}
 
 #[derive(Default)]
 struct InvocationPrintCapture {
@@ -250,105 +296,6 @@ impl PrintHandler for InvocationPrintCapture {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum RepositoryFileContextError {
-    PathArgument,
-    Plan(GeneratedRepositoryFileEffectPlanError),
-}
-
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-struct RepositoryFileContext {}
-
-#[derive(Debug, ProvidesStaticType)]
-struct RepositoryFileInvocationState {
-    effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>,
-    error: RefCell<Option<RepositoryFileContextError>>,
-}
-
-impl RepositoryFileInvocationState {
-    fn new() -> Self {
-        Self {
-            effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())),
-            error: RefCell::new(None),
-        }
-    }
-
-    fn from_evaluator<'a>(
-        eval: &'a Evaluator<'_, '_, '_>,
-    ) -> anyhow::Result<&'a RepositoryFileInvocationState> {
-        eval.extra
-            .and_then(|extra| extra.downcast_ref::<Self>())
-            .ok_or_else(|| anyhow::anyhow!("repository_ctx is outside repository-rule execution"))
-    }
-
-    fn fail(&self, error: RepositoryFileContextError) -> anyhow::Error {
-        *self.error.borrow_mut() = Some(error);
-        anyhow::anyhow!("unsupported repository_ctx.file argument")
-    }
-
-    fn take_error(&self) -> Option<RepositoryFileContextError> {
-        self.error.borrow_mut().take()
-    }
-
-    fn finish(&self) -> GeneratedRepositoryFileEffectPlan {
-        self.effects
-            .borrow_mut()
-            .take()
-            .expect("repository file context completes at most once")
-            .finish()
-    }
-}
-
-impl fmt::Display for RepositoryFileContext {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("<repository_ctx>")
-    }
-}
-
-starlark::starlark_simple_value!(RepositoryFileContext);
-
-#[starlark_value(type = "repository_ctx")]
-impl<'v> StarlarkValue<'v> for RepositoryFileContext {
-    fn get_methods() -> Option<&'static Methods> {
-        static METHODS: MethodsStatic = MethodsStatic::new();
-        METHODS.methods(repository_file_context_methods)
-    }
-}
-
-#[starlark_module]
-fn repository_file_context_methods(builder: &mut MethodsBuilder) {
-    fn file<'v>(
-        this: Value<'v>,
-        #[starlark(require = pos)] path: Value<'v>,
-        #[starlark(default = "")] content: &str,
-        #[starlark(default = true)] executable: bool,
-        #[starlark(default = false)] legacy_utf8: bool,
-        eval: &mut Evaluator<'v, '_, '_>,
-    ) -> anyhow::Result<NoneType> {
-        RepositoryFileContext::from_value(this)
-            .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
-        let _ = legacy_utf8;
-        let state = RepositoryFileInvocationState::from_evaluator(eval)?;
-        let Some(path) = path.unpack_str() else {
-            return Err(state.fail(RepositoryFileContextError::PathArgument));
-        };
-        let result = state
-            .effects
-            .borrow_mut()
-            .as_mut()
-            .expect("repository context has not completed")
-            .push(
-                CompactString::new(path),
-                Arc::from(content.as_bytes()),
-                executable,
-            );
-        if let Err(error) = result {
-            return Err(state.fail(RepositoryFileContextError::Plan(error)));
-        }
-        Ok(NoneType)
-    }
-}
-
 fn merge_observations(
     left: &PathObservationEpoch,
     right: &PathObservationEpoch,
@@ -367,21 +314,20 @@ fn merge_observations(
     .map_err(ObservedPathFrontierError::from)
 }
 
-fn root_label(
+enum RepositoryDefinitionLabel {
+    Root(HostRootBzlLabel),
+    Canonical {
+        repo: slug_identity_v2::CanonicalRepoName,
+        label: RepositoryBzlLabel,
+    },
+}
+
+fn definition_label(
     certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
     ordinal: usize,
     repository: &HostInstantiatedModuleExtensionRepository,
-) -> Result<HostRootBzlLabel, HostSelectedRepositoryFileEffectError> {
+) -> Result<RepositoryDefinitionLabel, HostSelectedRepositoryFileEffectError> {
     let label = &repository.call().definition.defining_label;
-    if !label.package().repo().is_root() {
-        return Err(
-            HostSelectedRepositoryFileEffectError::UnsupportedDefiningLabel {
-                certificate: certificate.clone(),
-                ordinal,
-                label: label.clone(),
-            },
-        );
-    }
     let target = RootPackageBzlTarget::parse(label.target().as_str()).map_err(|_| {
         HostSelectedRepositoryFileEffectError::UnsupportedDefiningLabel {
             certificate: certificate.clone(),
@@ -389,10 +335,25 @@ fn root_label(
             label: label.clone(),
         }
     })?;
-    Ok(HostRootBzlLabel::new(
-        label.package().package().clone(),
-        target,
-    ))
+    if label.package().repo().is_root() {
+        Ok(RepositoryDefinitionLabel::Root(HostRootBzlLabel::new(
+            label.package().package().clone(),
+            target,
+        )))
+    } else {
+        let external =
+            RepositoryBzlLabel::new(label.package().package().clone(), target).map_err(|_| {
+                HostSelectedRepositoryFileEffectError::UnsupportedDefiningLabel {
+                    certificate: certificate.clone(),
+                    ordinal,
+                    label: label.clone(),
+                }
+            })?;
+        Ok(RepositoryDefinitionLabel::Canonical {
+            repo: label.package().repo().clone(),
+            label: external,
+        })
+    }
 }
 
 fn authenticate_rule(
@@ -434,65 +395,129 @@ fn authenticate_rule(
     Ok(rule.implementation())
 }
 
-fn finish_result(
-    certificate: Arc<HostSelectedExtensionOwnerCertificate>,
+fn host_input_error(
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
     ordinal: usize,
-    implementation: starlark::values::FrozenValue,
-    capture: Option<InvocationPrintCapture>,
-    ctx: &mut DiceComputations<'_>,
-) -> Result<HostSelectedRepositoryFileEffect, HostSelectedRepositoryFileEffectError> {
-    let invocation_module = Module::new();
-    let context = invocation_module
-        .heap()
-        .alloc_simple(RepositoryFileContext {});
-    let state = RepositoryFileInvocationState::new();
-    let returned = {
-        let mut evaluator = Evaluator::new(&invocation_module);
-        if let Some(capture) = capture.as_ref() {
-            evaluator.set_print_handler(capture);
-        }
-        evaluator.extra = Some(&state);
-        evaluator.eval_function(implementation.to_value(), &[context], &[])
-    };
-    let context_error = state.take_error();
-    let result = match returned {
-        Err(error) => match context_error {
-            Some(RepositoryFileContextError::PathArgument) => {
-                Err(HostSelectedRepositoryFileEffectError::Invocation {
-                    certificate,
-                    ordinal,
-                    message: "repository_ctx.file path must be a string".into(),
-                })
-            }
-            Some(RepositoryFileContextError::Plan(error)) => {
-                Err(HostSelectedRepositoryFileEffectError::Path {
-                    certificate,
-                    ordinal,
-                    error,
-                })
-            }
-            None => Err(HostSelectedRepositoryFileEffectError::Invocation {
-                certificate,
-                ordinal,
-                message: error.to_string().into(),
-            }),
-        },
-        Ok(value) if !value.is_none() => Err(HostSelectedRepositoryFileEffectError::Result {
-            certificate,
-            ordinal,
-            type_name: value.get_type().into(),
-        }),
-        Ok(_) => Ok(HostSelectedRepositoryFileEffect {
-            certificate,
-            ordinal,
-            plan: state.finish(),
-        }),
-    };
-    if let Some(capture) = capture {
-        ctx.store_evaluation_data(capture.into_batch())
-            .expect("repository-file invocation stores one local Complete event batch");
+    message: impl Into<CompactString>,
+) -> HostSelectedRepositoryFileEffectError {
+    HostSelectedRepositoryFileEffectError::HostInput {
+        certificate: certificate.clone(),
+        ordinal,
+        message: message.into(),
     }
-    result
+}
+
+fn environment_need(
+    workspace: NormalizedAbsolutePath,
+    names: impl IntoIterator<Item = CompactString>,
+) -> SourcePreparationNeeds {
+    let names = RepositoryEnvironmentNameFrontier::from_unsorted(names);
+    SourcePreparationNeeds::environment(
+        NeedRepositoryEnvironmentNames::new(workspace, names)
+            .expect("an environment retry contains at least one name"),
+    )
+}
+
+async fn verified_environment(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    transaction: &RepositoryHostInputTransaction,
+    names: impl IntoIterator<Item = CompactString>,
+) -> Result<Vec<(CompactString, Option<Arc<str>>)>, CompactString> {
+    let mut names = names.into_iter().collect::<Vec<_>>();
+    names.sort();
+    names.dedup();
+    let mut observed = Vec::with_capacity(names.len());
+    for name in names {
+        let cell = ctx
+            .compute(&RepositoryEnvironmentCellKey::new(
+                workspace.dupe(),
+                name.clone(),
+            ))
+            .await
+            .map_err(|error| CompactString::new(error.to_string()))?;
+        let Some(value) = cell.value() else {
+            return Err(format!("repository environment name {name:?} is unauthorized").into());
+        };
+        let expected = transaction.snapshot().get(&name).cloned();
+        if value != &expected {
+            return Err(
+                format!("repository environment name {name:?} differs from request").into(),
+            );
+        }
+        observed.push((name, expected));
+    }
+    Ok(observed)
+}
+
+type DefinitionModuleResult =
+    Result<crate::bzl_module::FrozenBzlModule, HostSelectedRepositoryFileEffectHostBzlError>;
+
+#[rustfmt::skip]
+async fn load_definition_module(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryFileEffectKey,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    label: RepositoryDefinitionLabel,
+    mode: EffectMode,
+    mut observations: PathObservationEpoch,
+) -> Result<(DefinitionModuleResult, PathObservationEpoch), EffectDriver> {
+    let complete_compute_error = |message: String, observations: PathObservationEpoch| {
+        complete_effect_error(
+            HostSelectedRepositoryFileEffectError::Compute(message.into()),
+            observations,
+        )
+    };
+    match (label, mode) {
+        (RepositoryDefinitionLabel::Root(label), EffectMode::Legacy) => match ctx.compute(&HostBzlModuleEvalKey::new(key.workspace.dupe(), label)).await {
+            Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
+            Ok(SourcePreparationOutcome::Complete(value)) => Ok((value.as_ref().clone().map_err(HostSelectedRepositoryFileEffectHostBzlError::new), observations)),
+            Err(error) => Err(complete_compute_error(error.to_string(), observations)),
+        },
+        (RepositoryDefinitionLabel::Root(label), EffectMode::Observed) => match ctx.compute(&HostBzlModuleObservationKey::new(key.workspace.dupe(), label)).await {
+            Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => Err(SourcePreparationOutcome::Complete(Err(HostSelectedRepositoryFileEffectObservationError::HostBzl { certificate: certificate.clone(), ordinal: key.ordinal, error }))),
+            Ok(SourcePreparationOutcome::Complete(Ok(value))) => {
+                observations = merge_definition_observations(mode, certificate, key.ordinal, observations, value.observations())?;
+                Ok((value.result().clone().map_err(HostSelectedRepositoryFileEffectHostBzlError::new), observations))
+            }
+            Err(error) => Err(complete_compute_error(error.to_string(), observations)),
+        },
+        (RepositoryDefinitionLabel::Canonical { repo, label }, EffectMode::Legacy) => {
+            let input = match ctx.compute(&HostCanonicalRepositoryLoadRouteKey::new(key.workspace.dupe(), repo)).await {
+                Ok(SourcePreparationOutcome::Need(need)) => return Err(SourcePreparationOutcome::Need(need)),
+                Ok(SourcePreparationOutcome::Complete(route)) => route.as_ref().as_ref().map(|route| route.input().clone()).map_err(HostSelectedRepositoryFileEffectHostBzlError::new),
+                Err(error) => return Err(complete_compute_error(error.to_string(), observations)),
+            };
+            let input = match input { Ok(input) => input, Err(error) => return Ok((Err(error), observations)) };
+            match ctx.compute(&ExternalBzlModuleEvalKey::new_canonical(input, label)).await {
+                Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
+                Ok(SourcePreparationOutcome::Complete(value)) => Ok((value.as_ref().clone().map_err(HostSelectedRepositoryFileEffectHostBzlError::new), observations)),
+                Err(error) => Err(complete_compute_error(error.to_string(), observations)),
+            }
+        }
+        (RepositoryDefinitionLabel::Canonical { repo, label }, EffectMode::Observed) => {
+            let input = match ctx.compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(key.workspace.dupe(), repo)).await {
+                Ok(SourcePreparationOutcome::Need(need)) => return Err(SourcePreparationOutcome::Need(need)),
+                Ok(SourcePreparationOutcome::Complete(Err(error))) => return Err(SourcePreparationOutcome::Complete(Err(HostSelectedRepositoryFileEffectObservationError::CanonicalRoute { certificate: certificate.clone(), ordinal: key.ordinal, error: Arc::new(error) }))),
+                Ok(SourcePreparationOutcome::Complete(Ok(route))) => {
+                    observations = merge_definition_observations(mode, certificate, key.ordinal, observations, route.observations())?;
+                    route.result().as_ref().as_ref().map(|route| route.input().clone()).map_err(HostSelectedRepositoryFileEffectHostBzlError::new)
+                }
+                Err(error) => return Err(complete_compute_error(error.to_string(), observations)),
+            };
+            let input = match input { Ok(input) => input, Err(error) => return Ok((Err(error), observations)) };
+            match ctx.compute(&ExternalBzlModuleObservationKey::new_canonical(input, label)).await {
+                Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
+                Ok(SourcePreparationOutcome::Complete(Err(error))) => Err(SourcePreparationOutcome::Complete(Err(HostSelectedRepositoryFileEffectObservationError::HostBzl { certificate: certificate.clone(), ordinal: key.ordinal, error }))),
+                Ok(SourcePreparationOutcome::Complete(Ok(value))) => {
+                    observations = merge_definition_observations(mode, certificate, key.ordinal, observations, value.observations())?;
+                    Ok((value.result().as_ref().clone().map_err(HostSelectedRepositoryFileEffectHostBzlError::new), observations))
+                }
+                Err(error) => Err(complete_compute_error(error.to_string(), observations)),
+            }
+        }
+    }
 }
 
 async fn compute_effect(
@@ -513,12 +538,10 @@ async fn compute_effect(
             }
             Ok(SourcePreparationOutcome::Complete(value)) => (value, PathObservationEpoch::empty()),
             Err(error) => {
-                return SourcePreparationOutcome::Complete(Ok((
-                    Arc::new(Err(HostSelectedRepositoryFileEffectError::Compute(
-                        error.to_string().into(),
-                    ))),
+                return complete_effect_error(
+                    HostSelectedRepositoryFileEffectError::Compute(error.to_string().into()),
                     PathObservationEpoch::empty(),
-                )));
+                );
             }
         },
         EffectMode::Observed => match ctx
@@ -540,132 +563,210 @@ async fn compute_effect(
                 (value.result().dupe(), value.observations().dupe())
             }
             Err(error) => {
-                return SourcePreparationOutcome::Complete(Ok((
-                    Arc::new(Err(HostSelectedRepositoryFileEffectError::Compute(
-                        error.to_string().into(),
-                    ))),
+                return complete_effect_error(
+                    HostSelectedRepositoryFileEffectError::Compute(error.to_string().into()),
                     PathObservationEpoch::empty(),
-                )));
+                );
             }
         },
     };
     let certificate = match certificate.as_ref() {
         Ok(value) => Arc::new(value.clone()),
         Err(error) => {
-            return SourcePreparationOutcome::Complete(Ok((
-                Arc::new(Err(HostSelectedRepositoryFileEffectError::Certificate(
-                    error.clone(),
-                ))),
+            return complete_effect_error(
+                HostSelectedRepositoryFileEffectError::Certificate(error.clone()),
                 observations,
-            )));
+            );
         }
     };
     let Some(repository) = certificate.repository(key.ordinal) else {
-        return SourcePreparationOutcome::Complete(Ok((
-            Arc::new(Err(HostSelectedRepositoryFileEffectError::MissingOrdinal {
+        return complete_effect_error(
+            HostSelectedRepositoryFileEffectError::MissingOrdinal {
                 certificate,
                 ordinal: key.ordinal,
-            })),
+            },
             observations,
-        )));
+        );
     };
     let repository = repository.clone();
-    let label = match root_label(&certificate, key.ordinal, &repository) {
+    let label = match definition_label(&certificate, key.ordinal, &repository) {
         Ok(label) => label,
-        Err(error) => {
-            return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(error)), observations)));
-        }
+        Err(error) => return complete_effect_error(error, observations),
     };
-    let (module, child_observations) = match mode {
-        EffectMode::Legacy => match ctx
-            .compute(&HostBzlModuleEvalKey::new(key.workspace.dupe(), label))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            Ok(SourcePreparationOutcome::Complete(value)) => {
-                (value.as_ref().clone(), PathObservationEpoch::empty())
-            }
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Ok((
-                    Arc::new(Err(HostSelectedRepositoryFileEffectError::Compute(
-                        error.to_string().into(),
-                    ))),
-                    observations,
-                )));
-            }
-        },
-        EffectMode::Observed => match ctx
-            .compute(&HostBzlModuleObservationKey::new(
-                key.workspace.dupe(),
-                label,
-            ))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
-                return SourcePreparationOutcome::Complete(Err(
-                    HostSelectedRepositoryFileEffectObservationError::HostBzl {
-                        certificate,
-                        ordinal: key.ordinal,
-                        error,
-                    },
-                ));
-            }
-            Ok(SourcePreparationOutcome::Complete(Ok(value))) => {
-                (value.result().clone(), value.observations().dupe())
-            }
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Ok((
-                    Arc::new(Err(HostSelectedRepositoryFileEffectError::Compute(
-                        error.to_string().into(),
-                    ))),
-                    observations,
-                )));
-            }
-        },
-    };
-    let observations = match merge_observations(&observations, &child_observations) {
-        Ok(value) => value,
-        Err(error) => {
-            return SourcePreparationOutcome::Complete(Err(
-                HostSelectedRepositoryFileEffectObservationError::Merge {
-                    certificate,
-                    ordinal: key.ordinal,
-                    error,
-                },
-            ));
-        }
-    };
+    let (module, observations) =
+        match load_definition_module(ctx, key, &certificate, label, mode, observations).await {
+            Ok(value) => value,
+            Err(terminal) => return terminal,
+        };
     let module = match module {
         Ok(module) => module,
         Err(error) => {
-            return SourcePreparationOutcome::Complete(Ok((
-                Arc::new(Err(HostSelectedRepositoryFileEffectError::HostBzl {
-                    certificate,
+            return complete_effect_error(
+                HostSelectedRepositoryFileEffectError::HostBzl {
+                    certificate: certificate.clone(),
                     ordinal: key.ordinal,
-                    error: HostSelectedRepositoryFileEffectHostBzlError(error),
-                })),
+                    error,
+                },
                 observations,
-            )));
+            );
         }
     };
     let implementation = match authenticate_rule(&certificate, key.ordinal, &repository, &module) {
         Ok(value) => value,
+        Err(error) => return complete_effect_error(error, observations),
+    };
+    let transaction = match ctx
+        .per_transaction_data()
+        .data
+        .get::<RepositoryHostInputTransaction>()
+    {
+        Ok(transaction) => transaction.clone(),
         Err(error) => {
-            return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(error)), observations)));
+            return complete_effect_error(
+                host_input_error(&certificate, key.ordinal, error.to_string()),
+                observations,
+            );
         }
     };
+    let declared = repository
+        .call()
+        .definition
+        .environment
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>();
+    let unknown = declared
+        .iter()
+        .filter(|name| !transaction.frontier().contains(name))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !unknown.is_empty() {
+        return SourcePreparationOutcome::Need(environment_need(key.workspace.dupe(), unknown));
+    }
+    let platform = match ctx
+        .compute(&RepositoryPlatformKey::new(key.workspace.dupe()))
+        .await
+    {
+        Ok(platform) => platform,
+        Err(error) => {
+            return complete_effect_error(
+                host_input_error(&certificate, key.ordinal, error.to_string()),
+                observations,
+            );
+        }
+    };
+    if platform.os_name().eq_ignore_ascii_case("windows") {
+        return complete_effect_error(
+            host_input_error(
+                &certificate,
+                key.ordinal,
+                "Windows repository-rule execution is unsupported",
+            ),
+            observations,
+        );
+    }
+    let declared_observed =
+        match verified_environment(ctx, &key.workspace, &transaction, declared.iter().cloned())
+            .await
+        {
+            Ok(observed) => observed,
+            Err(message) => {
+                return complete_effect_error(
+                    host_input_error(&certificate, key.ordinal, message),
+                    observations,
+                );
+            }
+        };
     let capture = ctx
         .per_transaction_data()
         .data
         .get::<CaptureEvaluationEvents>()
         .is_ok()
         .then(InvocationPrintCapture::default);
-    let result = finish_result(certificate, key.ordinal, implementation, capture, ctx);
+    let invocation_result = invoke_repository_rule(
+        implementation,
+        platform.clone(),
+        transaction.snapshot().dupe(),
+        capture.as_ref().map(|capture| capture as &dyn PrintHandler),
+    );
+    let invocation = match invocation_result {
+        Ok(invocation) => invocation,
+        Err(error) => {
+            if let Some(capture) = capture {
+                ctx.store_evaluation_data(capture.into_batch())
+                    .expect("repository-file invocation stores one local Complete event batch");
+            }
+            let error = match error {
+                RepositoryRuleInvocationError::PathArgument => {
+                    HostSelectedRepositoryFileEffectError::Invocation {
+                        certificate,
+                        ordinal: key.ordinal,
+                        message: "repository_ctx.file path must be a string".into(),
+                    }
+                }
+                RepositoryRuleInvocationError::Plan(error) => {
+                    HostSelectedRepositoryFileEffectError::Path {
+                        certificate,
+                        ordinal: key.ordinal,
+                        error,
+                    }
+                }
+                RepositoryRuleInvocationError::Evaluation(message) => {
+                    HostSelectedRepositoryFileEffectError::Invocation {
+                        certificate,
+                        ordinal: key.ordinal,
+                        message,
+                    }
+                }
+                RepositoryRuleInvocationError::Result(type_name) => {
+                    HostSelectedRepositoryFileEffectError::Result {
+                        certificate,
+                        ordinal: key.ordinal,
+                        type_name,
+                    }
+                }
+            };
+            return complete_effect_error(error, observations);
+        }
+    };
+    let unknown = invocation
+        .dynamic_environment()
+        .iter()
+        .filter(|name| !transaction.frontier().contains(name))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !unknown.is_empty() {
+        return SourcePreparationOutcome::Need(environment_need(key.workspace.dupe(), unknown));
+    }
+    let dynamic_observed = match verified_environment(
+        ctx,
+        &key.workspace,
+        &transaction,
+        invocation.dynamic_environment().iter().cloned(),
+    )
+    .await
+    {
+        Ok(observed) => observed,
+        Err(message) => {
+            return complete_effect_error(
+                host_input_error(&certificate, key.ordinal, message),
+                observations,
+            );
+        }
+    };
+    if let Some(capture) = capture {
+        ctx.store_evaluation_data(capture.into_batch())
+            .expect("repository-file invocation stores one local Complete event batch");
+    }
+    let result = Ok(HostSelectedRepositoryFileEffect {
+        certificate,
+        ordinal: key.ordinal,
+        host: RepositoryRuleHostObservation::new(
+            platform,
+            declared_observed.into_iter().chain(dynamic_observed),
+        ),
+        plan: invocation.into_plan(),
+    });
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
 }
 
@@ -730,6 +831,8 @@ impl Key for HostSelectedRepositoryFileEffectObservationKey {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+    use std::path::PathBuf;
     use std::sync::Arc;
     use std::sync::Mutex;
 
@@ -741,157 +844,155 @@ mod tests {
     use dice::DynKey;
     use dice::Key;
     use dice::RichActivation;
+    use dice::UserComputationData;
     use dupe::Dupe;
     use slug_bzlmod_v2::HostSelectedExtensionDemandKey;
+    use slug_bzlmod_v2::OverrideAttributeValue;
+    use slug_bzlmod_v2::RepoRuleId;
+    use slug_bzlmod_v2::RepoSpec;
+    use slug_bzlmod_v2::RepositoryEnvironmentCell;
+    use slug_bzlmod_v2::RepositoryEnvironmentEntry;
+    use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
+    use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
+    use slug_bzlmod_v2::RepositoryMaterializationKind;
+    use slug_bzlmod_v2::RepositoryMaterializationRequest;
+    use slug_bzlmod_v2::RepositoryMaterializationRequestId;
+    use slug_bzlmod_v2::RepositoryMaterializationResult;
+    use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
+    use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
+    use slug_bzlmod_v2::RepositoryMaterializationSuccess;
+    use slug_bzlmod_v2::RepositoryPlatform;
     use slug_bzlmod_v2::SourcePreparationNeeds;
+    use slug_identity_v2::CanonicalLabel;
     use slug_identity_v2::CanonicalRepoName;
     use slug_workspace_v2::NeedPathObservations;
     use slug_workspace_v2::NormalizedAbsolutePath;
+    use slug_workspace_v2::PathDirectoryEntries;
+    use slug_workspace_v2::PathDirectoryEntry;
+    use slug_workspace_v2::PathDirectoryEntryKind;
+    use slug_workspace_v2::PathDirectoryName;
+    use slug_workspace_v2::PathLstat;
+    use slug_workspace_v2::PathNodeKind;
     use slug_workspace_v2::PathObservationDemand;
+    use slug_workspace_v2::PathObservationEpoch;
     use slug_workspace_v2::PathObservationEpochKey;
+    use slug_workspace_v2::PathObservationInstanceId;
     use slug_workspace_v2::PathObservationNamespace;
     use slug_workspace_v2::PathObservationOperation;
-    use starlark::environment::FrozenModule;
-    use starlark::environment::Globals;
-    use starlark::syntax::AstModule;
-    use starlark::syntax::Dialect;
+    use slug_workspace_v2::PathObservationResult;
+    use slug_workspace_v2::PathOperationResult;
+    use starlark_map::small_map::SmallMap;
 
     use super::*;
     use crate::module_extension_repository_instantiation::tests::WORKSPACE;
-    use crate::module_extension_repository_instantiation::tests::transaction_untracked;
-    use crate::module_extension_repository_instantiation::tests::transaction_with_tracker;
+    use crate::module_extension_repository_instantiation::tests::transaction_untracked as base_transaction_untracked;
+    use crate::module_extension_repository_instantiation::tests::transaction_with_tracker as base_transaction_with_tracker;
 
-    enum InvocationOutcome {
-        Complete(GeneratedRepositoryFileEffectPlan),
-        Context(RepositoryFileContextError),
-        Binding,
-    }
-
-    fn load(source: &str) -> FrozenModule {
-        let ast = AstModule::parse("//:repo.bzl", source.to_owned(), &Dialect::Standard).unwrap();
-        let module = Module::new();
-        Evaluator::new(&module)
-            .eval_module(ast, &Globals::standard())
-            .unwrap();
-        module.freeze().unwrap()
-    }
-
-    fn invoke_outcome(source: &str) -> InvocationOutcome {
-        let frozen = load(source);
-        let module = Module::new();
-        let function = frozen.get("run").unwrap().owned_value(module.frozen_heap());
-        let context = module.heap().alloc_simple(RepositoryFileContext {});
-        let state = RepositoryFileInvocationState::new();
-        let result = {
-            let mut evaluator = Evaluator::new(&module);
-            evaluator.extra = Some(&state);
-            evaluator.eval_function(function, &[context], &[])
+    async fn with_host_inputs_for(
+        transaction: dice::DiceTransaction,
+        workspace: NormalizedAbsolutePath,
+        tracker: Option<Arc<dyn ActivationTracker>>,
+        platform: RepositoryPlatform,
+        snapshot: RepositoryEnvironmentSnapshot,
+        frontier: RepositoryEnvironmentNameFrontier,
+    ) -> dice::DiceTransaction {
+        let mut data = UserComputationData {
+            cycle_detector: Some(crate::cycle_detector::bzl_load_cycle_detector()),
+            activation_tracker: tracker,
+            ..Default::default()
         };
-        match result {
-            Ok(value) => {
-                assert!(value.is_none());
-                assert!(state.take_error().is_none());
-                InvocationOutcome::Complete(state.finish())
-            }
-            Err(_) => match state.take_error() {
-                Some(error) => InvocationOutcome::Context(error),
-                None => InvocationOutcome::Binding,
-            },
-        }
-    }
-
-    fn invoke(
-        source: &str,
-    ) -> Result<GeneratedRepositoryFileEffectPlan, RepositoryFileContextError> {
-        match invoke_outcome(source) {
-            InvocationOutcome::Complete(plan) => Ok(plan),
-            InvocationOutcome::Context(error) => Err(error),
-            InvocationOutcome::Binding => panic!("expected repository context failure"),
-        }
-    }
-
-    #[test]
-    fn repository_ctx_file_preserves_defaults_order_bytes_and_trailing_forms() {
-        let plan = invoke(
-            r#"
-def run(ctx):
-    ctx.file("BUILD.bazel", "exports_files([\"generated.txt\"])\n")
-    ctx.file("generated.txt", "hello from extension\n", False, True)
-"#,
-        )
-        .unwrap();
-        assert_eq!(plan.effects().len(), 2);
-        assert_eq!(plan.effects()[0].path(), "BUILD.bazel");
-        assert_eq!(
-            plan.effects()[0].content(),
-            b"exports_files([\"generated.txt\"])\n"
-        );
-        assert!(plan.effects()[0].executable());
-        assert_eq!(plan.effects()[1].path(), "generated.txt");
-        assert_eq!(plan.effects()[1].content(), b"hello from extension\n");
-        assert!(!plan.effects()[1].executable());
-    }
-
-    #[test]
-    fn repository_ctx_file_records_first_typed_path_failure() {
-        let repeated = invoke(
-            r#"
-def run(ctx):
-    ctx.file("first", "one")
-    ctx.file("first", "two")
-"#,
-        );
-        assert!(matches!(
-            repeated,
-            Err(RepositoryFileContextError::Plan(
-                GeneratedRepositoryFileEffectPlanError::RepeatedPath(path)
-            )) if path == "first"
+        data.data.set(CaptureEvaluationEvents);
+        data.data.set(RepositoryHostInputTransaction::new(
+            snapshot.clone(),
+            frontier.clone(),
         ));
-        for path in ["", "/absolute", "a/../b", "a\\b", "a/"] {
-            let source = format!("def run(ctx):\n    ctx.file({path:?})\n");
-            assert!(matches!(
-                invoke(&source),
-                Err(RepositoryFileContextError::Plan(
-                    GeneratedRepositoryFileEffectPlanError::InvalidPath(_)
-                ))
-            ));
-        }
-        assert!(matches!(
-            invoke("def run(ctx):\n    ctx.file(1)\n"),
-            Err(RepositoryFileContextError::PathArgument)
-        ));
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(
+                RepositoryPlatformKey::new(workspace.dupe()),
+                platform,
+            )])
+            .unwrap();
+        updater
+            .changed_to(
+                frontier
+                    .iter()
+                    .map(|name| {
+                        (
+                            RepositoryEnvironmentCellKey::new(workspace.dupe(), name.clone()),
+                            RepositoryEnvironmentCell::observed(snapshot.get(name).cloned()),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap();
+        updater.commit_with_data(data).await
     }
 
-    #[test]
-    fn repository_ctx_file_uses_normal_starlark_binding_for_path_and_named_arguments() {
-        let plan = invoke(
-            r#"
-def run(ctx):
-    ctx.file("named", content="bytes", executable=False, legacy_utf8=True)
-"#,
+    async fn with_host_inputs(
+        transaction: dice::DiceTransaction,
+        tracker: Option<Arc<dyn ActivationTracker>>,
+    ) -> dice::DiceTransaction {
+        with_host_inputs_for(
+            transaction,
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            tracker,
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            RepositoryEnvironmentNameFrontier::empty(),
         )
-        .unwrap();
-        assert_eq!(plan.effects()[0].path(), "named");
-        assert_eq!(plan.effects()[0].content(), b"bytes");
-        assert!(!plan.effects()[0].executable());
+        .await
+    }
 
-        for source in [
-            "def run(ctx):\n    ctx.file(path='named')\n",
-            "def run(ctx):\n    ctx.file('named', 'one', content='two')\n",
-            "def run(ctx):\n    ctx.file('named', missing=True)\n",
-            "def run(ctx):\n    ctx.unknown()\n",
-        ] {
-            assert!(matches!(invoke_outcome(source), InvocationOutcome::Binding));
-        }
-        for source in [
-            "def run(ctx):\n    ctx.file(True)\n",
-            "def run(ctx):\n    ctx.file([])\n",
-        ] {
-            assert!(matches!(
-                invoke_outcome(source),
-                InvocationOutcome::Context(RepositoryFileContextError::PathArgument)
-            ));
-        }
+    async fn transaction_untracked(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        extension_present: bool,
+    ) -> dice::DiceTransaction {
+        with_host_inputs(
+            base_transaction_untracked(dice, module_source, extension_source, extension_present)
+                .await,
+            None,
+        )
+        .await
+    }
+
+    async fn transaction_with_tracker(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        extension_present: bool,
+        tracker: Arc<dyn ActivationTracker>,
+    ) -> dice::DiceTransaction {
+        with_host_inputs(
+            base_transaction_with_tracker(
+                dice,
+                module_source,
+                extension_source,
+                extension_present,
+                tracker.clone(),
+            )
+            .await,
+            Some(tracker),
+        )
+        .await
+    }
+
+    fn environment_snapshot(entries: &[(&str, &str)]) -> RepositoryEnvironmentSnapshot {
+        RepositoryEnvironmentSnapshot::from_canonical(
+            entries
+                .iter()
+                .map(|(name, value)| RepositoryEnvironmentEntry::new(*name, *value))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    }
+
+    fn environment_frontier(names: &[&str]) -> RepositoryEnvironmentNameFrontier {
+        RepositoryEnvironmentNameFrontier::from_unsorted(
+            names.iter().map(|name| CompactString::new(*name)),
+        )
     }
 
     const MODULE: &str = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, generated='first')\n";
@@ -904,6 +1005,28 @@ repo=repository_rule(implementation=write)
 def impl(ctx):
     repo(name='first')
 ext=module_extension(implementation=impl)
+"#;
+    const MSVC_ENVVARS_FIXTURE: &str = r#"MSVC_ENVVARS = [
+    "BAZEL_VC",
+    "BAZEL_VC_FULL_VERSION",
+    "BAZEL_VS",
+    "BAZEL_WINSDK_FULL_VERSION",
+    "VS90COMNTOOLS",
+    "VS100COMNTOOLS",
+    "VS110COMNTOOLS",
+    "VS120COMNTOOLS",
+    "VS140COMNTOOLS",
+    "VS150COMNTOOLS",
+    "VS160COMNTOOLS",
+    "TMP",
+    "TEMP",
+]
+
+def find_vc_path(*args, **kwargs):
+    return None
+
+def setup_vc_env_vars(*args, **kwargs):
+    return {}
 "#;
 
     #[derive(Default)]
@@ -940,19 +1063,565 @@ ext=module_extension(implementation=impl)
         }
     }
 
-    async fn owner(transaction: &mut dice::DiceTransaction) -> Arc<HostSelectedExtensionOwner> {
-        let requested = CanonicalRepoName::new("+ext+first").unwrap();
+    async fn owner_named(
+        transaction: &mut dice::DiceTransaction,
+        workspace: NormalizedAbsolutePath,
+        requested: &str,
+    ) -> Arc<HostSelectedExtensionOwner> {
+        let requested = CanonicalRepoName::new(requested).unwrap();
         let demand = transaction
-            .compute(&HostSelectedExtensionDemandKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-                requested,
-            ))
+            .compute(&HostSelectedExtensionDemandKey::new(workspace, requested))
             .await
             .unwrap();
         let SourcePreparationOutcome::Complete(demand) = demand else {
             panic!("selected demand must complete")
         };
         demand.as_ref().as_ref().unwrap().owner().clone()
+    }
+
+    async fn owner(transaction: &mut dice::DiceTransaction) -> Arc<HostSelectedExtensionOwner> {
+        owner_named(
+            transaction,
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            "+ext+first",
+        )
+        .await
+    }
+
+    fn platform_materialization(
+        workspace: &NormalizedAbsolutePath,
+        canonical_repo: &str,
+    ) -> RepositoryMaterializationEpochEntry {
+        RepositoryMaterializationEpochEntry {
+            request: Arc::new(RepositoryMaterializationRequest {
+                id: RepositoryMaterializationRequestId {
+                    workspace: workspace.dupe(),
+                    canonical_repo: CanonicalRepoName::new(canonical_repo).unwrap(),
+                },
+                repo_spec: RepoSpec {
+                    rule_id: RepoRuleId {
+                        bzl_file: CanonicalLabel::parse(
+                            "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                        )
+                        .unwrap(),
+                        rule_name: "local_repository".into(),
+                    },
+                    attributes: Arc::new(SmallMap::from_iter([(
+                        CompactString::from("path"),
+                        OverrideAttributeValue::String("platforms".into()),
+                    )])),
+                },
+                kind: RepositoryMaterializationKind::Local {
+                    logical_root: NormalizedAbsolutePath::new(format!(
+                        "{}/platforms",
+                        workspace.as_path().display()
+                    ))
+                    .unwrap(),
+                },
+            }),
+            result: RepositoryMaterializationResult::Success(
+                RepositoryMaterializationSuccess::Local,
+            ),
+        }
+    }
+
+    fn fixture_result(
+        demand: &PathObservationDemand,
+        instance: PathObservationInstanceId,
+        logical_root: &Path,
+        fixture_root: &Path,
+    ) -> PathObservationResult {
+        assert_eq!(
+            demand.namespace(),
+            PathObservationNamespace::Materialization(instance)
+        );
+        let relative = demand
+            .path()
+            .as_path()
+            .strip_prefix(logical_root)
+            .unwrap_or(Path::new(""));
+        let actual = fixture_root.join(relative);
+        let metadata = std::fs::symlink_metadata(&actual).ok();
+        match demand.operation() {
+            PathObservationOperation::Lstat => {
+                let value = metadata.map(|metadata| {
+                    let kind = if metadata.file_type().is_dir() {
+                        PathNodeKind::Directory
+                    } else if metadata.file_type().is_symlink() {
+                        PathNodeKind::Symlink
+                    } else {
+                        PathNodeKind::RegularFile
+                    };
+                    PathLstat::new(
+                        kind,
+                        950 + relative.components().count() as i64,
+                        metadata.len() as i64,
+                        1,
+                        1,
+                        if kind == PathNodeKind::Directory {
+                            0o755
+                        } else {
+                            0o644
+                        },
+                    )
+                });
+                PathObservationResult::Lstat(
+                    value.map_or(PathOperationResult::Missing, PathOperationResult::Present),
+                )
+            }
+            PathObservationOperation::FileBytes => {
+                let value = if relative == Path::new("cc/toolchains/toolchain_config_utils.bzl") {
+                    Some(Arc::<[u8]>::from(MSVC_ENVVARS_FIXTURE.as_bytes()))
+                } else {
+                    std::fs::read(actual).ok().map(Arc::<[u8]>::from)
+                };
+                PathObservationResult::FileBytes(
+                    value.map_or(PathOperationResult::Missing, PathOperationResult::Present),
+                )
+            }
+            PathObservationOperation::DirectoryEntries => {
+                let value = std::fs::read_dir(actual).ok().map(|entries| {
+                    PathDirectoryEntries::new(entries.map(|entry| {
+                        let entry = entry.unwrap();
+                        let kind = entry
+                            .file_type()
+                            .ok()
+                            .map(|kind| {
+                                if kind.is_dir() {
+                                    PathDirectoryEntryKind::Directory
+                                } else if kind.is_file() {
+                                    PathDirectoryEntryKind::File
+                                } else if kind.is_symlink() {
+                                    PathDirectoryEntryKind::Symlink
+                                } else {
+                                    PathDirectoryEntryKind::Unknown
+                                }
+                            })
+                            .unwrap_or(PathDirectoryEntryKind::Unknown);
+                        PathDirectoryEntry::new(
+                            PathDirectoryName::new(entry.file_name().to_str().unwrap()).unwrap(),
+                            kind,
+                        )
+                    }))
+                });
+                PathObservationResult::DirectoryEntries(
+                    value.map_or(PathOperationResult::Missing, PathOperationResult::Present),
+                )
+            }
+            PathObservationOperation::ReadLink => PathObservationResult::ReadLink(
+                std::fs::read_link(actual)
+                    .ok()
+                    .map(Arc::new)
+                    .map_or(PathOperationResult::Missing, PathOperationResult::Present),
+            ),
+            operation => panic!("unexpected fixture operation: {operation:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn exact_builtin_winsdk_reaches_generic_environment_retry() {
+        use crate::canonical_repository_route_tests::tests::WORKSPACE as BUILTIN_WORKSPACE;
+        use crate::canonical_repository_route_tests::tests::builtin_graph_dice;
+        use crate::canonical_repository_route_tests::tests::builtin_graph_module;
+        use crate::canonical_repository_route_tests::tests::transaction as builtin_transaction;
+
+        let dice = builtin_graph_dice();
+        let workspace = NormalizedAbsolutePath::new(BUILTIN_WORKSPACE).unwrap();
+        let module = builtin_graph_module();
+        let tracker = Arc::new(EffectTracker::default());
+        let transaction =
+            builtin_transaction(&dice, &module, "", false, Some(tracker.clone())).await;
+        let mut transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            RepositoryEnvironmentNameFrontier::empty(),
+        )
+        .await;
+        tracker.take();
+        let owner = owner_named(
+            &mut transaction,
+            workspace.dupe(),
+            "bazel_tools+winsdk_configure+local_config_winsdk",
+        )
+        .await;
+        let key = HostSelectedRepositoryFileEffectKey::new(workspace.dupe(), owner, 0);
+        let logical_root = PathBuf::from("/effect-rules-cc");
+        let fixture_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+            "../../tests/v2_oracle/fixtures/nonroot-module-extension-semantics/workspace/registry/modules/rules_cc/0.2.17",
+        );
+        let instance = PathObservationInstanceId::new(951);
+        let global = transaction.compute(&PathObservationEpochKey).await.unwrap();
+        let mut observations = global
+            .observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .collect::<Vec<_>>();
+        let mut environment_names = None;
+        for _ in 0..16 {
+            let outcome = transaction.compute(&key).await.unwrap();
+            let SourcePreparationOutcome::Need(need) = outcome else {
+                panic!("cold winsdk inputs must retry: {outcome:?}")
+            };
+            if let Some(environment) = need.repository_environment() {
+                environment_names = Some(environment.names().clone());
+                break;
+            }
+            if let Some(request) = need.repository_materializations().values().next() {
+                assert_eq!(need.repository_materializations().len(), 1);
+                assert_eq!(request.id.canonical_repo.as_str(), "rules_cc+");
+                let mut updater = transaction.into_updater();
+                updater
+                    .changed_to(vec![(
+                        RepositoryMaterializationResultEpochKey {
+                            workspace: workspace.dupe(),
+                        },
+                        RepositoryMaterializationResultEpoch::new(
+                            workspace.dupe(),
+                            [
+                                platform_materialization(&workspace, "platforms+"),
+                                platform_materialization(&workspace, "platforms"),
+                                RepositoryMaterializationEpochEntry {
+                                    request: request.clone(),
+                                    result: RepositoryMaterializationResult::Success(
+                                        RepositoryMaterializationSuccess::Immutable {
+                                            source_identity: Arc::from("effect-rules-cc-fixture"),
+                                            generation_root: logical_root.clone(),
+                                            observation_instance: instance,
+                                        },
+                                    ),
+                                },
+                            ],
+                        )
+                        .unwrap(),
+                    )])
+                    .unwrap();
+                transaction = updater.commit().await;
+            } else {
+                let paths = need
+                    .path_observations()
+                    .expect("canonical source path retry");
+                for demand in paths.demands() {
+                    observations.retain(|(current, _)| current != demand);
+                    observations.push((
+                        demand.dupe(),
+                        Arc::new(fixture_result(
+                            demand,
+                            instance,
+                            &logical_root,
+                            &fixture_root,
+                        )),
+                    ));
+                }
+                let epoch =
+                    PathObservationEpoch::from_shared(observations.iter().cloned()).unwrap();
+                let mut updater = transaction.into_updater();
+                updater
+                    .changed_to(vec![(PathObservationEpochKey, epoch)])
+                    .unwrap();
+                transaction = updater.commit().await;
+            }
+            transaction = with_host_inputs_for(
+                transaction,
+                workspace.dupe(),
+                Some(tracker.clone()),
+                RepositoryPlatform::new("linux", "x86_64"),
+                RepositoryEnvironmentSnapshot::empty(),
+                RepositoryEnvironmentNameFrontier::empty(),
+            )
+            .await;
+        }
+        let names = environment_names.expect("winsdk source inputs must converge");
+        assert_eq!(
+            names.iter().map(CompactString::as_str).collect::<Vec<_>>(),
+            [
+                "BAZEL_VC",
+                "BAZEL_VC_FULL_VERSION",
+                "BAZEL_VS",
+                "BAZEL_WINSDK_FULL_VERSION",
+                "TEMP",
+                "TMP",
+                "VS100COMNTOOLS",
+                "VS110COMNTOOLS",
+                "VS120COMNTOOLS",
+                "VS140COMNTOOLS",
+                "VS150COMNTOOLS",
+                "VS160COMNTOOLS",
+                "VS90COMNTOOLS",
+            ]
+        );
+        let mut transaction = with_host_inputs_for(
+            transaction,
+            workspace,
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            names,
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(value) = transaction.compute(&key).await.unwrap()
+        else {
+            panic!("authenticated winsdk must complete after retry")
+        };
+        let effect = value.as_ref().as_ref().unwrap();
+        assert_eq!(effect.plan().effects().len(), 2);
+        assert_eq!(effect.plan().effects()[0].path(), "BUILD");
+        assert_eq!(effect.plan().effects()[0].content(), b"");
+        assert!(!effect.plan().effects()[0].executable());
+        assert_eq!(effect.plan().effects()[1].path(), "toolchains.bzl");
+        assert_eq!(
+            effect.plan().effects()[1].content(),
+            b"# Auto-generated by winsdk_configure.bzl\n\ndef register_local_rc_exe_toolchains():\n    pass\n"
+        );
+        assert!(!effect.plan().effects()[1].executable());
+        let activations = tracker.take();
+        assert!(
+            activations
+                .iter()
+                .any(|(name, _, _)| { name.starts_with("host-canonical-repository-load-route:") })
+        );
+        assert!(activations.iter().all(|(name, _, _)| {
+            !name.starts_with("observed-host-canonical-repository-load-route:")
+                && !name.starts_with("observed-external-bzl-module:")
+        }));
+    }
+
+    #[tokio::test]
+    async fn repository_host_dependencies_retry_invalidate_and_fail_closed() {
+        const HOST_EXTENSION: &str = r#"
+def write(ctx):
+    ctx.getenv("DYNAMIC_ABSENT")
+    ctx.getenv("DYNAMIC_ABSENT", "fallback")
+    ctx.getenv("DYNAMIC_PRESENT")
+    ctx.getenv("FLIP")
+    ctx.file("constant", "same", executable = False)
+repo = repository_rule(
+    implementation = write,
+    environ = ["PRESENT", "MISSING", "EMPTY"],
+)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let base = base_transaction_untracked(&dice, MODULE, HOST_EXTENSION, true).await;
+        let snapshot_a = environment_snapshot(&[
+            ("DYNAMIC_PRESENT", "dynamic"),
+            ("EMPTY", ""),
+            ("PRESENT", "declared"),
+            ("UNRELATED", "one"),
+        ]);
+        let mut transaction = with_host_inputs_for(
+            base,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot_a.clone(),
+            RepositoryEnvironmentNameFrontier::empty(),
+        )
+        .await;
+        let selected_owner = owner(&mut transaction).await;
+        let key = HostSelectedRepositoryFileEffectKey::new(workspace.dupe(), selected_owner, 0);
+
+        let SourcePreparationOutcome::Need(declared_need) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("declared cold names must retry before invocation")
+        };
+        assert_eq!(
+            declared_need
+                .repository_environment()
+                .unwrap()
+                .names()
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            ["EMPTY", "MISSING", "PRESENT"]
+        );
+        let declared = environment_frontier(&["EMPTY", "MISSING", "PRESENT"]);
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot_a.clone(),
+            declared,
+        )
+        .await;
+        let SourcePreparationOutcome::Need(dynamic_need) = transaction.compute(&key).await.unwrap()
+        else {
+            panic!("staged dynamic reads must retry before publication")
+        };
+        assert_eq!(
+            dynamic_need
+                .repository_environment()
+                .unwrap()
+                .names()
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            ["DYNAMIC_ABSENT", "DYNAMIC_PRESENT", "FLIP"]
+        );
+        let all = environment_frontier(&[
+            "EMPTY",
+            "MISSING",
+            "PRESENT",
+            "DYNAMIC_ABSENT",
+            "DYNAMIC_PRESENT",
+            "FLIP",
+        ]);
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot_a.clone(),
+            all.clone(),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(first) = transaction.compute(&key).await.unwrap()
+        else {
+            panic!("authorized Host inputs must publish")
+        };
+        let first_effect = first.as_ref().as_ref().unwrap();
+        assert_eq!(first_effect.plan().effects()[0].content(), b"same");
+        assert_eq!(
+            first_effect
+                .host()
+                .environment()
+                .map(|(name, value)| (name, value.map(|value| value.as_ref())))
+                .collect::<Vec<_>>(),
+            [
+                ("DYNAMIC_ABSENT", None),
+                ("DYNAMIC_PRESENT", Some("dynamic")),
+                ("EMPTY", Some("")),
+                ("FLIP", None),
+                ("MISSING", None),
+                ("PRESENT", Some("declared")),
+            ]
+        );
+
+        let unrelated = environment_snapshot(&[
+            ("DYNAMIC_PRESENT", "dynamic"),
+            ("EMPTY", ""),
+            ("PRESENT", "declared"),
+            ("UNRELATED", "two"),
+        ]);
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            unrelated,
+            all.clone(),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(reused) = transaction.compute(&key).await.unwrap()
+        else {
+            panic!("unrelated Host name must remain complete")
+        };
+        assert!(Arc::ptr_eq(&first, &reused));
+
+        let snapshot_b = environment_snapshot(&[
+            ("DYNAMIC_PRESENT", "dynamic"),
+            ("EMPTY", ""),
+            ("FLIP", "present"),
+            ("PRESENT", "declared"),
+        ]);
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot_b,
+            all.clone(),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(second) = transaction.compute(&key).await.unwrap()
+        else {
+            panic!("relevant Host change must recompute")
+        };
+        assert_eq!(
+            first_effect.plan(),
+            second.as_ref().as_ref().unwrap().plan()
+        );
+        assert_ne!(first, second);
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot_a.clone(),
+            all.clone(),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(third) = transaction.compute(&key).await.unwrap()
+        else {
+            panic!("A/B/A Host identity must complete")
+        };
+        assert_eq!(first, third);
+
+        let declared_changed = environment_snapshot(&[
+            ("DYNAMIC_PRESENT", "dynamic"),
+            ("EMPTY", ""),
+            ("PRESENT", "changed"),
+        ]);
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            declared_changed,
+            all.clone(),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(declared_effect) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("declared present change must recompute")
+        };
+        assert_eq!(
+            first_effect.plan(),
+            declared_effect.as_ref().as_ref().unwrap().plan()
+        );
+        assert_ne!(first, declared_effect);
+
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![
+                (
+                    RepositoryEnvironmentCellKey::new(workspace.dupe(), "DYNAMIC_ABSENT"),
+                    RepositoryEnvironmentCell::Unauthorized,
+                ),
+                (
+                    RepositoryEnvironmentCellKey::new(workspace.dupe(), "DYNAMIC_PRESENT"),
+                    RepositoryEnvironmentCell::Unauthorized,
+                ),
+            ])
+            .unwrap();
+        transaction = updater.commit().await;
+        assert!(matches!(
+            transaction.compute(&key).await.unwrap(),
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(HostSelectedRepositoryFileEffectError::HostInput { .. }))
+        ));
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("windows", "x86_64"),
+            snapshot_a,
+            all,
+        )
+        .await;
+        assert!(matches!(
+            transaction.compute(&key).await.unwrap(),
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(HostSelectedRepositoryFileEffectError::HostInput { .. }))
+        ));
     }
 
     fn observed_carrier(
@@ -1010,7 +1679,11 @@ ext=module_extension(implementation=impl)
         let certificate = certificate.dupe();
         let certificate_value = Arc::new(certificate.result().as_ref().as_ref().unwrap().clone());
         let repository = certificate_value.repository(0).unwrap();
-        let label = root_label(&certificate_value, 0, repository).unwrap();
+        let RepositoryDefinitionLabel::Root(label) =
+            definition_label(&certificate_value, 0, repository).unwrap()
+        else {
+            panic!("fixture definition must be root")
+        };
         let child = transaction
             .compute(&HostBzlModuleObservationKey::new(workspace.dupe(), label))
             .await
@@ -1026,6 +1699,33 @@ ext=module_extension(implementation=impl)
         for (demand, result) in carrier.observations().observations() {
             assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref());
         }
+
+        let mismatch_source = EXTENSION.replace(
+            "repo=repository_rule(implementation=write)",
+            "repo=repository_rule(implementation=write, environ=['MISMATCH'])",
+        );
+        let mut mismatch = transaction_untracked(&dice, MODULE, &mismatch_source, true).await;
+        let RepositoryDefinitionLabel::Root(label) =
+            definition_label(&certificate_value, 0, repository).unwrap()
+        else {
+            unreachable!()
+        };
+        let mismatch_module = mismatch
+            .compute(&HostBzlModuleObservationKey::new(workspace.dupe(), label))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(mismatch_module)) = mismatch_module else {
+            panic!("mismatched module must load")
+        };
+        assert!(matches!(
+            authenticate_rule(
+                &certificate_value,
+                0,
+                repository,
+                mismatch_module.result().as_ref().unwrap()
+            ),
+            Err(HostSelectedRepositoryFileEffectError::Projection { .. })
+        ));
 
         let missing = transaction
             .compute(&HostSelectedRepositoryFileEffectKey::new(
@@ -1361,13 +2061,17 @@ ext=module_extension(implementation=impl)
         let source = include_str!("module_extension_repository_file_effect.rs");
         let production = &source[..source.find("\n#[cfg(test)]").unwrap()];
         for shape in [
-            "let Some(path) = path.unpack_str()",
             "get(&call.definition.exported_name)",
             "downcast::<FrozenRepositoryRuleDefinition>()",
             "if projection != call.definition",
             "Ok(rule.implementation())",
             "SourcePreparationOutcome::Complete(Err(error))",
-            "merge_observations(&observations, &child_observations)",
+            "RepositoryEnvironmentCellKey::new(",
+            "RepositoryPlatformKey::new(",
+            "invoke_repository_rule(",
+            "HostCanonicalRepositoryLoadRouteKey::new(",
+            "ExternalBzlModuleEvalKey::new_canonical(",
+            "HostSelectedRepositoryFileEffectObservationError::CanonicalRoute {",
             "HostSelectedRepositoryFileEffectObservationError::Certificate(error)",
             "HostSelectedRepositoryFileEffectObservationError::HostBzl {",
             "HostSelectedRepositoryFileEffectObservationError::Merge {",
@@ -1376,6 +2080,16 @@ ext=module_extension(implementation=impl)
                 production.contains(shape),
                 "missing producer shape: {shape}"
             );
+        }
+        let context = include_str!("repository_rule_context.rs");
+        for shape in [
+            "let Some(path) = path.unpack_str()",
+            "#[starlark_value(type = \"repository_ctx\")]",
+            "#[starlark_value(type = \"repository_os\")]",
+            "fn getenv<'v>(",
+            "AllocDict(self.snapshot.iter()",
+        ] {
+            assert!(context.contains(shape), "missing context shape: {shape}");
         }
         let start = production
             .find("pub struct HostSelectedRepositoryFileEffect {")

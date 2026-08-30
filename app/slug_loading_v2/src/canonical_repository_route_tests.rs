@@ -45,6 +45,7 @@ pub(super) mod tests {
     use slug_bzlmod_v2::RegistryUrls;
     use slug_bzlmod_v2::RepoRuleId;
     use slug_bzlmod_v2::RepoSpec;
+    use slug_bzlmod_v2::RepositoryHostInputTransaction;
     use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
     use slug_bzlmod_v2::RepositoryMaterializationKey;
     use slug_bzlmod_v2::RepositoryMaterializationKind;
@@ -55,6 +56,8 @@ pub(super) mod tests {
     use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
     use slug_bzlmod_v2::RepositoryMaterializationSuccess;
     use slug_bzlmod_v2::RepositoryPackageSourceKey;
+    use slug_bzlmod_v2::RepositoryPlatform;
+    use slug_bzlmod_v2::RepositoryPlatformKey;
     use slug_bzlmod_v2::RepositorySourceFileKey;
     use slug_bzlmod_v2::RootPackagePolicyInputs;
     use slug_bzlmod_v2::RootRepositoryRouteKey;
@@ -441,7 +444,16 @@ ext=module_extension(implementation=impl)
             ..Default::default()
         };
         user_data.data.set(CaptureEvaluationEvents);
+        user_data
+            .data
+            .set(RepositoryHostInputTransaction::default());
         let mut updater = dice.updater_with_data(user_data);
+        updater
+            .changed_to(vec![(
+                RepositoryPlatformKey::new(workspace.dupe()),
+                RepositoryPlatform::new("linux", "x86_64"),
+            )])
+            .unwrap();
         updater
             .changed_to(vec![(
                 slug_workspace_v2::WorkspaceSnapshotKey {

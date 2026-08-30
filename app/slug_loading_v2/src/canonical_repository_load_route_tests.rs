@@ -47,6 +47,7 @@ mod tests {
     use slug_bzlmod_v2::RegistryIo;
     use slug_bzlmod_v2::RegistryIoOutcome;
     use slug_bzlmod_v2::RegistryTransportError;
+    use slug_bzlmod_v2::RepositoryHostInputTransaction;
     use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
     use slug_bzlmod_v2::RepositoryMaterializationResult;
     use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
@@ -56,6 +57,8 @@ mod tests {
     use slug_bzlmod_v2::RepositoryPackageSourceAddress;
     use slug_bzlmod_v2::RepositoryPackageSourceKey;
     use slug_bzlmod_v2::RepositoryPackageSourceObservationKey;
+    use slug_bzlmod_v2::RepositoryPlatform;
+    use slug_bzlmod_v2::RepositoryPlatformKey;
     use slug_bzlmod_v2::RootPackageBzlTarget;
     use slug_bzlmod_v2::RootPackagePolicyInputs;
     use slug_bzlmod_v2::RootRepositoryRouteKey;
@@ -482,11 +485,21 @@ mod tests {
             }],
         )
         .unwrap();
-        let mut updater = dice.updater_with_data(UserComputationData {
+        let mut user_data = UserComputationData {
             cycle_detector: Some(bzl_load_cycle_detector()),
             activation_tracker: Some(tracker),
             ..Default::default()
-        });
+        };
+        user_data
+            .data
+            .set(RepositoryHostInputTransaction::default());
+        let mut updater = dice.updater_with_data(user_data);
+        updater
+            .changed_to(vec![(
+                RepositoryPlatformKey::new(request.id.workspace.clone()),
+                RepositoryPlatform::new("linux", "x86_64"),
+            )])
+            .unwrap();
         inject_root_package_policy_inputs(
             &mut updater,
             RootPackagePolicyInputs::new(
