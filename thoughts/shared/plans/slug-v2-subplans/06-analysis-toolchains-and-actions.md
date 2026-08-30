@@ -21336,3 +21336,11 @@ Freeze a compact Target/Exec/Starlark dependency-configuration ABI and separate
 executable bit in loading, exact package admission, and analysis-time fail-
 closed behavior until configured exec edges/FilesToRun are separately admitted.
 Preserve the proof draft and selected-context candidate unchanged.
+
+#### Exec-configured loading design accepted; implementation active (2026-08-29)
+
+Commit `291b84c2b` records independent design `ACCEPT`. Implement only
+`WP-4-5-7A-exec-configured-label-attribute-loading-implementation` under its
+frozen five-file allowlist and 220/350/570 caps. Preserve exact loading identity
+and analysis-time fail-closed behavior; do not implement exec-edge traversal,
+FilesToRun projection, a ruleset special case, or selected-context work.

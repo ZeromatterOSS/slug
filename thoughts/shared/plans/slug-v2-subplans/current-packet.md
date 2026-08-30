@@ -1,15 +1,16 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-exec-configured-label-attribute-loading-design`
+Packet: `WP-4-5-7A-exec-configured-label-attribute-loading-implementation`
 
 Milestone: M7A category 6 registered-toolchain prerequisite correction.
 
-Base: accepted Host-capability implementation `26a68d61c` and activated
-proof-only registration packet `20ad71ffa`. The passing row-3 proof draft and
-retained selected-context R2 candidate remain dirty and must not be edited by
-this docs-only packet.
+Base: independently accepted design commit `291b84c2b`, accepted Host-
+capability implementation `26a68d61c`, and activated proof-only registration
+packet `20ad71ffa`. The passing row-3 proof draft and retained selected-context
+R2 candidate remain dirty and must not be edited outside the exact five-file
+implementation allowlist.
 
-## Why this design is active
+## Why this implementation is active
 
 The proof-only registration packet authenticates all four exact
 `@bazel_tools` toolchain declarations and generically realizes the non-Windows
@@ -103,10 +104,10 @@ No lock may cross DICE compute/await. The new enum/bit live in the existing
 Arc-backed package value; no new retained collection or material copy is
 authorized. This is not a demonstrated hot path and needs no benchmark.
 
-## Exact future implementation allowlist, blobs, and caps
+## Exact implementation allowlist, blobs, and caps
 
-After independent design `ACCEPT`, implementation may change only these live
-baseline blobs:
+Implementation may change only these independently reviewed live baseline
+blobs:
 
 - `app/slug_loading_v2/src/attrs.rs`
   `ecb7ea40cd781a5f924599a8fee0994d69e208f0`;
@@ -158,6 +159,6 @@ new cache/interner/dependency; production change outside the three owners;
 proof change outside the two test owners; cap breach; or dirty-candidate
 overlap that cannot be isolated.
 
-After independent design `ACCEPT`, implement only the frozen five-file packet.
-After its terminal `ACCEPT`, resume the parked proof-only four-registration-row
-closure; only then may selected-context R2 return to terminal review.
+Implement only this frozen five-file packet. After its terminal `ACCEPT`,
+resume the parked proof-only four-registration-row closure; only then may
+selected-context R2 return to terminal review.
