@@ -21344,3 +21344,78 @@ Commit `291b84c2b` records independent design `ACCEPT`. Implement only
 frozen five-file allowlist and 220/350/570 caps. Preserve exact loading identity
 and analysis-time fail-closed behavior; do not implement exec-edge traversal,
 FilesToRun projection, a ruleset special case, or selected-context work.
+
+#### Exec-configured loading accepted; selected-BCR transform REPLAN (2026-08-29)
+
+Commit `831e574e6` terminally accepts the five-file prerequisite. It retains
+Target/Exec/Starlark attribute identity plus the executable bit, admits exact
+package inventory and fails closed before configured analysis consumes an
+unsupported edge. Focused proofs, full serial loading/analysis suites and the
+four-row registration inventory pass. The real REAPI dependent clears launcher
+row 1 and reaches ordinary selected-BCR `rules_shell@0.6.1` at row 2.
+
+The authentic RepoSpec has nine mandatory BCR fields because
+`ArchiveRepoSpecBuilder.setArchiveType` omits empty type. It carries
+`strip_prefix = "rules_shell-0.6.1"`, the BCR
+`module_dot_bazel_version.patch`, patch strip 1 and no overlays. Its verified
+release tar contains only regular files/directories, but uses 0664 and 0775
+file modes plus 0775 directory modes. Current core requires the tenth `type`
+field, empty transforms, patch strip zero and exactly 0644/0755 modes, so the
+observed `unsupported attribute shape` is only the first of four generic
+materialization gaps.
+
+Pinned Bazel 9.2 `IndexRegistry`, `ArchiveRepoSpecBuilder`,
+`IndexRegistryTest`, `DecompressorValue`, `CompressedTarFunction`,
+`StripPrefixedPath`, `http.bzl`, `utils.bzl`, `PatchUtil` and `PatchUtilTest`
+are authority. The pinned registry specification additionally makes source
+JSON patch order semantic. Slug's current private `SourceJson` parses patch
+and overlay objects through `BTreeMap`, so core cannot lawfully reconstruct
+that order after projection.
+
+The registration packet therefore reaches `REPLAN`; retain its passing proof
+draft unchanged. Design only
+`WP-5-7A-selected-bcr-archive-transform-architecture` at zero Rust. The frozen
+architecture uses two serial implementation successors:
+
+1. the selected-registry source producer preserves patch/overlay JSON order in
+   its insertion-ordered RepoSpec representation, while a separate narrow
+   RepoSpec publication-identity view compares ordered `remote_patches` keys
+   for exact http_archive/git_repository semantics and flows through both
+   route families to the actual materialization-request cutoff without
+   changing ordinary `SmallMap` or Starlark dict equality; and
+2. the core materializer consumes a phase-scratch format/prefix/overlay/patch/
+   MODULE plan, authenticates every payload, extracts into one private root,
+   applies overlay -> ordered patch -> registry MODULE, and publishes only the
+completed root under a transform-complete source association.
+
+The first independent architecture review rejected insertion order alone:
+Buck2-derived `SmallMap` equality is membership-based, so identical patch rows
+in a different order could equality-cut off before rematerialization. The
+corrected first successor therefore owns producer order plus the explicit
+publication-identity view and must prove same-entry patch A/B/A through both
+selected route/capability lanes at the real materialization-request DICE
+boundary. Normal nested map reorder remains equal; no digest substitutes for
+structural identity and no parallel retained side table is added.
+
+The core patch leaf is a new private module. It admits only bounded UTF-8 LF
+unified-diff modifications of existing safe regular paths with exact context;
+broader Bazel patch, archive, auth and repository-rule shapes remain typed
+unsupported. The tar-gzip format enum, prefix and transform rows make future
+format/patch breadth local to the same owners without widening today's exact
+claim. Any failure or cancellation destroys captures and the unpublished
+TempDir; no lock, background task, cache or semantic path inference is added.
+
+Clean Zabel `0795445f...` supplies peer guidance only: its registry parser
+retains source-ordered scratch rows, archive realization owns one verified
+private phase and patch parsing is isolated. Slug does not adopt its code,
+scheduler, cache, layout or compatibility claims. Bazel 9.2/BCR remain the
+behavior authority; BCR Starlark owns every rule including `cc_internal`, and
+`cc_common` remains a generic Host/provider ABI consumer.
+
+The current manifest owns exact successor blobs, caps, compatibility classes,
+proofs, lifecycle, complexity decisions and stops. Independent architecture/
+identity/lifecycle rereview accepts the corrected RepoSpec publication domain
+and carrier proof. Commit the design, then activate only the ordered producer/
+publication-identity successor. After both implementations pass, resume only
+the unchanged proof-only four-row registration closure before selected-context
+R2 review.
