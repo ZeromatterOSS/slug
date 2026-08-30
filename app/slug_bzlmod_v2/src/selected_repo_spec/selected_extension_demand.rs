@@ -516,31 +516,35 @@ fn owner_inputs(
             OwnerInputsError::Inconsistent { owner },
         ));
     }
-    if owner.id.isolation.is_some() || owner.id.extension_name.split_ascii_whitespace().count() != 1
+    if owner.kind() != HostSelectedExtensionOwnerKind::ModuleExtension
+        || owner.id.isolation.is_some()
+        || owner.id.extension_name.split_ascii_whitespace().count() != 1
     {
         return Err(HostSelectedExtensionOwnerInputsError(
             OwnerInputsError::Unsupported { owner },
         ));
     }
-    let root = uses
-        .iter()
-        .any(|usage| matches!(usage.owner, HostGraphModuleKey::Root));
-    if !root {
-        return Err(HostSelectedExtensionOwnerInputsError(
-            OwnerInputsError::Unsupported { owner },
-        ));
-    }
-    let mut pairs = mappings
-        .base_mappings
-        .iter()
-        .zip(mappings.mappings.iter())
-        .filter(|(base, _)| base.context_repo.is_root());
-    let Some((base_mapping, mapping)) = pairs.next() else {
-        return Err(HostSelectedExtensionOwnerInputsError(
-            OwnerInputsError::Missing { owner },
-        ));
-    };
-    if pairs.next().is_some() {
+    let definition_repo = owner.id.bzl_file.package().repo();
+    let host_ordinal =
+        match find_canonical_route_ordinal(definition_repo, mappings.routes.entries.iter()) {
+            CanonicalRouteMatch::Unique(ordinal) => ordinal,
+            CanonicalRouteMatch::Missing => {
+                return Err(HostSelectedExtensionOwnerInputsError(
+                    OwnerInputsError::Missing { owner },
+                ));
+            }
+            CanonicalRouteMatch::Duplicate { .. } => {
+                return Err(HostSelectedExtensionOwnerInputsError(
+                    OwnerInputsError::Inconsistent { owner },
+                ));
+            }
+        };
+    let mapping = mappings.mappings.get(host_ordinal).ok_or_else(|| {
+        HostSelectedExtensionOwnerInputsError(OwnerInputsError::Missing {
+            owner: owner.dupe(),
+        })
+    })?;
+    if &mapping.context_repo != definition_repo {
         return Err(HostSelectedExtensionOwnerInputsError(
             OwnerInputsError::Inconsistent { owner },
         ));
@@ -564,7 +568,7 @@ fn owner_inputs(
         bzl_file: owner.id.bzl_file.clone(),
         extension_name: owner.id.extension_name.clone(),
         unique_name: owner.unique_name.clone(),
-        base_mapping: base_mapping.clone(),
+        base_mapping: mapping.clone(),
         mapping: mapping.clone(),
         source: selected_extension_definition_source(&mappings.routes, mapping, &owner.id.bzl_file)
             .ok_or_else(|| {
@@ -1351,11 +1355,19 @@ mod tests {
     }
 
     #[test]
-    fn owner_inputs_projects_root_and_nonroot_rows_in_graph_and_tag_order() {
+    fn owner_inputs_uses_host_final_namespace_and_projects_usage_rows_in_graph_order() {
         let (owner, mappings) = owner_inputs_mappings();
+        assert_eq!(
+            mappings.base_mappings[0]
+                .entries
+                .get("generated")
+                .unwrap()
+                .as_str(),
+            "+base"
+        );
         let inputs = owner_inputs(owner, &mappings).unwrap();
         let (_, _, base, _) = inputs.request().namespace_parts();
-        assert_eq!(base.get("generated").unwrap().as_str(), "+base");
+        assert_eq!(base.get("generated").unwrap().as_str(), "+final");
         assert_eq!(
             inputs
                 .request()
@@ -1398,10 +1410,57 @@ mod tests {
         assert_eq!(second.4.get("root").unwrap(), &CanonicalRepoName::root());
         let mut no_root = mappings.clone();
         no_root.usages = no_root.usages[1..].into();
+        let nonroot_only = owner_inputs(inputs.owner().dupe(), &no_root).unwrap();
         assert!(matches!(
-            owner_inputs(inputs.owner().dupe(), &no_root),
+            nonroot_only.request().source(),
+            HostSelectedExtensionDefinitionSource::Root
+        ));
+        assert_eq!(nonroot_only.modules().len(), 1);
+        assert!(!nonroot_only.modules()[0].parts().3);
+
+        let mut missing_host = mappings.clone();
+        missing_host.routes = Arc::new(HostSelectedModuleRoutes {
+            entries: missing_host.routes.entries[1..].into(),
+            extension_projection: testing_extension_mapping_projection(),
+        });
+        assert!(matches!(
+            owner_inputs(inputs.owner().dupe(), &missing_host),
             Err(HostSelectedExtensionOwnerInputsError(
-                OwnerInputsError::Unsupported { .. }
+                OwnerInputsError::Missing { .. }
+            ))
+        ));
+
+        let mut duplicate_host = mappings.clone();
+        let mut duplicate_routes = duplicate_host.routes.entries.to_vec();
+        duplicate_routes.insert(1, duplicate_routes[0].clone());
+        duplicate_host.routes = Arc::new(HostSelectedModuleRoutes {
+            entries: duplicate_routes.into(),
+            extension_projection: testing_extension_mapping_projection(),
+        });
+        assert!(matches!(
+            owner_inputs(inputs.owner().dupe(), &duplicate_host),
+            Err(HostSelectedExtensionOwnerInputsError(
+                OwnerInputsError::Inconsistent { .. }
+            ))
+        ));
+
+        let mut missing_mapping = mappings.clone();
+        missing_mapping.mappings = Arc::from([]);
+        assert!(matches!(
+            owner_inputs(inputs.owner().dupe(), &missing_mapping),
+            Err(HostSelectedExtensionOwnerInputsError(
+                OwnerInputsError::Missing { .. }
+            ))
+        ));
+
+        let mut mismatched_context = mappings.clone();
+        let mut final_mappings = mismatched_context.mappings.to_vec();
+        final_mappings[0].context_repo = CanonicalRepoName::new("dep+1.0").unwrap();
+        mismatched_context.mappings = final_mappings.into();
+        assert!(matches!(
+            owner_inputs(inputs.owner().dupe(), &mismatched_context),
+            Err(HostSelectedExtensionOwnerInputsError(
+                OwnerInputsError::Inconsistent { .. }
             ))
         ));
         let mut invalid = mappings.clone();
@@ -1683,10 +1742,10 @@ mod tests {
         let mut final_mappings = mappings.mappings.to_vec();
         let dep = ApparentRepoName::new("dep").unwrap();
         let canonical = CanonicalRepoName::new("dep+1.0").unwrap();
-        let mut entries = (*final_mappings[0].entries).clone();
+        let mut entries = (*final_mappings[1].entries).clone();
         entries.insert(dep.clone(), canonical.clone());
-        final_mappings[0].entries = Arc::new(entries);
-        final_mappings[0].order = final_mappings[0]
+        final_mappings[1].entries = Arc::new(entries);
+        final_mappings[1].order = final_mappings[1]
             .order
             .iter()
             .cloned()
@@ -1703,7 +1762,7 @@ mod tests {
 
         let expected = selected_extension_definition_source(
             &mappings.routes,
-            &mappings.mappings[0],
+            &mappings.mappings[1],
             &id.bzl_file,
         )
         .unwrap();
@@ -1719,6 +1778,16 @@ mod tests {
         assert_eq!(definition.view().canonical_repo(), &canonical);
         assert_eq!(apparent_repo.as_str(), "dep");
         assert!(definition.view().repo_spec().is_some());
+
+        let mut nonroot_only = mappings;
+        nonroot_only.usages = nonroot_only.usages[1..].into();
+        let inputs = owner_inputs(inputs.owner().dupe(), &nonroot_only).unwrap();
+        assert_eq!(inputs.modules().len(), 1);
+        assert!(!inputs.modules()[0].parts().3);
+        assert!(matches!(
+            inputs.request().source(),
+            HostSelectedExtensionDefinitionSource::Selected { .. }
+        ));
     }
 
     #[test]

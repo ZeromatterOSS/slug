@@ -110,6 +110,8 @@ pub use host_module::RootModuleLoadingAnchorError;
 pub use host_module::RootModuleLoadingAnchorKey;
 #[doc(hidden)]
 pub use host_module::RootModuleLoadingAnchorObservationKey;
+#[doc(hidden)]
+pub use host_module::RootRepositoryBzlLoadRoute;
 pub use host_module::RootRepositoryRoute;
 pub use host_module::RootRepositoryRouteError;
 pub use host_module::RootRepositoryRouteKey;

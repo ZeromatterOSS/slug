@@ -2930,9 +2930,10 @@ impl HostCanonicalSelectedModuleDefinition {
                 {
                     Some(HostSelectedBzlLoadSource::Builtin)
                 }
-                _ => None,
+                _ => Some(HostSelectedBzlLoadSource::Canonical(canonical)),
             },
-            CanonicalRouteMatch::Missing | CanonicalRouteMatch::Duplicate { .. } => None,
+            CanonicalRouteMatch::Missing => Some(HostSelectedBzlLoadSource::Canonical(canonical)),
+            CanonicalRouteMatch::Duplicate { .. } => None,
         }
     }
 }
@@ -2941,6 +2942,7 @@ impl HostCanonicalSelectedModuleDefinition {
 pub(crate) enum HostSelectedBzlLoadSource {
     Selected(HostCanonicalSelectedModuleDefinition),
     Builtin,
+    Canonical(CanonicalRepoName),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -7859,8 +7861,9 @@ mod tests {
         version: &str,
         repo_name: &str,
         usages: Arc<[crate::NonrootExtensionUsage]>,
+        registry: bool,
     ) -> HostSelectedModuleEntry {
-        let mut entry = route_module(name, version, repo_name, false);
+        let mut entry = route_module(name, version, repo_name, registry);
         let HostGraphModuleSource::Discovered(module) = &entry.source else {
             unreachable!()
         };
@@ -8904,19 +8907,23 @@ mod tests {
         assert_eq!(route.module_name(), "owner");
         assert_eq!(route.canonical_repo().as_str(), "owner+");
         assert_eq!(route.apparent_repo().as_str(), "owner_alias");
-        let child = route
+        let crate::RootRepositoryBzlLoadRoute::Root(child) = route
             .selected_bzl_load_route(&ApparentRepoName::new("mapped_dep").unwrap())
-            .unwrap();
+            .unwrap()
+        else {
+            panic!("selected dependency must preserve its Root route")
+        };
         assert_eq!(
             (child.module_name(), child.canonical_repo().as_str()),
             ("mapped_dep", "mapped_dep+")
         );
-        assert!(
-            route
-                .selected_bzl_load_route(&ApparentRepoName::new("bazel_tools").unwrap())
-                .unwrap()
-                .is_builtin_bazel_tools()
-        );
+        let crate::RootRepositoryBzlLoadRoute::Root(builtin) = route
+            .selected_bzl_load_route(&ApparentRepoName::new("bazel_tools").unwrap())
+            .unwrap()
+        else {
+            panic!("built-in dependency must preserve its Root route")
+        };
+        assert!(builtin.is_builtin_bazel_tools());
         assert!(
             route
                 .selected_bzl_load_route(&ApparentRepoName::new("missing").unwrap())
@@ -8930,6 +8937,20 @@ mod tests {
         else {
             panic!("external request must retain selected source")
         };
+        let mut duplicate = definition.clone();
+        let routes = duplicate.routes.as_ref().as_ref().unwrap();
+        let mut duplicate_entries = routes.entries.to_vec();
+        duplicate_entries.push(duplicate_entries[2].clone());
+        duplicate.routes = Arc::new(Ok(HostSelectedModuleRoutes {
+            entries: duplicate_entries.into(),
+            extension_projection: routes.extension_projection.clone(),
+        }));
+        assert!(
+            duplicate
+                .mapped_bzl_load(&ApparentRepoName::new("mapped_dep").unwrap())
+                .is_none()
+        );
+
         let mut changed = definition.clone();
         let mut entries = changed.routes.as_ref().as_ref().unwrap().entries.to_vec();
         entries[2]
@@ -8962,6 +8983,43 @@ mod tests {
     }
 
     #[test]
+    fn selected_bzl_load_source_defers_generated_final_mapping_and_restores_a_b_a() {
+        let owner = route_key("owner", "1");
+        let projection = |generated: &'static str| {
+            let usage = nonroot_usage(
+                &owner,
+                "//:compatibility.bzl",
+                "compatibility",
+                test_proxy("compatibility", [("generated_dep", generated)]),
+                false,
+            );
+            let graph = route_graph([
+                route_root([("owner_alias", owner.clone())], Some("root_self")),
+                route_module_with_usages("owner", "1", "owner_self", Arc::from([usage]), true),
+            ]);
+            let routes = selected_routes(
+                &graph,
+                &HostSelectedRegistryRepoSpecs {
+                    entries: Arc::from([route_spec(owner.clone())]),
+                },
+            )
+            .unwrap();
+            HostCanonicalSelectedModuleDefinition {
+                routes: Arc::new(Ok(routes)),
+                ordinal: 1,
+            }
+            .mapped_bzl_load(&ApparentRepoName::new("generated_dep").unwrap())
+            .unwrap()
+        };
+        let a = projection("generated_a");
+        let b = projection("generated_b");
+        let restored = projection("generated_a");
+        assert!(matches!(a, HostSelectedBzlLoadSource::Canonical(_)));
+        assert_ne!(a, b);
+        assert_eq!(a, restored);
+    }
+
+    #[test]
     fn pure_extension_ids_group_isolate_collide_and_map_mvo_contexts() {
         let v1 = route_key("dep", "1");
         let v2 = route_key("dep", "2");
@@ -8981,8 +9039,8 @@ mod tests {
         );
         let graph = route_graph([
             route_root([("dep_one", v1.clone()), ("dep_two", v2.clone())], None),
-            route_module_with_usages("dep", "1", "dep", Arc::from([dep1_usage])),
-            route_module_with_usages("dep", "2", "dep", Arc::from([dep2_usage])),
+            route_module_with_usages("dep", "1", "dep", Arc::from([dep1_usage]), false),
+            route_module_with_usages("dep", "2", "dep", Arc::from([dep2_usage]), false),
         ]);
         let routes = Arc::new(
             selected_routes(

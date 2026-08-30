@@ -68,6 +68,7 @@ use slug_bzlmod_v2::RootPackageSource;
 use slug_bzlmod_v2::RootPackageSourceError;
 use slug_bzlmod_v2::RootPackageSourceKey;
 use slug_bzlmod_v2::RootPackageSourceObservationKey;
+use slug_bzlmod_v2::RootRepositoryBzlLoadRoute;
 use slug_bzlmod_v2::RootRepositoryRoute;
 use slug_bzlmod_v2::RootRepositoryRouteError;
 use slug_bzlmod_v2::RootRepositoryRouteKey;
@@ -1216,15 +1217,13 @@ fn resolve_external_bzl_load_label(
     route: &RootRepositoryRoute,
     package: &PackagePath,
     load: &str,
-) -> Result<ResolvedExternalBzlLoad, ExternalLoadLabelError> {
+) -> Result<(RootRepositoryBzlLoadRoute, RepositoryBzlLabel), ExternalLoadLabelError> {
     if !matches!(
         route.source(),
         slug_bzlmod_v2::RootRepositorySource::SelectedRegistry(_)
     ) {
-        return resolve_external_load_label(package, load).map(|label| ResolvedExternalBzlLoad {
-            route: HostRepositorySourceRoute::root(route.clone()),
-            label,
-        });
+        return resolve_external_load_label(package, load)
+            .map(|label| (RootRepositoryBzlLoadRoute::Root(route.clone()), label));
     }
     if let Some(target) = load.strip_prefix(':') {
         return RepositoryBzlLabel::new(
@@ -1236,17 +1235,14 @@ fn resolve_external_bzl_load_label(
                 }
             })?,
         )
-        .map(|label| ResolvedExternalBzlLoad {
-            route: HostRepositorySourceRoute::root(route.clone()),
-            label,
-        });
+        .map(|label| (RootRepositoryBzlLoadRoute::Root(route.clone()), label));
     }
     let label = ApparentLabel::parse(load).map_err(|message| ExternalLoadLabelError::Invalid {
         load: Arc::from(load),
         message: Arc::from(message),
     })?;
     let child_route = if label.repo().is_root() {
-        route.clone()
+        RootRepositoryBzlLoadRoute::Root(route.clone())
     } else {
         route.selected_bzl_load_route(label.repo()).ok_or_else(|| {
             ExternalLoadLabelError::Repository {
@@ -1263,10 +1259,7 @@ fn resolve_external_bzl_load_label(
             }
         })?,
     )
-    .map(|label| ResolvedExternalBzlLoad {
-        route: HostRepositorySourceRoute::root(child_route),
-        label,
-    })
+    .map(|label| (child_route, label))
 }
 
 fn resolve_canonical_external_bzl_load_label(
@@ -4400,12 +4393,46 @@ async fn resolve_external_bzl_child_route(
         let HostRepositorySourceRoute::Root(route) = route else {
             unreachable!()
         };
-        return match resolve_external_bzl_load_label(route, package, load) {
-            Ok(resolved) => ControlFlow::Continue((resolved, observations)),
-            Err(error) => ControlFlow::Break(external_bzl_complete(
-                Err(ExternalBzlModuleError::LoadLabel { source, error }),
+        let (child_route, label) = match resolve_external_bzl_load_label(route, package, load) {
+            Ok(resolved) => resolved,
+            Err(error) => {
+                return ControlFlow::Break(external_bzl_complete(
+                    Err(ExternalBzlModuleError::LoadLabel { source, error }),
+                    observations,
+                ));
+            }
+        };
+        return match child_route {
+            RootRepositoryBzlLoadRoute::Root(child_route) => ControlFlow::Continue((
+                ResolvedExternalBzlLoad {
+                    route: HostRepositorySourceRoute::root(child_route),
+                    label,
+                },
                 observations,
             )),
+            RootRepositoryBzlLoadRoute::Canonical(child_repo) => {
+                let (child_input, observations) = match compute_canonical_external_child_input(
+                    ctx,
+                    route.workspace().dupe(),
+                    child_repo,
+                    source,
+                    load,
+                    mode,
+                    observations,
+                )
+                .await
+                {
+                    ControlFlow::Continue(value) => value,
+                    ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
+                };
+                ControlFlow::Continue((
+                    ResolvedExternalBzlLoad {
+                        route: HostRepositorySourceRoute::canonical(child_input),
+                        label,
+                    },
+                    observations,
+                ))
+            }
         };
     };
     let (child_repo, label) = match resolve_canonical_external_bzl_load_label(input, package, load)
@@ -4577,7 +4604,18 @@ fn prepare_external_bzl_child_loads(
         .iter()
         .map(|load| {
             resolve_external_bzl_load_label(route, &key.label.package, load)
-                .map(|resolved| ExternalBzlChildLoad::Resolved(load.clone(), resolved))
+                .map(|(route, label)| match route {
+                    RootRepositoryBzlLoadRoute::Root(route) => ExternalBzlChildLoad::Resolved(
+                        load.clone(),
+                        ResolvedExternalBzlLoad {
+                            route: HostRepositorySourceRoute::root(route),
+                            label,
+                        },
+                    ),
+                    RootRepositoryBzlLoadRoute::Canonical(_) => {
+                        ExternalBzlChildLoad::Canonical(load.clone())
+                    }
+                })
                 .map_err(|error| {
                     external_bzl_complete(
                         Err(ExternalBzlModuleError::LoadLabel {

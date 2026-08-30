@@ -1157,6 +1157,13 @@ pub struct RootRepositoryRoute {
     source: RootRepositorySource,
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum RootRepositoryBzlLoadRoute {
+    Root(RootRepositoryRoute),
+    Canonical(CanonicalRepoName),
+}
+
 fn hash_override_attribute_value<H: Hasher>(value: &OverrideAttributeValue, state: &mut H) {
     std::mem::discriminant(value).hash(state);
     match value {
@@ -1406,7 +1413,10 @@ impl RootRepositoryRoute {
     }
 
     #[doc(hidden)]
-    pub fn selected_bzl_load_route(&self, apparent: &ApparentRepoName) -> Option<Self> {
+    pub fn selected_bzl_load_route(
+        &self,
+        apparent: &ApparentRepoName,
+    ) -> Option<RootRepositoryBzlLoadRoute> {
         let RootRepositorySource::SelectedRegistry(route) = &self.source else {
             return None;
         };
@@ -1419,8 +1429,9 @@ impl RootRepositoryRoute {
                         apparent_repo: apparent.clone(),
                     },
                 )
+                .map(RootRepositoryBzlLoadRoute::Root)
             }
-            HostSelectedBzlLoadSource::Builtin => Some(Self {
+            HostSelectedBzlLoadSource::Builtin => Some(RootRepositoryBzlLoadRoute::Root(Self {
                 workspace: self.workspace.dupe(),
                 apparent_repo: apparent.clone(),
                 module_name: CompactString::new("bazel_tools"),
@@ -1428,7 +1439,10 @@ impl RootRepositoryRoute {
                 source: RootRepositorySource::BuiltinBazelTools(
                     BuiltinBazelToolsSnapshot::CURRENT.route_identity(),
                 ),
-            }),
+            })),
+            HostSelectedBzlLoadSource::Canonical(canonical) => {
+                Some(RootRepositoryBzlLoadRoute::Canonical(canonical))
+            }
         }
     }
 

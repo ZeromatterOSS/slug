@@ -61,6 +61,7 @@ mod tests {
     use slug_bzlmod_v2::RepositoryPlatformKey;
     use slug_bzlmod_v2::RootPackageBzlTarget;
     use slug_bzlmod_v2::RootPackagePolicyInputs;
+    use slug_bzlmod_v2::RootRepositoryBzlLoadRoute;
     use slug_bzlmod_v2::RootRepositoryRouteKey;
     use slug_bzlmod_v2::SourcePreparationNeeds;
     use slug_bzlmod_v2::SourcePreparationOutcome;
@@ -128,6 +129,12 @@ mod tests {
     const ROOT_MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='parent', version='1', repo_name='parent_alias')\n";
     const PARENT_MODULE: &[u8] =
         b"module(name='parent', version='1')\nbazel_dep(name='leaf', version='1', repo_name='leaf_from_parent')\n";
+    const GENERATED_PARENT_MODULE: &[u8] = b"module(name='parent', version='1')\ne=use_extension('//:compatibility.bzl','compatibility')\nuse_repo(e, compatibility_repo='compatibility_repo')\n";
+    const GENERATED_PARENT_EXTENSION: &[u8] = br#"
+repo=repository_rule(implementation=lambda ctx: None)
+def impl(ctx): repo(name='compatibility_repo')
+compatibility=module_extension(implementation=impl)
+"#;
     const LEAF_MAPPING_A: &[u8] = b"module(name='leaf', version='1')\nbazel_dep(name='mapped', version='1', repo_name='alias_a')\n";
     const LEAF_MAPPING_B: &[u8] = b"module(name='leaf', version='1')\nbazel_dep(name='mapped', version='1', repo_name='alias_b')\n";
     const MAPPED_MODULE: &[u8] = b"module(name='mapped', version='1')\n";
@@ -137,6 +144,8 @@ mod tests {
         br#"{"url":"https://origin.invalid/leaf-b.tgz","integrity":"sha256-b"}"#;
     const OTHER_SOURCE: &[u8] =
         br#"{"url":"https://origin.invalid/source.tgz","integrity":"sha256-source"}"#;
+    const OBSERVED_PARENT_SOURCE: &str = "observed-host-repository-source-observation:@@parent+";
+    const OBSERVED_MISSING_SOURCE: &str = "observed-host-repository-source-observation:@@missing";
 
     struct StaticRegistryIo(BTreeMap<String, Arc<[u8]>>);
 
@@ -198,13 +207,17 @@ mod tests {
         assert!(!tracker.all_keys().iter().any(|key| key.starts_with(prefix)));
     }
 
-    fn registry_io(leaf_module: &'static [u8], leaf_source: &'static [u8]) -> StaticRegistryIo {
+    fn registry_io(
+        parent_module: &'static [u8],
+        leaf_module: &'static [u8],
+        leaf_source: &'static [u8],
+    ) -> StaticRegistryIo {
         let mut files = BTreeMap::from([(
             "https://registry.invalid/bazel_registry.json".to_owned(),
             Arc::from(&b"{}"[..]),
         )]);
         for (name, module, source) in [
-            ("parent", PARENT_MODULE, OTHER_SOURCE),
+            ("parent", parent_module, OTHER_SOURCE),
             ("leaf", leaf_module, leaf_source),
             ("mapped", MAPPED_MODULE, OTHER_SOURCE),
         ] {
@@ -220,11 +233,15 @@ mod tests {
         StaticRegistryIo(files)
     }
 
-    fn registry_dice(leaf_module: &'static [u8], leaf_source: &'static [u8]) -> Arc<Dice> {
+    fn registry_dice(
+        parent_module: &'static [u8],
+        leaf_module: &'static [u8],
+        leaf_source: &'static [u8],
+    ) -> Arc<Dice> {
         let mut builder = Dice::builder();
         slug_bzlmod_v2::install_registry_io(
             &mut builder,
-            Arc::new(registry_io(leaf_module, leaf_source)),
+            Arc::new(registry_io(parent_module, leaf_module, leaf_source)),
         );
         builder.build(DetectCycles::Enabled)
     }
@@ -264,7 +281,7 @@ mod tests {
         leaf_module: &'static [u8],
         leaf_source: &'static [u8],
     ) -> HostCanonicalRepositoryLoadRouteOutcome {
-        let dice = registry_dice(leaf_module, leaf_source);
+        let dice = registry_dice(PARENT_MODULE, leaf_module, leaf_source);
         transaction(&dice, ROOT_MODULE, EXTENSION_A, true, None)
             .await
             .compute(&HostCanonicalRepositoryLoadRouteKey::new(
@@ -280,7 +297,7 @@ mod tests {
         leaf_source: &'static [u8],
         canonical_repo: &str,
     ) -> (Arc<Dice>, HostCanonicalRepositorySourceInput) {
-        let dice = registry_dice(leaf_module, leaf_source);
+        let dice = registry_dice(PARENT_MODULE, leaf_module, leaf_source);
         let mut tx = transaction(&dice, ROOT_MODULE, EXTENSION_A, true, None).await;
         let outcome = tx
             .compute(&HostCanonicalRepositoryLoadRouteKey::new(
@@ -471,21 +488,26 @@ mod tests {
         .await
     }
 
-    async fn request_transaction_with_observations(
+    async fn requests_transaction_with_observations(
         dice: &Arc<Dice>,
-        request: Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>,
+        requests: impl IntoIterator<
+            Item = (
+                Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>,
+                RepositoryMaterializationSuccess,
+            ),
+        >,
         tracker: Arc<DependencyTrace>,
-        result: RepositoryMaterializationSuccess,
         observations: PathObservationEpoch,
     ) -> dice::DiceTransaction {
-        let epoch = RepositoryMaterializationResultEpoch::new(
-            request.id.workspace.clone(),
-            [RepositoryMaterializationEpochEntry {
-                request: request.clone(),
+        let entries = requests
+            .into_iter()
+            .map(|(request, result)| RepositoryMaterializationEpochEntry {
+                request,
                 result: RepositoryMaterializationResult::Success(result),
-            }],
-        )
-        .unwrap();
+            })
+            .collect::<Vec<_>>();
+        let workspace = entries[0].request.id.workspace.clone();
+        let epoch = RepositoryMaterializationResultEpoch::new(workspace.clone(), entries).unwrap();
         let mut user_data = UserComputationData {
             cycle_detector: Some(bzl_load_cycle_detector()),
             activation_tracker: Some(tracker),
@@ -497,15 +519,15 @@ mod tests {
         let mut updater = dice.updater_with_data(user_data);
         updater
             .changed_to(vec![(
-                RepositoryPlatformKey::new(request.id.workspace.clone()),
+                RepositoryPlatformKey::new(workspace.clone()),
                 RepositoryPlatform::new("linux", "x86_64"),
             )])
             .unwrap();
         inject_root_package_policy_inputs(
             &mut updater,
             RootPackagePolicyInputs::new(
-                request.id.workspace.clone(),
-                Arc::from([request.id.workspace.clone()]),
+                workspace.clone(),
+                Arc::from([workspace.clone()]),
                 std::iter::empty::<&str>(),
                 None,
                 Some("warning"),
@@ -515,9 +537,7 @@ mod tests {
         .unwrap();
         updater
             .changed_to(vec![(
-                RepositoryMaterializationResultEpochKey {
-                    workspace: request.id.workspace.clone(),
-                },
+                RepositoryMaterializationResultEpochKey { workspace },
                 epoch,
             )])
             .unwrap();
@@ -525,6 +545,17 @@ mod tests {
             .changed_to(vec![(PathObservationEpochKey, observations)])
             .unwrap();
         updater.commit().await
+    }
+
+    async fn request_transaction_with_observations(
+        dice: &Arc<Dice>,
+        request: Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>,
+        tracker: Arc<DependencyTrace>,
+        result: RepositoryMaterializationSuccess,
+        observations: PathObservationEpoch,
+    ) -> dice::DiceTransaction {
+        requests_transaction_with_observations(dice, [(request, result)], tracker, observations)
+            .await
     }
 
     fn canonical_bzl_key(
@@ -804,7 +835,7 @@ mod tests {
 
     #[tokio::test]
     async fn root_request_external_bzl_preserves_exact_source_children() {
-        let dice = registry_dice(LEAF_MAPPING_A, SOURCE_A);
+        let dice = registry_dice(PARENT_MODULE, LEAF_MAPPING_A, SOURCE_A);
         let mut root_tx = transaction(&dice, ROOT_MODULE, EXTENSION_A, true, None).await;
         let route = admitted_root_route(&mut root_tx, "parent_alias").await;
         let input = host_repository_source_input(route.source_capability()).unwrap();
@@ -814,15 +845,17 @@ mod tests {
         };
         let tracker = Arc::new(DependencyTrace::default());
         let instance = PathObservationInstanceId::new(76);
-        let mut tx = request_transaction_with_observations(
+        let mut tx = requests_transaction_with_observations(
             &dice,
-            request.clone(),
+            [(
+                request.clone(),
+                RepositoryMaterializationSuccess::Immutable {
+                    source_identity: Arc::from("root-request-bzl-source"),
+                    generation_root: PathBuf::from("/registry-parent"),
+                    observation_instance: instance,
+                },
+            )],
             tracker.clone(),
-            RepositoryMaterializationSuccess::Immutable {
-                source_identity: Arc::from("root-request-bzl-source"),
-                generation_root: PathBuf::from("/registry-parent"),
-                observation_instance: instance,
-            },
             bzl_source_epoch(
                 PathObservationNamespace::Materialization(instance),
                 "/registry-parent",
@@ -878,11 +911,260 @@ mod tests {
                 "path-observation:Materialization(PathObservationInstanceId { value: 76 }):\"/registry-parent/defs.bzl\":FileBytes".to_owned(),
             ]
         );
-        assert!(tracker.all_keys().iter().all(|key| {
-            !(key.starts_with("host-repository-source-observation:") && key.contains("parent+"))
-                && !(key.starts_with("observed-host-repository-source-observation:")
-                    && key.contains("parent+"))
-        }));
+        assert_no_activation(&tracker, "host-repository-source-observation:@@parent+");
+        assert_no_activation(&tracker, OBSERVED_PARENT_SOURCE);
+        assert_no_activation(&tracker, "host-canonical-repository-load-route:");
+        assert_no_activation(&tracker, "observed-host-canonical-repository-load-route:");
+    }
+
+    #[tokio::test]
+    async fn selected_child_load_stays_root_and_missing_mapping_activates_no_canonical_route() {
+        let dice = registry_dice(PARENT_MODULE, LEAF_MAPPING_A, SOURCE_A);
+        let mut root_tx = transaction(&dice, ROOT_MODULE, EXTENSION_A, true, None).await;
+        let route = admitted_root_route(&mut root_tx, "parent_alias").await;
+        let parent_input = host_repository_source_input(route.source_capability()).unwrap();
+        let HostRepositorySourceInputDispositionView::Request(parent_request) =
+            parent_input.view().disposition()
+        else {
+            panic!("selected parent must retain a source request")
+        };
+        let RootRepositoryBzlLoadRoute::Root(leaf_route) = route
+            .selected_bzl_load_route(&ApparentRepoName::new("leaf_from_parent").unwrap())
+            .unwrap()
+        else {
+            panic!("selected dependency must retain the direct Root route")
+        };
+        let leaf_input = host_repository_source_input(leaf_route.source_capability()).unwrap();
+        let HostRepositorySourceInputDispositionView::Request(leaf_request) =
+            leaf_input.view().disposition()
+        else {
+            panic!("selected child must retain a source request")
+        };
+        let host = root_tx.compute(&PathObservationEpochKey).await.unwrap();
+        let parent_instance = PathObservationInstanceId::new(77);
+        let leaf_instance = PathObservationInstanceId::new(78);
+        let parent = bzl_source_epoch(
+            PathObservationNamespace::Materialization(parent_instance),
+            "/registry-parent",
+            &[
+                (
+                    "selected.bzl",
+                    Some(b"load('@leaf_from_parent//:child.bzl', 'VALUE')\nRESULT = VALUE\n"),
+                ),
+                (
+                    "missing.bzl",
+                    Some(b"load('@missing//:child.bzl', 'VALUE')\n"),
+                ),
+            ],
+        );
+        let leaf = bzl_source_epoch(
+            PathObservationNamespace::Materialization(leaf_instance),
+            "/registry-leaf",
+            &[("child.bzl", Some(b"VALUE = 2\n"))],
+        );
+        let observations = merge_observations(&merge_observations(&host, &parent), &leaf);
+        let tracker = Arc::new(DependencyTrace::default());
+        let immutable = |source, root, instance| RepositoryMaterializationSuccess::Immutable {
+            source_identity: Arc::from(source),
+            generation_root: PathBuf::from(root),
+            observation_instance: instance,
+        };
+        let mut tx = requests_transaction_with_observations(
+            &dice,
+            [
+                (
+                    parent_request.clone(),
+                    immutable("selected-parent", "/registry-parent", parent_instance),
+                ),
+                (
+                    leaf_request.clone(),
+                    immutable("selected-child", "/registry-leaf", leaf_instance),
+                ),
+            ],
+            tracker.clone(),
+            observations,
+        )
+        .await;
+
+        let missing_key =
+            ExternalBzlModuleObservationKey::new(route.clone(), external_label("", "missing.bzl"));
+        let SourcePreparationOutcome::Complete(Ok(missing)) =
+            tx.compute(&missing_key).await.unwrap()
+        else {
+            panic!("missing mapping must complete with a semantic error")
+        };
+        assert!(matches!(
+            missing.result().as_ref().as_ref().unwrap_err(),
+            ExternalBzlModuleError::LoadLabel { .. }
+        ));
+        let selected_key =
+            ExternalBzlModuleObservationKey::new(route, external_label("", "selected.bzl"));
+        let SourcePreparationOutcome::Complete(Ok(selected)) =
+            tx.compute(&selected_key).await.unwrap()
+        else {
+            panic!("selected dependency load must complete")
+        };
+        let selected = selected.result().as_ref().as_ref().unwrap();
+        assert_eq!(
+            selected.manifest.direct_children[0].label,
+            CanonicalLabel::parse("@@leaf+//:child.bzl").unwrap()
+        );
+        let child_key = "observed-external-bzl-module:@@leaf+//:child.bzl";
+        assert!(
+            tracker
+                .dependencies(&selected_key.to_string())
+                .iter()
+                .any(|dependency| dependency == child_key)
+        );
+        assert!(
+            tracker
+                .all_keys()
+                .contains(&"observed-host-repository-source-file:@@leaf+:child.bzl".to_owned())
+        );
+        assert_no_activation(&tracker, OBSERVED_MISSING_SOURCE);
+        assert_no_activation(&tracker, "host-canonical-repository-load-route:");
+        assert_no_activation(&tracker, "observed-host-canonical-repository-load-route:");
+    }
+
+    #[tokio::test]
+    async fn selected_parent_routes_generated_load_through_canonical_owner() {
+        let dice = registry_dice(GENERATED_PARENT_MODULE, LEAF_MAPPING_A, SOURCE_A);
+        let mut root_tx = transaction(&dice, ROOT_MODULE, EXTENSION_A, true, None).await;
+        let route = admitted_root_route(&mut root_tx, "parent_alias").await;
+        let RootRepositoryBzlLoadRoute::Canonical(child_repo) = route
+            .selected_bzl_load_route(&ApparentRepoName::new("compatibility_repo").unwrap())
+            .unwrap()
+        else {
+            panic!("generated import must defer to the canonical owner")
+        };
+        let parent_input = host_repository_source_input(route.source_capability()).unwrap();
+        let HostRepositorySourceInputDispositionView::Request(parent_request) =
+            parent_input.view().disposition()
+        else {
+            panic!("selected parent must retain a source request")
+        };
+        let host = root_tx.compute(&PathObservationEpochKey).await.unwrap();
+        let parent_instance = PathObservationInstanceId::new(79);
+        let parent = bzl_source_epoch(
+            PathObservationNamespace::Materialization(parent_instance),
+            "/generated-parent",
+            &[
+                ("compatibility.bzl", Some(GENERATED_PARENT_EXTENSION)),
+                (
+                    "entry.bzl",
+                    Some(b"load('@compatibility_repo//:symbols.bzl', 'VALUE')\nRESULT = VALUE\n"),
+                ),
+            ],
+        );
+        let tracker = Arc::new(DependencyTrace::default());
+        let success = |source, root, instance| RepositoryMaterializationSuccess::Immutable {
+            source_identity: Arc::from(source),
+            generation_root: PathBuf::from(root),
+            observation_instance: instance,
+        };
+        let mut stage = requests_transaction_with_observations(
+            &dice,
+            [(
+                parent_request.clone(),
+                success("generated-parent", "/generated-parent", parent_instance),
+            )],
+            tracker.clone(),
+            merge_observations(&host, &parent),
+        )
+        .await;
+        let child = stage
+            .compute(&HostCanonicalRepositoryLoadRouteKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                child_repo.clone(),
+            ))
+            .await
+            .unwrap();
+        let child_input = load_route(&child).input().clone();
+        let HostRepositorySourceInputDispositionView::Request(child_request) =
+            child_input.view().disposition()
+        else {
+            panic!("generated child must retain its effect request")
+        };
+        let child_instance = PathObservationInstanceId::new(80);
+        let child_source = bzl_source_epoch(
+            PathObservationNamespace::Materialization(child_instance),
+            "/generated-compatibility",
+            &[("symbols.bzl", Some(b"VALUE = 'generated'\n"))],
+        );
+        let mut tx = requests_transaction_with_observations(
+            &dice,
+            [
+                (
+                    parent_request.clone(),
+                    success("generated-parent", "/generated-parent", parent_instance),
+                ),
+                (
+                    child_request.clone(),
+                    success(
+                        "generated-compatibility",
+                        "/generated-compatibility",
+                        child_instance,
+                    ),
+                ),
+            ],
+            tracker.clone(),
+            merge_observations(&merge_observations(&host, &parent), &child_source),
+        )
+        .await;
+        let label = external_label("", "entry.bzl");
+        let legacy_key = ExternalBzlModuleEvalKey::new(route.clone(), label.clone());
+        let observed_key = ExternalBzlModuleObservationKey::new(route, label);
+        let SourcePreparationOutcome::Complete(legacy) = tx.compute(&legacy_key).await.unwrap()
+        else {
+            panic!("generated child legacy load must complete")
+        };
+        let legacy = legacy.as_ref().as_ref().unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) =
+            tx.compute(&observed_key).await.unwrap()
+        else {
+            panic!("generated child observed load must complete")
+        };
+        let observed_module = observed.result().as_ref().as_ref().unwrap();
+        let result = observed_module.module.get("RESULT").unwrap();
+        assert_eq!(result.value().to_string(), "\"generated\"");
+        assert_eq!(
+            observed_module.manifest.direct_children[0].label,
+            CanonicalLabel::parse(&format!("{child_repo}//:symbols.bzl")).unwrap()
+        );
+        assert_eq!(
+            legacy.manifest.direct_children[0].label,
+            observed_module.manifest.direct_children[0].label
+        );
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let legacy_route =
+            HostCanonicalRepositoryLoadRouteKey::new(workspace.clone(), child_repo.clone())
+                .to_string();
+        let observed_route =
+            HostCanonicalRepositoryLoadRouteObservationKey::new(workspace, child_repo.clone())
+                .to_string();
+        let legacy_dependencies = tracker.dependencies(&legacy_key.to_string());
+        assert!(
+            legacy_dependencies.contains(&legacy_route),
+            "legacy dependencies: {legacy_dependencies:?}"
+        );
+        let observed_dependencies = tracker.dependencies(&observed_key.to_string());
+        assert!(
+            observed_dependencies.contains(&observed_route),
+            "observed dependencies: {observed_dependencies:?}"
+        );
+        let canonical_source =
+            format!("observed-host-repository-source-observation:{child_repo}:symbols.bzl");
+        assert!(tracker.all_keys().contains(&canonical_source));
+        let root_source = format!("observed-host-repository-source-file:{child_repo}");
+        assert_no_activation(&tracker, &root_source);
+        assert_no_activation(
+            &tracker,
+            "host-selected-extension-definition-load-requests:",
+        );
+        assert_no_activation(
+            &tracker,
+            "observed-host-selected-extension-definition-load-requests:",
+        );
     }
 
     #[tokio::test]
@@ -941,6 +1223,8 @@ mod tests {
                     && key.contains("bazel_tools"))
                 && !key.contains("repository-materialization-result:@@bazel_tools")
         }));
+        assert_no_activation(&tracker, "host-canonical-repository-load-route:");
+        assert_no_activation(&tracker, "observed-host-canonical-repository-load-route:");
     }
 
     #[tokio::test]
