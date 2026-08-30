@@ -19,6 +19,7 @@ use allocative::Allocative;
 use compact_str::CompactString;
 use dupe::Dupe;
 use slug_build_api_v2::ProviderId;
+use slug_build_api_v2::ProviderIdentity;
 use slug_bzlmod_v2::NonrootAttributeValue;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
@@ -94,14 +95,15 @@ use crate::module_extension_repository_rule::RepositoryRuleAttribute;
 use crate::module_extension_repository_rule::RepositoryRuleDefinition;
 use crate::provider::AnalysisBuiltinCallable;
 use crate::provider::BzlEvaluationContext;
-use crate::provider::FrozenUserProviderCallable;
 use crate::provider::OutputGroupInfo;
 use crate::provider::RunEnvironmentInfo;
 use crate::provider::UserProviderCallable;
+use crate::provider::starlark_provider_identity;
 use crate::provider::user_provider_from_arguments;
 use crate::starlark_label::StarlarkLabel;
 use crate::starlark_label::label_globals;
 use crate::starlark_label::resolve_label;
+use crate::testing_bootstrap::testing_bootstrap_globals;
 use crate::visibility::PackageGroupContents;
 use crate::visibility::RuleVisibility;
 use crate::visibility::VisibilitySource;
@@ -690,7 +692,7 @@ pub struct StarlarkRuleImplementation {
     implementation: FrozenValue,
     dependencies: Arc<[CanonicalLabel]>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
-    advertised_providers: Arc<[ProviderId]>,
+    advertised_providers: Arc<[ProviderIdentity]>,
     required_fragments: Arc<[CompactString]>,
     schema: Arc<[AttributeSchema]>,
     values: Arc<[AttributeValue]>,
@@ -730,7 +732,7 @@ impl StarlarkRuleImplementation {
         &self.required_toolchains
     }
 
-    pub fn advertised_providers(&self) -> &[ProviderId] {
+    pub fn advertised_providers(&self) -> &[ProviderIdentity] {
         &self.advertised_providers
     }
 
@@ -1319,7 +1321,7 @@ impl PackageRecorder {
         name: String,
         implementation: FrozenValue,
         required_toolchains: Arc<[ToolchainTypeRequirement]>,
-        advertised_providers: Arc<[ProviderId]>,
+        advertised_providers: Arc<[ProviderIdentity]>,
         required_fragments: Arc<[CompactString]>,
         capability: Arc<RuleCapability>,
         schema: Arc<[AttributeSchema]>,
@@ -3011,7 +3013,7 @@ struct RuleDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     #[trace(unsafe_ignore)]
-    advertised_providers: Arc<[ProviderId]>,
+    advertised_providers: Arc<[ProviderIdentity]>,
     #[trace(unsafe_ignore)]
     required_fragments: Arc<[CompactString]>,
     #[trace(unsafe_ignore)]
@@ -3029,7 +3031,7 @@ struct RuleDefinitionGen<V> {
 pub(crate) struct FrozenRuleDefinition {
     implementation: FrozenValue,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
-    advertised_providers: Arc<[ProviderId]>,
+    advertised_providers: Arc<[ProviderIdentity]>,
     required_fragments: Arc<[CompactString]>,
     pub(crate) schema: Arc<[FrozenRuleAttributeSchema]>,
     capability: Arc<RuleCapability>,
@@ -3057,7 +3059,7 @@ impl FrozenRuleDefinition {
     }
 
     #[cfg(test)]
-    pub(crate) fn advertised_providers(&self) -> &[ProviderId] {
+    pub(crate) fn advertised_providers(&self) -> &[ProviderIdentity] {
         &self.advertised_providers
     }
 
@@ -3170,7 +3172,7 @@ struct AspectDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     required_providers: Arc<[Arc<[ProviderId]>]>,
     #[trace(unsafe_ignore)]
-    advertised_providers: Arc<[ProviderId]>,
+    advertised_providers: Arc<[ProviderIdentity]>,
     #[trace(unsafe_ignore)]
     required_fragments: Arc<[CompactString]>,
     #[trace(unsafe_ignore)]
@@ -3190,7 +3192,7 @@ pub(crate) struct FrozenAspectDefinition {
     pub(crate) required_aspect: Option<FrozenValue>,
     pub(crate) required_toolchains: Arc<[ToolchainTypeRequirement]>,
     pub(crate) required_providers: Arc<[Arc<[ProviderId]>]>,
-    pub(crate) advertised_providers: Arc<[ProviderId]>,
+    pub(crate) advertised_providers: Arc<[ProviderIdentity]>,
     pub(crate) required_fragments: Arc<[CompactString]>,
     pub(crate) defining_label: CanonicalLabel,
     pub(crate) exported_name: Option<CompactString>,
@@ -3240,23 +3242,30 @@ impl<'v> Freeze for AspectDefinition<'v> {
     }
 }
 
-fn declaration_provider_id(value: Value, argument: &str) -> anyhow::Result<ProviderId> {
+fn declaration_provider_identity(value: Value, argument: &str) -> anyhow::Result<ProviderIdentity> {
     if let Some(provider) = value.downcast_ref::<UserProviderCallable>() {
         return provider
             .id()
-            .map(Dupe::dupe)
+            .map(|id| ProviderIdentity::user(id.dupe()))
             .ok_or_else(|| anyhow::anyhow!("{argument} providers must be exported"));
     }
-    if let Some(provider) = value.downcast_ref::<FrozenUserProviderCallable>() {
-        return Ok(provider.id().dupe());
+    if let Some(identity) = starlark_provider_identity(value) {
+        return Ok(identity);
     }
-    anyhow::bail!("{argument} must contain user provider constructors")
+    anyhow::bail!("{argument} must contain exported provider constructors")
+}
+
+fn declaration_user_provider_id(value: Value, argument: &str) -> anyhow::Result<ProviderId> {
+    declaration_provider_identity(value, argument)?
+        .user_id()
+        .map(Dupe::dupe)
+        .ok_or_else(|| anyhow::anyhow!("{argument} must contain user provider constructors"))
 }
 
 fn advertised_provider_ids(
     value: Option<Value>,
     argument: &str,
-) -> anyhow::Result<Arc<[ProviderId]>> {
+) -> anyhow::Result<Arc<[ProviderIdentity]>> {
     let Some(value) = value else {
         return Ok(Arc::from([]));
     };
@@ -3270,9 +3279,9 @@ fn advertised_provider_ids(
     let mut seen = SmallSet::new();
     let mut result = Vec::with_capacity(providers.len());
     for provider in providers {
-        let id = declaration_provider_id(provider, argument)?;
-        if seen.insert(id.dupe()) {
-            result.push(id);
+        let identity = declaration_provider_identity(provider, argument)?;
+        if seen.insert(identity.clone()) {
+            result.push(identity);
         }
     }
     Ok(result.into())
@@ -3296,7 +3305,7 @@ fn aspect_required_providers(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[P
             if providers.len() != 1 {
                 anyhow::bail!("aspect required_providers alternatives must be singletons");
             }
-            Ok(Arc::from([declaration_provider_id(
+            Ok(Arc::from([declaration_user_provider_id(
                 providers[0],
                 "aspect required_providers",
             )?]))
@@ -3305,7 +3314,7 @@ fn aspect_required_providers(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[P
         .map(Arc::from)
 }
 
-fn aspect_advertised_providers(value: Option<Value>) -> anyhow::Result<Arc<[ProviderId]>> {
+fn aspect_advertised_providers(value: Option<Value>) -> anyhow::Result<Arc<[ProviderIdentity]>> {
     advertised_provider_ids(value, "aspect provides")
 }
 
@@ -3366,7 +3375,7 @@ fn label_required_provider(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[Pro
     let [provider] = providers.content() else {
         anyhow::bail!("label providers supports exactly one exported provider");
     };
-    Ok(Arc::from([Arc::from([declaration_provider_id(
+    Ok(Arc::from([Arc::from([declaration_user_provider_id(
         *provider,
         "attribute providers",
     )?])]))
@@ -6512,6 +6521,7 @@ fn complete_loading_globals(bool_config: bool) -> Globals {
         aspect_globals(&mut globals);
         cc_common_globals(&mut globals);
         label_globals(&mut globals);
+        testing_bootstrap_globals(&mut globals);
         globals.set("OutputGroupInfo", OutputGroupInfo);
         globals.set("RunEnvironmentInfo", RunEnvironmentInfo);
     } else {

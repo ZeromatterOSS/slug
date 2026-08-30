@@ -1419,6 +1419,9 @@ pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> 
     if RunEnvironmentInfo::from_value(value).is_some() {
         return Some(ProviderIdentity::builtin("RunEnvironmentInfo"));
     }
+    if let Some(name) = crate::testing_bootstrap::testing_provider_identity(value) {
+        return Some(ProviderIdentity::builtin(name));
+    }
     None
 }
 
@@ -1432,6 +1435,12 @@ pub fn alloc_starlark_provider_callable(
         "DefaultInfo" | "ToolchainInfo" => heap.alloc(AnalysisBuiltinCallable::new(name)),
         "OutputGroupInfo" => heap.alloc(OutputGroupInfo),
         "RunEnvironmentInfo" => heap.alloc(RunEnvironmentInfo),
+        "ExecutionInfo"
+        | "InstrumentedFilesInfo"
+        | "AnalysisFailureInfo"
+        | "AnalysisTestResultInfo" => {
+            return crate::testing_bootstrap::alloc_testing_provider_token(heap, name);
+        }
         _ => return None,
     })
 }

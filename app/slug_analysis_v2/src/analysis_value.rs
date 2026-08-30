@@ -897,4 +897,54 @@ mod tests {
             1
         );
     }
+
+    #[test]
+    fn testing_bootstrap_builtin_keys_rematerialize_through_the_shared_provider_owner() {
+        let names = [
+            "ExecutionInfo",
+            "InstrumentedFilesInfo",
+            "AnalysisFailureInfo",
+            "AnalysisTestResultInfo",
+        ];
+        let mut values = vec![ProviderValue::DefaultInfo(DefaultInfo::empty())];
+        values.extend(names.into_iter().map(|name| {
+            ProviderValue::Occurrence(ProviderOccurrence::empty(ProviderIdentity::builtin(name)))
+        }));
+        let providers = ProviderCollection::new(values).unwrap();
+        let retained = ConfiguredTargetValue::new(
+            AnalysisConfiguredTargetKey::new(
+                slug_identity_v2::CanonicalLabel::parse("@@//:testing").unwrap(),
+                [7, 8, 9],
+            ),
+            providers,
+        );
+        let heap = FrozenHeap::new();
+        let value = AnalysisValueMaterializer::new(&heap)
+            .target(&retained)
+            .unwrap();
+        let target = AnalysisConfiguredTargetValue::from_value(value.to_value()).unwrap();
+        assert_eq!(target.providers.len(), names.len() + 1);
+        for name in names {
+            let token = alloc_starlark_provider_callable(&heap, name).unwrap();
+            assert_eq!(
+                starlark_provider_identity(token.to_value()),
+                Some(ProviderIdentity::builtin(name))
+            );
+            assert!(target.is_in(token.to_value()).unwrap(), "{name}");
+            let expected = target
+                .providers
+                .get(&ProviderIdentity::builtin(name))
+                .unwrap()
+                .to_value();
+            Heap::temp(|scratch| {
+                assert!(
+                    target
+                        .at(token.to_value(), scratch)
+                        .unwrap()
+                        .ptr_eq(expected),
+                    "{name}"
+                );
+            });
+        }
+    }
 }

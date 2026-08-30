@@ -29213,7 +29213,12 @@ MULTI_ASPECT = aspect(implementation = aspect_impl, provides = [P, Q, P])
     assert_eq!(
         rule.advertised_providers()
             .iter()
-            .map(ToString::to_string)
+            .map(|identity| {
+                identity
+                    .user_id()
+                    .expect("deduplicated provides are user providers")
+                    .to_string()
+            })
             .collect::<Vec<_>>(),
         expected
     );
@@ -29314,7 +29319,10 @@ fn assert_rules_rust_allocator_declarations(module: &FrozenModule) {
     assert_eq!(rule.capability().rule_class, "rust_allocator_libraries");
     assert_eq!(rule.advertised_providers().len(), 1);
     assert_eq!(
-        rule.advertised_providers()[0].to_string(),
+        rule.advertised_providers()[0]
+            .user_id()
+            .expect("allocator provides a user provider")
+            .to_string(),
         "@@rules_rust+//rust/private:providers.bzl%AllocatorLibrariesInfo"
     );
     let expected_toolchains = [
@@ -30528,7 +30536,13 @@ load("//rust/private:providers.bzl", "CaptureClippyOutputInfo", "ClippyInfo", "C
     let aspect = aspect_value.clone().downcast::<FrozenAspectDefinition>().unwrap();
     assert_eq!(aspect.attr_aspects.as_ref(), ["deps", "proc_macro_deps", "crate"]);
     assert!(aspect.required_aspect.unwrap().to_value().ptr_eq(module.get("rust_clippy_aspect").unwrap().value()));
-    assert_eq!(aspect.advertised_providers[0].to_string(), "@@rules_rust+//rust/private:clippy.bzl%RustClippyTestInfo");
+    assert_eq!(
+        aspect.advertised_providers[0]
+            .user_id()
+            .expect("clippy aspect provides a user provider")
+            .to_string(),
+        "@@rules_rust+//rust/private:clippy.bzl%RustClippyTestInfo"
+    );
     let rule = module.get("rust_clippy_test").unwrap().downcast::<FrozenRuleDefinition>().unwrap();
     assert_eq!(rule.capability().test_kind, Some(TestRuleKind::Test));
     let declared = &rule.schema[rule.schema.len() - 5..];
@@ -30867,7 +30881,10 @@ fn assert_frozen_rustfmt_test_aspect(aspect: &FrozenAspectDefinition) {
     assert!(aspect.required_providers.is_empty());
     assert_eq!(aspect.advertised_providers.len(), 1);
     assert_eq!(
-        aspect.advertised_providers[0].to_string(),
+        aspect.advertised_providers[0]
+            .user_id()
+            .expect("rustfmt aspect provides a user provider")
+            .to_string(),
         "@@dep+//rust/private:rustfmt.bzl%RustfmtTestInfo"
     );
     assert_eq!(

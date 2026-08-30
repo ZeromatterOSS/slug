@@ -233,6 +233,32 @@ blob/cap/dirty-isolation audits and `scripts/v2_archive_status.sh`. The real
 dependent may expose a later missing category or admitted invocation boundary;
 it must at least clear every testing-bootstrap loading lookup consistently.
 
+## Terminal implementation evidence
+
+The bounded R4 implementation is terminally `ACCEPT` after independent review.
+Its cached diff is confined to the seven authorized Rust files and adds 287
+production, 381 proof and 668 aggregate lines. The existing selected-context
+`package.rs` candidate reconstructs to its recorded SHA-256
+`0295ce524e14da9f5a2ee6e623111177f32620462ffa3590eb1e2dca448e3128`
+and remains unstaged byte-for-byte.
+
+Focused TestingBootstrap loading and shared-provider rematerialization proofs
+pass, as do the complete serial `slug_loading_v2` and `slug_analysis_v2`
+suites and the parked four-registration-row proof. `slug_cli_v2` rebuilds
+successfully. Two daemon-clean fresh-workspace/fresh-output-root
+`rules-rust-073-toolchain-owner` cqueries both clear every testing-bootstrap
+lookup and stop identically at the next independent boundary while reading
+`@@bazel_tools//tools/build_defs/cc:action_names.bzl`: its built-in source lacks
+the required immutable source owner. This is not a bootstrap inventory,
+identity, context or invocation failure.
+
+Formatting, diff, blob, allowlist, cap, dirty-isolation and archive checks pass
+apart from the archive checker's three already tracked retained-document
+exceptions. Independent terminal review confirms the exact inventories,
+static top-level identity, builtin-provider carrier/rematerialization,
+callable/noncallable barriers, user-only required-provider constraints, lack
+of `ProviderIdentity: Display`, and absence of new retained hot-path state.
+
 ## Implementation evidence and exclusions
 
 The R3 candidate remained unstaged during correction review. Production and
