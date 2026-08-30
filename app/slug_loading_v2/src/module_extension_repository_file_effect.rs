@@ -58,6 +58,7 @@ use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCer
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationKey;
 use crate::repository_rule_context::RepositoryRuleHostObservation;
 use crate::repository_rule_context::RepositoryRuleInvocationError;
+use crate::repository_rule_context::RepositoryRuleInvocationInput;
 use crate::repository_rule_context::invoke_repository_rule;
 
 #[doc(hidden)]
@@ -615,6 +616,25 @@ async fn compute_effect(
         Ok(value) => value,
         Err(error) => return complete_effect_error(error, observations),
     };
+    let (canonical_name, spec) = repository.spec_parts();
+    let input = match RepositoryRuleInvocationInput::new(
+        canonical_name.as_str().into(),
+        Some(repository.generated_name().into()),
+        spec.attributes.clone(),
+        repository.call().definition.attributes.clone(),
+    ) {
+        Ok(input) => input,
+        Err(message) => {
+            return complete_effect_error(
+                HostSelectedRepositoryFileEffectError::Projection {
+                    certificate: certificate.clone(),
+                    ordinal: key.ordinal,
+                    message,
+                },
+                observations,
+            );
+        }
+    };
     let transaction = match ctx
         .per_transaction_data()
         .data
@@ -685,6 +705,7 @@ async fn compute_effect(
         .then(InvocationPrintCapture::default);
     let invocation_result = invoke_repository_rule(
         implementation,
+        input,
         platform.clone(),
         transaction.snapshot().dupe(),
         capture.as_ref().map(|capture| capture as &dyn PrintHandler),
@@ -1876,6 +1897,281 @@ ext = module_extension(implementation = impl)
                 SourcePreparationOutcome::Complete(_) => unreachable!(),
             }),
         ));
+    }
+
+    #[tokio::test]
+    async fn repository_context_attributes_restore_warm_effects_for_ordinary_and_innate_owners() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let definition = r#"
+def write(ctx):
+    ctx.file('generated.txt', repr([ctx.name, ctx.original_name, ctx.attr.s, ctx.attr.words, ctx.attr.groups, ctx.attr.default]))
+repo=repository_rule(implementation=write, attrs={'s':attr.string(), 'words':attr.string_list(), 'groups':attr.string_list_dict(), 'default':attr.string(default='d')})
+"#;
+        let ordinary = |s: &str, words: &str, groups: &str| {
+            format!(
+                "{definition}def impl(ctx):\n    repo(name='first', s='{s}', words={words}, groups={groups})\next=module_extension(implementation=impl)\n"
+            )
+        };
+        let innate_module = |s: &str, words: &str, groups: &str| {
+            format!(
+                "module(name='bazel_tools')\nrepo=use_repo_rule('//:ext.bzl','repo')\nrepo(name='first', s='{s}', words={words}, groups={groups})\n"
+            )
+        };
+        for (module, requested) in [
+            (MODULE.to_owned(), "+ext+first"),
+            (
+                innate_module("one", "['a']", "{'z':['a'], 'a':['b']}"),
+                "+repo+first",
+            ),
+        ] {
+            let extensions = if requested == "+ext+first" {
+                [
+                    ordinary("one", "['a']", "{'z':['a'], 'a':['b']}"),
+                    ordinary("two", "['b']", "{'a':['b'], 'z':['a']}"),
+                    ordinary("one", "['a']", "{'z':['a'], 'a':['b']}"),
+                ]
+            } else {
+                [
+                    innate_module("one", "['a']", "{'z':['a'], 'a':['b']}"),
+                    innate_module("two", "['b']", "{'a':['b'], 'z':['a']}"),
+                    innate_module("one", "['a']", "{'z':['a'], 'a':['b']}"),
+                ]
+            };
+            let mut values = Vec::new();
+            for extension in extensions.iter() {
+                let (module_source, extension_source) = if requested == "+ext+first" {
+                    (module.as_str(), extension.as_str())
+                } else {
+                    (extension.as_str(), definition)
+                };
+                let mut tx =
+                    transaction_untracked(&dice, module_source, extension_source, true).await;
+                let owner = owner_named(&mut tx, workspace.dupe(), requested).await;
+                let SourcePreparationOutcome::Complete(value) = tx
+                    .compute(&HostSelectedRepositoryFileEffectKey::new(
+                        workspace.dupe(),
+                        owner,
+                        0,
+                    ))
+                    .await
+                    .unwrap()
+                else {
+                    panic!("effect must complete")
+                };
+                values.push(value);
+            }
+            let first = std::str::from_utf8(
+                values[0].as_ref().as_ref().unwrap().plan().effects()[0].content(),
+            )
+            .unwrap();
+            let changed = std::str::from_utf8(
+                values[1].as_ref().as_ref().unwrap().plan().effects()[0].content(),
+            )
+            .unwrap();
+            assert!(
+                first.contains(r#", "one", ["a"],"#) && changed.contains(r#", "two", ["b"],"#),
+                "{requested}: scalar and list values must both change"
+            );
+            assert!(
+                first.contains(r#"{"z": ["a"], "a": ["b"]}"#)
+                    && changed.contains(r#"{"a": ["b"], "z": ["a"]}"#),
+                "{requested}: nested map order must change without sorting"
+            );
+            assert_ne!(
+                first, changed,
+                "{requested}: scalar, collection, and nested-order transition"
+            );
+            assert_eq!(
+                values[0], values[2],
+                "{requested}: A/B/A restores effect identity"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn repository_context_defaults_names_and_failures_cover_both_owner_kinds() {
+        fn definition(default: &str, fail_after_file: bool) -> String {
+            let body = if fail_after_file {
+                "    ctx.file('staged')\n    return ctx.attr.missing\n"
+            } else {
+                "    ctx.file('generated.txt', repr([ctx.name, ctx.original_name, ctx.attr.value]))\n"
+            };
+            let descriptor = if default == "B" {
+                "attr.string_list(default=['B'])".to_owned()
+            } else {
+                format!("attr.string(default='{default}')")
+            };
+            format!(
+                "def write(ctx):\n{body}repo=repository_rule(implementation=write, attrs={{'value':{descriptor}}})\n"
+            )
+        }
+
+        fn ordinary(definition: &str, name: &str) -> String {
+            format!(
+                "{definition}def impl(ctx):\n    repo(name='{name}')\next=module_extension(implementation=impl)\n"
+            )
+        }
+
+        fn innate(name: &str) -> String {
+            format!(
+                "module(name='bazel_tools')\nrepo=use_repo_rule('//:ext.bzl','repo')\nrepo(name='{name}')\n"
+            )
+        }
+
+        fn ordinary_module(name: &str) -> String {
+            format!(
+                "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, generated='{name}')\n"
+            )
+        }
+
+        async fn effect(
+            dice: &Arc<Dice>,
+            workspace: &NormalizedAbsolutePath,
+            module: &str,
+            extension: &str,
+            requested: &str,
+        ) -> EffectResult {
+            let mut transaction = transaction_untracked(dice, module, extension, true).await;
+            let owner = owner_named(&mut transaction, workspace.dupe(), requested).await;
+            let SourcePreparationOutcome::Complete(value) = transaction
+                .compute(&HostSelectedRepositoryFileEffectKey::new(
+                    workspace.dupe(),
+                    owner,
+                    0,
+                ))
+                .await
+                .unwrap()
+            else {
+                panic!("repository context effect must complete")
+            };
+            value
+        }
+
+        fn content(value: &EffectResult) -> &[u8] {
+            value.as_ref().as_ref().unwrap().plan().effects()[0].content()
+        }
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        for innate_owner in [false, true] {
+            let mut defaults = Vec::new();
+            for default in ["A", "B", "A"] {
+                let definition = definition(default, false);
+                let (module, extension, requested) = if innate_owner {
+                    (innate("first"), definition, "+repo+first")
+                } else {
+                    (
+                        MODULE.to_owned(),
+                        ordinary(&definition, "first"),
+                        "+ext+first",
+                    )
+                };
+                defaults.push(effect(&dice, &workspace, &module, &extension, requested).await);
+            }
+            let canonical = if innate_owner {
+                "+repo+first"
+            } else {
+                "+ext+first"
+            };
+            assert_eq!(
+                content(&defaults[0]),
+                format!(r#"["{canonical}", "first", "A"]"#).as_bytes()
+            );
+            assert_ne!(content(&defaults[0]), content(&defaults[1]));
+            assert!(
+                std::str::from_utf8(content(&defaults[1]))
+                    .unwrap()
+                    .contains(r#"["B"]"#)
+            );
+            assert_eq!(
+                defaults[0], defaults[2],
+                "declaration kind/default A/B/A must restore"
+            );
+
+            let mut names = Vec::new();
+            for name in ["first", "second", "first"] {
+                let definition = definition("A", false);
+                let requested = if innate_owner {
+                    format!("+repo+{name}")
+                } else {
+                    format!("+ext+{name}")
+                };
+                let (module, extension) = if innate_owner {
+                    (innate(name), definition)
+                } else {
+                    (ordinary_module(name), ordinary(&definition, name))
+                };
+                names.push(effect(&dice, &workspace, &module, &extension, &requested).await);
+            }
+            let second_canonical = if innate_owner {
+                "+repo+second"
+            } else {
+                "+ext+second"
+            };
+            assert_eq!(
+                content(&names[1]),
+                format!(r#"["{second_canonical}", "second", "A"]"#).as_bytes(),
+                "canonical and generated/original names must both change"
+            );
+            assert_eq!(names[0], names[2], "name A/B/A must restore");
+
+            let failure_definition = definition("A", true);
+            let (module, extension, requested) = if innate_owner {
+                (innate("first"), failure_definition, "+repo+first")
+            } else {
+                (
+                    MODULE.to_owned(),
+                    ordinary(&failure_definition, "first"),
+                    "+ext+first",
+                )
+            };
+            let mut transaction = transaction_untracked(&dice, &module, &extension, true).await;
+            let owner = owner_named(&mut transaction, workspace.dupe(), requested).await;
+            let SourcePreparationOutcome::Complete(certificate) = transaction
+                .compute(&HostSelectedExtensionOwnerCertificateKey::new(
+                    workspace.dupe(),
+                    owner.clone(),
+                ))
+                .await
+                .unwrap()
+            else {
+                panic!("owner certificate must complete")
+            };
+            let repository = certificate
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .repository(0)
+                .unwrap();
+            let (canonical, spec) = repository.spec_parts();
+            let mut malformed = spec.attributes.as_ref().clone();
+            malformed.insert("value".into(), OverrideAttributeValue::Int(1));
+            assert!(
+                RepositoryRuleInvocationInput::new(
+                    canonical.as_str().into(),
+                    Some(repository.generated_name().into()),
+                    Arc::new(malformed),
+                    repository.call().definition.attributes.clone(),
+                )
+                .is_err()
+            );
+            let SourcePreparationOutcome::Complete(failed) = transaction
+                .compute(&HostSelectedRepositoryFileEffectKey::new(
+                    workspace.dupe(),
+                    owner,
+                    0,
+                ))
+                .await
+                .unwrap()
+            else {
+                panic!("failing effect must complete")
+            };
+            assert!(matches!(
+                failed.as_ref(),
+                Err(HostSelectedRepositoryFileEffectError::Invocation { .. })
+            ));
+        }
     }
 
     #[tokio::test]
