@@ -41,34 +41,27 @@ and later execute through the existing configured dependency/action owner.
 Macro finalizers, subrule toolchains/automatic exec groups, fragments,
 attached/configured aspects, and provider instances remain explicitly deferred.
 
-Run only `WP-4-5-7A-symbolic-macro-and-bzl-provider-key-implementation-r2` next
-under its exact R2 loading allowlist and 2,250/2,200/4,450 caps. It owns
-the complete frozen loading/package proof matrix and two fresh rules_rust
-replays, but only retains late namespace violations. The immediately scheduled
-40/120/160 analysis successor enforces those violations at the natural
-configured-target admission function under refreshed dirty-file hashes. Bazel
-9.2 commit `8220c619…` alone defines semantics. Clean Zabel `0795445f…`
-informs compact ownership and reuse only; `cc_common`/`cc_internal` remain
-generic downstream BCR Starlark discriminators, never parser or Rust C++ rule
-targets.
+Commit `e34cfdc7a` terminally accepts the symbolic-macro/provider successor.
+Both `.bzl` routes gain default non-finalizer `macro` and nonconstructible
+`PackageSpecificationInfo`; BUILD loses its `DefaultInfo` leak and retains only
+universe-owned `set` among the category. Fresh macro evaluators reuse the
+package owner and print sink, while compact macro instance, target origin,
+visibility, and namespace-violation facts participate in package equality.
+Typed labels cross the real rule-coercion path, implementations must be
+Starlark functions, and attribute inheritance requires `**kwargs`.
 
-Commit `368ef9296` freezes the R3 architecture and activates that exact first
-successor. Its live `package.rs` certificate remains 28 additions/zero
-deletions with worktree SHA-256 `623bcd93…`; exclude the definition-source hunk
-from every stage. The successor freezes a six-row inventory but does not claim
-deferred `subrule` is present. No analysis, subrule, set, parser, or C++ rule
-file is active.
+Full loading and analysis-lib validation passed. Two fresh authenticated
+rules_rust 0.73.0 replays clear `macro` and stop deterministically at missing
+`subrule`; independent correction rereview returned `ACCEPT`. The parked
+28-line `package.rs` definition-source hunk remained outside the commit.
 
-R1 implementation preflight stopped before Rust: the fresh evaluator cannot
-read the BUILD evaluator's private print handler, so the five-file envelope
-would send macro prints outside the retained package event batch. R2 adds only
-clean `bzl_module.rs` concrete capture ownership and its two existing package-
-evaluator handoffs, under corrected 2,250/2,200/4,450 caps. The recorder and all
-fresh macro evaluators share that same sink; no new event/DICE owner or
-starlark-rust change is permitted. Independent correction rereview returns
-`ACCEPT`.
-The terminal proof must discriminate one-batch BUILD-before/direct/nested/
-BUILD-after order, error-path prefix draining, and capture-disabled absence.
+Run only `WP-4-5-7A-symbolic-macro-namespace-analysis-enforcement` next under
+40/120/160 caps. It consumes the retained violation at the existing configured-
+target admission boundary, adds no DICE/loading owner, and preserves successful
+package loading. Then implement `subrule` as the next category member. Bazel 9.2
+commit `8220c619…` alone defines semantics. Clean Zabel `0795445f…` informs
+compact ownership and reuse only; `cc_common`/`cc_internal` remain generic
+downstream BCR Starlark discriminators, never parser or Rust C++ rule targets.
 
 ## Accepted `.bzl` load-visibility design; implementation activated (2026-08-27)
 
