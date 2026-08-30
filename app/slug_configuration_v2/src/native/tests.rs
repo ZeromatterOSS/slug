@@ -21,16 +21,27 @@ struct ExpectedDescriptor {
 }
 
 mod command_configuration_tests {
+    use std::mem::size_of;
     use std::sync::Arc;
 
+    use slug_identity_v2::ApparentRepoName;
     use slug_identity_v2::CanonicalLabel;
+    use slug_identity_v2::CanonicalRepoName;
+    use slug_identity_v2::OptionLabelContext;
+    use slug_identity_v2::RepositoryMapping;
+    use slug_identity_v2::RepositoryMappingId;
 
+    use super::super::configuration::OptionValue;
     use super::super::configuration::SlugConfiguration;
     use super::super::host::AutoCpuToken;
     use super::super::host::HostConversionInputs;
     use super::super::host::HostPathFlavor;
+    use super::super::label_convert::LabelValue;
+    use super::super::value::NativeOccurrence;
+    use super::super::value::NativeValue;
     use crate::CommandConfigurationOccurrence;
     use crate::CommandConfigurationOverlay;
+    use crate::NativeCommandOption;
 
     const PLATFORM_OPTIONS: &str = "com.google.devtools.build.lib.analysis.PlatformOptions";
 
@@ -46,6 +57,49 @@ mod command_configuration_tests {
             .unwrap(),
         )
         .unwrap()
+    }
+
+    fn mapping() -> RepositoryMapping {
+        let mut mapping = RepositoryMapping::new(RepositoryMappingId::new("command-test").unwrap());
+        mapping.insert(
+            ApparentRepoName::new("alias").unwrap(),
+            CanonicalRepoName::new("mapped+1.0").unwrap(),
+        );
+        mapping
+    }
+
+    fn native(
+        option: NativeCommandOption,
+        value: impl Into<String>,
+    ) -> CommandConfigurationOccurrence {
+        CommandConfigurationOccurrence::native(option, Some(value.into()), false)
+    }
+
+    fn value<'a>(configuration: &'a SlugConfiguration, name: &str) -> &'a OptionValue {
+        &configuration
+            .option_records()
+            .iter()
+            .find(|record| record.canonical_name == name)
+            .unwrap()
+            .value
+    }
+
+    fn native_text<'a>(configuration: &'a SlugConfiguration, name: &str) -> Option<&'a str> {
+        match value(configuration, name) {
+            OptionValue::Native(NativeOccurrence::Absent) => None,
+            OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Text(value))) => {
+                Some(value.as_str())
+            }
+            other => panic!("expected native text for {name}, got {other:?}"),
+        }
+    }
+
+    fn label(configuration: &SlugConfiguration, name: &str) -> Option<String> {
+        match value(configuration, name) {
+            OptionValue::Label(None) => None,
+            OptionValue::Label(Some(LabelValue::Label(value))) => Some(value.to_string()),
+            other => panic!("expected label for {name}, got {other:?}"),
+        }
     }
 
     #[test]
@@ -121,6 +175,206 @@ mod command_configuration_tests {
         assert_ne!(exec.projection(), other.projection());
         assert_eq!(exec, target.to_exec_for_platform(&linux).unwrap());
         assert_eq!(exec.to_exec_for_platform(&remote).unwrap(), other);
+    }
+
+    #[test]
+    fn typed_fdo_command_closure_uses_descriptor_conversion_and_root_mapping() {
+        let mapping = mapping();
+        let overlay: CommandConfigurationOverlay = vec![
+            native(NativeCommandOption::FdoOptimize, "//profiles:opt"),
+            native(NativeCommandOption::XbinaryFdo, "@alias//profiles:xbinary"),
+            native(NativeCommandOption::FdoProfile, ""),
+            native(NativeCommandOption::CsFdoProfile, "//profiles:cs"),
+            native(NativeCommandOption::FdoPrefetchHints, "//profiles:prefetch"),
+            native(
+                NativeCommandOption::PropellerOptimize,
+                "@alias//profiles:propeller",
+            ),
+            native(NativeCommandOption::MemprofProfile, "//profiles:memprof"),
+            native(NativeCommandOption::ProtoProfilePath, "//profiles:proto"),
+            native(NativeCommandOption::GrteTop, "//libc"),
+            native(NativeCommandOption::FdoInstrument, "instrument"),
+            native(NativeCommandOption::CsFdoInstrument, "cs-instrument"),
+            CommandConfigurationOccurrence::native(
+                NativeCommandOption::CollectCodeCoverage,
+                None::<&str>,
+                false,
+            ),
+        ]
+        .into();
+        let base = configuration();
+        let prepared = base
+            .with_command_configuration_context(
+                base.starlark_options().clone(),
+                &overlay,
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap();
+
+        assert_eq!(
+            native_text(&prepared, "fdo_optimize"),
+            Some("//profiles:opt")
+        );
+        assert_eq!(native_text(&prepared, "fdo_instrument"), Some("instrument"));
+        assert_eq!(
+            native_text(&prepared, "cs_fdo_instrument"),
+            Some("cs-instrument")
+        );
+        assert!(matches!(
+            value(&prepared, "collect_code_coverage"),
+            OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Bool(true)))
+        ));
+        assert_eq!(
+            label(&prepared, "xbinary_fdo").as_deref(),
+            Some("@@mapped+1.0//profiles:xbinary")
+        );
+        assert_eq!(label(&prepared, "fdo_profile"), None);
+        assert_eq!(
+            label(&prepared, "cs_fdo_profile").as_deref(),
+            Some("//profiles:cs")
+        );
+        assert_eq!(
+            label(&prepared, "fdo_prefetch_hints").as_deref(),
+            Some("//profiles:prefetch")
+        );
+        assert_eq!(
+            label(&prepared, "propeller_optimize").as_deref(),
+            Some("@@mapped+1.0//profiles:propeller")
+        );
+        assert_eq!(
+            label(&prepared, "memprof_profile").as_deref(),
+            Some("//profiles:memprof")
+        );
+        assert_eq!(
+            label(&prepared, "proto_profile_path").as_deref(),
+            Some("//profiles:proto")
+        );
+        assert_eq!(
+            label(&prepared, "grte_top").as_deref(),
+            Some("//libc:everything")
+        );
+
+        let default_libc: CommandConfigurationOverlay =
+            vec![native(NativeCommandOption::GrteTop, "default")].into();
+        let reset = base
+            .with_command_configuration_context(
+                base.starlark_options().clone(),
+                &default_libc,
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap();
+        assert_eq!(label(&reset, "grte_top"), None);
+
+        let selector_overlay: CommandConfigurationOverlay = vec![
+            native(NativeCommandOption::FdoOptimize, "//profiles:opt"),
+            native(NativeCommandOption::FdoProfile, "//profiles:profile"),
+            CommandConfigurationOccurrence::native(
+                NativeCommandOption::CollectCodeCoverage,
+                None::<&str>,
+                false,
+            ),
+            native(NativeCommandOption::FdoInstrument, "instrument"),
+        ]
+        .into();
+        let selector = base
+            .with_command_configuration_context(
+                base.starlark_options().clone(),
+                &selector_overlay,
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap();
+        for (name, expected) in [
+            ("fdo_optimize", "//profiles:opt"),
+            ("fdo_profile", "//profiles:profile"),
+            ("collect_code_coverage", "true"),
+            ("copt", "-Wno-error"),
+        ] {
+            assert!(
+                selector
+                    .matches_config_setting(&[(name.into(), expected.into())], &[])
+                    .unwrap(),
+                "selector mismatch for {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn direct_then_implicit_order_last_wins_and_failed_batches_do_not_publish() {
+        // Bazel 9.2 OptionsParserImpl records the direct option before parsing
+        // its child-priority implicit requirements. Both instrumentation
+        // descriptors source --copt=-Wno-error from the pinned registry.
+        let overlay: CommandConfigurationOverlay = vec![
+            native(NativeCommandOption::Copt, "before"),
+            native(NativeCommandOption::FdoInstrument, "first"),
+            native(NativeCommandOption::Copt, "after"),
+            native(NativeCommandOption::CsFdoInstrument, "null"),
+            native(NativeCommandOption::FdoInstrument, "last"),
+            CommandConfigurationOccurrence::native(
+                NativeCommandOption::CollectCodeCoverage,
+                None::<&str>,
+                true,
+            ),
+        ]
+        .into();
+        let base = configuration();
+        let changed = base
+            .with_command_configuration(base.starlark_options().clone(), &overlay)
+            .unwrap();
+        assert_eq!(native_text(&changed, "fdo_instrument"), Some("last"));
+        assert!(matches!(
+            value(&changed, "collect_code_coverage"),
+            OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Bool(false)))
+        ));
+        let OptionValue::Native(NativeOccurrence::List(copts)) = value(&changed, "copt") else {
+            panic!("expected repeated copt list")
+        };
+        assert_eq!(
+            copts
+                .0
+                .iter()
+                .map(|value| match value {
+                    NativeValue::Text(value) => value.as_str(),
+                    other => panic!("expected copt text, got {other:?}"),
+                })
+                .collect::<Vec<_>>(),
+            ["before", "-Wno-error", "after", "-Wno-error", "-Wno-error"]
+        );
+
+        let restored = base
+            .with_command_configuration(
+                base.starlark_options().clone(),
+                &CommandConfigurationOverlay::default(),
+            )
+            .unwrap();
+        assert_eq!(restored.canonical_bytes(), base.canonical_bytes());
+        assert_eq!(
+            restored.canonical_bytes().as_ptr(),
+            base.canonical_bytes().as_ptr()
+        );
+        assert_ne!(changed.canonical_bytes(), base.canonical_bytes());
+
+        let invalid: CommandConfigurationOverlay = vec![
+            native(NativeCommandOption::FdoOptimize, "//profiles:valid"),
+            CommandConfigurationOccurrence::native(
+                NativeCommandOption::CollectCodeCoverage,
+                Some("not-a-bool"),
+                false,
+            ),
+        ]
+        .into();
+        assert!(base.prepare_command_native_options(&invalid).is_err());
+        assert_eq!(native_text(&base, "fdo_optimize"), None);
+        assert_eq!(size_of::<NativeCommandOption>(), 1);
+        assert!(
+            size_of::<CommandConfigurationOccurrence>() <= 64,
+            "occurrence size: {}",
+            size_of::<CommandConfigurationOccurrence>()
+        );
+        assert!(
+            size_of::<CommandConfigurationOverlay>() <= 2 * size_of::<usize>(),
+            "overlay size: {}",
+            size_of::<CommandConfigurationOverlay>()
+        );
     }
 }
 

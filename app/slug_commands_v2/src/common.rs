@@ -14,6 +14,7 @@ use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_configuration_v2::CommandConfigurationOccurrence;
+use slug_configuration_v2::NativeCommandOption;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::TargetPattern;
 
@@ -522,6 +523,32 @@ pub(crate) fn command_configuration_occurrence(
         "extra_execution_platforms" => CommandConfigurationOccurrence::extra_execution_platforms(
             required_joined_value(flag, "--extra_execution_platforms=<patterns>")?,
         ),
+        "nocollect_code_coverage" => {
+            if flag.value.is_some() {
+                return Err(CommandParseError::InvalidFlagValue {
+                    flag: flag.raw.clone(),
+                    message: "Boolean no-form does not accept a joined value".to_owned(),
+                });
+            }
+            CommandConfigurationOccurrence::native(
+                NativeCommandOption::CollectCodeCoverage,
+                None::<&str>,
+                true,
+            )
+        }
+        name if NativeCommandOption::from_name(name).is_some() => {
+            let option = NativeCommandOption::from_name(name)
+                .expect("guarded native command option remains admitted");
+            let raw_value = if option.is_boolean() {
+                flag.value.as_deref()
+            } else {
+                Some(required_joined_value(
+                    flag,
+                    "a joined value for this native option",
+                )?)
+            };
+            CommandConfigurationOccurrence::native(option, raw_value, false)
+        }
         name => {
             let (label, negated) = if name.starts_with("//") || name.starts_with('@') {
                 (name, false)

@@ -8,6 +8,95 @@ use dupe::Dupe;
 use serde::Deserialize;
 use serde::Serialize;
 
+/// The closed Bazel 9.2 native-option set currently admitted at the command
+/// boundary. Keeping this typed prevents command capture from becoming an
+/// unchecked string-to-configuration mutation API.
+#[repr(u8)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Allocative,
+    Serialize,
+    Deserialize
+)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeCommandOption {
+    FdoOptimize,
+    XbinaryFdo,
+    FdoProfile,
+    CsFdoProfile,
+    FdoPrefetchHints,
+    PropellerOptimize,
+    MemprofProfile,
+    ProtoProfilePath,
+    GrteTop,
+    FdoInstrument,
+    CsFdoInstrument,
+    CollectCodeCoverage,
+    Copt,
+}
+
+impl NativeCommandOption {
+    pub fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "fdo_optimize" => Self::FdoOptimize,
+            "xbinary_fdo" => Self::XbinaryFdo,
+            "fdo_profile" => Self::FdoProfile,
+            "cs_fdo_profile" => Self::CsFdoProfile,
+            "fdo_prefetch_hints" => Self::FdoPrefetchHints,
+            "propeller_optimize" => Self::PropellerOptimize,
+            "memprof_profile" => Self::MemprofProfile,
+            "proto_profile_path" => Self::ProtoProfilePath,
+            "grte_top" => Self::GrteTop,
+            "fdo_instrument" => Self::FdoInstrument,
+            "cs_fdo_instrument" => Self::CsFdoInstrument,
+            "collect_code_coverage" => Self::CollectCodeCoverage,
+            "copt" => Self::Copt,
+            _ => return None,
+        })
+    }
+
+    pub const fn canonical_name(self) -> &'static str {
+        match self {
+            Self::FdoOptimize => "fdo_optimize",
+            Self::XbinaryFdo => "xbinary_fdo",
+            Self::FdoProfile => "fdo_profile",
+            Self::CsFdoProfile => "cs_fdo_profile",
+            Self::FdoPrefetchHints => "fdo_prefetch_hints",
+            Self::PropellerOptimize => "propeller_optimize",
+            Self::MemprofProfile => "memprof_profile",
+            Self::ProtoProfilePath => "proto_profile_path",
+            Self::GrteTop => "grte_top",
+            Self::FdoInstrument => "fdo_instrument",
+            Self::CsFdoInstrument => "cs_fdo_instrument",
+            Self::CollectCodeCoverage => "collect_code_coverage",
+            Self::Copt => "copt",
+        }
+    }
+
+    pub const fn is_boolean(self) -> bool {
+        matches!(self, Self::CollectCodeCoverage)
+    }
+
+    pub const fn requires_repository_mapping(self) -> bool {
+        matches!(
+            self,
+            Self::XbinaryFdo
+                | Self::FdoProfile
+                | Self::CsFdoProfile
+                | Self::FdoPrefetchHints
+                | Self::PropellerOptimize
+                | Self::MemprofProfile
+                | Self::ProtoProfilePath
+                | Self::GrteTop
+        )
+    }
+}
+
 /// One command occurrence retained until contextual configuration preparation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -22,6 +111,11 @@ pub enum CommandConfigurationOccurrence {
     },
     ExtraExecutionPlatforms {
         raw_value: CompactString,
+    },
+    Native {
+        option: NativeCommandOption,
+        raw_value: Option<CompactString>,
+        negated: bool,
     },
 }
 
@@ -48,6 +142,25 @@ impl CommandConfigurationOccurrence {
         Self::ExtraExecutionPlatforms {
             raw_value: raw_value.into(),
         }
+    }
+
+    pub fn native(
+        option: NativeCommandOption,
+        raw_value: Option<impl Into<CompactString>>,
+        negated: bool,
+    ) -> Self {
+        Self::Native {
+            option,
+            raw_value: raw_value.map(Into::into),
+            negated,
+        }
+    }
+
+    pub const fn requires_repository_mapping(&self) -> bool {
+        matches!(
+            self,
+            Self::Native { option, .. } if option.requires_repository_mapping()
+        )
     }
 }
 
@@ -82,6 +195,12 @@ impl CommandConfigurationOverlay {
 
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    pub fn requires_repository_mapping(&self) -> bool {
+        self.0
+            .iter()
+            .any(CommandConfigurationOccurrence::requires_repository_mapping)
     }
 
     /// Whether two carriers share the same immutable occurrence allocation.

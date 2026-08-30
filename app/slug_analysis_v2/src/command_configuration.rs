@@ -431,13 +431,6 @@ async fn prepare_driver(
         .slug_configuration()
         .expect("key validates structural configuration");
     let mut first_semantic = None;
-    let prepared_native = match base.prepare_command_native_options(&key.overlay) {
-        Ok(prepared) => Some(prepared),
-        Err(error) => {
-            first_semantic = Some(AnalysisError::message(error.to_string()));
-            None
-        }
-    };
 
     let root_mapping = RepositoryMapping::new(
         RepositoryMappingId::new("command-configuration-root")
@@ -476,13 +469,14 @@ async fn prepare_driver(
         resolved_rows.push(resolved);
     }
 
-    let requires_mapping = key.overlay.iter().any(|occurrence| {
-        matches!(
-            occurrence,
-            CommandConfigurationOccurrence::Starlark { apparent_label, .. }
-                if apparent_label.starts_with('@')
-        )
-    });
+    let requires_mapping = key.overlay.requires_repository_mapping()
+        || key.overlay.iter().any(|occurrence| {
+            matches!(
+                occurrence,
+                CommandConfigurationOccurrence::Starlark { apparent_label, .. }
+                    if apparent_label.starts_with('@')
+            )
+        });
     let mut needs = None;
     let mut first_outer = None;
     let mut observations = PathObservationEpoch::empty();
@@ -548,6 +542,20 @@ async fn prepare_driver(
             starlark_index += 1;
         }
     }
+
+    let native_mapping = option_mapping.as_ref().unwrap_or(&root_mapping);
+    let prepared_native = match base.prepare_command_native_options_with_context(
+        &key.overlay,
+        OptionLabelContext::MainRepository {
+            mapping: native_mapping,
+        },
+    ) {
+        Ok(prepared) => Some(prepared),
+        Err(error) => {
+            first_semantic.get_or_insert_with(|| AnalysisError::message(error.to_string()));
+            None
+        }
+    };
 
     let mut declarations = SmallMap::new();
     for label in distinct_labels.iter() {

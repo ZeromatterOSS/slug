@@ -21,6 +21,7 @@ use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_configuration_v2::CommandConfigurationOccurrence;
 use slug_configuration_v2::CommandConfigurationOverlay;
+use slug_configuration_v2::NativeCommandOption;
 use slug_configuration_v2::SlugConfiguration;
 use slug_configuration_v2::StarlarkOption;
 use slug_configuration_v2::StarlarkOptionScope;
@@ -482,6 +483,87 @@ fn retained_daemon_restores_c0_after_root_setting_c1_without_source_invalidation
         4,
         "C0 and C1 must each own stable target and selected-execution projections"
     );
+}
+
+#[test]
+fn retained_daemon_native_fdo_overlay_restores_a_b_a_without_source_invalidation() {
+    let workspace = scratch("native-fdo-command-a-b-a");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    write(
+        &workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nleaf = rule(implementation = _impl)\nprobe = rule(implementation = _impl, attrs = {\"dep\": attr.label()})\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"leaf\", \"probe\")\nconfig_setting(\n    name = \"native_enabled\",\n    values = {\n        \"fdo_optimize\": \"//profiles:opt\",\n        \"fdo_profile\": \"//profiles:profile\",\n        \"collect_code_coverage\": \"true\",\n        \"copt\": \"-Wno-error\",\n    },\n)\nleaf(name = \"on\")\nleaf(name = \"off\")\nprobe(name = \"probe\", dep = select({\":native_enabled\": \":on\", \"//conditions:default\": \":off\"}))\n",
+    );
+    write(
+        &workspace.join("profiles/BUILD.bazel"),
+        "exports_files([\"opt\", \"profile\"])\n",
+    );
+
+    let changed: CommandConfigurationOverlay = vec![
+        CommandConfigurationOccurrence::native(
+            NativeCommandOption::FdoOptimize,
+            Some("//profiles:opt"),
+            false,
+        ),
+        CommandConfigurationOccurrence::native(
+            NativeCommandOption::FdoProfile,
+            Some("//profiles:profile"),
+            false,
+        ),
+        CommandConfigurationOccurrence::native(
+            NativeCommandOption::CollectCodeCoverage,
+            None::<&str>,
+            false,
+        ),
+        CommandConfigurationOccurrence::native(
+            NativeCommandOption::FdoInstrument,
+            Some("instrument"),
+            false,
+        ),
+    ]
+    .into();
+    let request = |configuration_overlay| {
+        DaemonRequest::Cquery(CqueryRequest {
+            expression: "deps(//pkg:probe, 1)".to_owned(),
+            include_implicit: false,
+            include_tool: true,
+            output: CqueryOutput::Label,
+            configuration_overlay,
+            bzlmod: BzlmodRequestInputs::default(),
+            repository_environment: RepositoryEnvironmentRequestInputs::default(),
+        })
+    };
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let run = |daemon: &mut Daemon, overlay| {
+        let wire = serde_json::to_string(&request(overlay)).unwrap();
+        handle_request(daemon, &wire)
+    };
+
+    let initial = run(&mut daemon, CommandConfigurationOverlay::default());
+    let changed_wire = serde_json::to_string(&request(changed.clone())).unwrap();
+    let decoded: DaemonRequest = serde_json::from_str(&changed_wire).unwrap();
+    let DaemonRequest::Cquery(decoded) = decoded else {
+        panic!("expected cquery request")
+    };
+    assert_eq!(decoded.configuration_overlay, changed);
+    let selected = handle_request(&mut daemon, &changed_wire);
+    let restored = run(&mut daemon, CommandConfigurationOverlay::default());
+
+    for result in [&initial, &selected, &restored] {
+        assert_eq!(result.exit_code, 0, "{result:?}");
+        assert_eq!(result.invalidated_files, 0, "{result:?}");
+    }
+    assert!(initial.stdout.contains("//pkg:off"), "{initial:?}");
+    assert!(!initial.stdout.contains("//pkg:on"), "{initial:?}");
+    assert!(
+        selected.stdout.contains("//pkg:on"),
+        "initial={initial:?}; selected={selected:?}; restored={restored:?}"
+    );
+    assert!(!selected.stdout.contains("//pkg:off"), "{selected:?}");
+    assert_eq!(restored.stdout, initial.stdout);
 }
 
 #[test]

@@ -22,6 +22,7 @@ use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_commands_v2::query::QueryRequest;
 use slug_commands_v2::run::RunRequest;
 use slug_commands_v2::test::TestRequest;
+use slug_configuration_v2::NativeCommandOption;
 use slug_query_v2::QueryPolicy;
 
 #[test]
@@ -177,6 +178,110 @@ fn build_classifies_ordered_contextual_configuration_occurrences() {
                 || error.contains("does not accept")
                 || error.contains("expected --extra")
         );
+    }
+}
+
+#[test]
+fn build_and_cquery_capture_the_closed_native_fdo_sequence_in_raw_order() {
+    let flags = [
+        "--fdo_optimize=//profiles:opt",
+        "--xbinary_fdo=@profiles//:xbinary",
+        "--fdo_profile=",
+        "--cs_fdo_profile=//profiles:cs",
+        "--fdo_prefetch_hints=//profiles:prefetch",
+        "--propeller_optimize=//profiles:propeller",
+        "--memprof_profile=//profiles:memprof",
+        "--proto_profile_path=//profiles:proto",
+        "--grte_top=default",
+        "--fdo_instrument=instrument",
+        "--cs_fdo_instrument=cs-instrument",
+        "--collect_code_coverage",
+        "--copt=before",
+        "--collect_code_coverage=0",
+        "--nocollect_code_coverage",
+    ];
+    let mut build_args = flags.to_vec();
+    build_args.push("//pkg:bin");
+    let build = BuildRequest::parse(&build_args).unwrap();
+
+    let mut cquery_args = flags.to_vec();
+    cquery_args.push("//pkg:bin");
+    let cquery = CqueryRequest::parse(&cquery_args).unwrap();
+    assert_eq!(build.configuration_overlay, cquery.configuration_overlay);
+
+    let expected = [
+        (
+            NativeCommandOption::FdoOptimize,
+            Some("//profiles:opt"),
+            false,
+        ),
+        (
+            NativeCommandOption::XbinaryFdo,
+            Some("@profiles//:xbinary"),
+            false,
+        ),
+        (NativeCommandOption::FdoProfile, Some(""), false),
+        (
+            NativeCommandOption::CsFdoProfile,
+            Some("//profiles:cs"),
+            false,
+        ),
+        (
+            NativeCommandOption::FdoPrefetchHints,
+            Some("//profiles:prefetch"),
+            false,
+        ),
+        (
+            NativeCommandOption::PropellerOptimize,
+            Some("//profiles:propeller"),
+            false,
+        ),
+        (
+            NativeCommandOption::MemprofProfile,
+            Some("//profiles:memprof"),
+            false,
+        ),
+        (
+            NativeCommandOption::ProtoProfilePath,
+            Some("//profiles:proto"),
+            false,
+        ),
+        (NativeCommandOption::GrteTop, Some("default"), false),
+        (
+            NativeCommandOption::FdoInstrument,
+            Some("instrument"),
+            false,
+        ),
+        (
+            NativeCommandOption::CsFdoInstrument,
+            Some("cs-instrument"),
+            false,
+        ),
+        (NativeCommandOption::CollectCodeCoverage, None, false),
+        (NativeCommandOption::Copt, Some("before"), false),
+        (NativeCommandOption::CollectCodeCoverage, Some("0"), false),
+        (NativeCommandOption::CollectCodeCoverage, None, true),
+    ];
+    for (actual, (option, raw_value, negated)) in build.configuration_overlay.iter().zip(expected) {
+        assert!(matches!(
+            actual,
+            CommandConfigurationOccurrence::Native {
+                option: actual_option,
+                raw_value: actual_value,
+                negated: actual_negated,
+            } if *actual_option == option
+                && actual_value.as_deref() == raw_value
+                && *actual_negated == negated
+        ));
+    }
+
+    for flag in [
+        "--fdo_optimize",
+        "--fdo_profile",
+        "--copt",
+        "--nocollect_code_coverage=true",
+    ] {
+        assert!(BuildRequest::parse(&[flag, "//pkg:bin"]).is_err(), "{flag}");
     }
 }
 

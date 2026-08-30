@@ -5,6 +5,7 @@ pub mod native;
 
 pub use command::CommandConfigurationOccurrence;
 pub use command::CommandConfigurationOverlay;
+pub use command::NativeCommandOption;
 pub use native::NativeStringListOption;
 pub use native::PreparedCommandNativeOptions;
 pub use native::SlugConfiguration;
