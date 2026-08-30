@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-repository-context-attribute-namespace-implementation`
+Packet: `WP-4-5-7A-repository-context-attribute-namespace-implementation-r2`
 
 Milestone: M7A bootstrap-critical repository/ruleset closure.
 
@@ -10,6 +10,13 @@ accepted complete thirteen-kind repository-rule attribute carrier `0c3a172ed`,
 accepted effective repository Host inputs `64878a1be`, and accepted generic
 canonical repository Host capability `26a68d61c`. All unrelated dirty analysis,
 loading, core, and REAPI work remains parked and read-only.
+
+The recoverable uncommitted R1 candidate changes only the two allowed Rust
+owners and measures 290 production, 197 proof, and 487 aggregate net lines. Its
+focused context and selected-effect tests pass, but root review rejects
+acceptance because it does not prove the frozen ordinary/innate key-level A/B/A
+matrix. Preserve the candidate while correcting proof capacity; no R1 Rust is
+accepted or staged by this replan.
 
 ## Observable result
 
@@ -293,6 +300,18 @@ both routes still require at least one discriminating nested/default/name
 end-to-end case and no-effect failure. Add no copied registry, fixture manifest,
 checked-in output, or Bazel mutation.
 
+R2 must reuse the existing test-only
+`module_extension_repository_instantiation::tests::transaction_untracked`
+source updater and, where its built-in graph seed is required, the existing
+`canonical_repository_route_tests::tests::transaction`. Both accept replacement
+MODULE/extension source on the same `Dice` instance, so ordinary and innate
+tests can drive warm A/B/A without a new helper or production dependency. One
+compact transition may change explicit scalar/collection, declaration/default,
+nested order, and generated/original name together only if separate assertions
+show that each dimension changes the written plan/certificate identity and the
+restored A value is structurally equal. Projection/no-effect failures remain
+separate for each owner kind.
+
 ## Implementation allowlist, caps, validation, and stops
 
 The implementation may touch only:
@@ -310,8 +329,8 @@ package, ruleset, or public API file may change. No new file, crate, dependency,
 feature, fixture, unsafe code, public cross-crate type, key, lock, cache, hash,
 fallback, or compatibility shim.
 
-Cap net Rust production growth at **300 lines**, proof growth at **650 lines**,
-and aggregate growth at **950 lines**. Count from the accepted `1f9433600`
+Cap net Rust production growth at **300 lines**, proof growth at **1,100 lines**,
+and aggregate growth at **1,400 lines**. Count from the accepted `1f9433600`
 versions of the two allowlisted files, classifying everything before the first
 `#[cfg(test)]` as production. Every new helper stays below 150 lines.
 `repository_rule_context.rs` remains the cohesive evaluator adapter.
@@ -338,9 +357,15 @@ retained value borrows the evaluator heap; the two-file allowlist or caps fail;
 fresh replays require `workspace_root` or another deferred effect; or one
 focused correction does not resolve implementation/terminal review.
 
-## Activation state
+## R2 replan state
 
 Commit `47c937942` records independent `ACCEPT` of the corrected R3
-architecture. Implement only the two Rust owners and proofs above without
-changing its semantic contract. Root owns integration, cap/scope accounting,
-fresh replay, terminal review, scheduling closure, and commits.
+architecture. R1 fits production at 290/300 but its 197 proof lines omit the
+required ordinary/innate key-level matrix; the original 650 proof cap leaves no
+clean room for both owner transitions. R2 changes no semantic decision,
+production cap, file allowlist, fixture policy, or validation gate. It raises
+only proof/aggregate caps to 1,100/1,400 and freezes reuse of the existing
+same-DICE source updaters above. Independent replan review returns `ACCEPT`;
+complete the missing proofs without changing R1 production. Root owns
+integration, cap/scope accounting, fresh replay, terminal review, scheduling
+closure, and commits.
