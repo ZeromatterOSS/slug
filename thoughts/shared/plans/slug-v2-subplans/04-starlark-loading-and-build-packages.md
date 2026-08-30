@@ -87,15 +87,18 @@ predicates, ten typed `cpp` fields, ordinary late-bound rows, and persistent
 `TemplateVariableInfo`, then fails closed before configured hidden resolution.
 
 Configured hidden-dependency R2 preserved the correct pre-call and deferred-XML
-boundaries, but independent review returned `REPLAN`: no accepted command path
-could yet produce the non-default native states needed to prove its ten exact
-`cpp` projections. Run only
-`WP-4-5-7A-effective-native-command-fdo-closure-prerequisite-r1` next. Admit the
-nine field inputs, three suppressors, and implicit repeated `copt` through the
-shared CLI carrier, DICE-owned root mapping, pinned descriptor converters, and
-sole structural configuration owner. Add no generic raw mutator or subrule/
-query behavior. After acceptance, resume hidden dependency resolution as R3
-with R2's call/XML corrections intact.
+boundaries, but independent review returned `REPLAN` until a real non-default
+native producer existed. Commit `4425d3bfb` now accepts that bounded
+thirteen-option CLI-to-DICE closure. Run only
+`WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r4`: share one
+typed configuration-field identity, resolve literal and ten `cpp` projections
+through the existing target/selected-Exec child pipeline, validate provider/
+file/executable shape, and publish root loading-query facts. R3 plan review
+corrected configured-edge publication to the successful direct-call successor,
+accepted Bazel's inherent executable file targets, narrowed `fdo_optimize` to
+raw `//`, and repaired its source/blob ledger. Stop before Starlark value
+materialization or invocation; XML/aspects remain deferred and no rules_cc/C++
+special case is permitted.
 
 ## Accepted `.bzl` load-visibility design; implementation activated (2026-08-27)
 

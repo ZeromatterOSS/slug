@@ -1,239 +1,262 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-effective-native-command-fdo-closure-prerequisite-r1`
+Packet: `WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r4`
 
 Milestone: M7A bootstrap-critical generic Starlark/ruleset closure.
 
-Base: accepted subrule loading successor `965cfde5e`. Unrelated dirty
-analysis/toolchain and loading work remains parked; implementation must stage
-and validate only packet hunks.
-
-## Why this prerequisite exists
-
-Independent review returned `REPLAN` on the configured-subrule R2 packet. Its
-ten exact `cpp` `configuration_field` projections require non-default native
-configuration states, but Slug currently captures only Starlark build settings,
-`extra_toolchains`, and `extra_execution_platforms`. A public/test-only raw
-mutator would bypass command capture, repository mapping, descriptor conversion,
-implicit requirements, and DICE ownership.
-
-Admit the bounded native command closure below through the real command and
-configuration owners. Then resume
-`WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r3` on the accepted
-producer. This packet does not edit loading, subrule, query, or configured-rule
-dependency code.
+Base: accepted loading producer `965cfde5e` plus accepted command/configuration
+producer `4425d3bfb`. Unrelated dirty analysis/toolchain, evaluator-adapter,
+loading, core and REAPI work remains parked. Stage and validate only this
+packet's exact hunks.
 
 ## Observable result
 
-Joined build and cquery flags for the admitted FDO closure are captured in raw
-order before one-shot/daemon selection, resolved with the root repository
-mapping through the existing command-configuration DICE key, converted by the
-pinned Bazel 9.2 descriptors, and published once through the sole structural
-`SlugConfiguration` owner. Repetition, last-wins, boolean no-form, label
-mapping, and the `fdo_instrument`/`cs_fdo_instrument` implicit `copt` rows
-invalidate and restabilize A/B/A in one retained daemon graph.
+For a rule with attached subrules, resolve every lifted literal or admitted
+typed `configuration_field` label/default before Starlark invocation. Configure
+target dependencies in the owner's configuration and exec dependencies in the
+actual selected execution platform's Exec configuration. Reuse the existing
+configured-child/cycle/Need/alias pipeline, validate providers, single-file
+shape and executability, and retain ordered phase-scratch dependency facts.
+Ordinary rule attributes using the same typed defaults take the same route.
 
-The packet exposes no generic native-option mutation API and invokes no
-subrule or C++ rule implementation.
+Root-package loading `query` exposes deterministic synthesized attributes and
+implicit edges for literal hidden defaults. Because this packet deliberately
+terminates analysis before invocation, configured hidden edges are not
+publishable until the direct-call successor succeeds. The packet creates no
+evaluator-visible target, artifact or files-to-run wrapper and publishes no
+configured result or action.
 
-## Authority and compatibility
+## Learned facts and authority
 
 Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is the
 sole semantic authority:
 
-- `CppOptions.java:350-430,632-758` defines the FDO values, label converters,
-  and both `--copt=-Wno-error` implicit requirements;
-- `CoreOptions.java:567-580` defines `collect_code_coverage`;
-- `OptionsParserImpl.java:382-430,640-712` records a valued option before
-  parsing its implicit child-priority requirements;
-- `OptionValueDescription.java:446-493` proves that an explicitly supplied
-  default still expands implicit requirements; and
-- the pinned 341-row Slug descriptor registry is the source regression for
-  names, types, converters, repeatability, old names, and implicit rows.
+- `StarlarkSubrule.java:132-192,227-284` lifts transitive attributes, forbids
+  overrides, and supplies configured target/list, single Artifact, or
+  `FilesToRunProvider` values only at the later call boundary;
+- `StarlarkSubruleTest.java:801-1219` proves hidden-in-`ctx.attr`, literal,
+  single-file, executable/Exec and late-bound behavior;
+- `CppConfiguration.java:184-196,308-319,632-759,958-961` defines the ten
+  admitted `cpp` fields, suppression and derived `zipper`; and
+- `FileConfiguredTarget.java:79-104` defines inherent file
+  `DefaultInfo`/`FilesToRunProvider` behavior; `Attribute.java:2113-2127`
+  defines tool edges; and
+- `src/test/shell/integration/subrules_test.sh:98-119` proves hidden literal
+  dependencies and default rows in XML. This packet admits the graph facts,
+  not XML spelling.
 
-**Exact:** the admitted joined `--name=value` spellings; bare and joined
-boolean plus `--nocollect_code_coverage`; raw direct-occurrence order;
-descriptor conversion; main-repository apparent-label mapping; last-wins for
-single options; ordered accumulation for `copt`; direct-then-implicit order;
-explicit-default implicit expansion; and the resulting structural
-configuration facts.
+Authenticated rules_cc 0.2.17 `cc/private/toolchain/fdo/fdo_context.bzl`
+declares eight hidden rows using target configuration, provider predicates,
+single-file and executable shapes. Its ordinary `_libc_top` and `_zipper` rows
+prove the same producer is not subrule-specific.
 
-**Slug-native:** structural configuration bytes/identity, Rust diagnostics not
-fixed by a discriminator, and compact typed command carriers.
+Buck2/starlark-rust retained collection and DICE guidance applies to compact
+shared identities and dependency recording. Zabel is concept/optimization
+guidance only: sparse retained descriptors and borrowed projections are useful;
+copy no Zig code, names, layouts, diagnostics, or behavioral claims.
 
-**Unsupported/deferred:** space-separated native values; rc/`--config`,
-invocation-policy and mixed-priority expansion; every other native flag;
-generic descriptor admission; configuration transitions that write native
-options; exact Bazel checksum/output paths; C++ fragment projection; configured
-hidden dependencies; and every invocation/action effect.
+## Compatibility boundary
 
-## Exact admitted closure
+**Exact:** the finite `cpp` fields `fdo_optimize`, `xbinary_fdo`,
+`fdo_profile`, `cs_fdo_profile`, `fdo_prefetch_hints`, `propeller_optimize`,
+`memprof_profile`, `proto_profile_path`, `libc_top`, and `zipper`; Bazel's
+suppression/derived-zipper rules; absent projection as no dependency; literal
+label/label-list defaults; target versus selected-platform Exec configuration;
+OR-of-AND provider predicates; every label-list child; source/generated
+single-file cardinality and extension constraints; executable availability;
+hidden-attribute invisibility; and dependency-error precedence before the
+unsupported invocation terminal.
 
-Retain one `NativeCommandOption` enum with these thirteen values and no stringly
-open set:
+**Slug-native:** structural configuration and configured-node identity, Rust
+diagnostic wording where no discriminator freezes text, and internal query edge
+representation.
 
-1. field inputs: `fdo_optimize`, `xbinary_fdo`, `fdo_profile`,
-   `cs_fdo_profile`, `fdo_prefetch_hints`, `propeller_optimize`,
-   `memprof_profile`, `proto_profile_path`, and `grte_top` (the producer for the
-   Starlark `libc_top` field);
-2. suppressors: `fdo_instrument`, `cs_fdo_instrument`, and
-   `collect_code_coverage`; and
-3. the implicit/repetition closure: `copt`.
+**Unsupported/deferred:** subrule/rule invocation with resolved late-bound
+values; kwargs override rejection; evaluator-visible `ConfiguredTarget`,
+`Artifact`, and `FilesToRunProvider` values; subrule context, fragments,
+toolchains and actions; aspect subrules; XML/query presentation; absolute-path
+FDO artifacts and the enabling command flag; every non-`//`
+`fdo_optimize` spelling; configured hidden-edge/result publication; broader
+fragments/fields; exact Bazel configuration/output bytes; and rules_cc/C++
+semantics. `cc_common`/`cc_internal` remain generic BCR Starlark consumers.
 
-`zipper` has no independent command row: the later configuration-field packet
-derives it from the admitted FDO state and its typed tools-repository identity.
-No rules_cc-specific name or dependency path is introduced.
+## Shared typed owner
 
-## Architecture
+`slug_configuration_v2` owns one closed `ConfigurationField` identity. Its Cpp
+variant is a one-byte enum for the ten names; tools-repository identity remains
+part of the field identity because it affects `zipper`. Loading parses
+`configuration_field()` directly to this shared type and retains it in the
+existing sparse ordinary/lifted rows. Delete the loading-owned string allowlist;
+do not add a registry, raw native lookup/mutator, or parallel option store.
 
-### Raw command carrier and capture
+`SlugConfiguration::configuration_field_label` borrows the sole structural
+native option vector. Direct label fields project existing canonical labels;
+`fdo_optimize` projects only a valid raw `//` label. Every other non-null
+spelling fails configuration-field projection because Bazel's still-default
+`enable_fdo_profile_absolute_path=false` rejects it during
+`CppConfiguration` construction. `xbinary_fdo`, `propeller_optimize`, and
+`zipper` apply the pinned suppressor/derivation rules only after that global
+validity check. The same check rejects simultaneous `fdo_optimize`/
+`fdo_profile` and `fdo_instrument` with either optimization source, matching
+`CppConfiguration.reportInvalidOptions`; the prerequisite's descriptor-owned
+implicit `copt` already satisfies its remaining invariant. Projection is pure
+phase scratch and does not change configuration identity.
 
-Extend `CommandConfigurationOccurrence` with one typed native row containing
-`NativeCommandOption`, the unconverted joined value when present, and boolean
-negation. The existing immutable `Arc<[...]>` overlay remains the only retained
-command sequence and participates in its existing equality/hash/serde identity.
-Every new retained type derives `Allocative` and serde traits.
+## Loading and query projection
 
-`slug_commands_v2::common` recognizes only the thirteen typed names. Nonboolean
-options require joined values. `collect_code_coverage` accepts bare, joined
-boolean, and no-form spellings and rejects a valued no-form. Build and cquery
-already call this common capture before rejecting unsupported flags; do not add
-a parallel parser or change their request owners.
+Expose one borrowed iterator over ordinary and lifted configured dependency
+descriptors. It carries synthesized name, user name where applicable, kind,
+default, file/single-file/executable/Exec flags, and canonical provider
+alternatives. It borrows the existing package-owned rows; add no retained copy.
 
-### Descriptor-driven preparation
+The root loading-query graph appends literal hidden rows in lifted order, with
+deterministic synthesized names, `explicit = false`, and an `Implicit` edge
+kind. Configuration-field rows have no unconfigured label and remain absent
+from loading edges. Existing traversal includes implicit edges; same-package
+source derivation must include them. The existing bounded external loading-query
+route remains deferred; do not weaken its validation or add a fallback to claim
+external unconfigured query parity.
 
-Generalize `PreparedCommandNativeOptions` from native-only values to opaque
-complete option-row replacements. It remains phase scratch and publishes no
-partial configuration.
+## Configured dependency pipeline
 
-For each raw occurrence in order:
+Prepare ordinary configured attributes and the borrowed hidden/late-bound
+descriptors before child computation. Resolve literal labels directly and
+typed defaults from the owner's structural `SlugConfiguration`. Preserve row
+and label-list order in phase-scratch dependency records.
 
-1. select the exact pinned descriptor through the typed enum's class/name;
-2. validate the occurrence shape against the typed option;
-3. convert text/boolean/list rows through the existing native converter and
-   label rows through the existing label converter with the supplied root
-   `OptionLabelContext`;
-4. apply single-option last-wins or append an allow-multiple occurrence to the
-   current scratch value; and
-5. after the direct row, parse and apply that descriptor's pinned implicit
-   requirements at child order through the same typed descriptor path.
+Resolve the existing toolchain/execution-platform owner before making any
+`cfg="exec"` child key, including rules requesting zero toolchain types. Target
+rows use the parent configuration; Exec rows use
+`to_exec_for_platform(selected_actual_label)`. Never select host/default state
+independently. Feed both row kinds through the existing configured child key,
+observed Need union, cycle guard, requested/actual alias, and publication path.
+The generic child-preparation owner must normalize declared source-file labels,
+including exported files and cross-package sources, to the existing null/source
+key before computation; generated-file labels retain configured identity. This
+is a general dependency correction, not a subrule-specific lookup.
 
-Both instrumentation descriptors must obtain `--copt=-Wno-error` from their
-registry metadata, not a second semantic table. Explicit null/default values
-still expand. Preserve duplicates and exact order in `copt`; do not reuse the
-dedupe behavior of registration-pattern flags.
+Retain whether a scratch row is hidden and whether its configuration is Exec.
+Hidden rows never enter `PreparedDependency`/`ctx.attr`. Do not add a
+`ConfiguredEdgeKind` yet: Slug publishes edges only in a successful
+`ConfiguredNodeResult`, and the mandatory pre-call terminal makes success
+impossible in this packet. The direct-call successor must publish the ordered
+implicit edges and set the tool bit exactly for Exec-transition rows, following
+Bazel `Attribute.isToolDependency()`/`ExecutionTransitionFactory.isTool()`.
 
-Conversion must process every occurrence in raw order before the one existing
-`with_prepared_command_configuration` publication. Errors publish no
-configuration. The empty overlay retains the base allocation.
+After every child is available, validate provider alternatives as OR-of-AND;
+an empty alternatives slice is unrestricted and every label-list element is
+checked. Source/generated configured-node kinds carry Bazel's inherent
+`DefaultInfo` capability for predicate checks without allocating or publishing
+a provider wrapper. For single-file rows, a source/generated node contributes
+its one label-owned artifact; a rule/alias flattens its real
+`DefaultInfo.files`. Accept exactly one file matching any extension constraint
+and reject zero/multiple files. A direct file node is admitted only by
+`allow_files` or `allow_single_file` and its extension filter; rule targets
+remain admissible independently. Executable rule/alias rows require the
+child's real `DefaultInfo.files_to_run.executable`. Bazel
+`FileConfiguredTarget.createFilesToRunProvider` makes a source/generated file
+its own executable, so an otherwise file-admitted node satisfies executable
+with its label-owned artifact. All validation precedes the existing pre-call
+unsupported terminal; the terminal publishes no result, edge, provider wrapper
+or action.
 
-### DICE-owned root mapping
+## DICE, lifetime, and revision behavior
 
-Move native preparation in `slug_analysis_v2::command_configuration` after its
-existing optional root-mapping acquisition. Any admitted label-valued native
-row requests that same mapping input; Starlark and native rows share one
-mapping result, observation epoch, Need union, and error ordering. Root-local
-and apparent-external labels use `OptionLabelContext::MainRepository`.
-
-Do not create a native-option DICE key, mapping cache, label side table, or
-second publication path. The complete structural configuration remains the
-existing command-preparation result and therefore its DICE equality and
-invalidation identity.
+`ConfiguredNodeAnalysisKey` remains the sole retained computation. Loaded
+descriptors and `SlugConfiguration` remain DICE-retained semantic inputs;
+resolved rows, child-key batches and validation scratch die with the compute;
+no new configured result is retained on the terminal error. No new key, cache,
+side registry, lock, task, watcher or request carrier is allowed. Hold no lock
+across a DICE compute. Same-DICE source or command A/B/A must invalidate and
+restore error precedence without stale children, results or actions.
 
 ## Proof contract
 
-Only these exact proof paths are authorized:
+Use the accepted source tests above; add no Java helper or copied oracle
+fixture. Prove:
 
-- `app/slug_configuration_v2/src/native/tests.rs`, base blob
-  `27b61e8a76dafc4b0e3dd78332988dc59ee019ac`;
-- `app/slug_commands_v2/tests/commands.rs`, base blob
-  `56124af3e9b41f4f0d66649ad5530cddbc9d3e11`; and
-- `app/slug_server_v2/src/tests.rs`, base blob
-  `af68f3a8801c63ed40813672f366905d53f2a9da`.
+- all ten field projections, missing values, suppression/zipper, invalid
+  string and mutually exclusive option states, and one-byte identity;
+- borrowed retained rows and unchanged hidden invisibility;
+- literal/late-bound target and real selected-platform Exec keys, including
+  zero requested toolchains and requested-versus-actual alias identity;
+- provider OR-of-AND/list validation, unrestricted predicates, source and
+  generated single-file zero/one/many/extension cases, executable success and
+  failure, and dependency-error precedence;
+- loading implicit rows/edges, ordinary `_libc_top`/`_zipper`, the successful
+  validation-to-pre-call terminal, no configured result/invocation/actions, and
+  same-DICE A/B/A error restoration. Configured implicit/tool edge proof belongs
+  to the direct-call successor because only it can produce a successful result.
 
-Persist compact regressions for:
+Exact proof paths:
 
-- build and cquery capture of all thirteen typed rows in exact order, all
-  admitted boolean forms, and rejection of missing/malformed joined values;
-- all nine direct field inputs plus all three suppressors, root/apparent-
-  external label mapping, empty-to-null label behavior, and `grte_top`
-  conversion;
-- single-value last-wins, ordered repeated `copt`, both instrumentation
-  expansions, repeated expansions, explicit-default expansion, and direct/
-  implicit precedence in both orders;
-- no partial publication on a late bad occurrence, empty-overlay allocation
-  reuse, and structural A/B/A bytes;
-- one retained daemon A/B/A discriminator using existing `config_setting`/
-  selector analysis for representative text, label, boolean, and implicit
-  `copt` facts, with no source invalidation; and
-- serde/request round-trip retaining the typed overlay and raw order before
-  daemon analysis.
-
-The tests must cite the pinned Bazel source behavior above. Do not use a public
-raw mutator, a test-only production constructor, or configured-subrule code to
-manufacture the states.
+- `app/slug_configuration_v2/src/native/tests.rs`, base
+  `d6815f7344a37d0dbeac5d24bebf08060197bc42`;
+- `app/slug_loading_v2/tests/subrule_loading.rs`, base
+  `49a375e1ab5514b6b93e01728d45f0d2ce75c95f`;
+- new `app/slug_analysis_v2/tests/subrule.rs`;
+- `app/slug_query_v2/src/graph.rs`, base
+  `54cd452214127fe5429db46635dbe7e37f27c6e3`; and
+- `app/slug_server_v2/src/tests.rs`, base
+  `ee575cbe812227abd9bcaddf5a36905a65b1dae8`.
 
 ## Frozen implementation envelope
 
-Allowed production paths at base `965cfde5e`:
+Production paths at `4425d3bfb`:
 
-- `app/slug_configuration_v2/src/command.rs`, blob
-  `86c5bfd822430ac4ada8a2b52d6918ad1c03a954`;
-- `app/slug_configuration_v2/src/lib.rs`, blob
-  `2f85f37d7ecd3518eb2b53c8504f49a9258e44a4`;
-- `app/slug_configuration_v2/src/native/configuration.rs`, blob
-  `f62eabe1132452035599a2ea12f9bcce65da0d77`;
-- `app/slug_commands_v2/src/common.rs`, blob
-  `dbb0594a3a20e2f2090d74357acf6243b5b9dec3`; and
-- `app/slug_analysis_v2/src/command_configuration.rs`, blob
-  `99e57d733691fb485aabf2c4a82b06af27739618`.
+- new `app/slug_configuration_v2/src/native/configuration_field.rs`;
+- `app/slug_configuration_v2/src/native/configuration.rs`,
+  `046d569400b0ef0297df9fceb75309420a1628e3`; `src/native/mod.rs`,
+  `328785bd1e7ac9117e0ee27eea251c69af62a176`; and `src/lib.rs`,
+  `13181e449c8655b95a770e136dcf1cc12de8888d`;
+- `app/slug_loading_v2/src/subrule.rs`,
+  `0b2e4e4661e534ac1cd6279aff9e44526aa2a76a`; `src/lib.rs`,
+  `d7da3a9b82ebcaea26327285bf65f0407ea7f646`; and only the
+  fail-closed/accessor hunk of dirty `src/package.rs` (HEAD
+  `191b2082de14e5f057d8183c1c156671bd4cbd2a`, admitted worktree base
+  `bee28ca831f3d71ab3b8f1a29fab1559c4ce299f`);
+- new `app/slug_analysis_v2/src/subrule.rs`, only exact orchestration hunks of
+  dirty `src/dice.rs` (HEAD
+  `70d59f60b3f4b06702eb347e0b615c6961e912d1`, admitted worktree base
+  `2718df1109a4a543f5ac57c99b8c52aed52c8de3`), and the module/export
+  hunk of dirty `src/lib.rs` (HEAD
+  `f1144f085c47babc9d848d5aca662d496c500e2b`, worktree
+  `b1d7e9acccd6e5fe87bdbdc2f0372be3cc9d6758`); and
+- `app/slug_query_v2/src/graph.rs`,
+  `54cd452214127fe5429db46635dbe7e37f27c6e3`.
 
-The registry, native/label converters, build/cquery request owners, loading,
-query, configured-rule driver, and every dirty path are read-only inputs.
+Every other dirty hunk and file is excluded. Caps: 1,250 production additions,
+1,200 proof additions, 2,450 aggregate additions, no new production function
+above 140 lines, and no new retained descriptor copy. The touched `package.rs`,
+`dice.rs`, and `graph.rs` exceed 2,000 lines; keep only orchestration/accessor
+hunks there and place cohesive new logic in the named modules. No benchmark is
+required because the packet adds no cache and no demonstrated hot-path
+regression exists.
 
-Caps: 800 production additions, 750 proof additions, 1,550 aggregate additions,
-and no new production function above 130 lines. `NativeCommandOption` must fit
-in one byte; the occurrence and overlay retained-size assertions must remain
-bounded. No benchmark is required without a measured regression.
+## Validation and stops
 
-## Validation and review
+Run formatting and `git diff --check`; focused configuration/loading/analysis/
+query/server tests; full serial tests for all five affected crates; named
+build/cquery/query dependents; four-crate checks; retained-size and cap audits;
+forbidden-surface scans; base/worktree-blob isolation; archive checker; and an
+index-only repeat containing only packet hunks. Clean stale `slugd` around
+daemon tests. Rebuild `slug_cli_v2` before any `SLUG_V2_BIN` replay.
 
-Run serially:
+Independent plan and terminal implementation review are mandatory. `REPLAN`
+for invocation/value materialization/override handling; XML/aspects; a new key,
+pipeline, cache, registry or raw native mutator; host/default Exec fallback;
+C++-specific dependency code; partial publication; inability to distinguish
+source/generated file cardinality or executable facts; evaluator-heap retention;
+lock across compute; dirty-hunk overlap; unlisted files/cap overflow; Java; or
+an exact claim not proved against Bazel 9.2.
 
-1. focused configuration command tests;
-2. focused commands capture tests;
-3. focused retained-daemon native A/B/A test;
-4. full tests for `slug_configuration_v2`, `slug_commands_v2`,
-   `slug_analysis_v2`, and `slug_server_v2`;
-5. named build/cquery/command-configuration dependents;
-6. `cargo check` for the four affected crates;
-7. formatting, `git diff --check`, forbidden-surface grep, retained-size checks,
-   caps, archive checker, and scheduling consistency; and
-8. an index-only archive repeat containing only this packet and excluding all
-   parked hunks.
+## Immediate predecessor and successor
 
-Independent terminal review must check the exact thirteen-row closure,
-descriptor-owned implicit expansion, root-mapping/DICE ownership, error and
-publication ordering, CLI/daemon A/B/A proof, dirty-hunk isolation, caps, and
-the absence of any generic raw mutator.
-
-Stop and `REPLAN` for an untyped/open native name, public or test-only raw
-mutator, hard-coded duplicate implicit semantic table, missing copt ordering,
-mapping outside the existing DICE owner, partial configuration publication,
-new DICE key/cache/side registry, configured-subrule or query work, an edit
-outside the envelope, unisolatable parked changes, cap overflow, Java helper/
-runtime code, or a rules_cc-specific shortcut.
-
-## Zabel peer guidance
-
-Zabel's separation of raw invocation capture from effective configuration is
-useful peer guidance. Slug keeps that separation while using its existing typed
-descriptor registry and sole structural option vector. Copy no Zig code,
-allowlist, layout, diagnostic, or parity claim. Bazel 9.2 remains authoritative.
-
-## Immediate successor
-
-After terminal acceptance and commit, re-freeze
-`WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r3`. It must consume
-only this real structural producer, retain the corrected pre-call boundary and
-deferred XML classification from R2, and freeze exact proof paths/base blobs.
+Commit `4425d3bfb` accepted the lawful thirteen-option CLI-to-DICE producer
+after full validation and terminal review. R3 plan review returned `REPLAN`:
+an error cannot publish configured edges, files can be executable, the
+`fdo_optimize` grammar was too broad, and the query anchor/blob ledger was not
+mechanically exact. R4 makes only those corrections. After this packet,
+activate only the direct-call successor that materializes evaluator values,
+invocation and successful configured edges while preserving this packet's
+dependency owner and pre-call validation.
