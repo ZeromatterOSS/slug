@@ -52,6 +52,13 @@ informs compact ownership and reuse only; `cc_common`/`cc_internal` remain
 generic downstream BCR Starlark discriminators, never parser or Rust C++ rule
 targets.
 
+Commit `368ef9296` freezes the R3 architecture and activates that exact first
+successor. Its live `package.rs` certificate remains 28 additions/zero
+deletions with worktree SHA-256 `623bcd93…`; exclude the definition-source hunk
+from every stage. The successor freezes a six-row inventory but does not claim
+deferred `subrule` is present. No analysis, subrule, set, parser, or C++ rule
+file is active.
+
 ## Accepted `.bzl` load-visibility design; implementation activated (2026-08-27)
 
 The authenticated rules_cc traversal first requires Bazel's default-enabled

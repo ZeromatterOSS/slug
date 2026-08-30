@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-4-5-7A-bazel-bzl-global-capability-category-architecture-r3](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-symbolic-macro-and-bzl-provider-key-implementation](./slug-v2-subplans/current-packet.md).
 
 Commit `c83e70f0f` terminally accepts the repository-context attribute
 implementation. One authenticated immutable input serves ordinary and innate
@@ -69,6 +69,13 @@ corrected those semantics but its loading-only successor could not enforce late
 macro namespace violations. Independently accepted R3 retains the violation in
 package identity, schedules one bounded configured-target admission successor,
 and selects only the symbolic-macro/provider loading implementation first.
+Commit `368ef9296` freezes that accepted architecture. The current packet now
+implements only that selected loading/package successor under its exact
+five-file, dirty-hunk-isolated envelope; the analysis enforcement successor and
+all subrule work remain scheduled but inactive. Its inventory is a six-row
+ledger, not a premature six-present claim: `.bzl` routes gain `macro` and
+`PackageSpecificationInfo` while `subrule` remains explicitly absent until its
+declaration packet.
 
 ### M7 complete repository definitions built-in package accepted (2026-08-30)
 
