@@ -5599,8 +5599,14 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         );
         let context = BzlEvaluationContext::from_evaluator(eval)
             .map_err(|_| anyhow::anyhow!("repository_rule may only be called in a .bzl module"))?;
-        let defining_label = CanonicalLabel::parse(&format!("@@{}", context.source_label()))
-            .map_err(anyhow::Error::msg)?;
+        let source_label = context.source_label();
+        let canonical_source = if source_label.starts_with("@@") {
+            source_label.to_owned()
+        } else {
+            format!("@@{source_label}")
+        };
+        let defining_label =
+            CanonicalLabel::parse(&canonical_source).map_err(anyhow::Error::msg)?;
         let attrs = match attrs {
             None => Vec::new(),
             Some(value) if value.is_none() => Vec::new(),

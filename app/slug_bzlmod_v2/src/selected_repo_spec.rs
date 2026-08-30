@@ -91,9 +91,16 @@ pub use selected_extension_demand::HostSelectedExtensionOwnerInputsError;
 pub use selected_extension_demand::HostSelectedExtensionOwnerInputsKey;
 pub use selected_extension_demand::HostSelectedExtensionOwnerInputsObservationError;
 pub use selected_extension_demand::HostSelectedExtensionOwnerInputsObservationKey;
+pub use selected_extension_demand::HostSelectedExtensionOwnerKind;
 pub use selected_extension_demand::HostSelectedExtensionOwnerModuleInput;
+pub use selected_extension_demand::HostSelectedInnateRepositoryOwnerInputs;
+pub use selected_extension_demand::HostSelectedInnateRepositoryOwnerInputsError;
+pub use selected_extension_demand::HostSelectedInnateRepositoryOwnerInputsKey;
+pub use selected_extension_demand::HostSelectedInnateRepositoryOwnerInputsObservationError;
+pub use selected_extension_demand::HostSelectedInnateRepositoryOwnerInputsObservationKey;
 pub use selected_extension_demand::ObservedHostSelectedExtensionDemand;
 pub use selected_extension_demand::ObservedHostSelectedExtensionOwnerInputs;
+pub use selected_extension_demand::ObservedHostSelectedInnateRepositoryOwnerInputs;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 struct SelectedRegistryPolicyIdentity {
@@ -3462,6 +3469,7 @@ struct HostSelectedExtensionId {
     bzl_file: CanonicalLabel,
     extension_name: CompactString,
     isolation: Option<HostSelectedExtensionIsolation>,
+    kind: HostSelectedExtensionOwnerKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -3801,6 +3809,13 @@ fn selected_extension_mapping_projection(
                     }
                 }
             }),
+            kind: if input.bzl_label == "//:MODULE.bazel"
+                && input.extension_name.rsplit_once(' ').is_some()
+            {
+                HostSelectedExtensionOwnerKind::InnateRepositoryRule
+            } else {
+                HostSelectedExtensionOwnerKind::ModuleExtension
+            },
         };
         let unique_name = if let Some(existing) = names.get(&id) {
             existing.clone()

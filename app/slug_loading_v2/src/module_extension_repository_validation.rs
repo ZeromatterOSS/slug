@@ -19,6 +19,7 @@ use dupe::Dupe;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionImport;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionOverride;
 use slug_bzlmod_v2::HostSelectedExtensionOwner;
+use slug_bzlmod_v2::HostSelectedExtensionOwnerKind;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalRepoName;
@@ -32,7 +33,13 @@ use crate::module_extension::HostSelectedExtensionOwnerPureKey;
 use crate::module_extension::HostSelectedExtensionOwnerPureObservationError;
 use crate::module_extension::HostSelectedExtensionOwnerPureObservationKey;
 use crate::module_extension::HostSelectedExtensionOwnerPureResult;
+use crate::module_extension_innate_repository::HostPureInnateRepositoryOwnerError;
+use crate::module_extension_innate_repository::HostPureInnateRepositoryOwnerKey;
+use crate::module_extension_innate_repository::HostPureInnateRepositoryOwnerObservationError;
+use crate::module_extension_innate_repository::HostPureInnateRepositoryOwnerObservationKey;
+use crate::module_extension_innate_repository::HostPureInnateRepositoryOwnerResult;
 use crate::module_extension_repository_instantiation::HostInstantiateModuleExtensionRequestError;
+use crate::module_extension_repository_instantiation::HostInstantiatedInnateRepositoryOwner;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositories;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesError;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesForRequest;
@@ -40,6 +47,7 @@ use crate::module_extension_repository_instantiation::HostInstantiatedModuleExte
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesObservationError;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesObservationKey;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepository;
+use crate::module_extension_repository_instantiation::instantiate_innate_request;
 use crate::module_extension_repository_instantiation::instantiate_request;
 
 #[doc(hidden)]
@@ -71,15 +79,62 @@ impl<'a> HostGeneratedRepositoryMapping<'a> {
 }
 
 #[doc(hidden)]
-#[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct HostSelectedExtensionOwnerCertificate { pure: Arc<HostSelectedExtensionOwnerPureResult>, instantiated: HostInstantiatedModuleExtensionRepositoriesForRequest }
-#[rustfmt::skip]
+pub struct HostSelectedExtensionOwnerCertificate {
+    kind: PrivateOwnerCertificate,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum PrivateOwnerCertificate {
+    ModuleExtension {
+        pure: Arc<HostSelectedExtensionOwnerPureResult>,
+        instantiated: HostInstantiatedModuleExtensionRepositoriesForRequest,
+    },
+    InnateRepositoryRule {
+        pure: Arc<HostPureInnateRepositoryOwnerResult>,
+        instantiated: HostInstantiatedInnateRepositoryOwner,
+    },
+}
+
 impl HostSelectedExtensionOwnerCertificate {
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = (&CanonicalRepoName, &slug_bzlmod_v2::RepoSpec, &str, HostGeneratedRepositoryMapping<'_>)> {
-        self.instantiated.parts().1.iter().map(|repository| {
+    fn repositories_and_mapping(
+        &self,
+    ) -> (
+        &[HostInstantiatedModuleExtensionRepository],
+        &Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
+    ) {
+        match &self.kind {
+            PrivateOwnerCertificate::ModuleExtension { instantiated, .. } => {
+                (instantiated.parts().1, instantiated.mapping_entries())
+            }
+            PrivateOwnerCertificate::InnateRepositoryRule { instantiated, .. } => {
+                (instantiated.parts().1, instantiated.mapping_entries())
+            }
+        }
+    }
+
+    pub fn iter(
+        &self,
+    ) -> impl ExactSizeIterator<
+        Item = (
+            &CanonicalRepoName,
+            &slug_bzlmod_v2::RepoSpec,
+            &str,
+            HostGeneratedRepositoryMapping<'_>,
+        ),
+    > {
+        let (repositories, mapping) = self.repositories_and_mapping();
+        repositories.iter().map(move |repository| {
             let (canonical, spec) = repository.spec_parts();
-            (canonical, spec, repository.generated_name(), HostGeneratedRepositoryMapping { context_repo: canonical, entries: self.instantiated.mapping_entries().as_ref() })
+            (
+                canonical,
+                spec,
+                repository.generated_name(),
+                HostGeneratedRepositoryMapping {
+                    context_repo: canonical,
+                    entries: mapping.as_ref(),
+                },
+            )
         })
     }
 
@@ -87,16 +142,37 @@ impl HostSelectedExtensionOwnerCertificate {
         &self,
         ordinal: usize,
     ) -> Option<&HostInstantiatedModuleExtensionRepository> {
-        self.instantiated.parts().1.get(ordinal)
+        self.repositories_and_mapping().0.get(ordinal)
     }
 }
 #[doc(hidden)]
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError);
-#[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum PrivateOwnerCertificateError { Pure(HostSelectedExtensionOwnerPureError), Compute(CompactString), Instantiation { pure: Arc<HostSelectedExtensionOwnerPureResult>, error: HostInstantiateModuleExtensionRequestError }, Validation { pure: Arc<HostSelectedExtensionOwnerPureResult>, instantiated: HostInstantiatedModuleExtensionRepositoriesForRequest, error: HostValidateModuleExtensionRequestError } }
+enum PrivateOwnerCertificateError {
+    Pure(HostSelectedExtensionOwnerPureError),
+    InnatePure(HostPureInnateRepositoryOwnerError),
+    Compute(CompactString),
+    Instantiation {
+        pure: Arc<HostSelectedExtensionOwnerPureResult>,
+        error: HostInstantiateModuleExtensionRequestError,
+    },
+    InnateInstantiation {
+        pure: Arc<HostPureInnateRepositoryOwnerResult>,
+        error: HostInstantiateModuleExtensionRequestError,
+    },
+    Validation {
+        pure: Arc<HostSelectedExtensionOwnerPureResult>,
+        instantiated: HostInstantiatedModuleExtensionRepositoriesForRequest,
+        error: HostValidateModuleExtensionRequestError,
+    },
+    InnateValidation {
+        pure: Arc<HostPureInnateRepositoryOwnerResult>,
+        instantiated: HostInstantiatedInnateRepositoryOwner,
+        error: HostValidateModuleExtensionRequestError,
+    },
+}
 #[rustfmt::skip]
 impl fmt::Display for HostSelectedExtensionOwnerCertificateError { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{self:?}") } }
 impl std::error::Error for HostSelectedExtensionOwnerCertificateError {}
@@ -134,8 +210,14 @@ impl ObservedHostSelectedExtensionOwnerCertificate {
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct HostSelectedExtensionOwnerCertificateObservationError(
-    HostSelectedExtensionOwnerPureObservationError,
+    PrivateOwnerCertificateObservationError,
 );
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+enum PrivateOwnerCertificateObservationError {
+    ModuleExtension(HostSelectedExtensionOwnerPureObservationError),
+    InnateRepositoryRule(HostPureInnateRepositoryOwnerObservationError),
+}
 #[derive(Clone, Copy)]
 enum OwnerCertificateMode {
     Legacy,
@@ -148,16 +230,77 @@ type OwnerCertificateDriver = SourcePreparationOutcome<
     >,
 >;
 #[rustfmt::skip]
-async fn compute_owner_certificate(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOwnerCertificateKey, mode: OwnerCertificateMode) -> OwnerCertificateDriver {
+async fn compute_module_extension_certificate(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOwnerCertificateKey, mode: OwnerCertificateMode) -> OwnerCertificateDriver {
     let child = match mode {
-        OwnerCertificateMode::Legacy => match ctx.compute(&HostSelectedExtensionOwnerPureKey::new(key.workspace.clone(), key.owner.clone())).await { Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need), Ok(SourcePreparationOutcome::Complete(value)) => (value, PathObservationEpoch::empty()), Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Compute(error.to_string().into())))), PathObservationEpoch::empty()))) },
-        OwnerCertificateMode::Observed => match ctx.compute(&HostSelectedExtensionOwnerPureObservationKey::new(key.workspace.clone(), key.owner.clone())).await { Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need), Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostSelectedExtensionOwnerCertificateObservationError(error))), Ok(SourcePreparationOutcome::Complete(Ok(value))) => (value.result().dupe(), value.observations().dupe()), Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Compute(error.to_string().into())))), PathObservationEpoch::empty()))) },
+        OwnerCertificateMode::Legacy => match ctx.compute(&HostSelectedExtensionOwnerPureKey::new(key.workspace.clone(), key.owner.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(value)) => (value, PathObservationEpoch::empty()),
+            Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Compute(error.to_string().into())))), PathObservationEpoch::empty()))),
+        },
+        OwnerCertificateMode::Observed => match ctx.compute(&HostSelectedExtensionOwnerPureObservationKey::new(key.workspace.clone(), key.owner.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostSelectedExtensionOwnerCertificateObservationError(PrivateOwnerCertificateObservationError::ModuleExtension(error)))),
+            Ok(SourcePreparationOutcome::Complete(Ok(value))) => (value.result().dupe(), value.observations().dupe()),
+            Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Compute(error.to_string().into())))), PathObservationEpoch::empty()))),
+        },
     };
     let (pure, observations) = child;
-    let pure = match pure.as_ref() { Ok(value) => Arc::new(value.clone()), Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Pure(error.clone())))), observations))) };
-    let instantiated = match instantiate_request(&pure.receipt) { Ok(value) => value, Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Instantiation { pure, error }))), observations))) };
-    let result = match validate_request(&pure.receipt, &instantiated) { Ok(()) => Ok(HostSelectedExtensionOwnerCertificate { pure, instantiated }), Err(error) => Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Validation { pure, instantiated, error })) };
+    let pure = match pure.as_ref() {
+        Ok(value) => Arc::new(value.clone()),
+        Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Pure(error.clone())))), observations))),
+    };
+    let instantiated = match instantiate_request(&pure.receipt) {
+        Ok(value) => value,
+        Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Instantiation { pure, error }))), observations))),
+    };
+    let result = match validate_request(&pure.receipt, &instantiated) {
+        Ok(()) => Ok(HostSelectedExtensionOwnerCertificate {
+            kind: PrivateOwnerCertificate::ModuleExtension { pure, instantiated },
+        }),
+        Err(error) => Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Validation { pure, instantiated, error })),
+    };
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+#[rustfmt::skip]
+async fn compute_innate_certificate(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOwnerCertificateKey, mode: OwnerCertificateMode) -> OwnerCertificateDriver {
+    let child = match mode {
+        OwnerCertificateMode::Legacy => match ctx.compute(&HostPureInnateRepositoryOwnerKey::new(key.workspace.clone(), key.owner.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(value)) => (value, PathObservationEpoch::empty()),
+            Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Compute(error.to_string().into())))), PathObservationEpoch::empty()))),
+        },
+        OwnerCertificateMode::Observed => match ctx.compute(&HostPureInnateRepositoryOwnerObservationKey::new(key.workspace.clone(), key.owner.clone())).await {
+            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostSelectedExtensionOwnerCertificateObservationError(PrivateOwnerCertificateObservationError::InnateRepositoryRule(error)))),
+            Ok(SourcePreparationOutcome::Complete(Ok(value))) => (value.result().dupe(), value.observations().dupe()),
+            Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Compute(error.to_string().into())))), PathObservationEpoch::empty()))),
+        },
+    };
+    let (pure, observations) = child;
+    let pure = match pure.as_ref() {
+        Ok(value) => Arc::new(value.clone()),
+        Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::InnatePure(error.clone())))), observations))),
+    };
+    let instantiated = match instantiate_innate_request(pure.inputs.clone(), &pure.repository_rule_calls) {
+        Ok(value) => value,
+        Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::InnateInstantiation { pure, error }))), observations))),
+    };
+    let result = match validate_innate_request(&pure, &instantiated) {
+        Ok(()) => Ok(HostSelectedExtensionOwnerCertificate {
+            kind: PrivateOwnerCertificate::InnateRepositoryRule { pure, instantiated },
+        }),
+        Err(error) => Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::InnateValidation { pure, instantiated, error })),
+    };
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+#[rustfmt::skip]
+async fn compute_owner_certificate(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOwnerCertificateKey, mode: OwnerCertificateMode) -> OwnerCertificateDriver {
+    match key.owner.kind() {
+        HostSelectedExtensionOwnerKind::ModuleExtension => compute_module_extension_certificate(ctx, key, mode).await,
+        HostSelectedExtensionOwnerKind::InnateRepositoryRule => compute_innate_certificate(ctx, key, mode).await,
+    }
 }
 #[async_trait]
 #[rustfmt::skip]
@@ -523,11 +666,33 @@ pub(crate) fn validate_request(
             "invoked and instantiated extension requests differ".into(),
         ));
     }
+    validate_parts(request.validation_parts(), repositories)
+}
+
+fn validate_innate_request(
+    pure: &HostPureInnateRepositoryOwnerResult,
+    current: &HostInstantiatedInnateRepositoryOwner,
+) -> Result<(), HostValidateModuleExtensionRequestError> {
+    let (inputs, repositories) = current.parts();
+    if pure.inputs != *inputs {
+        return Err(HostValidateModuleExtensionRequestError::Join(
+            "innate invocation and instantiation inputs differ".into(),
+        ));
+    }
+    validate_parts(inputs.validation_parts(), repositories)
+}
+
+fn validate_parts(
+    (imports, overrides): (
+        &[HostSelectedExtensionDefinitionImport],
+        &[HostSelectedExtensionDefinitionOverride],
+    ),
+    repositories: &[HostInstantiatedModuleExtensionRepository],
+) -> Result<(), HostValidateModuleExtensionRequestError> {
     let generated = repositories
         .iter()
         .map(|repository| CompactString::from(repository.generated_name()))
         .collect::<SmallSet<_>>();
-    let (imports, overrides) = request.validation_parts();
     for import in imports {
         let (_, exported, _) = import.parts();
         if !generated.contains(exported)

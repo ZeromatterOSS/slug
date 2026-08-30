@@ -32,6 +32,7 @@ mod host_package_inventory_tests;
 pub mod keys;
 pub mod load_label;
 mod module_extension;
+mod module_extension_innate_repository;
 mod module_extension_repository_file_effect;
 mod module_extension_repository_instantiation;
 mod module_extension_repository_rule;

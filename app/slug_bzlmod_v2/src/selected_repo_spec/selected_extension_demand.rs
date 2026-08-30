@@ -17,10 +17,23 @@ use starlark_map::small_map::SmallMap;
 use super::*;
 
 #[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
+pub enum HostSelectedExtensionOwnerKind {
+    ModuleExtension,
+    InnateRepositoryRule,
+}
+
+#[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct HostSelectedExtensionOwner {
     id: HostSelectedExtensionId,
     unique_name: CanonicalRepoName,
+}
+
+impl HostSelectedExtensionOwner {
+    pub fn kind(&self) -> HostSelectedExtensionOwnerKind {
+        self.id.kind
+    }
 }
 
 #[doc(hidden)]
@@ -63,6 +76,73 @@ impl HostSelectedExtensionOwnerInputs {
     }
     pub fn modules(&self) -> &[HostSelectedExtensionOwnerModuleInput] {
         &self.modules
+    }
+}
+
+/// Graph-owned inputs for Bazel's synthetic `use_repo_rule` extension.
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostSelectedInnateRepositoryOwnerInputs {
+    owner: Arc<HostSelectedExtensionOwner>,
+    unique_name: CanonicalRepoName,
+    bzl_file: CanonicalLabel,
+    rule_name: CompactString,
+    label_conversion_base: CanonicalLabel,
+    base_mapping: HostSelectedRepositoryMapping,
+    mapping: HostSelectedRepositoryMapping,
+    tags: Arc<[crate::NonrootExtensionTag]>,
+    imports: Arc<[HostSelectedExtensionDefinitionImport]>,
+    overrides: Arc<[HostSelectedExtensionDefinitionOverride]>,
+}
+
+impl HostSelectedInnateRepositoryOwnerInputs {
+    pub fn owner(&self) -> &Arc<HostSelectedExtensionOwner> {
+        &self.owner
+    }
+
+    pub fn definition_parts(
+        &self,
+    ) -> (
+        &CanonicalLabel,
+        &str,
+        &CanonicalLabel,
+        &SmallMap<ApparentRepoName, CanonicalRepoName>,
+    ) {
+        (
+            &self.bzl_file,
+            &self.rule_name,
+            &self.label_conversion_base,
+            &self.mapping.entries,
+        )
+    }
+
+    pub fn namespace_parts(
+        &self,
+    ) -> (
+        &CanonicalRepoName,
+        &CanonicalRepoName,
+        &SmallMap<ApparentRepoName, CanonicalRepoName>,
+        &[HostSelectedExtensionDefinitionOverride],
+    ) {
+        (
+            &self.unique_name,
+            &self.base_mapping.context_repo,
+            &self.base_mapping.entries,
+            &self.overrides,
+        )
+    }
+
+    pub fn validation_parts(
+        &self,
+    ) -> (
+        &[HostSelectedExtensionDefinitionImport],
+        &[HostSelectedExtensionDefinitionOverride],
+    ) {
+        (&self.imports, &self.overrides)
+    }
+
+    pub fn tags(&self) -> &[crate::NonrootExtensionTag] {
+        &self.tags
     }
 }
 
@@ -165,6 +245,18 @@ impl fmt::Display for HostSelectedExtensionOwnerInputsError {
 }
 impl std::error::Error for HostSelectedExtensionOwnerInputsError {}
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostSelectedInnateRepositoryOwnerInputsError(OwnerInputsError);
+
+impl fmt::Display for HostSelectedInnateRepositoryOwnerInputsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+impl std::error::Error for HostSelectedInnateRepositoryOwnerInputsError {}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct HostSelectedExtensionDemandKey {
     workspace: NormalizedAbsolutePath,
@@ -253,6 +345,24 @@ impl HostSelectedExtensionOwnerInputsObservationKey {
         Self(HostSelectedExtensionOwnerInputsKey::new(workspace, owner))
     }
 }
+
+#[doc(hidden)]
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostSelectedInnateRepositoryOwnerInputsKey { workspace: NormalizedAbsolutePath, owner: Arc<HostSelectedExtensionOwner> }
+#[rustfmt::skip]
+impl HostSelectedInnateRepositoryOwnerInputsKey { pub fn new(workspace: NormalizedAbsolutePath, owner: Arc<HostSelectedExtensionOwner>) -> Self { Self { workspace, owner } } }
+#[rustfmt::skip]
+impl fmt::Display for HostSelectedInnateRepositoryOwnerInputsKey { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "host-selected-innate-repository-owner-inputs:{}:{}", self.workspace, self.owner.unique_name) } }
+
+#[doc(hidden)]
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostSelectedInnateRepositoryOwnerInputsObservationKey(HostSelectedInnateRepositoryOwnerInputsKey);
+#[rustfmt::skip]
+impl HostSelectedInnateRepositoryOwnerInputsObservationKey { pub fn new(workspace: NormalizedAbsolutePath, owner: Arc<HostSelectedExtensionOwner>) -> Self { Self(HostSelectedInnateRepositoryOwnerInputsKey::new(workspace, owner)) } }
+#[rustfmt::skip]
+impl fmt::Display for HostSelectedInnateRepositoryOwnerInputsObservationKey { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "observed-{}", self.0) } }
 impl fmt::Display for HostSelectedExtensionOwnerInputsObservationKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "observed-{}", self.0)
@@ -264,6 +374,13 @@ pub struct ObservedHostSelectedExtensionOwnerInputs {
     result: Arc<Result<HostSelectedExtensionOwnerInputs, HostSelectedExtensionOwnerInputsError>>,
     observations: PathObservationEpoch,
 }
+
+#[doc(hidden)]
+#[rustfmt::skip]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedHostSelectedInnateRepositoryOwnerInputs { result: Arc<Result<HostSelectedInnateRepositoryOwnerInputs, HostSelectedInnateRepositoryOwnerInputsError>>, observations: PathObservationEpoch }
+#[rustfmt::skip]
+impl ObservedHostSelectedInnateRepositoryOwnerInputs { pub fn result(&self) -> &Arc<Result<HostSelectedInnateRepositoryOwnerInputs, HostSelectedInnateRepositoryOwnerInputsError>> { &self.result } pub fn observations(&self) -> &PathObservationEpoch { &self.observations } }
 impl ObservedHostSelectedExtensionOwnerInputs {
     pub fn result(
         &self,
@@ -282,6 +399,10 @@ enum OwnerInputsObservationError {
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct HostSelectedExtensionOwnerInputsObservationError(OwnerInputsObservationError);
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct HostSelectedInnateRepositoryOwnerInputsObservationError(OwnerInputsObservationError);
 
 type MappingChild = SourcePreparationOutcome<
     Result<(ExtensionMappingsResult, PathObservationEpoch), ExtensionMappingsObservationError>,
@@ -553,6 +674,139 @@ fn owner_inputs(
     })
 }
 
+fn innate_owner_inputs(
+    owner: Arc<HostSelectedExtensionOwner>,
+    mappings: &HostSelectedExtensionMappings,
+) -> Result<HostSelectedInnateRepositoryOwnerInputs, HostSelectedInnateRepositoryOwnerInputsError> {
+    let fail = |kind| HostSelectedInnateRepositoryOwnerInputsError(kind);
+    let uses = mappings
+        .usages
+        .iter()
+        .filter(|usage| usage.id == owner.id)
+        .collect::<Vec<_>>();
+    let owner_key = uses.first().map(|usage| &usage.owner);
+    if owner.kind() != HostSelectedExtensionOwnerKind::InnateRepositoryRule
+        || owner.id.isolation.is_some()
+        || owner_key.is_none()
+        || uses
+            .iter()
+            .any(|usage| Some(&usage.owner) != owner_key || usage.unique_name != owner.unique_name)
+    {
+        return Err(fail(OwnerInputsError::Unsupported { owner }));
+    }
+    let owner_key = owner_key.expect("nonempty uses checked");
+    let route_index = mappings
+        .routes
+        .entries
+        .iter()
+        .position(|route| &route.entry.key == owner_key)
+        .ok_or_else(|| {
+            fail(OwnerInputsError::Missing {
+                owner: owner.dupe(),
+            })
+        })?;
+    let base_mapping = mappings.base_mappings.get(route_index).ok_or_else(|| {
+        fail(OwnerInputsError::Missing {
+            owner: owner.dupe(),
+        })
+    })?;
+    let mapping = mappings.mappings.get(route_index).ok_or_else(|| {
+        fail(OwnerInputsError::Missing {
+            owner: owner.dupe(),
+        })
+    })?;
+    let (raw_label, rule_name) = owner
+        .id
+        .extension_name
+        .rsplit_once(' ')
+        .filter(|(label, name)| !label.is_empty() && !name.is_empty())
+        .ok_or_else(|| {
+            fail(OwnerInputsError::Invalid {
+                owner: owner.dupe(),
+                message: "innate repository rule identity lacks label or name".into(),
+            })
+        })?;
+    if rule_name.starts_with('_') {
+        return Err(fail(OwnerInputsError::Invalid {
+            owner,
+            message: "innate repository rule name is private".into(),
+        }));
+    }
+    let bzl_file = resolve_extension_label(owner_key, raw_label, mapping).map_err(|error| {
+        fail(OwnerInputsError::Invalid {
+            owner: owner.dupe(),
+            message: error.to_string().into(),
+        })
+    })?;
+    let rule_name = CompactString::from(rule_name);
+    let route = &mappings.routes.entries[route_index];
+    let tags: Arc<[crate::NonrootExtensionTag]> = match &route.entry.source {
+        HostGraphModuleSource::Root(_) => mappings
+            .root_usages
+            .iter()
+            .filter(|candidate| {
+                candidate.isolation.is_none()
+                    && candidate.extension_name == owner.id.extension_name
+                    && resolve_extension_label(
+                        &HostGraphModuleKey::Root,
+                        candidate.bzl_label.as_str(),
+                        &route.mapping,
+                    )
+                    .is_ok_and(|label| label == owner.id.bzl_file)
+            })
+            .flat_map(|candidate| candidate.tags.iter().cloned())
+            .collect(),
+        HostGraphModuleSource::Discovered(module) => module
+            .module
+            .extension_usages
+            .iter()
+            .filter(|candidate| {
+                candidate.isolation.is_none()
+                    && candidate.extension_name == owner.id.extension_name
+                    && resolve_extension_label(
+                        &route.entry.key,
+                        candidate.bzl_label.as_str(),
+                        &route.mapping,
+                    )
+                    .is_ok_and(|label| label == owner.id.bzl_file)
+            })
+            .flat_map(|candidate| candidate.tags.iter().cloned())
+            .collect(),
+    };
+    if tags.is_empty() {
+        return Err(fail(OwnerInputsError::Invalid {
+            owner,
+            message: "innate repository rule owner has no retained repo call".into(),
+        }));
+    }
+    let overrides = mappings
+        .overrides
+        .iter()
+        .filter(|value| value.id == owner.id)
+        .map(|value| HostSelectedExtensionDefinitionOverride {
+            generated_name: value.generated_name.clone(),
+            replacement: value.replacement.clone(),
+            must_exist: value.must_exist,
+            location: value.location.clone(),
+        })
+        .collect();
+    Ok(HostSelectedInnateRepositoryOwnerInputs {
+        unique_name: owner.unique_name.clone(),
+        label_conversion_base: owner.id.bzl_file.clone(),
+        owner,
+        bzl_file,
+        rule_name,
+        base_mapping: base_mapping.clone(),
+        mapping: mapping.clone(),
+        tags,
+        imports: uses
+            .iter()
+            .flat_map(|usage| usage.validation_imports.iter().cloned())
+            .collect(),
+        overrides,
+    })
+}
+
 async fn demand_compute(
     key: &HostSelectedExtensionDemandKey,
     ctx: &mut DiceComputations<'_>,
@@ -629,6 +883,43 @@ fn finish_inputs_mappings_child(
                     )),
                 }),
                 epoch,
+            )))
+        }
+    }
+}
+
+async fn innate_inputs_compute(
+    key: &HostSelectedInnateRepositoryOwnerInputsKey,
+    ctx: &mut DiceComputations<'_>,
+    observed: bool,
+) -> SourcePreparationOutcome<
+    Result<
+        (
+            Arc<
+                Result<
+                    HostSelectedInnateRepositoryOwnerInputs,
+                    HostSelectedInnateRepositoryOwnerInputsError,
+                >,
+            >,
+            PathObservationEpoch,
+        ),
+        OwnerInputsObservationError,
+    >,
+> {
+    match mappings_child(ctx, &key.workspace, observed).await {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            SourcePreparationOutcome::Complete(Err(OwnerInputsObservationError::Mappings(error)))
+        }
+        SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+            SourcePreparationOutcome::Complete(Ok((
+                Arc::new(match result.as_ref() {
+                    Ok(mappings) => innate_owner_inputs(key.owner.dupe(), mappings),
+                    Err(error) => Err(HostSelectedInnateRepositoryOwnerInputsError(
+                        OwnerInputsError::Mappings(error.clone()),
+                    )),
+                }),
+                observations,
             )))
         }
     }
@@ -732,6 +1023,73 @@ impl Key for HostSelectedExtensionOwnerInputsObservationKey {
     }
 }
 
+#[async_trait]
+impl Key for HostSelectedInnateRepositoryOwnerInputsKey {
+    type Value = SourcePreparationOutcome<
+        Arc<
+            Result<
+                HostSelectedInnateRepositoryOwnerInputs,
+                HostSelectedInnateRepositoryOwnerInputsError,
+            >,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match innate_inputs_compute(self, ctx, false).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, _))) => {
+                SourcePreparationOutcome::Complete(result)
+            }
+            SourcePreparationOutcome::Complete(Err(_)) => unreachable!(),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostSelectedInnateRepositoryOwnerInputsObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostSelectedInnateRepositoryOwnerInputs,
+            HostSelectedInnateRepositoryOwnerInputsObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match innate_inputs_compute(&self.0, ctx, true).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(
+                    HostSelectedInnateRepositoryOwnerInputsObservationError(error),
+                ))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(
+                    ObservedHostSelectedInnateRepositoryOwnerInputs {
+                        result,
+                        observations,
+                    },
+                ))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -748,6 +1106,7 @@ mod tests {
             bzl_file: CanonicalLabel::parse("@@//:extension.bzl").unwrap(),
             extension_name: name.into(),
             isolation: None,
+            kind: HostSelectedExtensionOwnerKind::ModuleExtension,
         }
     }
 
@@ -784,6 +1143,15 @@ mod tests {
             dev_dependency: false,
             location: span(),
         }
+    }
+
+    fn repo_tag(name: &str) -> crate::NonrootExtensionTag {
+        let mut value = tag("repo");
+        value.attributes = Arc::new(SmallMap::from_iter([(
+            CompactString::from("name"),
+            crate::NonrootAttributeValue::String(name.into()),
+        )]));
+        value
     }
 
     fn owner_inputs_mappings() -> (
@@ -1057,12 +1425,244 @@ mod tests {
     }
 
     #[test]
+    fn innate_owner_inputs_keep_actual_and_synthetic_labels_and_require_one_owner() {
+        let (_, mut mappings) = owner_inputs_mappings();
+        let mut root_mapping = mappings.mappings[0].clone();
+        let mut entries = (*root_mapping.entries).clone();
+        entries.insert(
+            ApparentRepoName::new("definition").unwrap(),
+            CanonicalRepoName::new("dep+1.0").unwrap(),
+        );
+        root_mapping.entries = Arc::new(entries);
+        let id = HostSelectedExtensionId {
+            bzl_file: CanonicalLabel::parse("@@//:MODULE.bazel").unwrap(),
+            extension_name: "@definition//defs:repo.bzl repo".into(),
+            isolation: None,
+            kind: HostSelectedExtensionOwnerKind::InnateRepositoryRule,
+        };
+        let owner = Arc::new(HostSelectedExtensionOwner {
+            id: id.clone(),
+            unique_name: CanonicalRepoName::new("+repo").unwrap(),
+        });
+        mappings.root_usages = Arc::from([crate::module_eval::RootExtensionUsage {
+            bzl_label: "//:MODULE.bazel".into(),
+            extension_name: id.extension_name.clone(),
+            proxies: Arc::from([]),
+            tags: Arc::from([repo_tag("first"), repo_tag("second")]),
+            repo_overrides: Arc::new(SmallMap::new()),
+            isolation: None,
+        }]);
+        mappings.usages = Arc::from([usage(
+            HostGraphModuleKey::Root,
+            id.clone(),
+            "+repo",
+            "+repo+first",
+        )]);
+        mappings.mappings = Arc::from([root_mapping]);
+        mappings.base_mappings = mappings.base_mappings[..1].into();
+        mappings.routes = Arc::new(HostSelectedModuleRoutes {
+            entries: mappings.routes.entries[..1].into(),
+            extension_projection: testing_extension_mapping_projection(),
+        });
+
+        let inputs = innate_owner_inputs(owner.dupe(), &mappings).unwrap();
+        let (actual, rule, synthetic, _) = inputs.definition_parts();
+        assert_eq!(actual.to_string(), "@@dep+1.0//defs:repo.bzl");
+        assert_eq!(rule, "repo");
+        assert_eq!(synthetic.to_string(), "@@//:MODULE.bazel");
+        assert_eq!(
+            inputs
+                .tags()
+                .iter()
+                .map(|tag| match tag.attributes.get("name").unwrap() {
+                    crate::NonrootAttributeValue::String(value) => value.as_str(),
+                    value => panic!("unexpected name value: {value:?}"),
+                })
+                .collect::<Vec<_>>(),
+            ["first", "second"]
+        );
+
+        let mut changed_mapping = mappings.clone();
+        let mut changed = changed_mapping.mappings[0].clone();
+        let mut entries = (*changed.entries).clone();
+        entries.insert(
+            ApparentRepoName::new("definition").unwrap(),
+            CanonicalRepoName::root(),
+        );
+        changed.entries = Arc::new(entries);
+        changed_mapping.mappings = Arc::from([changed]);
+        let b = innate_owner_inputs(owner.dupe(), &changed_mapping).unwrap();
+        let restored = innate_owner_inputs(owner.dupe(), &mappings).unwrap();
+        assert_ne!(inputs, b);
+        assert_eq!(inputs, restored);
+
+        let mut validated = mappings.clone();
+        let mut use_row = validated.usages[0].clone();
+        use_row.validation_imports = Arc::from([HostSelectedExtensionDefinitionImport {
+            local_name: "alias".into(),
+            generated_name: "first".into(),
+            location: span(),
+        }]);
+        validated.usages = Arc::from([use_row]);
+        validated.overrides = Arc::from([HostSelectedExtensionOverride {
+            id: id.clone(),
+            generated_name: "second".into(),
+            replacement: CanonicalRepoName::root(),
+            must_exist: true,
+            location: span(),
+        }]);
+        let validation = innate_owner_inputs(owner.dupe(), &validated).unwrap();
+        let (imports, overrides) = validation.validation_parts();
+        assert_eq!(imports[0].parts().0, "alias");
+        assert_eq!(
+            overrides[0].parts(),
+            ("second", &CanonicalRepoName::root(), true)
+        );
+
+        let mut multiple = mappings.clone();
+        multiple.usages = Arc::from([mappings.usages[0].clone(), mappings.usages[0].clone()]);
+        assert!(innate_owner_inputs(owner.dupe(), &multiple).is_ok());
+        let mut inconsistent = multiple.clone();
+        let mut second = inconsistent.usages[1].clone();
+        second.unique_name = CanonicalRepoName::new("+other").unwrap();
+        inconsistent.usages = Arc::from([inconsistent.usages[0].clone(), second]);
+        assert!(matches!(
+            innate_owner_inputs(owner.dupe(), &inconsistent),
+            Err(HostSelectedInnateRepositoryOwnerInputsError(
+                OwnerInputsError::Unsupported { .. }
+            ))
+        ));
+        let mut two_owners = multiple;
+        let mut second = two_owners.usages[1].clone();
+        second.owner = HostGraphModuleKey::Module {
+            name: "dep".into(),
+            version: crate::module_version::BazelModuleVersion::parse("1.0").unwrap(),
+        };
+        two_owners.usages = Arc::from([two_owners.usages[0].clone(), second]);
+        assert!(matches!(
+            innate_owner_inputs(owner.dupe(), &two_owners),
+            Err(HostSelectedInnateRepositoryOwnerInputsError(
+                OwnerInputsError::Unsupported { .. }
+            ))
+        ));
+
+        let mut empty = mappings.clone();
+        let mut root_usage = empty.root_usages[0].clone();
+        root_usage.tags = Arc::from([]);
+        empty.root_usages = Arc::from([root_usage]);
+        assert!(matches!(
+            innate_owner_inputs(owner.dupe(), &empty),
+            Err(HostSelectedInnateRepositoryOwnerInputsError(
+                OwnerInputsError::Invalid { .. }
+            ))
+        ));
+
+        for (extension_name, isolation, expected_invalid) in [
+            ("repo", None, true),
+            (
+                "//defs:repo.bzl repo",
+                Some(HostSelectedExtensionIsolation::Root {
+                    proxy: "proxy".into(),
+                }),
+                false,
+            ),
+        ] {
+            let mut id = owner.id.clone();
+            id.extension_name = extension_name.into();
+            id.isolation = isolation;
+            let candidate = Arc::new(HostSelectedExtensionOwner {
+                id: id.clone(),
+                unique_name: owner.unique_name.clone(),
+            });
+            let mut invalid = mappings.clone();
+            invalid.usages =
+                Arc::from([usage(HostGraphModuleKey::Root, id, "+repo", "+repo+first")]);
+            let result = innate_owner_inputs(candidate, &invalid);
+            assert!(matches!(
+                (expected_invalid, result),
+                (
+                    true,
+                    Err(HostSelectedInnateRepositoryOwnerInputsError(
+                        OwnerInputsError::Invalid { .. }
+                    ))
+                ) | (
+                    false,
+                    Err(HostSelectedInnateRepositoryOwnerInputsError(
+                        OwnerInputsError::Unsupported { .. }
+                    ))
+                )
+            ));
+        }
+    }
+
+    #[test]
+    fn innate_owner_inputs_accept_nonroot_owner_mapping_and_reject_private_export() {
+        let (_, mut mappings) = owner_inputs_mappings();
+        let dep_key = mappings.routes.entries[1].entry.key.clone();
+        let id = HostSelectedExtensionId {
+            bzl_file: CanonicalLabel::parse("@@dep+1.0//:MODULE.bazel").unwrap(),
+            extension_name: "@root//defs:repo.bzl repo".into(),
+            isolation: None,
+            kind: HostSelectedExtensionOwnerKind::InnateRepositoryRule,
+        };
+        let owner = Arc::new(HostSelectedExtensionOwner {
+            id: id.clone(),
+            unique_name: CanonicalRepoName::new("dep+1+repo").unwrap(),
+        });
+        let mut routes = mappings.routes.entries.to_vec();
+        let HostGraphModuleSource::Discovered(module) = &routes[1].entry.source else {
+            unreachable!()
+        };
+        let mut module = (**module).clone();
+        module.module.extension_usages = Arc::from([crate::NonrootExtensionUsage {
+            bzl_label: "//:MODULE.bazel".into(),
+            extension_name: id.extension_name.clone(),
+            proxies: Arc::from([]),
+            tags: Arc::from([repo_tag("out")]),
+            repo_overrides: Arc::new(SmallMap::new()),
+            isolation: None,
+        }]);
+        routes[1].entry.source = HostGraphModuleSource::Discovered(Arc::new(module));
+        mappings.routes = Arc::new(HostSelectedModuleRoutes {
+            entries: routes.into(),
+            extension_projection: testing_extension_mapping_projection(),
+        });
+        mappings.usages = Arc::from([usage(dep_key, id.clone(), "dep+1+repo", "dep+1+repo+out")]);
+        let inputs = innate_owner_inputs(owner, &mappings).unwrap();
+        let (actual, rule, synthetic, _) = inputs.definition_parts();
+        assert_eq!(actual.to_string(), "@@//defs:repo.bzl");
+        assert_eq!(rule, "repo");
+        assert_eq!(synthetic.to_string(), "@@dep+1.0//:MODULE.bazel");
+
+        let mut private_id = id;
+        private_id.extension_name = "@root//defs:repo.bzl _repo".into();
+        let private = Arc::new(HostSelectedExtensionOwner {
+            id: private_id.clone(),
+            unique_name: CanonicalRepoName::new("dep+1+_repo").unwrap(),
+        });
+        let mut private_mappings = mappings;
+        private_mappings.usages = Arc::from([usage(
+            private_mappings.routes.entries[1].entry.key.clone(),
+            private_id,
+            "dep+1+_repo",
+            "dep+1+_repo+out",
+        )]);
+        assert!(matches!(
+            innate_owner_inputs(private, &private_mappings),
+            Err(HostSelectedInnateRepositoryOwnerInputsError(
+                OwnerInputsError::Invalid { .. }
+            ))
+        ));
+    }
+
+    #[test]
     fn owner_input_request_retains_selected_definition_source() {
         let (_, mut mappings) = owner_inputs_mappings();
         let id = HostSelectedExtensionId {
             bzl_file: CanonicalLabel::parse("@@dep+1.0//:extension.bzl").unwrap(),
             extension_name: "extension".into(),
             isolation: None,
+            kind: HostSelectedExtensionOwnerKind::ModuleExtension,
         };
         let owner = Arc::new(HostSelectedExtensionOwner {
             id: id.clone(),

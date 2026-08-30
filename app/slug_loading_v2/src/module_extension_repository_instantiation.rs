@@ -17,6 +17,8 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequest;
+use slug_bzlmod_v2::HostSelectedExtensionDefinitionOverride;
+use slug_bzlmod_v2::HostSelectedInnateRepositoryOwnerInputs;
 use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::RepoRuleId;
 use slug_bzlmod_v2::RepoSpec;
@@ -85,6 +87,28 @@ pub(crate) struct HostInstantiatedModuleExtensionRepositoriesForRequest {
     request: HostSelectedExtensionDefinitionLoadRequest,
     mapping_entries: Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     repositories: Arc<[HostInstantiatedModuleExtensionRepository]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct HostInstantiatedInnateRepositoryOwner {
+    inputs: Arc<HostSelectedInnateRepositoryOwnerInputs>,
+    mapping_entries: Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
+    repositories: Arc<[HostInstantiatedModuleExtensionRepository]>,
+}
+
+impl HostInstantiatedInnateRepositoryOwner {
+    pub(crate) fn parts(
+        &self,
+    ) -> (
+        &Arc<HostSelectedInnateRepositoryOwnerInputs>,
+        &[HostInstantiatedModuleExtensionRepository],
+    ) {
+        (&self.inputs, &self.repositories)
+    }
+
+    pub(crate) fn mapping_entries(&self) -> &Arc<SmallMap<ApparentRepoName, CanonicalRepoName>> {
+        &self.mapping_entries
+    }
 }
 
 impl HostInstantiatedModuleExtensionRepositoriesForRequest {
@@ -438,6 +462,90 @@ pub(crate) fn instantiate_request(
     HostInstantiatedModuleExtensionRepositoriesForRequest,
     HostInstantiateModuleExtensionRequestError,
 > {
+    let (unique_name, context_repo, base, overrides) = receipt.request.namespace_parts();
+    let (mapping_entries, repositories) = instantiate_parts(
+        unique_name,
+        context_repo,
+        base,
+        overrides,
+        &receipt.repository_rule_calls,
+        None,
+    )?;
+    Ok(HostInstantiatedModuleExtensionRepositoriesForRequest {
+        request: receipt.request.clone(),
+        mapping_entries,
+        repositories,
+    })
+}
+
+pub(crate) fn instantiate_innate_request(
+    inputs: Arc<HostSelectedInnateRepositoryOwnerInputs>,
+    calls: &[RepositoryRuleCallRecord],
+) -> Result<HostInstantiatedInnateRepositoryOwner, HostInstantiateModuleExtensionRequestError> {
+    let (unique_name, context_repo, base, overrides) = inputs.namespace_parts();
+    let (_, _, label_conversion_base, _) = inputs.definition_parts();
+    let (mapping_entries, repositories) = instantiate_parts(
+        unique_name,
+        context_repo,
+        base,
+        overrides,
+        calls,
+        Some(label_conversion_base),
+    )?;
+    Ok(HostInstantiatedInnateRepositoryOwner {
+        inputs,
+        mapping_entries,
+        repositories,
+    })
+}
+
+fn generated_repo(
+    unique_name: &CanonicalRepoName,
+    name: &str,
+) -> Result<CanonicalRepoName, CompactString> {
+    CanonicalRepoName::new(format!("{}+{name}", unique_name.as_str())).map_err(Into::into)
+}
+
+fn namespace_mapping(
+    unique_name: &CanonicalRepoName,
+    context_repo: &CanonicalRepoName,
+    base: &SmallMap<ApparentRepoName, CanonicalRepoName>,
+    overrides: &[HostSelectedExtensionDefinitionOverride],
+    calls: &[RepositoryRuleCallRecord],
+) -> Result<
+    (
+        CanonicalRepoName,
+        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
+    ),
+    CompactString,
+> {
+    let mut entries = base.clone();
+    for call in calls {
+        let apparent = ApparentRepoName::new(call.name.as_str()).map_err(CompactString::from)?;
+        entries.insert(apparent, generated_repo(unique_name, &call.name)?);
+    }
+    for override_value in overrides {
+        let (generated, replacement, _) = override_value.parts();
+        let apparent = ApparentRepoName::new(generated).map_err(CompactString::from)?;
+        entries.insert(apparent, replacement.clone());
+    }
+    Ok((context_repo.clone(), Arc::new(entries)))
+}
+
+fn instantiate_parts(
+    unique_name: &CanonicalRepoName,
+    context_repo: &CanonicalRepoName,
+    base: &SmallMap<ApparentRepoName, CanonicalRepoName>,
+    overrides: &[HostSelectedExtensionDefinitionOverride],
+    calls: &[RepositoryRuleCallRecord],
+    label_conversion_base: Option<&CanonicalLabel>,
+) -> Result<
+    (
+        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
+        Arc<[HostInstantiatedModuleExtensionRepository]>,
+    ),
+    HostInstantiateModuleExtensionRequestError,
+> {
     let fail = |current: &[HostInstantiatedModuleExtensionRepository],
                 call: Option<&RepositoryRuleCallRecord>,
                 error| HostInstantiateModuleExtensionRequestError {
@@ -445,16 +553,17 @@ pub(crate) fn instantiate_request(
         call: call.cloned(),
         error,
     };
-    let mapping = namespace_mapping(receipt).map_err(|message| {
-        fail(
-            &[],
-            None,
-            HostInstantiatedModuleExtensionRepositoryError::Namespace(message),
-        )
-    })?;
-    let (unique_name, _, _, _) = receipt.request.namespace_parts();
+    let mapping = namespace_mapping(unique_name, context_repo, base, overrides, calls).map_err(
+        |message| {
+            fail(
+                &[],
+                None,
+                HostInstantiatedModuleExtensionRepositoryError::Namespace(message),
+            )
+        },
+    )?;
     let mut current = Vec::new();
-    for call in receipt.repository_rule_calls.iter() {
+    for call in calls {
         let canonical_name = generated_repo(unique_name, &call.name).map_err(|message| {
             fail(
                 &current,
@@ -462,7 +571,12 @@ pub(crate) fn instantiate_request(
                 HostInstantiatedModuleExtensionRepositoryError::Namespace(message),
             )
         })?;
-        let repo_spec = instantiate_call(call, &mapping).map_err(|message| {
+        let repo_spec = instantiate_call_with_base(
+            call,
+            &mapping,
+            label_conversion_base.unwrap_or(&call.definition.defining_label),
+        )
+        .map_err(|message| {
             fail(
                 &current,
                 Some(call),
@@ -476,49 +590,27 @@ pub(crate) fn instantiate_request(
             repo_spec,
         });
     }
-    Ok(HostInstantiatedModuleExtensionRepositoriesForRequest {
-        request: receipt.request.clone(),
-        mapping_entries: mapping.1.clone(),
-        repositories: current.into(),
-    })
+    Ok((mapping.1, current.into()))
 }
 
-fn generated_repo(
-    unique_name: &CanonicalRepoName,
-    name: &str,
-) -> Result<CanonicalRepoName, CompactString> {
-    CanonicalRepoName::new(format!("{}+{name}", unique_name.as_str())).map_err(Into::into)
-}
-
-fn namespace_mapping(
-    receipt: &HostPureModuleExtensionInvocationReceipt,
-) -> Result<
-    (
-        CanonicalRepoName,
-        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
-    ),
-    CompactString,
-> {
-    let (unique_name, context_repo, base, overrides) = receipt.request.namespace_parts();
-    let mut entries = base.clone();
-    for call in receipt.repository_rule_calls.iter() {
-        let apparent = ApparentRepoName::new(call.name.as_str()).map_err(CompactString::from)?;
-        entries.insert(apparent, generated_repo(unique_name, &call.name)?);
-    }
-    for override_value in overrides {
-        let (generated, replacement, _) = override_value.parts();
-        let apparent = ApparentRepoName::new(generated).map_err(CompactString::from)?;
-        entries.insert(apparent, replacement.clone());
-    }
-    Ok((context_repo.clone(), Arc::new(entries)))
-}
-
+#[cfg(test)]
 fn instantiate_call(
     call: &RepositoryRuleCallRecord,
     mapping: &(
         CanonicalRepoName,
         Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     ),
+) -> Result<RepoSpec, CompactString> {
+    instantiate_call_with_base(call, mapping, &call.definition.defining_label)
+}
+
+fn instantiate_call_with_base(
+    call: &RepositoryRuleCallRecord,
+    mapping: &(
+        CanonicalRepoName,
+        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
+    ),
+    label_conversion_base: &CanonicalLabel,
 ) -> Result<RepoSpec, CompactString> {
     let mut converted = SmallMap::new();
     for (name, raw) in call.kwargs.iter() {
@@ -533,7 +625,7 @@ fn instantiate_call(
             .ok_or_else(|| CompactString::from(format!("unknown attribute '{name}' provided")))?;
         converted.insert(
             name.clone(),
-            convert_supplied(attribute, raw, &call.definition.defining_label, mapping)?,
+            convert_supplied(attribute, raw, label_conversion_base, mapping)?,
         );
     }
     for attribute in call.definition.attributes.iter() {
@@ -856,6 +948,48 @@ pub(crate) mod tests {
         assert!(!spec.attributes.contains_key("name"));
         assert!(!spec.attributes.contains_key("enabled"));
         assert!(!spec.attributes.contains_key("target"));
+    }
+
+    #[test]
+    fn innate_call_uses_module_base_but_keeps_actual_rule_id() {
+        let mut call = call(
+            [
+                schema("target", AttributeKind::Label, true, None),
+                schema(
+                    "default_target",
+                    AttributeKind::Label,
+                    false,
+                    Some(CoercedAttributeValue::Label(
+                        CanonicalLabel::parse("@@hidden+//defs:default").unwrap(),
+                    )),
+                ),
+            ],
+            [
+                ("name", RepositoryRuleCallValue::String("generated".into())),
+                ("target", RepositoryRuleCallValue::String(":dep".into())),
+            ],
+        );
+        call.definition.defining_label = CanonicalLabel::parse("@@hidden+//defs:repo.bzl").unwrap();
+        let module_base = CanonicalLabel::parse("@@//:MODULE.bazel").unwrap();
+        let innate = instantiate_call_with_base(&call, &mapping(), &module_base).unwrap();
+        assert_eq!(
+            innate.rule_id.bzl_file.to_string(),
+            "@@hidden+//defs:repo.bzl"
+        );
+        assert_eq!(
+            innate.attributes.get("target"),
+            Some(&OverrideAttributeValue::Label(
+                CanonicalLabel::parse("@@//:dep").unwrap()
+            ))
+        );
+        assert!(!innate.attributes.contains_key("default_target"));
+        let ordinary = instantiate_call(&call, &mapping()).unwrap();
+        assert_eq!(
+            ordinary.attributes.get("target"),
+            Some(&OverrideAttributeValue::Label(
+                CanonicalLabel::parse("@@hidden+//defs:dep").unwrap()
+            ))
+        );
     }
 
     #[test]

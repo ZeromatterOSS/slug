@@ -458,7 +458,19 @@ pub use selected_repo_spec::HostSelectedExtensionOwnerInputsObservationError;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionOwnerInputsObservationKey;
 #[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionOwnerKind;
+#[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionOwnerModuleInput;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedInnateRepositoryOwnerInputs;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedInnateRepositoryOwnerInputsError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedInnateRepositoryOwnerInputsKey;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedInnateRepositoryOwnerInputsObservationError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedInnateRepositoryOwnerInputsObservationKey;
 #[doc(hidden)]
 pub use selected_repo_spec::ObservedHostBuiltinBazelToolsRepositoryMapping;
 #[doc(hidden)]
@@ -471,6 +483,8 @@ pub use selected_repo_spec::ObservedHostSelectedExtensionDemand;
 pub use selected_repo_spec::ObservedHostSelectedExtensionEvaluationInputRequests;
 #[doc(hidden)]
 pub use selected_repo_spec::ObservedHostSelectedExtensionOwnerInputs;
+#[doc(hidden)]
+pub use selected_repo_spec::ObservedHostSelectedInnateRepositoryOwnerInputs;
 #[doc(hidden)]
 pub use source_preparation::HostCanonicalRepositorySourceInput;
 #[doc(hidden)]
