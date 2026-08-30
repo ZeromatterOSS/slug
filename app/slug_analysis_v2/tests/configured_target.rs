@@ -9,8 +9,20 @@
  */
 
 use std::collections::BTreeMap;
+use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
+use allocative::Allocative;
+use async_trait::async_trait;
+use dice::CancellationContext;
+use dice::DetectCycles;
+use dice::Dice;
+use dice::DiceComputations;
+use dice::Key;
 use slug_analysis_v2::AnalysisDiagnostic;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredActionAspectProvenance;
@@ -25,9 +37,10 @@ use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
+use slug_analysis_v2::ConfiguredToolchainContextRow;
+use slug_analysis_v2::ConfiguredToolchainSelection;
 use slug_analysis_v2::DiagnosticSeverity;
 use slug_analysis_v2::PlatformSemanticFact;
-use slug_analysis_v2::ToolchainSelection;
 use slug_analysis_v2::ToolchainTopology;
 use slug_analysis_v2::key::StarlarkOption;
 use slug_analysis_v2::key::StarlarkOptionScope;
@@ -36,7 +49,11 @@ use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
+use slug_build_api_v2::AnalysisConfiguredTargetKey;
+use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::AnalysisValue;
+use slug_build_api_v2::AnalysisValueKind;
+use slug_build_api_v2::ConfiguredTargetValue;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetOrder;
@@ -60,6 +77,76 @@ use slug_identity_v2::RepositoryMappingId;
 use slug_loading_v2::RuleCapability;
 use slug_loading_v2::TestRuleKind;
 use slug_workspace_v2::NormalizedAbsolutePath;
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+struct ContextInputKey;
+
+impl fmt::Display for ContextInputKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("test-toolchain-context-input")
+    }
+}
+
+#[async_trait]
+impl Key for ContextInputKey {
+    type Value = Arc<ConfiguredActionToolchainContext>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        panic!("ContextInputKey is injected")
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[derive(Debug, Clone, Allocative)]
+struct ContextParentKey {
+    #[allocative(skip)]
+    evaluations: Arc<AtomicUsize>,
+}
+
+impl PartialEq for ContextParentKey {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.evaluations, &other.evaluations)
+    }
+}
+
+impl Eq for ContextParentKey {}
+
+impl Hash for ContextParentKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.evaluations).hash(state);
+    }
+}
+
+impl fmt::Display for ContextParentKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("test-toolchain-context-parent")
+    }
+}
+
+#[async_trait]
+impl Key for ContextParentKey {
+    type Value = Arc<ConfiguredActionToolchainContext>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        self.evaluations.fetch_add(1, Ordering::SeqCst);
+        ctx.compute(&ContextInputKey).await.unwrap()
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
 
 fn target_config() -> ConfigurationKey {
     ConfigurationKey::target("targetabc").unwrap()
@@ -96,6 +183,153 @@ fn mapped_label(mapping_name: &str, repo_version: &str) -> CanonicalLabel {
     apparent.resolve(&mapping)
 }
 
+fn toolchain_context(
+    owner: &ConfiguredTargetKey,
+    platform: &ConfiguredTargetKey,
+    marker: &str,
+) -> Arc<ConfiguredActionToolchainContext> {
+    let implementation = ConfiguredTargetKey::new(
+        canonical("@@//:implementation"),
+        platform.configuration().clone(),
+    );
+    let selection = ConfiguredToolchainSelection::new(
+        canonical("@@//:toolchain"),
+        implementation.clone(),
+        implementation,
+        ProviderOccurrence::new(
+            ProviderIdentity::builtin("ToolchainInfo"),
+            [("marker", AnalysisValue::string(marker))],
+        ),
+    );
+    Arc::new(
+        ConfiguredActionToolchainContext::new(
+            platform.clone(),
+            vec![ConfiguredToolchainContextRow::new(
+                ConfiguredTargetKey::new(canonical("@@//:type"), owner.configuration().clone()),
+                ConfiguredTargetKey::new(canonical("@@//:type"), owner.configuration().clone()),
+                true,
+                Some(selection),
+            )],
+        )
+        .unwrap(),
+    )
+}
+
+fn toolchain_marker(context: &ConfiguredActionToolchainContext) -> &str {
+    let value = context.rows()[0]
+        .selected()
+        .unwrap()
+        .info()
+        .field("marker")
+        .unwrap();
+    let AnalysisValueKind::String(marker) = value.kind() else {
+        panic!("test toolchain marker must be a string")
+    };
+    marker
+}
+
+fn aliased_payload_context(shared: bool) -> Arc<ConfiguredActionToolchainContext> {
+    let target = structural_configurations()[0].clone();
+    let exec = structural_configurations()[1].clone();
+    let platform = ConfiguredTargetKey::new(canonical("@@//:platform"), exec.clone());
+    let leaf = || {
+        AnalysisDepset::new(
+            DepsetOrder::Default,
+            vec![AnalysisValue::string("same")],
+            vec![],
+        )
+        .unwrap()
+    };
+    let first = leaf();
+    let second = if shared { first.clone() } else { leaf() };
+    let rows = [first, second]
+        .into_iter()
+        .enumerate()
+        .map(|(index, depset)| {
+            let implementation = ConfiguredTargetKey::new(
+                canonical(&format!("@@//:implementation_{index}")),
+                exec.clone(),
+            );
+            let nested = ProviderCollection::new(vec![
+                ProviderValue::DefaultInfo(DefaultInfo::empty()),
+                ProviderValue::Occurrence(ProviderOccurrence::new(
+                    ProviderIdentity::user(ProviderId::new("//:nested.bzl", "Nested").unwrap()),
+                    [("payload", AnalysisValue::depset(depset))],
+                )),
+            ])
+            .unwrap();
+            let configured_payload = AnalysisValue::configured_target(ConfiguredTargetValue::new(
+                AnalysisConfiguredTargetKey::new(
+                    canonical(&format!("@@//:dependency_{index}")),
+                    b"same-config".as_slice(),
+                ),
+                nested,
+            ));
+            ConfiguredToolchainContextRow::new(
+                ConfiguredTargetKey::new(canonical(&format!("@@//:type_{index}")), target.clone()),
+                ConfiguredTargetKey::new(canonical(&format!("@@//:type_{index}")), target.clone()),
+                true,
+                Some(ConfiguredToolchainSelection::new(
+                    canonical(&format!("@@//:declaration_{index}")),
+                    implementation.clone(),
+                    implementation,
+                    ProviderOccurrence::new(
+                        ProviderIdentity::builtin("ToolchainInfo"),
+                        [("payload", configured_payload)],
+                    ),
+                )),
+            )
+        })
+        .collect::<Vec<_>>();
+    Arc::new(ConfiguredActionToolchainContext::new(platform, rows).unwrap())
+}
+
+#[tokio::test]
+async fn parent_dice_cutoff_tracks_cross_row_toolchain_payload_aliases() {
+    let a = aliased_payload_context(true);
+    let b = aliased_payload_context(false);
+    let restored_a = aliased_payload_context(true);
+    for (left, right) in a.rows().iter().zip(b.rows()) {
+        assert_eq!(
+            left.selected().unwrap().info(),
+            right.selected().unwrap().info()
+        );
+    }
+    assert_ne!(a, b);
+    assert_eq!(a, restored_a);
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let evaluations = Arc::new(AtomicUsize::new(0));
+    let parent = ContextParentKey {
+        evaluations: evaluations.clone(),
+    };
+    let mut updater = dice.updater();
+    updater
+        .changed_to(vec![(ContextInputKey, a.clone())])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    let first = transaction.compute(&parent).await.unwrap();
+    assert_eq!(evaluations.load(Ordering::SeqCst), 1);
+    assert_eq!(transaction.compute(&parent).await.unwrap(), first);
+    assert_eq!(evaluations.load(Ordering::SeqCst), 1);
+
+    let mut updater = dice.updater();
+    updater
+        .changed_to(vec![(ContextInputKey, b.clone())])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    assert_eq!(transaction.compute(&parent).await.unwrap(), b);
+    assert_eq!(evaluations.load(Ordering::SeqCst), 2);
+
+    let mut updater = dice.updater();
+    updater
+        .changed_to(vec![(ContextInputKey, restored_a)])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    assert_eq!(transaction.compute(&parent).await.unwrap(), first);
+    assert_eq!(evaluations.load(Ordering::SeqCst), 3);
+}
+
 fn default_action_context(
     owner: &ConfiguredTargetKey,
     platform_label: &str,
@@ -104,15 +338,7 @@ fn default_action_context(
         canonical(platform_label),
         structural_configurations()[1].clone(),
     );
-    let selection = ToolchainSelection::new(
-        platform.clone(),
-        canonical("@@//:toolchain"),
-        ConfiguredTargetKey::new(canonical("@@//:type"), owner.configuration().clone()),
-        ConfiguredTargetKey::new(
-            canonical("@@//:implementation"),
-            owner.configuration().clone(),
-        ),
-    );
+    let toolchain = toolchain_context(owner, &platform, "marker");
     let context = ConfiguredActionOwnerContext::new(
         owner.clone(),
         ConfiguredActionExecGroup::Default,
@@ -123,16 +349,13 @@ fn default_action_context(
         &BTreeMap::new(),
         &BTreeMap::new(),
         Vec::new(),
-        Some(Arc::new(ConfiguredActionToolchainContext::new(
-            selection.clone(),
-            "marker".into(),
-        ))),
+        Some(toolchain.clone()),
         ConfiguredActionAspectProvenance::Absent,
     )
     .unwrap();
     (
         Arc::new(context),
-        ToolchainTopology::new(vec![platform], Some(selection)).unwrap(),
+        ToolchainTopology::new(vec![platform], Some(toolchain)).unwrap(),
     )
 }
 
@@ -146,21 +369,18 @@ fn action_context(
     marker: &str,
     constraints: Vec<ConfiguredActionPlatformConstraint>,
 ) -> Result<Arc<ConfiguredActionOwnerContext>, String> {
+    if platform.configuration().kind() != slug_analysis_v2::ConfigurationKind::Exec
+        || platform.configuration().slug_configuration().is_none()
+    {
+        return Err("configured action platform requires structural exec configuration".to_owned());
+    }
     let properties = |entries: &[(&str, &str)]| {
         entries
             .iter()
             .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
             .collect::<BTreeMap<_, _>>()
     };
-    let selection = ToolchainSelection::new(
-        platform.clone(),
-        canonical("@@//:toolchain"),
-        ConfiguredTargetKey::new(canonical("@@//:type"), owner.configuration().clone()),
-        ConfiguredTargetKey::new(
-            canonical("@@//:implementation"),
-            owner.configuration().clone(),
-        ),
-    );
+    let toolchain = toolchain_context(owner, &platform, marker);
     ConfiguredActionOwnerContext::new(
         owner.clone(),
         group,
@@ -175,10 +395,7 @@ fn action_context(
         &properties(target_properties),
         &properties(group_properties),
         constraints,
-        Some(Arc::new(ConfiguredActionToolchainContext::new(
-            selection,
-            marker.into(),
-        ))),
+        Some(toolchain),
         ConfiguredActionAspectProvenance::Absent,
     )
     .map(Arc::new)
@@ -384,7 +601,11 @@ fn configured_node_result_keeps_provider_collection_outputs_and_diagnostics() {
     ])
     .unwrap();
 
-    let owner = ConfiguredTargetKey::new(canonical("@@//pkg:custom"), target_config());
+    let owner = ConfiguredTargetKey::new(
+        canonical("@@//pkg:custom"),
+        structural_configurations()[0].clone(),
+    );
+    let expected_owner = owner.clone();
     let (context, _) = default_action_context(&owner, "@@//:platform");
     let result = ConfiguredNodeResult::new_rule(owner, providers, None)
         .with_action_specs(
@@ -405,9 +626,18 @@ fn configured_node_result_keeps_provider_collection_outputs_and_diagnostics() {
             "placeholder analysis warning",
         )]);
 
+    assert_eq!(result.configured_target_key(), Some(&expected_owner));
     assert_eq!(
         result.configured_target_key().unwrap().stable_serialize(),
-        "@@//pkg:custom [target:targetabc]"
+        expected_owner.stable_serialize()
+    );
+    assert_eq!(
+        result
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .complete_identity_bytes(),
+        expected_owner.configuration().complete_identity_bytes()
     );
     assert_eq!(result.actions()[0].mnemonic(), "FileWrite");
     assert_eq!(result.declared_outputs(), &["pkg/out.txt".to_owned()]);
@@ -464,17 +694,16 @@ fn configured_node_result_capability_is_borrowed_and_participates_in_equality() 
 fn toolchain_topology_is_ordered_role_checked_and_structurally_equal() {
     let candidate = ConfiguredTargetKey::new(
         canonical("@@//:platform"),
-        ConfigurationKey::exec("exec").unwrap(),
+        structural_configurations()[1].clone(),
     );
-    let selection = ToolchainSelection::new(
-        candidate.clone(),
-        canonical("@@//:declaration"),
-        ConfiguredTargetKey::new(canonical("@@//:type"), target_config()),
-        ConfiguredTargetKey::new(canonical("@@//:implementation"), target_config()),
+    let owner = ConfiguredTargetKey::new(
+        canonical("@@//:owner"),
+        structural_configurations()[0].clone(),
     );
-    let topology = ToolchainTopology::new(vec![candidate.clone()], Some(selection)).unwrap();
+    let context = toolchain_context(&owner, &candidate, "topology");
+    let topology = ToolchainTopology::new(vec![candidate.clone()], Some(context)).unwrap();
     assert_eq!(
-        topology.selection().unwrap().execution_platform(),
+        topology.toolchain().unwrap().execution_platform(),
         &candidate
     );
     assert!(
@@ -604,8 +833,8 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
             ("z".into(), "platform".into()),
         ]
     );
-    assert_eq!(default.toolchain().unwrap().marker(), "marker-A");
-    assert_eq!(named.toolchain().unwrap().marker(), "marker-B");
+    assert_eq!(toolchain_marker(default.toolchain().unwrap()), "marker-A");
+    assert_eq!(toolchain_marker(named.toolchain().unwrap()), "marker-B");
     assert_eq!(default.execution_state(), State::SelectedToolchain);
     assert_ne!(default, named);
 
@@ -627,6 +856,34 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
     );
     assert_eq!(platform_only.execution_state(), State::SelectedPlatformOnly);
     assert!(platform_only.toolchain().is_none());
+    let unresolved_toolchain = Arc::new(
+        ConfiguredActionToolchainContext::new(
+            platform("@@//:p0"),
+            vec![ConfiguredToolchainContextRow::new(
+                ConfiguredTargetKey::new(canonical("@@//:optional"), owner.configuration().clone()),
+                ConfiguredTargetKey::new(canonical("@@//:optional"), owner.configuration().clone()),
+                false,
+                None,
+            )],
+        )
+        .unwrap(),
+    );
+    let all_optional = ConfiguredActionOwnerContext::new(
+        owner.clone(),
+        ConfiguredActionExecGroup::Default,
+        platform("@@//:p0"),
+        PlatformSemanticFact {
+            exec_properties: Arc::from([]),
+        },
+        &BTreeMap::new(),
+        &BTreeMap::new(),
+        Vec::new(),
+        Some(unresolved_toolchain),
+        ConfiguredActionAspectProvenance::Absent,
+    )
+    .unwrap();
+    assert_eq!(all_optional.execution_state(), State::SelectedPlatformOnly);
+    assert!(all_optional.toolchain().is_some());
 
     let restored = action_context(
         &owner,

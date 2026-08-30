@@ -751,6 +751,7 @@ impl BuildSettingDefinition {
 pub struct StarlarkRuleImplementation {
     #[allocative(skip)]
     implementation: FrozenValue,
+    definition_source: Arc<BzlModuleIdentity>,
     dependencies: Arc<[CanonicalLabel]>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     advertised_providers: Arc<[ProviderIdentity]>,
@@ -770,6 +771,7 @@ impl PartialEq for StarlarkRuleImplementation {
         // Frozen callable addresses are retained for Stage 6 lifetime only.
         // The semantic attachment projection below owns package equality.
         self.dependencies == other.dependencies
+            && self.definition_source == other.definition_source
             && self.required_toolchains == other.required_toolchains
             && self.advertised_providers == other.advertised_providers
             && self.required_fragments == other.required_fragments
@@ -787,6 +789,10 @@ impl Eq for StarlarkRuleImplementation {}
 impl StarlarkRuleImplementation {
     pub fn frozen_value(&self) -> FrozenValue {
         self.implementation
+    }
+
+    pub fn definition_source(&self) -> &Arc<BzlModuleIdentity> {
+        &self.definition_source
     }
 
     pub fn dependencies(&self) -> &[CanonicalLabel] {
@@ -1499,6 +1505,7 @@ impl PackageRecorder {
         &self,
         name: String,
         implementation: FrozenValue,
+        definition_source: Arc<BzlModuleIdentity>,
         required_toolchains: Arc<[ToolchainTypeRequirement]>,
         advertised_providers: Arc<[ProviderIdentity]>,
         required_fragments: Arc<[CompactString]>,
@@ -1533,6 +1540,7 @@ impl PackageRecorder {
             name,
             PackageTargetKind::StarlarkRule(StarlarkRuleImplementation {
                 implementation,
+                definition_source,
                 dependencies: dependencies.into(),
                 required_toolchains,
                 advertised_providers,
@@ -2656,6 +2664,15 @@ fn direct_toolchain_label(
     }
 }
 
+/// Resolve a rule-implementation string in the defining `.bzl` module's
+/// canonical repository context.
+pub fn resolve_rule_definition_label(
+    value: &str,
+    source: &BzlModuleIdentity,
+) -> anyhow::Result<CanonicalLabel> {
+    resolve_label(value, source)
+}
+
 fn toolchain_requirements(
     value: Option<Value>,
     eval: &Evaluator<'_, '_, '_>,
@@ -3394,6 +3411,8 @@ fn coerce_string_set_default<'v>(
 struct RuleDefinitionGen<V> {
     implementation: V,
     #[trace(unsafe_ignore)]
+    definition_source: Arc<BzlModuleIdentity>,
+    #[trace(unsafe_ignore)]
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     #[trace(unsafe_ignore)]
     advertised_providers: Arc<[ProviderIdentity]>,
@@ -3418,6 +3437,7 @@ struct RuleDefinitionGen<V> {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct FrozenRuleDefinition {
     implementation: FrozenValue,
+    definition_source: Arc<BzlModuleIdentity>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     advertised_providers: Arc<[ProviderIdentity]>,
     required_fragments: Arc<[CompactString]>,
@@ -3711,6 +3731,7 @@ impl<'v> Freeze for RuleDefinition<'v> {
             .into();
         Ok(FrozenRuleDefinition {
             implementation,
+            definition_source: self.definition_source,
             required_toolchains: self.required_toolchains,
             advertised_providers: self.advertised_providers,
             required_fragments: self.required_fragments,
@@ -6160,6 +6181,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         }
         let visibility = names.get("visibility").copied();
         let implementation = self.implementation;
+        let definition_source = self.definition_source.clone();
         let required_toolchains = self.required_toolchains.clone();
         let advertised_providers = self.advertised_providers.clone();
         let required_fragments = self.required_fragments.clone();
@@ -6376,6 +6398,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 recorder.starlark_rule(
                     name.to_owned(),
                     implementation,
+                    definition_source,
                     required_toolchains,
                     advertised_providers,
                     required_fragments,
@@ -7487,6 +7510,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         let (attached_subrules, subrule_callables) = attached_subrules(subrules)?;
         Ok(RuleDefinition {
             implementation,
+            definition_source: Arc::new(
+                BzlEvaluationContext::from_evaluator(eval)?
+                    .source_identity_for_call(eval)?
+                    .clone(),
+            ),
             required_toolchains: toolchain_requirements(toolchains, eval)?,
             advertised_providers: advertised_provider_ids(provides, "rule provides")?,
             required_fragments: required_configuration_fragments(fragments),

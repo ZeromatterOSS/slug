@@ -29,7 +29,6 @@ use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::TargetName;
 use slug_loading_v2::AttributeKind;
-use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::CommandRegistrationExpansionKey;
 use slug_loading_v2::CommandRegistrationExpansionObservationKey;
@@ -89,10 +88,11 @@ use crate::result::ConfiguredActionToolchainContext;
 use crate::result::ConfiguredNodeKind;
 use crate::result::ConfiguredNodeResult;
 use crate::result::ConfiguredPlatform;
+use crate::result::ConfiguredToolchainContextRow;
 use crate::result::ConfiguredToolchainResolution;
 use crate::result::ConfiguredToolchainResolutionRow;
+use crate::result::ConfiguredToolchainSelection;
 use crate::result::PlatformSemanticFact;
-use crate::result::ToolchainSelection;
 use crate::result::ToolchainTopology;
 use crate::starlark_rule::LoadedRuleError;
 use crate::starlark_rule::PreparedDependency;
@@ -347,11 +347,13 @@ impl ConfiguredToolchainResolutionKey {
         configuration: ConfigurationKey,
         requirements: Arc<[ToolchainTypeRequirement]>,
     ) -> Result<Self, AnalysisError> {
-        if configuration.kind() != ConfigurationKind::Target
-            || configuration.slug_configuration().is_none()
+        if !matches!(
+            configuration.kind(),
+            ConfigurationKind::Target | ConfigurationKind::Exec
+        ) || configuration.slug_configuration().is_none()
         {
             return Err(AnalysisError::message(
-                "configured toolchain resolution requires a structural target configuration",
+                "configured toolchain resolution requires a structural analysis configuration",
             ));
         }
         Ok(Self {
@@ -1632,28 +1634,26 @@ where
             crate::configured_target::ConfiguredEdgeKind::DeclaringVisibility,
         )
     }));
-    let selection = toolchain.as_ref().map(|toolchain| {
+    let toolchain_context = toolchain.as_ref().map(|toolchain| {
         toolchain
             .action_context
             .toolchain()
-            .expect("prepared toolchain context retains a toolchain")
-            .selection()
+            .expect("prepared toolchain retains its context")
             .clone()
     });
-    if let Some(toolchain) = &toolchain {
-        let selection = toolchain
-            .action_context
-            .toolchain()
-            .expect("prepared toolchain context retains a toolchain")
-            .selection();
-        edges.push(crate::configured_target::ConfiguredEdge::new(
-            selection.toolchain_type().clone().into(),
-            crate::configured_target::ConfiguredEdgeKind::ToolchainRequirement,
-        ));
-        edges.push(crate::configured_target::ConfiguredEdge::new(
-            selection.implementation().clone().into(),
-            crate::configured_target::ConfiguredEdgeKind::SelectedToolchainImplementation,
-        ));
+    if let Some(context) = &toolchain_context {
+        for row in context.rows() {
+            edges.push(crate::configured_target::ConfiguredEdge::new(
+                row.requested().clone().into(),
+                crate::configured_target::ConfiguredEdgeKind::ToolchainRequirement,
+            ));
+            if let Some(selection) = row.selected() {
+                edges.push(crate::configured_target::ConfiguredEdge::new(
+                    selection.implementation().clone().into(),
+                    crate::configured_target::ConfiguredEdgeKind::SelectedToolchainImplementation,
+                ));
+            }
+        }
     }
     edges.extend(
         candidate_execution_platforms
@@ -1688,7 +1688,7 @@ where
     );
     *event_batch = print_capture.map(AnalysisPrintCapture::into_batch);
     let toolchain_topology = candidate_execution_platforms.map(|candidates| {
-        ToolchainTopology::new(candidates, selection)
+        ToolchainTopology::new(candidates, toolchain_context)
             .expect("selected execution platform came from the candidate sequence")
     });
     value
@@ -2140,7 +2140,16 @@ fn require_supported_canonical_configured_target(
                 ..
             })
         )
-    ) || matches!((node, target), (ConfiguredNodeKey::Configured(_), Some(target)) if is_marker_leaf_target(target));
+    ) || matches!(
+        (node, target),
+        (
+            ConfiguredNodeKey::Configured(_),
+            Some(slug_loading_v2::PackageTarget {
+                kind: PackageTargetKind::StarlarkRule(_),
+                ..
+            })
+        )
+    );
     if supported {
         Ok(())
     } else {
@@ -2480,19 +2489,6 @@ fn local_toolchain_declarations(
         .collect()
 }
 
-fn root_apparent_type(label: &CanonicalLabel) -> Result<CompactString, AnalysisError> {
-    if !label.package().repo().is_root() {
-        return Err(AnalysisError::new(format!(
-            "toolchain requirements must be root labels: {label}"
-        )));
-    }
-    let text = label.to_string();
-    Ok(text
-        .strip_prefix("@@")
-        .expect("root canonical labels have the @@ spelling")
-        .into())
-}
-
 fn package_target<'a>(
     packages: &'a ConfiguredPackages,
     label: &CanonicalLabel,
@@ -2518,33 +2514,6 @@ fn configured_package_identity_matches(
     label: &CanonicalLabel,
 ) -> bool {
     package == label.package()
-}
-
-fn constraint_value_setting(
-    packages: &ConfiguredPackages,
-    label: &CanonicalLabel,
-) -> Result<CanonicalLabel, AnalysisError> {
-    let target = package_target(packages, label)?;
-    let PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintValue {
-        constraint_setting,
-    }) = &target.kind
-    else {
-        return Err(AnalysisError::new(format!(
-            "expected constraint_value at {label}"
-        )));
-    };
-    let setting = package_target(packages, constraint_setting)?;
-    if !matches!(
-        setting.kind,
-        PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintSetting {
-            default_constraint_value: None,
-        })
-    ) {
-        return Err(AnalysisError::new(format!(
-            "constraint value {label} references a non-constraint setting {constraint_setting}"
-        )));
-    }
-    Ok(constraint_setting.clone())
 }
 
 fn native_references(target: &slug_loading_v2::PackageTarget) -> Vec<CanonicalLabel> {
@@ -2596,13 +2565,6 @@ async fn compute_toolchain_analysis_input(
             }
         }
     }
-}
-
-#[derive(Debug, Clone)]
-struct PreparedExecutionPlatform {
-    key: ConfiguredTargetKey,
-    fact: PlatformSemanticFact,
-    constraints: Vec<ConfiguredActionPlatformConstraint>,
 }
 
 async fn load_configured_native_packages(
@@ -2686,141 +2648,6 @@ async fn load_configured_native_packages(
             return analysis_semantic_complete(Err(error));
         }
     }
-}
-
-fn validate_constraint_settings(
-    packages: &ConfiguredPackages,
-    values: &[CanonicalLabel],
-    duplicate: impl Fn() -> AnalysisError,
-) -> Result<(), AnalysisError> {
-    let mut settings = SmallSet::with_capacity(values.len());
-    for value in values {
-        let setting = constraint_value_setting(packages, value)?;
-        if !settings.insert(setting) {
-            return Err(duplicate());
-        }
-    }
-    Ok(())
-}
-
-fn is_marker_leaf_target(target: &slug_loading_v2::PackageTarget) -> bool {
-    let PackageTargetKind::StarlarkRule(rule) = &target.kind else {
-        return false;
-    };
-    let marker = rule.values().iter().any(|value| {
-        value.declaration_name == "marker"
-            && value.provenance == AttributeProvenance::Explicit
-            && matches!(value.value.as_ref(), CoercedAttributeValue::String(_))
-    });
-    let capability = target
-        .rule_capability()
-        .expect("Starlark rule has a capability");
-    let empty_tags = rule.values().iter().any(|value| {
-        value.declaration_name == "tags"
-            && value.provenance == AttributeProvenance::Default
-            && matches!(value.value.as_ref(), CoercedAttributeValue::StringList(tags) if tags.is_empty())
-    });
-    let user_schema = rule
-        .schema()
-        .iter()
-        .filter(|schema| !schema.is_builtin())
-        .collect::<Vec<_>>();
-    let builtin_defaults = rule.values().iter().all(|value| {
-        let Some(schema) = rule
-            .schema()
-            .iter()
-            .find(|schema| schema.declaration_name() == value.declaration_name)
-        else {
-            return false;
-        };
-        if !schema.is_builtin() {
-            return true;
-        }
-        match schema.declaration_name() {
-            "name" => {
-                value.provenance == AttributeProvenance::Explicit
-                    && matches!(value.value.as_ref(), CoercedAttributeValue::String(_))
-            }
-            "visibility" => value.provenance == AttributeProvenance::Default,
-            "generator_name" | "generator_function" | "generator_location" => {
-                value.provenance == AttributeProvenance::Implicit
-                    && matches!(value.value.as_ref(), CoercedAttributeValue::String(_))
-            }
-            "deprecation" => {
-                value.provenance == AttributeProvenance::Default
-                    && matches!(value.value.as_ref(), CoercedAttributeValue::None)
-            }
-            _ => {
-                value.provenance != AttributeProvenance::Explicit
-                    && match value.value.as_ref() {
-                        CoercedAttributeValue::None => true,
-                        CoercedAttributeValue::String(value) => value.is_empty(),
-                        CoercedAttributeValue::LabelList(values) => values.is_empty(),
-                        CoercedAttributeValue::StringList(values) => values.is_empty(),
-                        CoercedAttributeValue::StringDict(values) => values.is_empty(),
-                        CoercedAttributeValue::LabelListDict(values) => values.is_empty(),
-                        CoercedAttributeValue::Boolean(value) => !value,
-                        CoercedAttributeValue::Integer(value) => *value == 0,
-                        _ => false,
-                    }
-            }
-        }
-    });
-    marker
-        && rule.dependencies().is_empty()
-        && rule.required_toolchains().is_empty()
-        && !rule.is_root_string_build_setting()
-        && user_schema.len() == 1
-        && user_schema[0].declaration_name() == "marker"
-        && matches!(user_schema[0].kind(), AttributeKind::String)
-        && user_schema[0].transition().is_none()
-        && !user_schema[0].dependency_reachable()
-        && rule.values().len() == rule.schema().len()
-        && builtin_defaults
-        && empty_tags
-        && !capability.executable
-        && capability.test_kind.is_none()
-}
-
-fn validate_marker_toolchain(
-    packages: &ConfiguredPackages,
-    label: &CanonicalLabel,
-) -> Result<(), AnalysisError> {
-    let target = package_target(packages, label)?;
-    let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
-        toolchain_type,
-        implementation,
-        exec_compatible_with,
-        ..
-    }) = &target.kind
-    else {
-        return Err(AnalysisError::new(format!(
-            "registered toolchain is not toolchain: {label}"
-        )));
-    };
-    if !matches!(package_target(packages, toolchain_type), Ok(target) if matches!(target.kind, PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)))
-    {
-        return Err(AnalysisError::new(format!(
-            "toolchain references a non-toolchain type: {label}"
-        )));
-    }
-    validate_constraint_settings(packages, exec_compatible_with.value(), || {
-        AnalysisError::new(format!(
-            "toolchain has duplicate execution constraint setting: {label}"
-        ))
-    })?;
-    let implementation = package_target(packages, implementation)?;
-    let PackageTargetKind::StarlarkRule(_) = &implementation.kind else {
-        return Err(AnalysisError::new(format!(
-            "toolchain implementation is not a Starlark rule: {label}"
-        )));
-    };
-    if !is_marker_leaf_target(implementation) {
-        return Err(AnalysisError::new(format!(
-            "toolchain implementation is not a marker leaf: {label}"
-        )));
-    }
-    Ok(())
 }
 
 async fn prepare_toolchain_target_settings(
@@ -2938,102 +2765,187 @@ async fn prepare_toolchain_target_settings(
         .collect()))
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn prepare_selected_toolchain(
+async fn prepare_selected_toolchain_context(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
     owner: &ConfiguredTargetKey,
-    required: &CanonicalLabel,
-    required_type: CompactString,
-    candidates: &[ConfiguredTargetKey],
-    declaration: CanonicalLabel,
-    implementation: CanonicalLabel,
-    platform: PreparedExecutionPlatform,
+    resolution: &ConfiguredToolchainResolution,
 ) -> PreparedToolchainOutcome {
-    let configuration = owner.configuration().clone();
-    let key = ConfiguredNodeAnalysisKey::new(
-        workspace.dupe(),
-        ConfiguredTargetKey::new(implementation.clone(), configuration.clone()),
-    )
-    .expect("toolchain analysis inherits a structural configuration");
-    let selected = compute_toolchain_analysis_input(
-        ctx,
-        mode,
-        key,
-        "analyzing selected toolchain through DICE",
-    )
-    .await;
-    let result = match selected {
-        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
-        LoadingPreparationOutcome::Complete(Err(error)) => {
-            return LoadingPreparationOutcome::Complete(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(value)) => match value.as_ref() {
-            Ok(value) => value.clone(),
-            Err(error) => return toolchain_outcome(Err(error.clone())),
-        },
-    };
-    let topology_is_exact = result.edges().len() == candidates.len()
-        && result
-            .edges()
-            .iter()
-            .zip(candidates)
-            .enumerate()
-            .all(|(index, (edge, platform))| {
-                edge.target() == &ConfiguredNodeKey::configured(platform.clone())
-                    && matches!(edge.kind(), crate::configured_target::ConfiguredEdgeKind::CandidateExecutionPlatform { index: edge_index } if *edge_index == u32::try_from(index).expect("candidate index fits u32"))
-            })
-        && result.toolchain_topology().is_some_and(|topology| {
-            topology.candidate_execution_platforms() == candidates
-                && topology.selection().is_none()
-        });
-    let marker = result
-        .providers()
-        .toolchain_info()
-        .and_then(|info| info.field("marker"))
-        .and_then(|value| match value.kind() {
-            slug_build_api_v2::AnalysisValueKind::String(value) => Some(value),
-            _ => None,
-        });
-    if !topology_is_exact
-        || !result.diagnostics().is_empty()
-        || result.providers().len() != 2
-        || result.providers().default_info().is_none()
-        || marker.is_none()
-    {
-        return toolchain_outcome(Err(AnalysisError::new(
-            "selected toolchain implementation must return only DefaultInfo and ToolchainInfo with exact topology",
+    let execution_platform = resolution.execution_platform().actual().clone();
+    if execution_platform.configuration().kind() != ConfigurationKind::Exec {
+        return toolchain_outcome(Err(AnalysisError::message(
+            "selected toolchain implementation requires exec configuration",
         )));
     }
-    let toolchain = Arc::new(ConfiguredActionToolchainContext::new(
-        ToolchainSelection::new(
-            platform.key,
-            declaration,
-            ConfiguredTargetKey::new(required.clone(), configuration.clone()),
-            ConfiguredTargetKey::new(implementation, configuration),
-        ),
-        marker.expect("checked ToolchainInfo").into(),
-    ));
-    let context = ConfiguredActionOwnerContext::new(
+    let inputs = resolution
+        .rows()
+        .iter()
+        .enumerate()
+        .filter_map(|(index, row)| {
+            row.implementation().map(|implementation| {
+                let key = ConfiguredNodeAnalysisKey::new(
+                    workspace.dupe(),
+                    ConfiguredTargetKey::new(
+                        implementation.clone(),
+                        execution_platform.configuration().clone(),
+                    ),
+                )
+                .expect("selected implementation inherits structural exec configuration");
+                (index, key)
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let outcomes = if inputs.is_empty() {
+        Vec::new()
+    } else {
+        let cycle_guard = ctx.cycle_guard::<ConfiguredAnalysisCycleGuard>();
+        let child_future = ctx.compute_join(inputs, |ctx, (index, key)| {
+            Box::pin(async move {
+                (
+                    index,
+                    compute_toolchain_analysis_input(
+                        ctx,
+                        mode,
+                        key,
+                        "analyzing selected toolchain through DICE",
+                    )
+                    .await,
+                )
+            })
+        });
+        match cycle_guard {
+            Ok(Some(guard)) => match guard.guard_this(child_future).await {
+                Ok(outcomes) => outcomes,
+                Err(cycle) => {
+                    return toolchain_outcome(Err(AnalysisError::message(cycle.to_string())));
+                }
+            },
+            Ok(None) => child_future.await,
+            Err(error) => {
+                return toolchain_outcome(Err(AnalysisError::message(format!(
+                    "reading configured-analysis cycle guard: {error}"
+                ))));
+            }
+        }
+    };
+
+    let mut all_need: Option<LoadingPreparationNeeds> = None;
+    let mut first_outer = None;
+    let mut first_error = None;
+    let mut computed = SmallMap::with_capacity(outcomes.len());
+    for (index, outcome) in outcomes {
+        match outcome {
+            LoadingPreparationOutcome::Need(need) => {
+                all_need = Some(match all_need {
+                    Some(current) => current.try_union(&need).unwrap_or_else(|error| {
+                        panic!(
+                            "selected toolchain Needs must be structurally compatible: {error:?}"
+                        )
+                    }),
+                    None => need,
+                });
+            }
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                if first_outer.is_none() {
+                    first_outer = Some(error);
+                }
+            }
+            LoadingPreparationOutcome::Complete(Ok(value)) => match value.as_ref() {
+                Ok(result) => {
+                    computed.insert(index, result.dupe());
+                }
+                Err(error) => {
+                    if first_error.is_none() {
+                        first_error = Some(error.clone());
+                    }
+                }
+            },
+        }
+    }
+    if let Some(need) = all_need {
+        return LoadingPreparationOutcome::Need(need);
+    }
+    if let Some(error) = first_outer {
+        return LoadingPreparationOutcome::Complete(Err(error));
+    }
+    if let Some(error) = first_error {
+        return toolchain_outcome(Err(error));
+    }
+
+    let mut rows = Vec::with_capacity(resolution.rows().len());
+    for (index, row) in resolution.rows().iter().enumerate() {
+        let selected = match (row.declaration(), row.implementation()) {
+            (None, None) => None,
+            (Some(declaration), Some(implementation)) => {
+                let result = computed
+                    .get(&index)
+                    .expect("selected toolchain result remains ordered");
+                if !matches!(
+                    result.kind(),
+                    ConfiguredNodeKind::Rule | ConfiguredNodeKind::Alias
+                ) {
+                    return toolchain_outcome(Err(AnalysisError::message(format!(
+                        "selected toolchain implementation is not a Starlark rule: {implementation}"
+                    ))));
+                }
+                let Some(info) = result.providers().toolchain_info().cloned() else {
+                    return toolchain_outcome(Err(AnalysisError::message(format!(
+                        "selected toolchain implementation does not provide ToolchainInfo: {implementation}"
+                    ))));
+                };
+                let requested_implementation = ConfiguredTargetKey::new(
+                    implementation.clone(),
+                    execution_platform.configuration().clone(),
+                );
+                let actual_implementation = result
+                    .actual_configured_target()
+                    .cloned()
+                    .ok_or_else(|| {
+                        AnalysisError::message(format!(
+                            "selected toolchain implementation has no configured identity: {implementation}"
+                        ))
+                    });
+                let actual_implementation = match actual_implementation {
+                    Ok(actual) => actual,
+                    Err(error) => return toolchain_outcome(Err(error)),
+                };
+                Some(ConfiguredToolchainSelection::new(
+                    declaration.clone(),
+                    requested_implementation,
+                    actual_implementation,
+                    info,
+                ))
+            }
+            _ => unreachable!("resolution validates declaration and implementation selection"),
+        };
+        rows.push(ConfiguredToolchainContextRow::new(
+            row.requested().clone(),
+            row.actual().clone(),
+            row.mandatory(),
+            selected,
+        ));
+    }
+    let toolchain = match ConfiguredActionToolchainContext::new(execution_platform.clone(), rows) {
+        Ok(toolchain) => Arc::new(toolchain),
+        Err(error) => return toolchain_outcome(Err(AnalysisError::message(error))),
+    };
+    let action_context = ConfiguredActionOwnerContext::new(
         owner.clone(),
         ConfiguredActionExecGroup::Default,
-        toolchain.selection().execution_platform().clone(),
-        platform.fact,
+        execution_platform,
+        resolution.execution_platform().fact().clone(),
         &BTreeMap::new(),
         &BTreeMap::new(),
-        platform.constraints,
+        resolution.execution_platform().constraints().to_vec(),
         Some(toolchain),
         ConfiguredActionAspectProvenance::Absent,
     )
     .map(Arc::new)
-    .map_err(AnalysisError::new);
-    toolchain_outcome(context.map(|action_context| PreparedToolchain {
-        required_type,
-        action_context,
-    }))
+    .map_err(AnalysisError::message);
+    toolchain_outcome(action_context.map(|action_context| PreparedToolchain { action_context }))
 }
-
 fn resolution_success_eq(
     left: &ConfiguredToolchainResolutionOutcome,
     right: &ConfiguredToolchainResolutionOutcome,
@@ -3303,7 +3215,7 @@ async fn compute_configured_toolchain_resolution(
 ) -> AnalysisSemanticOutcome<Arc<ConfiguredToolchainResolution>> {
     let target_platform_key =
         ConfiguredTargetPlatformKey::new(key.workspace.dupe(), key.configuration.clone())
-            .expect("resolution key validates a structural target configuration");
+            .expect("resolution key validates a structural analysis configuration");
     let target_platform = match ctx.compute(&target_platform_key).await {
         Ok(LoadingPreparationOutcome::Need(need)) => return LoadingPreparationOutcome::Need(need),
         Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
@@ -3732,7 +3644,25 @@ async fn compute_configured_toolchain_resolution(
                 .expect("every requirement has a group")
                 .1
                 .clone();
-            ConfiguredToolchainResolutionRow::new(requested, actual, mandatory, declaration)
+            let implementation = declaration.as_ref().map(|declaration| {
+                let target = package_target(&packages, declaration)
+                    .expect("selected declaration remains in loaded packages");
+                let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+                    implementation,
+                    ..
+                }) = &target.kind
+                else {
+                    unreachable!("selected declaration remains a native toolchain")
+                };
+                implementation.clone()
+            });
+            ConfiguredToolchainResolutionRow::new(
+                requested,
+                actual,
+                mandatory,
+                declaration,
+                implementation,
+            )
         })
         .collect::<Vec<_>>()
         .into();
@@ -3741,79 +3671,6 @@ async fn compute_configured_toolchain_resolution(
         execution_platform,
         rows,
     ))))
-}
-
-/// The old marker-only implementation path remains a post-selection bridge.
-/// It is intentionally unavailable to multi-type and optional resolutions.
-async fn prepare_marker_toolchain_bridge(
-    ctx: &mut DiceComputations<'_>,
-    mode: ConfiguredAnalysisMode,
-    workspace: &NormalizedAbsolutePath,
-    owner: &ConfiguredTargetKey,
-    resolution: &ConfiguredToolchainResolution,
-    candidates: &[ConfiguredTargetKey],
-) -> PreparedToolchainOutcome {
-    let [row] = resolution.rows() else {
-        return toolchain_outcome(Err(AnalysisError::message("marker bridge is unavailable")));
-    };
-    let Some(declaration) = row.declaration().cloned() else {
-        return toolchain_outcome(Err(AnalysisError::message(
-            "marker bridge requires a selected declaration",
-        )));
-    };
-    if !row.mandatory() {
-        return toolchain_outcome(Err(AnalysisError::message(
-            "marker bridge requires a mandatory type",
-        )));
-    }
-    let mut labels = vec![declaration.clone()];
-    let packages = match load_configured_native_packages(ctx, mode, workspace, &mut labels).await {
-        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
-        LoadingPreparationOutcome::Complete(Err(error)) => {
-            return LoadingPreparationOutcome::Complete(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-            return toolchain_outcome(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
-    };
-    if let Err(error) = validate_marker_toolchain(&packages, &declaration) {
-        return toolchain_outcome(Err(error));
-    }
-    let implementation = match package_target(&packages, &declaration) {
-        Ok(slug_loading_v2::PackageTarget {
-            kind:
-                PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
-                    implementation,
-                    ..
-                }),
-            ..
-        }) => implementation.clone(),
-        Ok(_) => unreachable!("validated marker declaration remains toolchain"),
-        Err(error) => return toolchain_outcome(Err(error)),
-    };
-    let required_type = match root_apparent_type(row.requested().label()) {
-        Ok(value) => value,
-        Err(error) => return toolchain_outcome(Err(error)),
-    };
-    let platform = PreparedExecutionPlatform {
-        key: resolution.execution_platform().actual().clone(),
-        fact: resolution.execution_platform().fact().clone(),
-        constraints: resolution.execution_platform().constraints().to_vec(),
-    };
-    prepare_selected_toolchain(
-        ctx,
-        mode,
-        workspace,
-        owner,
-        row.requested().label(),
-        required_type,
-        candidates,
-        declaration,
-        implementation,
-        platform,
-    )
-    .await
 }
 
 #[async_trait]
@@ -4369,7 +4226,11 @@ impl ConfiguredNodeAnalysisKey {
             (
                 ConfiguredNodeKey::Configured(configured_target),
                 Some(PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)),
-            ) if configured_target.configuration().kind() == ConfigurationKind::Target => {
+            ) if matches!(
+                configured_target.configuration().kind(),
+                ConfigurationKind::Target | ConfigurationKind::Exec
+            ) =>
+            {
                 return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
                     self.node.clone(),
                     ConfiguredNodeKind::ToolchainType,
@@ -4382,7 +4243,11 @@ impl ConfiguredNodeAnalysisKey {
                 Some(PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
                     ..
                 })),
-            ) if configured_target.configuration().kind() == ConfigurationKind::Target => {
+            ) if matches!(
+                configured_target.configuration().kind(),
+                ConfigurationKind::Target | ConfigurationKind::Exec
+            ) =>
+            {
                 return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
                     self.node.clone(),
                     ConfiguredNodeKind::ToolchainDeclaration,
@@ -4701,15 +4566,15 @@ impl ConfiguredNodeAnalysisKey {
             }
             LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
         };
-        let prepared_toolchain = if matches!(resolution.rows(), [row] if row.mandatory() && row.declaration().is_some())
-        {
-            match prepare_marker_toolchain_bridge(
+        let prepared_toolchain = if resolution.rows().is_empty() {
+            None
+        } else {
+            match prepare_selected_toolchain_context(
                 ctx,
                 mode,
                 &self.workspace,
                 configured_target,
                 &resolution,
-                &candidate_execution_platforms,
             )
             .await
             {
@@ -4724,8 +4589,6 @@ impl ConfiguredNodeAnalysisKey {
                 }
                 LoadingPreparationOutcome::Complete(Ok(Ok(value))) => Some(value),
             }
-        } else {
-            None
         };
         let selected_platform = resolution.execution_platform();
         let action_context = if let Some(toolchain) = &prepared_toolchain {

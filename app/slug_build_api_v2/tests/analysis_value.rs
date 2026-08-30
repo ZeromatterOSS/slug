@@ -153,6 +153,49 @@ fn numeric_publication_equality_preserves_rematerialization_payload() {
 }
 
 #[test]
+fn provider_pair_publication_equality_preserves_cross_occurrence_aliases() {
+    let leaf = || {
+        AnalysisDepset::new(
+            DepsetOrder::Default,
+            vec![AnalysisValue::string("leaf")],
+            vec![],
+        )
+        .unwrap()
+    };
+    let shared = leaf();
+    let left = [
+        ProviderOccurrence::new(
+            ProviderIdentity::builtin("ToolchainInfo"),
+            [("value", AnalysisValue::depset(shared.clone()))],
+        ),
+        ProviderOccurrence::new(
+            ProviderIdentity::builtin("ToolchainInfo"),
+            [("value", AnalysisValue::depset(shared))],
+        ),
+    ];
+    let right = [
+        ProviderOccurrence::new(
+            ProviderIdentity::builtin("ToolchainInfo"),
+            [("value", AnalysisValue::depset(leaf()))],
+        ),
+        ProviderOccurrence::new(
+            ProviderIdentity::builtin("ToolchainInfo"),
+            [("value", AnalysisValue::depset(leaf()))],
+        ),
+    ];
+
+    assert!(ProviderOccurrence::publication_eq_pairs([(
+        &left[0], &right[0]
+    )]));
+    assert!(ProviderOccurrence::publication_eq_pairs([(
+        &left[1], &right[1]
+    )]));
+    assert!(!ProviderOccurrence::publication_eq_pairs(
+        left.iter().zip(&right)
+    ));
+}
+
+#[test]
 fn dictionary_visible_equality_ignores_order_but_publication_does_not() {
     let left = AnalysisValue::dictionary([
         (AnalysisValue::string("a"), AnalysisValue::integer(1)),

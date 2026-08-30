@@ -89,16 +89,24 @@ predicates, ten typed `cpp` fields, ordinary late-bound rows, and persistent
 Configured hidden-dependency R2 preserved the correct pre-call and deferred-XML
 boundaries, but independent review returned `REPLAN` until a real non-default
 native producer existed. Commit `4425d3bfb` now accepts that bounded
-thirteen-option CLI-to-DICE closure. Run only
-`WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r4`: share one
-typed configuration-field identity, resolve literal and ten `cpp` projections
-through the existing target/selected-Exec child pipeline, validate provider/
-file/executable shape, and publish root loading-query facts. R3 plan review
-corrected configured-edge publication to the successful direct-call successor,
-accepted Bazel's inherent executable file targets, narrowed `fdo_optimize` to
-raw `//`, and repaired its source/blob ledger. Stop before Starlark value
-materialization or invocation; XML/aspects remain deferred and no rules_cc/C++
-special case is permitted.
+thirteen-option CLI-to-DICE closure. The R4 packet-only gate then proved that
+configured Exec rule children depend on the still-parked generic selected-
+toolchain/action-context cutover: broad Exec resolution deadlocks the accepted
+injected-platform terminal, while zero-toolchain Exec analysis otherwise
+reaches the base Target-owner rejection. Run only
+`WP-4-5-7A-selected-toolchain-context-cutover-implementation-r3`, preserving
+the requester's exact structural Target-or-Exec configuration and selected
+implementation Exec configuration. R2's one-shot REAPI proof advanced into
+unrelated deferred rules_shell attribute and embedded recursive-glob loading;
+R3 instead proves the unchanged REAPI planner against a genuine validated
+configured-action semantic view without claiming that BCR command closure.
+After its acceptance, resume
+`WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r4` unchanged:
+share one typed configuration-field identity, resolve literal and ten `cpp`
+projections through the accepted target/selected-Exec child pipeline, validate
+provider/file/executable shape, and publish root loading-query facts. Stop
+before Starlark value materialization or invocation; XML/aspects remain
+deferred and no rules_cc/C++ special case is permitted.
 
 ## Accepted `.bzl` load-visibility design; implementation activated (2026-08-27)
 

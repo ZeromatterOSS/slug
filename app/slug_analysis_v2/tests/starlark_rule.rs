@@ -37,6 +37,7 @@ use slug_analysis_v2::CommandConfigurationPreparationKey;
 use slug_analysis_v2::CommandConfigurationPreparationObservationKey;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredActionExecutionState as ActionExecutionState;
+use slug_analysis_v2::ConfiguredActionToolchainContext;
 use slug_analysis_v2::ConfiguredConditionKey;
 use slug_analysis_v2::ConfiguredConditionMatch;
 use slug_analysis_v2::ConfiguredEdgeKind;
@@ -52,12 +53,14 @@ use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::ConfiguredTargetPlatformKey;
 use slug_analysis_v2::ConfiguredToolchainResolutionKey;
 use slug_analysis_v2::ConfiguredToolchainResolutionObservationKey;
+use slug_analysis_v2::ConfiguredToolchainSelection;
 use slug_analysis_v2::analysis_cycle_detector;
 use slug_analysis_v2::key::StarlarkOption;
 use slug_analysis_v2::key::StarlarkOptionScope;
 use slug_analysis_v2::key::StarlarkOptionValue;
 use slug_analysis_v2::prepare_configured_node_analysis;
 use slug_build_api_v2::ActionKind;
+use slug_build_api_v2::AnalysisValueKind;
 use slug_build_api_v2::ProviderId;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
@@ -1272,6 +1275,33 @@ fn candidate_labels(result: &ConfiguredNodeResult) -> Vec<String> {
         .collect()
 }
 
+fn selected_toolchain(result: &ConfiguredNodeResult) -> &ConfiguredToolchainSelection {
+    result
+        .toolchain_topology()
+        .unwrap()
+        .toolchain()
+        .unwrap()
+        .rows()
+        .iter()
+        .find_map(|row| row.selected())
+        .unwrap()
+}
+
+fn retained_toolchain_marker(context: &ConfiguredActionToolchainContext) -> &str {
+    let value = context
+        .rows()
+        .iter()
+        .find_map(|row| row.selected())
+        .unwrap()
+        .info()
+        .field("marker")
+        .unwrap();
+    let AnalysisValueKind::String(marker) = value.kind() else {
+        panic!("test ToolchainInfo marker must be a string")
+    };
+    marker
+}
+
 fn root_setting_value(key: &ConfiguredTargetKey) -> Option<&str> {
     let setting = CanonicalLabel::parse("@@//:setting").unwrap();
     key.configuration()
@@ -1389,13 +1419,15 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
         candidate_labels(&first),
         vec!["@@//:platform", "@@//.slug_test_host:host"]
     );
-    let selection = first.toolchain_topology().unwrap().selection().unwrap();
+    let toolchain = first.toolchain_topology().unwrap().toolchain().unwrap();
+    let row = &toolchain.rows()[0];
+    let selection = row.selected().unwrap();
     assert_eq!(
-        selection.execution_platform().label().to_string(),
+        toolchain.execution_platform().label().to_string(),
         "@@//:platform"
     );
     assert_eq!(selection.declaration().to_string(), "@@//:second");
-    assert_eq!(selection.toolchain_type().label().to_string(), "@@//:type");
+    assert_eq!(row.requested().label().to_string(), "@@//:type");
     assert_eq!(
         selection.implementation().label().to_string(),
         "@@//:second_impl"
@@ -1410,7 +1442,10 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
         context.exec_group(),
         &slug_analysis_v2::ConfiguredActionExecGroup::Default
     );
-    assert_eq!(context.toolchain().unwrap().marker(), "second");
+    assert_eq!(
+        retained_toolchain_marker(context.toolchain().unwrap()),
+        "second"
+    );
     assert_eq!(
         first
             .edges()
@@ -1449,13 +1484,7 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
         .unwrap();
     assert_eq!(provider_value(&reordered, &consumer), "first");
     assert_eq!(
-        reordered
-            .toolchain_topology()
-            .unwrap()
-            .selection()
-            .unwrap()
-            .declaration()
-            .to_string(),
+        selected_toolchain(&reordered).declaration().to_string(),
         "@@//:first"
     );
 
@@ -1604,13 +1633,7 @@ async fn command_registrations_precede_module_and_empty_overlay_restores_module_
         ]
     );
     assert_eq!(
-        first
-            .toolchain_topology()
-            .unwrap()
-            .selection()
-            .unwrap()
-            .declaration()
-            .to_string(),
+        selected_toolchain(&first).declaration().to_string(),
         "@@//:first"
     );
 
@@ -1680,7 +1703,7 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
         direct_impl
             .toolchain_topology()
             .unwrap()
-            .selection()
+            .toolchain()
             .is_none()
     );
     assert_eq!(
@@ -1705,7 +1728,8 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
         .await
         .unwrap();
     let first_context = first.actions()[0].context();
-    let first_selection = first.toolchain_topology().unwrap().selection().unwrap();
+    let first_toolchain = first.toolchain_topology().unwrap().toolchain().unwrap();
+    let first_selection = selected_toolchain(&first);
     let target_configuration = test_configuration();
     let exec_configuration = ConfigurationKey::from_slug(
         target_configuration
@@ -1715,7 +1739,7 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
             .unwrap(),
     );
     assert_eq!(
-        first_selection.execution_platform().configuration(),
+        first_toolchain.execution_platform().configuration(),
         &exec_configuration
     );
     let platform = topology_platform(&dice, &workspace, &exec_configuration)
@@ -1730,7 +1754,7 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
         "@@//:first_impl"
     );
     assert_eq!(
-        first_selection.execution_platform().label().to_string(),
+        first_toolchain.execution_platform().label().to_string(),
         "@@//:first_platform"
     );
     assert_eq!(
@@ -1751,13 +1775,20 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
     let second = root_target_request(&dice, &workspace, "@@//:request", tracker())
         .await
         .unwrap();
-    let second_selection = second.toolchain_topology().unwrap().selection().unwrap();
+    let second_selection = selected_toolchain(&second);
     assert_eq!(
         second_selection.declaration().to_string(),
         "@@//:second_toolchain"
     );
     assert_eq!(
-        second_selection.execution_platform().label().to_string(),
+        second
+            .toolchain_topology()
+            .unwrap()
+            .toolchain()
+            .unwrap()
+            .execution_platform()
+            .label()
+            .to_string(),
         "@@//:second_platform"
     );
     fs::write(workspace.join("MODULE.bazel"), TOPOLOGY_MODULE).unwrap();
@@ -1782,7 +1813,10 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
         first_context.platform_fact(),
         platform.platform_semantic_fact()
     );
-    assert_eq!(first_context.toolchain().unwrap().marker(), "first");
+    assert_eq!(
+        retained_toolchain_marker(first_context.toolchain().unwrap()),
+        "first"
+    );
     assert_eq!(first_context.platform_constraints().len(), 1);
     assert_eq!(
         first_context.platform_constraints()[0]
@@ -1945,7 +1979,7 @@ async fn root_toolchain_resolution_rejects_every_native_reference_and_selection_
             TOOLCHAIN_MODULE.replace("//:platform", "//:type"),
             TOOLCHAIN_DEFS.to_owned(),
             TOOLCHAIN_BUILD.to_owned(),
-            "incompatible with exec configuration",
+            "invalid semantic shape",
         ),
         (
             "toolchain kind",
@@ -1963,7 +1997,7 @@ async fn root_toolchain_resolution_rejects_every_native_reference_and_selection_
                 "constraint_setting = \":type\"",
                 1,
             ),
-            "incompatible with exec configuration",
+            "non-constraint setting",
         ),
         (
             "type reference",
@@ -1981,7 +2015,7 @@ async fn root_toolchain_resolution_rejects_every_native_reference_and_selection_
             TOOLCHAIN_MODULE.to_owned(),
             TOOLCHAIN_DEFS.to_owned(),
             TOOLCHAIN_BUILD.replacen("toolchain = \":second_impl\"", "toolchain = \":type\"", 1),
-            "not a Starlark rule",
+            "selected toolchain implementation is not a Starlark rule",
         ),
         (
             "exec reference",
@@ -2112,14 +2146,21 @@ async fn root_toolchain_resolution_filters_target_compatibility_and_target_to_ex
                 .await
             }
             .unwrap_or_else(|error| panic!("{name} observed={observed}: {error}"));
-            let selection = result.toolchain_topology().unwrap().selection().unwrap();
+            let selection = selected_toolchain(&result);
             assert_eq!(
                 selection.declaration().to_string(),
                 expected_declaration,
                 "{name} observed={observed}"
             );
             assert_eq!(
-                selection.execution_platform().label().to_string(),
+                result
+                    .toolchain_topology()
+                    .unwrap()
+                    .toolchain()
+                    .unwrap()
+                    .execution_platform()
+                    .label()
+                    .to_string(),
                 expected_platform,
                 "{name} observed={observed}"
             );
@@ -2145,80 +2186,350 @@ async fn configurable_toolchain_target_settings_use_distinct_selector_and_select
             .await
             .unwrap();
         assert_eq!(
-            result
-                .toolchain_topology()
-                .unwrap()
-                .selection()
-                .unwrap()
-                .declaration()
-                .to_string(),
+            selected_toolchain(&result).declaration().to_string(),
             expected
         );
     }
 }
 
 #[tokio::test]
-async fn root_toolchain_resolution_rejects_leaf_provider_callable_and_context_escapes() {
+async fn selected_toolchain_authenticates_builtin_info_and_context_keys() {
     let first_module =
         TOOLCHAIN_MODULE.replace("\"//:second\", \"//:first\"", "\"//:first\", \"//:second\"");
-    let dependency_defs = TOOLCHAIN_DEFS.replace(
-        "attrs = {\"marker\": attr.string(mandatory = True)})",
-        "attrs = {\"marker\": attr.string(mandatory = True), \"dep\": attr.label()})",
-    );
-    let transition_defs = format!(
-        "def _cfg(settings, attr): return {{\"//:setting\": \"value\"}}\nleaf_cfg = transition(implementation = _cfg, inputs = [], outputs = [\"//:setting\"])\n{}",
-        TOOLCHAIN_DEFS.replacen(
-            "{\"marker\": attr.string(mandatory = True)}",
-            "{\"marker\": attr.string(mandatory = True), \"dep\": attr.label(cfg = leaf_cfg)}",
-            1,
-        )
-    );
-    let cases = vec![
-        ("dependency leaf", first_module.clone(), dependency_defs, TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", dep = \":type\")", 1), "marker leaf"),
-        ("required leaf", first_module.clone(), TOOLCHAIN_DEFS.replacen("first_impl = rule(implementation = _first, attrs = {\"marker\": attr.string(mandatory = True)})", "first_impl = rule(implementation = _first, attrs = {\"marker\": attr.string(mandatory = True)}, toolchains = [\":type\"])", 1), TOOLCHAIN_BUILD.to_owned(), "marker leaf"),
-        ("transition leaf", first_module.clone(), transition_defs, TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", dep = \":type\")", 1), "marker leaf"),
-        ("build-setting leaf", first_module.clone(), TOOLCHAIN_DEFS.replacen("attrs = {\"marker\": attr.string(mandatory = True)})", "attrs = {\"marker\": attr.string(mandatory = True)}, build_setting = config.string(flag = True))", 1), TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", build_setting_default = \"bad\")", 1), "marker leaf"),
-        ("explicit tags", first_module.clone(), TOOLCHAIN_DEFS.to_owned(), TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", tags = [])", 1), "marker leaf"),
-        ("nonempty builtin", first_module.clone(), TOOLCHAIN_DEFS.to_owned(), TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", features = [\"bad\"])", 1), "marker leaf"),
-        ("omitted optional marker", first_module.clone(), TOOLCHAIN_DEFS.replacen("attr.string(mandatory = True)", "attr.string()", 1), TOOLCHAIN_BUILD.replacen("first_impl(name = \"first_impl\", marker = \"first\")", "first_impl(name = \"first_impl\")", 1), "marker leaf"),
-        ("extra scalar", first_module.clone(), TOOLCHAIN_DEFS.replacen("{\"marker\": attr.string(mandatory = True)}", "{\"marker\": attr.string(mandatory = True), \"extra\": attr.string()}", 1), TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", extra = \"bad\")", 1), "marker leaf"),
-        ("executable capability", first_module.clone(), TOOLCHAIN_DEFS.replacen("first_impl = rule(implementation = _first, attrs = {\"marker\": attr.string(mandatory = True)})", "first_impl = rule(implementation = _first, attrs = {\"marker\": attr.string(mandatory = True)}, executable = True)", 1), TOOLCHAIN_BUILD.to_owned(), "marker leaf"),
-        ("test capability", first_module.clone(), TOOLCHAIN_DEFS.replace("first_impl", "first_impl_test").replacen("attrs = {\"marker\": attr.string(mandatory = True)})", "attrs = {\"marker\": attr.string(mandatory = True)}, test = True)", 1), TOOLCHAIN_BUILD.replace("first_impl", "first_impl_test"), "marker leaf"),
-        ("missing callable marker", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo()"), TOOLCHAIN_BUILD.to_owned(), "must return only"),
-        ("positional callable marker", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(ctx.attr.marker)"), TOOLCHAIN_BUILD.to_owned(), "positional"),
-        ("typed callable marker", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(marker = 1)"), TOOLCHAIN_BUILD.to_owned(), "must return only"),
-        ("wrong callable name", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(value = ctx.attr.marker)"), TOOLCHAIN_BUILD.to_owned(), "must return only"),
-        ("context index", TOOLCHAIN_MODULE.to_owned(), TOOLCHAIN_DEFS.replace("ctx.toolchains[\"//:type\"]", "ctx.toolchains[\"//:missing\"]"), TOOLCHAIN_BUILD.to_owned(), "only contains //:type"),
-
-        ("user ToolchainInfo", first_module.clone(), format!("ToolchainInfo = provider(fields = {{}})\n{}", TOOLCHAIN_DEFS.replacen("return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]", "return [platform_common.ToolchainInfo(marker = ctx.attr.marker), ToolchainInfo()]", 1)), TOOLCHAIN_BUILD.to_owned(), "must return only"),
-        ("user DefaultInfo", first_module.clone(), format!("DefaultInfo = provider(fields = {{}})\n{}", TOOLCHAIN_DEFS.replacen("return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]", "return [platform_common.ToolchainInfo(marker = ctx.attr.marker), DefaultInfo()]", 1)), TOOLCHAIN_BUILD.to_owned(), "must return only"),
-        ("provider cardinality", first_module, format!("Extra = provider(fields = {{\"value\": \"\"}})\n{}", TOOLCHAIN_DEFS.replacen("return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]", "return [platform_common.ToolchainInfo(marker = ctx.attr.marker), Extra(value = \"bad\")]", 1)), TOOLCHAIN_BUILD.to_owned(), "must return only"),
+    let cases = [
+        (
+            "missing builtin",
+            TOOLCHAIN_DEFS.replace(
+                "return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]",
+                "return []",
+            ),
+            TOOLCHAIN_BUILD.to_owned(),
+            "does not provide ToolchainInfo",
+        ),
+        (
+            "user collision",
+            format!(
+                "ToolchainInfo = provider(fields = {{\"marker\": \"\"}})\n{}",
+                TOOLCHAIN_DEFS.replace(
+                    "return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]",
+                    "return [ToolchainInfo(marker = ctx.attr.marker)]",
+                )
+            ),
+            TOOLCHAIN_BUILD.to_owned(),
+            "does not provide ToolchainInfo",
+        ),
+        (
+            "unrequested index",
+            TOOLCHAIN_DEFS.replace(
+                "ctx.toolchains[\"//:type\"]",
+                "ctx.toolchains[\"//:missing\"]",
+            ),
+            TOOLCHAIN_BUILD.to_owned(),
+            "does not contain requested type",
+        ),
+        (
+            "invalid index type",
+            TOOLCHAIN_DEFS.replace("ctx.toolchains[\"//:type\"]", "ctx.toolchains[1]"),
+            TOOLCHAIN_BUILD.to_owned(),
+            "indices must be Labels or Strings",
+        ),
     ];
-    for (name, module, defs, build, expected) in cases {
-        let error = toolchain_case(&module, &defs, &build).await.unwrap_err();
+    for (name, defs, build, expected) in cases {
+        let error = toolchain_case(&first_module, &defs, &build)
+            .await
+            .unwrap_err();
         assert!(error.contains(expected), "{name}: {error}");
     }
 }
+
+#[tokio::test]
+async fn selected_toolchain_round_trips_arbitrary_nested_payload_once() {
+    let defs = r#"Nested = provider(fields = {"value": ""})
+ConsumerInfo = provider(fields = {"value": ""})
+PAYLOAD_LABEL = Label("//:payload")
+TYPE = Label("//:type")
+def _impl(ctx):
+    out = ctx.actions.declare_file("payload.txt")
+    ctx.actions.write(out, "payload")
+    return [
+        DefaultInfo(files = depset([out])),
+        platform_common.ToolchainInfo(
+            label = PAYLOAD_LABEL,
+            artifact = out,
+            items = ["one", "two"],
+            mapping = {"key": "value"},
+            record = struct(value = "record"),
+            provider = Nested(value = "nested"),
+            transitive = depset(["leaf"]),
+        ),
+    ]
+impl = rule(implementation = _impl)
+def _request(ctx):
+    selected = ctx.toolchains["//:type"]
+    again = ctx.toolchains[TYPE]
+    if selected != again or again != selected:
+        fail("repeated Label/String lookup must return the same value")
+    direct = platform_common.ToolchainInfo(
+        label = selected.label,
+        artifact = selected.artifact,
+        items = selected.items,
+        mapping = selected.mapping,
+        record = selected.record,
+        provider = selected.provider,
+        transitive = selected.transitive,
+    )
+    if selected != direct or direct != selected:
+        fail("direct and rematerialized ToolchainInfo must compare equally")
+    return [ConsumerInfo(value = selected.provider.value)]
+request = rule(implementation = _request, toolchains = ["//:type"])
+"#;
+    let build = r#"load(":defs.bzl", "impl", "request")
+platform(name = "platform")
+toolchain_type(name = "type")
+impl(name = "impl")
+toolchain(name = "toolchain", toolchain_type = ":type", toolchain = ":impl")
+request(name = "request")
+"#;
+    let result = toolchain_case(
+        "module(name = 'root')\nregister_execution_platforms('//:platform')\nregister_toolchains('//:toolchain')\n",
+        defs,
+        build,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        provider_value(
+            &result,
+            &ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap()
+        ),
+        "nested"
+    );
+    let info = selected_toolchain(&result).info();
+    assert!(matches!(
+        info.field("label").unwrap().kind(),
+        AnalysisValueKind::Label(_)
+    ));
+    assert!(matches!(
+        info.field("artifact").unwrap().kind(),
+        AnalysisValueKind::Artifact(_)
+    ));
+    assert!(matches!(
+        info.field("items").unwrap().kind(),
+        AnalysisValueKind::List(_)
+    ));
+    assert!(matches!(
+        info.field("mapping").unwrap().kind(),
+        AnalysisValueKind::Dictionary(_)
+    ));
+    assert!(matches!(
+        info.field("record").unwrap().kind(),
+        AnalysisValueKind::Struct(_)
+    ));
+    assert!(matches!(
+        info.field("provider").unwrap().kind(),
+        AnalysisValueKind::Provider(_)
+    ));
+    assert!(matches!(
+        info.field("transitive").unwrap().kind(),
+        AnalysisValueKind::Depset(_)
+    ));
+}
+
+#[tokio::test]
+async fn nested_selected_toolchain_cycle_fails_deterministically_and_recovers() {
+    let workspace = scratch();
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = 'root')\nregister_execution_platforms('//:platform')\nregister_toolchains('//:outer_tc', '//:inner_tc')\n",
+    )
+    .unwrap();
+    let cyclic_defs = r#"def _impl(ctx):
+    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
+outer_impl = rule(
+    implementation = _impl,
+    attrs = {"marker": attr.string(mandatory = True)},
+    toolchains = ["//:inner_type"],
+)
+inner_impl = rule(
+    implementation = _impl,
+    attrs = {"marker": attr.string(mandatory = True)},
+    toolchains = ["//:outer_type"],
+)
+request = rule(implementation = _impl, attrs = {"marker": attr.string()}, toolchains = ["//:outer_type"])
+"#;
+    fs::write(workspace.join("defs.bzl"), cyclic_defs).unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "inner_impl", "outer_impl", "request")
+platform(name = "platform")
+toolchain_type(name = "outer_type")
+toolchain_type(name = "inner_type")
+outer_impl(name = "outer_impl", marker = "outer")
+inner_impl(name = "inner_impl", marker = "inner")
+toolchain(name = "outer_tc", toolchain_type = ":outer_type", toolchain = ":outer_impl")
+toolchain(name = "inner_tc", toolchain_type = ":inner_type", toolchain = ":inner_impl")
+request(name = "request", marker = "request")
+"#,
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let request = || {
+        root_target_request(
+            &dice,
+            &workspace,
+            "@@//:request",
+            Arc::new(RootActivationTracker::default()),
+        )
+    };
+    let first_error = request().await.unwrap_err();
+    let second_error = request().await.unwrap_err();
+    assert_eq!(second_error, first_error);
+    assert!(
+        first_error.contains("configured alias cycle"),
+        "{first_error}"
+    );
+
+    fs::write(
+        workspace.join("defs.bzl"),
+        cyclic_defs.replace("    toolchains = [\"//:outer_type\"],\n)", ")"),
+    )
+    .unwrap();
+    let result = request().await.unwrap();
+    let outer = selected_toolchain(&result).implementation().clone();
+    let outer_result = root_target_request_with_configuration(
+        &dice,
+        &workspace,
+        &outer.label().to_string(),
+        outer.configuration().clone(),
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        retained_toolchain_marker(
+            outer_result
+                .toolchain_topology()
+                .unwrap()
+                .toolchain()
+                .unwrap()
+        ),
+        "inner"
+    );
+}
+
 #[tokio::test]
 async fn selected_toolchain_accepts_declared_actions_and_default_outputs() {
     let workspace = scratch();
-    let defs = TOOLCHAIN_DEFS.replacen(
+    let defs = format!(
+        "Extra = provider(fields = {{\"value\": \"\"}})\ndef _dep(ctx): return [Extra(value = \"dep\")]\ndep = rule(implementation = _dep)\n{}",
+        TOOLCHAIN_DEFS.replacen(
         "    print(\"FIRST_LOCAL\")\n    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]",
-        "    out = ctx.actions.declare_file(\"toolchain.txt\")\n    ctx.actions.write(out, \"toolchain\")\n    return [DefaultInfo(files = depset([out])), platform_common.ToolchainInfo(marker = ctx.attr.marker)]",
+        "    out = ctx.actions.declare_file(\"toolchain.txt\")\n    ctx.actions.write(out, ctx.attr.dep.label.name)\n    return [DefaultInfo(files = depset([out])), platform_common.ToolchainInfo(marker = ctx.attr.marker), Extra(value = \"extra\")]",
         1,
-    );
+    )
+    .replacen(
+        "attrs = {\"marker\": attr.string(mandatory = True)})",
+        "attrs = {\"marker\": attr.string(mandatory = True), \"dep\": attr.label()})",
+        1,
+    ));
+    let build = TOOLCHAIN_BUILD
+        .replacen(
+            "load(\":defs.bzl\", \"first_impl\"",
+            "load(\":defs.bzl\", \"dep\", \"first_impl\"",
+            1,
+        )
+        .replacen(
+            "first_impl(name = \"first_impl\", marker = \"first\")",
+            "dep(name = \"dep\")\nfirst_impl(name = \"first_impl\", marker = \"first\", dep = \":dep\")",
+            1,
+        );
     let module =
         TOOLCHAIN_MODULE.replace("\"//:second\", \"//:first\"", "\"//:first\", \"//:second\"");
     fs::write(workspace.join("MODULE.bazel"), module).unwrap();
     fs::write(workspace.join("defs.bzl"), &defs).unwrap();
-    fs::write(workspace.join("BUILD.bazel"), TOOLCHAIN_BUILD).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), &build).unwrap();
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = || Arc::new(RootActivationTracker::default());
-    let result = root_target_request(&dice, &workspace, "@@//:request", tracker())
-        .await
-        .unwrap();
+    let target_only = CanonicalLabel::parse("@@//:target_only").unwrap();
+    let exec_propagated = CanonicalLabel::parse("@@//:exec_propagated").unwrap();
+    let request_configuration = test_configuration()
+        .with_starlark_option(StarlarkOption::string(
+            target_only.clone(),
+            "target",
+            StarlarkOptionScope::Target,
+        ))
+        .with_starlark_option(StarlarkOption::string(
+            exec_propagated.clone(),
+            "exec",
+            StarlarkOptionScope::Universal,
+        ));
+    let result = root_target_request_with_configuration(
+        &dice,
+        &workspace,
+        "@@//:request",
+        request_configuration,
+        tracker(),
+    )
+    .await
+    .unwrap();
     assert!(result.edges().iter().any(|edge| {
         edge.kind() == &slug_analysis_v2::ConfiguredEdgeKind::SelectedToolchainImplementation
+    }));
+    assert_eq!(result.actions().len(), 1, "child actions stay child-owned");
+    let selected = selected_toolchain(&result).implementation().clone();
+    assert_eq!(
+        selected.configuration().kind(),
+        slug_analysis_v2::ConfigurationKind::Exec
+    );
+    assert_eq!(
+        selected.configuration(),
+        result
+            .toolchain_topology()
+            .unwrap()
+            .toolchain()
+            .unwrap()
+            .execution_platform()
+            .configuration()
+    );
+    assert!(
+        selected
+            .configuration()
+            .starlark_option(&target_only)
+            .is_none()
+    );
+    assert_eq!(
+        selected
+            .configuration()
+            .starlark_option(&exec_propagated)
+            .unwrap()
+            .value()
+            .as_str(),
+        Some("exec")
+    );
+    let selected_result = root_target_request_with_configuration(
+        &dice,
+        &workspace,
+        &selected.label().to_string(),
+        selected.configuration().clone(),
+        tracker(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(selected_result.actions().len(), 1);
+    assert_eq!(
+        provider_value(
+            &selected_result,
+            &ProviderId::new("//:defs.bzl", "Extra").unwrap()
+        ),
+        "extra"
+    );
+    assert!(selected_result.edges().iter().any(|edge| {
+        edge.target().label().to_string() == "@@//:dep"
+            && matches!(
+                edge.kind(),
+                ConfiguredEdgeKind::OrdinaryAttribute { attribute, index }
+                    if attribute == "dep" && *index == 0
+            )
     }));
     let direct = root_target_request(&dice, &workspace, "@@//:first_impl", tracker())
         .await
@@ -2232,7 +2543,7 @@ async fn selected_toolchain_accepts_declared_actions_and_default_outputs() {
     assert_eq!(direct.configured_file_write_actions().unwrap().len(), 1);
     fs::write(
         workspace.join("BUILD.bazel"),
-        TOOLCHAIN_BUILD.replace(
+        build.replace(
             "platform(name = \"platform\", constraint_values = [\":linux\"])",
             "platform(name = \"platform\", constraint_values = [\":linux\"], exec_properties = {\"mode\": \"edited\"})",
         ),
@@ -2244,7 +2555,7 @@ async fn selected_toolchain_accepts_declared_actions_and_default_outputs() {
             .unwrap(),
         direct
     );
-    fs::write(workspace.join("BUILD.bazel"), TOOLCHAIN_BUILD).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), &build).unwrap();
     assert_eq!(
         root_target_request(&dice, &workspace, "@@//:first_impl", tracker())
             .await
@@ -2272,9 +2583,15 @@ async fn selected_platform_terminals_suppress_implementation_and_rule_evaluation
     let platform = seed
         .toolchain_topology()
         .unwrap()
-        .selection()
+        .toolchain()
         .unwrap()
-        .execution_platform();
+        .execution_platform()
+        .clone();
+    let invalid_platform = Arc::new(ConfiguredNodeResult::new_rule(
+        platform.clone(),
+        seed.providers().clone(),
+        None,
+    ));
     let platform_key =
         ConfiguredNodeAnalysisObservationKey::new(root.clone(), platform.clone()).unwrap();
     let root_key = ConfiguredNodeAnalysisObservationKey::new(
@@ -2296,17 +2613,19 @@ async fn selected_platform_terminals_suppress_implementation_and_rule_evaluation
         ),
         (
             "semantic",
-            AnalysisPreparationOutcome::Complete(Ok(Arc::new(Ok(seed.clone())))),
+            AnalysisPreparationOutcome::Complete(Ok(Arc::new(Ok(invalid_platform)))),
         ),
     ];
     for (name, value) in cases {
+        let case_dice = Dice::builder().build(DetectCycles::Enabled);
         let tracker = Arc::new(RootActivationTracker::with_loading());
         let mut data = UserComputationData {
             activation_tracker: Some(tracker.clone()),
+            cycle_detector: Some(analysis_cycle_detector()),
             ..Default::default()
         };
         data.data.set(CaptureEvaluationEvents);
-        let mut updater = dice.updater_with_data(data);
+        let mut updater = case_dice.updater_with_data(data);
         inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
         updater
             .changed_to(vec![(platform_key.clone(), value)])
@@ -2461,7 +2780,16 @@ async fn multi_optional_alias_resolution_maximizes_coverage_without_provider_ana
         r#"def _impl(ctx):
     return [platform_common.ToolchainInfo(marker = "unused")]
 impl = rule(implementation = _impl)
+A_TYPE = Label("//:a")
 def _request(ctx):
+    if "//:a_alias" not in ctx.toolchains or "//:a_alias_two" not in ctx.toolchains or A_TYPE not in ctx.toolchains or "//:b" not in ctx.toolchains:
+        fail("selected alias keys must be present")
+    if ctx.toolchains["//:a_alias"] != ctx.toolchains["//:a_alias_two"] or ctx.toolchains["//:a_alias"] != ctx.toolchains[A_TYPE]:
+        fail("requested aliases and post-alias key must share one value")
+    if "//:missing" not in ctx.toolchains or ctx.toolchains["//:missing"] != None:
+        fail("unresolved optional type must be present as None")
+    if "//:unrequested" in ctx.toolchains:
+        fail("unrequested type must not be present")
     out = ctx.actions.declare_file("multi.txt")
     ctx.actions.write(out, "multi")
     return [DefaultInfo(files = depset([out]))]
@@ -2469,8 +2797,8 @@ request = rule(
     implementation = _request,
     toolchains = [
         config_common.toolchain_type("//:a_alias", mandatory = False),
-        "//:a",
-        config_common.toolchain_type("//:b", mandatory = False),
+        "//:a_alias_two",
+        "//:b",
         config_common.toolchain_type("//:missing", mandatory = False),
     ],
 )
@@ -2489,6 +2817,7 @@ platform(name = "p_b", constraint_values = [":b_value"])
 platform(name = "p_both", constraint_values = [":a_value", ":b_value"])
 toolchain_type(name = "a")
 alias(name = "a_alias", actual = ":a")
+alias(name = "a_alias_two", actual = ":a")
 toolchain_type(name = "b")
 toolchain_type(name = "missing")
 impl(name = "impl")
@@ -2504,8 +2833,8 @@ request(name = "request")
     let workspace_key = NormalizedAbsolutePath::new(workspace.clone()).unwrap();
     let requirements: Arc<[ToolchainTypeRequirement]> = Arc::from([
         ToolchainTypeRequirement::new(CanonicalLabel::parse("@@//:a_alias").unwrap(), false),
-        ToolchainTypeRequirement::new(CanonicalLabel::parse("@@//:a").unwrap(), true),
-        ToolchainTypeRequirement::new(CanonicalLabel::parse("@@//:b").unwrap(), false),
+        ToolchainTypeRequirement::new(CanonicalLabel::parse("@@//:a_alias_two").unwrap(), true),
+        ToolchainTypeRequirement::new(CanonicalLabel::parse("@@//:b").unwrap(), true),
         ToolchainTypeRequirement::new(CanonicalLabel::parse("@@//:missing").unwrap(), false),
     ]);
     let key = ConfiguredToolchainResolutionKey::new(
@@ -2580,7 +2909,7 @@ request(name = "request")
     assert_eq!(result.actions().len(), 1);
     assert_eq!(
         result.actions()[0].context().execution_state(),
-        ActionExecutionState::SelectedPlatformOnly
+        ActionExecutionState::SelectedToolchain
     );
     assert_eq!(
         result.actions()[0]
@@ -2591,7 +2920,12 @@ request(name = "request")
             .to_string(),
         "@@//:p_both"
     );
-    assert!(result.toolchain_topology().unwrap().selection().is_none());
+    let context = result.toolchain_topology().unwrap().toolchain().unwrap();
+    assert_eq!(context.rows().len(), 4);
+    assert!(context.rows()[0].selected().is_some());
+    assert!(context.rows()[1].selected().is_some());
+    assert!(context.rows()[2].selected().is_some());
+    assert!(context.rows()[3].selected().is_none());
 }
 
 #[tokio::test]
@@ -2815,7 +3149,7 @@ async fn selected_nonroot_registrations_preserve_canonical_repository_identity()
             "@@//.slug_test_host:host",
         ]
     );
-    let selection = legacy.toolchain_topology().unwrap().selection().unwrap();
+    let selection = selected_toolchain(&legacy);
     assert_eq!(
         selection.declaration().to_string(),
         "@@dep_b+//shared:selected"
@@ -2963,9 +3297,7 @@ async fn later_reference_round_need_yields_to_resolution_semantic_error() {
     fs::write(workspace.join("missing/BUILD.bazel"), "constraint_setting(name = \"setting\")\nconstraint_value(name = \"value\", constraint_setting = \":setting\")\n").unwrap();
     let semantic = request().await.unwrap_err();
     assert!(
-        semantic.contains(
-            "native toolchain_type target @@//:type is incompatible with exec configuration"
-        ),
+        semantic.contains("platform @@//:platform references a non-constraint value @@//:type"),
         "{semantic}"
     );
 }

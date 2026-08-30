@@ -18,17 +18,21 @@ use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
+use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::AnalysisValueKind;
 use slug_build_api_v2::CtxActions;
 use slug_build_api_v2::ProviderCollection;
+use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
 use slug_loading_v2::AttributeKind;
+use slug_loading_v2::BzlModuleIdentity;
 use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::PackageTargetKind;
+use slug_loading_v2::package::resolve_rule_definition_label;
 use slug_loading_v2::provider::StarlarkDefaultInfo;
-use slug_loading_v2::provider::StarlarkToolchainInfo;
 use slug_loading_v2::provider::ToolchainInfoAnalysisContext;
+use slug_loading_v2::provider::starlark_label;
 use starlark::PrintHandler;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
@@ -53,6 +57,7 @@ use starlark::values::dict::AllocDict;
 use starlark::values::list::ListRef;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
+use starlark_map::small_map::SmallMap;
 
 use crate::analysis_value::AnalysisArtifactValue;
 use crate::analysis_value::AnalysisValueLowerer;
@@ -103,7 +108,8 @@ struct AnalysisContextGen<V> {
     dependencies: Arc<[AnalysisDependency]>,
     resolved_attributes: Arc<[ResolvedRuleAttribute]>,
     build_setting_value: Option<V>,
-    toolchain: Option<PreparedToolchain>,
+    #[trace(unsafe_ignore)]
+    toolchain: Option<PreparedAnalysisToolchains>,
 }
 
 unsafe impl<'v> Coerce<AnalysisContextGen<Value<'v>>> for AnalysisContextGen<FrozenValue> {}
@@ -180,8 +186,21 @@ pub(crate) struct PreparedDependency {
 
 #[derive(Debug, Clone, Allocative)]
 pub(crate) struct PreparedToolchain {
-    pub(crate) required_type: CompactString,
     pub(crate) action_context: Arc<ConfiguredActionOwnerContext>,
+}
+
+#[derive(Debug, Clone, Allocative)]
+struct PreparedAnalysisToolchainRow {
+    requested: slug_identity_v2::CanonicalLabel,
+    actual: slug_identity_v2::CanonicalLabel,
+    #[allocative(skip)]
+    info: Option<FrozenValue>,
+}
+
+#[derive(Debug, Clone, Allocative)]
+struct PreparedAnalysisToolchains {
+    definition_source: Arc<BzlModuleIdentity>,
+    rows: Arc<[PreparedAnalysisToolchainRow]>,
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
@@ -385,7 +404,32 @@ fn allocate_analysis_attribute<'v>(
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct AnalysisToolchains(PreparedToolchain);
+struct AnalysisToolchains(PreparedAnalysisToolchains);
+
+impl AnalysisToolchains {
+    fn transform(&self, index: Value<'_>) -> starlark::Result<slug_identity_v2::CanonicalLabel> {
+        if let Some(label) = starlark_label(index) {
+            return Ok(label);
+        }
+        let Some(raw) = index.unpack_str() else {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "ctx.toolchains indices must be Labels or Strings"
+            )));
+        };
+        resolve_rule_definition_label(raw, &self.0.definition_source)
+            .map_err(starlark::Error::new_other)
+    }
+
+    fn row(
+        &self,
+        label: &slug_identity_v2::CanonicalLabel,
+    ) -> Option<&PreparedAnalysisToolchainRow> {
+        self.0
+            .rows
+            .iter()
+            .find(|row| &row.requested == label || &row.actual == label)
+    }
+}
 
 impl fmt::Display for AnalysisToolchains {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -397,26 +441,18 @@ starlark::starlark_simple_value!(AnalysisToolchains);
 
 #[starlark_value(type = "toolchains")]
 impl<'v> StarlarkValue<'v> for AnalysisToolchains {
-    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        if index.unpack_str() != Some(self.0.required_type.as_str()) {
-            return Err(starlark::Error::new_other(anyhow::anyhow!(
-                "ctx.toolchains only contains {}",
-                self.0.required_type
-            )));
-        }
-        let marker = heap
-            .alloc_str(
-                self.0
-                    .action_context
-                    .toolchain()
-                    .expect("prepared toolchain context retains a toolchain")
-                    .marker(),
-            )
-            .to_value();
-        Ok(StarlarkToolchainInfo::alloc_value(
-            heap,
-            [(CompactString::new("marker"), marker)],
-        ))
+    fn at(&self, index: Value<'v>, _heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let label = self.transform(index)?;
+        let row = self.row(&label).ok_or_else(|| {
+            starlark::Error::new_other(anyhow::anyhow!(
+                "ctx.toolchains does not contain requested type {label}"
+            ))
+        })?;
+        Ok(row.info.map_or_else(Value::new_none, FrozenValue::to_value))
+    }
+
+    fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(self.row(&self.transform(other)?).is_some())
     }
 }
 
@@ -542,6 +578,94 @@ impl<'v> StarlarkValue<'v> for AnalysisActions {
 
 /// Synchronously evaluate one loaded rule after DICE has prepared all direct
 /// dependency providers. No graph lookup or asynchronous work occurs here.
+fn materialize_toolchain_info(
+    actual: &slug_identity_v2::CanonicalLabel,
+    info: &ProviderOccurrence,
+    materialized: &mut SmallMap<slug_identity_v2::CanonicalLabel, FrozenValue>,
+    materializer: &mut AnalysisValueMaterializer<'_>,
+) -> Result<FrozenValue, String> {
+    if let Some(value) = materialized.get(actual) {
+        return Ok(*value);
+    }
+    let value = materializer.value(&AnalysisValue::provider(info.clone()))?;
+    materialized.insert(actual.clone(), value);
+    Ok(value)
+}
+
+fn materialize_analysis_toolchains(
+    toolchain: PreparedToolchain,
+    definition_source: Arc<BzlModuleIdentity>,
+    materializer: &mut AnalysisValueMaterializer<'_>,
+) -> Result<PreparedAnalysisToolchains, String> {
+    let context = toolchain
+        .action_context
+        .toolchain()
+        .expect("prepared toolchain retains its configured context");
+    let mut materialized = SmallMap::with_capacity(context.rows().len());
+    let rows = context
+        .rows()
+        .iter()
+        .map(|row| {
+            let info = row
+                .selected()
+                .map(|selected| {
+                    materialize_toolchain_info(
+                        row.actual().label(),
+                        selected.info(),
+                        &mut materialized,
+                        materializer,
+                    )
+                })
+                .transpose()?;
+            Ok(PreparedAnalysisToolchainRow {
+                requested: row.requested().label().clone(),
+                actual: row.actual().label().clone(),
+                info,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    Ok(PreparedAnalysisToolchains {
+        definition_source,
+        rows: rows.into(),
+    })
+}
+
+#[cfg(test)]
+mod toolchain_materialization_tests {
+    use slug_build_api_v2::ProviderIdentity;
+    use starlark::values::FrozenHeap;
+
+    use super::*;
+
+    #[test]
+    fn distinct_requested_aliases_share_one_actual_toolchain_value() {
+        let heap = FrozenHeap::new();
+        let mut materializer = AnalysisValueMaterializer::new(&heap);
+        let mut materialized = SmallMap::new();
+        let actual = slug_identity_v2::CanonicalLabel::parse("@@//:actual").unwrap();
+        let other = slug_identity_v2::CanonicalLabel::parse("@@//:other").unwrap();
+        let alias_a = ProviderOccurrence::new(
+            ProviderIdentity::builtin("ToolchainInfo"),
+            [("marker", AnalysisValue::string("shared"))],
+        );
+        let alias_b = alias_a.clone();
+
+        let first =
+            materialize_toolchain_info(&actual, &alias_a, &mut materialized, &mut materializer)
+                .unwrap();
+        let second =
+            materialize_toolchain_info(&actual, &alias_b, &mut materialized, &mut materializer)
+                .unwrap();
+        let distinct =
+            materialize_toolchain_info(&other, &alias_b, &mut materialized, &mut materializer)
+                .unwrap();
+
+        assert!(first.to_value().ptr_eq(second.to_value()));
+        assert!(!first.to_value().ptr_eq(distinct.to_value()));
+        assert_eq!(materialized.len(), 2);
+    }
+}
+
 pub(crate) fn evaluate_loaded_rule(
     package: &LoadedPackage,
     target_name: &str,
@@ -584,9 +708,9 @@ pub(crate) fn evaluate_loaded_rule(
         key.label().clone(),
         key.configuration().complete_identity_bytes(),
     );
-    let dependencies = {
+    let (dependencies, toolchain) = {
         let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
-        dependencies
+        let dependencies = dependencies
             .into_iter()
             .map(|dependency| {
                 let target =
@@ -596,7 +720,17 @@ pub(crate) fn evaluate_loaded_rule(
                     target,
                 })
             })
-            .collect::<Result<Arc<[_]>, String>>()?
+            .collect::<Result<Arc<[_]>, String>>()?;
+        let toolchain = toolchain
+            .map(|toolchain| {
+                materialize_analysis_toolchains(
+                    toolchain,
+                    implementation.definition_source().clone(),
+                    &mut materializer,
+                )
+            })
+            .transpose()?;
+        (dependencies, toolchain)
     };
     let returned = {
         let toolchain_info_context = ToolchainInfoAnalysisContext;

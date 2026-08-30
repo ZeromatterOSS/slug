@@ -9,12 +9,34 @@
  */
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use prost::Message;
+use slug_analysis_v2::ConfigurationKey;
+use slug_analysis_v2::ConfiguredActionAspectProvenance;
+use slug_analysis_v2::ConfiguredActionExecGroup;
+use slug_analysis_v2::ConfiguredActionOwnerContext;
+use slug_analysis_v2::ConfiguredActionToolchainContext;
+use slug_analysis_v2::ConfiguredNodeResult;
+use slug_analysis_v2::ConfiguredTargetKey;
+use slug_analysis_v2::ConfiguredToolchainContextRow;
+use slug_analysis_v2::ConfiguredToolchainSelection;
+use slug_analysis_v2::PlatformSemanticFact;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
+use slug_build_api_v2::AnalysisValue;
+use slug_build_api_v2::DefaultInfo;
+use slug_build_api_v2::ProviderCollection;
+use slug_build_api_v2::ProviderIdentity;
+use slug_build_api_v2::ProviderOccurrence;
+use slug_build_api_v2::ProviderValue;
+use slug_configuration_v2::SlugConfiguration;
+use slug_configuration_v2::native::host::AutoCpuToken;
+use slug_configuration_v2::native::host::HostConversionInputs;
+use slug_configuration_v2::native::host::HostPathFlavor;
+use slug_identity_v2::CanonicalLabel;
 use slug_reapi_v2::ExecutionEvidence;
 use slug_reapi_v2::FileWriteReapiPlan;
 use slug_reapi_v2::GeneratedOutput;
@@ -128,75 +150,107 @@ fn declarative_write_action_rejects_the_raw_executor_projection() {
 
 #[test]
 fn configured_file_write_reapi_plan_reads_retained_platform_properties() {
-    let workspace = std::env::temp_dir().join(format!(
-        "slug-reapi-configured-action-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&workspace);
-    std::fs::create_dir_all(&workspace).unwrap();
-    std::fs::write(
-        workspace.join("MODULE.bazel"),
-        "module(name = \"root\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:toolchain\")\n",
+    let host = HostConversionInputs::new(
+        Some(AutoCpuToken::K8),
+        Some(HostPathFlavor::Unix),
+        None,
+        Arc::from([]),
+        Arc::from([]),
     )
     .unwrap();
-    std::fs::write(
-        workspace.join("defs.bzl"),
-        r#"def _tool(ctx): return [platform_common.ToolchainInfo(marker = "retained")]
-def _write(ctx):
-    out = ctx.actions.declare_file("out.txt")
-    ctx.actions.write(out, "content")
-    return [DefaultInfo(files = depset([out]))]
-tool = rule(implementation = _tool, attrs = {"marker": attr.string(mandatory = True)})
-write = rule(implementation = _write, toolchains = ["//:type"])
-"#,
-    )
-    .unwrap();
-    std::fs::write(
-        workspace.join("BUILD.bazel"),
-        r#"load(":defs.bzl", "tool", "write")
-platform(name = "platform", exec_properties = {"z": "last", "a": "first"})
-toolchain_type(name = "type")
-tool(name = "implementation", marker = "retained")
-toolchain(name = "toolchain", toolchain_type = ":type", toolchain = ":implementation")
-write(name = "write")
-"#,
-    )
-    .unwrap();
-
-    let targets = [slug_core_v2::runtime::TargetPattern::parse("//:write").unwrap()];
+    let target = ConfigurationKey::from_slug(SlugConfiguration::default_target(&host).unwrap());
+    let exec = ConfigurationKey::from_slug(SlugConfiguration::default_exec(&host).unwrap());
+    let label = |value| CanonicalLabel::parse(value).unwrap();
+    let owner = ConfiguredTargetKey::new(label("@@//:write"), target.clone());
+    let platform = ConfiguredTargetKey::new(label("@@//:platform"), exec.clone());
+    let implementation = ConfiguredTargetKey::new(label("@@//:implementation"), exec);
+    let selected = ConfiguredToolchainSelection::new(
+        label("@@//:toolchain"),
+        implementation.clone(),
+        implementation,
+        ProviderOccurrence::new(
+            ProviderIdentity::builtin("ToolchainInfo"),
+            [("marker", AnalysisValue::string("retained"))],
+        ),
+    );
+    let toolchains = Arc::new(
+        ConfiguredActionToolchainContext::new(
+            platform.clone(),
+            vec![ConfiguredToolchainContextRow::new(
+                ConfiguredTargetKey::new(label("@@//:type"), target.clone()),
+                ConfiguredTargetKey::new(label("@@//:type"), target),
+                true,
+                Some(selected),
+            )],
+        )
+        .unwrap(),
+    );
+    let context = Arc::new(
+        ConfiguredActionOwnerContext::new(
+            owner.clone(),
+            ConfiguredActionExecGroup::Default,
+            platform,
+            PlatformSemanticFact {
+                exec_properties: Arc::from([
+                    ("a".into(), "first".into()),
+                    ("z".into(), "last".into()),
+                ]),
+            },
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            Vec::new(),
+            Some(toolchains),
+            ConfiguredActionAspectProvenance::Absent,
+        )
+        .unwrap(),
+    );
+    let providers =
+        ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
+    let result = ConfiguredNodeResult::new_rule(owner, providers, None)
+        .with_action_specs(
+            vec![ActionSpec::new(
+                ActionKind::Write {
+                    content: "content".to_owned(),
+                    is_executable: false,
+                },
+                "FileWrite",
+                vec![ActionOutput::new("out.txt", ActionOutputKind::File)],
+            )],
+            vec![context.clone()],
+        )
+        .unwrap();
+    let action = result
+        .configured_file_write_actions()
+        .unwrap()
+        .next()
+        .unwrap();
+    let view = slug_core_v2::runtime::ResolvedFileWriteSemanticView::from_configured_action(action);
     let mut remote_defaults = BTreeMap::new();
     remote_defaults.insert("remote".to_owned(), "ignored".to_owned());
-    let accepted = slug_core_v2::runtime::evaluate_workspace_build_command_with_bzlmod_inputs(
-        &workspace,
-        &targets,
-        slug_core_v2::runtime::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
-        slug_core_v2::runtime::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
-            .unwrap(),
-        slug_core_v2::runtime::LockfileMode::Update,
-        &[],
-        Default::default(),
-    )
-    .unwrap();
-    let projected = accepted.project(|terminal| {
-        let evaluation = terminal.as_ref().as_ref().unwrap();
-        let views = evaluation.resolved_file_write_semantic_views().unwrap();
-        let context = views[0].action().context().clone();
-        let plan = FileWriteReapiPlan::from_resolved(&views[0], &remote_defaults).unwrap();
-        assert_eq!(
-            plan.command().platform_properties,
-            BTreeMap::from([
-                ("a".to_owned(), "first".to_owned()),
-                ("z".to_owned(), "last".to_owned()),
-            ])
-        );
-        assert!(std::sync::Arc::ptr_eq(
-            views[0].action().context(),
-            &context,
-        ));
-        slug_core_v2::runtime::TerminalOutput::new(0, String::new(), String::new())
-    });
-    assert_eq!(projected.publish().into_parts().1, 0);
-    std::fs::remove_dir_all(workspace).unwrap();
+    let row = &view.action().toolchain().unwrap().rows()[0];
+    assert_eq!(row.requested().label().to_string(), "@@//:type");
+    assert_eq!(
+        row.selected().unwrap().implementation().label().to_string(),
+        "@@//:implementation"
+    );
+    assert_eq!(
+        row.selected()
+            .unwrap()
+            .info()
+            .field("marker")
+            .unwrap()
+            .as_str(),
+        Some("retained")
+    );
+    let plan = FileWriteReapiPlan::from_resolved(&view, &remote_defaults).unwrap();
+    assert_eq!(
+        plan.command().platform_properties,
+        BTreeMap::from([
+            ("a".to_owned(), "first".to_owned()),
+            ("z".to_owned(), "last".to_owned()),
+        ])
+    );
+    assert!(Arc::ptr_eq(view.action().context(), &context));
 }
 
 #[test]

@@ -893,7 +893,27 @@ async fn resolved_file_write_view_borrows_immutable_owner_context_without_closur
         views[0].action().execution_platform().label().to_string(),
         "@@//:platform"
     );
-    assert_eq!(views[0].action().toolchain().unwrap().marker(), "toolchain");
+    let toolchain_row = &views[0].action().toolchain().unwrap().rows()[0];
+    assert_eq!(toolchain_row.requested().label().to_string(), "@@//:type");
+    assert_eq!(
+        toolchain_row
+            .selected()
+            .unwrap()
+            .implementation()
+            .label()
+            .to_string(),
+        "@@//:implementation"
+    );
+    assert_eq!(
+        toolchain_row
+            .selected()
+            .unwrap()
+            .info()
+            .field("marker")
+            .unwrap()
+            .as_str(),
+        Some("toolchain")
+    );
     let without_platform = BuildCommandEvaluation {
         anchor: base.anchor.clone(),
         targets: base.targets.clone(),

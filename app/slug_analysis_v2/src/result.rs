@@ -20,6 +20,7 @@ use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::ProviderCollection;
+use slug_build_api_v2::ProviderOccurrence;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::RuleCapability;
 
@@ -72,50 +73,90 @@ pub enum ConfiguredNodeKind {
     ToolchainDeclaration,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-pub struct ToolchainSelection {
-    execution_platform: ConfiguredTargetKey,
+#[derive(Debug, Clone, Allocative)]
+pub struct ConfiguredToolchainSelection {
     declaration: CanonicalLabel,
-    toolchain_type: ConfiguredTargetKey,
     implementation: ConfiguredTargetKey,
+    actual_implementation: ConfiguredTargetKey,
+    info: ProviderOccurrence,
 }
 
-impl ToolchainSelection {
+impl ConfiguredToolchainSelection {
     pub fn new(
-        execution_platform: ConfiguredTargetKey,
         declaration: CanonicalLabel,
-        toolchain_type: ConfiguredTargetKey,
         implementation: ConfiguredTargetKey,
+        actual_implementation: ConfiguredTargetKey,
+        info: ProviderOccurrence,
     ) -> Self {
         Self {
-            execution_platform,
             declaration,
-            toolchain_type,
             implementation,
+            actual_implementation,
+            info,
         }
-    }
-
-    pub fn execution_platform(&self) -> &ConfiguredTargetKey {
-        &self.execution_platform
     }
 
     pub fn declaration(&self) -> &CanonicalLabel {
         &self.declaration
     }
 
-    pub fn toolchain_type(&self) -> &ConfiguredTargetKey {
-        &self.toolchain_type
-    }
-
     pub fn implementation(&self) -> &ConfiguredTargetKey {
         &self.implementation
+    }
+
+    pub fn actual_implementation(&self) -> &ConfiguredTargetKey {
+        &self.actual_implementation
+    }
+
+    pub fn info(&self) -> &ProviderOccurrence {
+        &self.info
+    }
+}
+
+#[derive(Debug, Clone, Allocative)]
+pub struct ConfiguredToolchainContextRow {
+    requested: ConfiguredTargetKey,
+    actual: ConfiguredTargetKey,
+    mandatory: bool,
+    selected: Option<ConfiguredToolchainSelection>,
+}
+
+impl ConfiguredToolchainContextRow {
+    pub fn new(
+        requested: ConfiguredTargetKey,
+        actual: ConfiguredTargetKey,
+        mandatory: bool,
+        selected: Option<ConfiguredToolchainSelection>,
+    ) -> Self {
+        Self {
+            requested,
+            actual,
+            mandatory,
+            selected,
+        }
+    }
+
+    pub fn requested(&self) -> &ConfiguredTargetKey {
+        &self.requested
+    }
+
+    pub fn actual(&self) -> &ConfiguredTargetKey {
+        &self.actual
+    }
+
+    pub fn mandatory(&self) -> bool {
+        self.mandatory
+    }
+
+    pub fn selected(&self) -> Option<&ConfiguredToolchainSelection> {
+        self.selected.as_ref()
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct ToolchainTopology {
     candidate_execution_platforms: Arc<[ConfiguredTargetKey]>,
-    selection: Option<ToolchainSelection>,
+    toolchain: Option<Arc<ConfiguredActionToolchainContext>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -167,6 +208,7 @@ pub struct ConfiguredToolchainResolutionRow {
     actual: ConfiguredTargetKey,
     mandatory: bool,
     declaration: Option<CanonicalLabel>,
+    implementation: Option<CanonicalLabel>,
 }
 
 impl ConfiguredToolchainResolutionRow {
@@ -175,12 +217,19 @@ impl ConfiguredToolchainResolutionRow {
         actual: ConfiguredTargetKey,
         mandatory: bool,
         declaration: Option<CanonicalLabel>,
+        implementation: Option<CanonicalLabel>,
     ) -> Self {
+        assert_eq!(
+            declaration.is_some(),
+            implementation.is_some(),
+            "toolchain declaration and implementation selection must agree"
+        );
         Self {
             requested,
             actual,
             mandatory,
             declaration,
+            implementation,
         }
     }
 
@@ -198,6 +247,10 @@ impl ConfiguredToolchainResolutionRow {
 
     pub fn declaration(&self) -> Option<&CanonicalLabel> {
         self.declaration.as_ref()
+    }
+
+    pub fn implementation(&self) -> Option<&CanonicalLabel> {
+        self.implementation.as_ref()
     }
 }
 
@@ -268,22 +321,107 @@ impl ConfiguredPlatform {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-pub struct ConfiguredActionToolchainContext(ToolchainSelection, CompactString);
+#[derive(Debug, Clone, Allocative)]
+pub struct ConfiguredActionToolchainContext {
+    execution_platform: ConfiguredTargetKey,
+    rows: Arc<[ConfiguredToolchainContextRow]>,
+}
 
 impl ConfiguredActionToolchainContext {
-    pub fn new(selection: ToolchainSelection, marker: CompactString) -> Self {
-        Self(selection, marker)
+    pub fn new(
+        execution_platform: ConfiguredTargetKey,
+        rows: Vec<ConfiguredToolchainContextRow>,
+    ) -> Result<Self, String> {
+        ensure_action(
+            execution_platform.configuration().kind() == ConfigurationKind::Exec
+                && execution_platform
+                    .configuration()
+                    .slug_configuration()
+                    .is_some(),
+            "configured toolchain context requires structural exec platform",
+        )?;
+        ensure_action(
+            !rows.is_empty(),
+            "configured toolchain context requires rows",
+        )?;
+        let mut requested = BTreeSet::new();
+        ensure_action(
+            rows.iter()
+                .all(|row| requested.insert(row.requested.clone())),
+            "configured toolchain context has duplicate requested type",
+        )?;
+        ensure_action(
+            rows.iter().all(|row| {
+                is_analysis_configured(&row.requested)
+                    && row.actual.configuration() == row.requested.configuration()
+                    && is_analysis_configured(&row.actual)
+                    && (!row.mandatory || row.selected.is_some())
+                    && row.selected.as_ref().is_none_or(|selected| {
+                        selected.implementation.configuration()
+                            == execution_platform.configuration()
+                            && selected.actual_implementation.configuration()
+                                == execution_platform.configuration()
+                            && selected.info.identity().is_builtin("ToolchainInfo")
+                    })
+            }),
+            "configured toolchain context has invalid row identity",
+        )?;
+        Ok(Self {
+            execution_platform,
+            rows: rows.into(),
+        })
     }
 
-    pub fn selection(&self) -> &ToolchainSelection {
-        &self.0
+    pub fn execution_platform(&self) -> &ConfiguredTargetKey {
+        &self.execution_platform
     }
 
-    pub fn marker(&self) -> &str {
-        &self.1
+    pub fn rows(&self) -> &[ConfiguredToolchainContextRow] {
+        &self.rows
+    }
+
+    pub fn has_selected(&self) -> bool {
+        self.rows.iter().any(|row| row.selected.is_some())
     }
 }
+
+impl PartialEq for ConfiguredActionToolchainContext {
+    fn eq(&self, other: &Self) -> bool {
+        self.execution_platform == other.execution_platform
+            && self.rows.len() == other.rows.len()
+            && self
+                .rows
+                .iter()
+                .zip(other.rows.iter())
+                .all(|(left, right)| {
+                    left.requested == right.requested
+                        && left.actual == right.actual
+                        && left.mandatory == right.mandatory
+                        && match (&left.selected, &right.selected) {
+                            (None, None) => true,
+                            (Some(left), Some(right)) => {
+                                left.declaration == right.declaration
+                                    && left.implementation == right.implementation
+                                    && left.actual_implementation == right.actual_implementation
+                            }
+                            _ => false,
+                        }
+                })
+            && ProviderOccurrence::publication_eq_pairs(
+                self.rows
+                    .iter()
+                    .zip(other.rows.iter())
+                    .filter_map(|(left, right)| {
+                        Some((
+                            left.selected.as_ref()?.info(),
+                            right.selected.as_ref()?.info(),
+                        ))
+                    }),
+            )
+    }
+}
+
+impl Eq for ConfiguredActionToolchainContext {}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative)]
 pub enum ConfiguredActionExecutionState {
@@ -306,8 +444,8 @@ pub struct ConfiguredActionOwnerContext {
 impl ConfiguredActionOwnerContext {
     pub fn unresolved_default(owner: ConfiguredTargetKey) -> Result<Self, String> {
         ensure_action(
-            is_target_configured(&owner),
-            "configured action owner requires target configuration",
+            is_analysis_configured(&owner),
+            "configured action owner requires structural analysis configuration",
         )?;
         Ok(Self {
             owner,
@@ -333,8 +471,8 @@ impl ConfiguredActionOwnerContext {
         aspect: ConfiguredActionAspectProvenance,
     ) -> Result<Self, String> {
         ensure_action(
-            is_target_configured(&owner),
-            "configured action owner requires target configuration",
+            is_analysis_configured(&owner),
+            "configured action owner requires structural analysis configuration",
         )?;
         ensure_action(
             execution_platform.configuration().kind() == ConfigurationKind::Exec
@@ -346,19 +484,15 @@ impl ConfiguredActionOwnerContext {
         )?;
         if let Some(toolchain) = &toolchain {
             ensure_action(
-                toolchain.selection().execution_platform() == &execution_platform,
+                toolchain.execution_platform() == &execution_platform,
                 "configured action toolchain has mismatched platform",
             )?;
             ensure_action(
-                [
-                    toolchain.selection().toolchain_type(),
-                    toolchain.selection().implementation(),
-                ]
-                .into_iter()
-                .all(|key| {
-                    key.configuration() == owner.configuration() && is_target_configured(key)
+                toolchain.rows().iter().all(|row| {
+                    row.requested().configuration() == owner.configuration()
+                        && row.actual().configuration() == owner.configuration()
                 }),
-                "configured action toolchain requires owner target configuration",
+                "configured action toolchain types require owner analysis configuration",
             )?;
         }
         ensure_action(
@@ -411,7 +545,12 @@ impl ConfiguredActionOwnerContext {
     }
 
     pub fn execution_state(&self) -> ConfiguredActionExecutionState {
-        match (self.execution_platform.is_some(), self.toolchain.is_some()) {
+        match (
+            self.execution_platform.is_some(),
+            self.toolchain
+                .as_ref()
+                .is_some_and(|toolchain| toolchain.has_selected()),
+        ) {
             (false, _) => ConfiguredActionExecutionState::UnresolvedDefault,
             (true, true) => ConfiguredActionExecutionState::SelectedToolchain,
             (true, false) => ConfiguredActionExecutionState::SelectedPlatformOnly,
@@ -439,8 +578,11 @@ impl ConfiguredActionOwnerContext {
     }
 }
 
-fn is_target_configured(key: &ConfiguredTargetKey) -> bool {
-    key.configuration().kind() == ConfigurationKind::Target
+fn is_analysis_configured(key: &ConfiguredTargetKey) -> bool {
+    matches!(
+        key.configuration().kind(),
+        ConfigurationKind::Target | ConfigurationKind::Exec
+    ) && key.configuration().slug_configuration().is_some()
 }
 
 fn ensure_action(condition: bool, message: &'static str) -> Result<(), String> {
@@ -543,7 +685,7 @@ impl<'a> ConfiguredActionView<'a> {
 impl ToolchainTopology {
     pub fn new(
         candidate_execution_platforms: Vec<ConfiguredTargetKey>,
-        selection: Option<ToolchainSelection>,
+        toolchain: Option<Arc<ConfiguredActionToolchainContext>>,
     ) -> Result<Self, String> {
         if candidate_execution_platforms
             .iter()
@@ -551,23 +693,14 @@ impl ToolchainTopology {
         {
             return Err("candidate execution platforms require exec configuration".to_owned());
         }
-        if let Some(selection) = &selection
-            && !candidate_execution_platforms.contains(selection.execution_platform())
+        if let Some(toolchain) = &toolchain
+            && !candidate_execution_platforms.contains(toolchain.execution_platform())
         {
             return Err("selected execution platform is not a candidate".to_owned());
         }
-        if selection.as_ref().is_some_and(|selection| {
-            selection.toolchain_type().configuration().kind() != ConfigurationKind::Target
-                || selection.implementation().configuration().kind() != ConfigurationKind::Target
-        }) {
-            return Err(
-                "selected toolchain type and implementation require target configuration"
-                    .to_owned(),
-            );
-        }
         Ok(Self {
             candidate_execution_platforms: candidate_execution_platforms.into(),
-            selection,
+            toolchain,
         })
     }
 
@@ -575,8 +708,8 @@ impl ToolchainTopology {
         &self.candidate_execution_platforms
     }
 
-    pub fn selection(&self) -> Option<&ToolchainSelection> {
-        self.selection.as_ref()
+    pub fn toolchain(&self) -> Option<&Arc<ConfiguredActionToolchainContext>> {
+        self.toolchain.as_ref()
     }
 }
 

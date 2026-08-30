@@ -2944,7 +2944,8 @@ pub struct ResolvedRunSemanticView<'a> {
 }
 
 impl<'a> ResolvedFileWriteSemanticView<'a> {
-    fn from_action(action: ConfiguredActionView<'a>) -> Self {
+    #[doc(hidden)]
+    pub fn from_configured_action(action: ConfiguredActionView<'a>) -> Self {
         Self { action }
     }
 
@@ -3278,7 +3279,9 @@ impl BuildCommandEvaluation {
         let mut views = Vec::new();
         for owner in owners {
             for action in owner.configured_file_write_actions()? {
-                views.push(ResolvedFileWriteSemanticView::from_action(action));
+                views.push(ResolvedFileWriteSemanticView::from_configured_action(
+                    action,
+                ));
             }
         }
         Ok(views)

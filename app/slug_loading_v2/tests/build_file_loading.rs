@@ -21,11 +21,14 @@ use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
+use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
 use slug_loading_v2::AllowSingleFile;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::BzlModuleEvaluator;
+use slug_loading_v2::BzlModuleIdentity;
 use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::PackageTarget;
 use slug_loading_v2::PackageTargetKind;
@@ -54,6 +57,7 @@ use slug_loading_v2::package::BuildSettingDefault;
 use slug_loading_v2::package::BuildSettingDefinition;
 use slug_loading_v2::package::BuildSettingScope;
 use slug_loading_v2::package::NativeToolchainTarget;
+use slug_loading_v2::package::resolve_rule_definition_label;
 use slug_workspace_v2::WorkspaceRawFileValue;
 use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
@@ -3398,6 +3402,23 @@ probe_rule(name = "probe")
     assert!(dependencies(&loaded, "probe").is_empty());
     assert!(requirements(&loaded, "first_impl").is_empty());
     assert!(requirements(&loaded, "second_impl").is_empty());
+    let probe = loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "probe")
+        .unwrap();
+    let PackageTargetKind::StarlarkRule(probe) = &probe.kind else {
+        panic!("probe must remain a Starlark rule")
+    };
+    assert_eq!(
+        probe.definition_source().label,
+        CanonicalLabel::parse("@@//:defs.bzl").unwrap()
+    );
+    assert!(probe.definition_source().repository_mapping.is_empty());
+    assert_eq!(
+        resolve_rule_definition_label(":demo_type", probe.definition_source()).unwrap(),
+        CanonicalLabel::parse("@@//:demo_type").unwrap()
+    );
 
     let consumer = workspace.join("consumer");
     let empty_defs = workspace.join("empty.bzl");
@@ -3420,6 +3441,32 @@ probe_rule(name = "probe")
     );
     assert!(dependencies(&consumer, "consumer_probe").is_empty());
     assert!(requirements(&consumer, "empty").is_empty());
+}
+
+#[test]
+fn rule_definition_resolver_uses_external_source_repository_mapping() {
+    let source = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules+//pkg:defs.bzl").unwrap(),
+        workspace_path: "/workspace/rules/pkg/defs.bzl".into(),
+        repository_mapping: Arc::from([(
+            ApparentRepoName::new("toolchains").unwrap(),
+            CanonicalRepoName::new("toolchains+1.0").unwrap(),
+        )]),
+    };
+    assert_eq!(
+        resolve_rule_definition_label("@toolchains//cc:type", &source).unwrap(),
+        CanonicalLabel::parse("@@toolchains+1.0//cc:type").unwrap()
+    );
+    assert_eq!(
+        resolve_rule_definition_label("//types:local", &source).unwrap(),
+        CanonicalLabel::parse("@@rules+//types:local").unwrap()
+    );
+    assert!(
+        resolve_rule_definition_label("@requester_only//cc:type", &source)
+            .unwrap_err()
+            .to_string()
+            .contains("not visible")
+    );
 }
 
 #[test]

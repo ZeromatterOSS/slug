@@ -382,6 +382,15 @@ impl ProviderOccurrence {
                 .all(AnalysisValue::is_starlark_immutable)
     }
 
+    /// Compare an ordered publication boundary while preserving alias
+    /// partitions shared by values in different provider occurrences.
+    pub fn publication_eq_pairs<'a>(pairs: impl IntoIterator<Item = (&'a Self, &'a Self)>) -> bool {
+        let mut state = PublicationEqState::default();
+        pairs
+            .into_iter()
+            .all(|(left, right)| left.publication_eq_with(right, &mut state))
+    }
+
     pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         self.identity == other.identity
             && self.fields.len() == other.fields.len()

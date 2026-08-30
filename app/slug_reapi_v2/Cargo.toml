@@ -18,3 +18,8 @@ tonic = { workspace = true, features = ["transport"] }
 [build-dependencies]
 protoc-bin-vendored = { workspace = true }
 tonic-build = { workspace = true }
+
+[dev-dependencies]
+slug_analysis_v2 = { workspace = true }
+slug_configuration_v2 = { workspace = true }
+slug_identity_v2 = { workspace = true }

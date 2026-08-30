@@ -1,262 +1,311 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r4`
+Packet: `WP-4-5-7A-selected-toolchain-context-cutover-implementation-r3`
 
-Milestone: M7A bootstrap-critical generic Starlark/ruleset closure.
+Milestone: M7A category 6 prerequisite for configured hidden Exec dependencies.
 
-Base: accepted loading producer `965cfde5e` plus accepted command/configuration
-producer `4425d3bfb`. Unrelated dirty analysis/toolchain, evaluator-adapter,
-loading, core and REAPI work remains parked. Stage and validate only this
-packet's exact hunks.
+Base: `ad274cc1a`. The prior configured-hidden-dependency R4 implementation is
+not part of this packet. Its index-only gate proved that an Exec-configured
+Starlark dependency reaches the selected-toolchain/action-context boundary,
+which remains Target-only at this base. All R4 and unrelated dirty repository,
+loading, analysis, core and REAPI hunks remain excluded.
+
+R2 terminal implementation review returned `REPLAN` only because its mandatory
+one-shot REAPI proof did not reach the selected-context assertions. The R2
+candidate advanced beyond the base selected-BCR terminal to the unrelated
+`rules_shell` `attr.label_list(flags=...)` loading boundary; a bounded local
+rules_shell experiment then advanced to the independently deferred recursive
+`glob(["**"])` in embedded `@bazel_tools//tools/res`. R3 does not widen the
+parser, attribute, glob, BCR or ruleset surface to make that command succeed.
+It replaces only the proof route with a hermetic semantic-consumer regression.
 
 ## Observable result
 
-For a rule with attached subrules, resolve every lifted literal or admitted
-typed `configuration_field` label/default before Starlark invocation. Configure
-target dependencies in the owner's configuration and exec dependencies in the
-actual selected execution platform's Exec configuration. Reuse the existing
-configured-child/cycle/Need/alias pipeline, validate providers, single-file
-shape and executability, and retain ordered phase-scratch dependency facts.
-Ordinary rule attributes using the same typed defaults take the same route.
+Delete the marker-only selected-toolchain bridge. For every selected
+toolchain row, analyze the declared implementation under the chosen platform's
+exact structural Exec configuration, retain its authenticated builtin
+`ToolchainInfo` occurrence, publish ordered requested/actual/optional topology,
+and expose the same occurrence through immutable alias-aware multi-type
+`ctx.toolchains`. A nested Exec-configured rule with zero or nonzero toolchain
+requirements uses the ordinary guarded configured-analysis pipeline without a
+Target-owner fallback or deadlock.
 
-Root-package loading `query` exposes deterministic synthesized attributes and
-implicit edges for literal hidden defaults. Because this packet deliberately
-terminates analysis before invocation, configured hidden edges are not
-publishable until the direct-call successor succeeds. The packet creates no
-evaluator-visible target, artifact or files-to-run wrapper and publishes no
-configured result or action.
+No parser, BCR rule logic, ruleset-specific payload, new DICE key, cache,
+registry or evaluator-retained value is added.
 
-## Learned facts and authority
+## Authority and learned facts
 
-Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is the
-sole semantic authority:
+Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is
+the sole semantic authority:
 
-- `StarlarkSubrule.java:132-192,227-284` lifts transitive attributes, forbids
-  overrides, and supplies configured target/list, single Artifact, or
-  `FilesToRunProvider` values only at the later call boundary;
-- `StarlarkSubruleTest.java:801-1219` proves hidden-in-`ctx.attr`, literal,
-  single-file, executable/Exec and late-bound behavior;
-- `CppConfiguration.java:184-196,308-319,632-759,958-961` defines the ten
-  admitted `cpp` fields, suppression and derived `zipper`; and
-- `FileConfiguredTarget.java:79-104` defines inherent file
-  `DefaultInfo`/`FilesToRunProvider` behavior; `Attribute.java:2113-2127`
-  defines tool edges; and
-- `src/test/shell/integration/subrules_test.sh:98-119` proves hidden literal
-  dependencies and default rows in XML. This packet admits the graph facts,
-  not XML spelling.
+- `ConfiguredTargetFunction.java:349-369` loads configured toolchain
+  dependencies before the requesting rule;
+- `DependencyProducer.java:160-176` associates those dependencies with the
+  selected execution platform;
+- `ResolvedToolchainContext.load:48-105` extracts builtin `ToolchainInfo`,
+  preserves mandatory/optional rows, permits additional providers, rejects a
+  missing required provider and represents unresolved optional selection as
+  null;
+- `StarlarkRuleContext.toolchains:878-897` and
+  `StarlarkToolchainContext:69-151` define immutable Label/String lookup,
+  membership, missing-optional `None` and unrequested-key failure; and
+- `ResolvedToolchainContextTest.load_optional_missing`,
+  `load_aliasedToolchain`, `load_withTemplateVariables`, and the applicable
+  `RuleContextTest` cases supply the discriminating semantics.
 
-Authenticated rules_cc 0.2.17 `cc/private/toolchain/fdo/fdo_context.bzl`
-declares eight hidden rows using target configuration, provider predicates,
-single-file and executable shapes. Its ordinary `_libc_top` and `_zipper` rows
-prove the same producer is not subrule-specific.
+The accepted provider-independent resolution already owns the selected
+`ConfiguredPlatform` and ordered requested/actual mandatory/optional rows. Its
+selected declaration package is tracked, but the retained row currently drops
+the implementation label. Retain that label at the producer; do not reload or
+rediscover it later.
 
-Buck2/starlark-rust retained collection and DICE guidance applies to compact
-shared identities and dependency recording. Zabel is concept/optimization
-guidance only: sparse retained descriptors and borrowed projections are useful;
-copy no Zig code, names, layouts, diagnostics, or behavioral claims.
+The accepted recursive analysis-value graph supplies cheap-clone provider
+occurrences, deep publication equality and fresh evaluator materialization.
+The marker bridge instead supports only one mandatory row, uses Target
+configuration for the selected implementation, extracts one string and
+reconstructs a provider. Delete that bridge.
 
-## Compatibility boundary
+The existing `ConfiguredNodeResult::configured_file_write_actions` is the
+validation boundary for the public `ConfiguredActionView`: it rejects absent
+selected platforms, non-FileWrite actions, invalid output shape and unsupported
+execution fields before yielding an otherwise unconstructible borrowed view.
+R3 may expose one doc-hidden
+`ResolvedFileWriteSemanticView::from_configured_action` composition seam that
+only wraps this already-validated view. It adds no state, alternate validation,
+fallback, retained value or executor policy and cannot outlive its source
+configured result.
 
-**Exact:** the finite `cpp` fields `fdo_optimize`, `xbinary_fdo`,
-`fdo_profile`, `cs_fdo_profile`, `fdo_prefetch_hints`, `propeller_optimize`,
-`memprof_profile`, `proto_profile_path`, `libc_top`, and `zipper`; Bazel's
-suppression/derived-zipper rules; absent projection as no dependency; literal
-label/label-list defaults; target versus selected-platform Exec configuration;
-OR-of-AND provider predicates; every label-list child; source/generated
-single-file cardinality and extension constraints; executable availability;
-hidden-attribute invisibility; and dependency-error precedence before the
-unsupported invocation terminal.
+The failed R4 index-only run is a new discriminating regression: broadly
+admitting Exec resolution without this cutover either rejects an ordinary
+Exec child at `ConfiguredActionOwnerContext` or follows an injected semantic
+platform terminal into recursive analysis. The prerequisite must preserve the
+accepted `selected_platform_terminals_suppress_implementation_and_rule_evaluation`
+test and make genuine selected children use the full retained context.
 
-**Slug-native:** structural configuration and configured-node identity, Rust
-diagnostic wording where no discriminator freezes text, and internal query edge
-representation.
+`docs/developers/dice.md` applies. `ConfiguredNodeAnalysisKey` remains the sole
+semantic producer; the existing configured-analysis cycle detector guards the
+complete selected-child computation and no lock crosses a DICE compute.
 
-**Unsupported/deferred:** subrule/rule invocation with resolved late-bound
-values; kwargs override rejection; evaluator-visible `ConfiguredTarget`,
-`Artifact`, and `FilesToRunProvider` values; subrule context, fragments,
-toolchains and actions; aspect subrules; XML/query presentation; absolute-path
-FDO artifacts and the enabling command flag; every non-`//`
-`fdo_optimize` spelling; configured hidden-edge/result publication; broader
-fragments/fields; exact Bazel configuration/output bytes; and rules_cc/C++
-semantics. `cc_common`/`cc_internal` remain generic BCR Starlark consumers.
+Clean `../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a`
+is peer concept/optimization guidance only. Requested/post-alias row
+separation, unresolved optional rows and caller-owned evaluator materialization
+are useful. Copy no Zig code, layout, names, diagnostics or compatibility
+claims.
 
-## Shared typed owner
+## Decision and compatibility
 
-`slug_configuration_v2` owns one closed `ConfigurationField` identity. Its Cpp
-variant is a one-byte enum for the ten names; tools-repository identity remains
-part of the field identity because it affects `zipper`. Loading parses
-`configuration_field()` directly to this shared type and retains it in the
-existing sparse ordinary/lifted rows. Delete the loading-owned string allowlist;
-do not add a registry, raw native lookup/mutator, or parallel option store.
+Replace singular marker selection with one ordered retained context:
 
-`SlugConfiguration::configuration_field_label` borrows the sole structural
-native option vector. Direct label fields project existing canonical labels;
-`fdo_optimize` projects only a valid raw `//` label. Every other non-null
-spelling fails configuration-field projection because Bazel's still-default
-`enable_fdo_profile_absolute_path=false` rejects it during
-`CppConfiguration` construction. `xbinary_fdo`, `propeller_optimize`, and
-`zipper` apply the pinned suppressor/derivation rules only after that global
-validity check. The same check rejects simultaneous `fdo_optimize`/
-`fdo_profile` and `fdo_instrument` with either optimization source, matching
-`CppConfiguration.reportInvalidOptions`; the prerequisite's descriptor-owned
-implicit `copt` already satisfies its remaining invariant. Projection is pure
-phase scratch and does not change configuration identity.
+```text
+ConfiguredToolchainSelection {
+  declaration: CanonicalLabel,
+  implementation: ConfiguredTargetKey,        // requested, Exec
+  actual_implementation: ConfiguredTargetKey, // alias-resolved, Exec
+  info: ProviderOccurrence,                    // builtin ToolchainInfo
+}
 
-## Loading and query projection
+ConfiguredToolchainContextRow {
+  requested: ConfiguredTargetKey, // requester's structural Target or Exec configuration
+  actual: ConfiguredTargetKey,    // post-alias type, same configuration
+  mandatory: bool,
+  selected: Option<ConfiguredToolchainSelection>,
+}
 
-Expose one borrowed iterator over ordinary and lifted configured dependency
-descriptors. It carries synthesized name, user name where applicable, kind,
-default, file/single-file/executable/Exec flags, and canonical provider
-alternatives. It borrows the existing package-owned rows; add no retained copy.
+ConfiguredActionToolchainContext {
+  execution_platform: ConfiguredTargetKey, // selected structural Exec
+  rows: Arc<[ConfiguredToolchainContextRow]>,
+}
+```
 
-The root loading-query graph appends literal hidden rows in lifted order, with
-deterministic synthesized names, `explicit = false`, and an `Implicit` edge
-kind. Configuration-field rows have no unconfigured label and remain absent
-from loading edges. Existing traversal includes implicit edges; same-package
-source derivation must include them. The existing bounded external loading-query
-route remains deferred; do not weaken its validation or add a fallback to claim
-external unconfigured query parity.
+Construction validates that requested and actual type rows use the requester's
+identical structural Target-or-Exec configuration, selected platform and
+implementation identities use structural Exec, and requested rows are unique.
+It also validates alias convergence, declaration/implementation pairing,
+mandatory selection, builtin `ToolchainInfo` identity and row order. Several
+requested aliases may share one actual type and one evaluator-scratch value.
 
-## Configured dependency pipeline
+`ToolchainTopology` retains candidate order plus an optional shared
+`Arc<ConfiguredActionToolchainContext>`. The requester topology, default action
+context and evaluator preparation use the same Arc. An all-optional unresolved
+context is `SelectedPlatformOnly`; no requirements retain no context.
 
-Prepare ordinary configured attributes and the borrowed hidden/late-bound
-descriptors before child computation. Resolve literal labels directly and
-typed defaults from the owner's structural `SlugConfiguration`. Preserve row
-and label-list order in phase-scratch dependency records.
+- **Exact:** structural Target-or-Exec requester configuration on requested and
+  actual type rows, selected implementation configuration, ordered
+  mandatory/optional rows, requested and post-alias lookup, missing optional `None`, provider
+  authentication, additional child providers/actions, nested selected
+  requirements, dependency/error order and immutable `ctx.toolchains` behavior
+  for admitted recursive analysis values.
+- **Slug-native:** complete structural configuration identity, Rust Arc/layout,
+  retained publication equality, cycle wording and unproved diagnostics.
+- **Unsupported/deferred:** callable-valued retained provider fields,
+  `ToolchainTypeInfo` index objects, `ctx.var`, nondefault/automatic exec groups,
+  aspects, broader actions, exact Bazel configuration/output bytes, and the
+  configured-hidden subrule invocation/publication work that resumes in R4.
 
-Resolve the existing toolchain/execution-platform owner before making any
-`cfg="exec"` child key, including rules requesting zero toolchain types. Target
-rows use the parent configuration; Exec rows use
-`to_exec_for_platform(selected_actual_label)`. Never select host/default state
-independently. Feed both row kinds through the existing configured child key,
-observed Need union, cycle guard, requested/actual alias, and publication path.
-The generic child-preparation owner must normalize declared source-file labels,
-including exported files and cross-package sources, to the existing null/source
-key before computation; generated-file labels retain configured identity. This
-is a general dependency correction, not a subrule-specific lookup.
+BCR Starlark owns all rules and control flow including `cc_internal`.
+`cc_common` and future builtins are generic host/provider-ABI clients. The
+starlark-rust `set` builtin remains evaluator-global and is not reimplemented.
 
-Retain whether a scratch row is hidden and whether its configuration is Exec.
-Hidden rows never enter `PreparedDependency`/`ctx.attr`. Do not add a
-`ConfiguredEdgeKind` yet: Slug publishes edges only in a successful
-`ConfiguredNodeResult`, and the mandatory pre-call terminal makes success
-impossible in this packet. The direct-call successor must publish the ordered
-implicit edges and set the tool bit exactly for Exec-transition rows, following
-Bazel `Attribute.isToolDependency()`/`ExecutionTransitionFactory.isTool()`.
+## Producer, equality and evaluator handoff
 
-After every child is available, validate provider alternatives as OR-of-AND;
-an empty alternatives slice is unrestricted and every label-list element is
-checked. Source/generated configured-node kinds carry Bazel's inherent
-`DefaultInfo` capability for predicate checks without allocating or publishing
-a provider wrapper. For single-file rows, a source/generated node contributes
-its one label-owned artifact; a rule/alias flattens its real
-`DefaultInfo.files`. Accept exactly one file matching any extension constraint
-and reject zero/multiple files. A direct file node is admitted only by
-`allow_files` or `allow_single_file` and its extension filter; rule targets
-remain admissible independently. Executable rule/alias rows require the
-child's real `DefaultInfo.files_to_run.executable`. Bazel
-`FileConfiguredTarget.createFilesToRunProvider` makes a source/generated file
-its own executable, so an otherwise file-admitted node satisfies executable
-with its label-owned artifact. All validation precedes the existing pre-call
-unsupported terminal; the terminal publishes no result, edge, provider wrapper
-or action.
+Extend provider-free resolution rows with the already-loaded selected
+implementation label. In declared requirement order, prepare unresolved
+optional rows or guarded Exec-configured selected-child keys. Aggregate every
+Need; otherwise choose the first outer error and then first semantic error in
+row order. Accept ordinary Rule or alias-to-Rule results, require the builtin
+`ToolchainInfo` occurrence and retain requested plus authenticated actual child
+identity.
 
-## DICE, lifetime, and revision behavior
+Parent edges remain deterministic: ordinary/transitioned/visibility edges,
+one requirement edge per row, one selected-implementation edge per selected
+row, then candidate execution platforms. Selected child actions and providers
+remain child-owned.
 
-`ConfiguredNodeAnalysisKey` remains the sole retained computation. Loaded
-descriptors and `SlugConfiguration` remain DICE-retained semantic inputs;
-resolved rows, child-key batches and validation scratch die with the compute;
-no new configured result is retained on the terminal error. No new key, cache,
-side registry, lock, task, watcher or request carrier is allowed. Hold no lock
-across a DICE compute. Same-DICE source or command A/B/A must invalidate and
-restore error precedence without stale children, results or actions.
+`ProviderOccurrence::eq` remains Bazel-visible equality, not publication
+equality. One build-api helper compares the ordered occurrence pairs with a
+single shared `PublicationEqState`; context equality must not compare each row
+with a fresh state. This preserves cross-row depset/configured-target alias
+partitions and DICE cutoff behavior.
 
-## Proof contract
+Loading retains the rule definition's shared `Arc<BzlModuleIdentity>` and
+repository mapping. A read-only loading resolver interprets String indices;
+analysis does not infer mappings. Before evaluator entry,
+`AnalysisValueMaterializer` materializes each selected occurrence once into
+the module `FrozenHeap`; only evaluator-scratch `FrozenValue`s are retained.
+Label/String requested and post-alias lookup return the same object.
 
-Use the accepted source tests above; add no Java helper or copied oracle
-fixture. Prove:
+The REAPI proof constructs genuine structural Target and Exec configurations,
+a selected platform, an authenticated selected `ToolchainInfo` occurrence, one
+`ConfiguredActionOwnerContext`, and one `ConfiguredNodeResult` with a real
+FileWrite action. It obtains the action only through
+`configured_file_write_actions`, wraps that borrowed validated view through the
+doc-hidden semantic-view seam, and calls the unchanged
+`FileWriteReapiPlan::from_resolved`. This is direct cross-crate proof that REAPI
+consumes the generic semantic view; it is not an end-to-end BCR/loading or
+command-closure claim.
 
-- all ten field projections, missing values, suppression/zipper, invalid
-  string and mutually exclusive option states, and one-byte identity;
-- borrowed retained rows and unchanged hidden invisibility;
-- literal/late-bound target and real selected-platform Exec keys, including
-  zero requested toolchains and requested-versus-actual alias identity;
-- provider OR-of-AND/list validation, unrestricted predicates, source and
-  generated single-file zero/one/many/extension cases, executable success and
-  failure, and dependency-error precedence;
-- loading implicit rows/edges, ordinary `_libc_top`/`_zipper`, the successful
-  validation-to-pre-call terminal, no configured result/invocation/actions, and
-  same-DICE A/B/A error restoration. Configured implicit/tool edge proof belongs
-  to the direct-call successor because only it can produce a successful result.
+## Ownership, revision and memory
 
-Exact proof paths:
+`ConfiguredNodeAnalysisKey` owns resolution, selected children, edges and the
+retained context. Existing registration, constraint, command-overlay,
+implementation source, mapping and configuration dependencies drive
+invalidation in Legacy and Observed modes. A/B/A must restore complete result
+equality without stale payloads or evaluator replay.
 
-- `app/slug_configuration_v2/src/native/tests.rs`, base
-  `d6815f7344a37d0dbeac5d24bebf08060197bc42`;
-- `app/slug_loading_v2/tests/subrule_loading.rs`, base
-  `49a375e1ab5514b6b93e01728d45f0d2ce75c95f`;
-- new `app/slug_analysis_v2/tests/subrule.rs`;
-- `app/slug_query_v2/src/graph.rs`, base
-  `54cd452214127fe5429db46635dbe7e37f27c6e3`; and
-- `app/slug_server_v2/src/tests.rs`, base
-  `ee575cbe812227abd9bcaddf5a36905a65b1dae8`.
+Resolution/context rows, configured identities, definition identity and
+provider occurrences are DICE/loading-retained semantic memory. They remain
+`Allocative`, use compact shared Arc slices and cheap-clone values, and add no
+parallel retained descriptor. Join scratch, cycle futures, materializer memo
+tables, heaps and lookup views die with the compute/evaluation. There is no
+new cache, interner, task, watcher, request carrier or async transfer.
 
-## Frozen implementation envelope
+The Buck2 utility review classifies compact collections, `Dupe`/Arc sharing,
+`Allocative` and the shared publication-equality state as retained patterns to
+preserve. No V1/Buck2 code import or new hash identity is needed.
 
-Production paths at `4425d3bfb`:
+## Required proof
 
-- new `app/slug_configuration_v2/src/native/configuration_field.rs`;
-- `app/slug_configuration_v2/src/native/configuration.rs`,
-  `046d569400b0ef0297df9fceb75309420a1628e3`; `src/native/mod.rs`,
-  `328785bd1e7ac9117e0ee27eea251c69af62a176`; and `src/lib.rs`,
-  `13181e449c8655b95a770e136dcf1cc12de8888d`;
-- `app/slug_loading_v2/src/subrule.rs`,
-  `0b2e4e4661e534ac1cd6279aff9e44526aa2a76a`; `src/lib.rs`,
-  `d7da3a9b82ebcaea26327285bf65f0407ea7f646`; and only the
-  fail-closed/accessor hunk of dirty `src/package.rs` (HEAD
-  `191b2082de14e5f057d8183c1c156671bd4cbd2a`, admitted worktree base
-  `bee28ca831f3d71ab3b8f1a29fab1559c4ce299f`);
-- new `app/slug_analysis_v2/src/subrule.rs`, only exact orchestration hunks of
-  dirty `src/dice.rs` (HEAD
-  `70d59f60b3f4b06702eb347e0b615c6961e912d1`, admitted worktree base
-  `2718df1109a4a543f5ac57c99b8c52aed52c8de3`), and the module/export
-  hunk of dirty `src/lib.rs` (HEAD
-  `f1144f085c47babc9d848d5aca662d496c500e2b`, worktree
-  `b1d7e9acccd6e5fe87bdbdc2f0372be3cc9d6758`); and
-- `app/slug_query_v2/src/graph.rs`,
-  `54cd452214127fe5429db46635dbe7e37f27c6e3`.
+Reuse accepted fixtures and add no Java helper or Bazel fixture. Prove:
 
-Every other dirty hunk and file is excluded. Caps: 1,250 production additions,
-1,200 proof additions, 2,450 aggregate additions, no new production function
-above 140 lines, and no new retained descriptor copy. The touched `package.rs`,
-`dice.rs`, and `graph.rs` exceed 2,000 lines; keep only orchestration/accessor
-hunks there and place cohesive new logic in the named modules. No benchmark is
-required because the packet adds no cache and no demonstrated hot-path
-regression exists.
+- selected implementation keys exactly equal the chosen platform Exec
+  configuration, including target-scoped suppression and exec propagation;
+- two mandatory rows plus an unresolved optional row preserve order;
+- requested aliases and one actual type share one evaluator object for both
+  Label and String lookup, including an external definition mapping;
+- arbitrary admitted nested ToolchainInfo payloads, additional providers,
+  outputs/actions and child edges remain authentic and child-owned;
+- user-provider collisions, missing builtin providers, mandatory absence,
+  child failure, Need/outer precedence and configured cycles fail closed;
+- a selected implementation with its own toolchain requirement completes
+  without deadlock;
+- registration, provider payload and mapping A/B/A restore exactly;
+- one parent DICE cutoff A/B/A distinguishes a cross-row payload alias
+  partition even when Bazel-visible occurrence equality is unchanged;
+- zero-requirement platform-only behavior and injected selected-platform
+  terminals remain unchanged;
+- complete configured identity serialization remains asserted; and
+- the real REAPI planner consumes the hermetically constructed validated
+  configured-action semantic view, observes the requested and implementation
+  identities plus the retained `ToolchainInfo` payload, shares the same action
+  context Arc, and emits the selected platform's ordered properties rather
+  than remote defaults.
+
+## Frozen allowlist and caps
+
+Only these paths may change from `ad274cc1a`:
+
+- `Cargo.lock`, blob
+  `a4305123359154ae4e78e40b609c83e9515cebcd`, only the proof-only
+  `slug_reapi_v2` dependency rows;
+- `app/slug_build_api_v2/src/analysis_value.rs`, blob
+  `36d09b931985a0726a4d16660de322b10868231b`;
+- `app/slug_build_api_v2/tests/analysis_value.rs`, blob
+  `892c95624521c21d50a6ad820876b63518bec15f`;
+- `app/slug_loading_v2/src/package.rs`, blob
+  `191b2082de14e5f057d8183c1c156671bd4cbd2a`;
+- `app/slug_loading_v2/tests/build_file_loading.rs`, blob
+  `2ad939ed512890c27c3959876db4af20dff7a2d3`;
+- `app/slug_analysis_v2/src/result.rs`, blob
+  `3ad9df5c09303cd83aaa7acfc06d0e96483ba308`;
+- `app/slug_analysis_v2/src/dice.rs`, blob
+  `70d59f60b3f4b06702eb347e0b615c6961e912d1`;
+- `app/slug_analysis_v2/src/starlark_rule.rs`, blob
+  `756e4ebca5802fb1f384546c1b42a54c93773866`;
+- `app/slug_analysis_v2/src/lib.rs`, blob
+  `f1144f085c47babc9d848d5aca662d496c500e2b`;
+- `app/slug_analysis_v2/tests/configured_target.rs`, blob
+  `675ba67e2f114f310aedb176ebdc91cfc1bd471a`;
+- `app/slug_analysis_v2/tests/starlark_rule.rs`, blob
+  `cbdfa181596d2011dbc48ba2dc05064d53123daa`;
+- `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`, blob
+  `ad2255da58671c20eb4447ffce3a8bbdcddee05c`;
+- `app/slug_core_v2/src/runtime/dice.rs`, blob
+  `005c20b9e0b0c605654402e9db43935db3e9d4f5`, only the doc-hidden
+  semantic-view composition seam and its existing internal caller;
+- `app/slug_reapi_v2/Cargo.toml`, blob
+  `32d96de03a6093348404c84117166cdcbddc0c21`, only proof-only workspace
+  dev-dependencies; and
+- `app/slug_reapi_v2/tests/reapi.rs`, blob
+  `1c466d40e4233c198d80592a48dafbb4a50ee608`.
+
+Caps are 680 production additions, 1,160 proof additions and 1,840 aggregate
+additions. Current candidate measurements are 626/962/1,588, classifying the
+Cargo manifest and lockfile dev-dependency rows as proof-only. Physical net
+growth remains within the prior R1 per-file caps; the REAPI proof may grow by at
+most 140 lines. `dice.rs` and `package.rs` remain large natural orchestration/
+definition owners and replace narrow bridge/accessor code; cohesive retained
+types remain in `result.rs` and evaluator projection in `starlark_rule.rs`.
+The added `dice.rs` seam is a five-addition wrapper at the existing FileWrite
+semantic-view owner, not a new responsibility or retained representation.
+
+No benchmark is required: retained rows reuse existing Arc/provider data and
+no demonstrated hot-path regression exists. Retained size, publication
+equality and full dependent tests are mandatory.
 
 ## Validation and stops
 
-Run formatting and `git diff --check`; focused configuration/loading/analysis/
-query/server tests; full serial tests for all five affected crates; named
-build/cquery/query dependents; four-crate checks; retained-size and cap audits;
-forbidden-surface scans; base/worktree-blob isolation; archive checker; and an
-index-only repeat containing only packet hunks. Clean stale `slugd` around
-daemon tests. Rebuild `slug_cli_v2` before any `SLUG_V2_BIN` replay.
+Run Rust formatting and `git diff --check`; focused and full serial tests for
+`slug_build_api_v2`, `slug_loading_v2` and `slug_analysis_v2`; full serial
+direct-dependent tests for `slug_query_v2`, `slug_reapi_v2` and
+`slug_core_v2`; archive, allowlist, cap, forbidden-marker, retained-size and
+base/index isolation checks; and an index-only repeat. Rebuild `slug_cli_v2`
+before any binary replay and clean stale `slugd` around daemon tests.
 
-Independent plan and terminal implementation review are mandatory. `REPLAN`
-for invocation/value materialization/override handling; XML/aspects; a new key,
-pipeline, cache, registry or raw native mutator; host/default Exec fallback;
-C++-specific dependency code; partial publication; inability to distinguish
-source/generated file cardinality or executable facts; evaluator-heap retention;
-lock across compute; dirty-hunk overlap; unlisted files/cap overflow; Java; or
-an exact claim not proved against Bazel 9.2.
+Independent reserved-architecture plan review and terminal DICE/identity/
+evaluator review are mandatory.
 
-## Immediate predecessor and successor
+`REPLAN` for a new DICE key, Target-configured selected implementation,
+inferred mapping, retained evaluator heap/value, cache/interner/registry,
+lock across compute, lossy/per-builtin provider copy, per-row publication
+state, marker shim, parser/BCR/ruleset logic, unguarded recursive selection,
+semantic-view construction from anything other than an already-validated
+`ConfiguredActionView`, new validation/fallback/state in that seam, file outside
+the allowlist, cap increase, or another material correction.
 
-Commit `4425d3bfb` accepted the lawful thirteen-option CLI-to-DICE producer
-after full validation and terminal review. R3 plan review returned `REPLAN`:
-an error cannot publish configured edges, files can be executable, the
-`fdo_optimize` grammar was too broad, and the query anchor/blob ledger was not
-mechanically exact. R4 makes only those corrections. After this packet,
-activate only the direct-call successor that materializes evaluator values,
-invocation and successful configured edges while preserving this packet's
-dependency owner and pre-call validation.
+## Immediate successor
+
+After terminal acceptance and commit, reactivate
+`WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r4` on this new
+base. Its implementation remains parked and must be re-staged/revalidated;
+then Exec hidden dependencies may use the accepted selected-child/action-
+context architecture before the direct-call invocation successor.

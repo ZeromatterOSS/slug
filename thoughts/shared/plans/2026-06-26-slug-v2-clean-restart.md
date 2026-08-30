@@ -30,13 +30,25 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, and FDO command configuration accepted; configured hidden dependencies active** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; real starlark-rust `set` in `cb71a302d` | hidden target/Exec dependency configuration, validation and query facts precede invocation; contexts, toolchains, values and action families remain later | resolve and validate generic configured hidden dependencies through the existing selected-platform child pipeline, then stop before invocation |
+| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, and FDO command configuration accepted; selected-toolchain context prerequisite active** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; real starlark-rust `set` in `cb71a302d` | the configured-hidden R4 index gate proved Exec rule children require the still-parked selected-toolchain/action-context cutover before hidden dependency validation can be accepted | accept the generic selected-toolchain context R3, then resume configured hidden Target/Exec dependencies and stop before invocation |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r4](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-selected-toolchain-context-cutover-implementation-r3](./slug-v2-subplans/current-packet.md).
+
+The configured-hidden-dependency R4 candidate passes in the combined dirty
+worktree but fails from its exact index: broad Exec resolution hangs the
+accepted injected-platform terminal, while a zero-toolchain Exec child reaches
+the base action-context Target-owner rejection. R4 is replanned, not narrowed.
+The active prerequisite restores the previously reviewed generic selected
+toolchain context and Exec-selected child architecture; R4 resumes on its
+accepted commit without importing parser, C++ or ruleset-specific behavior.
+R2 terminal review rejected only a one-shot REAPI proof that encountered later
+rules_shell/recursive-glob loading gaps before its assertions. R3 instead uses
+one bounded hermetic configured-action semantic-consumer proof and does not
+claim or implement that deferred BCR/loading closure.
 
 Commit `c83e70f0f` terminally accepts the repository-context attribute
 implementation. One authenticated immutable input serves ordinary and innate
@@ -375,7 +387,7 @@ remain unchanged. Pinned Bazel 9.2 is sole compatibility authority; clean
 Zabel is peer ownership/capability guidance only. BCR Starlark owns all rules
 including `cc_internal`; `cc_common` remains a generic host/provider ABI.
 
-### M7 selected-toolchain context R1 terminal REPLAN; corrected R2 active (2026-08-28)
+### M7 selected-toolchain context R1/R2 terminal REPLAN; corrected R3 active (2026-08-30)
 
 The R1 candidate implements the retained ordered context, exact Exec-selected
 child analysis through the existing guarded configured-analysis family,
@@ -394,16 +406,24 @@ actual type. The required REAPI suite also reaches exact
 `platforms` module used by existing hermetic configured tests, and an existing
 complete configured-identity assertion was weakened.
 
+R2 canonicalized scratch materialization by actual toolchain type, proved
+pointer identity for two distinct aliases, and restored the complete structural
+stable-serialization assertion. Its one-shot REAPI proof advances beyond the
+base terminal but then stops first at rules_shell `attr.label_list(flags=...)`
+and, with a disposable
+local rules_shell experiment, at embedded `tools/res` recursive glob. Those are
+independent later BCR/loading surfaces, so terminal review returns `REPLAN`.
+
 Run only
-`WP-4-5-7A-selected-toolchain-context-cutover-implementation-r2`. Canonicalize
-scratch materialization by actual toolchain type and prove pointer identity for
-two distinct aliases, restore the complete structural stable-serialization
-assertion, and admit only the REAPI test file for a local `platforms` fixture.
-Do not weaken selected-child analysis, alter production repository policy, add
-a DICE key, or broaden parser/BCR/ruleset behavior. Pinned Bazel 9.2 remains
-authority; clean Zabel remains peer guidance only, BCR Starlark owns all rule
-flow including `cc_internal`, and `cc_common` remains a generic host/provider-
-ABI client.
+`WP-4-5-7A-selected-toolchain-context-cutover-implementation-r3`. Preserve the
+R2 implementation and replace only that proof route with a genuine configured
+result/action/context passed through the existing validated action view, a
+doc-hidden semantic-view wrapper and the unchanged REAPI planner. Do not claim
+end-to-end BCR/command closure, weaken selected-child analysis, alter production
+repository policy, add a DICE key, or broaden parser/BCR/ruleset behavior.
+Pinned Bazel 9.2 remains authority; clean Zabel remains peer guidance only, BCR
+Starlark owns all rule flow including `cc_internal`, and `cc_common` remains a
+generic host/provider-ABI client.
 
 ### M7 recursive analysis evaluator adapter accepted; category-6 implementation active (2026-08-28)
 
