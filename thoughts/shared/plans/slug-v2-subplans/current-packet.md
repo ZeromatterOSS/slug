@@ -1,261 +1,235 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-innate-repository-rule-owner-certificate-implementation-r2`
+Packet: `WP-4-5-7A-canonical-repository-rule-host-capability-implementation`
 
 Milestone: M7A category 6 generated-repository prerequisite.
 
-Base: accepted architecture commit `30118d7fd` and effective Host-input
-implementation commit `64878a1be`. The stopped canonical Host-capability draft
-must be parked recoverably; the older dirty selected-context R2 candidate
-remains unaccepted worktree state.
+Base: accepted effective Host-input implementation commit `64878a1be` and
+accepted innate owner certificate commit `7bcac3da3`, with the dirty selected-
+context R2 candidate retained unchanged. Both predecessor packets are
+terminally `ACCEPT` after independent correction review.
 
 ## Observable result
 
-Implement one generic selected-owner boundary for Bazel 9.2 innate
-`use_repo_rule`: keep the synthetic selected-extension identity used by module
-resolution, but authenticate its actual repository-rule label/export and
-instantiate retained calls through a distinct certificate. The accepted
-ordinary `module_extension` owner remains unchanged.
+Generic authenticated BCR `repository_rule` implementations can consume the
+accepted command-scoped repository platform/environment inputs through
+`repository_ctx.os`, `repository_ctx.getenv`, and staged
+`repository_ctx.file`. Declared and dynamically discovered names become
+per-name DICE dependencies through typed retries, and the real pinned
+`winsdk_configure.bzl` non-Windows branch realizes its exact two files.
 
-The implementation stops at an authenticated RepoSpec/certificate handoff. It
-does not execute `winsdk_configure`, expose a repository-context capability,
-change MODULE evaluation, or resume the stopped Host-capability or selected-
-context drafts.
+This packet does not add a ruleset-specific repository implementation, Windows
+SDK/path discovery, another repository-context capability, registration-row
+proof, selected configured context, action, or REAPI behavior.
 
-## Learned facts and authority
+## Authority, learned facts, and compatibility
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-is sole semantic authority. `ModuleFileGlobals.useRepoRule` creates an innate
-extension whose synthetic `.bzl` identity is `//:MODULE.bazel` and whose name
-is `"<raw bzl label> <rule name>"`. `InnateRunnableExtension.load` requires a
-singular owning module, splits that name at the last space, resolves the raw
-label in that module's repository mapping, rejects a private rule name, and
-loads the actual `.bzl`; `run` authenticates an exported repository rule and
-instantiates the retained tag kwargs in call order. Pinned
-`ModuleExtensionResolutionTest.innate`, `innate_repoRuleDependencies`,
-`innate_noSuchRepoRule`, `innate_noSuchValue`,
-`innate_noSuchValueIfPrivate`, and `innate_invalidAttributeValue` cover the
-positive, mapping/dependency, export-kind/name, privacy and attribute borders.
+is sole semantic authority. `RepositoryFetchFunction` requests every declared
+`repository_rule(environ=...)` name before invocation;
+`RepoEnvironmentFunction` owns one dependency per variable and preserves
+absent separately from empty; `StarlarkRepositoryContext` records dynamic
+`getenv`; `StarlarkOS` supplies `name`, `arch`, and the full effective
+environment view; and `DigestWriter` retains OS/architecture plus declared
+environment identity even when output bytes agree. Pinned
+`external_integration_test.sh` supplies declared/dynamic change,
+unrelated-name, override, and stable-command invalidation evidence.
 
-Slug already retains Bazel's compound name in `module_eval.rs`; that file and
-representation are correct and stay unchanged. The first live rejection in
-`selected_extension_demand.rs` is not the whole bug: current owner inputs also
-require a root use and root mapping, construct a load request for the synthetic
-MODULE label, and `module_extension.rs` then authenticates only
-`FrozenModuleExtensionDefinition`. Deleting either guard would load the wrong
-file/type and fabricate ordinary-extension semantics.
+The authenticated pinned BCR `tools/res/winsdk_configure.bzl` is the exact
+non-Windows observable: it declares MSVC environment names, observes
+`repository_ctx.os.name`, and writes empty `BUILD` plus `toolchains.bzl` whose
+registration function body is `pass`. An actual Windows Host requires
+unadmitted path/SDK/executable discovery and must fail before publication.
 
-The R1 exact winsdk proof then crossed the repaired owner boundary and the
-existing canonical `rules_cc+` materialization/path-retry owner. Evaluation of
-that external `.bzl` exposed a separate generic normalization defect:
-`BzlEvaluationContext::from_manifest` retains external source labels beginning
-`@@`, while `repository_rule` in `package.rs` unconditionally prepends another
-`@@`. This produces an invalid `@@@@rules_cc+...` defining label. The adjacent
-`aspect` constructor already implements the required generic
-`starts_with("@@")` normalization. R2 admits only that same narrow correction
-before resuming the unchanged innate certificate proof.
+`docs/developers/dice.md`, Buck2-derived
+`dice/dice_tests/src/linear_recompute.rs`,
+`dice/dice/src/impls/tests/user_data.rs`, and
+`dice/dice/src/transaction_update.rs` govern dependency recording, equality
+cutoff, injected values, transaction data, retry, cancellation, and the
+no-lock-across-compute rule.
 
-`docs/developers/dice.md` governs producer ownership, dependency recording,
-equality cutoff, observed path frontiers and the no-lock-across-compute rule.
-Clean `../zabel` commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` is concept and optimization
-guidance only; it supplies no behavior, identity or byte authority.
+Clean `../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a`
+is concept/test guidance only: provider-supplied OS values, immutable
+environment views, dynamic-name recording, and staged/discardable effects are
+useful separation ideas. No Zig code, layout, store, scheduler, or
+compatibility claim is copied.
 
-- **Exact:** compound identity and last-space split; exactly one owning
-  module, including nonroot; owner-relative label resolution; private-name and
-  exported-kind authentication; retained tag order/kwargs; separate actual
-  rule and synthetic MODULE label domains; generated repository names,
-  dependencies, imports, mappings, overrides and RepoSpecs; and unchanged
-  ordinary-extension behavior.
-- **Slug-native:** the Rust enum/certificate and DICE key layout, retained Arc
-  projections, path-observation equality, and non-oracle diagnostic wording.
-- **Unsupported/deferred:** repository-rule attribute/value families outside
-  Slug's already admitted matrix; Windows Host realization and unadmitted
-  repository-context capabilities; lockfile marker-byte parity; and any
-  ruleset-specific shortcut. Unsupported values fail closed.
+- **Exact:** on an admitted non-Windows Host, sorted declared views;
+  absent/empty; declared and dynamic per-name invalidation; unrelated-name
+  non-invalidation; `repository_ctx.os`/`getenv` access shape and values;
+  canonical defining-label/export authentication; existing file path/mode
+  semantics; and exact pinned non-Windows winsdk output bytes.
+- **Slug-native:** Rust Host OS/architecture spelling through the exact
+  Starlark fields; structural DICE/effect identity; typed monotone Host retry;
+  staged effect publication; internal authorization state; and existing Busy
+  command overlap.
+- **Unsupported/deferred:** Windows repository execution and SDK/path/
+  executable discovery; strict/action repository-environment interaction;
+  bazelrc inputs; non-Unicode and Windows environment/path edge behavior;
+  repository-context capabilities beyond OS/environment/file; `local` and
+  `configure` scheduling policy; exact Bazel marker bytes; and selected-context
+  closure.
 
-BCR Starlark remains the owner of all rule logic, including `cc_internal`.
-`cc_common` remains only a generic Host/provider ABI client. This is neither a
-`set`-builtin nor a C++ parser packet.
+BCR Starlark owns every rule and control-flow decision, including
+`cc_internal`; `cc_common` is only a generic Host/provider ABI client. This is
+not a `set` or C++ parser packet.
 
-## Accepted architecture and implementation
+No new oracle fixture is authorized. Existing authenticated BCR sources and
+accepted pinned Bazel tests are sufficient. Strict/action-environment and
+Windows upstream variants are skipped because those surfaces are explicitly
+unsupported. There is no fallback or deletion ledger.
 
-### Bzlmod owner projection
+## Natural owners and implementation
 
-Keep `HostSelectedExtensionOwner` as the synthetic demand/namespace identity.
-Split selected-owner inputs into an explicit ordinary or innate projection;
-do not infer the branch in loading from whitespace alone. The innate
-projection owns:
+### Canonical definition and context
 
-- the untouched synthetic owner and unique generated-repository namespace;
-- exactly one `HostGraphModuleKey` owner and its base/final repository mapping;
-- the actual canonical repository-rule `.bzl` label and exported rule name,
-  resolved by splitting at the last space in the singular owner's mapping;
-- the distinct canonical synthetic `//:MODULE.bazel` label-conversion base in
-  the owning repository, never the actual rule's package;
-- that owner's retained `repo` tags in source order, including raw kwargs,
-  call location and `dev_dependency` filtering already performed by MODULE
-  evaluation; and
-- validation imports plus any lawful namespace override projection.
+Add `app/slug_loading_v2/src/repository_rule_context.rs`. It owns only the
+invocation-scratch repository context values/capabilities and the compact
+sorted observed-Host projection used by the completed effect. Reuse the
+adopted Rust/Buck2 Starlark evaluator and the existing canonical source/load
+route; do not parse rule implementations or add a second loader.
 
-Reject zero/multiple owners, isolation, an absent last-space component,
-private names, route/mapping ambiguity, mismatched unique identities and
-unresolvable labels before loading. Preserve full structural equality: the
-synthetic identity, owner key, both mappings, actual label/name, tags,
-imports/overrides and canonical source-route demand all participate.
+The defining label routes through the existing Root/Canonical external `.bzl`
+owner. Canonical definitions consume the accepted explicit ordinary/innate owner
+certificate and its authenticated actual `RepoRuleId`; they use the existing
+canonical load and module-evaluation keys without reconstructing the
+synthetic `//:MODULE.bazel` identity. `bzl_module.rs`, despite exceeding
+10,000 lines, may expose only a thin reuse boundary for that existing route; it
+gains no loader, cache, semantic side table, or repository execution owner.
 
-`selected_extension_demand.rs` remains the natural Bzlmod producer and DICE
-owner of these graph-derived facts. `module_eval.rs` stays unchanged. No
-loading-side graph scan, string repair, side registry or winsdk branch is
-allowed.
+The context exposes:
 
-### Loading-owned innate certificate
+- `repository_ctx.os.name` and `.arch` from `RepositoryPlatformKey`;
+- `repository_ctx.os.environ` from the immutable full request snapshot;
+- `repository_ctx.getenv(name, default=None)` from that snapshot while
+  recording the dynamic name; and
+- the existing staged `repository_ctx.file` capability with unchanged path and
+  mode semantics.
 
-Add a cohesive `module_extension_innate_repository.rs` next to, not inside,
-the ordinary owner. Root definitions reuse the root `.bzl` owner. Every
-nonroot definition computes the existing `HostCanonicalRepositoryLoadRoute`
-and passes its complete canonical source input to the existing external `.bzl`
-owner; this admits built-in, selected-registry, selected-nonregistry and
-generated repositories without a new loader. A generated definition therefore
-depends on its producer's existing repository-file effect plan, typed Need,
-path observations and cycle detector before any load. Authenticate
-`FrozenRepositoryRuleDefinition`, then reobserve the same definition
-projection after the existing observed-load retry boundary and convert the
-retained innate tags into ordered `RepositoryRuleCallRecord`s. Only the
-already admitted None/bool/i32/string/label matrix is accepted.
+Evaluator values and the dynamic-name recorder are invocation scratch and may
+not escape. The completed effect retains only platform plus every declared and
+dynamically recorded absent-or-value observation, sorted canonically. It never
+retains or depends on the unobserved remainder of the full environment.
 
-Keep actual rule identity and call-site label conversion separate. The
-`RepoSpec.rule_id` retains the authenticated definition's actual `.bzl` label.
-For an innate supplied label string, add a narrow instantiation seam that uses
-the retained synthetic owner `//:MODULE.bazel` label as the relative package/
-repository base plus the owning module mapping. Repository-rule defaults keep
-their definition-owned canonical labels. The existing ordinary instantiation
-entry point continues to use each call's actual defining label and is
-unchanged.
+### DICE effect owner and typed retry
 
-The result is the existing heap-independent pure invocation receipt shape, so
-the existing repository instantiation and validation owners continue to own
-canonical names, namespace mappings, RepoSpecs, import/override validation and
-certification. Their public certificate dispatches by the explicit Bzlmod
-owner kind and returns one unchanged consumer-facing iterator. Ordinary
-extension evaluation remains in `module_extension.rs` and never sees an
-innate projection.
+`module_extension_repository_file_effect.rs` remains the sole async DICE owner
+of definition authentication, Host-key computation, synchronous invocation,
+staged-plan discard/publication, dependency validation, and completed effect
+equality. It delegates context construction and capabilities to the new
+module.
 
-For every repository-rule definition, normalize the evaluator source label
-exactly once: retain an already-canonical `@@...` label unchanged and prefix a
-root `//...` label with `@@`. The resulting `RepoRuleId.bzl_file` remains the
-actual canonical external definition label. This is shared `.bzl` behavior,
-not an innate, rules_cc or winsdk branch.
+Before invocation, compare authenticated declaration `environ` names with the
+transaction frontier. Batch every unknown name into one typed environment
+Need, without constructing a context or invoking Starlark. On retry, compute
+the platform and declared per-name keys in sorted order. Only
+`Observed(value)` that matches the same transaction snapshot is admissible;
+`Unauthorized` or any frontier/cell/snapshot mismatch fails closed.
 
-Root/canonical source dependencies, generated effect plan, mapping/route
-inputs, definition manifest, retained calls, separate conversion base and
-merged `PathObservationEpoch` are DICE-retained semantic memory. Evaluator/load
-values are phase scratch; no evaluator heap escapes. There is no service cache
-or mutable registry. Cancellation publishes no partial certificate; equality
-cutoff includes the complete projection and observations; workspace shutdown
-releases retained state. No lock spans a DICE compute, repository effect or
-`.bzl` load.
+After synchronous evaluation, compare all recorded dynamic names with the
+same frontier. If any are unknown, discard the staged plan and return one
+batched typed Need. On the successful replay, compute every recorded dynamic
+per-name key and verify the same snapshot values before publication. Any
+definition, projection, Host input, dependency, invocation, effect,
+cancellation, or mismatch failure discards the plan. Repeated equal Needs are
+existing environment non-progress; no repository/path Need may be fabricated.
 
-### Request, retry and downstream handoff
+Complete effect equality includes the compact observed-Host projection beside
+the file plan, so a relevant Host change invalidates even when generated bytes
+agree. An unrelated name is not a dependency and retains the cached effect.
+The packet-1 core lifecycle remains the sole production injector and restores
+rejected/cancelled extra cells to `Unauthorized`; loading test code may inject
+the shared lower keys directly to prove that completed effects cannot warm-
+reuse across those transitions.
 
-The immutable workspace/selected-graph request and existing path frontier are
-the only request inputs. Root and canonical loads preserve their existing
-typed Need/retry, generated-effect observation, cycle failure and final
-reobservation behavior. A definition-load or instantiation failure publishes
-no new repository effect or materialization; a generated definition may first
-observe the already-owned effect that produces its source. Successful
-certification hands the same RepoSpec/mapping surface to the existing
-generated-repository consumer; additional repository Host observations remain
-the stopped successor's job.
+The existing command lease/Busy boundary remains before allocation. No mutex
+may be held across DICE compute/await, Starlark invocation, retry, effect,
+cancellation, or publication. Injected keys/effects are DICE-retained semantic
+memory; the accepted request snapshot/frontier remain core session-retained;
+context values, recorded names, and staged file plans are command/phase
+scratch until publication or discard. Workspace shutdown releases retained
+state; no new eviction policy, interner, registry, or mutable cache is added.
 
-No fallback is added. The stopped Host-capability draft must be parked
-recoverably before implementation because it overlaps `slug_loading_v2` and
-currently contains a deliberately discriminating failing winsdk test. The
-older selected-context candidate remains untouched. Restore the Host draft
-only after the innate implementation is terminally accepted.
+### Non-Windows winsdk realization
 
-## Exact allowlist, blobs and caps
+Execute the exact selected BCR `winsdk_configure.bzl` through the generic path.
+On non-Windows, publish exactly empty `BUILD` and exact `toolchains.bzl` with
+`register_local_rc_exe_toolchains(): pass`. Do not special-case
+`local_config_winsdk`. A forced Windows platform fails before any file plan is
+published.
 
-Only the following existing files may change, at their exact base blobs:
+## Exact allowlist, blobs, and caps
 
-- `app/slug_bzlmod_v2/src/selected_repo_spec/selected_extension_demand.rs`
-  `45dcb30d2d23b42e58b573a7ac8625aa6f86771b`;
-- `app/slug_bzlmod_v2/src/selected_repo_spec.rs`
-  `5bc1424cd42420174049bd318440541fde8ec6b0`;
-- `app/slug_bzlmod_v2/src/lib.rs`
-  `c565c5bfbd58f294826ecfe7bac56f5258ecafdb`;
+Only these existing files may change, at their exact current/base blobs:
+
+- `app/slug_loading_v2/src/module_extension_repository_file_effect.rs`
+  `7396e2a80e2079be695f860af8b077d415bd7c3c`;
 - `app/slug_loading_v2/src/bzl_module.rs`
-  `8309f65c379a12e66fcd53eccfc49cd9f53cb889`;
-- new `app/slug_loading_v2/src/module_extension_innate_repository.rs`;
-- `app/slug_loading_v2/src/module_extension_repository_instantiation.rs`
-  `57b937c19a655c9eb52827f7ac305f04af198670`;
-- `app/slug_loading_v2/src/module_extension_repository_validation.rs`
-  `29b11c178b58550bcc34c41f16c9846fbbdcefdf`;
+  `8309f65c379a12e66fcd53eccfc49cd9f53cb889`; and
 - `app/slug_loading_v2/src/lib.rs`
-  `9e4d4ec028ca3ec7ea95ff88298cb85943f7945a`;
-- `app/slug_loading_v2/src/package.rs`
-  `3b0e095e617e524545c9b724afc845853e2b0890`; the live pre-correction overlay
-  is `88029ade1085485ba01fc513a88fdfef968de9a5`, and only the non-overlapping
-  `repository_rule` source-label normalization at the former line 5625 is
-  authorized; every other dirty hunk remains excluded and unstaged; and
-- new `app/slug_loading_v2/tests/innate_repository_rule_owner.rs`.
+  `2f614c604b52456943d5353c84cefc486804f9ed`.
 
-`module_extension.rs`, `module_eval.rs`, Cargo files, core, command, server,
-analysis, action, REAPI, repository-context/effect files, every other
-`package.rs` hunk and all ruleset/BCR sources are forbidden. Permit at most
-1,250 production Rust, 1,400 proof Rust
-and 2,650 aggregate Rust additions. The new loading module is the required
-complexity split: `selected_repo_spec.rs`, `bzl_module.rs`, instantiation and
-validation already exceed or approach the 2,000-line review trigger and may
-gain only thin projection/reuse/dispatch seams, not a second evaluator,
-loader, namespace owner or general cleanup. This is graph/loading work, not a
-demonstrated hot path; no benchmark is required.
+The only new production file is
+`app/slug_loading_v2/src/repository_rule_context.rs`. The only new separate
+proof file is
+`app/slug_loading_v2/tests/repository_rule_host_capabilities.rs`.
+
+Maximum additions: 650 production Rust, 900 proof Rust and 1,550 aggregate
+Rust lines. No Cargo manifest/lockfile, asset, fixture, command, server, core,
+Bzlmod, analysis, selected-context, action, REAPI, or other loading file may
+change. Preserve the dirty selected-context candidate exactly and stage/commit
+only packet deltas.
+
+`bzl_module.rs` receives only a thin canonical-route reuse surface. The effect
+file remains cohesive as the existing async DICE/effect owner; context
+construction, Starlark capability methods, dynamic recording and retained
+Host projection belong in the new module. No hot-path benchmark is required:
+repository-rule invocation is not a demonstrated hot path, and all retained
+collections are bounded sorted immutable projections using the accepted
+`CompactString`/`Arc` representation.
 
 ## Discriminating proof and validation
 
-The implementation proof must cover:
+The new proof must cover:
 
-- explicit ordinary-versus-innate classification and unchanged ordinary
-  owner output;
-- root and nonroot singular owners, multiple-owner rejection, last-space
-  parsing, owner-relative apparent-label resolution and mapping A/B/A;
-- private, absent and wrong-kind exports plus definition reobservation drift;
-- multiple retained calls in source order with name, None/bool/i32/string/
-  label kwargs, unsupported-value rejection and generated namespace identity;
-- a rule exported from `//defs:rule.bzl` whose supplied `:dep` resolves to the
-  owner repository root `//:dep`, while its `RepoRuleId` remains
-  `//defs:rule.bzl` and definition defaults remain definition-owned;
-- imports/override validation; root, built-in, selected and generated source
-  observations; generated repo-rule dependency routing, typed retry and cycle
-  failure; and create/edit/delete/recreate invalidation; and
-- the exact authenticated built-in winsdk owner reaching (but not executing)
-  the generic repository-effect handoff without a winsdk/local-config branch;
-  its selected external `rules_cc+` dependency must authenticate with an exact
-  `@@rules_cc+//...` `RepoRuleId.bzl_file`, never a double-prefixed label.
+- root and canonical defining labels plus projection mismatch;
+- declared-present direct dependency and declared-cold-absent Need before any
+  invocation, followed by successful retry;
+- sorted declared view, present/absent/empty, OS name/architecture, and full
+  `os.environ`;
+- dynamic `getenv` with and without a default; cold dynamic-absent Need with
+  staged-plan discard and authenticated retry; warm no-retry; and dynamic
+  dependency replay;
+- missing-to-present-to-missing A/B/A, unrelated-name cache retention, and
+  retained observed-input inequality even when file bytes agree;
+- staged-plan discard on every failure/cancellation;
+- completed rejected/cancelled effects cannot warm-reuse after both extra-
+  absent and extra-present cells restore to `Unauthorized`, using direct
+  shared-key injection only in loading test code;
+- unchanged file path/mode behavior and exact non-Windows pinned winsdk bytes;
+  and
+- forced Windows failure before publication.
 
-Reuse pinned sources and existing deterministic BCR fixtures; add no Bazel
-oracle fixture unless a demonstrated message/output gap remains. Run focused
-Bzlmod projection and loading certificate tests, full serial
-`slug_bzlmod_v2` and `slug_loading_v2`, one direct generated-repository
-consumer, `cargo fmt --all`, `git diff --check`, exact scope/blob/cap/dirty-
-isolation checks and `scripts/v2_archive_status.sh`.
+Run focused context/effect tests, the full serial `slug_loading_v2` suite, and
+direct `slug_core_v2` and `slug_bzlmod_v2` dependents. Then run
+`cargo fmt --all`, `git diff --check`, exact blob/scope/cap/dirty-isolation
+audits and `scripts/v2_archive_status.sh`. Do not run Cargo commands in
+parallel on the shared target directory; clean stale `slugd` around daemon-
+sensitive validation if any is added.
 
-## Stops and successors
+## Stops and successor
 
-`REPLAN` for whitespace-only dispatch; multiple owning modules; root-only
-mapping; actual rule resolution outside the owner mapping; conflating the
-actual definition label with the synthetic MODULE conversion base; synthetic
-MODULE loading; ordinary-extension invocation for innate calls; generated
-source without the existing canonical load-route/effect/cycle owners; copied
-repository instantiation/validation; a new loader/key registry; loss of path
-observation or call/mapping identity; evaluator values escaping; ruleset/
-winsdk special case; any other change to the pre-existing `package.rs` overlay;
-change outside the allowlist/caps; or inability to isolate both dirty
-candidates.
+`REPLAN` for a whole-map/frontier dependency; ambient environment read;
+daemon fallback; hidden evaluator semantic state; lock across compute/await;
+new loader, fallback scan or duplicate innate-owner authentication; ruleset/winsdk special case; unknown-name
+publication without typed retry; repeated Need without non-progress;
+repository/path Need fabricated for environment; foreign workspace or
+`Unauthorized` semantic value; staged plan surviving retry/failure/
+cancellation; Host identity omitted from effect equality; Windows realization;
+exact marker-byte claim; new Cargo dependency; change outside allowlist/caps;
+or inability to isolate the dirty selected-context candidate.
 
-After terminal implementation acceptance, restore and reissue
-`WP-4-5-7A-canonical-repository-rule-host-capability-implementation` against
-the accepted innate certificate, remove its now-obsolete discriminating
-failure expectation, complete its exact Host/context/effect proofs, and keep
-Windows stopped. Then run the proof-only registered-toolchain closure before
-returning selected-context R2 to terminal review.
+After terminal acceptance, activate only
+`WP-4-5-7A-registered-toolchain-generated-repository-proof` under the frozen
+proof-only four-file allowlist and 900-line cap. Only after that packet passes
+may the retained selected-context R2 candidate return to terminal review.
