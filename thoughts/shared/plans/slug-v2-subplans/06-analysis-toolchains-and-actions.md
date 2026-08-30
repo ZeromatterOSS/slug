@@ -21510,3 +21510,16 @@ five-production/proof-file boundary plus the three exact clean assertions and
 500/700/1,200 caps. Preserve the existing selected-context package diff
 byte-for-byte and do not broaden required-provider constraints or configured
 analysis behavior.
+
+The first R3 compile then exposes a fourth clean assertion in the same file:
+the two-element advertised-provider deduplication proof maps
+`ToString::to_string`. Because R3 admitted exactly three scalar assertions, the
+candidate stops unstaged. Activate only
+`WP-6-7A-testing-bootstrap-host-abi-architecture-r4`, adding that mapped proof
+to the explicit `.user_id()` projection allowlist with unchanged production
+scope and caps. A generic `ProviderIdentity: Display` remains forbidden.
+
+Independent R4 correction review returns `ACCEPT`. Resume only
+`WP-6-7A-testing-bootstrap-loading-implementation-r4` with exactly four
+explicit user-provider projections and the unchanged category, file, context,
+identity, invocation and 500/700/1,200 boundaries.

@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-testing-bootstrap-loading-implementation-r3`
+Packet: `WP-6-7A-testing-bootstrap-loading-implementation-r4`
 
 Milestone: M7A category 6 registered-toolchain closure prerequisite.
 
@@ -10,7 +10,7 @@ accepted canonical repository Host capabilities `26a68d61c`, and parked
 proof-only registration base `20ad71ffa`. The passing four-row proof draft and
 retained selected-context R2 candidate remain dirty and read-only.
 
-## Why this implementation packet is active
+## Why this corrected implementation packet is active
 
 The selected-BCR archive owner is terminally accepted. Its 32 focused rows
 pass, the full core run adds no packet-related failure, and two fresh-root real
@@ -37,6 +37,13 @@ R3 admits only those assertions and requires explicit `.user_id()` projection;
 it does not add `Display` to `ProviderIdentity` or widen runtime behavior.
 Independent correction review returns `ACCEPT`; the architecture and bounded
 implementation successor below are now frozen.
+
+The first R3 compile exposes one additional assertion in the same clean test
+file and carrier-fallout category: a two-element `.map(ToString::to_string)` at
+the advertised-provider deduplication proof. R3 explicitly authorized exactly
+three assertions, so the candidate stops unstaged. R4 adds only that fourth
+explicit user-provider projection; no production contract or cap changes.
+Independent R4 correction review returns `ACCEPT`.
 
 ## Authority and learned facts
 
@@ -175,7 +182,7 @@ registry, clone-heavy side table or memory-accounting exemption is added.
 
 ## Active implementation boundary
 
-Implement only `WP-6-7A-testing-bootstrap-loading-implementation-r3` against:
+Implement only `WP-6-7A-testing-bootstrap-loading-implementation-r4` against:
 
 - `app/slug_loading_v2/src/lib.rs` blob
   `0cd03c1d18a8bff96a9e7b8f8ff8bce1d65ad777`;
@@ -193,11 +200,13 @@ Implement only `WP-6-7A-testing-bootstrap-loading-implementation-r3` against:
   builtin-rematerialization proof in
   `app/slug_analysis_v2/src/analysis_value.rs` blob
   `e0f314611e2165f40915c7eaf7d5baaf4d3e325f`; and
-- exactly three user-provider rendering assertions in clean
+- exactly four user-provider rendering assertions in clean
   `app/slug_loading_v2/src/host_package_load_tests.rs` blob
-  `16a046d63baa4eaf94a6abea8b63a5a0cb002b16`. Each must use
-  `.user_id().expect(...).to_string()` after the carrier conversion; adding a
-  generic `Display` implementation for `ProviderIdentity` is forbidden.
+  `16a046d63baa4eaf94a6abea8b63a5a0cb002b16`: the two-element mapped rendering
+  at the advertised-provider deduplication proof plus the three scalar
+  assertions already named by R3. Each must use explicit `.user_id()`
+  projection after the carrier conversion; adding a generic `Display`
+  implementation for `ProviderIdentity` is forbidden.
 
 Cap additions at 500 production, 700 proof and 1,200 aggregate Rust lines.
 `package.rs` already exceeds the authoring split trigger, so it receives only
@@ -226,9 +235,8 @@ it must at least clear every testing-bootstrap loading lookup consistently.
 
 ## Implementation evidence and exclusions
 
-The preceding design used only pinned Bazel sources, live Slug owners, the
-authentic materialized rules_shell files, and clean Zabel guidance. Production
-and proof edits are now authorized only in the frozen implementation allowlist
+The R3 candidate remained unstaged during correction review. Production and
+proof edits are now authorized only in the frozen implementation allowlist
 above. Scheduling status may additionally change only in:
 
 - `thoughts/shared/plans/slug-v2-subplans/current-packet.md`;
@@ -249,7 +257,7 @@ TestingBootstrap inventory; provider identity derived from display text;
 invocation without configured context ownership; loading-time execution of a
 lazy rule implementation; analysis behavior delegated to Bazel/Java; global
 mutable callbacks; universal-environment widening; `set`, parser, `cc_common`
-or `cc_internal` work; or implementation outside the accepted R3 allowlist.
+or `cc_internal` work; or implementation outside the accepted R4 allowlist.
 
 BCR Starlark remains the complete rule/control-flow owner, including
 `cc_internal`; `cc_common` is only another consumer of the generic Host/provider
