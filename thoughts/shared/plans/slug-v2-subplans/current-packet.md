@@ -1,19 +1,20 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-repository-context-attribute-namespace-architecture-r3`
+Packet: `WP-4-5-7A-repository-context-attribute-namespace-implementation`
 
 Milestone: M7A bootstrap-critical repository/ruleset closure.
 
-Base: terminally accepted module-loaded native-context implementation
-`1f9433600`, accepted complete thirteen-kind repository-rule attribute carrier
-`0c3a172ed`, accepted effective repository Host inputs `64878a1be`, and accepted
-generic canonical repository Host capability `26a68d61c`. All unrelated dirty
-analysis, loading, core, and REAPI work remains parked and read-only.
+Base: independently accepted repository-context architecture `47c937942`,
+terminally accepted module-loaded native-context implementation `1f9433600`,
+accepted complete thirteen-kind repository-rule attribute carrier `0c3a172ed`,
+accepted effective repository Host inputs `64878a1be`, and accepted generic
+canonical repository Host capability `26a68d61c`. All unrelated dirty analysis,
+loading, core, and REAPI work remains parked and read-only.
 
 ## Observable result
 
-Freeze, without Rust changes, one bounded implementation contract for Bazel
-9.2's value-bearing `repository_ctx` category: direct immutable `name` and
+Implement the independently accepted bounded contract for Bazel 9.2's
+value-bearing `repository_ctx` category: direct immutable `name` and
 `original_name` fields plus one read-only `attr` namespace over all thirteen
 already-admitted repository-rule attribute kinds. The same authenticated input,
 effective-value precedence, recursive allocator, and evaluator value must serve
@@ -268,7 +269,7 @@ make the namespace writable, infer values from the demanded ruleset, flatten
 containers, use display strings for labels, or claim the full `repository_ctx`
 API from this category.
 
-## Successor implementation proof matrix
+## Implementation proof matrix
 
 | Proof | Ordinary | Innate | Required observation |
 |---|---:|---:|---|
@@ -294,7 +295,7 @@ checked-in output, or Bazel mutation.
 
 ## Implementation allowlist, caps, validation, and stops
 
-The successor implementation may touch only:
+The implementation may touch only:
 
 - `app/slug_loading_v2/src/repository_rule_context.rs` — immutable invocation
   input, preflight, non-retained source views, sole recursive allocator,
@@ -337,18 +338,9 @@ retained value borrows the evaluator heap; the two-file allowlist or caps fail;
 fresh replays require `workspace_root` or another deferred effect; or one
 focused correction does not resolve implementation/terminal review.
 
-## Architecture packet allowlist
+## Activation state
 
-This R3 architecture correction is zero-Rust and may change only:
-
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
-- orchestration routing records for correction review, acceptance, activation,
-  and closure.
-
-R2 is rejected because it incorrectly published a retained explicit `None`;
-R3 follows pinned `AttributeUtils` and `RepoDefinitionFunction` by treating it
-as absence before unknown/mandatory/default processing. Independent R3
-correction review returns `ACCEPT`. Commit this frozen architecture, then
-replace the manifest with the bounded implementation packet without changing
-the contract and begin Rust immediately.
+Commit `47c937942` records independent `ACCEPT` of the corrected R3
+architecture. Implement only the two Rust owners and proofs above without
+changing its semantic contract. Root owns integration, cap/scope accounting,
+fresh replay, terminal review, scheduling closure, and commits.
