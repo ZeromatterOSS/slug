@@ -2,6 +2,8 @@
 
 Archived terminal packet records displaced from the bounded live routing log.
 
+| 2026-08-27 | M7A canonical repository load-route R2 alias-free proof stop | One bounded writer, root lifecycle/hash correction, full serial validation and independent terminal review; Bazel 9.2 authority and Zabel peer guidance only | unchanged six-file canonical source/load route; transitive selected proof only | The 1,174/1,097 candidate passed 13 focused, 576 bzlmod, 352 loading, dependent, CLI and structural gates, but selected successes retained root aliases and selected spec/mapping were not independently discriminated | `REPLAN`; retain no Rust and retry only `WP-4-5-7A-canonical-repository-load-route-implementation-r3` under 1,200/1,450 caps with a root-unmapped transitive registry source/listing proof and separate selected spec/mapping A/B/A rows |
+
 | 2026-08-26 | M7A complete compile-variable acceptance and action-template frontier audit | Root exact native/producer proof, full serial validation, alias tightening and independent review; recursive compile/proxy/toolchain source trace; clean Zabel peer guidance only | proof-only complete compile variables; next proof-only complete action templates | `97faa6e71` accepts native alias, all producer eager identities and ordered set; all six children of `compile_action_templates.bzl` are accepted and its eager surface is imports plus lazy functions | `ACCEPT`; implement only `WP-4-7A-rules-cc-compile-action-templates-complete-loading-proof` under 0/600/600 and invoke nothing |
 
 | Date | Packet | Route | Wall time | Evidence | Review/rework | Result and next-use note |
