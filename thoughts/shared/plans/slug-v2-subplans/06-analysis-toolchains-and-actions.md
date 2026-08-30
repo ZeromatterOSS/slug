@@ -21304,3 +21304,20 @@ core-owned attempt/acceptance/restoration injection. Repository evaluation,
 context capabilities, winsdk realization, registration proof and selected
 configured analysis remain stopped. The current manifest owns exact blobs,
 caps, lifecycle/redaction proof and stop conditions.
+
+#### Canonical repository Host capabilities accepted; registration proof active (2026-08-29)
+
+Commits `64878a1be`, `7bcac3da3`, and `26a68d61c` accept the shared Host-input
+lifecycle, explicit innate owner certificate, and generic authenticated
+repository context respectively. The final implementation supplies
+`repository_ctx.os`, full immutable `os.environ`, dynamically recorded
+`getenv`, staged `file`, sorted per-name DICE dependencies/effect identity,
+typed retry/discard, and exact non-Windows BCR winsdk realization. Full loading
+and direct dependent validation pass; corrected terminal review is `ACCEPT`.
+
+Activate only `WP-4-5-7A-registered-toolchain-generated-repository-proof`.
+It is proof-only under the frozen four-file live-blob allowlist and 900-line
+cap. Prove the real four `@bazel_tools` registration rows in source order,
+empty non-Windows winsdk row 3 without `UnsupportedCatalog`, and unchanged
+selected custom implementation, `ctx.toolchains`, action context and REAPI
+projection. Preserve the retained selected-context R2 candidate as baseline.

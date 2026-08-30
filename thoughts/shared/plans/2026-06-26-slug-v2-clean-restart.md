@@ -72,6 +72,21 @@ selected-context Rust. Bazel 9.2 remains sole semantic authority; clean Zabel
 is concept/optimization guidance only. BCR Starlark owns all rule logic,
 including `cc_internal`, and `cc_common` stays a generic Host/provider ABI.
 
+### M7 repository Host capabilities accepted; registration closure active (2026-08-29)
+
+Commit `26a68d61c` accepts generic authenticated `repository_ctx.os`, immutable
+full `os.environ`, dynamic `getenv`, staged `file`, sorted per-name Host DICE
+dependencies/effect identity, typed retry/discard, and the exact pinned BCR
+non-Windows winsdk output. Full loading and direct dependent validation pass;
+independent corrected terminal review returned `ACCEPT`.
+
+Run only `WP-4-5-7A-registered-toolchain-generated-repository-proof` under its
+proof-only four-file live-blob allowlist and 900-line cap. Prove the actual four
+`@bazel_tools` registration rows in source order, empty non-Windows row 3 with
+no demanded `UnsupportedCatalog`, and unchanged retained selected
+implementation, `ctx.toolchains`, action context and REAPI projection. BCR
+Starlark remains the rule owner; Zabel remains guidance, not authority.
+
 ### M7 effective repository Host inputs accepted; canonical capabilities active (2026-08-28)
 
 Commit `64878a1be` accepts one immutable effective environment across every
