@@ -139,7 +139,10 @@ the RepoSpec publication boundary, proves both selected route lanes through the
 actual request cutoff, and leaves ordinary map equality unchanged. Independent
 architecture/identity/lifecycle rereview is `ACCEPT`. Implement only
 `WP-5-7A-selected-bcr-transform-identity-implementation` under the frozen
-five-code-file plus Cargo manifest allowlist and caps; archive realization
+five-code-file plus Cargo manifest allowlist and caps. Preflight showed that
+the direct use of workspace-pinned `serde` necessarily adds exactly one local
+dependency-list row to `Cargo.lock`; the corrected manifest admits that
+mechanical row and no lock version/source/checksum change. Archive realization
 remains a separately activated successor.
 
 ### M7 effective repository Host inputs accepted; canonical capabilities active (2026-08-28)

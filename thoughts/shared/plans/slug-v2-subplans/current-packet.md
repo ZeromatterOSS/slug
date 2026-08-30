@@ -189,9 +189,14 @@ Implement only this packet against:
   materialization-request/DICE A/B/A cutoff proof; and
 - `app/slug_bzlmod_v2/Cargo.toml`
   `001c688b7cf4d201eeb8e18da87f4a5e878c278e` solely for the existing workspace
-  `serde` dependency needed by a local ordered-map visitor.
+  `serde` dependency needed by a local ordered-map visitor; and
+- `Cargo.lock` `109b0d788b38f04a37593a6dd6cf8d97adbc6dbf` solely for Cargo's
+  mechanically required addition of `serde` to the existing local
+  `slug_bzlmod_v2` dependency list. No version, checksum, source or other
+  package row may change.
 
-Cap additions at 360 production, 420 proof and 780 aggregate Rust/TOML lines.
+Cap additions at 360 production, 420 proof and 780 aggregate Rust/TOML/lock
+lines.
 Prove source-order patch and overlay A/B/A projection, exact optional `type`,
 unchanged other source kinds, ordinary nested-map reorder equality, exact
 http_archive/git_repository `remote_patches` inequality, complete-content hash
@@ -206,7 +211,8 @@ source dependents, formatting, scope/cap/blob checks and `git diff --check`.
 Stop for a `SmallMap`/Starlark-dict equality change, a second retained order
 carrier, equality by digest, a rule/attribute pair beyond the frozen exact two,
 global JSON-order change, sorted patch order, new cache/interner, unrelated
-source-kind behavior, Cargo lock change or cap breach.
+source-kind behavior, any Cargo-lock change beyond that exact one dependency
+edge, or cap breach.
 
 ## Successor 2: archive transform realization
 
