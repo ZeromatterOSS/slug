@@ -134,6 +134,51 @@ const FILES: &[(&str, &str, bool)] = &[
         false,
     ),
     (
+        "tools/build_defs/repo/BUILD",
+        "58fc51781cf26bfbcbd2c615f4cd0bd64892c3f7332e403eb1a885fea27ff3ca",
+        false,
+    ),
+    (
+        "tools/build_defs/repo/cache.bzl",
+        "119c3fb281fcb02ce8aa0cd2f4fa315830ab160b483e4e041986422d2294d15b",
+        false,
+    ),
+    (
+        "tools/build_defs/repo/git.bzl",
+        "c4f89658b4465dc4e42f87312b74d549fb434197bf0ade88fc4276550f68811b",
+        false,
+    ),
+    (
+        "tools/build_defs/repo/git_worker.bzl",
+        "0bf607d50370d151bba1b541e8023ff040527f50f8fa8884157002ed9c63c339",
+        false,
+    ),
+    (
+        "tools/build_defs/repo/http.bzl",
+        "9e908b9d6491cb950a9713d8b758b7b6f83871adbc768eb4997ca12e06ac240a",
+        false,
+    ),
+    (
+        "tools/build_defs/repo/java.bzl",
+        "94fa09f776bb93a5ed3de1fccdb3a8f22c8792d01e5d7df6d588817b2cf02d7d",
+        false,
+    ),
+    (
+        "tools/build_defs/repo/jvm.bzl",
+        "b3e2ff70d3706171123636248d7175dcb0046bbedea776016d49befc7a810309",
+        false,
+    ),
+    (
+        "tools/build_defs/repo/local.bzl",
+        "f41d310ee3fcef8a637ddff5b21eb05724ad377bbb1b679d146327478613e4db",
+        false,
+    ),
+    (
+        "tools/build_defs/repo/utils.bzl",
+        "902f228e729bb7ee86f86a3d434ccbddd9350bb5c7c869fa2f5fda90361605db",
+        false,
+    ),
+    (
         "tools/cpp/cc_configure.bzl",
         "f1264cd4a6552eba7368729212aba64031ecd4330923d2bef61a20791ee2b4c5",
         false,
@@ -262,19 +307,29 @@ async fn invalid_wrong_kind_and_unsupported_catalog_are_distinct() {
 async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions() {
     let first_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let second_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let first = read(&first_dice, "tools/test/BUILD").await.unwrap();
+    let first = read(&first_dice, "tools/build_defs/repo/utils.bzl")
+        .await
+        .unwrap();
     let middle = read(&first_dice, "MODULE.bazel").await.unwrap();
-    let restored = read(&first_dice, "tools/test/BUILD").await.unwrap();
-    let independent_graph = read(&second_dice, "tools/test/BUILD").await.unwrap();
+    let sibling = read(&first_dice, "tools/build_defs/repo/http.bzl")
+        .await
+        .unwrap();
+    let restored = read(&first_dice, "tools/build_defs/repo/utils.bzl")
+        .await
+        .unwrap();
+    let independent_graph = read(&second_dice, "tools/build_defs/repo/utils.bzl")
+        .await
+        .unwrap();
     assert_eq!(first, restored);
     assert_eq!(first, independent_graph);
     assert_ne!(first.sha256(), middle.sha256());
+    assert_ne!(first.sha256(), sibling.sha256());
 
     let identity = BuiltinBazelToolsSnapshot::CURRENT.route_identity();
     assert_eq!(identity.snapshot(), BuiltinBazelToolsSnapshot::Bazel9_2);
     assert_eq!(
         hex::encode(identity.manifest_sha256()),
-        "6001b11da394fc0571eb9e943a8a650bfb8a746e460fc9b1c0960d925cd2986c"
+        "de4c723127e85a58d4fc5331e16135cdc1448afc0edb3792a1515ee2266f198f"
     );
 }
 

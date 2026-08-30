@@ -232,6 +232,60 @@ const CATALOG: &[CatalogEntry] = &[
         executable: false,
     },
     CatalogEntry {
+        path: "tools/build_defs/repo/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/repo/BUILD"),
+        expected_sha256: "58fc51781cf26bfbcbd2c615f4cd0bd64892c3f7332e403eb1a885fea27ff3ca",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/repo/cache.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/repo/cache.bzl"),
+        expected_sha256: "119c3fb281fcb02ce8aa0cd2f4fa315830ab160b483e4e041986422d2294d15b",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/repo/git.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/repo/git.bzl"),
+        expected_sha256: "c4f89658b4465dc4e42f87312b74d549fb434197bf0ade88fc4276550f68811b",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/repo/git_worker.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/repo/git_worker.bzl"),
+        expected_sha256: "0bf607d50370d151bba1b541e8023ff040527f50f8fa8884157002ed9c63c339",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/repo/http.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/repo/http.bzl"),
+        expected_sha256: "9e908b9d6491cb950a9713d8b758b7b6f83871adbc768eb4997ca12e06ac240a",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/repo/java.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/repo/java.bzl"),
+        expected_sha256: "94fa09f776bb93a5ed3de1fccdb3a8f22c8792d01e5d7df6d588817b2cf02d7d",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/repo/jvm.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/repo/jvm.bzl"),
+        expected_sha256: "b3e2ff70d3706171123636248d7175dcb0046bbedea776016d49befc7a810309",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/repo/local.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/repo/local.bzl"),
+        expected_sha256: "f41d310ee3fcef8a637ddff5b21eb05724ad377bbb1b679d146327478613e4db",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/repo/utils.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/repo/utils.bzl"),
+        expected_sha256: "902f228e729bb7ee86f86a3d434ccbddd9350bb5c7c869fa2f5fda90361605db",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/cpp/cc_configure.bzl",
         bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/cc_configure.bzl"),
         expected_sha256: "f1264cd4a6552eba7368729212aba64031ecd4330923d2bef61a20791ee2b4c5",
@@ -854,6 +908,20 @@ mod tests {
             ]
         );
         assert_eq!(
+            listing_rows("tools/build_defs/repo"),
+            [
+                ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                ("cache.bzl".to_owned(), PathDirectoryEntryKind::File),
+                ("git.bzl".to_owned(), PathDirectoryEntryKind::File),
+                ("git_worker.bzl".to_owned(), PathDirectoryEntryKind::File,),
+                ("http.bzl".to_owned(), PathDirectoryEntryKind::File),
+                ("java.bzl".to_owned(), PathDirectoryEntryKind::File),
+                ("jvm.bzl".to_owned(), PathDirectoryEntryKind::File),
+                ("local.bzl".to_owned(), PathDirectoryEntryKind::File),
+                ("utils.bzl".to_owned(), PathDirectoryEntryKind::File),
+            ]
+        );
+        assert_eq!(
             listing_rows("tools/cpp"),
             [
                 ("cc_configure.bzl".to_owned(), PathDirectoryEntryKind::File,),
@@ -1020,7 +1088,7 @@ mod tests {
             evaluate_builtin_module_source(BuiltinBazelToolsSnapshot::CURRENT, &source).unwrap();
         assert_eq!(
             hex::encode(value.route_identity.manifest_sha256()),
-            "6001b11da394fc0571eb9e943a8a650bfb8a746e460fc9b1c0960d925cd2986c"
+            "de4c723127e85a58d4fc5331e16135cdc1448afc0edb3792a1515ee2266f198f"
         );
         assert_eq!(value.module_sha256, source.sha256());
         assert_eq!(

@@ -3107,7 +3107,7 @@ mod tests {
         }
         assert_eq!(
             hex::encode(identity.manifest_sha256()),
-            "6001b11da394fc0571eb9e943a8a650bfb8a746e460fc9b1c0960d925cd2986c"
+            "de4c723127e85a58d4fc5331e16135cdc1448afc0edb3792a1515ee2266f198f"
         );
 
         let unknown = observed_route(&dice, EpochBuilder::root(source, 1).build(), "missing").await;
