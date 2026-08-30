@@ -2151,6 +2151,21 @@ fn require_supported_canonical_configured_target(
     }
 }
 
+fn require_macro_namespace_compliance(
+    package: &slug_loading_v2::LoadedPackage,
+    label: &CanonicalLabel,
+) -> Result<(), AnalysisError> {
+    let Some(macro_name) = package
+        .macro_origin(label.target().as_str())
+        .and_then(|origin| origin.namespace_violation.as_deref())
+    else {
+        return Ok(());
+    };
+    Err(AnalysisError::message(format!(
+        "Target {label} declared in symbolic macro '{macro_name}' violates macro naming rules and cannot be built. Name must be the same as the macro's name, or the macro's name followed by '_' (recommended), '-', or '.', and a non-empty string."
+    )))
+}
+
 type PreparedToolchainOutcome = AnalysisSemanticOutcome<PreparedToolchain>;
 type ConfiguredPackageValue = Arc<HostPackageInventory>;
 type ConfiguredPackages = Vec<(PackageIdentifier, ConfiguredPackageValue)>;
@@ -4137,6 +4152,9 @@ impl ConfiguredNodeAnalysisKey {
             .targets
             .iter()
             .find(|target| target.name == label.target().as_str());
+        if let Err(error) = require_macro_namespace_compliance(package, label) {
+            return root_analysis_driver_complete(Err(error));
+        }
         if let Err(error) = require_supported_canonical_configured_target(node, target) {
             return root_analysis_driver_complete(Err(error));
         }

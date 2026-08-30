@@ -90,7 +90,7 @@ Only these files may change:
 
 - `app/slug_analysis_v2/src/dice.rs`, only the post-package target-admission
   helper/call site;
-- `app/slug_analysis_v2/tests/configured_target.rs`, only focused configured
+- `app/slug_analysis_v2/tests/starlark_rule.rs`, only focused configured
   namespace and A/B/A proof;
 - this manifest, the canonical plan, and Stage 4 plan for scheduling/acceptance.
 
@@ -102,9 +102,9 @@ At activation, unrelated worktree baselines are read-only:
 
 - `dice.rs`: HEAD blob `e31aae7f06d6de497ee7a7bd9e1968d6548be540`,
   worktree blob `cf684bdc152bd9c5833130c52190f3466595b338`;
-- `configured_target.rs`: HEAD blob
-  `675ba67e2f114f310aedb176ebdc91cfc1bd471a`, worktree blob
-  `d0449a945d9647975f8141d5f6beec59518f7758`.
+- `starlark_rule.rs`: HEAD blob
+  `23d0a682fc6b4619fe5df1f82cfc2db1569713aa`, worktree blob
+  `84a1c56b17ab1112fd2f6e1bf407675d29ab58bb`.
 
 Re-audit both hashes before editing and stage only packet-owned hunks. Stop and
 `REPLAN` if either baseline moves, the natural call site is materially changed,

@@ -7561,3 +7561,67 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
         ],
     );
 }
+
+#[tokio::test]
+async fn symbolic_macro_namespace_violation_is_enforced_only_during_analysis_and_restores() {
+    let workspace = scratch();
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"def _rule_impl(ctx):
+    return [DefaultInfo(files = depset([]))]
+
+made = rule(implementation = _rule_impl)
+
+def _macro_impl(name, visibility, target_name):
+    made(name = name, visibility = visibility)
+    made(name = target_name, visibility = visibility)
+
+made_macro = macro(
+    implementation = _macro_impl,
+    attrs = {"target_name": attr.string(mandatory = True, configurable = False)},
+)
+"#,
+    )
+    .unwrap();
+    let violating_build =
+        "load(':defs.bzl', 'made_macro')\nmade_macro(name = 'abc', target_name = 'libabc.so')\n";
+    fs::write(package.join("BUILD.bazel"), violating_build).unwrap();
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let configuration = test_configuration();
+    let compliant = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//pkg:abc").unwrap(),
+        configuration.clone(),
+    );
+    let generated = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//pkg:libabc.so").unwrap(),
+        configuration,
+    );
+
+    analyze_request(&dice, &workspace, &compliant, None, false)
+        .await
+        .unwrap();
+    let first = analyze_request(&dice, &workspace, &generated, None, false)
+        .await
+        .unwrap_err();
+    let expected = "Target @@//pkg:libabc.so declared in symbolic macro 'abc' violates macro naming rules and cannot be built. Name must be the same as the macro's name, or the macro's name followed by '_' (recommended), '-', or '.', and a non-empty string.";
+    assert_eq!(first, expected);
+
+    fs::write(
+        package.join("BUILD.bazel"),
+        "load(':defs.bzl', 'made_macro')\nmade_macro(name = 'libabc', target_name = 'libabc.so')\n",
+    )
+    .unwrap();
+    analyze_request(&dice, &workspace, &generated, None, false)
+        .await
+        .unwrap();
+
+    fs::write(package.join("BUILD.bazel"), violating_build).unwrap();
+    let restored = analyze_request(&dice, &workspace, &generated, None, false)
+        .await
+        .unwrap_err();
+    assert_eq!(restored, expected);
+}
