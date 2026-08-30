@@ -93,6 +93,7 @@ use crate::host_glob::HostGlobPrepared;
 use crate::host_glob::HostGlobRequestTraversalError;
 use crate::module_extension_repository_rule::RepositoryRuleAttribute;
 use crate::module_extension_repository_rule::RepositoryRuleDefinition;
+use crate::module_extension_repository_rule::RepositoryRuleInvocationState;
 use crate::provider::AnalysisBuiltinCallable;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::OutputGroupInfo;
@@ -6297,6 +6298,32 @@ impl fmt::Display for NativeModule {
 
 #[starlark_module]
 fn native_methods(builder: &mut MethodsBuilder) {
+    fn existing_rule(
+        #[starlark(this)] _native: Value,
+        name: &str,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let _ = name;
+        if !RepositoryRuleInvocationState::is_active(eval) {
+            anyhow::bail!(
+                "native.existing_rule() is supported only during module extension evaluation"
+            );
+        }
+        Ok(NoneType)
+    }
+
+    fn existing_rules<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        if !RepositoryRuleInvocationState::is_active(eval) {
+            anyhow::bail!(
+                "native.existing_rules() is supported only during module extension evaluation"
+            );
+        }
+        Ok(FrozenValue::new_empty_dict().to_value())
+    }
+
     fn exports_files(
         #[starlark(this)] _native: Value,
         srcs: UnpackListOrTuple<&str>,

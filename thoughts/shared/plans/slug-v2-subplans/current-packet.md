@@ -129,9 +129,10 @@ DICE key, lock, cache, fallback, or fixture.
 
 `package.rs` remains the cohesive native-method registry despite its size; two
 context-gated methods belong beside the existing `native` surface and moving
-them would split method registration from its value owner. Add no new touched
-function above 150 lines; keep the predicate and tests bounded. This is not a
-hot-path or retained-memory change.
+them would split method registration from its value owner. The existing
+generated registry function is the admitted cohesive size exception; add no
+new helper above 150 lines and keep the predicate and tests bounded. This is
+not a hot-path or retained-memory change.
 
 Validate serially:
 

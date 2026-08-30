@@ -113,6 +113,12 @@ impl RepositoryRuleInvocationState {
         self.records.borrow().clone().into()
     }
 
+    pub(crate) fn is_active(eval: &Evaluator<'_, '_, '_>) -> bool {
+        eval.extra
+            .and_then(|extra| extra.downcast_ref::<Self>())
+            .is_some()
+    }
+
     fn from_evaluator<'a>(
         eval: &'a Evaluator<'_, '_, '_>,
     ) -> anyhow::Result<&'a RepositoryRuleInvocationState> {
@@ -479,6 +485,7 @@ mod tests {
     use starlark::syntax::Dialect;
 
     use super::*;
+    use crate::package::build_file_loading_globals;
     use crate::package::loading_globals;
     use crate::provider::BzlEvaluationContext;
 
@@ -494,6 +501,16 @@ mod tests {
             .map_err(|error| error.to_string())?;
         drop(evaluator);
         module.freeze().map_err(|error| format!("{error:?}"))
+    }
+
+    fn evaluate_build(source: &str) -> Result<(), String> {
+        let ast = AstModule::parse("//:BUILD", source.to_owned(), &Dialect::Standard)
+            .map_err(|error| error.to_string())?;
+        let module = Module::new();
+        Evaluator::new(&module)
+            .eval_module(ast, &build_file_loading_globals())
+            .map(|_| ())
+            .map_err(|error| error.to_string())
     }
 
     fn invoke(
@@ -539,6 +556,54 @@ _repo = repository_rule(
     },
 )
 "#;
+
+    #[test]
+    fn native_existing_rules_are_empty_immutable_and_drive_repository_calls() {
+        let loaded = load(&format!(
+            "{BASE}\ndef run():\n  one=native.existing_rule('missing')\n  many=native.existing_rules()\n  if one != None or len(many) != 0 or 'missing' in many or many:\n    fail('existing-rule no-op contract')\n  _repo(name='created', evidence=(one, many))\n\ndef mutate():\n  many=native.existing_rules()\n  many['late']=1\n  _repo(name='unreachable')\n"
+        ))
+        .unwrap();
+
+        let (result, records) = invoke(&loaded, "run", |_| Vec::new());
+        assert_eq!(result.unwrap(), "None");
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].name, "created");
+        assert!(matches!(
+            &records[0].kwargs[1].1,
+            RepositoryRuleCallValue::Sequence(values)
+                if matches!(values.as_ref(), [
+                    RepositoryRuleCallValue::None,
+                    RepositoryRuleCallValue::Map(entries),
+                ] if entries.is_empty())
+        ));
+
+        let (error, records) = invoke(&loaded, "mutate", |_| Vec::new());
+        let error = error.unwrap_err();
+        assert!(error.to_ascii_lowercase().contains("immutable"), "{error}");
+        assert!(records.is_empty());
+    }
+
+    #[test]
+    fn native_existing_rule_methods_enforce_signature_and_context() {
+        let loaded = load(
+            "def missing(): native.existing_rule()\ndef typed(): native.existing_rule(1)\ndef extra(): native.existing_rule('x', 'y')\ndef plural_arg(): native.existing_rules('x')\n",
+        )
+        .unwrap();
+        for function in ["missing", "typed", "extra", "plural_arg"] {
+            let (error, records) = invoke(&loaded, function, |_| Vec::new());
+            assert!(error.is_err(), "{function} unexpectedly succeeded");
+            assert!(records.is_empty());
+        }
+
+        for error in [
+            load("native.existing_rule('x')\n").unwrap_err(),
+            load("native.existing_rules()\n").unwrap_err(),
+            evaluate_build("native.existing_rule('x')\n").unwrap_err(),
+            evaluate_build("native.existing_rules()\n").unwrap_err(),
+        ] {
+            assert!(error.contains("only during module extension evaluation"));
+        }
+    }
 
     #[test]
     fn definition_and_scalar_capture_preserve_order_identity_and_provenance() {
