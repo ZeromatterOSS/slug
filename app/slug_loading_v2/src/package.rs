@@ -13,6 +13,7 @@ use std::cell::RefCell;
 use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -53,7 +54,9 @@ use starlark::values::Trace;
 use starlark::values::UnpackValue;
 use starlark::values::Value;
 use starlark::values::ValueLike;
+use starlark::values::dict::AllocDict;
 use starlark::values::dict::DictRef;
+use starlark::values::list::AllocList;
 use starlark::values::list::ListRef;
 use starlark::values::list::UnpackList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
@@ -82,6 +85,7 @@ use crate::attrs::NativeRuleClass;
 use crate::attrs::TransitionDefinition as LoadingTransitionDefinition;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::bzl_module::FrozenBzlLifetimeEntry;
+use crate::bzl_module::LoadingPrintCapture;
 use crate::bzl_visibility::bzl_visibility_globals;
 use crate::cc_common::cc_common_globals;
 use crate::glob::GlobError;
@@ -96,6 +100,7 @@ use crate::module_extension_repository_rule::RepositoryRuleAttribute;
 use crate::module_extension_repository_rule::RepositoryRuleDefinition;
 use crate::module_extension_repository_rule::RepositoryRuleInvocationState;
 use crate::provider::AnalysisBuiltinCallable;
+use crate::provider::BuiltinProviderKey;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::OutputGroupInfo;
 use crate::provider::RunEnvironmentInfo;
@@ -128,6 +133,10 @@ pub struct LoadedPackage {
     pub targets: Vec<PackageTarget>,
     /// Sparse RuleClass values keyed by their stable position in `targets`.
     pub native_attributes: Arc<[NativeTargetAttributes]>,
+    /// Package-owned symbolic macro instances in stable declaration order.
+    pub macro_instances: Arc<[MacroInstanceRecord]>,
+    /// Sparse target-origin rows keyed by stable position in `targets`.
+    pub macro_target_origins: Arc<[MacroTargetOrigin]>,
     pub used_globs: Vec<GlobSpec>,
     /// Ordered label-first direct `.bzl` roots for this BUILD evaluation.
     pub direct_load_roots: Arc<[BzlModuleIdentity]>,
@@ -146,6 +155,8 @@ impl PartialEq for LoadedPackage {
             && self.default_visibility == other.default_visibility
             && self.targets == other.targets
             && self.native_attributes == other.native_attributes
+            && self.macro_instances == other.macro_instances
+            && self.macro_target_origins == other.macro_target_origins
             && self.used_globs == other.used_globs
             && self.direct_load_roots == other.direct_load_roots
             && self.reachable_loads == other.reachable_loads
@@ -170,6 +181,18 @@ impl LoadedPackage {
             .binary_search_by_key(&target_index, |entry| entry.target_index)
             .ok()
             .map(|index| &self.native_attributes[index].attributes)
+    }
+
+    pub fn macro_origin(&self, target: &str) -> Option<&MacroTargetOrigin> {
+        let target_index = self
+            .targets
+            .iter()
+            .position(|candidate| candidate.name == target)?;
+        let target_index = u32::try_from(target_index).ok()?;
+        self.macro_target_origins
+            .binary_search_by_key(&target_index, |entry| entry.target_index)
+            .ok()
+            .map(|index| &self.macro_target_origins[index])
     }
     #[cfg(test)]
     #[allow(dead_code)] // Unix-only Host owner test coverage.
@@ -203,6 +226,33 @@ impl LoadedPackage {
 pub struct NativeTargetAttributes {
     pub target_index: u32,
     pub attributes: NativeRuleAttributes,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct MacroDefinitionIdentity {
+    pub defining_label: CanonicalLabel,
+    pub exported_name: CompactString,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct MacroInstanceRecord {
+    pub identity: CompactString,
+    pub name: CompactString,
+    pub same_name_depth: u32,
+    pub parent: Option<u32>,
+    pub definition: MacroDefinitionIdentity,
+    pub visibility: RuleVisibility,
+    pub generator_name: CompactString,
+    pub generator_function: CompactString,
+    pub generator_location: CompactString,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct MacroTargetOrigin {
+    pub target_index: u32,
+    pub macro_index: u32,
+    pub definition_package: PackageIdentifier,
+    pub namespace_violation: Option<CompactString>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -846,6 +896,8 @@ struct PackageState {
     default_package_metadata: Arc<[CanonicalLabel]>,
     licenses: Arc<[CompactString]>,
     targets: SmallMap<String, RecordedTarget>,
+    macro_instances: Vec<MacroInstanceRecord>,
+    active_macro: Option<usize>,
     used_globs: Vec<GlobSpec>,
 }
 
@@ -858,6 +910,8 @@ impl Default for PackageState {
             default_package_metadata: Arc::from([]),
             licenses: Arc::from([]),
             targets: SmallMap::new(),
+            macro_instances: Vec::new(),
+            active_macro: None,
             used_globs: Vec::new(),
         }
     }
@@ -868,6 +922,23 @@ struct RecordedTarget {
     kind: PackageTargetKind,
     visibility: VisibilitySource,
     native_overrides: Vec<NativeAttributeOverride>,
+    macro_origin: Option<(usize, PackageIdentifier, Option<CompactString>)>,
+}
+
+#[derive(ProvidesStaticType)]
+pub(crate) struct MacroEvaluationContext<'a> {
+    recorder: &'a PackageRecorder,
+    bzl: BzlEvaluationContext,
+}
+
+impl<'a> MacroEvaluationContext<'a> {
+    pub(crate) fn recorder(&self) -> &'a PackageRecorder {
+        self.recorder
+    }
+
+    pub(crate) fn bzl(&self) -> &BzlEvaluationContext {
+        &self.bzl
+    }
 }
 
 #[derive(Debug)]
@@ -918,6 +989,7 @@ pub(crate) struct PackageRecorder {
     package: CompactString,
     package_identifier: PackageIdentifier,
     repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
+    print_capture: Option<Rc<LoadingPrintCapture>>,
     state: RefCell<PackageState>,
 }
 
@@ -933,6 +1005,7 @@ impl PackageRecorder {
             ),
             package,
             repository_mapping: Arc::from([]),
+            print_capture: None,
             state: RefCell::new(PackageState::default()),
         }
     }
@@ -951,8 +1024,21 @@ impl PackageRecorder {
             package,
             package_identifier,
             repository_mapping,
+            print_capture: None,
             state: RefCell::new(PackageState::default()),
         }
+    }
+
+    pub(crate) fn with_print_capture(
+        mut self,
+        print_capture: Option<Rc<LoadingPrintCapture>>,
+    ) -> Self {
+        self.print_capture = print_capture;
+        self
+    }
+
+    fn print_capture(&self) -> Option<&LoadingPrintCapture> {
+        self.print_capture.as_deref()
     }
 
     pub(crate) fn take_host_glob_control(&self) -> Option<HostGlobAttemptControl> {
@@ -971,8 +1057,26 @@ impl PackageRecorder {
 
     fn from_evaluator<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> {
         eval.extra
-            .and_then(|extra| extra.downcast_ref::<Self>())
+            .and_then(|extra| {
+                extra.downcast_ref::<Self>().or_else(|| {
+                    extra
+                        .downcast_ref::<MacroEvaluationContext<'_>>()
+                        .map(MacroEvaluationContext::recorder)
+                })
+            })
             .ok_or_else(|| anyhow::anyhow!("Bazel package global invoked without package state"))
+    }
+
+    fn reject_macro_operation(&self, operation: &str) -> anyhow::Result<()> {
+        if self.state.borrow().active_macro.is_some() {
+            anyhow::bail!("{operation} may not be called from a symbolic macro");
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn has_active_macro_for_test(&self) -> bool {
+        self.state.borrow().active_macro.is_some()
     }
 
     fn for_glob<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> {
@@ -983,14 +1087,14 @@ impl PackageRecorder {
             })
     }
 
-    fn set_default_visibility(&self, visibility: Vec<String>) -> anyhow::Result<()> {
+    fn set_default_visibility(&self, visibility: Vec<VisibilityArgument>) -> anyhow::Result<()> {
         self.state.borrow_mut().default_visibility = self.parse_visibility(visibility)?;
         Ok(())
     }
 
     fn set_package_defaults(
         &self,
-        visibility: Option<Vec<String>>,
+        visibility: Option<Vec<VisibilityArgument>>,
         deprecation: Option<String>,
         testonly: Option<bool>,
         package_metadata: Option<Vec<String>>,
@@ -1026,7 +1130,7 @@ impl PackageRecorder {
     fn exports_files(
         &self,
         srcs: Vec<String>,
-        visibility: Option<Vec<String>>,
+        visibility: Option<Vec<VisibilityArgument>>,
     ) -> anyhow::Result<()> {
         let visibility = self.visibility_source(visibility, VisibilitySource::AlwaysPublic)?;
         for src in srcs {
@@ -1039,7 +1143,7 @@ impl PackageRecorder {
         &self,
         name: String,
         srcs: Option<CoercedAttributeValue>,
-        visibility: Option<Vec<String>>,
+        visibility: Option<Vec<VisibilityArgument>>,
     ) -> anyhow::Result<()> {
         let srcs_explicit = srcs.is_some();
         let srcs_value = srcs.unwrap_or_else(empty_labels);
@@ -1093,7 +1197,7 @@ impl PackageRecorder {
         name: String,
         tests: Option<Vec<String>>,
         mut tags: Vec<String>,
-        visibility: Option<Vec<String>>,
+        visibility: Option<Vec<VisibilityArgument>>,
     ) -> anyhow::Result<()> {
         let tests_explicit = tests.is_some();
         let mut tests = tests
@@ -1132,7 +1236,7 @@ impl PackageRecorder {
         &self,
         name: String,
         actual: String,
-        visibility: Option<Vec<String>>,
+        visibility: Option<Vec<VisibilityArgument>>,
     ) -> anyhow::Result<()> {
         let actual = self.dependency_label(&actual)?;
         self.record_target(
@@ -1149,7 +1253,7 @@ impl PackageRecorder {
         define_values: Option<SmallMap<String, String>>,
         flag_values: Option<SmallMap<String, String>>,
         constraint_values: Option<Vec<String>>,
-        visibility: Option<Vec<String>>,
+        visibility: Option<Vec<VisibilityArgument>>,
     ) -> anyhow::Result<()> {
         let normalize_strings = |values: Option<SmallMap<String, String>>| {
             values.map(|values| {
@@ -1223,7 +1327,7 @@ impl PackageRecorder {
         &self,
         name: String,
         target: NativeToolchainTarget,
-        visibility: Option<Vec<String>>,
+        visibility: Option<Vec<VisibilityArgument>>,
     ) -> anyhow::Result<()> {
         self.record_target(
             name,
@@ -1329,7 +1433,7 @@ impl PackageRecorder {
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
         build_setting_definition: Option<BuildSettingDefinition>,
-        visibility: Option<Vec<String>>,
+        visibility: Option<RuleVisibility>,
     ) -> anyhow::Result<()> {
         let mut dependencies = Vec::new();
         for value in values.iter() {
@@ -1362,7 +1466,7 @@ impl PackageRecorder {
                 capability,
                 build_setting_definition,
             }),
-            self.visibility_source(visibility, VisibilitySource::PackageDefault)?,
+            visibility.map_or(VisibilitySource::PackageDefault, VisibilitySource::Declared),
         )
     }
 
@@ -1389,18 +1493,21 @@ impl PackageRecorder {
         Ok(label)
     }
 
-    fn parse_visibility(&self, values: Vec<String>) -> anyhow::Result<RuleVisibility> {
+    fn parse_visibility(&self, values: Vec<VisibilityArgument>) -> anyhow::Result<RuleVisibility> {
         RuleVisibility::from_declared_labels(
             values
                 .iter()
-                .map(|value| self.dependency_label(value))
+                .map(|value| match value {
+                    VisibilityArgument::Raw(value) => self.dependency_label(value),
+                    VisibilityArgument::Canonical(value) => Ok(value.clone()),
+                })
                 .collect::<anyhow::Result<Vec<_>>>()?,
         )
     }
 
     fn visibility_source(
         &self,
-        values: Option<Vec<String>>,
+        values: Option<Vec<VisibilityArgument>>,
         omitted: VisibilitySource,
     ) -> anyhow::Result<VisibilitySource> {
         values
@@ -1421,12 +1528,42 @@ impl PackageRecorder {
         if state.targets.get(&name).is_some() {
             anyhow::bail!("target '{name}' declared more than once");
         }
+        if let Some(macro_index) = state
+            .macro_instances
+            .iter()
+            .rposition(|instance| instance.name == name)
+            && state.active_macro != Some(macro_index)
+        {
+            anyhow::bail!(
+                "target '{name}' conflicts with an existing macro (and was not created by it)"
+            );
+        }
+        let macro_origin = state.active_macro.map(|macro_index| {
+            let macro_instance = &state.macro_instances[macro_index];
+            let violation = (!name_is_within_macro_namespace(&name, &macro_instance.name))
+                .then(|| macro_instance.name.clone());
+            (
+                macro_index,
+                macro_instance.definition.defining_label.package().clone(),
+                violation,
+            )
+        });
+        let visibility = match (&visibility, &macro_origin) {
+            (VisibilitySource::PackageDefault, Some((_, definition_package, _))) => {
+                VisibilitySource::Declared(concat_visibility_with_package(
+                    &RuleVisibility::Private,
+                    definition_package,
+                )?)
+            }
+            _ => visibility,
+        };
         state.targets.insert(
             name,
             RecordedTarget {
                 kind,
                 visibility,
                 native_overrides: Vec::new(),
+                macro_origin,
             },
         );
         Ok(())
@@ -1738,6 +1875,24 @@ impl PackageRecorder {
             })
             .collect::<Vec<_>>()
             .into();
+        let macro_target_origins = state
+            .targets
+            .iter()
+            .enumerate()
+            .filter_map(|(target_index, (_, target))| {
+                target.macro_origin.as_ref().map(
+                    |(macro_index, definition_package, namespace_violation)| MacroTargetOrigin {
+                        target_index: u32::try_from(target_index)
+                            .expect("package target count exceeds u32"),
+                        macro_index: u32::try_from(*macro_index)
+                            .expect("package macro count exceeds u32"),
+                        definition_package: definition_package.clone(),
+                        namespace_violation: namespace_violation.clone(),
+                    },
+                )
+            })
+            .collect::<Vec<_>>()
+            .into();
         LoadedPackage {
             package_dir,
             build_file,
@@ -1752,6 +1907,8 @@ impl PackageRecorder {
                 })
                 .collect(),
             native_attributes,
+            macro_instances: state.macro_instances.into(),
+            macro_target_origins,
             used_globs: state.used_globs,
             direct_load_roots,
             reachable_loads,
@@ -1759,6 +1916,34 @@ impl PackageRecorder {
             retained_bzl_modules,
         }
     }
+}
+
+fn name_is_within_macro_namespace(name: &str, macro_name: &str) -> bool {
+    name == macro_name
+        || name.strip_prefix(macro_name).is_some_and(|suffix| {
+            suffix.len() >= 2
+                && matches!(
+                    suffix.as_bytes().first(),
+                    Some(b'_') | Some(b'-') | Some(b'.')
+                )
+        })
+}
+
+fn concat_visibility_with_package(
+    visibility: &RuleVisibility,
+    package: &PackageIdentifier,
+) -> anyhow::Result<RuleVisibility> {
+    if visibility.is_public() {
+        return Ok(RuleVisibility::Public);
+    }
+    let package_label =
+        CanonicalLabel::parse(&format!("{package}:__pkg__")).map_err(anyhow::Error::msg)?;
+    let labels = visibility
+        .raw_declared_labels()
+        .iter()
+        .cloned()
+        .chain(std::iter::once(package_label));
+    RuleVisibility::from_declared_labels(labels)
 }
 
 fn native_rule_class(kind: &PackageTargetKind) -> Option<NativeRuleClass> {
@@ -2205,6 +2390,49 @@ fn list(items: UnpackListOrTuple<&str>) -> Vec<String> {
     items.items.into_iter().map(str::to_owned).collect()
 }
 
+struct UnpackVisibility {
+    items: Vec<VisibilityArgument>,
+}
+
+enum VisibilityArgument {
+    Raw(String),
+    Canonical(CanonicalLabel),
+}
+
+impl starlark::values::type_repr::StarlarkTypeRepr for UnpackVisibility {
+    type Canonical = <UnpackListOrTuple<Value<'static>> as starlark::values::type_repr::StarlarkTypeRepr>::Canonical;
+
+    fn starlark_type_repr() -> starlark::typing::Ty {
+        UnpackListOrTuple::<Value<'static>>::starlark_type_repr()
+    }
+}
+
+impl<'v> UnpackValue<'v> for UnpackVisibility {
+    type Error = starlark::Error;
+
+    fn unpack_value_impl(value: Value<'v>) -> starlark::Result<Option<Self>> {
+        let Some(values) = UnpackListOrTuple::<Value<'v>>::unpack_value(value)? else {
+            return Ok(None);
+        };
+        let items = values
+            .items
+            .into_iter()
+            .map(|value| {
+                if let Some(value) = value.unpack_str() {
+                    Ok(VisibilityArgument::Raw(value.to_owned()))
+                } else if let Some(label) = StarlarkLabel::from_value(value) {
+                    Ok(VisibilityArgument::Canonical(label.canonical().clone()))
+                } else {
+                    Err(starlark::Error::new_other(anyhow::anyhow!(
+                        "visibility must contain strings or Labels"
+                    )))
+                }
+            })
+            .collect::<starlark::Result<Vec<_>>>()?;
+        Ok(Some(Self { items }))
+    }
+}
+
 pub(crate) fn package_context_label(
     base_package: &str,
     raw: &str,
@@ -2390,14 +2618,16 @@ fn toolchain_requirements(
 }
 
 fn package_global(
-    default_visibility: Option<UnpackListOrTuple<&str>>,
+    default_visibility: Option<UnpackVisibility>,
     default_deprecation: Option<&str>,
     default_testonly: Option<bool>,
     default_package_metadata: Option<UnpackListOrTuple<&str>>,
     eval: &mut Evaluator,
 ) -> anyhow::Result<NoneType> {
-    PackageRecorder::from_evaluator(eval)?.set_package_defaults(
-        default_visibility.map(list),
+    let recorder = PackageRecorder::from_evaluator(eval)?;
+    recorder.reject_macro_operation("package()")?;
+    recorder.set_package_defaults(
+        default_visibility.map(|value| value.items),
         default_deprecation.map(ToOwned::to_owned),
         default_testonly,
         default_package_metadata.map(list),
@@ -2415,24 +2645,25 @@ fn licenses_global(
 
 fn exports_files_global(
     srcs: UnpackListOrTuple<&str>,
-    visibility: Option<UnpackListOrTuple<&str>>,
+    visibility: Option<UnpackVisibility>,
     eval: &mut Evaluator,
 ) -> anyhow::Result<NoneType> {
-    PackageRecorder::from_evaluator(eval)?.exports_files(list(srcs), visibility.map(list))?;
+    PackageRecorder::from_evaluator(eval)?
+        .exports_files(list(srcs), visibility.map(|value| value.items))?;
     Ok(NoneType)
 }
 
 fn filegroup_global<'v>(
     name: &str,
     srcs: Option<Value<'v>>,
-    visibility: Option<UnpackListOrTuple<&str>>,
+    visibility: Option<UnpackVisibility>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<NoneType> {
     let recorder = PackageRecorder::from_evaluator(eval)?;
     let srcs = srcs
         .map(|srcs| coerce_starlark_value(recorder, AttributeKind::LabelList, "srcs", true, srcs))
         .transpose()?;
-    recorder.filegroup(name.to_owned(), srcs, visibility.map(list))?;
+    recorder.filegroup(name.to_owned(), srcs, visibility.map(|value| value.items))?;
     recorder.set_native_generator_from_evaluator(name, eval)?;
     Ok(NoneType)
 }
@@ -2441,7 +2672,7 @@ fn test_suite_global(
     name: &str,
     tests: Option<UnpackListOrTuple<&str>>,
     tags: UnpackListOrTuple<&str>,
-    visibility: Option<UnpackListOrTuple<&str>>,
+    visibility: Option<UnpackVisibility>,
     eval: &mut Evaluator,
 ) -> anyhow::Result<NoneType> {
     let recorder = PackageRecorder::from_evaluator(eval)?;
@@ -2449,7 +2680,7 @@ fn test_suite_global(
         name.to_owned(),
         tests.map(list),
         list(tags),
-        visibility.map(list),
+        visibility.map(|value| value.items),
     )?;
     recorder.set_native_generator_from_evaluator(name, eval)?;
     Ok(NoneType)
@@ -2458,11 +2689,15 @@ fn test_suite_global(
 fn alias_global(
     name: &str,
     actual: &str,
-    visibility: Option<UnpackListOrTuple<&str>>,
+    visibility: Option<UnpackVisibility>,
     eval: &mut Evaluator,
 ) -> anyhow::Result<NoneType> {
     let recorder = PackageRecorder::from_evaluator(eval)?;
-    recorder.alias(name.to_owned(), actual.to_owned(), visibility.map(list))?;
+    recorder.alias(
+        name.to_owned(),
+        actual.to_owned(),
+        visibility.map(|value| value.items),
+    )?;
     recorder.set_native_generator_from_evaluator(name, eval)?;
     Ok(NoneType)
 }
@@ -2493,6 +2728,9 @@ fn glob_global<'v>(
 }
 
 fn raw_attribute_value(value: Value) -> anyhow::Result<RawAttributeValue> {
+    if let Some(value) = StarlarkLabel::from_value(value) {
+        return Ok(RawAttributeValue::Label(value.canonical().clone()));
+    }
     if let Some(value) = value.unpack_str() {
         return Ok(RawAttributeValue::String(value.into()));
     }
@@ -2709,6 +2947,9 @@ enum RawLabelContext<'a> {
 
 impl RawLabelContext<'_> {
     fn label(self, value: &RawAttributeValue, context: &str) -> anyhow::Result<CanonicalLabel> {
+        if let RawAttributeValue::Label(value) = value {
+            return Ok(value.clone());
+        }
         match self {
             Self::Root(package) => raw_label(package, value, context),
             Self::Package(recorder) => recorder.dependency_label(&raw_string(value, context)?),
@@ -2716,6 +2957,19 @@ impl RawLabelContext<'_> {
     }
 
     fn output(self, value: &RawAttributeValue, context: &str) -> anyhow::Result<CanonicalLabel> {
+        if let RawAttributeValue::Label(value) = value {
+            let expected_package = match self {
+                Self::Root(package) => {
+                    value.package().repo().is_root()
+                        && value.package().package().as_str() == package
+                }
+                Self::Package(recorder) => value.package() == &recorder.package_identifier,
+            };
+            if !expected_package {
+                anyhow::bail!("output label must name a valid target in this package: {value}");
+            }
+            return Ok(value.clone());
+        }
         match self {
             Self::Root(package) => raw_output(package, value, context),
             Self::Package(recorder) => recorder.output_label(&raw_string(value, context)?),
@@ -2898,7 +3152,8 @@ fn coerce_starlark_value(
             let mut branches = Vec::new();
             let mut default = None;
             for branch in part.branches.iter() {
-                if branch.condition == "//conditions:default" {
+                if matches!(&branch.condition, SelectorCondition::Raw(condition) if condition == "//conditions:default")
+                {
                     default = Some(Arc::new(coerce_starlark_value(
                         recorder,
                         kind,
@@ -2907,8 +3162,16 @@ fn coerce_starlark_value(
                         branch.value,
                     )?));
                 } else {
+                    let condition = match &branch.condition {
+                        SelectorCondition::Raw(condition) => {
+                            recorder.dependency_label(condition)?
+                        }
+                        SelectorCondition::Canonical(condition) => {
+                            CanonicalLabel::parse(condition).map_err(anyhow::Error::msg)?
+                        }
+                    };
                     branches.push((
-                        recorder.dependency_label(&branch.condition)?,
+                        condition,
                         Arc::new(coerce_starlark_value(
                             recorder,
                             kind,
@@ -3038,6 +3301,206 @@ pub(crate) struct FrozenRuleDefinition {
     pub(crate) schema: Arc<[FrozenRuleAttributeSchema]>,
     capability: Arc<RuleCapability>,
     pub(crate) build_setting_definition: Option<BuildSettingDefinition>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct MacroAttributeSchema {
+    name: CompactString,
+    kind: AttributeKind,
+    mandatory: bool,
+    configurable: bool,
+    default: Option<CoercedAttributeValue>,
+    default_to_none: bool,
+    allow_files: bool,
+    allow_single_file: Option<AllowSingleFile>,
+    allowed_values: AllowedAttributeValues,
+}
+
+impl MacroAttributeSchema {
+    fn from_definition(name: &str, definition: &AttributeDefinition<'_>) -> anyhow::Result<Self> {
+        if definition.attached_aspect.is_some()
+            || definition.transition.is_some()
+            || !definition.required_providers.is_empty()
+        {
+            anyhow::bail!("macro attribute '{name}' uses an unsupported dependency constraint");
+        }
+        Ok(Self {
+            name: name.into(),
+            kind: definition.kind,
+            mandatory: definition.mandatory,
+            configurable: definition.configurable,
+            default: definition.default.clone(),
+            default_to_none: false,
+            allow_files: definition.allow_files,
+            allow_single_file: definition.allow_single_file.clone(),
+            allowed_values: definition.allowed_values.clone(),
+        })
+    }
+
+    fn inherited(schema: &FrozenRuleAttributeSchema) -> Option<Self> {
+        (!schema.name.starts_with('_')
+            && !matches!(
+                schema.name.as_str(),
+                "name"
+                    | "visibility"
+                    | "generator_name"
+                    | "generator_function"
+                    | "generator_location"
+            )
+            && schema.attached_aspect.is_none()
+            && schema.transition.is_none()
+            && schema.required_providers.is_empty())
+        .then(|| Self {
+            name: schema.name.clone(),
+            kind: schema.kind,
+            mandatory: schema.mandatory,
+            configurable: schema.configurable,
+            default: schema.default.clone(),
+            default_to_none: !schema.mandatory,
+            allow_files: schema.allow_files,
+            allow_single_file: schema.allow_single_file.clone(),
+            allowed_values: schema.allowed_values.clone(),
+        })
+    }
+
+    fn inherited_transient(schema: &RuleAttributeSchema<'_>) -> Option<Self> {
+        (!schema.name.starts_with('_')
+            && !matches!(
+                schema.name.as_str(),
+                "name"
+                    | "visibility"
+                    | "generator_name"
+                    | "generator_function"
+                    | "generator_location"
+            )
+            && schema.attached_aspect.is_none()
+            && schema.transition.is_none()
+            && schema.required_providers.is_empty())
+        .then(|| Self {
+            name: schema.name.clone(),
+            kind: schema.kind,
+            mandatory: schema.mandatory,
+            configurable: schema.configurable,
+            default: schema.default.clone(),
+            default_to_none: !schema.mandatory,
+            allow_files: schema.allow_files,
+            allow_single_file: schema.allow_single_file.clone(),
+            allowed_values: schema.allowed_values.clone(),
+        })
+    }
+
+    fn inherited_macro(schema: &Self) -> Self {
+        Self {
+            default_to_none: !schema.mandatory,
+            ..schema.clone()
+        }
+    }
+}
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
+struct SymbolicMacroDefinitionGen<V> {
+    implementation: V,
+    #[trace(unsafe_ignore)]
+    definition_source: Arc<BzlModuleIdentity>,
+    #[trace(unsafe_ignore)]
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    #[trace(unsafe_ignore)]
+    attributes: Arc<[MacroAttributeSchema]>,
+    #[trace(unsafe_ignore)]
+    documentation: Option<CompactString>,
+    #[allocative(skip)]
+    #[trace(unsafe_ignore)]
+    exported_name: OnceCell<CompactString>,
+}
+
+type SymbolicMacroDefinition<'v> = SymbolicMacroDefinitionGen<Value<'v>>;
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct FrozenSymbolicMacroDefinition {
+    implementation: FrozenValue,
+    definition_source: Arc<BzlModuleIdentity>,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    attributes: Arc<[MacroAttributeSchema]>,
+    documentation: Option<CompactString>,
+    exported_name: CompactString,
+}
+
+starlark::starlark_complex_values!(SymbolicMacroDefinition);
+
+impl<V> fmt::Display for SymbolicMacroDefinitionGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.exported_name.get() {
+            Some(name) => write!(f, "macro {name}"),
+            None => f.write_str("macro <unexported>"),
+        }
+    }
+}
+
+impl fmt::Display for FrozenSymbolicMacroDefinition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "macro {}", self.exported_name)
+    }
+}
+
+impl<'v> Freeze for SymbolicMacroDefinition<'v> {
+    type Frozen = FrozenSymbolicMacroDefinition;
+
+    fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
+        let Some(exported_name) = self.exported_name.into_inner() else {
+            return Err(FreezeError::new(
+                "the result of macro() must be assigned to a top-level variable".to_owned(),
+            ));
+        };
+        Ok(FrozenSymbolicMacroDefinition {
+            implementation: self.implementation.freeze(freezer)?,
+            definition_source: self.definition_source,
+            source_identities_by_filename: self.source_identities_by_filename,
+            attributes: self.attributes,
+            documentation: self.documentation,
+            exported_name,
+        })
+    }
+}
+
+#[starlark_value(type = "macro")]
+impl<'v> StarlarkValue<'v> for SymbolicMacroDefinition<'v> {
+    type Canonical = FrozenSymbolicMacroDefinition;
+
+    fn export_as(
+        &self,
+        variable_name: &str,
+        _eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<()> {
+        if self.exported_name.get().is_none() {
+            let _ = self.exported_name.set(variable_name.into());
+        }
+        Ok(())
+    }
+
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        _args: &Arguments<'v, '_>,
+        _eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Err(starlark::Error::new_other(anyhow::anyhow!(
+            "macro() definitions may only be called after their .bzl module is frozen"
+        )))
+    }
+}
+
+#[starlark_value(type = "macro")]
+impl<'v> StarlarkValue<'v> for FrozenSymbolicMacroDefinition {
+    type Canonical = Self;
+
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        invoke_symbolic_macro(self, args, eval)
+    }
 }
 
 type RuleDefinition<'v> = RuleDefinitionGen<Value<'v>>;
@@ -3547,6 +4010,7 @@ impl<'v> StarlarkValue<'v> for FrozenAspectDefinition {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 enum RawAttributeValue {
+    Label(CanonicalLabel),
     String(CompactString),
     Boolean(bool),
     Integer(i32),
@@ -3784,6 +4248,36 @@ fn starlark_generator_metadata(
     (
         context.local_value.unwrap_or_default().into(),
         context.function_name.into(),
+        format!("{build_file}:{}:{}", position.line + 1, position.column + 1).into(),
+    )
+}
+
+fn symbolic_macro_generator_metadata(
+    recorder: &PackageRecorder,
+    eval: &Evaluator<'_, '_, '_>,
+    name: &str,
+    exported_name: &str,
+) -> (CompactString, CompactString, CompactString) {
+    let metadata = starlark_generator_metadata(recorder, eval);
+    if !metadata.0.is_empty() {
+        return metadata;
+    }
+    let Some(call_location) = eval.call_stack_top_location() else {
+        return (name.into(), exported_name.into(), CompactString::default());
+    };
+    let position = call_location.resolve_span_for_reporting().begin;
+    let build_file = Path::new(call_location.filename())
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("BUILD.bazel");
+    let build_file = if recorder.package.is_empty() {
+        build_file.to_owned()
+    } else {
+        format!("{}/{build_file}", recorder.package)
+    };
+    (
+        name.into(),
+        exported_name.into(),
         format!("{build_file}:{}:{}", position.line + 1, position.column + 1).into(),
     )
 }
@@ -4462,11 +4956,15 @@ impl<'v> StarlarkValue<'v> for FrozenModuleExtensionDefinition {
     type Canonical = Self;
 }
 
+#[derive(Debug, Clone, Trace, Freeze, Allocative)]
+enum SelectorCondition {
+    Raw(String),
+    Canonical(String),
+}
+
 #[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
 struct SelectorBranchGen<V> {
-    #[trace(unsafe_ignore)]
-    #[freeze(identity)]
-    condition: CompactString,
+    condition: SelectorCondition,
     value: V,
 }
 
@@ -5336,26 +5834,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 )));
             }
         }
-        let visibility = if let Some(visibility) = names.get("visibility") {
-            let visibility = ListRef::from_value(*visibility).ok_or_else(|| {
-                starlark::Error::new_other(anyhow::anyhow!(
-                    "attribute `visibility` must be a list of strings"
-                ))
-            })?;
-            visibility
-                .iter()
-                .map(|value| {
-                    value.unpack_str().map(ToOwned::to_owned).ok_or_else(|| {
-                        starlark::Error::new_other(anyhow::anyhow!(
-                            "attribute `visibility` must be a list of strings"
-                        ))
-                    })
-                })
-                .collect::<starlark::Result<Vec<_>>>()
-                .map(Some)?
-        } else {
-            None
-        };
+        let visibility = names.get("visibility").copied();
         let implementation = self.implementation;
         let required_toolchains = self.required_toolchains.clone();
         let advertised_providers = self.advertised_providers.clone();
@@ -5364,6 +5843,9 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         let heap = eval.heap();
         PackageRecorder::from_evaluator(eval)
             .and_then(|recorder| {
+                let visibility = visibility
+                    .map(|value| parse_rule_visibility_argument(recorder, value))
+                    .transpose()?;
                 let (default_visibility, default_deprecation, default_testonly, default_metadata) = {
                     let state = recorder.state.borrow();
                     (
@@ -5375,8 +5857,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 };
                 let effective_visibility = visibility
                     .as_ref()
-                    .map(|values| recorder.parse_visibility(values.clone()))
-                    .transpose()?
+                    .cloned()
                     .unwrap_or(default_visibility);
                 let visibility_value = starlark_effective_visibility(&effective_visibility)?;
                 let generator = starlark_generator_metadata(recorder, eval);
@@ -5587,6 +6068,392 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
     }
 }
 
+fn allocate_macro_attribute<'v>(
+    value: &CoercedAttributeValue,
+    heap: Heap<'v>,
+) -> anyhow::Result<Value<'v>> {
+    let label = |value: &CanonicalLabel| heap.alloc_simple(StarlarkLabel::new(value.clone()));
+    Ok(match value {
+        CoercedAttributeValue::None => Value::new_none(),
+        CoercedAttributeValue::Boolean(value) => Value::new_bool(*value),
+        CoercedAttributeValue::Integer(value) => heap.alloc(*value),
+        CoercedAttributeValue::String(value) => heap.alloc_str(value).to_value(),
+        CoercedAttributeValue::Label(value) | CoercedAttributeValue::Output(value) => label(value),
+        CoercedAttributeValue::StringList(values) => {
+            heap.alloc(AllocList(values.iter().map(|value| value.as_str())))
+        }
+        CoercedAttributeValue::LabelList(values) | CoercedAttributeValue::OutputList(values) => {
+            heap.alloc(AllocList(values.iter().map(label)))
+        }
+        CoercedAttributeValue::StringDict(values) => heap.alloc(AllocDict(
+            values
+                .iter()
+                .map(|(key, value)| (key.as_str(), value.as_str())),
+        )),
+        CoercedAttributeValue::StringListDict(values) => {
+            heap.alloc(AllocDict(values.iter().map(|(key, values)| {
+                (
+                    key.as_str(),
+                    heap.alloc(AllocList(values.iter().map(|value| value.as_str()))),
+                )
+            })))
+        }
+        CoercedAttributeValue::StringKeyedLabelDict(values) => heap.alloc(AllocDict(
+            values
+                .iter()
+                .map(|(key, value)| (key.as_str(), label(value))),
+        )),
+        CoercedAttributeValue::LabelKeyedStringDict(values) => heap.alloc(AllocDict(
+            values
+                .iter()
+                .map(|(key, value)| (label(key), value.as_str())),
+        )),
+        CoercedAttributeValue::LabelListDict(values) => {
+            heap.alloc(AllocDict(values.iter().map(|(key, values)| {
+                (
+                    key.as_str(),
+                    heap.alloc(AllocList(values.iter().map(label))),
+                )
+            })))
+        }
+        CoercedAttributeValue::Selector { branches, default } => {
+            let mut selector_branches = branches
+                .iter()
+                .map(|(condition, value)| {
+                    Ok(SelectorBranchGen {
+                        condition: SelectorCondition::Canonical(condition.to_string()),
+                        value: allocate_macro_attribute(value, heap)?,
+                    })
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            if let Some(default) = default {
+                selector_branches.push(SelectorBranchGen {
+                    condition: SelectorCondition::Raw("//conditions:default".into()),
+                    value: allocate_macro_attribute(default, heap)?,
+                });
+            }
+            heap.alloc(SelectorValueGen {
+                parts: vec![SelectorPartGen {
+                    prefix: Vec::new(),
+                    suffix: Vec::new(),
+                    branches: selector_branches,
+                }],
+            })
+        }
+        CoercedAttributeValue::Concatenation(left, right) => {
+            let left = allocate_macro_attribute(left, heap)?;
+            let right = allocate_macro_attribute(right, heap)?;
+            if let Some(selector) = SelectorValue::from_value(left) {
+                match selector {
+                    starlark::__macro_refs::Either::Left(selector) => selector
+                        .add(right, heap)
+                        .transpose()
+                        .map_err(|error| anyhow::anyhow!(error.to_string()))?
+                        .ok_or_else(|| anyhow::anyhow!("invalid macro selector concatenation"))?,
+                    starlark::__macro_refs::Either::Right(_) => {
+                        anyhow::bail!("unexpected frozen selector in fresh macro evaluator")
+                    }
+                }
+            } else if let Some(selector) = SelectorValue::from_value(right) {
+                match selector {
+                    starlark::__macro_refs::Either::Left(selector) => selector
+                        .radd(left, heap)
+                        .transpose()
+                        .map_err(|error| anyhow::anyhow!(error.to_string()))?
+                        .ok_or_else(|| anyhow::anyhow!("invalid macro selector concatenation"))?,
+                    starlark::__macro_refs::Either::Right(_) => {
+                        anyhow::bail!("unexpected frozen selector in fresh macro evaluator")
+                    }
+                }
+            } else {
+                anyhow::bail!("macro concatenation lost its selector")
+            }
+        }
+    })
+}
+
+fn allocate_configurable_macro_attribute<'v>(
+    value: &CoercedAttributeValue,
+    configurable: bool,
+    heap: Heap<'v>,
+) -> anyhow::Result<Value<'v>> {
+    let value = allocate_macro_attribute(value, heap)?;
+    if !configurable || value.is_none() || SelectorValue::from_value(value).is_some() {
+        return Ok(value);
+    }
+    Ok(heap.alloc(SelectorValueGen {
+        parts: vec![SelectorPartGen {
+            prefix: Vec::new(),
+            suffix: Vec::new(),
+            branches: vec![SelectorBranchGen {
+                condition: SelectorCondition::Raw("//conditions:default".into()),
+                value,
+            }],
+        }],
+    }))
+}
+
+fn visibility_argument<'v>(visibility: &RuleVisibility, heap: Heap<'v>) -> Value<'v> {
+    let labels: Vec<CanonicalLabel> = match visibility {
+        RuleVisibility::Public => vec![CanonicalLabel::parse("@@//visibility:public").unwrap()],
+        RuleVisibility::Private => vec![CanonicalLabel::parse("@@//visibility:private").unwrap()],
+        RuleVisibility::Restricted(value) => value.declared_labels().to_vec(),
+    };
+    heap.alloc(AllocList(
+        labels
+            .into_iter()
+            .map(|label| heap.alloc_simple(StarlarkLabel::new(label))),
+    ))
+}
+
+fn parse_macro_visibility(
+    recorder: &PackageRecorder,
+    value: Option<Value<'_>>,
+    parent: Option<&MacroInstanceRecord>,
+) -> anyhow::Result<RuleVisibility> {
+    let parsed = match value.filter(|value| !value.is_none()) {
+        Some(value) => {
+            let values = ListRef::from_value(value)
+                .ok_or_else(|| anyhow::anyhow!("macro visibility must be a list of labels"))?;
+            let labels = values
+                .iter()
+                .map(|value| {
+                    if let Some(label) = StarlarkLabel::from_value(value) {
+                        Ok(label.canonical().clone())
+                    } else {
+                        value
+                            .unpack_str()
+                            .ok_or_else(|| anyhow::anyhow!("macro visibility must contain labels"))
+                            .and_then(|value| recorder.dependency_label(value))
+                    }
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            RuleVisibility::from_declared_labels(labels)?
+        }
+        None if parent.is_some() => RuleVisibility::Private,
+        None => recorder.state.borrow().default_visibility.clone(),
+    };
+    let instantiating_package = parent
+        .map(|parent| parent.definition.defining_label.package())
+        .unwrap_or(&recorder.package_identifier);
+    concat_visibility_with_package(&parsed, instantiating_package)
+}
+
+fn parse_rule_visibility_argument(
+    recorder: &PackageRecorder,
+    value: Value<'_>,
+) -> anyhow::Result<RuleVisibility> {
+    let values = ListRef::from_value(value)
+        .ok_or_else(|| anyhow::anyhow!("attribute `visibility` must be a list of labels"))?;
+    let labels = values
+        .iter()
+        .map(|value| {
+            if let Some(label) = StarlarkLabel::from_value(value) {
+                Ok(label.canonical().clone())
+            } else {
+                value
+                    .unpack_str()
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("attribute `visibility` must be a list of labels")
+                    })
+                    .and_then(|value| recorder.dependency_label(value))
+            }
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    RuleVisibility::from_declared_labels(labels)
+}
+
+fn invoke_symbolic_macro<'v>(
+    definition: &FrozenSymbolicMacroDefinition,
+    args: &Arguments<'v, '_>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> starlark::Result<Value<'v>> {
+    args.no_positional_args(eval.heap())?;
+    let names = args.names_map()?;
+    let recorder = PackageRecorder::from_evaluator(eval).map_err(starlark::Error::new_other)?;
+    let name = names
+        .get("name")
+        .and_then(|value| value.unpack_str())
+        .ok_or_else(|| {
+            starlark::Error::new_other(anyhow::anyhow!(
+                "missing value for mandatory attribute 'name' in '{}' macro",
+                definition.exported_name
+            ))
+        })?
+        .to_owned();
+    for attribute in names.keys() {
+        if attribute.as_str() != "name"
+            && attribute.as_str() != "visibility"
+            && !definition
+                .attributes
+                .iter()
+                .any(|schema| schema.name == attribute.as_str())
+        {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "no such attribute '{}' in '{}' macro",
+                attribute.as_str(),
+                definition.exported_name
+            )));
+        }
+    }
+
+    let (parent_index, parent) = {
+        let state = recorder.state.borrow();
+        (
+            state.active_macro,
+            state
+                .active_macro
+                .map(|index| state.macro_instances[index].clone()),
+        )
+    };
+    if let Some(parent) = &parent {
+        if !name_is_within_macro_namespace(&name, &parent.name) {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "macro '{}' cannot declare submacro named '{}'",
+                parent.name,
+                name
+            )));
+        }
+    }
+    let identity = MacroDefinitionIdentity {
+        defining_label: definition.definition_source.label.clone(),
+        exported_name: definition.exported_name.clone(),
+    };
+    {
+        let state = recorder.state.borrow();
+        let mut ancestor = state.active_macro;
+        while let Some(index) = ancestor {
+            let instance = &state.macro_instances[index];
+            if instance.definition == identity {
+                return Err(starlark::Error::new_other(anyhow::anyhow!(
+                    "recursive call to symbolic macro '{}'",
+                    definition.exported_name
+                )));
+            }
+            ancestor = instance.parent.map(|index| index as usize);
+        }
+        if state.targets.contains_key(&name) {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "macro '{name}' conflicts with an existing target"
+            )));
+        }
+        if state.macro_instances.iter().any(|instance| {
+            instance.name == name
+                && !(parent.as_ref().is_some_and(|parent| parent.name == name)
+                    && instance.parent != parent_index.map(|index| index as u32))
+        }) {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "macro '{name}' conflicts with an existing macro"
+            )));
+        }
+    }
+    let visibility =
+        parse_macro_visibility(recorder, names.get("visibility").copied(), parent.as_ref())
+            .map_err(starlark::Error::new_other)?;
+    let same_name_depth = parent
+        .as_ref()
+        .filter(|parent| parent.name == name)
+        .map_or(1, |parent| parent.same_name_depth + 1);
+    let (generator_name, generator_function, generator_location) =
+        symbolic_macro_generator_metadata(recorder, eval, &name, &definition.exported_name);
+    let macro_index = {
+        let mut state = recorder.state.borrow_mut();
+        let index = state.macro_instances.len();
+        state.macro_instances.push(MacroInstanceRecord {
+            identity: format!("{name}:{same_name_depth}").into(),
+            name: name.clone().into(),
+            same_name_depth,
+            parent: parent_index.map(|index| index as u32),
+            definition: identity,
+            visibility: visibility.clone(),
+            generator_name,
+            generator_function,
+            generator_location,
+        });
+        index
+    };
+
+    let module = starlark::environment::Module::new();
+    let bzl = BzlEvaluationContext::macro_runtime_context(
+        (*definition.definition_source).clone(),
+        definition.source_identities_by_filename.clone(),
+    );
+    let context = MacroEvaluationContext { recorder, bzl };
+    let result = {
+        let mut macro_eval = Evaluator::new(&module);
+        macro_eval.extra = Some(&context);
+        if let Some(capture) = recorder.print_capture() {
+            macro_eval.set_print_handler(capture);
+        }
+        let mut argument_names = Vec::with_capacity(definition.attributes.len() + 2);
+        let mut argument_values = Vec::with_capacity(definition.attributes.len() + 2);
+        argument_names.push(CompactString::const_new("name"));
+        argument_values.push(module.heap().alloc_str(&name).to_value());
+        argument_names.push(CompactString::const_new("visibility"));
+        argument_values.push(visibility_argument(&visibility, module.heap()));
+        for schema in definition.attributes.iter() {
+            let explicit = names.get(schema.name.as_str()).copied();
+            let coerced = match explicit.filter(|value| !value.is_none()) {
+                Some(value) => Some(
+                    coerce_starlark_value(
+                        recorder,
+                        schema.kind,
+                        &schema.name,
+                        schema.configurable,
+                        value,
+                    )
+                    .and_then(|value| {
+                        validate_allowed_value(&schema.name, &value, &schema.allowed_values)?;
+                        Ok(value)
+                    })
+                    .map_err(starlark::Error::new_other)?,
+                ),
+                None if schema.mandatory => {
+                    return Err(starlark::Error::new_other(anyhow::anyhow!(
+                        "missing value for mandatory attribute '{}'",
+                        schema.name
+                    )));
+                }
+                None if schema.default_to_none => None,
+                None => Some(
+                    schema
+                        .default
+                        .clone()
+                        .unwrap_or_else(|| intrinsic_default(schema.kind)),
+                ),
+            };
+            argument_names.push(schema.name.clone());
+            argument_values.push(match coerced {
+                Some(value) => allocate_configurable_macro_attribute(
+                    &value,
+                    schema.configurable,
+                    module.heap(),
+                )
+                .map_err(starlark::Error::new_other)?,
+                None => Value::new_none(),
+            });
+        }
+        let named = argument_names
+            .iter()
+            .zip(argument_values.iter().copied())
+            .map(|(name, value)| (name.as_str(), value))
+            .collect::<Vec<_>>();
+        recorder.state.borrow_mut().active_macro = Some(macro_index);
+        let result = macro_eval.eval_function(definition.implementation.to_value(), &[], &named);
+        recorder.state.borrow_mut().active_macro = parent_index;
+        result
+    };
+    let value = result?;
+    if !value.is_none() {
+        return Err(starlark::Error::new_other(anyhow::anyhow!(
+            "macro '{}' may not return a non-None value (got {})",
+            name,
+            value.to_repr()
+        )));
+    }
+    Ok(Value::new_none())
+}
+
 fn repository_rule_default_matches(kind: AttributeKind, value: &CoercedAttributeValue) -> bool {
     matches!(
         (kind, value),
@@ -5631,6 +6498,136 @@ fn repository_rule_default_matches(kind: AttributeKind, value: &CoercedAttribute
                 CoercedAttributeValue::LabelListDict(_)
             )
     )
+}
+
+fn symbolic_macro_global<'v>(
+    implementation: Value<'v>,
+    attrs: Option<Value<'v>>,
+    inherit_attrs: Option<Value<'v>>,
+    finalizer: bool,
+    doc: Option<Value<'v>>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> anyhow::Result<SymbolicMacroDefinition<'v>> {
+    let implementation_parameters = implementation
+        .parameters_spec()
+        .ok_or_else(|| anyhow::anyhow!("macro implementation must be a Starlark function"))?;
+    if finalizer {
+        anyhow::bail!("symbolic macro finalizers are not supported in this packet");
+    }
+    let documentation = match doc.filter(|value| !value.is_none()) {
+        Some(value) => Some(
+            value
+                .unpack_str()
+                .ok_or_else(|| anyhow::anyhow!("macro doc must be a string or None"))?
+                .into(),
+        ),
+        None => None,
+    };
+    let attrs = match attrs.filter(|value| !value.is_none()) {
+        Some(value) => DictRef::from_value(value)
+            .ok_or_else(|| anyhow::anyhow!("macro attrs must be a dict or None"))?
+            .iter()
+            .map(|(name, value)| {
+                Ok((
+                    name.unpack_str()
+                        .ok_or_else(|| anyhow::anyhow!("macro attr names must be strings"))?
+                        .to_owned(),
+                    value,
+                ))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?,
+        None => Vec::new(),
+    };
+    let mut attributes = Vec::new();
+    for (name, value) in &attrs {
+        if matches!(name.as_str(), "name" | "visibility") {
+            anyhow::bail!("Cannot declare a macro attribute named '{name}'");
+        }
+        if name.starts_with('_') {
+            anyhow::bail!("macro attribute '{name}' must be public");
+        }
+        if value.is_none() {
+            continue;
+        }
+        let definition = rule_attribute_definition_from_value(*value)
+            .ok_or_else(|| anyhow::anyhow!("macro attribute '{name}' must use attr.*()"))?;
+        attributes.push(MacroAttributeSchema::from_definition(name, &definition)?);
+    }
+    let explicit_names = attrs
+        .iter()
+        .map(|(name, _)| name.as_str())
+        .collect::<Vec<_>>();
+    let inherit_attrs = inherit_attrs.filter(|value| !value.is_none());
+    if inherit_attrs.is_some()
+        && !implementation_parameters
+            .parameters_str()
+            .split(',')
+            .any(|parameter| parameter.trim_start().starts_with("**"))
+    {
+        anyhow::bail!("macro implementation must have a **kwargs parameter to inherit attributes");
+    }
+    if let Some(inherit) = inherit_attrs {
+        let inherited = if inherit.unpack_str() == Some("common") {
+            starlark_builtin_schema::<Value<'v>>(false, false, None, false)
+                .iter()
+                .filter_map(MacroAttributeSchema::inherited_transient)
+                .collect::<Vec<_>>()
+        } else if let Some(rule) = RuleDefinition::from_value(inherit) {
+            match rule {
+                starlark::__macro_refs::Either::Left(rule) => {
+                    if rule.rule_class.get().is_none() {
+                        anyhow::bail!("inherit_attrs rule must be exported");
+                    }
+                    rule.schema
+                        .iter()
+                        .filter_map(MacroAttributeSchema::inherited_transient)
+                        .collect()
+                }
+                starlark::__macro_refs::Either::Right(rule) => rule
+                    .schema
+                    .iter()
+                    .filter_map(MacroAttributeSchema::inherited)
+                    .collect(),
+            }
+        } else if let Some(symbolic_macro) = SymbolicMacroDefinition::from_value(inherit) {
+            match symbolic_macro {
+                starlark::__macro_refs::Either::Left(symbolic_macro) => {
+                    if symbolic_macro.exported_name.get().is_none() {
+                        anyhow::bail!("inherit_attrs macro must be exported");
+                    }
+                    symbolic_macro
+                        .attributes
+                        .iter()
+                        .map(MacroAttributeSchema::inherited_macro)
+                        .collect()
+                }
+                starlark::__macro_refs::Either::Right(symbolic_macro) => symbolic_macro
+                    .attributes
+                    .iter()
+                    .map(MacroAttributeSchema::inherited_macro)
+                    .collect(),
+            }
+        } else {
+            anyhow::bail!(
+                "invalid inherit_attrs value; expected an exported rule, macro, or 'common'"
+            );
+        };
+        attributes.extend(
+            inherited
+                .into_iter()
+                .filter(|attribute| !explicit_names.contains(&attribute.name.as_str())),
+        );
+    }
+    let context = BzlEvaluationContext::from_evaluator(eval)
+        .map_err(|_| anyhow::anyhow!("macro() may only be called in a .bzl module"))?;
+    Ok(SymbolicMacroDefinitionGen {
+        implementation,
+        definition_source: Arc::new(context.source_identity_for_call(eval)?.clone()),
+        source_identities_by_filename: context.source_identities_by_filename(),
+        attributes: attributes.into(),
+        documentation,
+        exported_name: OnceCell::new(),
+    })
 }
 
 #[starlark_module]
@@ -5836,7 +6833,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     }
 
     fn package(
-        default_visibility: Option<UnpackListOrTuple<&str>>,
+        default_visibility: Option<UnpackVisibility>,
         default_deprecation: Option<&str>,
         default_testonly: Option<bool>,
         default_package_metadata: Option<UnpackListOrTuple<&str>>,
@@ -5857,7 +6854,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
 
     fn exports_files(
         srcs: UnpackListOrTuple<&str>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         exports_files_global(srcs, visibility, eval)
@@ -5866,7 +6863,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn filegroup<'v>(
         name: &str,
         srcs: Option<Value<'v>>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -5880,7 +6877,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         name: &str,
         tests: Option<UnpackListOrTuple<&str>>,
         #[starlark(default=UnpackListOrTuple::default())] tags: UnpackListOrTuple<&str>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -5892,7 +6889,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn alias<'v>(
         name: &str,
         actual: &str,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -5910,7 +6907,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] define_values: Option<SmallMap<String, String>>,
         #[starlark(require = named)] flag_values: Option<SmallMap<String, String>>,
         #[starlark(require = named)] constraint_values: Option<UnpackListOrTuple<&str>>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -5921,7 +6918,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             define_values,
             flag_values,
             constraint_values.map(list),
-            visibility.map(list),
+            visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
         recorder.set_native_overrides(name, kwargs)?;
@@ -5931,7 +6928,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn constraint_setting<'v>(
         name: &str,
         #[starlark(require = named)] default_constraint_value: Option<Value<'v>>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -5952,7 +6949,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             NativeToolchainTarget::ConstraintSetting {
                 default_constraint_value,
             },
-            visibility.map(list),
+            visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
         recorder.set_native_overrides(name, kwargs)?;
@@ -5962,7 +6959,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn constraint_value<'v>(
         name: &str,
         constraint_setting: &str,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -5972,7 +6969,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             NativeToolchainTarget::ConstraintValue {
                 constraint_setting: recorder.native_toolchain_label(constraint_setting)?,
             },
-            visibility.map(list),
+            visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
         recorder.set_native_overrides(name, kwargs)?;
@@ -5982,7 +6979,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn platform<'v>(
         name: &str,
         #[starlark(default = UnpackList::default())] constraint_values: UnpackList<&str>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -5992,7 +6989,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             NativeToolchainTarget::Platform {
                 constraint_values: recorder.native_toolchain_labels(&constraint_values.items)?,
             },
-            visibility.map(list),
+            visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
         recorder.set_native_overrides(name, kwargs)?;
@@ -6001,7 +6998,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
 
     fn toolchain_type<'v>(
         name: &str,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -6009,7 +7006,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
             NativeToolchainTarget::ToolchainType,
-            visibility.map(list),
+            visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
         recorder.set_native_overrides(name, kwargs)?;
@@ -6024,7 +7021,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] target_compatible_with: Option<UnpackList<&str>>,
         #[starlark(require = named)] use_target_platform_constraints: Option<bool>,
         #[starlark(require = named)] target_settings: Option<Value<'v>>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -6039,7 +7036,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 use_target_platform_constraints,
                 target_settings,
             )?,
-            visibility.map(list),
+            visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
         recorder.set_native_overrides(name, kwargs)?;
@@ -6279,7 +7276,7 @@ fn select_globals(builder: &mut GlobalsBuilder) {
                 branches: branches
                     .into_iter()
                     .map(|(condition, value)| SelectorBranchGen {
-                        condition: CompactString::new(condition),
+                        condition: SelectorCondition::Raw(condition.to_owned()),
                         value,
                     })
                     .collect(),
@@ -6339,7 +7336,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
     fn exports_files(
         #[starlark(this)] _native: Value,
         srcs: UnpackListOrTuple<&str>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         exports_files_global(srcs, visibility, eval)
@@ -6349,7 +7346,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] _native: Value<'v>,
         name: &str,
         srcs: Option<Value<'v>>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -6364,7 +7361,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
         name: &str,
         tests: Option<UnpackListOrTuple<&str>>,
         #[starlark(default=UnpackListOrTuple::default())] tags: UnpackListOrTuple<&str>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -6377,7 +7374,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] _native: Value<'v>,
         name: &str,
         actual: &str,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -6393,7 +7390,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] define_values: Option<SmallMap<String, String>>,
         #[starlark(require = named)] flag_values: Option<SmallMap<String, String>>,
         #[starlark(require = named)] constraint_values: Option<UnpackListOrTuple<&str>>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -6404,7 +7401,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
             define_values,
             flag_values,
             constraint_values.map(list),
-            visibility.map(list),
+            visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
         recorder.set_native_overrides(name, kwargs)?;
@@ -6415,7 +7412,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] _native: Value<'v>,
         name: &str,
         #[starlark(require = named)] default_constraint_value: Option<Value<'v>>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -6436,7 +7433,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
             NativeToolchainTarget::ConstraintSetting {
                 default_constraint_value,
             },
-            visibility.map(list),
+            visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
         recorder.set_native_overrides(name, kwargs)?;
@@ -6447,7 +7444,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] _native: Value<'v>,
         name: &str,
         constraint_setting: &str,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -6457,7 +7454,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
             NativeToolchainTarget::ConstraintValue {
                 constraint_setting: recorder.native_toolchain_label(constraint_setting)?,
             },
-            visibility.map(list),
+            visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
         recorder.set_native_overrides(name, kwargs)?;
@@ -6468,7 +7465,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] _native: Value<'v>,
         name: &str,
         #[starlark(default = UnpackList::default())] constraint_values: UnpackList<&str>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -6478,7 +7475,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
             NativeToolchainTarget::Platform {
                 constraint_values: recorder.native_toolchain_labels(&constraint_values.items)?,
             },
-            visibility.map(list),
+            visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
         recorder.set_native_overrides(name, kwargs)?;
@@ -6488,7 +7485,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
     fn toolchain_type<'v>(
         #[starlark(this)] _native: Value<'v>,
         name: &str,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -6496,7 +7493,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
         recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
             NativeToolchainTarget::ToolchainType,
-            visibility.map(list),
+            visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
         recorder.set_native_overrides(name, kwargs)?;
@@ -6512,7 +7509,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] target_compatible_with: Option<UnpackList<&str>>,
         #[starlark(require = named)] use_target_platform_constraints: Option<bool>,
         #[starlark(require = named)] target_settings: Option<Value<'v>>,
-        visibility: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
@@ -6527,7 +7524,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
                 use_target_platform_constraints,
                 target_settings,
             )?,
-            visibility.map(list),
+            visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
         recorder.set_native_overrides(name, kwargs)?;
@@ -6597,6 +7594,17 @@ impl AllocFrozenValue for BzlmodNativeModule {
 
 #[starlark_module]
 fn bzl_only_globals(builder: &mut GlobalsBuilder) {
+    fn r#macro<'v>(
+        #[starlark(require = named)] implementation: Value<'v>,
+        #[starlark(require = named)] attrs: Option<Value<'v>>,
+        #[starlark(require = named)] inherit_attrs: Option<Value<'v>>,
+        #[starlark(require = named, default = false)] finalizer: bool,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<SymbolicMacroDefinition<'v>> {
+        symbolic_macro_global(implementation, attrs, inherit_attrs, finalizer, doc, eval)
+    }
+
     fn configuration_field(fragment: &str, name: &str) -> anyhow::Result<NoneType> {
         let _ = (fragment, name);
         anyhow::bail!("configuration_field is unsupported in Slug loading")
@@ -6627,11 +7635,15 @@ fn complete_loading_globals(bool_config: bool, bzlmod_native: bool) -> Globals {
         testing_bootstrap_globals(&mut globals);
         globals.set("OutputGroupInfo", OutputGroupInfo);
         globals.set("RunEnvironmentInfo", RunEnvironmentInfo);
+        globals.set(
+            "PackageSpecificationInfo",
+            BuiltinProviderKey::new("PackageSpecificationInfo"),
+        );
+        globals.set("DefaultInfo", AnalysisBuiltinCallable::new("DefaultInfo"));
     } else {
         globals.set("config", BuildFileConfigModule);
     }
     globals.set("platform_common", PlatformCommonModule);
-    globals.set("DefaultInfo", AnalysisBuiltinCallable::new("DefaultInfo"));
     globals.set("depset", AnalysisBuiltinCallable::new("depset"));
     globals.build()
 }

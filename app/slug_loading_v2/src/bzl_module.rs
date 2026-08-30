@@ -19,6 +19,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::unix::ffi::OsStringExt;
 use std::path::Path;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -163,14 +164,18 @@ pub struct EvaluatedBzlModule {
     pub manifest: BzlLoadManifest,
 }
 
-#[derive(Default)]
-struct LoadingPrintCapture {
+#[derive(Debug, Default)]
+pub(crate) struct LoadingPrintCapture {
     events: RefCell<Vec<EvaluationEvent>>,
 }
 
 impl LoadingPrintCapture {
     fn into_batch(self) -> EventBatch {
         EventBatch::from_events(self.events.into_inner())
+    }
+
+    pub(crate) fn drain_batch(&self) -> EventBatch {
+        EventBatch::from_events(self.events.borrow_mut().drain(..).collect::<Vec<_>>())
     }
 }
 
@@ -735,11 +740,15 @@ fn evaluate_host_package_attempt(
             EventBatch::empty(),
         );
     }
+    let print_capture = input
+        .capture_events
+        .then(|| Rc::new(LoadingPrintCapture::default()));
     let recorder = PackageRecorder::new_host(
         prepared,
         input.package_identifier.clone(),
         repository_mapping,
-    );
+    )
+    .with_print_capture(print_capture.clone());
     let module = Module::new();
     let loader = LocalBzlLoader {
         modules: input
@@ -748,19 +757,19 @@ fn evaluate_host_package_attempt(
             .map(|(load, module)| (load.as_str(), module.module.dupe()))
             .collect(),
     };
-    let print_capture = input.capture_events.then(LoadingPrintCapture::default);
     let globals = build_file_loading_globals();
     let evaluation = {
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&recorder);
         evaluator.set_loader(&loader);
-        if let Some(print_capture) = print_capture.as_ref() {
+        if let Some(print_capture) = print_capture.as_deref() {
             evaluator.set_print_handler(print_capture);
         }
         evaluator.eval_module(ast, &globals).map(|_| ())
     };
     let event_batch = print_capture
-        .map(LoadingPrintCapture::into_batch)
+        .as_deref()
+        .map(LoadingPrintCapture::drain_batch)
         .unwrap_or_else(EventBatch::empty);
     let control = recorder.take_host_glob_control();
 
@@ -7064,7 +7073,9 @@ impl Key for PackageLoadKey {
                 );
                 validate_direct_bzl_load_visibilities(&package_identifier, &loaded_modules)
                     .map_err(|error| LoadingError::new(error.to_string()))?;
-                let recorder = PackageRecorder::new(listing, package_label);
+                let print_capture = capture_events.then(|| Rc::new(LoadingPrintCapture::default()));
+                let recorder = PackageRecorder::new(listing, package_label)
+                    .with_print_capture(print_capture.clone());
                 let module = Module::new();
                 let loader = LocalBzlLoader {
                     modules: loaded_modules
@@ -7072,18 +7083,19 @@ impl Key for PackageLoadKey {
                         .map(|(load, module)| (load.as_str(), module.module.dupe()))
                         .collect(),
                 };
-                let print_capture = capture_events.then(LoadingPrintCapture::default);
                 let globals = build_file_loading_globals();
                 {
                     let mut evaluator = Evaluator::new(&module);
                     evaluator.extra = Some(&recorder);
                     evaluator.set_loader(&loader);
-                    if let Some(print_capture) = print_capture.as_ref() {
+                    if let Some(print_capture) = print_capture.as_deref() {
                         evaluator.set_print_handler(print_capture);
                     }
                     let evaluation = evaluator.eval_module(ast, &globals).map(|_| ());
                     drop(evaluator);
-                    event_batch = print_capture.map(LoadingPrintCapture::into_batch);
+                    event_batch = print_capture
+                        .as_deref()
+                        .map(LoadingPrintCapture::drain_batch);
                     evaluation.map_err(|error| LoadingError::new(error.to_string()))?;
                 }
                 let direct_load_roots = first_seen_direct_roots(&loaded_modules);

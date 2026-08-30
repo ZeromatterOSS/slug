@@ -117,6 +117,7 @@ use super::RepositoryPackageLoadObservationKey;
 use super::RootPackageDirectLoad;
 use super::RootPackageLoadObservationKey;
 use super::build_file_loading_globals;
+use super::bzlmod_loading_globals;
 use super::loading_globals;
 use super::merge_root_package_observations;
 use super::resolve_external_load_label;
@@ -127,6 +128,7 @@ use crate::AttributeKind;
 use crate::CoercedAttributeValue;
 use crate::HostCanonicalRepositoryLoadRouteObservationKey;
 use crate::LoadingPreparationOutcome;
+use crate::PackageListing;
 use crate::PackageTargetKind;
 use crate::RootPackageLoadKey;
 use crate::TestRuleKind;
@@ -136,6 +138,8 @@ use crate::cycle_detector::bzl_load_cycle_detector;
 use crate::package::BuildSettingDefinition;
 use crate::package::FrozenAspectDefinition;
 use crate::package::FrozenRuleDefinition;
+use crate::package::PackageRecorder;
+use crate::provider::BuiltinProviderKey;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::FrozenUserProviderCallable;
 use crate::provider::OutputGroupInfo;
@@ -147,6 +151,7 @@ use crate::provider::loading_provider_id;
 use crate::provider::starlark_provider_identity;
 use crate::provider::starlark_user_provider_fields;
 use crate::starlark_label::StarlarkLabel;
+use crate::visibility::RuleVisibility;
 
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
@@ -1931,6 +1936,53 @@ async fn load_repository_package_fixture(
         ))
         .await
         .unwrap()
+}
+
+async fn load_repository_package_fixture_on(
+    dice: &Arc<Dice>,
+    files: &[(&str, &[u8])],
+    variant: i64,
+) -> RepositoryPackageOutcome {
+    let mut transaction = transaction(
+        dice,
+        EpochBuilder::external_sources(files, variant).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    transaction
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap()
+}
+
+async fn load_repository_package_fixture_with_events(
+    files: &[(&str, &[u8])],
+    variant: i64,
+    capture_events: bool,
+) -> (RepositoryPackageOutcome, Vec<TrackedBatch>) {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(EventTracker::default());
+    let mut transaction = transaction(
+        &dice,
+        EpochBuilder::external_sources(files, variant).build(),
+        capture_events,
+        Some(tracker.clone()),
+    )
+    .await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    (outcome, tracker.take())
 }
 
 fn observed_repository_package(
@@ -33015,6 +33067,30 @@ fn eval_global(source: &str, globals: &Globals) -> Result<FrozenModule, String> 
     module.freeze().map_err(|error| format!("{error:?}"))
 }
 
+fn symbolic_macro_build_attempt(defs: &str, build: &str) -> (Result<(), String>, bool) {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@//:defs.bzl").unwrap(),
+        workspace_path: PathBuf::from("/workspace/defs.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let defs = eval_bzl_with_identity(defs, owner).unwrap();
+    let ast = AstModule::parse("BUILD.bazel", build.to_owned(), &Dialect::Bazel).unwrap();
+    let module = Module::new();
+    let recorder = PackageRecorder::new(PackageListing::new(vec![], vec![], vec![], vec![]), "");
+    let loader = LocalBzlLoader {
+        modules: vec![(":defs.bzl", defs)],
+    };
+    let mut evaluator = Evaluator::new(&module);
+    evaluator.extra = Some(&recorder);
+    evaluator.set_loader(&loader);
+    let result = evaluator
+        .eval_module(ast, &build_file_loading_globals())
+        .map(|_| ())
+        .map_err(|error| error.to_string());
+    drop(evaluator);
+    (result, recorder.has_active_macro_for_test())
+}
+
 #[test]
 fn bazel_json_module_is_shared_complete_and_deterministic() {
     let source = r#"
@@ -33220,6 +33296,560 @@ fn bazel_set_is_shared_by_bzl_and_build_without_overlay_leaks() {
             assert!(eval_global(rejected, globals).is_err(), "{rejected}");
         }
     }
+}
+
+#[test]
+fn bazel_category_six_globals_and_provider_key_are_exactly_partitioned() {
+    let bzl = loading_globals();
+    let bzlmod = bzlmod_loading_globals();
+    let build = build_file_loading_globals();
+    for globals in [&bzl, &bzlmod] {
+        let names = globals
+            .names()
+            .map(|name| name.as_str())
+            .collect::<Vec<_>>();
+        for present in [
+            "macro",
+            "PackageSpecificationInfo",
+            "RunEnvironmentInfo",
+            "set",
+            "DefaultInfo",
+        ] {
+            assert!(names.contains(&present), "missing {present}");
+        }
+        assert!(!names.contains(&"subrule"));
+    }
+    let build_names = build.names().map(|name| name.as_str()).collect::<Vec<_>>();
+    assert!(build_names.contains(&"set"));
+    for absent in [
+        "macro",
+        "PackageSpecificationInfo",
+        "RunEnvironmentInfo",
+        "DefaultInfo",
+        "subrule",
+    ] {
+        assert!(!build_names.contains(&absent), "BUILD leaked {absent}");
+    }
+
+    let module = eval_global(
+        "KEY=PackageSpecificationInfo\nKIND=type(KEY)\nTEXT=repr(KEY)",
+        &bzl,
+    )
+    .unwrap();
+    let key_binding = module.get("KEY").unwrap();
+    let key = key_binding.value();
+    assert_eq!(module.get("KIND").unwrap().unpack_str(), Some("Provider"));
+    assert_eq!(
+        module.get("TEXT").unwrap().unpack_str(),
+        Some("<function PackageSpecificationInfo>")
+    );
+    assert!(
+        starlark_provider_identity(key)
+            .is_some_and(|identity| identity.is_builtin("PackageSpecificationInfo"))
+    );
+    let heap = FrozenHeap::new();
+    let rematerialized = heap.alloc(BuiltinProviderKey::new("PackageSpecificationInfo"));
+    assert_symmetric_equal_and_hash(key.to_value(), rematerialized.to_value());
+    let error = eval_global("X=PackageSpecificationInfo()", &bzl).unwrap_err();
+    assert!(
+        error.contains("Operation `call()` not supported on type `Provider`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn symbolic_macro_expands_nested_rules_and_retains_package_owned_origin() {
+    let build = r#"load(":defs.bzl", loaded_outer = "outer")
+loaded_outer(name = "tree", text = "explicit", visibility = ["//visibility:public"])
+"#;
+    let defs = r#"def _rule_impl(ctx):
+    return [DefaultInfo()]
+
+leaf_rule = rule(implementation = _rule_impl, attrs = {"text": attr.string()})
+
+def _leaf_impl(name, visibility, text):
+    leaf_rule(name = name, text = text, visibility = visibility)
+
+leaf = macro(implementation = _leaf_impl, attrs = {
+    "text": attr.string(default = "default"),
+})
+
+def _outer_impl(name, visibility, text):
+    leaf(name = name, text = text, visibility = visibility)
+    native.filegroup(name = name + "_native", visibility = visibility)
+    native.filegroup(name = name + "-dash", visibility = visibility)
+    native.filegroup(name = name + ".dot", visibility = visibility)
+    leaf_rule(name = "retained_violation", text = text)
+
+outer = macro(implementation = _outer_impl, attrs = {
+    "text": attr.string(mandatory = True),
+})
+"#;
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@//:defs.bzl").unwrap(),
+        workspace_path: PathBuf::from("/workspace/defs.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let defs = eval_bzl_with_identity(defs, owner).unwrap();
+    let ast = AstModule::parse("BUILD.bazel", build.to_owned(), &Dialect::Bazel).unwrap();
+    let module = Module::new();
+    let recorder = PackageRecorder::new(PackageListing::new(vec![], vec![], vec![], vec![]), "");
+    let loader = LocalBzlLoader {
+        modules: vec![(":defs.bzl", defs)],
+    };
+    let mut evaluator = Evaluator::new(&module);
+    evaluator.extra = Some(&recorder);
+    evaluator.set_loader(&loader);
+    evaluator
+        .eval_module(ast, &build_file_loading_globals())
+        .unwrap();
+    drop(evaluator);
+    let package = recorder.finish(
+        PathBuf::from("/workspace"),
+        PathBuf::from("/workspace/BUILD.bazel"),
+        Arc::from([]),
+        Arc::from([]),
+        [0; 32],
+        Arc::from([]),
+    );
+    assert_eq!(
+        package
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "tree",
+            "tree_native",
+            "tree-dash",
+            "tree.dot",
+            "retained_violation"
+        ]
+    );
+    assert_eq!(package.macro_instances.len(), 2);
+    assert_eq!(package.macro_instances[0].name.as_str(), "tree");
+    assert_eq!(package.macro_instances[0].parent, None);
+    assert_eq!(
+        package.macro_instances[0]
+            .definition
+            .defining_label
+            .to_string(),
+        "@@//:defs.bzl"
+    );
+    assert_eq!(
+        package.macro_instances[0].definition.exported_name.as_str(),
+        "outer"
+    );
+    assert_eq!(package.macro_instances[0].generator_name.as_str(), "tree");
+    assert!(!package.macro_instances[0].generator_function.is_empty());
+    assert!(
+        package.macro_instances[0]
+            .generator_location
+            .contains("BUILD.bazel")
+    );
+    assert_eq!(package.macro_instances[1].name.as_str(), "tree");
+    assert_eq!(package.macro_instances[1].parent, Some(0));
+    assert_eq!(package.macro_instances[1].same_name_depth, 2);
+    assert_eq!(package.macro_instances[1].generator_name.as_str(), "tree");
+    assert!(!package.macro_instances[1].generator_function.is_empty());
+    assert!(
+        package.macro_instances[1]
+            .generator_location
+            .contains("defs.bzl")
+    );
+    let nested = package.macro_origin("tree").unwrap();
+    assert_eq!(nested.macro_index, 1);
+    assert_eq!(nested.namespace_violation, None);
+    let violation = package.macro_origin("retained_violation").unwrap();
+    assert_eq!(violation.macro_index, 0);
+    assert_eq!(violation.namespace_violation.as_deref(), Some("tree"));
+    for target in &package.targets[..4] {
+        assert!(package.effective_visibility(target).unwrap().is_public());
+    }
+    assert!(
+        !package
+            .effective_visibility(&package.targets[4])
+            .unwrap()
+            .is_public()
+    );
+}
+
+#[tokio::test]
+async fn symbolic_macro_fresh_evaluators_share_one_ordered_package_event_sink() {
+    let successful: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(':defs.bzl','outer')\nprint('BUILD-before')\nouter(name='tree')\nprint('BUILD-after')\n",
+        ),
+        (
+            "defs.bzl",
+            b"def _inner(name, visibility):\n  print('nested-macro')\ninner=macro(implementation=_inner)\ndef _outer(name, visibility):\n  print('direct-macro')\n  inner(name=name+'_child')\nouter=macro(implementation=_outer)\n",
+        ),
+    ];
+    let (outcome, batches) =
+        load_repository_package_fixture_with_events(successful, 426, true).await;
+    let package = repository_package_terminal(&outcome);
+    assert_eq!(package.macro_instances.len(), 2);
+    let package_batch = batches
+        .iter()
+        .find(|batch| {
+            batch.key.starts_with("repository-package-inventory:") && batch.batch.is_some()
+        })
+        .unwrap();
+    assert_eq!(
+        event_texts(package_batch.batch.as_ref().unwrap()),
+        [
+            "BUILD-before",
+            "direct-macro",
+            "nested-macro",
+            "BUILD-after"
+        ]
+    );
+
+    let failing: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(':defs.bzl','outer')\nprint('BUILD-before')\nouter(name='tree')\nprint('BUILD-after')\n",
+        ),
+        (
+            "defs.bzl",
+            b"def _inner(name, visibility):\n  print('nested-macro')\n  fail('nested failure')\ninner=macro(implementation=_inner)\ndef _outer(name, visibility):\n  print('direct-macro')\n  inner(name=name+'_child')\nouter=macro(implementation=_outer)\n",
+        ),
+    ];
+    let (outcome, batches) = load_repository_package_fixture_with_events(failing, 427, true).await;
+    assert!(repository_package_error(&outcome).contains("nested failure"));
+    let package_batch = batches
+        .iter()
+        .find(|batch| {
+            batch.key.starts_with("repository-package-inventory:") && batch.batch.is_some()
+        })
+        .unwrap();
+    assert_eq!(
+        event_texts(package_batch.batch.as_ref().unwrap()),
+        ["BUILD-before", "direct-macro", "nested-macro"]
+    );
+
+    let (outcome, batches) =
+        load_repository_package_fixture_with_events(successful, 428, false).await;
+    let _ = repository_package_terminal(&outcome);
+    assert!(
+        batches
+            .iter()
+            .filter(|batch| {
+                batch.key.starts_with("repository-package-inventory:")
+                    || batch.key.starts_with("repository-package-load:")
+            })
+            .all(|batch| batch.batch.is_none())
+    );
+}
+
+#[test]
+fn symbolic_macro_declaration_and_invocation_fail_closed_without_frame_leaks() {
+    let implementation = "def _impl(name, visibility):\n  pass\n";
+    for source in [
+        format!("{implementation}M=macro(implementation=_impl, finalizer=True)"),
+        format!(
+            "{implementation}M=macro(implementation=_impl, attrs={{'_private': attr.string()}})"
+        ),
+        format!("{implementation}M=macro(implementation=_impl, inherit_attrs=1)"),
+        format!("{implementation}HIDDEN=[macro(implementation=_impl)]"),
+        format!("{implementation}M=macro(implementation=_impl)\nM(name='early')"),
+    ] {
+        assert!(
+            eval_bzl_with_identity(&source, clippy_owner()).is_err(),
+            "{source}"
+        );
+    }
+    for (source, expected) in [
+        (
+            "M=macro(implementation=len)".to_owned(),
+            "macro implementation must be a Starlark function",
+        ),
+        (
+            "P=provider()\nM=macro(implementation=P)".to_owned(),
+            "macro implementation must be a Starlark function",
+        ),
+        (
+            format!("{implementation}R=rule(implementation=_impl)\nM=macro(implementation=R)"),
+            "macro implementation must be a Starlark function",
+        ),
+        (
+            "def _rule_impl(ctx): return [DefaultInfo()]\nR=rule(implementation=_rule_impl, attrs={'inherited': attr.string()})\ndef _impl(name, visibility, inherited): pass\nM=macro(implementation=_impl, inherit_attrs=R)".to_owned(),
+            "macro implementation must have a **kwargs parameter",
+        ),
+    ] {
+        let error = eval_bzl_with_identity(&source, clippy_owner())
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(expected), "{error}");
+    }
+
+    let cases = [
+        (
+            "def _impl(name, visibility):\n  return 'bad'\nM=macro(implementation=_impl)\n",
+            "load(':defs.bzl','M')\nM(name='x')\n",
+            "may not return a non-None value",
+        ),
+        (
+            "def _impl(name, visibility):\n  package(default_visibility=['//visibility:public'])\nM=macro(implementation=_impl)\n",
+            "load(':defs.bzl','M')\nM(name='x')\n",
+            "package() may not be called from a symbolic macro",
+        ),
+        (
+            "def _impl(name, visibility):\n  glob(['*.rs'])\nM=macro(implementation=_impl)\n",
+            "load(':defs.bzl','M')\nM(name='x')\n",
+            "glob() may only be called while evaluating a BUILD package",
+        ),
+        (
+            "def _impl(name, visibility):\n  native.existing_rule('x')\nM=macro(implementation=_impl)\n",
+            "load(':defs.bzl','M')\nM(name='x')\n",
+            "supported only during module extension evaluation",
+        ),
+        (
+            "def _impl(name, visibility):\n  M(name=name+'_child')\nM=macro(implementation=_impl)\n",
+            "load(':defs.bzl','M')\nM(name='x')\n",
+            "recursive call to symbolic macro",
+        ),
+        (
+            "def _child(name, visibility):\n  pass\nchild=macro(implementation=_child)\ndef _outer(name, visibility):\n  child(name='outside')\nouter=macro(implementation=_outer)\n",
+            "load(':defs.bzl','outer')\nouter(name='tree')\n",
+            "cannot declare submacro",
+        ),
+        (
+            "def _impl(name, visibility):\n  pass\nM=macro(implementation=_impl)\n",
+            "load(':defs.bzl','M')\nM(name='x')\nnative.filegroup(name='x')\n",
+            "conflicts with an existing macro",
+        ),
+    ];
+    for (defs, build, expected) in cases {
+        let (result, active) = symbolic_macro_build_attempt(defs, build);
+        let error = result.unwrap_err();
+        assert!(error.contains(expected), "{error}");
+        assert!(!active, "macro frame leaked after: {error}");
+    }
+
+    let defs = "def _impl(name, visibility, required):\n  pass\nM=macro(implementation=_impl, attrs={'required': attr.string(mandatory=True)})\n";
+    for build in [
+        "load(':defs.bzl','M')\nM('x')\n",
+        "load(':defs.bzl','M')\nM(name='x')\n",
+        "load(':defs.bzl','M')\nM(name='x', unknown=True)\n",
+    ] {
+        let (result, active) = symbolic_macro_build_attempt(defs, build);
+        assert!(result.is_err(), "{build}");
+        assert!(!active, "{build}");
+    }
+}
+
+#[test]
+fn symbolic_macro_schema_covers_attr_kinds_inheritance_deletion_and_promotion() {
+    let defs = r#"
+def _rule_impl(ctx):
+    return [DefaultInfo()]
+
+AllRule = rule(implementation = _rule_impl, attrs = {
+    "text": attr.string(),
+    "boolean": attr.bool(),
+    "integer": attr.int(),
+    "strings": attr.string_list(),
+    "label": attr.label(),
+    "labels": attr.label_list(),
+    "output": attr.output(),
+    "outputs": attr.output_list(),
+    "string_dict": attr.string_dict(),
+    "string_list_dict": attr.string_list_dict(),
+    "string_label_dict": attr.string_keyed_label_dict(),
+    "label_string_dict": attr.label_keyed_string_dict(),
+    "label_list_dict": attr.label_list_dict(),
+})
+
+def _all_impl(name, visibility, **kwargs):
+    if type(kwargs["text"]) != "select":
+        fail("configurable scalar was not promoted")
+    AllRule(name = name, visibility = visibility, **kwargs)
+
+All = macro(implementation = _all_impl, attrs = {
+    "text": attr.string(),
+    "boolean": attr.bool(),
+    "integer": attr.int(),
+    "strings": attr.string_list(),
+    "label": attr.label(),
+    "labels": attr.label_list(),
+    "output": attr.output(),
+    "outputs": attr.output_list(),
+    "string_dict": attr.string_dict(),
+    "string_list_dict": attr.string_list_dict(),
+    "string_label_dict": attr.string_keyed_label_dict(),
+    "label_string_dict": attr.label_keyed_string_dict(),
+    "label_list_dict": attr.label_list_dict(),
+})
+
+BaseRule = rule(implementation = _rule_impl, attrs = {
+    "kept": attr.string(default = "rule-default"),
+    "drop": attr.string(default = "drop-default"),
+})
+
+def _from_rule_impl(name, visibility, **kwargs):
+    if kwargs["kept"] != None or "drop" in kwargs:
+        fail("rule inheritance did not project None/delete")
+
+FromRule = macro(
+    implementation = _from_rule_impl,
+    inherit_attrs = BaseRule,
+    attrs = {"drop": None},
+)
+
+def _base_impl(name, visibility, first, second):
+    pass
+
+BaseMacro = macro(implementation = _base_impl, attrs = {
+    "first": attr.string(default = "first-default"),
+    "second": attr.string(default = "second-default"),
+})
+
+def _from_macro_impl(name, visibility, **kwargs):
+    if kwargs["first"] != None or kwargs["third"] == None or "second" in kwargs:
+        fail("macro inheritance did not preserve order/default/delete")
+
+FromMacro = macro(
+    implementation = _from_macro_impl,
+    inherit_attrs = BaseMacro,
+    attrs = {"second": None, "third": attr.string(default = "third-default")},
+)
+
+def _common_impl(name, visibility, **kwargs):
+    if "tags" not in kwargs:
+        fail("common inheritance omitted tags")
+
+FromCommon = macro(implementation = _common_impl, inherit_attrs = "common")
+"#;
+    let build = r#"
+load(":defs.bzl", "All", "FromRule", "FromMacro", "FromCommon")
+All(
+    name = "all",
+    visibility = ["//visibility:public"],
+    text = "text",
+    boolean = True,
+    integer = 7,
+    strings = ["a"],
+    label = ":dep",
+    labels = [":dep"],
+    output = "one.out",
+    outputs = ["two.out"],
+    string_dict = {"k": "v"},
+    string_list_dict = {"k": ["v"]},
+    string_label_dict = {"k": ":dep"},
+    label_string_dict = {":dep": "v"},
+    label_list_dict = {"k": [":dep"]},
+)
+FromRule(name = "from_rule")
+FromMacro(name = "from_macro")
+FromCommon(name = "from_common", tags = ["tag"])
+"#;
+    let (result, active) = symbolic_macro_build_attempt(defs, build);
+    assert!(result.is_ok(), "{:?}", result.unwrap_err());
+    assert!(!active);
+}
+
+#[tokio::test]
+async fn symbolic_macro_definition_and_build_inputs_invalidate_and_restore_a_b_a() {
+    const BUILD_A: &[u8] =
+        b"load(':defs.bzl','M')\nM(name='one', visibility=['//visibility:public'])\n";
+    const BUILD_B: &[u8] =
+        b"load(':defs.bzl','M')\nM(name='two', visibility=['//visibility:public'])\n";
+    const DEFS_A: &[u8] = b"def _rule_impl(ctx): return [DefaultInfo()]\nR=rule(implementation=_rule_impl, attrs={'text': attr.string()})\ndef _impl(name, visibility, text): R(name=name, text=text, visibility=visibility)\nM=macro(implementation=_impl, attrs={'text': attr.string(default='a')})\n";
+    const DEFS_B: &[u8] = b"def _rule_impl(ctx): return [DefaultInfo()]\nR=rule(implementation=_rule_impl, attrs={'text': attr.string()})\ndef _impl(name, visibility, text): R(name=name, text=text, visibility=visibility)\nM=macro(implementation=_impl, attrs={'text': attr.string(default='b')})\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let files = |build, defs| [("BUILD.bazel", build), ("defs.bzl", defs)];
+
+    let a = load_repository_package_fixture_on(&dice, &files(BUILD_A, DEFS_A), 429).await;
+    let definition_b =
+        load_repository_package_fixture_on(&dice, &files(BUILD_A, DEFS_B), 430).await;
+    let definition_restored =
+        load_repository_package_fixture_on(&dice, &files(BUILD_A, DEFS_A), 431).await;
+    let build_b = load_repository_package_fixture_on(&dice, &files(BUILD_B, DEFS_A), 432).await;
+    let build_restored =
+        load_repository_package_fixture_on(&dice, &files(BUILD_A, DEFS_A), 433).await;
+
+    assert!(!RepositoryPackageLoadKey::equality(&a, &definition_b));
+    assert!(RepositoryPackageLoadKey::equality(&a, &definition_restored));
+    assert!(!RepositoryPackageLoadKey::equality(&a, &build_b));
+    assert!(RepositoryPackageLoadKey::equality(&a, &build_restored));
+    assert_eq!(repository_package_terminal(&a).macro_instances.len(), 1);
+}
+
+#[test]
+fn symbolic_macro_visibility_separates_call_site_and_definition_packages() {
+    let call_site = PackageIdentifier::new(
+        CanonicalRepoName::new("dep+").unwrap(),
+        PackagePath::parse("app").unwrap(),
+    );
+    let definition = PackageIdentifier::new(
+        CanonicalRepoName::new("dep+").unwrap(),
+        PackagePath::parse("macros").unwrap(),
+    );
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@dep+//macros:defs.bzl").unwrap(),
+        workspace_path: PathBuf::from("/workspace/dep/macros/defs.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let defs = eval_bzl_with_identity(
+        "def _rule_impl(ctx): return [DefaultInfo()]\nR=rule(implementation=_rule_impl)\ndef _child(name, visibility): R(name=name)\nchild=macro(implementation=_child)\ndef _outer(name, visibility): child(name=name)\nouter=macro(implementation=_outer)\n",
+        owner,
+    )
+    .unwrap();
+    let ast = AstModule::parse(
+        "/workspace/dep/app/BUILD.bazel",
+        "load('//macros:defs.bzl','outer')\nouter(name='tree')\n".to_owned(),
+        &Dialect::Bazel,
+    )
+    .unwrap();
+    let module = Module::new();
+    let recorder =
+        PackageRecorder::new_host(Arc::new(SmallMap::new()), call_site.clone(), Arc::from([]));
+    let loader = LocalBzlLoader {
+        modules: vec![("//macros:defs.bzl", defs)],
+    };
+    let mut evaluator = Evaluator::new(&module);
+    evaluator.extra = Some(&recorder);
+    evaluator.set_loader(&loader);
+    evaluator
+        .eval_module(ast, &build_file_loading_globals())
+        .unwrap();
+    drop(evaluator);
+    let package = recorder.finish(
+        PathBuf::from("/workspace/dep/app"),
+        PathBuf::from("/workspace/dep/app/BUILD.bazel"),
+        Arc::from([]),
+        Arc::from([]),
+        [0; 32],
+        Arc::from([]),
+    );
+    assert_eq!(package.macro_instances.len(), 2);
+    let exact_packages = |visibility: &RuleVisibility| {
+        visibility
+            .direct_packages()
+            .unwrap()
+            .exact_positive()
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        exact_packages(&package.macro_instances[0].visibility),
+        [call_site]
+    );
+    assert_eq!(
+        exact_packages(&package.macro_instances[1].visibility),
+        [definition.clone()]
+    );
+    assert_eq!(
+        exact_packages(&package.effective_visibility(&package.targets[0]).unwrap()),
+        [definition.clone()]
+    );
+    assert_eq!(
+        package.macro_origin("tree").unwrap().definition_package,
+        definition
+    );
 }
 
 #[test]

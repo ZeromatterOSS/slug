@@ -87,6 +87,40 @@ pub fn alloc_frozen_starlark_label(
     heap.alloc(StarlarkLabel::new(label))
 }
 
+/// A built-in provider identity that is usable as a key but has no Starlark
+/// constructor. Bazel prints all built-in provider keys with function syntax,
+/// including providers whose Java implementation has no self-call method.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub(crate) struct BuiltinProviderKey {
+    name: &'static str,
+}
+
+impl BuiltinProviderKey {
+    pub(crate) const fn new(name: &'static str) -> Self {
+        Self { name }
+    }
+}
+
+impl fmt::Display for BuiltinProviderKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<function {}>", self.name)
+    }
+}
+
+starlark::starlark_simple_value!(BuiltinProviderKey);
+
+#[starlark_value(type = "Provider")]
+impl<'v> StarlarkValue<'v> for BuiltinProviderKey {
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.name.hash(hasher);
+        Ok(())
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(Self::from_value(other).is_some_and(|other| self.name == other.name))
+    }
+}
+
 /// Fixed `.bzl` declaration token; configured output-group values are deferred.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct OutputGroupInfo;
@@ -200,7 +234,13 @@ impl BzlEvaluationContext {
 
     pub(crate) fn from_evaluator<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> {
         eval.extra
-            .and_then(|extra| extra.downcast_ref::<Self>())
+            .and_then(|extra| {
+                extra.downcast_ref::<Self>().or_else(|| {
+                    extra
+                        .downcast_ref::<crate::package::MacroEvaluationContext<'_>>()
+                        .map(crate::package::MacroEvaluationContext::bzl)
+                })
+            })
             .ok_or_else(|| anyhow::anyhow!("operation may only be called in a .bzl module"))
     }
 
@@ -262,6 +302,33 @@ impl BzlEvaluationContext {
             anyhow::bail!("ambiguous Starlark caller in the Bzl manifest: {filename}");
         }
         Ok(identity)
+    }
+
+    pub(crate) fn macro_runtime_context(
+        source_identity: BzlModuleIdentity,
+        source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    ) -> Self {
+        let canonical_source = source_identity.label.to_string();
+        let source_label = if source_identity.label.package().repo().is_root() {
+            canonical_source
+                .strip_prefix("@@")
+                .expect("canonical root labels begin with @@")
+                .into()
+        } else {
+            canonical_source.into()
+        };
+        Self {
+            source_label,
+            source_identity,
+            source_identities_by_filename,
+            bzl_load_visibility: RefCell::new(None),
+        }
+    }
+
+    pub(crate) fn source_identities_by_filename(
+        &self,
+    ) -> Arc<[(CompactString, BzlModuleIdentity)]> {
+        self.source_identities_by_filename.clone()
     }
 
     pub(crate) fn source_label_for_call(
@@ -1403,6 +1470,9 @@ fn empty_evaluator_depset<'v>(order: DepsetOrder, eval: &mut Evaluator<'v, '_, '
 }
 
 pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> {
+    if let Some(key) = BuiltinProviderKey::from_value(value) {
+        return Some(ProviderIdentity::builtin(key.name));
+    }
     if let Some(callable) = FrozenUserProviderCallable::from_value(value) {
         return Some(ProviderIdentity::user(callable.id().dupe()));
     }
@@ -1432,6 +1502,7 @@ pub fn alloc_starlark_provider_callable(
     name: &'static str,
 ) -> Option<FrozenValue> {
     Some(match name {
+        "PackageSpecificationInfo" => heap.alloc(BuiltinProviderKey::new(name)),
         "DefaultInfo" | "ToolchainInfo" => heap.alloc(AnalysisBuiltinCallable::new(name)),
         "OutputGroupInfo" => heap.alloc(OutputGroupInfo),
         "RunEnvironmentInfo" => heap.alloc(RunEnvironmentInfo),
