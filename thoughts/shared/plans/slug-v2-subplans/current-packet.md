@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-innate-repository-rule-owner-certificate-implementation`
+Packet: `WP-4-5-7A-innate-repository-rule-owner-certificate-implementation-r2`
 
 Milestone: M7A category 6 generated-repository prerequisite.
 
@@ -44,6 +44,16 @@ require a root use and root mapping, construct a load request for the synthetic
 MODULE label, and `module_extension.rs` then authenticates only
 `FrozenModuleExtensionDefinition`. Deleting either guard would load the wrong
 file/type and fabricate ordinary-extension semantics.
+
+The R1 exact winsdk proof then crossed the repaired owner boundary and the
+existing canonical `rules_cc+` materialization/path-retry owner. Evaluation of
+that external `.bzl` exposed a separate generic normalization defect:
+`BzlEvaluationContext::from_manifest` retains external source labels beginning
+`@@`, while `repository_rule` in `package.rs` unconditionally prepends another
+`@@`. This produces an invalid `@@@@rules_cc+...` defining label. The adjacent
+`aspect` constructor already implements the required generic
+`starts_with("@@")` normalization. R2 admits only that same narrow correction
+before resuming the unchanged innate certificate proof.
 
 `docs/developers/dice.md` governs producer ownership, dependency recording,
 equality cutoff, observed path frontiers and the no-lock-across-compute rule.
@@ -131,6 +141,12 @@ owner kind and returns one unchanged consumer-facing iterator. Ordinary
 extension evaluation remains in `module_extension.rs` and never sees an
 innate projection.
 
+For every repository-rule definition, normalize the evaluator source label
+exactly once: retain an already-canonical `@@...` label unchanged and prefix a
+root `//...` label with `@@`. The resulting `RepoRuleId.bzl_file` remains the
+actual canonical external definition label. This is shared `.bzl` behavior,
+not an innate, rules_cc or winsdk branch.
+
 Root/canonical source dependencies, generated effect plan, mapping/route
 inputs, definition manifest, retained calls, separate conversion base and
 merged `PathObservationEpoch` are DICE-retained semantic memory. Evaluator/load
@@ -176,12 +192,18 @@ Only the following existing files may change, at their exact base blobs:
 - `app/slug_loading_v2/src/module_extension_repository_validation.rs`
   `29b11c178b58550bcc34c41f16c9846fbbdcefdf`;
 - `app/slug_loading_v2/src/lib.rs`
-  `9e4d4ec028ca3ec7ea95ff88298cb85943f7945a`; and
+  `9e4d4ec028ca3ec7ea95ff88298cb85943f7945a`;
+- `app/slug_loading_v2/src/package.rs`
+  `3b0e095e617e524545c9b724afc845853e2b0890`; the live pre-correction overlay
+  is `88029ade1085485ba01fc513a88fdfef968de9a5`, and only the non-overlapping
+  `repository_rule` source-label normalization at the former line 5625 is
+  authorized; every other dirty hunk remains excluded and unstaged; and
 - new `app/slug_loading_v2/tests/innate_repository_rule_owner.rs`.
 
 `module_extension.rs`, `module_eval.rs`, Cargo files, core, command, server,
-analysis, action, REAPI, repository-context/effect files and all ruleset/BCR
-sources are forbidden. Permit at most 1,250 production Rust, 1,400 proof Rust
+analysis, action, REAPI, repository-context/effect files, every other
+`package.rs` hunk and all ruleset/BCR sources are forbidden. Permit at most
+1,250 production Rust, 1,400 proof Rust
 and 2,650 aggregate Rust additions. The new loading module is the required
 complexity split: `selected_repo_spec.rs`, `bzl_module.rs`, instantiation and
 validation already exceed or approach the 2,000-line review trigger and may
@@ -207,7 +229,9 @@ The implementation proof must cover:
   observations; generated repo-rule dependency routing, typed retry and cycle
   failure; and create/edit/delete/recreate invalidation; and
 - the exact authenticated built-in winsdk owner reaching (but not executing)
-  the generic repository-effect handoff without a winsdk/local-config branch.
+  the generic repository-effect handoff without a winsdk/local-config branch;
+  its selected external `rules_cc+` dependency must authenticate with an exact
+  `@@rules_cc+//...` `RepoRuleId.bzl_file`, never a double-prefixed label.
 
 Reuse pinned sources and existing deterministic BCR fixtures; add no Bazel
 oracle fixture unless a demonstrated message/output gap remains. Run focused
@@ -225,8 +249,9 @@ MODULE loading; ordinary-extension invocation for innate calls; generated
 source without the existing canonical load-route/effect/cycle owners; copied
 repository instantiation/validation; a new loader/key registry; loss of path
 observation or call/mapping identity; evaluator values escaping; ruleset/
-winsdk special case; change outside the allowlist/caps; or inability to isolate
-both dirty candidates.
+winsdk special case; any other change to the pre-existing `package.rs` overlay;
+change outside the allowlist/caps; or inability to isolate both dirty
+candidates.
 
 After terminal implementation acceptance, restore and reissue
 `WP-4-5-7A-canonical-repository-rule-host-capability-implementation` against
