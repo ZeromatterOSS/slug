@@ -21321,3 +21321,18 @@ cap. Prove the real four `@bazel_tools` registration rows in source order,
 empty non-Windows winsdk row 3 without `UnsupportedCatalog`, and unchanged
 selected custom implementation, `ctx.toolchains`, action context and REAPI
 projection. Preserve the retained selected-context R2 candidate as baseline.
+
+#### Registered closure proof REPLAN; exec-configured loading design active (2026-08-29)
+
+The proof draft passes exact four-row source/mapping authentication and generic
+empty non-Windows winsdk row 3. The real REAPI dependent then continues to
+row 1 and stops at verbatim launcher BUILD line 72: loading already parses
+`attr.label(cfg="exec", ...)`, but drops its configuration/executable flags
+from immutable `AttributeSchema` and rejects target invocation before package
+inventory. A proof-only correction cannot change that production owner.
+
+Design only `WP-4-5-7A-exec-configured-label-attribute-loading-design`.
+Freeze a compact Target/Exec/Starlark dependency-configuration ABI and separate
+executable bit in loading, exact package admission, and analysis-time fail-
+closed behavior until configured exec edges/FilesToRun are separately admitted.
+Preserve the proof draft and selected-context candidate unchanged.
