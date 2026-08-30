@@ -16,6 +16,7 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
+use super::super::repository_archive::SelectedBcrArchiveFormat;
 use super::super::repository_io::ArchiveFailureStage;
 use super::*;
 
@@ -230,10 +231,15 @@ fn runtime() -> tokio::runtime::Runtime {
         .unwrap()
 }
 
-fn plan(urls: Vec<String>, bytes: &[u8]) -> SelectedBcrTarGz {
-    SelectedBcrTarGz {
+fn plan(urls: Vec<String>, bytes: &[u8]) -> SelectedBcrArchive {
+    SelectedBcrArchive {
+        format: SelectedBcrArchiveFormat::TarGz,
         urls: urls.into_boxed_slice(),
         integrity: Sha256::digest(bytes).into(),
+        strip_prefix: None,
+        patches: Box::new([]),
+        overlays: Box::new([]),
+        patch_strip: 0,
         module_url: "https://registry.test/MODULE.bazel".into(),
         module_integrity: [0; 32],
     }

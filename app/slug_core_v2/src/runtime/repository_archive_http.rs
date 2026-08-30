@@ -24,11 +24,15 @@ use tokio::net::TcpStream;
 use tokio::time::timeout;
 use tokio_rustls::TlsConnector;
 
-use super::repository_archive::SelectedBcrTarGz;
+use super::repository_archive::SelectedBcrArchive;
+use super::repository_archive::SelectedBcrOverlay;
+use super::repository_archive::SelectedBcrPatch;
 use super::repository_io::ArchiveMaterializationError;
 
 const CAPTURE_LIMIT: u64 = 128 * 1024 * 1024;
 const MODULE_CAPTURE_LIMIT: u64 = 1024 * 1024;
+const PATCH_CAPTURE_LIMIT: u64 = 8 * 1024 * 1024;
+const OVERLAY_CAPTURE_LIMIT: u64 = 64 * 1024 * 1024;
 const MAX_ADDRESSES: usize = 64;
 const MAX_REDIRECTS: usize = 39;
 
@@ -256,7 +260,7 @@ impl Environment for NativeEnvironment {
 }
 
 pub(super) fn capture_selected_bcr(
-    plan: &SelectedBcrTarGz,
+    plan: &SelectedBcrArchive,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
 ) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
@@ -265,7 +269,7 @@ pub(super) fn capture_selected_bcr(
 }
 
 fn capture_selected_bcr_with(
-    plan: &SelectedBcrTarGz,
+    plan: &SelectedBcrArchive,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
     environment: &impl Environment,
@@ -282,7 +286,7 @@ fn capture_selected_bcr_with(
 }
 
 pub(super) fn capture_selected_bcr_module(
-    plan: &SelectedBcrTarGz,
+    plan: &SelectedBcrArchive,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
 ) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
@@ -292,6 +296,40 @@ pub(super) fn capture_selected_bcr_module(
         plan.module_integrity,
         MODULE_CAPTURE_LIMIT,
         "MODULE",
+        runtime,
+        active,
+        &environment,
+    )
+}
+
+pub(super) fn capture_selected_bcr_overlay(
+    overlay: &SelectedBcrOverlay,
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    let environment = NativeEnvironment::new()?;
+    capture_urls(
+        &overlay.urls,
+        overlay.integrity,
+        OVERLAY_CAPTURE_LIMIT,
+        "overlay",
+        runtime,
+        active,
+        &environment,
+    )
+}
+
+pub(super) fn capture_selected_bcr_patch(
+    patch: &SelectedBcrPatch,
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    let environment = NativeEnvironment::new()?;
+    capture_urls(
+        std::slice::from_ref(&patch.url),
+        patch.integrity,
+        PATCH_CAPTURE_LIMIT,
+        "patch",
         runtime,
         active,
         &environment,

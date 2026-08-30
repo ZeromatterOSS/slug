@@ -1194,6 +1194,67 @@ fn selected_bcr_request(
     })
 }
 
+fn transform_bcr_spec() -> RepoSpec {
+    let mut spec = selected_bcr_spec();
+    let attributes = Arc::make_mut(&mut spec.attributes);
+    attributes.shift_remove("type");
+    attributes.insert(
+        "strip_prefix".into(),
+        OverrideAttributeValue::String("rules_shell-0.6.1".into()),
+    );
+    attributes.insert(
+        "remote_patches".into(),
+        OverrideAttributeValue::Map(Arc::new(SmallMap::from_iter([
+            (
+                OverrideAttributeKey::String("https://registry.test/z.patch".into()),
+                OverrideAttributeValue::String(
+                    format!(
+                        "sha256-{}",
+                        base64::engine::general_purpose::STANDARD.encode([8; 32])
+                    )
+                    .into(),
+                ),
+            ),
+            (
+                OverrideAttributeKey::String("https://registry.test/a.patch".into()),
+                OverrideAttributeValue::String(
+                    format!(
+                        "sha256-{}",
+                        base64::engine::general_purpose::STANDARD.encode([9; 32])
+                    )
+                    .into(),
+                ),
+            ),
+        ]))),
+    );
+    let overlay_key = OverrideAttributeKey::String("bin/generated".into());
+    attributes.insert(
+        "remote_file_urls".into(),
+        OverrideAttributeValue::Map(Arc::new(SmallMap::from_iter([(
+            overlay_key.clone(),
+            OverrideAttributeValue::Iterable(Arc::new([
+                OverrideAttributeValue::String("https://mirror.test/generated".into()),
+                OverrideAttributeValue::String("https://origin.test/generated".into()),
+            ])),
+        )]))),
+    );
+    attributes.insert(
+        "remote_file_integrity".into(),
+        OverrideAttributeValue::Map(Arc::new(SmallMap::from_iter([(
+            overlay_key,
+            OverrideAttributeValue::String(
+                format!(
+                    "sha256-{}",
+                    base64::engine::general_purpose::STANDARD.encode([10; 32])
+                )
+                .into(),
+            ),
+        )]))),
+    );
+    attributes.insert("remote_patch_strip".into(), OverrideAttributeValue::Int(1));
+    spec
+}
+
 fn reject_bcr(key: &str, value: OverrideAttributeValue) {
     let mut spec = selected_bcr_spec();
     Arc::make_mut(&mut spec.attributes).insert(key.into(), value);
@@ -1214,9 +1275,23 @@ fn selected_bcr_plan_is_exact_and_never_falls_back() {
         ]
     );
     assert_eq!(
-        (plan.integrity, plan.module_url, plan.module_integrity),
         (
+            plan.format,
+            plan.integrity,
+            plan.strip_prefix.as_deref(),
+            plan.patches.len(),
+            plan.overlays.len(),
+            plan.patch_strip,
+            plan.module_url,
+            plan.module_integrity,
+        ),
+        (
+            SelectedBcrArchiveFormat::TarGz,
             [7; 32],
+            None,
+            0,
+            0,
+            0,
             "https://registry.test/MODULE.bazel".into(),
             [7; 32]
         )
@@ -1225,7 +1300,6 @@ fn selected_bcr_plan_is_exact_and_never_falls_back() {
     for key in [
         "urls",
         "integrity",
-        "type",
         "strip_prefix",
         "remote_patches",
         "remote_file_urls",
@@ -1238,6 +1312,12 @@ fn selected_bcr_plan_is_exact_and_never_falls_back() {
         Arc::make_mut(&mut malformed.attributes).shift_remove(key);
         assert!(parse_archive_plan(&malformed).is_err(), "missing {key}");
     }
+    let mut inferred = selected_bcr_spec();
+    Arc::make_mut(&mut inferred.attributes).shift_remove("type");
+    assert!(matches!(
+        parse_archive_plan(&inferred),
+        Ok(ArchivePlan::SelectedBcrTarGz(_))
+    ));
     let mut partial = selected_bcr_spec();
     for key in [
         "integrity",
@@ -1262,8 +1342,8 @@ fn selected_bcr_plan_is_exact_and_never_falls_back() {
         ("urls", OverrideAttributeValue::Iterable(Arc::new([OverrideAttributeValue::Int(0)]))),
         ("integrity", OverrideAttributeValue::Iterable(Arc::new([]))),
         ("type", OverrideAttributeValue::String("tar".into())), ("type", OverrideAttributeValue::Int(0)),
-        ("strip_prefix", OverrideAttributeValue::String("nonempty".into())), ("strip_prefix", OverrideAttributeValue::Int(0)),
-        ("remote_patch_strip", OverrideAttributeValue::Int(1)), ("remote_patch_strip", OverrideAttributeValue::String("0".into())),
+        ("strip_prefix", OverrideAttributeValue::String("../unsafe".into())), ("strip_prefix", OverrideAttributeValue::Int(0)),
+        ("remote_patch_strip", OverrideAttributeValue::Int(33)), ("remote_patch_strip", OverrideAttributeValue::String("0".into())),
         ("remote_module_file_urls", OverrideAttributeValue::String("https://registry.test/MODULE.bazel".into())),
         ("remote_module_file_urls", OverrideAttributeValue::Iterable(Arc::new([]))),
         ("remote_module_file_urls", OverrideAttributeValue::Iterable(Arc::new([OverrideAttributeValue::Int(0)]))),
@@ -1306,6 +1386,88 @@ fn selected_bcr_plan_is_exact_and_never_falls_back() {
         parse_archive_plan(&local_extra),
         Ok(ArchivePlan::LocalTar)
     ));
+}
+
+#[test]
+fn selected_bcr_transform_plan_retains_order_and_rejects_ambiguous_inputs() {
+    let ArchivePlan::SelectedBcrTarGz(plan) = parse_archive_plan(&transform_bcr_spec()).unwrap()
+    else {
+        panic!("transform source must remain selected BCR")
+    };
+    assert_eq!(plan.strip_prefix.as_deref(), Some("rules_shell-0.6.1"));
+    assert_eq!(plan.patch_strip, 1);
+    assert_eq!(
+        plan.patches
+            .iter()
+            .map(|patch| patch.url.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "https://registry.test/z.patch",
+            "https://registry.test/a.patch"
+        ]
+    );
+    assert_eq!(plan.overlays[0].destination, "bin/generated");
+    assert_eq!(
+        plan.overlays[0].urls.as_ref(),
+        [
+            "https://mirror.test/generated",
+            "https://origin.test/generated"
+        ]
+    );
+
+    let mut ambiguous = transform_bcr_spec();
+    Arc::make_mut(&mut ambiguous.attributes).insert(
+        "urls".into(),
+        OverrideAttributeValue::Iterable(Arc::new([
+            OverrideAttributeValue::String("https://origin.test/archive.tar.gz".into()),
+            OverrideAttributeValue::String("https://origin.test/archive.zip".into()),
+        ])),
+    );
+    assert!(parse_archive_plan(&ambiguous).is_err());
+    Arc::make_mut(&mut ambiguous.attributes)
+        .insert("type".into(), OverrideAttributeValue::String("tgz".into()));
+    assert!(parse_archive_plan(&ambiguous).is_ok());
+
+    let mut bad_patch_sri = transform_bcr_spec();
+    Arc::make_mut(&mut bad_patch_sri.attributes).insert(
+        "remote_patches".into(),
+        OverrideAttributeValue::Map(Arc::new(SmallMap::from_iter([(
+            OverrideAttributeKey::String("https://registry.test/a.patch".into()),
+            OverrideAttributeValue::String("not-sri".into()),
+        )]))),
+    );
+    assert!(parse_archive_plan(&bad_patch_sri).is_err());
+
+    let mut mismatched_overlay = transform_bcr_spec();
+    Arc::make_mut(&mut mismatched_overlay.attributes).insert(
+        "remote_file_integrity".into(),
+        OverrideAttributeValue::Map(Arc::new(SmallMap::new())),
+    );
+    assert!(parse_archive_plan(&mismatched_overlay).is_err());
+
+    for destination in ["../escape", "/absolute", "a//b", "a\\b"] {
+        let mut malformed = transform_bcr_spec();
+        let attributes = Arc::make_mut(&mut malformed.attributes);
+        let urls = attributes.shift_remove("remote_file_urls").unwrap();
+        let integrity = attributes.shift_remove("remote_file_integrity").unwrap();
+        let replace_key = |value: OverrideAttributeValue| match value {
+            OverrideAttributeValue::Map(values) => OverrideAttributeValue::Map(Arc::new(
+                values
+                    .iter()
+                    .map(|(_, value)| {
+                        (
+                            OverrideAttributeKey::String(destination.into()),
+                            value.clone(),
+                        )
+                    })
+                    .collect(),
+            )),
+            _ => unreachable!(),
+        };
+        attributes.insert("remote_file_urls".into(), replace_key(urls));
+        attributes.insert("remote_file_integrity".into(), replace_key(integrity));
+        assert!(parse_archive_plan(&malformed).is_err(), "{destination}");
+    }
 }
 
 #[test]

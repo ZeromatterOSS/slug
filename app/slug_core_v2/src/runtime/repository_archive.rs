@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use base64::Engine;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_bzlmod_v2::OverrideAttributeKey;
 use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::RepoSpec;
 
@@ -19,10 +20,9 @@ use super::repository_io::optional_string;
 use super::repository_io::reject_extra_attributes;
 use super::repository_io::required_string;
 
-const BCR_KEYS: &[&str] = &[
+const BCR_REQUIRED_KEYS: &[&str] = &[
     "urls",
     "integrity",
-    "type",
     "strip_prefix",
     "remote_patches",
     "remote_file_urls",
@@ -46,13 +46,36 @@ const BCR_ONLY_KEYS: &[&str] = &[
 #[derive(Debug)]
 pub(super) enum ArchivePlan {
     LocalTar,
-    SelectedBcrTarGz(SelectedBcrTarGz),
+    SelectedBcrTarGz(SelectedBcrArchive),
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(super) enum SelectedBcrArchiveFormat {
+    TarGz,
 }
 
 #[derive(Debug)]
-pub(super) struct SelectedBcrTarGz {
+pub(super) struct SelectedBcrPatch {
+    pub(super) url: String,
+    pub(super) integrity: [u8; 32],
+}
+
+#[derive(Debug)]
+pub(super) struct SelectedBcrOverlay {
+    pub(super) destination: String,
     pub(super) urls: Box<[String]>,
     pub(super) integrity: [u8; 32],
+}
+
+#[derive(Debug)]
+pub(super) struct SelectedBcrArchive {
+    pub(super) format: SelectedBcrArchiveFormat,
+    pub(super) urls: Box<[String]>,
+    pub(super) integrity: [u8; 32],
+    pub(super) strip_prefix: Option<String>,
+    pub(super) patches: Box<[SelectedBcrPatch]>,
+    pub(super) overlays: Box<[SelectedBcrOverlay]>,
+    pub(super) patch_strip: usize,
     pub(super) module_url: String,
     pub(super) module_integrity: [u8; 32],
 }
@@ -71,39 +94,32 @@ pub(super) fn parse_archive_plan(spec: &RepoSpec) -> Result<ArchivePlan, String>
     if !bcr_candidate {
         return Ok(ArchivePlan::LocalTar);
     }
-    if keys.len() != BCR_KEYS.len() || BCR_KEYS.iter().any(|key| !keys.contains(key)) {
+    if !matches!(keys.len(), 9 | 10)
+        || BCR_REQUIRED_KEYS.iter().any(|key| !keys.contains(key))
+        || keys
+            .iter()
+            .any(|key| *key != "type" && !BCR_REQUIRED_KEYS.contains(key))
+    {
         return Err("http_archive has an unsupported attribute shape".into());
     }
     let urls = strings(spec, "urls")?;
     if urls.is_empty() || urls.iter().any(|url| !https(url)) {
         return Err("selected BCR http_archive urls must be nonempty HTTPS URLs".into());
     }
-    if string(spec, "type")? != "tar.gz" {
-        return Err("selected BCR http_archive type must be exactly tar.gz".into());
-    }
-    if string(spec, "strip_prefix")? != "" {
-        return Err("selected BCR http_archive strip_prefix must be empty".into());
-    }
-    for key in [
-        "remote_patches",
-        "remote_file_urls",
-        "remote_file_integrity",
-    ] {
-        match spec.attributes.get(key) {
-            Some(OverrideAttributeValue::Map(values)) if values.is_empty() => {}
-            _ => {
-                return Err(format!(
-                    "selected BCR http_archive {key} must be an empty map"
-                ));
-            }
+    let format = selected_bcr_format(spec, &urls)?;
+    let strip_prefix =
+        normalized_transform_path(string(spec, "strip_prefix")?, true, "strip_prefix")?;
+    let patches = selected_bcr_patches(spec)?;
+    let overlays = selected_bcr_overlays(spec)?;
+    let patch_strip = match spec.attributes.get("remote_patch_strip") {
+        Some(OverrideAttributeValue::Int(value)) if (0..=32).contains(value) => *value as usize,
+        _ => {
+            return Err(
+                "selected BCR http_archive remote_patch_strip must be an Int from 0 through 32"
+                    .into(),
+            );
         }
-    }
-    if !matches!(
-        spec.attributes.get("remote_patch_strip"),
-        Some(OverrideAttributeValue::Int(0))
-    ) {
-        return Err("selected BCR http_archive remote_patch_strip must be Int(0)".into());
-    }
+    };
     let module_urls = strings(spec, "remote_module_file_urls")?;
     let [module_url] = module_urls.as_slice() else {
         return Err("selected BCR http_archive requires exactly one remote MODULE URL".into());
@@ -111,23 +127,180 @@ pub(super) fn parse_archive_plan(spec: &RepoSpec) -> Result<ArchivePlan, String>
     if !https(module_url) {
         return Err("selected BCR http_archive MODULE URL must be HTTPS".into());
     }
-    Ok(ArchivePlan::SelectedBcrTarGz(SelectedBcrTarGz {
+    Ok(ArchivePlan::SelectedBcrTarGz(SelectedBcrArchive {
+        format,
         urls: urls.into_boxed_slice(),
         integrity: sri(spec, "integrity")?,
+        strip_prefix,
+        patches: patches.into_boxed_slice(),
+        overlays: overlays.into_boxed_slice(),
+        patch_strip,
         module_url: module_url.clone(),
         module_integrity: sri(spec, "remote_module_file_integrity")?,
     }))
 }
 
 pub(super) fn materialize_selected_bcr_capture(
-    plan: &SelectedBcrTarGz,
+    plan: &SelectedBcrArchive,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
 ) -> Result<Materialized, ArchiveMaterializationError> {
     let archive = super::repository_archive_http::capture_selected_bcr(plan, runtime, active)?;
-    super::repository_archive_realize::realize_selected_bcr(plan, archive, active, || {
-        super::repository_archive_http::capture_selected_bcr_module(plan, runtime, active)
-    })
+    let overlays = plan
+        .overlays
+        .iter()
+        .map(|overlay| {
+            super::repository_archive_http::capture_selected_bcr_overlay(overlay, runtime, active)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let patches = plan
+        .patches
+        .iter()
+        .map(|patch| {
+            super::repository_archive_http::capture_selected_bcr_patch(patch, runtime, active)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let module =
+        super::repository_archive_http::capture_selected_bcr_module(plan, runtime, active)?;
+    super::repository_archive_realize::realize_selected_bcr(
+        plan, archive, overlays, patches, module, active,
+    )
+}
+
+fn selected_bcr_format(
+    spec: &RepoSpec,
+    urls: &[String],
+) -> Result<SelectedBcrArchiveFormat, String> {
+    match spec.attributes.get("type") {
+        Some(OverrideAttributeValue::String(value))
+            if matches!(value.as_str(), "tar.gz" | "tgz") =>
+        {
+            Ok(SelectedBcrArchiveFormat::TarGz)
+        }
+        Some(OverrideAttributeValue::String(_)) => {
+            Err("selected BCR http_archive has an unsupported explicit type".into())
+        }
+        Some(_) => Err("selected BCR http_archive type must be a string".into()),
+        None => {
+            if urls.iter().all(|value| {
+                url::Url::parse(value).is_ok_and(|url| {
+                    let path = url.path();
+                    path.ends_with(".tar.gz") || path.ends_with(".tgz")
+                })
+            }) {
+                Ok(SelectedBcrArchiveFormat::TarGz)
+            } else {
+                Err("selected BCR http_archive type cannot be inferred from every URL".into())
+            }
+        }
+    }
+}
+
+fn selected_bcr_patches(spec: &RepoSpec) -> Result<Vec<SelectedBcrPatch>, String> {
+    let values = attribute_map(spec, "remote_patches")?;
+    values
+        .iter()
+        .map(|(key, value)| {
+            let url = attribute_string_key(key, "remote_patches")?;
+            if !https(url) {
+                return Err("selected BCR remote patch URL must be HTTPS".into());
+            }
+            Ok(SelectedBcrPatch {
+                url: url.to_owned(),
+                integrity: sri_value(value, "remote_patches")?,
+            })
+        })
+        .collect()
+}
+
+fn selected_bcr_overlays(spec: &RepoSpec) -> Result<Vec<SelectedBcrOverlay>, String> {
+    let urls = attribute_map(spec, "remote_file_urls")?;
+    let integrities = attribute_map(spec, "remote_file_integrity")?;
+    if urls.len() != integrities.len() || integrities.keys().any(|key| urls.get(key).is_none()) {
+        return Err("selected BCR overlay URL and integrity key sets must match".into());
+    }
+    urls.iter()
+        .map(|(key, value)| {
+            let destination = attribute_string_key(key, "remote_file_urls")?;
+            let destination = normalized_transform_path(destination, false, "overlay destination")?
+                .expect("nonempty overlay destination");
+            let urls = attribute_strings(value, "remote_file_urls")?;
+            if urls.is_empty() || urls.iter().any(|url| !https(url)) {
+                return Err("selected BCR overlay URLs must be nonempty HTTPS URLs".into());
+            }
+            let integrity = integrities
+                .get(key)
+                .expect("validated overlay key set remains complete");
+            Ok(SelectedBcrOverlay {
+                destination,
+                urls: urls.into_boxed_slice(),
+                integrity: sri_value(integrity, "remote_file_integrity")?,
+            })
+        })
+        .collect()
+}
+
+fn normalized_transform_path(
+    value: &str,
+    allow_empty: bool,
+    subject: &str,
+) -> Result<Option<String>, String> {
+    let value = value.strip_suffix('/').unwrap_or(value);
+    if value.is_empty() {
+        return allow_empty
+            .then_some(None)
+            .ok_or_else(|| format!("selected BCR {subject} must be nonempty"));
+    }
+    if value.len() > 256
+        || value.starts_with('/')
+        || value.contains('\\')
+        || value.contains('\0')
+        || value.split('/').count() > 32
+        || value
+            .split('/')
+            .any(|component| component.is_empty() || matches!(component, "." | ".."))
+    {
+        return Err(format!(
+            "selected BCR {subject} must be a safe relative path"
+        ));
+    }
+    Ok(Some(value.to_owned()))
+}
+
+fn attribute_map<'a>(
+    spec: &'a RepoSpec,
+    key: &str,
+) -> Result<
+    &'a starlark_map::small_map::SmallMap<OverrideAttributeKey, OverrideAttributeValue>,
+    String,
+> {
+    match spec.attributes.get(key) {
+        Some(OverrideAttributeValue::Map(values)) => Ok(values),
+        _ => Err(format!("selected BCR http_archive {key} must be a map")),
+    }
+}
+
+fn attribute_string_key<'a>(
+    key: &'a OverrideAttributeKey,
+    subject: &str,
+) -> Result<&'a str, String> {
+    match key {
+        OverrideAttributeKey::String(value) => Ok(value),
+        _ => Err(format!("selected BCR {subject} keys must be strings")),
+    }
+}
+
+fn attribute_strings(value: &OverrideAttributeValue, subject: &str) -> Result<Vec<String>, String> {
+    match value {
+        OverrideAttributeValue::Iterable(values) => values
+            .iter()
+            .map(|value| match value {
+                OverrideAttributeValue::String(value) => Ok(value.to_string()),
+                _ => Err(format!("selected BCR {subject} must contain strings")),
+            })
+            .collect(),
+        _ => Err(format!("selected BCR {subject} values must be lists")),
+    }
 }
 
 fn string<'a>(spec: &'a RepoSpec, key: &str) -> Result<&'a str, String> {
@@ -153,7 +326,18 @@ fn strings(spec: &RepoSpec, key: &str) -> Result<Vec<String>, String> {
 }
 
 fn sri(spec: &RepoSpec, key: &str) -> Result<[u8; 32], String> {
-    let encoded = string(spec, key)?
+    let value = spec
+        .attributes
+        .get(key)
+        .ok_or_else(|| format!("selected BCR http_archive {key} is missing"))?;
+    sri_value(value, key)
+}
+
+fn sri_value(value: &OverrideAttributeValue, key: &str) -> Result<[u8; 32], String> {
+    let OverrideAttributeValue::String(value) = value else {
+        return Err(format!("selected BCR http_archive {key} must be a string"));
+    };
+    let encoded = value
         .strip_prefix("sha256-")
         .ok_or_else(|| format!("selected BCR http_archive {key} must be SHA-256 SRI"))?;
     base64::engine::general_purpose::STANDARD

@@ -21439,3 +21439,23 @@ archive format/prefix/transform plan, verified captures, private root, bounded
 patch parser and transform-complete source association remain one phase-scratch
 owner. The separately dirty registration and selected-context candidates stay
 read-only until this successor terminally passes.
+
+#### Archive realization R1 global-PAX stop; R2 active (2026-08-30)
+
+R1 passes its 31 focused archive rows, ordered producer/request identity and
+the parked four-row registration proof. The fresh-root real REAPI dependent
+then advances into the authentic `rules_shell@0.6.1` release stream and fails
+at physical block 0: a global PAX header whose sole length-framed record is the
+semantic-inert `comment` release commit. Bazel's `CompressedTarFunction`
+consumes PAX generically and does not inspect this metadata when producing the
+filesystem. R1's contract incorrectly deferred every PAX shape, so independent
+terminal review returns `REPLAN`.
+
+Activate only
+`WP-5-7A-selected-bcr-archive-transform-implementation-r2`. Preserve the same
+nine-file core allowlist, 900/1,100/2,000 caps, private-root lifecycle and
+archive-digest identity. Add a bounded parser for well-formed global PAX
+records whose only key is `comment`; keep local PAX, malformed framing and all
+semantic or unknown keys fail-closed. This is a generic inert-metadata category,
+not a rules_shell comment-value special case. Resume the unchanged registration
+closure only after the real fresh-root REAPI dependent passes twice.

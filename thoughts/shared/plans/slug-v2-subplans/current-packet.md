@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-7A-selected-bcr-archive-transform-implementation`
+Packet: `WP-5-7A-selected-bcr-archive-transform-implementation-r2`
 
 Milestone: M7A category 6 registered-toolchain repository prerequisite.
 
@@ -33,6 +33,15 @@ This is a generic selected-BCR archive transform boundary, not a rules_shell,
 registration, parser, Starlark builtin, `cc_common`, action or REAPI defect.
 The active packet implements the already frozen complete category owner.
 
+R1 implemented that owner and passed every hermetic archive row, but the first
+fresh-root real REAPI replay exposed one incorrect source fact: the
+authenticated rules_shell archive begins with a global PAX header before its
+regular-file/directory entries. Physical block 0 has typeflag `g`; its sole
+well-formed record is the semantic-inert `comment` key carrying the release
+commit. Bazel accepts it through its generic tar reader, while R1 rejects every
+PAX header. Independent terminal review therefore returned `REPLAN`. R2 adds
+only the bounded generic metadata category required by that evidence.
+
 ## Learned facts and authority
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -45,8 +54,10 @@ is sole semantic authority:
   `testArchiveWithExplicitType` discriminate absent versus explicit archive
   type, strip prefix, patches, overlays and remote MODULE projection;
 - `DecompressorValue`, `CompressedTarFunction` and `StripPrefixedPath` infer
-  `.tar.gz`/`.tgz`, discard paths outside a prefix, fail when the prefix is not
-  found and make extracted regular files user-readable;
+  `.tar.gz`/`.tgz`, consume PAX through `TarArchiveInputStream`, discard paths
+  outside a prefix, fail when the prefix is not found and make extracted
+  regular files user-readable; `CompressedTarFunction` does not inspect PAX
+  `comment` metadata when projecting filesystem output;
 - `http.bzl::_http_archive_impl` and `utils.bzl::{download_remote_files,patch}`
   extract first, place authenticated overlays, apply authenticated remote
   patches in map order, then replace `MODULE.bazel` with the authenticated
@@ -63,6 +74,13 @@ reordered patch program structurally distinct at DICE cutoffs. The exact BCR
 `rules_shell/0.6.1/source.json`, patch, MODULE file and release archive are the
 real downstream evidence; no semantic stub is lawful.
 
+The same SHA-256-authenticated release stream starts with a 512-byte global
+PAX header and one 512-byte payload block. The payload is exactly one POSIX PAX
+record, `52 comment=e071f45e209f3e154210faed3d0e60c29aef3b4a\n`;
+the first archive directory begins at physical block 2. This is source evidence
+for a generic inert-metadata parser, not permission to compare the comment
+value or repository name.
+
 Clean `../zabel` commit `0795445f3ab60f4e49070bdd0b94425c5610f73a`
 is concept/test guidance only. Its `registry_source_json.zig` keeps patch rows
 ordered and scratch-owned; `archive_source_realization.zig` keeps verified
@@ -76,16 +94,18 @@ claims.
 - **Exact:** absent/explicit tar-gzip type selection for the admitted source;
   source-order retained patch/overlay projection; HTTPS/SHA-256 SRI
   authentication; normalized `strip_prefix`; extraction of the admitted
-  regular-file/directory tar subset; regular-file read/execute bits; overlay
-  before ordered patch before registry-MODULE replacement; final
+  regular-file/directory tar subset plus well-formed global PAX records whose
+  only key is semantic-inert `comment`; regular-file read/execute bits;
+  overlay before ordered patch before registry-MODULE replacement; final
   `rules_shell@0.6.1` bytes required by loading; and the successful four-row
   registration continuation.
 - **Slug-native:** Rust valid-Unicode path restriction, bounded transport/tar/
   patch ceilings, strict path-containment diagnostics, directory metadata and
   timestamps, collision-safe transform/source association, sequential capture
   scheduling, and TempDir/cancellation publication mechanics.
-- **Unsupported/deferred:** archive formats other than tar.gz/tgz; PAX,
-  symlink, hardlink, device, sparse and non-Unicode archive entries; patch
+- **Unsupported/deferred:** archive formats other than tar.gz/tgz; local PAX,
+  malformed global PAX, every global PAX key other than `comment`, symlink,
+  hardlink, device, sparse and non-Unicode archive entries; patch
   creation/deletion/rename/mode-only/binary/fuzzy-context and malformed-UTF-8
   shapes; local patches, patch commands, auth/netrc, user `files` symlink
   overlays and broader `http_archive` attributes. Every unadmitted shape fails
@@ -155,6 +175,17 @@ this exact phase order:
 4. replace `MODULE.bazel` with the verified registry copy; and
 5. return the private root only after the session remains active.
 
+The tar reader consumes any number allowed by the existing physical-header
+limit of global PAX payloads, each capped at 64 KiB. Each payload must be
+UTF-8, NUL-free,
+newline-terminated POSIX length-framed records, and every record key must be
+exactly `comment`. Record lengths are checked against consumed bytes, and PAX
+payload reads use the same decompressed-byte and cancellation owner. Local PAX,
+malformed framing, or a semantic/unknown key fails before publication. The
+comment value is neither retained nor compared: the verified archive digest
+already authenticates every header/payload byte, while Bazel filesystem output
+does not depend on this extra metadata.
+
 Patch parsing lives in a new private `repository_archive_patch.rs`, not in the
 already multi-responsibility archive/HTTP files. The admitted parser supports
 UTF-8 LF unified-diff modifications of existing regular files, multiple files
@@ -177,10 +208,19 @@ identity, both complete hash owners and route/request/DICE A/B/A proof under
 161 production, 344 proof and 505 aggregate additions. Ordinary
 `SmallMap`/Starlark equality and global serde ordering remain unchanged.
 
-## Active implementation: archive transform realization
+## R1 terminal stop and active R2 implementation
 
-Implement `WP-5-7A-selected-bcr-archive-transform-implementation` against
-these clean baseline blobs:
+R1's focused archive suite passed 31 rows with one disposable artifact row
+ignored; its full core run passed 297 rows with the same three independently
+reproduced dirty route/event failures and one ignore. Producer/request identity
+and the parked four-row proof passed. The real fresh-root REAPI dependent then
+advanced into authentic rules_shell realization and failed only at the leading
+global PAX header. Independent terminal review returned `REPLAN`: freeze the
+generic inert global-comment category before resuming and do not add a
+rules_shell byte special case.
+
+Implement `WP-5-7A-selected-bcr-archive-transform-implementation-r2` against
+these clean baseline blobs and the complete R1 candidate:
 
 - `app/slug_core_v2/src/runtime/mod.rs`
   `de71925e40b73800c6b589526bddbad90c2e4c2e`;
@@ -215,7 +255,11 @@ patches, SRI and field-shape failures; exact prefix discard/not-found behavior;
 0664/0775 rules_shell-shaped modes; overlay-before-patch-before-MODULE bytes;
 multiple patches/files/hunks; unsupported patch shapes; transform-aware source
 association; cancellation between every phase; and capture/private-root
-cleanup on each failure. Use generated hermetic tar/capture inputs plus the
+cleanup on each failure. It must additionally prove well-formed global
+`comment` records are consumed without output changes; multiple bounded
+records; malformed length/framing/UTF-8/NUL rejection; local PAX rejection;
+semantic and unknown global-key rejection; and cancellation during PAX payload
+consumption. Use generated hermetic tar/capture inputs plus the
 exact small rules_shell source/patch bytes already authenticated above; add no
 new oracle fixture.
 
@@ -236,14 +280,15 @@ received independent architecture/identity/lifecycle `ACCEPT`; the identity
 successor is now accepted. This implementation changes only the frozen
 nine-file core allowlist.
 
-`REPLAN` for a rules_shell/BCR byte special case; a patch skip because the
+`REPLAN` for a rules_shell/BCR comment-value special case; accepting local,
+malformed, semantic or unknown PAX; a patch skip because the
 registry MODULE later overwrites the file; lost source order; format inference
 from content or repository name; unverified transform input; identity omitting
 a semantic transform; external `patch`/shell/JVM execution; global cache or
 background task; partial root publication; owner/Cargo/file/cap widening; or a
 real rules_shell tar/patch shape outside the admitted subset.
 
-Implement only the frozen active allowlist.
+Implement only the frozen active R2 allowlist.
 After this packet receives terminal `ACCEPT`, resume the unchanged proof-only
 four-registration-row closure. Only after that proof and its command/
 REAPI dependents pass may the retained selected-context R2 candidate return to

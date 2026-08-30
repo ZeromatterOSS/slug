@@ -15,7 +15,8 @@ use flate2::read::MultiGzDecoder;
 use sha2::Digest;
 use sha2::Sha256;
 
-use super::repository_archive::SelectedBcrTarGz;
+use super::repository_archive::SelectedBcrArchive;
+use super::repository_archive::SelectedBcrArchiveFormat;
 use super::repository_io::ArchiveMaterializationError;
 use super::repository_io::Materialized;
 
@@ -28,41 +29,95 @@ const LOGICAL_LIMIT: usize = 8192;
 const PATH_LIMIT: usize = 256;
 const COMPONENT_LIMIT: usize = 32;
 const MODULE_LIMIT: u64 = 1024 * 1024;
+const PAX_PAYLOAD_LIMIT: u64 = 64 * 1024;
 
 pub(super) fn realize_selected_bcr(
-    plan: &SelectedBcrTarGz,
+    plan: &SelectedBcrArchive,
     archive: tempfile::NamedTempFile,
+    overlays: Vec<tempfile::NamedTempFile>,
+    patches: Vec<tempfile::NamedTempFile>,
+    module: tempfile::NamedTempFile,
     active: &dyn Fn() -> bool,
-    module_capture: impl FnOnce() -> Result<tempfile::NamedTempFile, ArchiveMaterializationError>,
 ) -> Result<Materialized, ArchiveMaterializationError> {
+    if overlays.len() != plan.overlays.len() || patches.len() != plan.patches.len() {
+        return Err(materialization(
+            "selected BCR transform capture count does not match plan",
+        ));
+    }
     let root = tempfile::tempdir()
         .map_err(|error| materialization(format!("creating selected BCR root: {error}")))?;
-    extract(archive.as_file(), root.path(), active)?;
+    extract(
+        archive.as_file(),
+        root.path(),
+        plan.strip_prefix.as_deref(),
+        active,
+    )?;
     archive
         .close()
         .map_err(|error| materialization(format!("deleting verified archive capture: {error}")))?;
+    for (overlay, capture) in plan.overlays.iter().zip(overlays) {
+        place_overlay(capture, root.path(), &overlay.destination, active)?;
+    }
+    for capture in patches {
+        let bytes = read_capture(capture, "patch", 8 * 1024 * 1024, active)?;
+        super::repository_archive_patch::apply_selected_bcr_patch(
+            root.path(),
+            &bytes,
+            plan.patch_strip,
+            active,
+        )?;
+    }
+    place_module(module, root.path(), active)?;
     if !active() {
         return Err(materialization("repository session is no longer active"));
     }
-    let module = module_capture()?;
-    place_module(module, root.path(), active)?;
     Ok(Materialized::AssociatedImmutable {
         source_identity: selected_bcr_source_association(plan),
         root,
     })
 }
 
-fn selected_bcr_source_association(plan: &SelectedBcrTarGz) -> Arc<str> {
+fn selected_bcr_source_association(plan: &SelectedBcrArchive) -> Arc<str> {
     let mut digest = Sha256::new();
-    digest.update(b"slug.selected-bcr-root.v1\0");
-    digest.update(plan.integrity);
-    digest.update(plan.module_integrity);
+    digest.update(b"slug.selected-bcr-root.v2\0");
+    framed(
+        &mut digest,
+        match plan.format {
+            SelectedBcrArchiveFormat::TarGz => b"tar-gzip",
+        },
+    );
+    framed(
+        &mut digest,
+        plan.strip_prefix.as_deref().unwrap_or("").as_bytes(),
+    );
+    framed(&mut digest, &plan.integrity);
+    framed_usize(&mut digest, plan.patches.len());
+    for patch in &plan.patches {
+        framed(&mut digest, &patch.integrity);
+    }
+    framed_usize(&mut digest, plan.patch_strip);
+    framed_usize(&mut digest, plan.overlays.len());
+    for overlay in &plan.overlays {
+        framed(&mut digest, overlay.destination.as_bytes());
+        framed(&mut digest, &overlay.integrity);
+    }
+    framed(&mut digest, &plan.module_integrity);
     Arc::from(hex::encode(digest.finalize()))
+}
+
+fn framed(digest: &mut Sha256, value: &[u8]) {
+    digest.update((value.len() as u64).to_be_bytes());
+    digest.update(value);
+}
+
+fn framed_usize(digest: &mut Sha256, value: usize) {
+    digest.update((value as u64).to_be_bytes());
 }
 
 fn extract(
     capture: &File,
     root: &Path,
+    strip_prefix: Option<&str>,
     active: &dyn Fn() -> bool,
 ) -> Result<(), ArchiveMaterializationError> {
     let mut capture = capture
@@ -78,6 +133,7 @@ fn extract(
     let mut headers = 0usize;
     let mut logical = 0usize;
     let mut payload = 0u64;
+    let mut prefix_found = strip_prefix.is_none();
 
     loop {
         let block = tar.block("reading tar header")?;
@@ -99,8 +155,10 @@ fn extract(
         validate_checksum(&block)?;
         let header = tar::Header::from_byte_slice(&block);
         let entry_type = header.entry_type();
-        if entry_type.is_pax_global_extensions() || entry_type.is_pax_local_extensions() {
-            return Err(materialization("selected BCR tar contains a PAX header"));
+        if entry_type.is_pax_local_extensions() {
+            return Err(materialization(
+                "selected BCR tar contains unsupported local PAX metadata",
+            ));
         }
         if entry_type.is_gnu_longlink() {
             return Err(materialization("selected BCR tar contains a GNU long link"));
@@ -111,7 +169,19 @@ fn extract(
         let size = header
             .size()
             .map_err(|error| materialization(format!("reading tar entry size: {error}")))?;
-
+        if entry_type.is_pax_global_extensions() {
+            if size > PAX_PAYLOAD_LIMIT {
+                return Err(materialization(
+                    "selected BCR global PAX payload exceeds size limit",
+                ));
+            }
+            payload = checked_payload(payload, size)?;
+            let mut bytes = vec![0; size as usize];
+            tar.read_exact(&mut bytes, "reading global PAX metadata")?;
+            validate_global_pax_comment(&bytes)?;
+            tar.padding(size)?;
+            continue;
+        }
         if entry_type.is_gnu_longname() {
             if pending_longname.is_some() {
                 return Err(materialization(
@@ -143,8 +213,8 @@ fn extract(
         let mode = header
             .mode()
             .map_err(|error| materialization(format!("reading tar mode: {error}")))?;
-        if (kind == EntryKind::Directory && mode != 0o755)
-            || (kind == EntryKind::Regular && !matches!(mode, 0o644 | 0o755))
+        if (kind == EntryKind::Directory && !matches!(mode, 0o755 | 0o775))
+            || (kind == EntryKind::Regular && !matches!(mode, 0o644 | 0o664 | 0o755 | 0o775))
         {
             return Err(materialization("selected BCR unsupported entry mode"));
         }
@@ -162,6 +232,40 @@ fn extract(
                     "selected BCR tar has an invalid root entry",
                 ));
             }
+            continue;
+        };
+        let path = match strip_prefix {
+            None => Some(path),
+            Some(prefix) if path == prefix => {
+                if kind != EntryKind::Directory {
+                    return Err(materialization(
+                        "selected BCR strip_prefix root is not a directory",
+                    ));
+                }
+                prefix_found = true;
+                None
+            }
+            Some(prefix) => path
+                .strip_prefix(prefix)
+                .and_then(|suffix| suffix.strip_prefix('/'))
+                .map(|suffix| {
+                    prefix_found = true;
+                    suffix.to_owned()
+                }),
+        };
+        let Some(path) = path else {
+            if kind == EntryKind::Directory {
+                if size != 0 {
+                    return Err(materialization("selected BCR directory has a payload"));
+                }
+            } else {
+                if size > ENTRY_LIMIT {
+                    return Err(materialization("selected BCR entry exceeds size limit"));
+                }
+                payload = checked_payload(payload, size)?;
+                tar.copy_exact(size, &mut std::io::sink(), "discarded prefix entry")?;
+            }
+            tar.padding(size)?;
             continue;
         };
         admit_namespace(&namespace, &path, kind)?;
@@ -213,6 +317,9 @@ fn extract(
             }
         }
         tar.padding(size)?;
+    }
+    if !prefix_found {
+        return Err(materialization("selected BCR strip_prefix was not found"));
     }
     Ok(())
 }
@@ -307,6 +414,146 @@ fn checked_payload(current: u64, size: u64) -> Result<u64, ArchiveMaterializatio
         .checked_add(size)
         .filter(|total| *total <= PAYLOAD_LIMIT)
         .ok_or_else(|| materialization("selected BCR payload exceeds total limit"))
+}
+
+fn validate_global_pax_comment(bytes: &[u8]) -> Result<(), ArchiveMaterializationError> {
+    if bytes.is_empty() || bytes.contains(&0) || std::str::from_utf8(bytes).is_err() {
+        return Err(materialization(
+            "selected BCR global PAX metadata must be nonempty NUL-free UTF-8",
+        ));
+    }
+    let mut cursor = 0usize;
+    while cursor < bytes.len() {
+        let space = bytes[cursor..]
+            .iter()
+            .position(|byte| *byte == b' ')
+            .map(|offset| cursor + offset)
+            .ok_or_else(|| materialization("selected BCR global PAX record has no length"))?;
+        let digits = &bytes[cursor..space];
+        if digits.is_empty()
+            || !digits.iter().all(u8::is_ascii_digit)
+            || (digits.len() > 1 && digits[0] == b'0')
+        {
+            return Err(materialization(
+                "selected BCR global PAX record length is malformed",
+            ));
+        }
+        let length = std::str::from_utf8(digits)
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .ok_or_else(|| materialization("selected BCR global PAX record length is invalid"))?;
+        let end = cursor
+            .checked_add(length)
+            .filter(|end| *end <= bytes.len() && *end > space + 2)
+            .ok_or_else(|| materialization("selected BCR global PAX record length is invalid"))?;
+        let record = &bytes[space + 1..end];
+        let body = record
+            .strip_suffix(b"\n")
+            .ok_or_else(|| materialization("selected BCR global PAX record lacks final LF"))?;
+        let equals = body.iter().position(|byte| *byte == b'=').ok_or_else(|| {
+            materialization("selected BCR global PAX record has no key separator")
+        })?;
+        if &body[..equals] != b"comment" {
+            return Err(materialization(
+                "selected BCR global PAX key is unsupported",
+            ));
+        }
+        cursor = end;
+    }
+    Ok(())
+}
+
+fn read_capture(
+    mut capture: tempfile::NamedTempFile,
+    subject: &str,
+    limit: u64,
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, ArchiveMaterializationError> {
+    let size = capture
+        .as_file()
+        .metadata()
+        .map_err(|error| materialization(format!("sizing verified {subject} capture: {error}")))?
+        .len();
+    if size > limit {
+        return Err(materialization(format!(
+            "verified {subject} capture exceeds size limit"
+        )));
+    }
+    if !active() {
+        return Err(materialization("repository session is no longer active"));
+    }
+    capture
+        .as_file_mut()
+        .seek(SeekFrom::Start(0))
+        .map_err(|error| materialization(format!("seeking verified {subject} capture: {error}")))?;
+    let mut bytes = Vec::with_capacity(size as usize);
+    capture
+        .as_file_mut()
+        .read_to_end(&mut bytes)
+        .map_err(|error| materialization(format!("reading verified {subject} capture: {error}")))?;
+    capture.close().map_err(|error| {
+        materialization(format!("deleting verified {subject} capture: {error}"))
+    })?;
+    Ok(bytes)
+}
+
+fn place_overlay(
+    capture: tempfile::NamedTempFile,
+    root: &Path,
+    destination: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<(), ArchiveMaterializationError> {
+    let bytes = read_capture(capture, "overlay", 64 * 1024 * 1024, active)?;
+    let target = root.join(destination);
+    let parent = target
+        .parent()
+        .ok_or_else(|| materialization("selected BCR overlay target has no parent"))?;
+    std::fs::create_dir_all(parent).map_err(|error| {
+        materialization(format!(
+            "creating selected BCR overlay parent {destination}: {error}"
+        ))
+    })?;
+    let mut staged = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
+        materialization(format!(
+            "staging selected BCR overlay {destination}: {error}"
+        ))
+    })?;
+    staged.as_file_mut().write_all(&bytes).map_err(|error| {
+        materialization(format!(
+            "writing selected BCR overlay {destination}: {error}"
+        ))
+    })?;
+    staged.as_file_mut().flush().map_err(|error| {
+        materialization(format!(
+            "flushing selected BCR overlay {destination}: {error}"
+        ))
+    })?;
+    set_mode(staged.path(), 0o755)?;
+    match std::fs::symlink_metadata(&target) {
+        Ok(metadata) if !metadata.file_type().is_file() => {
+            return Err(materialization(
+                "selected BCR overlay target is not a regular file",
+            ));
+        }
+        Ok(_) => std::fs::remove_file(&target).map_err(|error| {
+            materialization(format!(
+                "removing prior overlay target {destination}: {error}"
+            ))
+        })?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(materialization(format!(
+                "inspecting selected BCR overlay target {destination}: {error}"
+            )));
+        }
+    }
+    staged.persist(&target).map_err(|error| {
+        materialization(format!(
+            "placing selected BCR overlay {destination}: {}",
+            error.error
+        ))
+    })?;
+    Ok(())
 }
 
 fn place_module(
@@ -453,7 +700,7 @@ impl<'a, R: Read> BoundedTarReader<'a, R> {
     fn copy_exact(
         &mut self,
         mut remaining: u64,
-        output: &mut File,
+        output: &mut impl Write,
         path: &str,
     ) -> Result<(), ArchiveMaterializationError> {
         let mut buffer = [0u8; 64 * 1024];
