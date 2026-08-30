@@ -1,22 +1,23 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-7A-selected-bcr-transform-identity-implementation`
+Packet: `WP-5-7A-selected-bcr-archive-transform-implementation`
 
 Milestone: M7A category 6 registered-toolchain repository prerequisite.
 
-Base: independently accepted architecture `2a7c9436e`, accepted exec-configured
-loading implementation `831e574e6`, accepted canonical repository Host
-capabilities `26a68d61c`, and the parked proof-only registration base
-`20ad71ffa`. The passing four-row proof draft and retained selected-context R2
-candidate remain dirty and are read-only during implementation.
+Base: accepted ordered source/RepoSpec identity `01f2802f0`, independently
+accepted architecture `2a7c9436e`, accepted exec-configured loading
+implementation `831e574e6`, accepted canonical repository Host capabilities
+`26a68d61c`, and parked proof-only registration base `20ad71ffa`. The passing
+four-row proof draft and retained selected-context R2 candidate remain dirty
+and are read-only during implementation.
 
 ## Why this implementation is active
 
-The exec/executable label-attribute prerequisite is terminally accepted. It
-retains Target/Exec/Starlark identity in loading, admits package inventory and
-fails closed before unsupported configured consumption. Focused and full
-loading/analysis suites pass, and the exact four-row registration inventory
-proof still passes.
+The ordered producer/publication-identity successor is terminally accepted in
+`01f2802f0`. It retains source JSON patch/overlay order, keeps ordinary map
+equality unchanged, and makes exact `http_archive`/`git_repository`
+`remote_patches` order structural through both route families and the actual
+materialization-request DICE cutoff.
 
 The real command/REAPI dependent now clears launcher row 1 and stops at row 2
 while loading `@@bazel_tools//tools/test:BUILD`'s ordinary
@@ -30,8 +31,7 @@ zero and only 0644/0755 entries.
 
 This is a generic selected-BCR archive transform boundary, not a rules_shell,
 registration, parser, Starlark builtin, `cc_common`, action or REAPI defect.
-The proof-only packet cannot change it. Design the complete category owner
-before another Rust edit.
+The active packet implements the already frozen complete category owner.
 
 ## Learned facts and authority
 
@@ -170,55 +170,17 @@ RepoSpec/materialization request identity. No lock crosses I/O or DICE
 compute. Any capture, transform, cancellation or validation failure drops all
 captures and the unpublished private root.
 
-## Active implementation: ordered producer and publication identity
+## Immediate predecessor accepted
 
-Implement only this packet against:
+Commit `01f2802f0` accepts the ordered producer, narrow RepoSpec publication
+identity, both complete hash owners and route/request/DICE A/B/A proof under
+161 production, 344 proof and 505 aggregate additions. Ordinary
+`SmallMap`/Starlark equality and global serde ordering remain unchanged.
 
-- `app/slug_bzlmod_v2/src/selected_repo_spec.rs`
-  `8ba4d01d3224dbc3d55e020b794868261d691ca9`; and
-- `app/slug_bzlmod_v2/src/module_eval.rs`
-  `450467a02d1712643399e656e213f8e4406b91ad` for the narrow RepoSpec
-  publication-identity equality owner;
-- `app/slug_bzlmod_v2/src/host_module.rs`
-  `ca66f7aeae66bdb1637fc53ab90c011f4f1dcb21` and
-  `app/slug_bzlmod_v2/src/canonical_repository_route.rs`
-  `f1a0018bb156c7b7a4b46671cc1de1e7f90d128b` solely to add the ordered
-  publication component to their existing complete RepoSpec hash projections;
-- `app/slug_bzlmod_v2/tests/source_preparation_dice.rs`
-  `19292cfd6617dd5b76e7c6c39eced53befd799f3` for the actual
-  materialization-request/DICE A/B/A cutoff proof; and
-- `app/slug_bzlmod_v2/Cargo.toml`
-  `001c688b7cf4d201eeb8e18da87f4a5e878c278e` solely for the existing workspace
-  `serde` dependency needed by a local ordered-map visitor; and
-- `Cargo.lock` `109b0d788b38f04a37593a6dd6cf8d97adbc6dbf` solely for Cargo's
-  mechanically required addition of `serde` to the existing local
-  `slug_bzlmod_v2` dependency list. No version, checksum, source or other
-  package row may change.
+## Active implementation: archive transform realization
 
-Cap additions at 360 production, 420 proof and 780 aggregate Rust/TOML/lock
-lines.
-Prove source-order patch and overlay A/B/A projection, exact optional `type`,
-unchanged other source kinds, ordinary nested-map reorder equality, exact
-http_archive/git_repository `remote_patches` inequality, complete-content hash
-plus patch-order hash discrimination, and same-entry patch-order A/B/A at the
-actual materialization-request DICE boundary. The proof must traverse the
-selected definition into both root/apparent and canonical source capabilities;
-a RepoSpec-only unit assertion is insufficient. Also prove no global serde
-feature/order change. Run the focused source projection, route/capability and
-source-preparation DICE tests, full serial `slug_bzlmod_v2`, its direct selected-
-source dependents, formatting, scope/cap/blob checks and `git diff --check`.
-
-Stop for a `SmallMap`/Starlark-dict equality change, a second retained order
-carrier, equality by digest, a rule/attribute pair beyond the frozen exact two,
-global JSON-order change, sorted patch order, new cache/interner, unrelated
-source-kind behavior, any Cargo-lock change beyond that exact one dependency
-edge, or cap breach.
-
-## Successor 2: archive transform realization
-
-Only after successor 1 terminal `ACCEPT`, activate
-`WP-5-7A-selected-bcr-archive-transform-implementation` against these clean
-baseline blobs:
+Implement `WP-5-7A-selected-bcr-archive-transform-implementation` against
+these clean baseline blobs:
 
 - `app/slug_core_v2/src/runtime/mod.rs`
   `de71925e40b73800c6b589526bddbad90c2e4c2e`;
@@ -267,12 +229,12 @@ before and after daemon-sensitive tests.
 
 ## Design stops and successor
 
-This design packet changes only the canonical plan, this manifest, Stage 6,
-the routing log and its bounded August history compaction. It changes zero
-Rust. The first independent review returned `REPLAN` because insertion order
+The first independent design review returned `REPLAN` because insertion order
 was not structural identity. The corrected narrow RepoSpec publication domain,
-complete carrier trace, request-boundary A/B/A proof and unchanged archive
-lifecycle then received independent architecture/identity/lifecycle `ACCEPT`.
+complete carrier trace, request-boundary A/B/A proof and archive lifecycle then
+received independent architecture/identity/lifecycle `ACCEPT`; the identity
+successor is now accepted. This implementation changes only the frozen
+nine-file core allowlist.
 
 `REPLAN` for a rules_shell/BCR byte special case; a patch skip because the
 registry MODULE later overwrites the file; lost source order; format inference
@@ -281,9 +243,8 @@ a semantic transform; external `patch`/shell/JVM execution; global cache or
 background task; partial root publication; owner/Cargo/file/cap widening; or a
 real rules_shell tar/patch shape outside the admitted subset.
 
-This activation commits no Rust. Implement only the frozen active allowlist.
-After this packet receives terminal `ACCEPT`, activate successor 2 separately.
-After both implementation successors terminally pass, resume the unchanged
-proof-only four-registration-row closure. Only after that proof and its command/
+Implement only the frozen active allowlist.
+After this packet receives terminal `ACCEPT`, resume the unchanged proof-only
+four-registration-row closure. Only after that proof and its command/
 REAPI dependents pass may the retained selected-context R2 candidate return to
 terminal review, followed by M8 bootstrap work.

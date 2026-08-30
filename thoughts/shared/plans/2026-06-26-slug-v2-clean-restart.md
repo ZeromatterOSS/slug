@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-5-7A-selected-bcr-transform-identity-implementation](./slug-v2-subplans/current-packet.md).
+[WP-5-7A-selected-bcr-archive-transform-implementation](./slug-v2-subplans/current-packet.md).
 
 Category 4 is terminally accepted in `568b0c698`; category 5's retained value
 graph is independently accepted in `5ce967d55`, and its R3 evaluator adapter is
@@ -112,7 +112,7 @@ the immutable loading schema, admit package inventory, and fail closed before
 configured analysis consumes an unsupported exec/executable edge. Preserve the
 parked registration proof and selected-context candidate outside named hunks.
 
-### M7 BCR transform design accepted; ordered identity implementation active (2026-08-29)
+### M7 ordered BCR transform identity accepted; archive realization active (2026-08-30)
 
 Commit `831e574e6` terminally accepts the generic loading prerequisite. Full
 serial loading and analysis suites pass, the four-row inventory proof remains
@@ -132,18 +132,17 @@ Bazel 9.2/BCR remain behavior authority. Clean Zabel informs ordered scratch/
 realization ownership only; no rules_shell special case, Rust rule
 implementation or `cc_common` semantic owner is permitted.
 
-The first independent review rejected physical insertion order as sufficient
-identity because Buck2-derived `SmallMap` equality is membership-based. The
-corrected design adds collision-safe ordered `remote_patches` key identity at
-the RepoSpec publication boundary, proves both selected route lanes through the
-actual request cutoff, and leaves ordinary map equality unchanged. Independent
-architecture/identity/lifecycle rereview is `ACCEPT`. Implement only
-`WP-5-7A-selected-bcr-transform-identity-implementation` under the frozen
-five-code-file plus Cargo manifest allowlist and caps. Preflight showed that
-the direct use of workspace-pinned `serde` necessarily adds exactly one local
-dependency-list row to `Cargo.lock`; the corrected manifest admits that
-mechanical row and no lock version/source/checksum change. Archive realization
-remains a separately activated successor.
+Commit `01f2802f0` terminally accepts producer-retained source order and the
+narrow structural RepoSpec publication identity. Focused route/request/DICE,
+full serial Bzlmod and loading gates pass; independent terminal review is
+`ACCEPT`. The full core gate's three separately dirty route/event failures do
+not cross the selected-patch surface and remain owned by their parked packet.
+
+Run only `WP-5-7A-selected-bcr-archive-transform-implementation` under its
+frozen nine-file core allowlist and 900/1,100/2,000 caps. Add the complete
+phase-scratch archive plan, verified archive/overlay/patch/MODULE capture,
+private-root transform sequence and transform-aware source association. Do not
+change Bzlmod, loading, registration, action or REAPI files.
 
 ### M7 effective repository Host inputs accepted; canonical capabilities active (2026-08-28)
 

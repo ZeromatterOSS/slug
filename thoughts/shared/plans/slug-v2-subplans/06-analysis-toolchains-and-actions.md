@@ -21424,3 +21424,18 @@ in `Cargo.lock`, with every version/source/checksum and other package row
 frozen. Archive realization remains stopped. After both
 implementations pass, resume only the unchanged proof-only four-row
 registration closure before selected-context R2 review.
+
+#### Ordered selected-BCR identity accepted; archive realization active (2026-08-30)
+
+Commit `01f2802f0` accepts source-ordered patch/overlay projection, exact
+ordered `remote_patches` RepoSpec publication identity for the two admitted
+Bazel repository rules, matching complete hash owners, and both route families
+through the actual materialization-request DICE cutoff. Independent terminal
+review is `ACCEPT`; focused, serial Bzlmod and loading gates pass.
+
+Activate only `WP-5-7A-selected-bcr-archive-transform-implementation` under
+the manifest's clean nine-file core allowlist and 900/1,100/2,000 caps. The
+archive format/prefix/transform plan, verified captures, private root, bounded
+patch parser and transform-complete source association remain one phase-scratch
+owner. The separately dirty registration and selected-context candidates stay
+read-only until this successor terminally passes.
