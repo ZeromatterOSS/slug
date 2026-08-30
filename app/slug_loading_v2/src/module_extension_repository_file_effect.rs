@@ -469,12 +469,12 @@ async fn load_definition_module(
         )
     };
     match (label, mode) {
-        (RepositoryDefinitionLabel::Root(label), EffectMode::Legacy) => match ctx.compute(&HostBzlModuleEvalKey::new(key.workspace.dupe(), label)).await {
+        (RepositoryDefinitionLabel::Root(label), EffectMode::Legacy) => match ctx.compute(&HostBzlModuleEvalKey::new_bzlmod(key.workspace.dupe(), label)).await {
             Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
             Ok(SourcePreparationOutcome::Complete(value)) => Ok((value.as_ref().clone().map_err(HostSelectedRepositoryFileEffectHostBzlError::new), observations)),
             Err(error) => Err(complete_compute_error(error.to_string(), observations)),
         },
-        (RepositoryDefinitionLabel::Root(label), EffectMode::Observed) => match ctx.compute(&HostBzlModuleObservationKey::new(key.workspace.dupe(), label)).await {
+        (RepositoryDefinitionLabel::Root(label), EffectMode::Observed) => match ctx.compute(&HostBzlModuleObservationKey::new_bzlmod(key.workspace.dupe(), label)).await {
             Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
             Ok(SourcePreparationOutcome::Complete(Err(error))) => Err(SourcePreparationOutcome::Complete(Err(HostSelectedRepositoryFileEffectObservationError::HostBzl { certificate: certificate.clone(), ordinal: key.ordinal, error }))),
             Ok(SourcePreparationOutcome::Complete(Ok(value))) => {
@@ -490,7 +490,7 @@ async fn load_definition_module(
                 Err(error) => return Err(complete_compute_error(error.to_string(), observations)),
             };
             let input = match input { Ok(input) => input, Err(error) => return Ok((Err(error), observations)) };
-            match ctx.compute(&ExternalBzlModuleEvalKey::new_canonical(input, label)).await {
+            match ctx.compute(&ExternalBzlModuleEvalKey::new_canonical_bzlmod(input, label)).await {
                 Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
                 Ok(SourcePreparationOutcome::Complete(value)) => Ok((value.as_ref().clone().map_err(HostSelectedRepositoryFileEffectHostBzlError::new), observations)),
                 Err(error) => Err(complete_compute_error(error.to_string(), observations)),
@@ -507,7 +507,7 @@ async fn load_definition_module(
                 Err(error) => return Err(complete_compute_error(error.to_string(), observations)),
             };
             let input = match input { Ok(input) => input, Err(error) => return Ok((Err(error), observations)) };
-            match ctx.compute(&ExternalBzlModuleObservationKey::new_canonical(input, label)).await {
+            match ctx.compute(&ExternalBzlModuleObservationKey::new_canonical_bzlmod(input, label)).await {
                 Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
                 Ok(SourcePreparationOutcome::Complete(Err(error))) => Err(SourcePreparationOutcome::Complete(Err(HostSelectedRepositoryFileEffectObservationError::HostBzl { certificate: certificate.clone(), ordinal: key.ordinal, error }))),
                 Ok(SourcePreparationOutcome::Complete(Ok(value))) => {
@@ -2070,7 +2070,7 @@ ext=module_extension(implementation=impl)
             "RepositoryPlatformKey::new(",
             "invoke_repository_rule(",
             "HostCanonicalRepositoryLoadRouteKey::new(",
-            "ExternalBzlModuleEvalKey::new_canonical(",
+            "ExternalBzlModuleEvalKey::new_canonical_bzlmod(",
             "HostSelectedRepositoryFileEffectObservationError::CanonicalRoute {",
             "HostSelectedRepositoryFileEffectObservationError::Certificate(error)",
             "HostSelectedRepositoryFileEffectObservationError::HostBzl {",

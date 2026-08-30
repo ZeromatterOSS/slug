@@ -149,7 +149,10 @@ async fn load_bzl(
         let root = HostRootBzlLabel::new(label.package().package().clone(), target);
         let (result, incoming) = match mode {
             Mode::Legacy => match ctx
-                .compute(&HostBzlModuleEvalKey::new(key.workspace.dupe(), root))
+                .compute(&HostBzlModuleEvalKey::new_bzlmod(
+                    key.workspace.dupe(),
+                    root,
+                ))
                 .await
             {
                 Ok(SourcePreparationOutcome::Need(need)) => {
@@ -168,7 +171,7 @@ async fn load_bzl(
                 }
             },
             Mode::Observed => match ctx
-                .compute(&HostBzlModuleObservationKey::new(
+                .compute(&HostBzlModuleObservationKey::new_bzlmod(
                     key.workspace.dupe(),
                     root,
                 ))
@@ -283,7 +286,7 @@ async fn load_bzl(
     };
     let (result, incoming) = match mode {
         Mode::Legacy => match ctx
-            .compute(&ExternalBzlModuleEvalKey::new_canonical(
+            .compute(&ExternalBzlModuleEvalKey::new_canonical_bzlmod(
                 route.input().clone(),
                 repository_label,
             ))
@@ -305,7 +308,7 @@ async fn load_bzl(
             }
         },
         Mode::Observed => match ctx
-            .compute(&ExternalBzlModuleObservationKey::new_canonical(
+            .compute(&ExternalBzlModuleObservationKey::new_canonical_bzlmod(
                 route.input().clone(),
                 repository_label,
             ))

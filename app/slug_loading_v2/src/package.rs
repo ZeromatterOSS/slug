@@ -20,6 +20,7 @@ use compact_str::CompactString;
 use dupe::Dupe;
 use slug_build_api_v2::ProviderId;
 use slug_build_api_v2::ProviderIdentity;
+use slug_bzlmod_v2::BuiltinBazelToolsSnapshot;
 use slug_bzlmod_v2::NonrootAttributeValue;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
@@ -6290,11 +6291,22 @@ fn select_globals(builder: &mut GlobalsBuilder) {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct NativeModule;
 
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct BzlmodNativeModule;
+
 impl fmt::Display for NativeModule {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("native")
     }
 }
+
+impl fmt::Display for BzlmodNativeModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("native")
+    }
+}
+
+static NATIVE_METHODS: MethodsStatic = MethodsStatic::new();
 
 #[starlark_module]
 fn native_methods(builder: &mut MethodsBuilder) {
@@ -6552,12 +6564,32 @@ fn native_methods(builder: &mut MethodsBuilder) {
 #[starlark_value(type = "native")]
 impl<'v> StarlarkValue<'v> for NativeModule {
     fn get_methods() -> Option<&'static Methods> {
+        NATIVE_METHODS.methods(native_methods)
+    }
+}
+
+#[starlark_value(type = "native")]
+impl<'v> StarlarkValue<'v> for BzlmodNativeModule {
+    fn get_methods() -> Option<&'static Methods> {
         static METHODS: MethodsStatic = MethodsStatic::new();
-        METHODS.methods(native_methods)
+        METHODS.methods(|builder| {
+            NATIVE_METHODS.populate(native_methods, builder);
+            builder.set_attribute(
+                "bazel_version",
+                BuiltinBazelToolsSnapshot::CURRENT.bazel_version(),
+                None,
+            );
+        })
     }
 }
 
 impl AllocFrozenValue for NativeModule {
+    fn alloc_frozen_value(self, heap: &FrozenHeap) -> FrozenValue {
+        heap.alloc_simple(self)
+    }
+}
+
+impl AllocFrozenValue for BzlmodNativeModule {
     fn alloc_frozen_value(self, heap: &FrozenHeap) -> FrozenValue {
         heap.alloc_simple(self)
     }
@@ -6571,13 +6603,17 @@ fn bzl_only_globals(builder: &mut GlobalsBuilder) {
     }
 }
 
-fn complete_loading_globals(bool_config: bool) -> Globals {
+fn complete_loading_globals(bool_config: bool, bzlmod_native: bool) -> Globals {
     let mut globals = GlobalsBuilder::new();
     populate_universe(&mut globals);
     package_globals(&mut globals);
     select_globals(&mut globals);
     LibraryExtension::Json.add(&mut globals);
-    globals.set("native", NativeModule);
+    if bzlmod_native {
+        globals.set("native", BzlmodNativeModule);
+    } else {
+        globals.set("native", NativeModule);
+    }
     globals.set("attr", AttrModule);
     if bool_config {
         LibraryExtension::StructType.add(&mut globals);
@@ -6601,11 +6637,15 @@ fn complete_loading_globals(bool_config: bool) -> Globals {
 }
 
 pub(crate) fn loading_globals() -> Globals {
-    complete_loading_globals(true)
+    complete_loading_globals(true, false)
+}
+
+pub(crate) fn bzlmod_loading_globals() -> Globals {
+    complete_loading_globals(true, true)
 }
 
 pub(crate) fn build_file_loading_globals() -> Globals {
-    complete_loading_globals(false)
+    complete_loading_globals(false, false)
 }
 
 #[cfg(test)]
@@ -6617,7 +6657,10 @@ mod module_extension_definition_tests {
 
     use super::*;
 
-    fn evaluate(source: &str) -> anyhow::Result<starlark::environment::FrozenModule> {
+    fn evaluate_with_globals(
+        source: &str,
+        globals: Globals,
+    ) -> anyhow::Result<starlark::environment::FrozenModule> {
         let ast = AstModule::parse("//:ext.bzl", source.to_owned(), &Dialect::Standard)
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         let module = Module::new();
@@ -6625,10 +6668,14 @@ mod module_extension_definition_tests {
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&context);
         evaluator
-            .eval_module(ast, &loading_globals())
+            .eval_module(ast, &globals)
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         drop(evaluator);
         Ok(module.freeze()?)
+    }
+
+    fn evaluate(source: &str) -> anyhow::Result<starlark::environment::FrozenModule> {
+        evaluate_with_globals(source, loading_globals())
     }
 
     fn projection(source: &str) -> ModuleExtensionDefinitionProjection {
@@ -6654,6 +6701,29 @@ mod module_extension_definition_tests {
                 .is_ok()
         );
         evaluate("captured = Label\n").unwrap();
+    }
+
+    #[test]
+    fn bazel_version_is_present_only_in_bzlmod_native() {
+        let build = evaluate(
+            "captured = (hasattr(native, 'bazel_version'), getattr(native, 'bazel_version', None), 'bazel_version' in dir(native))\n",
+        )
+        .unwrap();
+        assert_eq!(
+            build.get("captured").unwrap().value().to_repr(),
+            "(False, None, False)"
+        );
+        assert!(evaluate("captured = native.bazel_version\n").is_err());
+
+        let bzlmod = evaluate_with_globals(
+            "captured = (native.bazel_version, hasattr(native, 'bazel_version'), getattr(native, 'bazel_version'), 'bazel_version' in dir(native))\n",
+            bzlmod_loading_globals(),
+        )
+        .unwrap();
+        assert_eq!(
+            bzlmod.get("captured").unwrap().value().to_repr(),
+            "(\"9.2.0\", True, \"9.2.0\", True)"
+        );
     }
 
     fn tag_attribute(

@@ -59,6 +59,12 @@ impl BuiltinBazelToolsRouteIdentity {
 impl BuiltinBazelToolsSnapshot {
     pub const CURRENT: Self = Self::Bazel9_2;
 
+    pub fn bazel_version(self) -> &'static str {
+        match self {
+            Self::Bazel9_2 => "9.2.0",
+        }
+    }
+
     fn tag(self) -> &'static str {
         match self {
             Self::Bazel9_2 => "bazel-9.2.0-8220c6198837d5c13d53fea211cf3282aa12408a",
@@ -1035,6 +1041,17 @@ mod tests {
             error,
             BuiltinBazelToolsSourceFileError::Integrity { .. }
         ));
+    }
+
+    #[test]
+    fn current_snapshot_owns_the_exact_bazel_version() {
+        assert_eq!(BuiltinBazelToolsSnapshot::CURRENT.bazel_version(), "9.2.0");
+        assert_eq!(
+            BuiltinBazelToolsSnapshot::CURRENT
+                .route_identity()
+                .snapshot(),
+            BuiltinBazelToolsSnapshot::CURRENT
+        );
     }
 
     #[test]

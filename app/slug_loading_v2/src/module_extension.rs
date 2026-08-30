@@ -323,23 +323,23 @@ async fn pure_host_bzl(ctx: &mut DiceComputations<'_>, workspace: &NormalizedAbs
         source => RootRepositoryRoute::for_selected_extension_definition(workspace.dupe(), source),
     };
     let child: PureHostBzlChild = match (mode, selected) {
-        (PureInvocationsMode::Legacy, None) => match ctx.compute(&HostBzlModuleEvalKey::new(workspace.dupe(), label)).await {
+        (PureInvocationsMode::Legacy, None) => match ctx.compute(&HostBzlModuleEvalKey::new_bzlmod(workspace.dupe(), label)).await {
             Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(result)) => SourcePreparationOutcome::Complete(Ok((PureBzlCarrier::Root(result), PathObservationEpoch::empty()))),
             Err(error) => return Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()))), observations)),
         },
-        (PureInvocationsMode::Observed, None) => match ctx.compute(&HostBzlModuleObservationKey::new(workspace.dupe(), label)).await {
+        (PureInvocationsMode::Observed, None) => match ctx.compute(&HostBzlModuleObservationKey::new_bzlmod(workspace.dupe(), label)).await {
             Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(Err(error))) => return Err(SourcePreparationOutcome::Complete(Err(PureModuleExtensionInvocationsObservationError::HostBzl { prepared: prepared.dupe(), index, error }))),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => SourcePreparationOutcome::Complete(Ok((PureBzlCarrier::Root(Arc::new(observed.result().clone())), observed.observations().dupe()))),
             Err(error) => return Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()))), observations)),
         },
-        (PureInvocationsMode::Legacy, Some(route)) => match ctx.compute(&ExternalBzlModuleEvalKey::new(route, RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target.dupe()).expect("selected target was parsed"))).await {
+        (PureInvocationsMode::Legacy, Some(route)) => match ctx.compute(&ExternalBzlModuleEvalKey::new_bzlmod(route, RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target.dupe()).expect("selected target was parsed"))).await {
             Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(result)) => SourcePreparationOutcome::Complete(Ok((PureBzlCarrier::Selected(result), PathObservationEpoch::empty()))),
             Err(error) => return Err(pure_complete(Err(after(HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()))), observations)),
         },
-        (PureInvocationsMode::Observed, Some(route)) => match ctx.compute(&ExternalBzlModuleObservationKey::new(route, RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target).expect("selected target was parsed"))).await {
+        (PureInvocationsMode::Observed, Some(route)) => match ctx.compute(&ExternalBzlModuleObservationKey::new_bzlmod(route, RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target).expect("selected target was parsed"))).await {
             Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(Err(error))) => return Err(SourcePreparationOutcome::Complete(Err(PureModuleExtensionInvocationsObservationError::HostBzl { prepared: prepared.dupe(), index, error }))),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => SourcePreparationOutcome::Complete(Ok((PureBzlCarrier::Selected(observed.result().dupe()), observed.observations().dupe()))),
@@ -672,23 +672,23 @@ async fn owner_bzl(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOw
         source => RootRepositoryRoute::for_selected_extension_definition(key.workspace.dupe(), source),
     };
     let child = match (mode, selected) {
-        (PureInvocationsMode::Legacy, None) => match ctx.compute(&HostBzlModuleEvalKey::new(key.workspace.dupe(), label.clone())).await {
+        (PureInvocationsMode::Legacy, None) => match ctx.compute(&HostBzlModuleEvalKey::new_bzlmod(key.workspace.dupe(), label.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return Err(SourcePreparationOutcome::Need(need)),
             Ok(SourcePreparationOutcome::Complete(result)) => (result.as_ref().clone().map_err(|error| error.to_string()), PathObservationEpoch::empty()),
             Err(error) => return Err(owner_complete(Err(owner_after(inputs, Arc::from([]), error.to_string())), observations)),
         },
-        (PureInvocationsMode::Observed, None) => match ctx.compute(&HostBzlModuleObservationKey::new(key.workspace.dupe(), label.clone())).await {
+        (PureInvocationsMode::Observed, None) => match ctx.compute(&HostBzlModuleObservationKey::new_bzlmod(key.workspace.dupe(), label.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return Err(SourcePreparationOutcome::Need(need)),
             Ok(SourcePreparationOutcome::Complete(Err(error))) => return Err(SourcePreparationOutcome::Complete(Err(HostSelectedExtensionOwnerPureObservationError::HostBzl { inputs: inputs.clone(), first: first.cloned(), error }))),
             Ok(SourcePreparationOutcome::Complete(Ok(value))) => (value.result().clone().map_err(|error| error.to_string()), value.observations().dupe()),
             Err(error) => return Err(owner_complete(Err(owner_after(inputs, Arc::from([]), error.to_string())), observations)),
         },
-        (PureInvocationsMode::Legacy, Some(route)) => match ctx.compute(&ExternalBzlModuleEvalKey::new(route, RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target.dupe()).expect("selected target was parsed"))).await {
+        (PureInvocationsMode::Legacy, Some(route)) => match ctx.compute(&ExternalBzlModuleEvalKey::new_bzlmod(route, RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target.dupe()).expect("selected target was parsed"))).await {
             Ok(SourcePreparationOutcome::Need(need)) => return Err(SourcePreparationOutcome::Need(need)),
             Ok(SourcePreparationOutcome::Complete(result)) => (result.as_ref().clone().map_err(|error| error.to_string()), PathObservationEpoch::empty()),
             Err(error) => return Err(owner_complete(Err(owner_after(inputs, Arc::from([]), error.to_string())), observations)),
         },
-        (PureInvocationsMode::Observed, Some(route)) => match ctx.compute(&ExternalBzlModuleObservationKey::new(route, RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target).expect("selected target was parsed"))).await {
+        (PureInvocationsMode::Observed, Some(route)) => match ctx.compute(&ExternalBzlModuleObservationKey::new_bzlmod(route, RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target).expect("selected target was parsed"))).await {
             Ok(SourcePreparationOutcome::Need(need)) => return Err(SourcePreparationOutcome::Need(need)),
             Ok(SourcePreparationOutcome::Complete(Err(error))) => return Err(SourcePreparationOutcome::Complete(Err(HostSelectedExtensionOwnerPureObservationError::HostBzl { inputs: inputs.clone(), first: first.cloned(), error }))),
             Ok(SourcePreparationOutcome::Complete(Ok(value))) => (value.result().as_ref().clone().map_err(|error| error.to_string()), value.observations().dupe()),
@@ -2084,11 +2084,11 @@ mod tests {
         let rows = tracker.take();
         let dependencies = tracker.take_dependencies();
         let observed_parent_dependencies = &dependencies.iter().find(|(name, _)| name.starts_with("observed-host-pure-module-extension-invocations:")).unwrap().1;
-        assert_eq!(observed_parent_dependencies, &["observed-host-prepared-module-extension-inputs:\"/module-extension-repository-rule\"", "observed-host-bzl-module:\"/module-extension-repository-rule\"://:first.bzl", "observed-host-bzl-module:\"/module-extension-repository-rule\"://:second.bzl"]);
+        assert_eq!(observed_parent_dependencies, &["observed-host-prepared-module-extension-inputs:\"/module-extension-repository-rule\"", "observed-bzlmod-host-bzl-module:\"/module-extension-repository-rule\"://:first.bzl", "observed-bzlmod-host-bzl-module:\"/module-extension-repository-rule\"://:second.bzl"]);
         let parent = rows.iter().find(|row| row.key.starts_with("observed-host-pure-module-extension-invocations:")).unwrap();
         let prints = parent.batch.as_ref().unwrap().events().iter().filter_map(|event| match event { EvaluationEvent::StarlarkPrint { text, .. } => Some(text.as_str()), _ => None }).collect::<Vec<_>>();
         assert_eq!(prints, ["invoke-first", "invoke-second"]);
-        let children = rows.iter().enumerate().filter(|(_, row)| row.key.starts_with("observed-host-bzl-module:")).collect::<Vec<_>>();
+        let children = rows.iter().enumerate().filter(|(_, row)| row.key.starts_with("observed-bzlmod-host-bzl-module:")).collect::<Vec<_>>();
         assert_eq!(children.iter().filter_map(|(_, row)| row.batch.as_ref()).flat_map(|batch| batch.events()).filter_map(|event| match event { EvaluationEvent::StarlarkPrint { text, .. } => Some(text.as_str()), _ => None }).collect::<Vec<_>>(), ["load-first", "load-second"]);
         assert_eq!(children.iter().map(|(_, row)| (row.key.contains("first.bzl"), row.kind)).collect::<Vec<_>>(), [(true, ActivationKind::Evaluated), (false, ActivationKind::Evaluated), (true, ActivationKind::Reused), (false, ActivationKind::Reused)]);
         assert!(children.windows(2).all(|pair| pair[0].1.key != pair[1].1.key || pair[1].1.kind == ActivationKind::Reused));
@@ -2464,8 +2464,8 @@ mod tests {
         let production = &source[..source.find("mod tests {").unwrap()];
         let owner = &production[production.find("async fn owner_bzl").unwrap()..];
         assert!(owner.contains("RootRepositoryRoute::for_selected_extension_definition"));
-        assert!(owner.contains("ExternalBzlModuleEvalKey::new"));
-        assert!(owner.contains("ExternalBzlModuleObservationKey::new"));
+        assert!(owner.contains("ExternalBzlModuleEvalKey::new_bzlmod"));
+        assert!(owner.contains("ExternalBzlModuleObservationKey::new_bzlmod"));
         assert!(owner.contains("owner_bzl(ctx, key, &inputs, None"));
         assert!(owner.contains("owner_bzl(ctx, key, &inputs, Some(&first)"));
     }

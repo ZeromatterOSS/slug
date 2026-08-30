@@ -135,6 +135,7 @@ use crate::package::ModuleExtensionTagCoercionError;
 use crate::package::PackageRecorder;
 use crate::package::PackageTargetKind;
 use crate::package::build_file_loading_globals;
+use crate::package::bzlmod_loading_globals;
 use crate::package::loading_globals;
 use crate::package::prepare_module_extension_tag_attributes;
 use crate::package::validate_module_extension_tag_schema;
@@ -1478,16 +1479,33 @@ impl HostBzlModuleError {
     }
 }
 
+#[derive(Debug, Clone, Copy, Dupe, PartialEq, Eq, Hash, Allocative)]
+enum BzlModuleContext {
+    Build,
+    Bzlmod,
+}
+
+impl BzlModuleContext {
+    fn globals(self) -> starlark::environment::Globals {
+        match self {
+            Self::Build => loading_globals(),
+            Self::Bzlmod => bzlmod_loading_globals(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(crate) struct HostBzlModuleEvalKey {
     workspace: NormalizedAbsolutePath,
     label: HostRootBzlLabel,
+    context: BzlModuleContext,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(crate) struct HostBzlCycleIdentity {
     workspace: NormalizedAbsolutePath,
     label: HostRootBzlLabel,
+    context: BzlModuleContext,
 }
 
 impl HostBzlCycleIdentity {
@@ -1502,20 +1520,48 @@ impl HostBzlCycleIdentity {
 
 impl HostBzlModuleEvalKey {
     pub(crate) fn new(workspace: NormalizedAbsolutePath, label: HostRootBzlLabel) -> Self {
-        Self { workspace, label }
+        Self::with_context(workspace, label, BzlModuleContext::Build)
+    }
+
+    pub(crate) fn new_bzlmod(workspace: NormalizedAbsolutePath, label: HostRootBzlLabel) -> Self {
+        Self::with_context(workspace, label, BzlModuleContext::Bzlmod)
+    }
+
+    fn with_context(
+        workspace: NormalizedAbsolutePath,
+        label: HostRootBzlLabel,
+        context: BzlModuleContext,
+    ) -> Self {
+        Self {
+            workspace,
+            label,
+            context,
+        }
     }
 
     pub(crate) fn cycle_identity(&self) -> HostBzlCycleIdentity {
         HostBzlCycleIdentity {
             workspace: self.workspace.dupe(),
             label: self.label.clone(),
+            context: self.context,
         }
     }
 }
 
 impl fmt::Display for HostBzlModuleEvalKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "host-bzl-module:{}:{}", self.workspace, self.label)
+        match self.context {
+            BzlModuleContext::Build => {
+                write!(f, "host-bzl-module:{}:{}", self.workspace, self.label)
+            }
+            BzlModuleContext::Bzlmod => {
+                write!(
+                    f,
+                    "bzlmod-host-bzl-module:{}:{}",
+                    self.workspace, self.label
+                )
+            }
+        }
     }
 }
 
@@ -1539,28 +1585,55 @@ impl ObservedHostBzlModule {
 pub(crate) struct HostBzlModuleObservationKey {
     workspace: NormalizedAbsolutePath,
     label: HostRootBzlLabel,
+    context: BzlModuleContext,
 }
 
 impl HostBzlModuleObservationKey {
     pub(crate) fn new(workspace: NormalizedAbsolutePath, label: HostRootBzlLabel) -> Self {
-        Self { workspace, label }
+        Self::with_context(workspace, label, BzlModuleContext::Build)
+    }
+
+    pub(crate) fn new_bzlmod(workspace: NormalizedAbsolutePath, label: HostRootBzlLabel) -> Self {
+        Self::with_context(workspace, label, BzlModuleContext::Bzlmod)
+    }
+
+    fn with_context(
+        workspace: NormalizedAbsolutePath,
+        label: HostRootBzlLabel,
+        context: BzlModuleContext,
+    ) -> Self {
+        Self {
+            workspace,
+            label,
+            context,
+        }
     }
 
     pub(crate) fn cycle_identity(&self) -> HostBzlCycleIdentity {
         HostBzlCycleIdentity {
             workspace: self.workspace.dupe(),
             label: self.label.clone(),
+            context: self.context,
         }
     }
 }
 
 impl fmt::Display for HostBzlModuleObservationKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "observed-host-bzl-module:{}:{}",
-            self.workspace, self.label
-        )
+        match self.context {
+            BzlModuleContext::Build => {
+                write!(
+                    f,
+                    "observed-host-bzl-module:{}:{}",
+                    self.workspace, self.label
+                )
+            }
+            BzlModuleContext::Bzlmod => write!(
+                f,
+                "observed-bzlmod-host-bzl-module:{}:{}",
+                self.workspace, self.label
+            ),
+        }
     }
 }
 
@@ -1568,24 +1641,55 @@ impl fmt::Display for HostBzlModuleObservationKey {
 pub(crate) struct ExternalBzlModuleEvalKey {
     route: HostRepositorySourceRoute,
     label: RepositoryBzlLabel,
+    context: BzlModuleContext,
 }
 
 impl ExternalBzlModuleEvalKey {
     pub(crate) fn new(route: RootRepositoryRoute, label: RepositoryBzlLabel) -> Self {
-        Self {
-            route: HostRepositorySourceRoute::root(route),
+        Self::from_source_route(
+            HostRepositorySourceRoute::root(route),
             label,
-        }
+            BzlModuleContext::Build,
+        )
+    }
+    pub(crate) fn new_bzlmod(route: RootRepositoryRoute, label: RepositoryBzlLabel) -> Self {
+        Self::from_source_route(
+            HostRepositorySourceRoute::root(route),
+            label,
+            BzlModuleContext::Bzlmod,
+        )
     }
     #[allow(dead_code)] // Direct canonical entry is exercised by the packet proof surface.
     pub(crate) fn new_canonical(
         input: slug_bzlmod_v2::HostCanonicalRepositorySourceInput,
         label: RepositoryBzlLabel,
     ) -> Self {
-        Self::from_source_route(HostRepositorySourceRoute::canonical(input), label)
+        Self::from_source_route(
+            HostRepositorySourceRoute::canonical(input),
+            label,
+            BzlModuleContext::Build,
+        )
     }
-    fn from_source_route(route: HostRepositorySourceRoute, label: RepositoryBzlLabel) -> Self {
-        Self { route, label }
+    pub(crate) fn new_canonical_bzlmod(
+        input: slug_bzlmod_v2::HostCanonicalRepositorySourceInput,
+        label: RepositoryBzlLabel,
+    ) -> Self {
+        Self::from_source_route(
+            HostRepositorySourceRoute::canonical(input),
+            label,
+            BzlModuleContext::Bzlmod,
+        )
+    }
+    fn from_source_route(
+        route: HostRepositorySourceRoute,
+        label: RepositoryBzlLabel,
+        context: BzlModuleContext,
+    ) -> Self {
+        Self {
+            route,
+            label,
+            context,
+        }
     }
     fn canonical_label(&self) -> CanonicalLabel {
         self.label.canonical_label(&self.route)
@@ -1594,12 +1698,20 @@ impl ExternalBzlModuleEvalKey {
         ExternalBzlCycleIdentity {
             route: self.route.clone(),
             label: self.label.clone(),
+            context: self.context,
         }
     }
 }
 impl fmt::Display for ExternalBzlModuleEvalKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "external-bzl-module:{}", self.canonical_label())
+        match self.context {
+            BzlModuleContext::Build => {
+                write!(f, "external-bzl-module:{}", self.canonical_label())
+            }
+            BzlModuleContext::Bzlmod => {
+                write!(f, "bzlmod-external-bzl-module:{}", self.canonical_label())
+            }
+        }
     }
 }
 
@@ -1607,6 +1719,7 @@ impl fmt::Display for ExternalBzlModuleEvalKey {
 pub(crate) struct ExternalBzlCycleIdentity {
     route: HostRepositorySourceRoute,
     label: RepositoryBzlLabel,
+    context: BzlModuleContext,
 }
 impl ExternalBzlCycleIdentity {
     pub(crate) fn canonical_label(&self) -> CanonicalLabel {
@@ -1619,6 +1732,9 @@ impl ExternalBzlModuleObservationKey {
     pub(crate) fn new(route: RootRepositoryRoute, label: RepositoryBzlLabel) -> Self {
         Self(ExternalBzlModuleEvalKey::new(route, label))
     }
+    pub(crate) fn new_bzlmod(route: RootRepositoryRoute, label: RepositoryBzlLabel) -> Self {
+        Self(ExternalBzlModuleEvalKey::new_bzlmod(route, label))
+    }
     #[allow(dead_code)] // Direct canonical entry is exercised by the packet proof surface.
     pub(crate) fn new_canonical(
         input: slug_bzlmod_v2::HostCanonicalRepositorySourceInput,
@@ -1626,8 +1742,20 @@ impl ExternalBzlModuleObservationKey {
     ) -> Self {
         Self(ExternalBzlModuleEvalKey::new_canonical(input, label))
     }
-    fn from_source_route(route: HostRepositorySourceRoute, label: RepositoryBzlLabel) -> Self {
-        Self(ExternalBzlModuleEvalKey::from_source_route(route, label))
+    pub(crate) fn new_canonical_bzlmod(
+        input: slug_bzlmod_v2::HostCanonicalRepositorySourceInput,
+        label: RepositoryBzlLabel,
+    ) -> Self {
+        Self(ExternalBzlModuleEvalKey::new_canonical_bzlmod(input, label))
+    }
+    fn from_source_route(
+        route: HostRepositorySourceRoute,
+        label: RepositoryBzlLabel,
+        context: BzlModuleContext,
+    ) -> Self {
+        Self(ExternalBzlModuleEvalKey::from_source_route(
+            route, label, context,
+        ))
     }
     pub(crate) fn cycle_identity(&self) -> ExternalBzlCycleIdentity {
         self.0.cycle_identity()
@@ -2413,6 +2541,7 @@ async fn compute_host_bzl_module(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
     label: &HostRootBzlLabel,
+    context: BzlModuleContext,
     mode: HostBzlModuleMode,
     capture_events: bool,
     event_batch: &mut Option<EventBatch>,
@@ -2515,7 +2644,11 @@ async fn compute_host_bzl_module(
             .expect("Host bzl loading requires the request cycle detector");
         let child = match mode {
             HostBzlModuleMode::Legacy => {
-                let child = HostBzlModuleEvalKey::new(workspace.dupe(), child_label.clone());
+                let child = HostBzlModuleEvalKey::with_context(
+                    workspace.dupe(),
+                    child_label.clone(),
+                    context,
+                );
                 match guard.guard_this(ctx.compute(&child)).await {
                     Ok(result) => host_dice_invariant(result)
                         .map(|value| Ok((value.as_ref().clone(), PathObservationEpoch::empty()))),
@@ -2529,7 +2662,11 @@ async fn compute_host_bzl_module(
                 }
             }
             HostBzlModuleMode::Observed => {
-                let child = HostBzlModuleObservationKey::new(workspace.dupe(), child_label.clone());
+                let child = HostBzlModuleObservationKey::with_context(
+                    workspace.dupe(),
+                    child_label.clone(),
+                    context,
+                );
                 match guard.guard_this(ctx.compute(&child)).await {
                     Ok(result) => match host_dice_invariant(result) {
                         SourcePreparationOutcome::Need(need) => {
@@ -2551,6 +2688,7 @@ async fn compute_host_bzl_module(
                             &HostBzlCycleIdentity {
                                 workspace: workspace.dupe(),
                                 label: label.clone(),
+                                context,
                             },
                             &cycle,
                             observations,
@@ -2625,7 +2763,7 @@ async fn compute_host_bzl_module(
     };
     let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
     let print_capture = capture_events.then(LoadingPrintCapture::default);
-    let globals = loading_globals();
+    let globals = context.globals();
     {
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&evaluation_context);
@@ -2708,6 +2846,7 @@ impl Key for HostBzlModuleEvalKey {
             ctx,
             &self.workspace,
             &self.label,
+            self.context,
             HostBzlModuleMode::Legacy,
             capture_events,
             &mut event_batch,
@@ -2757,6 +2896,7 @@ impl Key for HostBzlModuleObservationKey {
             ctx,
             &self.workspace,
             &self.label,
+            self.context,
             HostBzlModuleMode::Observed,
             capture_events,
             &mut event_batch,
@@ -3066,8 +3206,11 @@ async fn loaded_extension_definition_bzl(
     match (mode, selected_route) {
         (LoadedModuleExtensionDefinitionsMode::Legacy, None) => {
             match host_dice_invariant(
-                ctx.compute(&HostBzlModuleEvalKey::new(workspace.dupe(), root_label))
-                    .await,
+                ctx.compute(&HostBzlModuleEvalKey::new_bzlmod(
+                    workspace.dupe(),
+                    root_label,
+                ))
+                .await,
             ) {
                 SourcePreparationOutcome::Need(need) => Err(SourcePreparationOutcome::Need(need)),
                 SourcePreparationOutcome::Complete(result) => Ok((
@@ -3078,7 +3221,7 @@ async fn loaded_extension_definition_bzl(
         }
         (LoadedModuleExtensionDefinitionsMode::Observed, None) => {
             match host_dice_invariant(
-                ctx.compute(&HostBzlModuleObservationKey::new(
+                ctx.compute(&HostBzlModuleObservationKey::new_bzlmod(
                     workspace.dupe(),
                     root_label,
                 ))
@@ -3095,7 +3238,7 @@ async fn loaded_extension_definition_bzl(
             }
         }
         (LoadedModuleExtensionDefinitionsMode::Legacy, Some(route)) => match ctx
-            .compute(&ExternalBzlModuleEvalKey::new(
+            .compute(&ExternalBzlModuleEvalKey::new_bzlmod(
                 route,
                 selected_label.clone(),
             ))
@@ -3117,7 +3260,10 @@ async fn loaded_extension_definition_bzl(
             )),
         },
         (LoadedModuleExtensionDefinitionsMode::Observed, Some(route)) => match ctx
-            .compute(&ExternalBzlModuleObservationKey::new(route, selected_label))
+            .compute(&ExternalBzlModuleObservationKey::new_bzlmod(
+                route,
+                selected_label,
+            ))
             .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
@@ -4163,6 +4309,7 @@ async fn complete_observed_external_bzl_cycle(
             let source_key = ExternalBzlModuleEvalKey::from_source_route(
                 identity.route.clone(),
                 identity.label.clone(),
+                identity.context,
             );
             let source = match compute_external_bzl_source(
                 ctx,
@@ -4205,13 +4352,14 @@ async fn compute_external_bzl_child(
     ctx: &mut DiceComputations<'_>,
     route: &HostRepositorySourceRoute,
     label: RepositoryBzlLabel,
+    context: BzlModuleContext,
     mode: ExternalBzlModuleMode,
 ) -> SourcePreparationOutcome<Result<ExternalBzlRecursiveChild, ObservedPathFrontierError>> {
     let guard = host_dice_invariant(ctx.cycle_guard::<ExternalBzlLoadCycleGuard>())
         .expect("external Bzl loading requires the request cycle detector");
     match mode {
         ExternalBzlModuleMode::Legacy => {
-            let child = ExternalBzlModuleEvalKey::from_source_route(route.clone(), label);
+            let child = ExternalBzlModuleEvalKey::from_source_route(route.clone(), label, context);
             match guard.guard_this(ctx.compute(&child)).await {
                 Ok(Ok(SourcePreparationOutcome::Need(need))) => {
                     SourcePreparationOutcome::Need(need)
@@ -4231,7 +4379,8 @@ async fn compute_external_bzl_child(
             }
         }
         ExternalBzlModuleMode::Observed => {
-            let child = ExternalBzlModuleObservationKey::from_source_route(route.clone(), label);
+            let child =
+                ExternalBzlModuleObservationKey::from_source_route(route.clone(), label, context);
             match guard.guard_this(ctx.compute(&child)).await {
                 Ok(Ok(outcome)) => match external_bzl_observed_child(outcome) {
                     ControlFlow::Continue(value) => {
@@ -4510,16 +4659,23 @@ async fn compute_external_bzl_children(
         };
         observations = incoming;
         let child_label = resolved.label.canonical_label(&resolved.route);
-        let child =
-            match compute_external_bzl_child(ctx, &resolved.route, resolved.label, mode).await {
-                SourcePreparationOutcome::Need(need) => {
-                    return ControlFlow::Break(SourcePreparationOutcome::Need(need));
-                }
-                SourcePreparationOutcome::Complete(Err(error)) => {
-                    return ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)));
-                }
-                SourcePreparationOutcome::Complete(Ok(child)) => child,
-            };
+        let child = match compute_external_bzl_child(
+            ctx,
+            &resolved.route,
+            resolved.label,
+            key.context,
+            mode,
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => {
+                return ControlFlow::Break(SourcePreparationOutcome::Need(need));
+            }
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                return ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)));
+            }
+            SourcePreparationOutcome::Complete(Ok(child)) => child,
+        };
         let (value, incoming) = match child {
             ExternalBzlRecursiveChild::Value(value, incoming) => (value, incoming),
             ExternalBzlRecursiveChild::Compute(message) => {
@@ -4632,6 +4788,7 @@ fn prepare_external_bzl_child_loads(
 #[allow(clippy::too_many_arguments)]
 fn evaluate_external_bzl_module(
     route: &HostRepositorySourceRoute,
+    context: BzlModuleContext,
     canonical_label: CanonicalLabel,
     presentation_path: PathBuf,
     source_text: Arc<String>,
@@ -4671,7 +4828,7 @@ fn evaluate_external_bzl_module(
     };
     let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
     let print_capture = capture_events.then(LoadingPrintCapture::default);
-    let globals = loading_globals();
+    let globals = context.globals();
     {
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&evaluation_context);
@@ -4788,6 +4945,7 @@ async fn compute_external_bzl_module(
 
     evaluate_external_bzl_module(
         &key.route,
+        key.context,
         canonical_label,
         source.presentation_path,
         source_text,
@@ -5717,7 +5875,11 @@ async fn compute_repository_package_child(
     let canonical_label = resolved.label.canonical_label(&resolved.route);
     let child_result = match mode {
         RepositoryPackageInventoryMode::Legacy => {
-            let child = ExternalBzlModuleEvalKey::from_source_route(resolved.route, resolved.label);
+            let child = ExternalBzlModuleEvalKey::from_source_route(
+                resolved.route,
+                resolved.label,
+                BzlModuleContext::Build,
+            );
             match ctx.compute(&child).await {
                 Ok(SourcePreparationOutcome::Need(need)) => {
                     return ControlFlow::Break(SourcePreparationOutcome::Need(need));
@@ -5742,8 +5904,11 @@ async fn compute_repository_package_child(
             }
         }
         RepositoryPackageInventoryMode::Observed => {
-            let child =
-                ExternalBzlModuleObservationKey::from_source_route(resolved.route, resolved.label);
+            let child = ExternalBzlModuleObservationKey::from_source_route(
+                resolved.route,
+                resolved.label,
+                BzlModuleContext::Build,
+            );
             match ctx.compute(&child).await {
                 Ok(outcome) => match finish_repository_package_observed_child(outcome) {
                     ControlFlow::Continue(value) => {
@@ -7193,6 +7358,8 @@ mod module_extension_definition_loading_tests {
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
 
+    use bv::RepositoryMaterializationResult as MaterializationResult;
+    use bv::RepositoryMaterializationSuccess as MaterializationSuccess;
     use dice::ActivationData;
     use dice::ActivationKind;
     use dice::ActivationTracker;
@@ -7201,6 +7368,7 @@ mod module_extension_definition_loading_tests {
     use dice::DynKey;
     use dice::RichActivation;
     use dice::UserComputationData;
+    use slug_bzlmod_v2 as bv;
     use slug_bzlmod_v2::BzlmodCommandPolicyKey;
     use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
     use slug_bzlmod_v2::LockfileMode;
@@ -7523,6 +7691,150 @@ mod module_extension_definition_loading_tests {
         .await
     }
 
+    #[tokio::test]
+    async fn host_bzl_context_is_recursive_and_structural_for_legacy_and_observed_keys() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let label = HostRootBzlLabel::new(
+            PackagePath::root(),
+            RootPackageBzlTarget::parse("ext.bzl").unwrap(),
+        );
+        let mut transaction = case_transaction(
+            &dice,
+            "module(name='bazel_tools')\n",
+            "load('//:child.bzl', 'version')\ncaptured = version\n",
+            "version = native.bazel_version\n",
+            true,
+            None,
+        )
+        .await;
+
+        let build_key = HostBzlModuleEvalKey::new(workspace.dupe(), label.clone());
+        let bzlmod_key = HostBzlModuleEvalKey::new_bzlmod(workspace.dupe(), label.clone());
+        let build = transaction.compute(&build_key).await.unwrap();
+        let bzlmod = transaction.compute(&bzlmod_key).await.unwrap();
+        let restored = transaction.compute(&build_key).await.unwrap();
+        assert!(HostBzlModuleEvalKey::equality(&build, &restored));
+        assert!(matches!(build, SourcePreparationOutcome::Complete(value) if value.is_err()));
+        let SourcePreparationOutcome::Complete(value) = bzlmod else {
+            panic!("Bzlmod load unexpectedly requested preparation")
+        };
+        assert_eq!(
+            value
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .module
+                .get("captured")
+                .unwrap()
+                .unpack_str(),
+            Some("9.2.0")
+        );
+
+        let build_key = HostBzlModuleObservationKey::new(workspace.dupe(), label.clone());
+        let bzlmod_key = HostBzlModuleObservationKey::new_bzlmod(workspace, label);
+        assert_ne!(build_key, bzlmod_key);
+        assert_ne!(build_key.cycle_identity(), bzlmod_key.cycle_identity());
+        let build = transaction.compute(&build_key).await.unwrap();
+        let bzlmod = transaction.compute(&bzlmod_key).await.unwrap();
+        let restored = transaction.compute(&build_key).await.unwrap();
+        assert!(HostBzlModuleObservationKey::equality(&build, &restored));
+        assert!(matches!(
+            build,
+            SourcePreparationOutcome::Complete(Ok(value)) if value.result().is_err()
+        ));
+        let SourcePreparationOutcome::Complete(Ok(value)) = bzlmod else {
+            panic!("observed Bzlmod load did not complete")
+        };
+        assert_eq!(
+            value
+                .result()
+                .as_ref()
+                .unwrap()
+                .module
+                .get("captured")
+                .unwrap()
+                .unpack_str(),
+            Some("9.2.0")
+        );
+    }
+
+    #[tokio::test]
+    async fn external_bzl_context_is_recursive_for_root_and_mapped_canonical_children() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let mut transaction = case_transaction(
+            &dice,
+            "# external context proof\nmodule(name='bazel_tools')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\n",
+            "",
+            "",
+            true,
+            None,
+        )
+        .await;
+        let route_key =
+            RootRepositoryRouteKey::new(workspace.dupe(), ApparentRepoName::new("dep").unwrap())
+                .unwrap();
+        let SourcePreparationOutcome::Complete(route) =
+            transaction.compute(&route_key).await.unwrap()
+        else {
+            panic!("direct-local route unexpectedly requested preparation")
+        };
+        let route = route.as_ref().as_ref().unwrap().clone();
+        let label = |name| {
+            RepositoryBzlLabel::new(
+                PackagePath::root(),
+                RootPackageBzlTarget::parse(name).unwrap(),
+            )
+            .unwrap()
+        };
+        let build_key = ExternalBzlModuleEvalKey::new(route.clone(), label("parent.bzl"));
+        let bzlmod_key = ExternalBzlModuleEvalKey::new_bzlmod(route, label("parent.bzl"));
+        let build = transaction.compute(&build_key).await.unwrap();
+        let bzlmod = transaction.compute(&bzlmod_key).await.unwrap();
+        let restored = transaction.compute(&build_key).await.unwrap();
+        assert!(ExternalBzlModuleEvalKey::equality(&build, &restored));
+        assert!(matches!(build, SourcePreparationOutcome::Complete(value) if value.is_err()));
+        assert!(matches!(
+            &bzlmod,
+            SourcePreparationOutcome::Complete(value)
+                if value.as_ref().as_ref().unwrap().module.get("captured").unwrap().unpack_str()
+                    == Some("9.2.0")
+        ));
+        let canonical_key = HostCanonicalRepositoryLoadRouteKey::new(
+            workspace,
+            CanonicalRepoName::new("dep+").unwrap(),
+        );
+        let SourcePreparationOutcome::Complete(canonical) =
+            transaction.compute(&canonical_key).await.unwrap()
+        else {
+            panic!("canonical route unexpectedly requested preparation")
+        };
+        let input = canonical.as_ref().as_ref().unwrap().input().clone();
+        let build_key = ExternalBzlModuleObservationKey::new_canonical(
+            input.clone(),
+            label("mapped_parent.bzl"),
+        );
+        let bzlmod_key = ExternalBzlModuleObservationKey::new_canonical_bzlmod(
+            input,
+            label("mapped_parent.bzl"),
+        );
+        let build = transaction.compute(&build_key).await.unwrap();
+        let bzlmod = transaction.compute(&bzlmod_key).await.unwrap();
+        let restored = transaction.compute(&build_key).await.unwrap();
+        assert!(ExternalBzlModuleObservationKey::equality(&build, &restored));
+        assert!(matches!(
+            build,
+            SourcePreparationOutcome::Complete(Ok(value)) if value.result().is_err()
+        ));
+        assert!(matches!(
+            &bzlmod,
+            SourcePreparationOutcome::Complete(Ok(value))
+                if value.result().as_ref().as_ref().unwrap().module.get("captured").unwrap()
+                    .unpack_str() == Some("9.2.0")
+        ));
+    }
+
     async fn case_transaction_with_other(
         dice: &Arc<Dice>,
         module_source: &str,
@@ -7533,6 +7845,19 @@ mod module_extension_definition_loading_tests {
         tracker: Option<Arc<BzlEventTracker>>,
     ) -> DiceTransaction {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let dep_sources = [
+            ("dep/MODULE.bazel", "module(name='dep',version='1.0')\n"),
+            (
+                "dep/parent.bzl",
+                "load(':child.bzl','version')\ncaptured=version\n",
+            ),
+            (
+                "dep/mapped_parent.bzl",
+                "load('@dep//:child.bzl','version')\ncaptured=version\n",
+            ),
+            ("dep/child.bzl", "version=native.bazel_version\n"),
+            ("dep/BUILD.bazel", ""),
+        ];
         let mut updater = dice.updater_with_data(host_bzl_user_data(
             crate::cycle_detector::bzl_load_cycle_detector(),
             tracker,
@@ -7543,32 +7868,43 @@ mod module_extension_definition_loading_tests {
                     workspace: workspace.as_path().to_owned(),
                 },
                 Arc::new(slug_workspace_v2::WorkspaceSnapshot {
-                    files: Arc::new(SortedMap::from_iter([
-                        (
-                            workspace.as_path().join("MODULE.bazel"),
-                            WorkspaceFileValue::Present(Arc::new(module_source.to_owned())),
-                        ),
-                        (
-                            workspace.as_path().join("ext.bzl"),
-                            WorkspaceFileValue::Present(Arc::new(extension_source.to_owned())),
-                        ),
-                        (
-                            workspace.as_path().join("child.bzl"),
-                            if child_present {
-                                WorkspaceFileValue::Present(Arc::new(child_source.to_owned()))
-                            } else {
-                                WorkspaceFileValue::Absent
+                    files: Arc::new(SortedMap::from_iter(
+                        [
+                            (
+                                workspace.as_path().join("MODULE.bazel"),
+                                WorkspaceFileValue::Present(Arc::new(module_source.to_owned())),
+                            ),
+                            (
+                                workspace.as_path().join("ext.bzl"),
+                                WorkspaceFileValue::Present(Arc::new(extension_source.to_owned())),
+                            ),
+                            (
+                                workspace.as_path().join("child.bzl"),
+                                if child_present {
+                                    WorkspaceFileValue::Present(Arc::new(child_source.to_owned()))
+                                } else {
+                                    WorkspaceFileValue::Absent
+                                },
+                            ),
+                            (
+                                workspace.as_path().join("other.bzl"),
+                                WorkspaceFileValue::Present(Arc::new(other_source.to_owned())),
+                            ),
+                            (
+                                workspace.as_path().join("BUILD.bazel"),
+                                WorkspaceFileValue::Present(Arc::new(String::new())),
+                            ),
+                        ]
+                        .into_iter()
+                        .chain(dep_sources.into_iter().map(
+                            |(name, source)| {
+                                (
+                                    workspace.as_path().join(name),
+                                    WorkspaceFileValue::Present(Arc::new(source.to_owned())),
+                                )
                             },
-                        ),
-                        (
-                            workspace.as_path().join("other.bzl"),
-                            WorkspaceFileValue::Present(Arc::new(other_source.to_owned())),
-                        ),
-                        (
-                            workspace.as_path().join("BUILD.bazel"),
-                            WorkspaceFileValue::Present(Arc::new(String::new())),
-                        ),
-                    ])),
+                        )),
+                    )),
                 }),
             )])
             .unwrap();
@@ -7612,119 +7948,198 @@ mod module_extension_definition_loading_tests {
             .unwrap(),
         )
         .unwrap();
+        let mut attributes = SmallMap::new();
+        attributes.insert(
+            "path".into(),
+            bv::OverrideAttributeValue::String("dep".into()),
+        );
+        let request = Arc::new(bv::RepositoryMaterializationRequest {
+            id: bv::RepositoryMaterializationRequestId {
+                workspace: workspace.dupe(),
+                canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
+            },
+            repo_spec: bv::RepoSpec {
+                rule_id: bv::RepoRuleId {
+                    bzl_file: CanonicalLabel::parse(
+                        "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                    )
+                    .unwrap(),
+                    rule_name: "local_repository".into(),
+                },
+                attributes: Arc::new(attributes),
+            },
+            kind: bv::RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new(format!("{WORKSPACE}/dep")).unwrap(),
+            },
+        });
         updater
             .changed_to(vec![(
                 RepositoryMaterializationResultEpochKey {
                     workspace: workspace.dupe(),
                 },
-                RepositoryMaterializationResultEpoch::new(workspace.dupe(), []).unwrap(),
+                RepositoryMaterializationResultEpoch::new(
+                    workspace.dupe(),
+                    [bv::RepositoryMaterializationEpochEntry {
+                        request,
+                        result: MaterializationResult::Success(MaterializationSuccess::Local),
+                    }]
+                    .into_iter()
+                    .filter(|_| module_source.contains("external context proof")),
+                )
+                .unwrap(),
             )])
             .unwrap();
         let path_epoch = PathObservationEpoch::new(
-            ["/", WORKSPACE]
-                .into_iter()
-                .enumerate()
-                .map(|(index, path)| {
-                    (
-                        PathObservationDemand::new(
-                            PathObservationNamespace::Host,
-                            NormalizedAbsolutePath::new(path).unwrap(),
-                            PathObservationOperation::Lstat,
-                        ),
-                        PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
-                            PathNodeKind::Directory,
-                            index as i64 + 1,
-                            1,
-                            1,
-                            1,
-                            0o755,
-                        ))),
-                    )
-                })
-                .chain(
-                    ["REPO.bazel", ".bazelignore", "BUILD", "MODULE.bazel.lock"]
-                        .into_iter()
-                        .map(|name| {
-                            (
-                                PathObservationDemand::new(
-                                    PathObservationNamespace::Host,
-                                    NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}"))
-                                        .unwrap(),
-                                    PathObservationOperation::Lstat,
-                                ),
-                                PathObservationResult::Lstat(PathOperationResult::Missing),
-                            )
-                        }),
-                )
-                .chain(std::iter::once((
+            [
+                ("/", 1),
+                (WORKSPACE, 2),
+                ("/extension-definition-loading/dep", 25),
+            ]
+            .into_iter()
+            .map(|(path, stamp)| {
+                (
                     PathObservationDemand::new(
                         PathObservationNamespace::Host,
-                        NormalizedAbsolutePath::new(format!("{WORKSPACE}/BUILD.bazel")).unwrap(),
+                        NormalizedAbsolutePath::new(path).unwrap(),
                         PathObservationOperation::Lstat,
                     ),
                     PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
-                        PathNodeKind::RegularFile,
-                        20,
+                        PathNodeKind::Directory,
+                        stamp,
                         1,
                         1,
                         1,
-                        0o644,
+                        0o755,
                     ))),
-                )))
-                .chain(
-                    ["MODULE.bazel", "ext.bzl", "child.bzl", "other.bzl"]
-                        .into_iter()
-                        .enumerate()
-                        .map(|(index, name)| {
-                            (
-                                PathObservationDemand::new(
-                                    PathObservationNamespace::Host,
-                                    NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}"))
-                                        .unwrap(),
-                                    PathObservationOperation::Lstat,
-                                ),
-                                PathObservationResult::Lstat(
-                                    if name == "child.bzl" && !child_present {
-                                        PathOperationResult::Missing
-                                    } else {
-                                        PathOperationResult::Present(PathLstat::new(
-                                            PathNodeKind::RegularFile,
-                                            index as i64 + 30,
-                                            1,
-                                            1,
-                                            1,
-                                            0o644,
-                                        ))
-                                    },
-                                ),
-                            )
-                        }),
                 )
-                .chain(
-                    [
-                        ("MODULE.bazel", module_source.as_bytes()),
-                        ("ext.bzl", extension_source.as_bytes()),
-                        ("child.bzl", child_source.as_bytes()),
-                        ("other.bzl", other_source.as_bytes()),
-                    ]
+            })
+            .chain(
+                [
+                    "REPO.bazel",
+                    ".bazelignore",
+                    "BUILD",
+                    "MODULE.bazel.lock",
+                    "dep/REPO.bazel",
+                    "dep/.bazelignore",
+                    "dep/BUILD",
+                    "dep/MODULE.bazel.lock",
+                ]
+                .into_iter()
+                .map(|name| {
+                    (
+                        PathObservationDemand::new(
+                            PathObservationNamespace::Host,
+                            NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}")).unwrap(),
+                            PathObservationOperation::Lstat,
+                        ),
+                        PathObservationResult::Lstat(PathOperationResult::Missing),
+                    )
+                }),
+            )
+            .chain(std::iter::once((
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new(format!("{WORKSPACE}/BUILD.bazel")).unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                    PathNodeKind::RegularFile,
+                    20,
+                    1,
+                    1,
+                    1,
+                    0o644,
+                ))),
+            )))
+            .chain(
+                ["MODULE.bazel", "ext.bzl", "child.bzl", "other.bzl"]
                     .into_iter()
-                    .map(|(name, bytes)| {
+                    .enumerate()
+                    .map(|(index, name)| {
                         (
                             PathObservationDemand::new(
                                 PathObservationNamespace::Host,
                                 NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}")).unwrap(),
-                                PathObservationOperation::FileBytes,
+                                PathObservationOperation::Lstat,
                             ),
-                            PathObservationResult::FileBytes(
+                            PathObservationResult::Lstat(
                                 if name == "child.bzl" && !child_present {
                                     PathOperationResult::Missing
                                 } else {
-                                    PathOperationResult::Present(Arc::from(bytes))
+                                    PathOperationResult::Present(PathLstat::new(
+                                        PathNodeKind::RegularFile,
+                                        index as i64 + 30,
+                                        1,
+                                        1,
+                                        1,
+                                        0o644,
+                                    ))
                                 },
                             ),
                         )
                     }),
-                ),
+            )
+            .chain(
+                dep_sources
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, (name, _))| {
+                        (
+                            PathObservationDemand::new(
+                                PathObservationNamespace::Host,
+                                NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}")).unwrap(),
+                                PathObservationOperation::Lstat,
+                            ),
+                            PathObservationResult::Lstat(PathOperationResult::Present(
+                                PathLstat::new(
+                                    PathNodeKind::RegularFile,
+                                    index as i64 + 40,
+                                    1,
+                                    1,
+                                    1,
+                                    0o644,
+                                ),
+                            )),
+                        )
+                    }),
+            )
+            .chain(
+                [
+                    ("MODULE.bazel", module_source.as_bytes()),
+                    ("ext.bzl", extension_source.as_bytes()),
+                    ("child.bzl", child_source.as_bytes()),
+                    ("other.bzl", other_source.as_bytes()),
+                ]
+                .into_iter()
+                .map(|(name, bytes)| {
+                    (
+                        PathObservationDemand::new(
+                            PathObservationNamespace::Host,
+                            NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}")).unwrap(),
+                            PathObservationOperation::FileBytes,
+                        ),
+                        PathObservationResult::FileBytes(
+                            if name == "child.bzl" && !child_present {
+                                PathOperationResult::Missing
+                            } else {
+                                PathOperationResult::Present(Arc::from(bytes))
+                            },
+                        ),
+                    )
+                }),
+            )
+            .chain(dep_sources.into_iter().map(|(name, source)| {
+                (
+                    PathObservationDemand::new(
+                        PathObservationNamespace::Host,
+                        NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}")).unwrap(),
+                        PathObservationOperation::FileBytes,
+                    ),
+                    PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                        source.as_bytes(),
+                    ))),
+                )
+            })),
         )
         .unwrap();
         updater
@@ -8493,7 +8908,7 @@ mod module_extension_definition_loading_tests {
         let (changed_rows, _) = tracker.take_rows();
         let reused = changed_rows
             .iter()
-            .filter(|row| row.key.starts_with("observed-host-bzl-module:"))
+            .filter(|row| row.key.starts_with("observed-bzlmod-host-bzl-module:"))
             .collect::<Vec<_>>();
         assert!(matches!(reused.as_slice(), [row]
             if row.key.ends_with("//:ext.bzl")
@@ -9691,7 +10106,7 @@ mod module_extension_definition_loading_tests {
         assert!(
             !parent_rows
                 .iter()
-                .any(|row| row.key.starts_with("observed-host-bzl-module:"))
+                .any(|row| row.key.starts_with("observed-bzlmod-host-bzl-module:"))
         );
         let warm =
             observed_loaded_handles(dice, root, ext, child, other, Some(tracker.clone())).await;
@@ -9738,11 +10153,11 @@ mod module_extension_definition_loading_tests {
         let admitted = |key: &str, family: BzlTrackerFamily| {
             matches!(family, BzlTrackerFamily::BzlmodCommandPolicy | BzlTrackerFamily::BzlmodEnvironmentPolicy)
             || "root-module-command-policy: root-module-environment-policy: root-module-lockfile-mode: visible-lockfile: host-visible-lockfile:".split_whitespace().any(|prefix| key.starts_with(prefix))
-            || !"host-selected-extension-definition-load-requests: host-bzl-module: host-loaded-module-extension-definitions: host-prepared-module-extension-inputs: host-pure-module-extension-invocations: host-instantiated-module-extension-repositories: host-validated-module-extension-repositories: host-root-repository-mapping: host-canonical-selected-module-definition: host-generated-repository-definition: slug-command:".split_whitespace().any(|prefix| key.starts_with(prefix))
+            || !"host-selected-extension-definition-load-requests: bzlmod-host-bzl-module: host-loaded-module-extension-definitions: host-prepared-module-extension-inputs: host-pure-module-extension-invocations: host-instantiated-module-extension-repositories: host-validated-module-extension-repositories: host-root-repository-mapping: host-canonical-selected-module-definition: host-generated-repository-definition: slug-command:".split_whitespace().any(|prefix| key.starts_with(prefix))
         };
         let bzl = rows
             .iter()
-            .filter(|row| row.key.starts_with("observed-host-bzl-module:"))
+            .filter(|row| row.key.starts_with("observed-bzlmod-host-bzl-module:"))
             .collect::<Vec<_>>();
         assert_eq!(bzl.len(), labels.len(), "{bzl:?}");
         for ((row, label), print) in bzl
@@ -9775,7 +10190,7 @@ mod module_extension_definition_loading_tests {
         assert!(!rows.iter().any(|row| {
             row.key
                 .starts_with("host-selected-extension-definition-load-requests:")
-                || row.key.starts_with("host-bzl-module:")
+                || row.key.starts_with("bzlmod-host-bzl-module:")
         }));
         assert!(
             parent.dependencies[0]
@@ -9785,7 +10200,7 @@ mod module_extension_definition_loading_tests {
             parent
                 .dependencies
                 .iter()
-                .filter(|row| row.starts_with("observed-host-bzl-module"))
+                .filter(|row| row.starts_with("observed-bzlmod-host-bzl-module"))
                 .map(|row| row.rsplit(':').next().unwrap())
                 .collect::<Vec<_>>(),
             labels
@@ -9885,7 +10300,7 @@ mod module_extension_definition_loading_tests {
                 let (rows, dependencies) = tracker.take_rows();
                 let bzl = rows
                     .iter()
-                    .filter(|row| row.key.starts_with("observed-host-bzl-module:"))
+                    .filter(|row| row.key.starts_with("observed-bzlmod-host-bzl-module:"))
                     .collect::<Vec<_>>();
                 assert_eq!(bzl.len(), position + 1);
                 for (index, row) in bzl.iter().enumerate() {
@@ -10035,14 +10450,14 @@ mod module_extension_definition_loading_tests {
         assert_eq!(
             legacy_rows
                 .iter()
-                .filter(|row| row.key.starts_with("host-bzl-module:"))
+                .filter(|row| row.key.starts_with("bzlmod-host-bzl-module:"))
                 .count(),
             3
         );
         assert!(!legacy_rows.iter().any(|row| {
             row.key
                 .starts_with("observed-host-selected-extension-definition-load-requests:")
-                || row.key.starts_with("observed-host-bzl-module:")
+                || row.key.starts_with("observed-bzlmod-host-bzl-module:")
         }));
         let mut first_transaction = case_transaction_with_other(
             &dice,
@@ -10118,7 +10533,7 @@ mod module_extension_definition_loading_tests {
         assert!(
             !warm_rows
                 .iter()
-                .any(|row| row.key.starts_with("observed-host-bzl-module"))
+                .any(|row| row.key.starts_with("observed-bzlmod-host-bzl-module"))
         );
 
         let changed = compute_observed_loaded_with_other(
@@ -10201,7 +10616,7 @@ mod module_extension_definition_loading_tests {
             parent_dependencies
                 .dependencies
                 .iter()
-                .any(|dependency| dependency.starts_with("observed-host-bzl-module"))
+                .any(|dependency| dependency.starts_with("observed-bzlmod-host-bzl-module"))
         );
         assert!(activations.iter().any(|row| {
             row.key == key.to_string()
@@ -10463,10 +10878,16 @@ mod module_extension_definition_loading_tests {
             [
                 HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(workspace.dupe())
                     .to_string(),
-                HostBzlModuleObservationKey::new(workspace.dupe(), observed_test_label("ext.bzl"))
-                    .to_string(),
-                HostBzlModuleObservationKey::new(workspace, observed_test_label("other.bzl"))
-                    .to_string(),
+                HostBzlModuleObservationKey::new_bzlmod(
+                    workspace.dupe(),
+                    observed_test_label("ext.bzl"),
+                )
+                .to_string(),
+                HostBzlModuleObservationKey::new_bzlmod(
+                    workspace,
+                    observed_test_label("other.bzl"),
+                )
+                .to_string(),
             ]
         );
         for key in
@@ -10555,8 +10976,8 @@ mod module_extension_definition_loading_tests {
         let definition = &production[definition_start..definition_end];
         assert!(definition.contains("match request.source()"));
         assert!(definition.contains("RootRepositoryRoute::for_selected_extension_definition"));
-        assert!(definition.contains("ExternalBzlModuleEvalKey::new"));
-        assert!(definition.contains("ExternalBzlModuleObservationKey::new"));
+        assert!(definition.contains("ExternalBzlModuleEvalKey::new_bzlmod"));
+        assert!(definition.contains("ExternalBzlModuleObservationKey::new_bzlmod"));
         let resolver = &production[production
             .find("fn resolve_external_bzl_load_label")
             .unwrap()..];
@@ -10565,7 +10986,8 @@ mod module_extension_definition_loading_tests {
             .find("async fn compute_external_bzl_children")
             .unwrap()..];
         assert!(children.contains("resolved.label.canonical_label(&resolved.route)"));
-        assert!(children.contains("compute_external_bzl_child(ctx, &resolved.route"));
+        assert!(children.contains("compute_external_bzl_child("));
+        assert!(children.contains("key.context"));
     }
 }
 
