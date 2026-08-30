@@ -112,7 +112,7 @@ the immutable loading schema, admit package inventory, and fail closed before
 configured analysis consumes an unsupported exec/executable edge. Preserve the
 parked registration proof and selected-context candidate outside named hunks.
 
-### M7 exec-configured loading accepted; BCR archive transform design active (2026-08-29)
+### M7 BCR transform design accepted; ordered identity implementation active (2026-08-29)
 
 Commit `831e574e6` terminally accepts the generic loading prerequisite. Full
 serial loading and analysis suites pass, the four-row inventory proof remains
@@ -122,24 +122,25 @@ generic repository boundary: absent archive type, nonempty strip prefix,
 source-ordered authenticated patch, patch strip 1 and 0664/0775 tar modes.
 
 The proof-only registration packet cannot change repository materialization.
-Design only `WP-5-7A-selected-bcr-archive-transform-architecture`. Freeze the
-producer-owned patch order, a narrow RepoSpec publication identity that adds
-ordered `remote_patches` keys only for exact http_archive/git_repository while
-leaving ordinary map equality unchanged, its propagation through both route
-families and the actual materialization-request cutoff, the complete phase-
-scratch transform plan, verified overlay/patch/MODULE order, transform-aware
-source identity and private-root lifecycle. Bazel 9.2/BCR remain behavior
-authority. Clean Zabel informs ordered scratch/realization ownership only; no
-rules_shell special case, Rust rule implementation or `cc_common` semantic
-owner is permitted.
+Commit `2a7c9436e` freezes the producer-owned patch order, a narrow RepoSpec
+publication identity that adds ordered `remote_patches` keys only for exact
+http_archive/git_repository while leaving ordinary map equality unchanged, its
+propagation through both route families and the actual materialization-request
+cutoff, the complete phase-scratch transform plan, verified overlay/patch/
+MODULE order, transform-aware source identity and private-root lifecycle.
+Bazel 9.2/BCR remain behavior authority. Clean Zabel informs ordered scratch/
+realization ownership only; no rules_shell special case, Rust rule
+implementation or `cc_common` semantic owner is permitted.
 
 The first independent review rejected physical insertion order as sufficient
 identity because Buck2-derived `SmallMap` equality is membership-based. The
 corrected design adds collision-safe ordered `remote_patches` key identity at
 the RepoSpec publication boundary, proves both selected route lanes through the
 actual request cutoff, and leaves ordinary map equality unchanged. Independent
-architecture/identity/lifecycle rereview is `ACCEPT`; commit this design before
-activating only its ordered producer/publication-identity successor.
+architecture/identity/lifecycle rereview is `ACCEPT`. Implement only
+`WP-5-7A-selected-bcr-transform-identity-implementation` under the frozen
+five-code-file plus Cargo manifest allowlist and caps; archive realization
+remains a separately activated successor.
 
 ### M7 effective repository Host inputs accepted; canonical capabilities active (2026-08-28)
 

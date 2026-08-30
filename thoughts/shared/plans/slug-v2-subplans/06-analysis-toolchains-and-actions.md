@@ -21415,7 +21415,9 @@ behavior authority; BCR Starlark owns every rule including `cc_internal`, and
 The current manifest owns exact successor blobs, caps, compatibility classes,
 proofs, lifecycle, complexity decisions and stops. Independent architecture/
 identity/lifecycle rereview accepts the corrected RepoSpec publication domain
-and carrier proof. Commit the design, then activate only the ordered producer/
-publication-identity successor. After both implementations pass, resume only
-the unchanged proof-only four-row registration closure before selected-context
-R2 review.
+and carrier proof; commit `2a7c9436e` records that accepted design. Active
+packet `WP-5-7A-selected-bcr-transform-identity-implementation` may change only
+the frozen producer, RepoSpec equality, two hash owners, request-boundary proof
+and Cargo manifest. Archive realization remains stopped. After both
+implementations pass, resume only the unchanged proof-only four-row
+registration closure before selected-context R2 review.

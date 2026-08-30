@@ -1,15 +1,16 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-7A-selected-bcr-archive-transform-architecture`
+Packet: `WP-5-7A-selected-bcr-transform-identity-implementation`
 
 Milestone: M7A category 6 registered-toolchain repository prerequisite.
 
-Base: accepted exec-configured loading implementation `831e574e6`, accepted
-canonical repository Host capabilities `26a68d61c`, and the parked proof-only
-registration base `20ad71ffa`. The passing four-row proof draft and retained
-selected-context R2 candidate remain dirty and are read-only during design.
+Base: independently accepted architecture `2a7c9436e`, accepted exec-configured
+loading implementation `831e574e6`, accepted canonical repository Host
+capabilities `26a68d61c`, and the parked proof-only registration base
+`20ad71ffa`. The passing four-row proof draft and retained selected-context R2
+candidate remain dirty and are read-only during implementation.
 
-## Why design is active
+## Why this implementation is active
 
 The exec/executable label-attribute prerequisite is terminally accepted. It
 retains Target/Exec/Starlark identity in loading, admits package inventory and
@@ -169,10 +170,9 @@ RepoSpec/materialization request identity. No lock crosses I/O or DICE
 compute. Any capture, transform, cancellation or validation failure drops all
 captures and the unpublished private root.
 
-## Successor 1: ordered producer and publication identity
+## Active implementation: ordered producer and publication identity
 
-After design `ACCEPT`, activate only
-`WP-5-7A-selected-bcr-transform-identity-implementation` against:
+Implement only this packet against:
 
 - `app/slug_bzlmod_v2/src/selected_repo_spec.rs`
   `8ba4d01d3224dbc3d55e020b794868261d691ca9`; and
@@ -275,8 +275,9 @@ a semantic transform; external `patch`/shell/JVM execution; global cache or
 background task; partial root publication; owner/Cargo/file/cap widening; or a
 real rules_shell tar/patch shape outside the admitted subset.
 
-Implement only successor 1 after its separate activation commit. After both
-implementation successors terminally pass, resume the unchanged
+This activation commits no Rust. Implement only the frozen active allowlist.
+After this packet receives terminal `ACCEPT`, activate successor 2 separately.
+After both implementation successors terminally pass, resume the unchanged
 proof-only four-registration-row closure. Only after that proof and its command/
 REAPI dependents pass may the retained selected-context R2 candidate return to
 terminal review, followed by M8 bootstrap work.
