@@ -55,12 +55,27 @@ rules_rust 0.73.0 replays clear `macro` and stop deterministically at missing
 `subrule`; independent correction rereview returned `ACCEPT`. The parked
 28-line `package.rs` definition-source hunk remained outside the commit.
 
-Run only `WP-4-5-7A-symbolic-macro-namespace-analysis-enforcement` next under
-40/120/160 caps. It consumes the retained violation at the existing configured-
-target admission boundary, adds no DICE/loading owner, and preserves successful
-package loading. Then implement `subrule` as the next category member. Bazel 9.2
-commit `8220c619…` alone defines semantics. Clean Zabel `0795445f…` informs
-compact ownership and reuse only; `cc_common`/`cc_internal` remain generic
+Commit `541fcfaf2` accepts the 18-production/64-proof configured namespace
+successor. It consumes only the retained loading fact after exact target lookup,
+rejects before configured semantic work, and passes exact failure plus A/B/A,
+the full analysis suite, named cquery/build dependents, isolated staged build,
+and independent terminal review. Parked analysis work remains outside the
+commit.
+
+Run only `WP-4-5-7A-subrule-declaration-and-analysis-architecture-r2` next.
+The authentic first rules_cc consumer proves that a token-only global is not a
+meaningful vertical: `create_fdo_context` has eight private
+`configuration_field` label defaults, `cpp` fragment access, hidden rule
+attachment, and later actions. R1 was `REPLAN`: Bazel late-bound identity is
+typed fragment class plus field and tools repository, never the defining `.bzl`
+module; descriptor lifting is ordered while rule/nested authorization and
+publication are set-semantic; the first successor must freeze paths/caps and a
+deterministic stop; and full FDO invocation additionally needs
+`args`/`run`/`symlink` plus `cc_common.absolute_symlink` action families. R2
+separates those owners and claims only the first loading successor after
+review. Bazel 9.2 commit `8220c619…` alone defines semantics. Clean Zabel
+`0795445f…` informs sparse spans, compact identity, typed late-bound ownership,
+and borrowed context lifetime only; `cc_common`/`cc_internal` remain generic
 downstream BCR Starlark discriminators, never parser or Rust C++ rule targets.
 
 ## Accepted `.bzl` load-visibility design; implementation activated (2026-08-27)
