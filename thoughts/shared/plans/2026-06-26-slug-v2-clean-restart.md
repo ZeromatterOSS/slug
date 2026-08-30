@@ -30,59 +30,45 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; module-loaded native context and repository-context attribute architecture accepted; implementation R3 active; category-6 selected-context retained** | accepted M7A loading/repository closure through `1f9433600`: canonical Root/Canonical `.bzl` routing, complete exact `tools/build_defs/repo`, all thirteen repository-rule attribute carriers, ordinary/innate generated-repository authentication, `native.existing_rule[s]`, and recursively separated BUILD/Bzlmod native contexts with exact Bzlmod `native.bazel_version == "9.2.0"`; `47c937942` accepts the complete value-bearing `repository_ctx` contract; `602c14a0e` accepts R2's proof-only cap correction; independent review accepts R3's replacement-only 500/1,600 cap | R1 omits the required key-level matrix and wraps `Override`/`Coerced` sources in parallel allocator branches instead of the accepted normalized value view; two fresh pre-R1 replays next fail at authenticated `repository_ctx.attr` | replace the source-wrapper branches with the normalized view, complete proofs, then replay and proof-only registration closure |
+| M7: command/ruleset breadth | **partial; repository-context implementation accepted; `.bzl` global-capability category architecture active; category-6 selected-context retained** | accepted M7A loading/repository closure through `c83e70f0f`: canonical Root/Canonical `.bzl` routing, complete exact `tools/build_defs/repo`, all thirteen repository-rule attribute carriers, ordinary/innate generated-repository authentication, recursively separated BUILD/Bzlmod native contexts, and the complete admitted value-bearing `repository_ctx` namespace; the real starlark-rust `set` remains accepted in `cb71a302d` | two fresh rules_rust replays pass the former `repository_ctx.attr` boundary and next fail at missing `.bzl` global `macro` in the authentic generated `bazel_features` repository; `PackageSpecificationInfo` and `subrule` are the same missing category | freeze the complete six-name `.bzl` capability architecture, then implement shared exported/provider identity with separate macro loading and subrule analysis lifecycles |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-5-7A-repository-context-attribute-namespace-implementation-r3](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-bazel-bzl-global-capability-category-architecture-r3](./slug-v2-subplans/current-packet.md).
 
-Commit `1f9433600` terminally accepts the general module-loaded native-context
-implementation. It carries BUILD/Bzlmod context through root and external
-evaluation, observation, cycle, and recursive child identity; exposes exact
-`native.bazel_version == "9.2.0"` only in Bzlmod; preserves BUILD absence; and
-routes ordinary, selected, innate, and repository-definition owners through
-the explicit Bzlmod constructors. Full Bzlmod/loading validation, a rebuilt
-CLI, two fresh replays, cap/scope checks, and corrected independent terminal
-review pass. The implementation is 212 production, 300 proof, and 512 net
-lines; the parked 28-line `package.rs` hunk remains unstaged and byte-isolated.
+Commit `c83e70f0f` terminally accepts the repository-context attribute
+implementation. One authenticated immutable input serves ordinary and innate
+generated repositories; all thirteen kinds use one normalized recursive
+projector with exact explicit/default/implicit precedence, canonical label
+objects and order. Full loading/Bzlmod validation, rebuilt CLI replays, caps,
+and corrected independent terminal review pass.
 
-Both fresh rules_rust replays now pass the former
-`@@bazel_features+//private:globals_repo.bzl:22` boundary. They next fail while
-executing the authenticated `globals_repo` rule at line 25 because
-`repository_ctx.attr` is absent. The outer requested
-`@@rules_cc++compatibility_proxy+cc_compatibility_proxy//:symbols.bzl` route is
-missing only because the aggregate selected-extension closure contains that
-earlier failed generated repository.
+Both fresh rules_rust replays clear the former
+`@@bazel_features+//private:globals_repo.bzl:25` `repository_ctx.attr` failure.
+They next execute the authentic generated global repository and stop at missing
+`macro` on line 7. That file selects one Bazel 9.2 category containing `macro`,
+`PackageSpecificationInfo`, `RunEnvironmentInfo`, `set`, `subrule`, and
+`DefaultInfo`. Slug already has the real starlark-rust `set` and admitted
+provider slices; the other three names are absent.
 
-Commit `47c937942` terminally accepts the independently reviewed architecture.
-R2 was rejected because it treated a retained explicit `None` as publishable;
-pinned Bazel skips `None` before unknown, mandatory, and default processing,
-including when it re-instantiates imported or registry `RepoSpec`s. R3 corrects
-that semantic row and otherwise retains the reviewed architecture: one
-authenticated invocation input, one non-retained source view and recursive
-evaluator allocator for
-`name`, `original_name`, and the full read-only `attr` namespace over all
-thirteen admitted attribute kinds. It specifies explicit/default/implicit
-precedence, recursive order and canonical labels, original-name fallback,
-reflection, ordinary/innate DICE A/B/A and no-effect proofs, the exact two-file
-implementation allowlist, and initial 300/650/950 caps. `workspace_root` and
-filesystem/process/network methods remain separate future effect categories.
-`cc_common` remains only a downstream generic BCR Starlark integration
-discriminator; Bazel 9.2 is sole semantic authority and clean Zabel is peer
-ownership/optimization guidance only. Implement only
-`repository_rule_context.rs` and the authenticated handoff/proofs in
-`module_extension_repository_file_effect.rs`. The recoverable R1 candidate is
-290 production/197 proof/487 aggregate and passes focused context/selected
-effect tests, but it omits the frozen ordinary/innate key-level A/B/A and
-no-effect matrix. R2's independently accepted proof replan raises proof capacity
-to 1,100 but a production audit then rejects R1's tagged `Override`/`Coerced`
-source view and parallel allocator branches. R3 keeps the two-file semantics and
-1,100 proof cap, raises only production/aggregate capacity to 500/1,600, and
-requires replacement by the frozen normalized scalar/iterable/map view before
-completing the two-owner matrix. Independent R3 replan review returns `ACCEPT`;
-replace the rejected production shape before adding more proof.
+Freeze the category before more Rust. Keep one `.bzl` global-composition owner
+and defining-module export identity, but separate package-owned synchronous
+symbolic macro expansion from retained subrule declaration metadata and
+evaluator-local configured-analysis invocation. Add one provider-key lane for
+nonconstructible `PackageSpecificationInfo`; do not erase specialized provider
+values into a generic callable. Finalizer macros, configured-aspect subrules,
+package-group instances, and broader provider fields stay explicitly deferred.
+`cc_common` remains only a downstream generic BCR Starlark discriminator.
+Bazel 9.2 is sole semantic authority; clean Zabel supplies peer ownership and
+compact-retention guidance only. Independent review is required before the
+first bounded successor implementation. R1 review exposed BUILD-global leakage,
+unowned subrule toolchain/fragment claims, and an incomplete proof contract; R2
+corrected those semantics but its loading-only successor could not enforce late
+macro namespace violations. Independently accepted R3 retains the violation in
+package identity, schedules one bounded configured-target admission successor,
+and selects only the symbolic-macro/provider loading implementation first.
 
 ### M7 complete repository definitions built-in package accepted (2026-08-30)
 

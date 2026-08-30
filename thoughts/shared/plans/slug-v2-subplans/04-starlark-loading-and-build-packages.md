@@ -22,6 +22,36 @@ a Starlark-visible method needs label resolution, file reads, repo mapping, or
 repository materialization, route that through a named DICE key or async bridge
 before returning the Starlark-visible value.
 
+## Bazel `.bzl` global capability category architecture accepted (2026-08-30)
+
+Independent R3 review accepts the category-wide architecture selected by the
+authentic Bazel 9.2 `bazel_features` globals repository. Both `.bzl`
+environments must expose `macro`, `PackageSpecificationInfo`,
+`RunEnvironmentInfo`, `set`, `subrule`, and `DefaultInfo`; BUILD globals expose
+only universe-owned `set` among those names. The first implementation therefore
+also removes Slug's current BUILD `DefaultInfo` leak. Existing starlark-rust
+`set` remains untouched.
+
+Use one nonconstructible provider-key lane for `PackageSpecificationInfo` and
+one defining-module export identity shape, while keeping lifecycles separate:
+fresh-evaluator non-finalizer macro expansion mutates the existing package
+owner and retains compact instance/target origin, visibility, and namespace
+violation identity; dependency-only subrules retain sparse hidden attributes
+and later execute through the existing configured dependency/action owner.
+Macro finalizers, subrule toolchains/automatic exec groups, fragments,
+attached/configured aspects, and provider instances remain explicitly deferred.
+
+Run only `WP-4-5-7A-symbolic-macro-and-bzl-provider-key-implementation` next
+under its exact five-file loading allowlist and 2,100/2,200/4,300 caps. It owns
+the complete frozen loading/package proof matrix and two fresh rules_rust
+replays, but only retains late namespace violations. The immediately scheduled
+40/120/160 analysis successor enforces those violations at the natural
+configured-target admission function under refreshed dirty-file hashes. Bazel
+9.2 commit `8220c619…` alone defines semantics. Clean Zabel `0795445f…`
+informs compact ownership and reuse only; `cc_common`/`cc_internal` remain
+generic downstream BCR Starlark discriminators, never parser or Rust C++ rule
+targets.
+
 ## Accepted `.bzl` load-visibility design; implementation activated (2026-08-27)
 
 The authenticated rules_cc traversal first requires Bazel's default-enabled
