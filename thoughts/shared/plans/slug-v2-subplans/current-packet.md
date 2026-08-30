@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-symbolic-macro-and-bzl-provider-key-implementation`
+Packet: `WP-4-5-7A-symbolic-macro-and-bzl-provider-key-implementation-r2`
 
 Milestone: M7A bootstrap-critical generic Starlark/ruleset closure.
 
@@ -23,6 +23,8 @@ capability architecture:
   globals;
 - preserve the existing real starlark-rust `set`, `DefaultInfo`, and
   `RunEnvironmentInfo` value owners; and
+- share the existing package-loading print/event sink with every fresh macro
+  evaluator so macro prints retain source order in the same event batch; and
 - rebuild the V2 CLI and run two fresh authenticated rules_rust replays through
   the current `bazel_features` `macro` boundary.
 
@@ -128,6 +130,21 @@ compact instances, target origin/visibility, and namespace-violation state are
 package semantics and participate structurally in equality/invalidation. Add
 no macro cache, DICE key, lock, background task, or retained evaluator value.
 
+### Existing event-owner handoff
+
+The R1 preflight proved that starlark-rust exposes a print-handler setter but no
+getter or evaluator-context inheritance API. The two BUILD evaluation owners in
+`bzl_module.rs` create `LoadingPrintCapture`; a fresh macro evaluator otherwise
+falls back to stderr and silently escapes the package event batch.
+
+Move or wrap that existing concrete capture as one shared loading-owned value,
+give the `PackageRecorder` an optional clone during the two existing BUILD
+evaluator constructions, and install the same capture on each fresh macro
+evaluator. Drain the unchanged sink only after the complete BUILD/macro call
+tree returns. Preserve exact source order and the current capture-disabled
+behavior. This is a carrier correction, not a second event owner: add no DICE
+key, event type, buffering layer, public API, or starlark-rust change.
+
 ## Frozen proof matrix
 
 Terminal implementation requires:
@@ -159,6 +176,11 @@ Terminal implementation requires:
 - DICE A/B/A: source definition and BUILD invocation independently invalidate
   and restore through frozen-module/package owners, including origin,
   visibility, and namespace-violation changes; and
+- event ownership: with capture enabled, one package attempt records
+  BUILD-before, direct-macro, nested-macro, and BUILD-after prints in exact
+  execution order in one `EventBatch`; a failing nested macro still drains the
+  ordered prefix into the attempt error batch; with capture disabled, neither
+  the BUILD nor fresh macro evaluators create or retain a capture sink;
 - integration: focused tests, full loading and Bzlmod suites, rebuilt
   `slug_cli_v2`, stale-`slugd` cleanup, then two fresh authenticated rules_rust
   replays that clear `macro` and stop only at the next real boundary or succeed.
@@ -171,6 +193,8 @@ implemented inside the exact file and cap envelope.
 Only these files may change:
 
 - `app/slug_loading_v2/src/package.rs`;
+- `app/slug_loading_v2/src/bzl_module.rs` only for the concrete shared print
+  capture and its two existing package-evaluator handoffs;
 - `app/slug_loading_v2/src/provider.rs`;
 - `app/slug_loading_v2/src/testing_bootstrap.rs` only for proven token
   convergence;
@@ -179,7 +203,7 @@ Only these files may change:
 - this current packet, the canonical plan, Stage 4 plan, routing log/history for
   activation/terminal records only.
 
-Caps are 2,100 production, 2,200 proof, and 4,300 aggregate net added/deleted
+Caps are 2,250 production, 2,200 proof, and 4,450 aggregate net added/deleted
 lines from this packet base. Moving code counts at the destination.
 
 `package.rs` contains another workstream's exact unstaged baseline: 28
@@ -188,6 +212,13 @@ additions/zero deletions, HEAD blob
 `623bcd93f7a8dde2fad8728ea157e9510b05dedd79a4f1cba5a4ba4a4275f047`.
 It adds rule definition-source retention/resolution. Re-audit before every
 stage, exclude those hunks byte-for-byte, and commit only packet-owned hunks.
+
+`bzl_module.rs` is clean at R2 activation: HEAD blob
+`d2c079a6b630c1abb0ef24aae39041a78282f852`, worktree SHA-256
+`aba7f6623b5a38c6bdd5d5ded858cbc87c677ecfdcab9f0bdf381832b05f02ca`.
+Only the existing concrete capture definition and the package evaluators near
+the current host/root BUILD paths may change; all Bzl/DICE route logic is
+read-only.
 
 ## Validation and terminal review
 
@@ -215,13 +246,19 @@ claims. Bazel 9.2 remains sole truth.
 
 Stop and `REPLAN` for a new DICE/package owner, retained evaluator values,
 parallel target/provider identity, transaction model, generic builtin-callable
-erasure, starlark-rust modification, file outside the allowlist, cap overflow,
+erasure, starlark-rust modification, file outside the R2 allowlist, cap overflow,
 or any need to touch the dirty analysis namespace-enforcement successor now.
 Request human design input only if exact fresh-evaluator package expansion
 cannot be represented with Slug's existing package/frozen-module owners.
 
-Independent activation review returns `ACCEPT`. The activation audit corrected
+Independent R1 activation review returned `ACCEPT`. The activation audit corrected
 the architecture's ambiguous “six-name inventory” wording to an exact six-row
 ledger: five names are present after this packet and `subrule` remains absent
 until its scheduled declaration owner. No placeholder or compatibility claim
-was added.
+was added. Implementation preflight then returned `REPLAN` before Rust because
+the fresh evaluator could not inherit the loading print sink within the
+five-file envelope. R2 adds only clean `bzl_module.rs` capture/handoff sites and
+150 production/aggregate lines. Initial correction review confirmed the owner
+and two call sites but returned `REPLAN` because the frozen matrix omitted event
+evidence; R2 now requires exact direct/nested/error/disabled capture rows before
+implementation. Focused correction rereview returns `ACCEPT`; implement R2.

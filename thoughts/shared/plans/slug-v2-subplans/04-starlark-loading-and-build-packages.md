@@ -41,8 +41,8 @@ and later execute through the existing configured dependency/action owner.
 Macro finalizers, subrule toolchains/automatic exec groups, fragments,
 attached/configured aspects, and provider instances remain explicitly deferred.
 
-Run only `WP-4-5-7A-symbolic-macro-and-bzl-provider-key-implementation` next
-under its exact five-file loading allowlist and 2,100/2,200/4,300 caps. It owns
+Run only `WP-4-5-7A-symbolic-macro-and-bzl-provider-key-implementation-r2` next
+under its exact R2 loading allowlist and 2,250/2,200/4,450 caps. It owns
 the complete frozen loading/package proof matrix and two fresh rules_rust
 replays, but only retains late namespace violations. The immediately scheduled
 40/120/160 analysis successor enforces those violations at the natural
@@ -58,6 +58,17 @@ deletions with worktree SHA-256 `623bcd93…`; exclude the definition-source hun
 from every stage. The successor freezes a six-row inventory but does not claim
 deferred `subrule` is present. No analysis, subrule, set, parser, or C++ rule
 file is active.
+
+R1 implementation preflight stopped before Rust: the fresh evaluator cannot
+read the BUILD evaluator's private print handler, so the five-file envelope
+would send macro prints outside the retained package event batch. R2 adds only
+clean `bzl_module.rs` concrete capture ownership and its two existing package-
+evaluator handoffs, under corrected 2,250/2,200/4,450 caps. The recorder and all
+fresh macro evaluators share that same sink; no new event/DICE owner or
+starlark-rust change is permitted. Independent correction rereview returns
+`ACCEPT`.
+The terminal proof must discriminate one-batch BUILD-before/direct/nested/
+BUILD-after order, error-path prefix draining, and capture-disabled absence.
 
 ## Accepted `.bzl` load-visibility design; implementation activated (2026-08-27)
 

@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-4-5-7A-symbolic-macro-and-bzl-provider-key-implementation](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-symbolic-macro-and-bzl-provider-key-implementation-r2](./slug-v2-subplans/current-packet.md).
 
 Commit `c83e70f0f` terminally accepts the repository-context attribute
 implementation. One authenticated immutable input serves ordinary and innate
@@ -71,11 +71,18 @@ package identity, schedules one bounded configured-target admission successor,
 and selects only the symbolic-macro/provider loading implementation first.
 Commit `368ef9296` freezes that accepted architecture. The current packet now
 implements only that selected loading/package successor under its exact
-five-file, dirty-hunk-isolated envelope; the analysis enforcement successor and
+R2 dirty-hunk-isolated envelope; the analysis enforcement successor and
 all subrule work remain scheduled but inactive. Its inventory is a six-row
 ledger, not a premature six-present claim: `.bzl` routes gain `macro` and
 `PackageSpecificationInfo` while `subrule` remains explicitly absent until its
-declaration packet.
+declaration packet. R1 preflight made no Rust change and exposed one missing
+carrier: fresh evaluators cannot inherit the private BUILD evaluator print sink.
+R2 admits only the clean `bzl_module.rs` capture plus its two existing package
+handoffs, keeping the same event batch and raising production/aggregate caps by
+150. No DICE route or starlark-rust API changes.
+The corrected frozen matrix requires one-batch BUILD-before/direct/nested/
+BUILD-after order, error-prefix draining, and capture-disabled absence.
+Independent correction rereview returns `ACCEPT`; implement R2.
 
 ### M7 complete repository definitions built-in package accepted (2026-08-30)
 
