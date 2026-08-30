@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-repository-context-attribute-namespace-implementation-r2`
+Packet: `WP-4-5-7A-repository-context-attribute-namespace-implementation-r3`
 
 Milestone: M7A bootstrap-critical repository/ruleset closure.
 
@@ -14,9 +14,12 @@ loading, core, and REAPI work remains parked and read-only.
 The recoverable uncommitted R1 candidate changes only the two allowed Rust
 owners and measures 290 production, 197 proof, and 487 aggregate net lines. Its
 focused context and selected-effect tests pass, but root review rejects
-acceptance because it does not prove the frozen ordinary/innate key-level A/B/A
-matrix. Preserve the candidate while correcting proof capacity; no R1 Rust is
-accepted or staged by this replan.
+acceptance because it omits the frozen ordinary/innate key-level A/B/A matrix
+and its `RepositoryAttributeValueRef` is a tagged `Override`/`Coerced` source
+wrapper with parallel allocator branches rather than the accepted normalized
+non-retained value view. Preserve the candidate only as recoverable work while
+replacing that production shape and completing proof; no R1 Rust is accepted or
+staged by this replan.
 
 ## Observable result
 
@@ -329,8 +332,8 @@ package, ruleset, or public API file may change. No new file, crate, dependency,
 feature, fixture, unsafe code, public cross-crate type, key, lock, cache, hash,
 fallback, or compatibility shim.
 
-Cap net Rust production growth at **300 lines**, proof growth at **1,100 lines**,
-and aggregate growth at **1,400 lines**. Count from the accepted `1f9433600`
+Cap net Rust production growth at **500 lines**, proof growth at **1,100 lines**,
+and aggregate growth at **1,600 lines**. Count from the accepted `1f9433600`
 versions of the two allowlisted files, classifying everything before the first
 `#[cfg(test)]` as production. Every new helper stays below 150 lines.
 `repository_rule_context.rs` remains the cohesive evaluator adapter.
@@ -357,15 +360,18 @@ retained value borrows the evaluator heap; the two-file allowlist or caps fail;
 fresh replays require `workspace_root` or another deferred effect; or one
 focused correction does not resolve implementation/terminal review.
 
-## R2 replan state
+## R3 replan state
 
-Commit `47c937942` records independent `ACCEPT` of the corrected R3
-architecture. R1 fits production at 290/300 but its 197 proof lines omit the
-required ordinary/innate key-level matrix; the original 650 proof cap leaves no
-clean room for both owner transitions. R2 changes no semantic decision,
-production cap, file allowlist, fixture policy, or validation gate. It raises
-only proof/aggregate caps to 1,100/1,400 and freezes reuse of the existing
-same-DICE source updaters above. Independent replan review returns `ACCEPT`;
-complete the missing proofs without changing R1 production. Root owns
-integration, cap/scope accounting, fresh replay, terminal review, scheduling
-closure, and commits.
+Commit `47c937942` records independent `ACCEPT` of the corrected architecture.
+R1 fits its former production cap but violates the architecture's normalized
+view/single allocator contract and omits the key-level matrix. Commit
+`602c14a0e` accepts R2's proof-only cap increase; the production audit then
+exposes the source-wrapper mismatch before more tests are added. R3 changes no
+semantic decision, file allowlist, fixture policy, proof cap, or validation
+gate. It raises production/aggregate caps to 500/1,600 solely to replace the
+`Override`/`Coerced` wrapper branches with normalized scalar/iterable/map views
+and iterator adapters, then complete the already-required proofs. No old branch
+may remain beside the normalized allocator. Independent R3 replan review
+returns `ACCEPT`; replace the rejected production shape before adding more
+proof. Root owns integration, cap/scope accounting, fresh replay, terminal
+review, scheduling closure, and commits.

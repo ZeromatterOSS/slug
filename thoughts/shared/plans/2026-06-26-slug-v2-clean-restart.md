@@ -30,13 +30,13 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; module-loaded native context and repository-context attribute architecture accepted; implementation R2 active; category-6 selected-context retained** | accepted M7A loading/repository closure through `1f9433600`: canonical Root/Canonical `.bzl` routing, complete exact `tools/build_defs/repo`, all thirteen repository-rule attribute carriers, ordinary/innate generated-repository authentication, `native.existing_rule[s]`, and recursively separated BUILD/Bzlmod native contexts with exact Bzlmod `native.bazel_version == "9.2.0"`; `47c937942` accepts the complete value-bearing `repository_ctx` contract; independent review accepts R2's proof-only cap correction and the recoverable R1 candidate fits production at 290/300 | R1 omits the required ordinary/innate key-level A/B/A/no-effect matrix; two fresh pre-R1 rules_rust replays clear `globals_repo.bzl:22` and next fail at authenticated `repository_ctx.attr` access in line 25 | complete the unchanged two-file R2 implementation under 300/1,100/1,400, then replay and proof-only registration closure |
+| M7: command/ruleset breadth | **partial; module-loaded native context and repository-context attribute architecture accepted; implementation R3 active; category-6 selected-context retained** | accepted M7A loading/repository closure through `1f9433600`: canonical Root/Canonical `.bzl` routing, complete exact `tools/build_defs/repo`, all thirteen repository-rule attribute carriers, ordinary/innate generated-repository authentication, `native.existing_rule[s]`, and recursively separated BUILD/Bzlmod native contexts with exact Bzlmod `native.bazel_version == "9.2.0"`; `47c937942` accepts the complete value-bearing `repository_ctx` contract; `602c14a0e` accepts R2's proof-only cap correction; independent review accepts R3's replacement-only 500/1,600 cap | R1 omits the required key-level matrix and wraps `Override`/`Coerced` sources in parallel allocator branches instead of the accepted normalized value view; two fresh pre-R1 replays next fail at authenticated `repository_ctx.attr` | replace the source-wrapper branches with the normalized view, complete proofs, then replay and proof-only registration closure |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-5-7A-repository-context-attribute-namespace-implementation-r2](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-repository-context-attribute-namespace-implementation-r3](./slug-v2-subplans/current-packet.md).
 
 Commit `1f9433600` terminally accepts the general module-loaded native-context
 implementation. It carries BUILD/Bzlmod context through root and external
@@ -76,11 +76,13 @@ ownership/optimization guidance only. Implement only
 `module_extension_repository_file_effect.rs`. The recoverable R1 candidate is
 290 production/197 proof/487 aggregate and passes focused context/selected
 effect tests, but it omits the frozen ordinary/innate key-level A/B/A and
-no-effect matrix. R2 preserves its Rust and the two-file/300-production
-boundary, raises only proof/aggregate caps to 1,100/1,400, and requires the
-existing same-DICE source updaters rather than a new fixture helper. Independent
-replan review returns `ACCEPT`; complete the missing two-owner matrix without
-changing R1 production.
+no-effect matrix. R2's independently accepted proof replan raises proof capacity
+to 1,100 but a production audit then rejects R1's tagged `Override`/`Coerced`
+source view and parallel allocator branches. R3 keeps the two-file semantics and
+1,100 proof cap, raises only production/aggregate capacity to 500/1,600, and
+requires replacement by the frozen normalized scalar/iterable/map view before
+completing the two-owner matrix. Independent R3 replan review returns `ACCEPT`;
+replace the rejected production shape before adding more proof.
 
 ### M7 complete repository definitions built-in package accepted (2026-08-30)
 
