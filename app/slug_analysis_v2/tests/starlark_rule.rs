@@ -7104,6 +7104,100 @@ parent(name = "parent", dep = select({":choose": ":selected", "//conditions:defa
 }
 
 #[tokio::test]
+async fn exec_and_executable_attributes_fail_closed_before_configured_consumption() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _unsupported(ctx):
+    fail("RULE_EVALUATED")
+def _ok(ctx):
+    return [DefaultInfo()]
+def _transition(settings, attr):
+    return {"//:setting": "changed"}
+configured = transition(implementation = _transition, inputs = [], outputs = ["//:setting"])
+exec_rule = rule(implementation = _unsupported, attrs = {"dep": attr.label(cfg = "exec")})
+executable_rule = rule(implementation = _unsupported, attrs = {"dep": attr.label(cfg = configured, executable = True)})
+ok_rule = rule(implementation = _ok)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "exec_rule", "executable_rule", "ok_rule")
+exec_rule(name = "exec", dep = ":missing_exec_child")
+executable_rule(name = "executable", dep = ":missing_executable_child")
+ok_rule(name = "ok")
+"#,
+    )
+    .unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for (target, expected_exec, expected_executable) in
+        [("exec", true, false), ("executable", false, true)]
+    {
+        let tracker = Arc::new(RootActivationTracker::default());
+        let key = ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+            test_configuration(),
+        );
+        let error = analyze_request_typed(&dice, &workspace, &key, Some(tracker.clone()), false)
+            .await
+            .unwrap_err();
+        assert!(
+            !error.to_string().contains("RULE_EVALUATED"),
+            "{target}: {error}"
+        );
+        assert!(matches!(
+            error.kind(),
+            AnalysisErrorKind::UnsupportedConfiguredAttribute {
+                target: error_target,
+                attribute,
+                exec_configuration,
+                executable,
+            } if error_target == key.label()
+                && attribute == "dep"
+                && *exec_configuration == expected_exec
+                && *executable == expected_executable
+        ));
+        let (activations, _, _) = tracker.take();
+        assert!(
+            activations
+                .iter()
+                .all(|(identity, _)| !identity.contains("missing_")),
+            "unsupported child was configured: {activations:#?}"
+        );
+    }
+
+    let tracker = Arc::new(RootActivationTracker::default());
+    let ok = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:ok").unwrap(),
+        test_configuration(),
+    );
+    let first = analyze_request_typed(&dice, &workspace, &ok, Some(tracker.clone()), false)
+        .await
+        .unwrap();
+    let second = analyze_request_typed(&dice, &workspace, &ok, Some(tracker.clone()), false)
+        .await
+        .unwrap();
+    assert_eq!(first, second);
+    assert!(first.actions().is_empty());
+    let codes = activation_codes(&tracker.take().0);
+    assert!(
+        codes
+            .iter()
+            .any(|code| code == "resolved/@@//:ok=<default>:E"),
+        "missing evaluated activation: {codes:#?}"
+    );
+    assert!(
+        codes
+            .iter()
+            .any(|code| code == "resolved/@@//:ok=<default>:R"),
+        "missing warm reuse activation: {codes:#?}"
+    );
+}
+
+#[tokio::test]
 async fn analysis_event_capture_is_target_local_empty_replacing_and_failure_prefix_preserving() {
     let workspace = scratch();
     for package in ["rules", "leaf", "parent"] {

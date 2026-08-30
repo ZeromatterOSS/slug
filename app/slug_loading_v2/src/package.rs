@@ -65,6 +65,7 @@ use starlark_map::small_set::SmallSet;
 
 use crate::attrs::AllowSingleFile;
 use crate::attrs::AllowedAttributeValues;
+use crate::attrs::AttributeDependencyConfiguration;
 use crate::attrs::AttributeKind;
 use crate::attrs::AttributeProvenance;
 use crate::attrs::AttributeSchema;
@@ -3076,16 +3077,6 @@ impl FrozenRuleDefinition {
                 "target invocation for rules requiring configuration fragments is not supported"
             );
         }
-        if let Some(attribute) = self
-            .schema
-            .iter()
-            .find(|attribute| attribute.executable || attribute.exec_configuration)
-        {
-            anyhow::bail!(
-                "target invocation for executable or exec-configured attribute '{}' is not supported",
-                attribute.name
-            );
-        }
         if let Some(attribute) = self.schema.iter().find(|attribute| {
             !attribute.required_providers.is_empty() || attribute.attached_aspect.is_some()
         }) {
@@ -5397,6 +5388,25 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                             ),
                         )
                     } else {
+                        let dependency_configuration = match (
+                            declaration.exec_configuration,
+                            declaration.transition.as_ref(),
+                        ) {
+                            (false, None) => AttributeDependencyConfiguration::Target,
+                            (true, None) => AttributeDependencyConfiguration::Exec,
+                            (false, Some(transition)) => {
+                                AttributeDependencyConfiguration::Starlark(
+                                    LoadingTransitionDefinition::new(
+                                        transition.implementation,
+                                        transition.output.clone(),
+                                    ),
+                                )
+                            }
+                            (true, Some(_)) => anyhow::bail!(
+                                "attribute '{}' cannot combine cfg='exec' with a Starlark transition",
+                                declaration.name
+                            ),
+                        };
                         AttributeSchema::new(
                             declaration.name.clone(),
                             declaration.kind,
@@ -5408,12 +5418,10 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                                     .clone()
                                     .unwrap_or_else(|| intrinsic_default(declaration.kind)),
                             ),
-                            declaration.transition.as_ref().map(|transition| {
-                                LoadingTransitionDefinition::new(
-                                    transition.implementation,
-                                    transition.output.clone(),
-                                )
-                            }),
+                        )
+                        .with_dependency_configuration(
+                            dependency_configuration,
+                            declaration.executable,
                         )
                         .with_allow_files(declaration.allow_files)
                         .with_allow_single_file(declaration.allow_single_file.clone())

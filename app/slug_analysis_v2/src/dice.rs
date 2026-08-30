@@ -45,6 +45,7 @@ use slug_loading_v2::ModuleRegistrationExpansionKey;
 use slug_loading_v2::ModuleRegistrationExpansionObservationError;
 use slug_loading_v2::ModuleRegistrationExpansionObservationKey;
 use slug_loading_v2::PackageTargetKind;
+use slug_loading_v2::attrs::AttributeDependencyConfiguration;
 use slug_loading_v2::attrs::TransitionDefinition;
 use slug_loading_v2::package::BuildSettingDeclaration;
 use slug_loading_v2::package::NativeToolchainTarget;
@@ -134,6 +135,12 @@ pub enum AnalysisErrorKind {
     ExecutableRuleMissingExecutable {
         rule_class: CompactString,
     },
+    UnsupportedConfiguredAttribute {
+        target: CanonicalLabel,
+        attribute: CompactString,
+        exec_configuration: bool,
+        executable: bool,
+    },
     Message(String),
 }
 
@@ -169,6 +176,22 @@ impl AnalysisError {
         Self { kind }
     }
 
+    fn unsupported_configured_attribute(
+        target: CanonicalLabel,
+        attribute: impl Into<CompactString>,
+        exec_configuration: bool,
+        executable: bool,
+    ) -> Self {
+        Self {
+            kind: AnalysisErrorKind::UnsupportedConfiguredAttribute {
+                target,
+                attribute: attribute.into(),
+                exec_configuration,
+                executable,
+            },
+        }
+    }
+
     pub fn kind(&self) -> &AnalysisErrorKind {
         &self.kind
     }
@@ -188,6 +211,23 @@ impl fmt::Display for AnalysisError {
                 f,
                 "The rule '{rule_class}' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns."
             ),
+            AnalysisErrorKind::UnsupportedConfiguredAttribute {
+                target,
+                attribute,
+                exec_configuration,
+                executable,
+            } => {
+                let declaration = match (*exec_configuration, *executable) {
+                    (true, true) => "cfg=\"exec\" and executable=True",
+                    (true, false) => "cfg=\"exec\"",
+                    (false, true) => "executable=True",
+                    (false, false) => unreachable!("unsupported attribute retains a reason"),
+                };
+                write!(
+                    f,
+                    "configured analysis of target `{target}` does not yet support attribute `{attribute}` declared with {declaration}"
+                )
+            }
             AnalysisErrorKind::Message(message) => f.write_str(message),
         }
     }
@@ -4441,6 +4481,29 @@ impl ConfiguredNodeAnalysisKey {
             .node
             .configured_target()
             .expect("Starlark rule nodes retain structural configuration");
+        let implementation = match starlark_rule_implementation(package, configured_target) {
+            Ok(implementation) => implementation,
+            Err(error) => return root_analysis_driver_complete(Err(error)),
+        };
+        if let Some(schema) = implementation.schema().iter().find(|schema| {
+            schema.executable()
+                || matches!(
+                    schema.dependency_configuration(),
+                    AttributeDependencyConfiguration::Exec
+                )
+        }) {
+            return root_analysis_driver_complete(Err(
+                AnalysisError::unsupported_configured_attribute(
+                    configured_target.label().clone(),
+                    schema.declaration_name(),
+                    matches!(
+                        schema.dependency_configuration(),
+                        AttributeDependencyConfiguration::Exec
+                    ),
+                    schema.executable(),
+                ),
+            ));
+        }
         let resolved_attributes = match prepare_configured_rule_attributes(
             ctx,
             mode,

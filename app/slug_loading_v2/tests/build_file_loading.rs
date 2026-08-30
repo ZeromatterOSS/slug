@@ -33,6 +33,7 @@ use slug_loading_v2::RuleCapability;
 use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::TestSuiteMembership;
 use slug_loading_v2::VisibilitySource;
+use slug_loading_v2::attrs::AttributeDependencyConfiguration;
 use slug_loading_v2::file_discovery::BUILD_FILE_FALLBACK;
 use slug_loading_v2::file_discovery::BUILD_FILE_PRIMARY;
 use slug_loading_v2::file_discovery::MODULE_FILE;
@@ -225,6 +226,70 @@ fn try_load_package_with_event_capture(
             let mut transaction = updater.commit().await;
             evaluator.evaluate_package(&mut transaction, package).await
         })
+}
+
+async fn load_package_with_retained_dice(
+    dice: &Arc<Dice>,
+    workspace: &Path,
+    package: &Path,
+) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
+    let files = [
+        workspace.join(MODULE_FILE),
+        package.join(BUILD_FILE_PRIMARY),
+        package.join("defs.bzl"),
+    ]
+    .into_iter()
+    .map(|path| {
+        let value = match fs::read_to_string(&path) {
+            Ok(source) => WorkspaceFileValue::Present(Arc::new(source)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                WorkspaceFileValue::Absent
+            }
+            Err(error) => WorkspaceFileValue::ReadError(Arc::new(error.to_string())),
+        };
+        (path, value)
+    })
+    .collect();
+    let text = Arc::new(WorkspaceSnapshot {
+        files: Arc::new(files),
+    });
+    let raw = raw_snapshot_from_text(&text);
+    let mut updater = dice.updater();
+    updater
+        .changed_to(vec![(
+            WorkspaceSnapshotKey {
+                workspace: workspace.to_path_buf(),
+            },
+            text,
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.to_path_buf(),
+            },
+            raw,
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceDirectorySnapshotKey {
+                workspace: workspace.to_path_buf(),
+            },
+            Arc::new(directory_snapshot(workspace)),
+        )])
+        .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
+    BzlModuleEvaluator::new(workspace)?
+        .evaluate_package(&mut updater.commit().await, package)
+        .await
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2556,46 +2621,100 @@ fn attr_and_transition_parameters_are_named_only_and_transition_inputs_are_requi
 }
 
 #[test]
-fn executable_and_exec_attribute_policies_fail_before_target_recording() {
+fn exec_and_executable_attributes_retain_loading_identity_and_restore() {
     let workspace = scratch("executable-exec-attribute-policy");
     let package = workspace.join("pkg");
     fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
     fs::create_dir_all(&package).unwrap();
-    let definitions = |attribute: &str| {
-        format!(
-            "def _impl(ctx): return [DefaultInfo()]\ndef _transition(settings, attr): return {{}}\nprobe = rule(implementation = _impl, attrs = {{\"x\": {attribute}}})\n"
-        )
-    };
     fs::write(
         package.join(BUILD_FILE_PRIMARY),
-        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"subject\")\n",
+        "load(\":defs.bzl\", \"leaf\", \"probe\")\nleaf(name = \"binary\")\nprobe(name = \"subject\", binary = \":binary\")\n",
     )
     .unwrap();
-
-    for attribute in [
-        "attr.label(cfg = \"exec\")",
-        "attr.label(cfg = \"exec\", executable = False)",
-        "attr.label(cfg = transition(implementation = _transition, inputs = [], outputs = [\"//pkg:setting\"]), executable = True)",
-    ] {
-        fs::write(package.join("defs.bzl"), definitions(attribute)).unwrap();
-        let error = try_load_package(&workspace, &package)
-            .unwrap_err()
-            .to_string();
-        assert!(
-            error.contains("target invocation for executable or exec-configured attribute 'x'"),
-            "error: {error}"
-        );
-    }
-
     fs::write(
         package.join("defs.bzl"),
-        definitions("attr.label(cfg = transition(implementation = _transition, inputs = [], outputs = [\"//pkg:setting\"]), executable = False)"),
+        r#"def _impl(ctx): return [DefaultInfo()]
+def _transition(settings, attr): return {}
+leaf = rule(implementation = _impl)
+probe = rule(implementation = _impl, attrs = {
+    "target_dep": attr.label(default = ":binary"),
+    "binary": attr.label(cfg = "exec", allow_single_file = True, mandatory = True),
+    "executable_dep": attr.label(cfg = transition(implementation = _transition, inputs = [], outputs = ["//pkg:setting"]), executable = True, default = ":binary"),
+})
+"#,
     )
     .unwrap();
+    let loaded = load_package(&workspace, &package);
+    let PackageTargetKind::StarlarkRule(rule) = &loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "subject")
+        .unwrap()
+        .kind
+    else {
+        panic!("expected Starlark rule")
+    };
+    let schema = |name: &str| {
+        rule.schema()
+            .iter()
+            .find(|schema| schema.declaration_name() == name)
+            .unwrap()
+    };
+    assert!(matches!(
+        schema("target_dep").dependency_configuration(),
+        AttributeDependencyConfiguration::Target
+    ));
+    assert!(matches!(
+        schema("binary").dependency_configuration(),
+        AttributeDependencyConfiguration::Exec
+    ));
     assert_eq!(
-        load_package(&workspace, &package).targets[0].name,
-        "subject"
+        schema("binary").allow_single_file(),
+        Some(&AllowSingleFile::True)
     );
+    assert!(schema("binary").mandatory());
+    assert!(!schema("binary").executable());
+    let AttributeDependencyConfiguration::Starlark(transition) =
+        schema("executable_dep").dependency_configuration()
+    else {
+        panic!("custom transition identity was not retained")
+    };
+    assert_eq!(transition.output(), "//pkg:setting");
+    assert!(schema("executable_dep").executable());
+    assert_ne!(schema("target_dep"), schema("binary"));
+    assert_ne!(schema("binary"), schema("executable_dep"));
+    assert!(
+        rule.dependencies()
+            .iter()
+            .any(|label| label.target().as_str() == "binary")
+    );
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let restored = runtime.block_on(async {
+        let first = load_package_with_retained_dice(&dice, &workspace, &package)
+            .await
+            .unwrap();
+        let target_source = fs::read_to_string(package.join("defs.bzl"))
+            .unwrap()
+            .replace("cfg = \"exec\", ", "");
+        fs::write(package.join("defs.bzl"), &target_source).unwrap();
+        let target = load_package_with_retained_dice(&dice, &workspace, &package)
+            .await
+            .unwrap();
+        assert_ne!(first, target);
+        let exec_source = target_source.replace(
+            "attr.label(allow_single_file = True",
+            "attr.label(cfg = \"exec\", allow_single_file = True",
+        );
+        fs::write(package.join("defs.bzl"), exec_source).unwrap();
+        let restored = load_package_with_retained_dice(&dice, &workspace, &package)
+            .await
+            .unwrap();
+        assert_eq!(first, restored);
+        restored
+    });
+    assert_eq!(loaded, restored);
 
     for attribute in [
         "attr.label(False)",
@@ -2603,8 +2722,16 @@ fn executable_and_exec_attribute_policies_fail_before_target_recording() {
         "attr.label(doc = 1)",
         "attr.string(doc = 1)",
         "attr.label(executable = True)",
+        "attr.label(cfg = \"target\")",
+        "attr.label(cfg = 1)",
     ] {
-        fs::write(package.join("defs.bzl"), definitions(attribute)).unwrap();
+        fs::write(
+            package.join("defs.bzl"),
+            format!(
+                "def _impl(ctx): return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {{\"x\": {attribute}}})\n"
+            ),
+        )
+        .unwrap();
         assert!(
             try_load_package(&workspace, &package).is_err(),
             "{attribute}"

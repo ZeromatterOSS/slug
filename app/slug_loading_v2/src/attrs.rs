@@ -54,6 +54,13 @@ pub(crate) enum AllowedAttributeValues {
     String(Arc<[CompactString]>),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum AttributeDependencyConfiguration {
+    Target,
+    Exec,
+    Starlark(TransitionDefinition),
+}
+
 impl AttributeKind {
     pub(crate) fn reaches_labels(self) -> bool {
         !matches!(
@@ -94,7 +101,8 @@ pub struct AttributeSchema {
     allow_single_file: Option<AllowSingleFile>,
     allowed_values: AllowedAttributeValues,
     default: Option<Arc<CoercedAttributeValue>>,
-    transition: Option<TransitionDefinition>,
+    dependency_configuration: AttributeDependencyConfiguration,
+    executable: bool,
 }
 
 impl AttributeSchema {
@@ -104,7 +112,6 @@ impl AttributeSchema {
         mandatory: bool,
         configurable: bool,
         default: Option<CoercedAttributeValue>,
-        transition: Option<TransitionDefinition>,
     ) -> Self {
         let declaration_name = declaration_name.into();
         let query_name = declaration_name
@@ -125,7 +132,8 @@ impl AttributeSchema {
             allow_single_file: None,
             allowed_values: AllowedAttributeValues::None,
             default: default.map(Arc::new),
-            transition,
+            dependency_configuration: AttributeDependencyConfiguration::Target,
+            executable: false,
         }
     }
 
@@ -141,14 +149,7 @@ impl AttributeSchema {
         order_independent: bool,
         ordinary_dependency: bool,
     ) -> Self {
-        let mut schema = Self::new(
-            declaration_name,
-            kind,
-            mandatory,
-            configurable,
-            default,
-            None,
-        );
+        let mut schema = Self::new(declaration_name, kind, mandatory, configurable, default);
         schema.order_independent = order_independent;
         schema.ordinary_dependency = ordinary_dependency;
         schema.builtin = true;
@@ -209,8 +210,28 @@ impl AttributeSchema {
     pub fn default(&self) -> Option<&CoercedAttributeValue> {
         self.default.as_deref()
     }
+    pub fn dependency_configuration(&self) -> &AttributeDependencyConfiguration {
+        &self.dependency_configuration
+    }
+    pub fn executable(&self) -> bool {
+        self.executable
+    }
     pub fn transition(&self) -> Option<&TransitionDefinition> {
-        self.transition.as_ref()
+        match &self.dependency_configuration {
+            AttributeDependencyConfiguration::Starlark(transition) => Some(transition),
+            AttributeDependencyConfiguration::Target | AttributeDependencyConfiguration::Exec => {
+                None
+            }
+        }
+    }
+    pub(crate) fn with_dependency_configuration(
+        mut self,
+        dependency_configuration: AttributeDependencyConfiguration,
+        executable: bool,
+    ) -> Self {
+        self.dependency_configuration = dependency_configuration;
+        self.executable = executable;
+        self
     }
 }
 
@@ -1372,8 +1393,7 @@ mod tests {
 
     #[test]
     fn query_value_keeps_the_loading_value_structure_order_and_provenance() {
-        let schema =
-            AttributeSchema::new("chosen", AttributeKind::LabelList, false, true, None, None);
+        let schema = AttributeSchema::new("chosen", AttributeKind::LabelList, false, true, None);
         let before = CanonicalLabel::parse("@@//pkg:before").unwrap();
         let selected = CanonicalLabel::parse("@@//pkg:selected").unwrap();
         let fallback = CanonicalLabel::parse("@@//pkg:fallback").unwrap();
