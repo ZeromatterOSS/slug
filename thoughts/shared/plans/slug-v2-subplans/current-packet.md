@@ -1,41 +1,19 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-repository-rule-attribute-family-architecture`
+Packet: `WP-4-5-7A-repository-rule-attribute-family-implementation-r2`
 
 Milestone: M7A bootstrap-critical repository/ruleset closure.
 
-Base: accepted complete direct Bazel 9.2 `tools/build_defs/repo` catalog
-`3023718a0` and accepted generated-repository route/owner `f747507f6`.
-Selected-context, configured-analysis, registration, and REAPI candidates remain
-dirty, parked, and read-only.
+Base: accepted architecture `a286f0b04`, accepted complete direct Bazel 9.2
+`tools/build_defs/repo` catalog `3023718a0`, and accepted generated-repository
+route/owner `f747507f6`. Selected-context, configured-analysis, registration,
+and REAPI candidates remain dirty, parked, and read-only.
 
-## Immediate predecessor
+## Observable result
 
-Commit `3023718a0` imports the complete direct embedded
-`tools/build_defs/repo` package: `BUILD.repo` as `BUILD` plus all eight sibling
-`.bzl` files, 2,513 exact lines/96,027 bytes at mode 0644. Exact hashes,
-checked-in inventory, direct listing, package-set visibility, manifest identity
-`de4c7231…`, 592 Bzlmod tests, 430 loading tests, all integrations, CLI build,
-two cold replays, and independent architecture/terminal reviews pass.
-
-Both cold replays now advance beyond `utils.bzl` and stop identically while
-loading `@@bazel_features+//private:globals_repo.bzl`:
-
-```text
-unsupported repository_rule attribute schema 'globals'
-globals = attr.string_list_dict(mandatory = True)
-```
-
-This is unrelated to `cc_common`, `cc_internal`, C++ rules, the parser, or
-Starlark `set`. It is the first live discriminator for Slug's deliberately
-scalar-only repository-rule attribute bridge.
-
-## Design question and category boundary
-
-Freeze one generic architecture for the complete repository-rule attribute
-value family already exposed by Slug's shared `attr` module, rather than adding
-a `globals` or `string_list_dict` special case. The family is all thirteen
-Bazel 9.2 public descriptor kinds:
+Implement the reviewed complete repository-rule attribute value category. Both
+ordinary module-extension repository calls and innate `use_repo_rule` calls
+must accept and identically publish all thirteen Bazel 9.2 public kinds:
 
 ```text
 bool, int, string, label, output,
@@ -44,178 +22,223 @@ string_dict, string_list_dict,
 string_keyed_label_dict, label_keyed_string_dict, label_list_dict
 ```
 
-The architecture must make later descriptor-policy breadth additive without
-changing the retained raw-call or RepoSpec value representation. It must keep
-ordinary module-extension calls and innate `use_repo_rule` calls on the same
-coercion and publication semantics.
+Two fresh real rules_rust replays must advance beyond the current
+`bazel_features` rejection at
+`globals = attr.string_list_dict(mandatory = True)` and stop identically at the
+next authentic unsupported boundary or succeed. That successor is evidence,
+not authorization to widen this packet.
 
-This packet is docs/evidence/design only. It authorizes no Rust or fixture
-change. Its terminal output is an independently reviewed implementation packet
-or `REPLAN`.
+## Accepted architecture and authority
 
-## Learned facts and authority
+Commit `a286f0b04` records independent R2 `ACCEPT`. Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` is sole semantic authority:
 
-Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is sole
-semantic authority:
+- `StarlarkRepositoryModule.repositoryRule` accepts standard `Descriptor`
+  values and adds `Descriptor.build(attrName)` without a scalar-only schema.
+- `ModuleExtensionEvalStarlarkThreadContext.deepCloneAttrValue` immediately
+  copies None/bool/int/string/Label, ordered dictionaries, and iterable values
+  from the evaluator call.
+- `RepoRule.instantiate` delegates all definitions and calls to
+  `AttributeUtils.typeCheckAttrValues`, then publishes only explicitly supplied
+  non-None nonlegacy attributes in invocation order.
+- `AttributeUtils.typeCheckAttrValues` converts by descriptor kind, validates
+  mandatory/default values, and recursively rejects nonvisible labels.
+- `InnateRunnableExtension` calls the same `RepoRule.instantiate` path with its
+  owner mapping and definition-package label converter.
+- `StarlarkAttrModuleApi`/`BuildType` define exactly the thirteen kinds above;
+  `BuildType.OutputType` additionally requires output labels to remain in the
+  converter's base package.
+- A disposable Bazel 9.2 oracle successfully instantiated one repository rule
+  with explicit nonempty values of every kind. No oracle workspace is retained.
 
-- `StarlarkRepositoryModule.repositoryRule` casts every `attrs` value to a
-  standard `Descriptor` and passes `Descriptor.build(attrName)` directly to the
-  `RepoRule` builder. It does not define a scalar-only repository schema.
-- `RepoRule.instantiate` runs the common `AttributeUtils.typeCheckAttrValues`,
-  preserves only explicitly supplied non-None attributes in `RepoSpec`, and
-  resolves labels through the definition's repository mapping.
-- `StarlarkAttrModuleApi` defines exactly the thirteen public kinds above.
-- A disposable Bazel 9.2 oracle instantiated one repository rule with an
-  explicit nonempty value for every kind and successfully queried its generated
-  `@probe//:x`. No oracle workspace or copied output is retained.
+Relevant upstream tests are
+`ModuleExtensionResolutionTest`'s complex `string_list_dict` rows and
+`starlark_repository_test.sh`'s typed/default label rows. They do not cover the
+whole category, so the accepted disposable all-thirteen probe plus pinned
+source remains the stronger category evidence. Add no checked-in oracle
+fixture.
 
-The live Slug audit establishes:
+Clean Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is
+**concept/test only** guidance: retain one complete typed family and avoid a
+per-ruleset adapter. Copy no Zabel code, scheduler, store, fingerprint, token,
+or semantic claim.
 
-1. `AttributeKind`, `AttributeDefinition`, and `CoercedAttributeValue` already
-   represent all thirteen kinds and preserve ordered nested values.
-2. `repository_rule()` nevertheless accepts only String/Boolean/Integer/Label
-   definitions and scalar-compatible defaults.
-3. `RepositoryRuleCallValue` captures only None/bool/i32/string/canonical label;
-   ordinary extension list/dict/tuple values therefore fail before type
-   coercion.
-4. innate `use_repo_rule` values already retain list, tuple, dict, string-key,
-   and label-key structure in `NonrootAttributeValue`, but its bridge rejects
-   every collection.
-5. `OverrideAttributeValue` and `OverrideAttributeKey` already provide the
-   complete heap-independent recursive iterable/map/label RepoSpec carrier.
-   Their `SmallMap` structural equality and the three RepoSpec hash owners are
-   intentionally membership-based, while `RepoSpecPublicationIdentity`
-   currently restores observable map order only for the built-in
-   `http_archive`/`git_repository` `remote_patches` attribute. The retained
-   carrier is complete, but its generic recursive publication projection is
-   not.
+The Buck2-derived utility review keeps the existing `Arc`, `CompactString`,
+`SmallMap`, `SmallSet`, `Allocative`, and Starlark value-identity utilities.
+No new collection, interner, cache, strong hash, or dependency is admitted.
+The Stage 9 retained-utility row remains unchanged because this packet adapts
+an existing V2-owned carrier rather than importing a donor utility.
 
-Clean Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` remains
-**concept/test only** guidance. Its repository declaration/execution path uses
-one complete typed attribute family, including `string_list_dict`, and avoids a
-per-ruleset adapter. Use that completeness and test shape as guidance only; do
-not reuse Zabel code, scheduler, store, tokens, fingerprints, or semantics.
+## Implementation decision
 
-## Required architecture decision
+1. Extend loading-private `RepositoryRuleCallValue` with one normalized
+   sequence variant and one ordered recursive map variant whose keys are
+   strings or canonical labels. Lists and tuples deep-copy to the same sequence
+   identity. Copy ordinary calls immediately, reject active-container cycles,
+   reject integers outside i32 and unsupported values/keys, and retain no
+   evaluator value or identity.
+2. Convert innate `NonrootAttributeValue` lists, tuples, dictionaries, strings,
+   labels and scalar values into that same call carrier. Deferred-invalid
+   float/builtin/proxy/cycle tokens continue to fail closed.
+3. Replace the scalar `convert_supplied` match with one kind-directed recursive
+   coercer into the existing `OverrideAttributeValue`. Resolve raw strings
+   through the definition/owner base and final mapping at every scalar, list,
+   dictionary key and nested-list label position; preserve authenticated
+   canonical Label objects and validate visibility. Enforce the definition
+   package for output/output-list values.
+4. Admit all thirteen kinds in `repository_rule()` while continuing to reject
+   explicit configurable policy, transitions/cfg, executable, allow-files,
+   allow-single-file, providers and allowed-values. Add a repository-only
+   complete default-kind predicate; do not widen tag-class validation.
+5. Validate every omitted explicit default by kind and recursive label/output
+   visibility, but retain Bazel's rule that defaults do not enter `RepoSpec`.
+   Explicit None remains omitted and therefore does not satisfy mandatory.
+6. Replace the `http_archive`/`git_repository` `remote_patches` publication
+   exception with one borrowed generic projection. Top-level attributes remain
+   name-addressed and membership-equal; every nested map compares and hashes
+   its ordered key/value sequence recursively, including maps beneath
+   sequences. `RepoSpec::eq` continues to combine structural membership
+   equality with this projection. The two production RepoSpec hash owners
+   already call the projection and must remain unchanged unless a compile or
+   equality-contract proof demonstrates a necessary correction.
 
-The design must freeze:
+## Compatibility and non-decisions
 
-- one heap-independent recursive raw-call carrier for None, bool, i32, string,
-  canonical label, sequence, and string/canonical-label-keyed map values;
-- list and tuple acceptance with one post-coercion sequence identity, ordered
-  dictionary values, cycle rejection, i32 bounds, and fail-closed unsupported
-  keys/values;
-- one kind-directed coercer from that carrier into existing
-  `OverrideAttributeValue`, including mapping-relative labels at every nested
-  position and output-label behavior;
-- one generic `RepoSpecPublicationIdentity` projection which keeps top-level
-  attributes name-addressed but compares and hashes every nested map's key
-  order and recursively projected values in insertion order; replace the
-  `remote_patches` ruleset special case, preserve existing membership equality,
-  and update all three RepoSpec hash owners through the shared projection;
-- shared ordinary-extension and innate-call conversion, without raw Starlark
-  heap values escaping evaluation;
-- complete default-kind validation for the thirteen kinds while retaining
-  Bazel's rule that only explicit non-None call attributes enter RepoSpec;
-- exact error/order behavior for unknown, mandatory, wrong-kind, bad label,
-  missing mapping, duplicate repository name, and cyclic raw values; and
-- a descriptor-policy ledger distinguishing metadata supported in this packet
-  from explicit `configurable`, transition/cfg, executable, allow-files,
-  allow-single-file, provider, allowed-values, `remotable`, and other policy
-  breadth. Unsupported policy must continue to fail closed, but the retained
-  value carrier must not need redesign when it is later admitted.
+- **Exact:** the thirteen admitted descriptor kinds; list/tuple normalization;
+  ordered sequence/dictionary values; nested label/output coercion; intrinsic
+  and explicit default validation; mandatory/unknown/wrong-kind/bad-label/
+  missing-mapping behavior; explicit non-None publication; and ordinary/innate
+  value parity.
+- **Slug-native:** Rust carrier names, `Arc`/`SmallMap` layout, error enums and
+  the conservative recursive publication equality/hash projection. The latter
+  prevents DICE cutoff of an order-observable repository input and is not a
+  claim about Java `Dict` equality or Bazel fingerprint bytes.
+- **Unsupported/deferred:** explicit descriptor policies named above;
+  `remotable`; additional `repository_ctx` methods; repository action/download
+  breadth; parser or `set` work; other Starlark builtin categories; `cc_common`,
+  `cc_internal`, rules_cc or C++ rule/action semantics; JVM/HotSpot state; and
+  the next replay boundary.
 
-Prefer the existing `OverrideAttributeValue` recursive shape or a bounded
-loading-private isomorphic carrier only after reviewing ownership and stage
-meaning. Do not duplicate thirteen bespoke stored variants when the recursive
-carrier can preserve exact values compactly. Do not widen tag-class attributes,
-configured rule attributes, root module parsing, or repository execution Host
-methods merely because they reuse `attr` syntax.
+No new public cross-crate value, DICE key, global registry, side cache, command
+repair, filesystem read, physical materialization, fallback, parser branch, or
+ruleset special case. BCR Starlark remains the rule owner; `cc_common` remains
+only a future generic Host/provider ABI consumer.
 
-## Compatibility and ownership
+## Ownership, request/revision, and memory
 
-- **Exact target:** accepted descriptor kinds; explicit-value type coercion;
-  list/tuple equivalence after coercion; dictionary order/content; nested label
-  resolution; intrinsic/explicit defaults; mandatory and unknown handling;
-  explicit non-None RepoSpec publication; ordinary/innate parity; and stable
-  errors/order demonstrated by Bazel 9.2 source or oracle.
-- **Slug-native:** Rust recursive carrier types, `Arc`/`SmallMap` layout, DICE
-  key names, error enums, membership equality, and the conservative recursive
-  publication-equality/hash projection that prevents an order-observable map
-  change from being cut off. This projection is semantic identity, not a claim
-  about Bazel Java `Dict` equality or fingerprint bytes.
-- **Unsupported/deferred:** descriptor policy not admitted by the frozen ledger;
-  `remotable`; additional repository_ctx Host methods; repository action or
-  download breadth; other Starlark builtin categories; parser/set work; C++
-  rule/action semantics; exact JVM/HotSpot state; and later bootstrap families.
+The frozen loading definition owns schema metadata. The invocation evaluator
+owns mutable Starlark values only until it copies a call into the existing
+heap-independent receipt. The loading instantiation owner combines that receipt
+with the authenticated definition label and final repository mapping and
+publishes the existing `RepoSpec`. Ordinary and innate calls converge before
+coercion; no command-local adapter survives publication.
 
-Natural owners remain the loading-owned repository-rule definition/call and
-instantiation pipeline plus the existing Bzlmod `RepoSpec`. No new DICE key,
-global registry, side cache, command repair, physical source lookup, or fallback
-is permitted. Calls are evaluator/phase scratch until copied into existing
-heap-independent invocation receipts; RepoSpecs remain DICE-retained semantic
-values. No retained value may borrow a Starlark heap.
+`RepoSpec` remains DICE-retained semantic state. Per `docs/developers/dice.md`,
+every order-observable nested map participates in equality cutoff and in both
+route/request hashes. A/B/A changes must restore equality and hash identity.
+No lock, task, async transfer, cache, eviction, shutdown, or cancellation owner
+changes. All new scratch allocations die with evaluation/instantiation; no
+retained value borrows a Starlark heap or request scratch. Overlapping requests
+observe immutable receipts/specs through existing DICE dependencies.
 
-## Evidence and implementation-plan deliverable
+## Proof matrix
 
-The design must cite the exact Bazel source/test/oracle rows for all thirteen
-kinds and at least these discriminators:
+Focused tests must prove:
 
-1. empty/nonempty list and tuple inputs normalize to the same typed value;
-2. ordered string and label dictionaries retain key/value association;
-3. labels resolve correctly as strings and `Label()` objects at scalar, list,
-   key, and nested-list positions;
-4. defaults of every kind validate without being published when omitted;
-5. explicit None is omitted; mandatory, wrong-kind, invalid key, cycle, large
-   integer, missing mapping, and unknown attribute fail at the natural stage;
-6. ordinary and innate calls publish equal RepoSpecs for equal semantics;
-7. A/B/A value/mapping changes restore structural identity; and
-8. the real `bazel_features` globals repository advances in two fresh replays.
+1. ordinary call capture deep-copies None/scalars/Label, list and tuple to one
+   sequence form, ordered nested dictionaries, and rejects cycles, large ints,
+   invalid keys and callable/unsupported values without a partial record;
+2. definitions admit every kind and correct explicit/intrinsic default while
+   every deferred descriptor policy still fails closed;
+3. explicit empty/nonempty values of all thirteen kinds produce exact
+   `OverrideAttributeValue` shapes and preserve order;
+4. string and Label-object labels resolve at scalar, list, map-key, map-value,
+   nested-list, output and output-list positions, with missing mapping,
+   invisible canonical labels and cross-package outputs rejected;
+5. defaults of all thirteen kinds validate but remain unpublished; explicit
+   None is omitted; mandatory, unknown and wrong-kind failures retain natural
+   ordering;
+6. ordinary and innate calls with equal semantics publish equal RepoSpecs;
+   their list/tuple spellings normalize equally and their invalid raw forms fail
+   through the same coercion boundary;
+7. reordered nested maps with unchanged membership are structurally equal but
+   have distinct generic publication identity and both production route hashes;
+   A/B/A restores identity for ordinary and innate inputs; reordering only
+   top-level attributes preserves publication equality and both production
+   route hashes; and
+8. existing selected-BCR `remote_patches` order proofs remain green without a
+   built-in/rule-name special case.
 
-The A/B/A matrix must include reordered dictionary entries with unchanged
-membership for both ordinary and innate calls. It must prove the recursively
-ordered publication projection changes and restores, while ordinary structural
-membership equality remains unchanged. Audit `RepoSpec::eq` and every live
-RepoSpec hash owner together so equality/hash contracts remain coherent.
+Reuse colocated unit/DICE scaffolding and the real rules_rust workspace. No new
+fixture, copied registry subtree, manifest, or expected output is admitted.
 
-Reuse existing synthetic extension/innate/mapping/DICE scaffolding and the real
-rules_rust fixture. Add no checked-in oracle fixture unless pinned source plus a
-disposable probe cannot discriminate a required behavior; if one is necessary,
-freeze its provenance before implementation.
+## Exact allowlist and dirty isolation
 
-The implementation packet must name exact live blobs and hunks. Its Bzlmod
-allowlist must include the retained projection owner in `module_eval.rs`, both
-route/request hash owners in `canonical_repository_route.rs` and
-`host_module.rs`, and the existing publication-identity proof in
-`selected_repo_spec.rs`; no additional RepoSpec equality/hash owner may remain
-unaudited. In particular,
-`app/slug_loading_v2/src/package.rs` is already dirty with unrelated
-definition-source work; any later packet must freeze its live blob, permit only
-the repository-rule schema hunk, preserve the parked changes byte-for-byte, and
-stage only packet-owned hunks. It must set production/test caps, complexity
-decisions for `package.rs` and the 2,249-line instantiation owner, serial crate
-and direct-dependent validation, two clean replays, and independent terminal
-review.
+Base `a286f0b04`; exact live blobs before implementation:
 
-## Allowlist and stops
+- `app/slug_loading_v2/src/module_extension_repository_rule.rs`
+  `af918a5f55a5735d2727e8b98211b45fc17718d8`;
+- `app/slug_loading_v2/src/module_extension_repository_instantiation.rs`
+  `0b64abfed3e451015035d94289fa6c426dc0f498`;
+- `app/slug_loading_v2/src/module_extension_innate_repository.rs`
+  `a04272161682f86b36c8e46cc13662d52b7410aa`;
+- `app/slug_loading_v2/src/package.rs` live
+  `46669562b2326c16fb720394e1e9b56328730f27`, whose HEAD blob is
+  `b48b51d7360c75fd4415564d70cf651e760933a3`;
+- `app/slug_bzlmod_v2/src/module_eval.rs`
+  `31b1ccb368123481db0f1eef9d795e04d633db36`;
+- `app/slug_bzlmod_v2/src/selected_repo_spec.rs`
+  `aa047c0236fda9f853b7806f7aeaf75b9408ad2a`.
 
-Only these scheduling documents may change in this design packet:
+`canonical_repository_route.rs` blob
+`42458a059436e9920948263314ddc03b5406e084` and `host_module.rs` blob
+`b849106d9028d1a5f384cd11e9cbe17ffe8aca25` are read-only audited hash
+consumers. Change them only after `REPLAN`.
 
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`;
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`; and
-- the orchestration routing log only if review returns `REPLAN` or a reusable
-  unusual routing lesson.
+The pre-existing 28-line `package.rs` definition-source diff occupies hunks
+near lines 690-6125 but not the repository-rule schema hunk near 5613. Preserve
+those bytes exactly. At close, stage only the packet-owned repository-rule hunk
+from `package.rs`; never stage the whole file. Every other dirty analysis,
+loading, core and REAPI file is parked and excluded.
 
-Validate source anchors, disposable oracle result, dirty isolation, canonical/
-manifest packet-ID consistency, `git diff --check`, and independent architecture
-review. No Cargo build/test is required because Rust is unchanged.
+Scheduling documents may change only to record terminal acceptance, `REPLAN`,
+or the next authentic packet.
 
-`REPLAN` if exact semantics require a new public cross-crate value or DICE owner;
-if the thirteen kinds cannot share one recursive raw carrier and kind-directed
-coercer; if ordinary and innate calls require different RepoSpec semantics; if
-the dirty `package.rs` work cannot be isolated; if descriptor policy cannot be
-bounded without silently claiming parity; if any parser, set, C++ rule,
-ruleset-specific, filesystem, materialization, JVM, or fallback path is needed;
-if generic recursively ordered publication identity cannot replace the current
-ruleset-specific `remote_patches` projection without widening storage; or if a
-second material architecture correction is required after review.
+## Caps, complexity, validation, and stops
+
+Cap net Rust production growth at 550 lines, net Rust test growth at 900 lines,
+and total at 1,450 lines. No new file, crate, dependency, unsafe code, key,
+fixture, background task, lock, cache, fallback, or public compatibility shim.
+
+`package.rs` (6,959 live lines) remains the cohesive loading-global definition
+owner; its only packet hunk is a schema-kind/default predicate and extracting a
+new module would split declaration policy from its producer. The 2,249-line
+instantiation owner remains cohesive because all added code is one recursive
+attribute coercer beside its existing mapping/default logic. No touched
+function may exceed 150 lines; split local conversion helpers if needed.
+`module_eval.rs`, `host_module.rs`, and `selected_repo_spec.rs` are also large,
+but this packet touches only the existing compact RepoSpec identity function
+and colocated proofs; semantic, presentation, persistence and transport owners
+do not move.
+
+Validate serially:
+
+1. focused loading capture/schema/coercion/innate tests and focused Bzlmod
+   publication-identity/hash tests;
+2. `cargo test -p slug_bzlmod_v2` then `cargo test -p slug_loading_v2`;
+3. `cargo build -p slug_cli_v2` before any `SLUG_V2_BIN` replay;
+4. clean stale `slugd`, run two copied-workspace/fresh-output-root real
+   rules_rust cqueries, and clean stale `slugd` afterward;
+5. `cargo fmt --all -- --check`, `git diff --check`, exact allowlist/cap and
+   package dirty-byte isolation checks; and
+6. `scripts/v2_archive_status.sh` plus independent terminal review.
+
+`REPLAN` before widening if a new public cross-crate carrier or DICE owner is
+required; ordinary and innate calls cannot share one coercer; output semantics
+require a generated-repository context absent from the authenticated inputs;
+generic recursively ordered publication identity cannot replace the special
+case; a policy must be silently admitted; the dirty package hunk cannot be
+isolated; a parser, set, ruleset, filesystem, materialization, JVM or fallback
+path is needed; a read-only hash consumer must change for more than mechanical
+equality coherence; caps are exceeded; or one focused implementation correction
+does not resolve terminal review.
