@@ -62,7 +62,9 @@ the full analysis suite, named cquery/build dependents, isolated staged build,
 and independent terminal review. Parked analysis work remains outside the
 commit.
 
-Run only `WP-4-5-7A-subrule-declaration-and-analysis-architecture-r2` next.
+Commit `4900ce46b` accepts
+`WP-4-5-7A-subrule-declaration-and-analysis-architecture-r2` after focused
+independent rereview.
 The authentic first rules_cc consumer proves that a token-only global is not a
 meaningful vertical: `create_fdo_context` has eight private
 `configuration_field` label defaults, `cpp` fragment access, hidden rule
@@ -77,6 +79,14 @@ review. Bazel 9.2 commit `8220c619…` alone defines semantics. Clean Zabel
 `0795445f…` informs sparse spans, compact identity, typed late-bound ownership,
 and borrowed context lifetime only; `cc_common`/`cc_internal` remain generic
 downstream BCR Starlark discriminators, never parser or Rust C++ rule targets.
+
+Run only `WP-4-5-7A-subrule-loading-declaration-and-late-bound-carrier` next.
+Add `.bzl` declaration/export identity, the eight admitted typed FDO
+`configuration_field` producers, rule attachment, and ordered sparse hidden
+rows plus set-semantic authorization identity under the frozen five-file
+allowlist and caps. The authenticated declaration/attachment must freeze; stop
+configured analysis before hidden late-bound resolution or any invocation/
+action. Do not activate later context, fragment, toolchain, or action packets.
 
 ## Accepted `.bzl` load-visibility design; implementation activated (2026-08-27)
 

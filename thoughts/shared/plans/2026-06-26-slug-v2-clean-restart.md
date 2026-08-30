@@ -30,13 +30,13 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; repository context and symbolic-macro lifecycle accepted; corrected subrule architecture active** | accepted M7A loading/repository closure through `c83e70f0f`; `e34cfdc7a` adds exact default non-finalizer symbolic macros and nonconstructible `PackageSpecificationInfo`; `541fcfaf2` enforces retained macro namespaces at configured-target admission; the real starlark-rust `set` remains accepted in `cb71a302d` | two fresh rules_rust replays clear `macro` and stop deterministically at missing `subrule`; the authentic first rules_cc declaration also requires eight typed `configuration_field` label defaults, fragment retention, hidden rule attachment, and later configured invocation | accept corrected rule-side `subrule` architecture, then implement only its frozen loading/declaration successor without claiming complete FDO actions |
+| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, and subrule architecture accepted; subrule loading active** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected typed/set-ordered subrule architecture in `4900ce46b`; real starlark-rust `set` in `cb71a302d` | two fresh rules_rust replays stop at missing `subrule`; the first rules_cc declaration requires eight typed `configuration_field` label defaults and hidden rule attachment before later configured invocation/actions | implement only the frozen subrule loading/declaration/late-bound carrier successor and stop before configured resolution or invocation |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-5-7A-subrule-declaration-and-analysis-architecture-r2](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-subrule-loading-declaration-and-late-bound-carrier](./slug-v2-subplans/current-packet.md).
 
 Commit `c83e70f0f` terminally accepts the repository-context attribute
 implementation. One authenticated immutable input serves ordinary and innate
@@ -77,6 +77,13 @@ families. `cc_common`/`cc_internal` remain downstream generic BCR Starlark
 consumers, never parser or Rust C++ rule targets. Bazel 9.2 remains sole
 semantic authority; clean Zabel remains peer concept and optimization guidance
 only.
+
+Commit `4900ce46b` accepts that corrected architecture after focused
+independent rereview. Implement only its frozen first successor: loading
+declaration/export, typed FDO `configuration_field` carriers, rule attachment,
+ordered sparse hidden rows and set-semantic identity. The deterministic stop is
+configured hidden late-bound resolution before invocation or action
+publication.
 
 ### M7 complete repository definitions built-in package accepted (2026-08-30)
 

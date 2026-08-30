@@ -1,28 +1,26 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-subrule-declaration-and-analysis-architecture-r2`
+Packet: `WP-4-5-7A-subrule-loading-declaration-and-late-bound-carrier`
 
 Milestone: M7A bootstrap-critical generic Starlark/ruleset closure.
 
 Base: accepted six-name category architecture `368ef9296`, symbolic-macro and
 provider loading `e34cfdc7a`, configured macro namespace enforcement
-`541fcfaf2`, and the live loading/configured-analysis owners. All unrelated
-dirty Rust work remains parked and read-only.
+`541fcfaf2`, accepted subrule lifecycle architecture `4900ce46b`, and the live
+loading owners. All unrelated dirty Rust work remains parked and read-only.
 
 ## Observable result
 
-Correct and freeze one Rust-native architecture plus bounded implementation
-series for Bazel 9.2 rule-side `subrule`: declaration/export, lifted hidden
-dependencies, typed `configuration_field` defaults, rule attachment,
-configured resolution, callable context lifetime, nesting, fragments, and the
-zero/one-toolchain contract.
+Implement the accepted first Bazel 9.2 rule-side `subrule` vertical: `.bzl`
+declaration/export identity, typed admitted `configuration_field` values,
+rule attachment, and deterministic sparse hidden rows/spans. The authenticated
+rules_cc FDO declaration and `cc_toolchain` attachment must load and freeze,
+then configured analysis must fail closed before hidden late-bound resolution
+or any subrule call/action.
 
-This is a docs/source audit only and authorizes no Rust. Revision one was
-`REPLAN`: it gave `configuration_field` the wrong identity, conflated ordered
-lifting with set-semantic authorization, did not freeze its first successor,
-and implied a larger action/FDO invocation surface than Slug currently owns.
-Revision two must close exactly those four blockers and select only the first
-loading successor.
+This packet implements only successor one of the accepted six-part lifecycle.
+Configured hidden dependencies, call/context execution, nesting, fragments,
+automatic-exec-group toolchains, and broader actions remain inactive.
 
 ## Learned facts and authority
 
@@ -204,8 +202,8 @@ pipeline is `REPLAN`.
 
 ## First successor frozen contract
 
-After architecture acceptance, activate only
-`WP-4-5-7A-subrule-loading-declaration-and-late-bound-carrier`.
+This packet is the active
+`WP-4-5-7A-subrule-loading-declaration-and-late-bound-carrier` successor.
 
 Allowed files and frozen baselines at `541fcfaf2`:
 
@@ -275,17 +273,16 @@ producers, and a subrule context borrowing its enclosing action owner. Copy no
 Zig code, layout, allowlist, diagnostics, or parity claims. Bazel 9.2 remains
 the only authority.
 
-## Review, docs validation, and stops
+## Review and stops
 
-Independent correction review must check only: typed producer identity and
-cross-module/value-change proof; ordered-versus-set representation and four
-graph-shape proofs; the frozen first-successor contract; and the exact context/
-action/FDO stop ledger. Run targeted scheduling consistency,
-`git diff --check`, and the archive checker. No Cargo is required for this
-docs-only packet.
+Independent implementation review must check typed producer identity,
+cross-module equality, ordered-versus-set representation and graph-shape
+proofs, exact dirty-hunk isolation, retained-size accounting, the authenticated
+FDO declaration/attachment freeze, and the configured fail-closed stop. Run the
+full validation contract above plus archive and scheduling consistency checks.
 
-Only this manifest, the canonical plan, Stage 4 plan, and routing history may
-change. Stop and `REPLAN` for an untyped/global configuration lookup, defining-
+Stop and `REPLAN` for an edit outside the frozen allowlist, cap overflow,
+unisolatable parked hunks, an untyped/global configuration lookup, defining-
 module late-bound identity, a side registry, duplicate rule/dependency/action
 pipeline, evaluator values retained outside frozen module ownership, context
 escape, Java/Bazel runtime dependency, or any claim of complete FDO/C++
@@ -293,8 +290,10 @@ semantics before its named action families are accepted.
 
 ## Immediate predecessor
 
-Commit `541fcfaf2` consumes retained symbolic-macro namespace violations at
-configured-target admission. Its isolated staged candidate, full analysis
-suite, named cquery/build dependents, and independent terminal review pass.
-The BCR frontier remains missing `subrule`; `set` stays starlark-rust, while
-`cc_common`/`cc_internal` are generic downstream BCR Starlark consumers.
+Commit `4900ce46b` accepts the corrected six-part subrule lifecycle
+architecture after independent rereview. It uses typed fragment-class/field/
+tools-repository identity, separates ordered hidden lifting from set-semantic
+authorization/publication, freezes this successor's paths/blobs/caps/proofs,
+and defers unavailable FDO action families honestly. `set` stays
+starlark-rust, while `cc_common`/`cc_internal` are generic downstream BCR
+Starlark consumers.
