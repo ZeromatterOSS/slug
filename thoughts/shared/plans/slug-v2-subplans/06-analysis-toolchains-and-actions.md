@@ -21459,3 +21459,54 @@ records whose only key is `comment`; keep local PAX, malformed framing and all
 semantic or unknown keys fail-closed. This is a generic inert-metadata category,
 not a rules_shell comment-value special case. Resume the unchanged registration
 closure only after the real fresh-root REAPI dependent passes twice.
+
+#### Selected-BCR archive accepted; TestingBootstrap Host ABI active (2026-08-30)
+
+Commit `1599d730c` accepts inferred/explicit tar-gzip planning, safe prefix
+projection, authenticated overlays and ordered patches, registry MODULE
+replacement, transform-complete source association, 0664/0775 modes and the
+bounded global-PAX `comment` category. Focused archive validation is 32 pass,
+one intentional ignore; full core adds no packet-related failure. Independent
+terminal review is `ACCEPT`.
+
+Two fresh-root real REAPI replays now materialize authentic rules_shell and
+load its three nested modules before both stop at
+`coverage_common.instrumented_files_info`. Pinned Bazel 9.2 supplies that
+namespace through a single five-binding `TestingBootstrap` together with
+`testing`, `InstrumentedFilesInfo`, `AnalysisFailureInfo` and
+`AnalysisTestResultInfo`. Activate only
+`WP-6-7A-testing-bootstrap-host-abi-architecture`: freeze the entire bootstrap
+category and its namespace member inventories, stable loading/provider
+identity, and invocation-local configured-analysis boundary before Rust work.
+No one-symbol placeholder, `set`/parser change, `cc_common` special case or
+Rust rule implementation is permitted. Clean Zabel remains peer guidance only.
+
+#### TestingBootstrap architecture R3 accepted; implementation active (2026-08-30)
+
+Independent review rejects R1's loading-only carrier claim. Slug's rule/aspect
+`provides` path still stores user-only `ProviderId`, so merely exposing testing
+provider names cannot preserve Bazel builtin provider identity through package
+declarations and analysis rematerialization. R1 also treated all four providers
+as callable, overclaimed stable member-method pointer identity, and omitted
+Bazel's explicit exclusion of registered bootstrap globals from `@_builtins`
+`.bzl` evaluation.
+
+R2 independently accepts that architecture but finds one mechanical allowlist
+omission: converting advertised providers reaches three clean loading-test
+assertions that render user provider IDs. Activate only
+`WP-6-7A-testing-bootstrap-host-abi-architecture-r3`. Freeze the
+complete five-binding/member category together with generic advertised-
+provider `ProviderIdentity`, actual analysis rematerialization proof, exact
+callable/noncallable provider behavior, top-level-only process-stability claims
+and unsupported `@_builtins` loading. Admit explicit `.user_id()` projections
+in exactly those three assertions; do not add `Display` to the generic identity.
+Invocation remains fail-closed; no
+configured coverage stub, global callback, parser/`set` work, or rules_shell/
+`cc_common` special case is permitted.
+
+Independent correction review returns `ACCEPT`. Implement only
+`WP-6-7A-testing-bootstrap-loading-implementation-r3` under the frozen
+five-production/proof-file boundary plus the three exact clean assertions and
+500/700/1,200 caps. Preserve the existing selected-context package diff
+byte-for-byte and do not broaden required-provider constraints or configured
+analysis behavior.
