@@ -330,6 +330,7 @@ fn hash_repo_spec<H: Hasher>(spec: &RepoSpec, state: &mut H) {
     spec.rule_id.bzl_file.hash(state);
     spec.rule_id.rule_name.hash(state);
     hash_attribute_map(spec.attributes.as_ref(), state);
+    spec.publication_identity().hash(state);
 }
 
 fn hash_mapping<H: Hasher>(mapping: impl Iterator<Item = (impl Hash, impl Hash)>, state: &mut H) {

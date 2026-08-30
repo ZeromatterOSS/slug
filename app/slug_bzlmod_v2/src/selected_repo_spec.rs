@@ -7,7 +7,6 @@
  * of this source tree. You may select the license that applies to you.
  */
 
-use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Component;
 use std::path::Path;
@@ -23,6 +22,11 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use serde::Deserialize;
+use serde::Deserializer;
+use serde::de::Error as _;
+use serde::de::MapAccess;
+use serde::de::Visitor;
 use serde_json::Map;
 use serde_json::Value;
 use slug_identity_v2::ApparentRepoName;
@@ -315,8 +319,8 @@ struct SourceJson {
     mirror_urls: Vec<String>,
     integrity: Option<String>,
     strip_prefix: Option<String>,
-    patches: BTreeMap<String, String>,
-    overlay: BTreeMap<String, String>,
+    patches: Vec<(String, String)>,
+    overlay: Vec<(String, String)>,
     patch_strip: i32,
     archive_type: Option<String>,
     path: Option<String>,
@@ -326,6 +330,48 @@ struct SourceJson {
     tag: Option<String>,
     init_submodules: bool,
     verbose: bool,
+}
+
+#[derive(Deserialize)]
+struct OrderedSourceMaps {
+    #[serde(default, deserialize_with = "ordered_string_map")]
+    patches: Vec<(String, String)>,
+    #[serde(default, deserialize_with = "ordered_string_map")]
+    overlay: Vec<(String, String)>,
+}
+
+fn ordered_string_map<'de, D>(deserializer: D) -> Result<Vec<(String, String)>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct OrderedStringMapVisitor;
+
+    impl<'de> Visitor<'de> for OrderedStringMapVisitor {
+        type Value = Vec<(String, String)>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("a JSON object with unique string keys and string values")
+        }
+
+        fn visit_map<A>(self, mut values: A) -> Result<Self::Value, A::Error>
+        where
+            A: MapAccess<'de>,
+        {
+            let mut rows = Vec::with_capacity(values.size_hint().unwrap_or(0));
+            let mut names = SmallSet::new();
+            while let Some((name, value)) = values.next_entry::<String, String>()? {
+                if !names.insert(name.clone()) {
+                    return Err(A::Error::custom(format!(
+                        "duplicate ordered map key {name:?}"
+                    )));
+                }
+                rows.push((name, value));
+            }
+            Ok(rows)
+        }
+    }
+
+    deserializer.deserialize_map(OrderedStringMapVisitor)
 }
 struct RegistryJson {
     mirrors: Vec<String>,
@@ -396,24 +442,22 @@ fn json_strings(
         .collect()
 }
 
-fn json_string_map(
+fn validate_json_string_map(
     module: &HostGraphModuleKey,
     object: &Map<String, Value>,
     name: &str,
-) -> Result<BTreeMap<String, String>, HostSelectedRegistryRepoSpecsError> {
+) -> Result<(), HostSelectedRegistryRepoSpecsError> {
     let Some(value) = object.get(name) else {
-        return Ok(BTreeMap::new());
+        return Ok(());
     };
     let Value::Object(values) = value else {
         return Err(fail(module, format!("field {name} must be a string map")));
     };
-    values
-        .iter()
-        .map(|(key, value)| match value {
-            Value::String(value) => Ok((key.clone(), value.clone())),
-            _ => Err(fail(module, format!("field {name} must be a string map"))),
-        })
-        .collect()
+    if values.values().all(Value::is_string) {
+        Ok(())
+    } else {
+        Err(fail(module, format!("field {name} must be a string map")))
+    }
 }
 
 fn json_bool(
@@ -448,14 +492,23 @@ fn parse_source_json(
     bytes: &[u8],
 ) -> Result<SourceJson, HostSelectedRegistryRepoSpecsError> {
     let object = json_object(module, "source.json", bytes)?;
+    validate_json_string_map(module, &object, "patches")?;
+    validate_json_string_map(module, &object, "overlay")?;
+    let ordered: OrderedSourceMaps = serde_json::from_slice(bytes).map_err(|error| {
+        HostSelectedRegistryRepoSpecsError::Json {
+            module: module.clone(),
+            file: "source.json".into(),
+            message: error.to_string().into(),
+        }
+    })?;
     Ok(SourceJson {
         source_type: json_string(module, &object, "type")?,
         url: json_string(module, &object, "url")?,
         mirror_urls: json_strings(module, &object, "mirror_urls")?,
         integrity: json_string(module, &object, "integrity")?,
         strip_prefix: json_string(module, &object, "strip_prefix")?,
-        patches: json_string_map(module, &object, "patches")?,
-        overlay: json_string_map(module, &object, "overlay")?,
+        patches: ordered.patches,
+        overlay: ordered.overlay,
         patch_strip: json_i32(module, &object, "patch_strip")?,
         archive_type: json_string(module, &object, "archive_type")?,
         path: json_string(module, &object, "path")?,
@@ -852,7 +905,7 @@ fn archive_repo_spec(
             OverrideAttributeValue::String(integrity.into()),
         )
     });
-    let overlay_urls = source.overlay.keys().map(|file| {
+    let overlay_urls = source.overlay.iter().map(|(file, _)| {
         (
             file.clone(),
             strings([format!(
@@ -6264,6 +6317,9 @@ fn selected_registry_proof_spec(module: HostGraphModuleKey) -> HostSelectedRegis
 mod tests {
     use std::cell::Cell;
     use std::collections::BTreeMap;
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hash;
+    use std::hash::Hasher;
     use std::path::Path;
     use std::sync::Arc;
     use std::sync::Mutex;
@@ -7875,6 +7931,34 @@ mod tests {
         }
     }
 
+    fn map_string_keys<'a>(spec: &'a RepoSpec, name: &str) -> Vec<&'a str> {
+        match spec.attributes.get(name).unwrap() {
+            OverrideAttributeValue::Map(values) => values
+                .keys()
+                .map(|key| match key {
+                    OverrideAttributeKey::String(value) => value.as_str(),
+                    key => panic!("{name} contained non-string key {key:?}"),
+                })
+                .collect(),
+            value => panic!("{name} was not a map: {value:?}"),
+        }
+    }
+
+    fn archive_spec(source_json: &str) -> RepoSpec {
+        archive_repo_spec(
+            &module(),
+            &source(source_json),
+            "https://registry.test",
+            "https://registry.test/modules/demo/1/MODULE.bazel".into(),
+            [0; 32],
+            &[],
+            None,
+            "demo",
+            "1",
+        )
+        .unwrap()
+    }
+
     #[test]
     fn source_json_defaults_and_typed_failures() {
         let parsed = source(r#"{"url":"https://example.test/a","integrity":"sha256-x"}"#);
@@ -7884,7 +7968,248 @@ mod tests {
         assert!(parse_source_json(&module(), br#"{"patch_strip":2147483648}"#).is_err());
         assert!(parse_source_json(&module(), br#"{"mirror_urls":"bad"}"#).is_err());
         assert!(parse_source_json(&module(), br#"{"patches":{"x":1}}"#).is_err());
+        assert!(
+            parse_source_json(&module(), br#"{"patches":{"x":"sha256-a","x":"sha256-b"}}"#)
+                .is_err()
+        );
         assert!(parse_source_json(&module(), b"[]").is_err());
+    }
+
+    #[test]
+    fn ordered_source_maps_and_repo_spec_publication_identity_are_exact() {
+        let source_a = r#"{"url":"https://origin.test/a.tgz","integrity":"sha256-a",
+            "patches":{"z.patch":"sha256-z","a.patch":"sha256-a"},
+            "overlay":{"z.txt":"sha256-z","a.txt":"sha256-a"}}"#;
+        let source_b = r#"{"url":"https://origin.test/a.tgz","integrity":"sha256-a",
+            "patches":{"a.patch":"sha256-a","z.patch":"sha256-z"},
+            "overlay":{"a.txt":"sha256-a","z.txt":"sha256-z"}}"#;
+        let a = archive_spec(source_a);
+        let b = archive_spec(source_b);
+        let restored = archive_spec(source_a);
+
+        assert_eq!(
+            map_string_keys(&a, "remote_patches"),
+            [
+                "https://registry.test/modules/demo/1/patches/z.patch",
+                "https://registry.test/modules/demo/1/patches/a.patch",
+            ]
+        );
+        assert_eq!(map_string_keys(&a, "remote_file_urls"), ["z.txt", "a.txt"]);
+        assert!(!a.attributes.contains_key("type"));
+        assert_ne!(a, b);
+        assert_eq!(a, restored);
+
+        let identity_hash = |spec: &RepoSpec| {
+            let mut state = DefaultHasher::new();
+            spec.publication_identity().hash(&mut state);
+            state.finish()
+        };
+        assert_ne!(identity_hash(&a), identity_hash(&b));
+        assert_eq!(identity_hash(&a), identity_hash(&restored));
+
+        let mut ordinary_a = SmallMap::new();
+        ordinary_a.insert(
+            "ordinary".into(),
+            attrs_map([
+                ("z".to_owned(), OverrideAttributeValue::Int(1)),
+                ("a".to_owned(), OverrideAttributeValue::Int(2)),
+            ]),
+        );
+        let mut ordinary_b = SmallMap::new();
+        ordinary_b.insert(
+            "ordinary".into(),
+            attrs_map([
+                ("a".to_owned(), OverrideAttributeValue::Int(2)),
+                ("z".to_owned(), OverrideAttributeValue::Int(1)),
+            ]),
+        );
+        assert_eq!(
+            repo_spec(
+                "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                "http_archive",
+                ordinary_a,
+            ),
+            repo_spec(
+                "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                "http_archive",
+                ordinary_b,
+            )
+        );
+        let remote_patches_a: SmallMap<CompactString, OverrideAttributeValue> =
+            SmallMap::from_iter([(
+                CompactString::new("remote_patches"),
+                attrs_map([
+                    ("z".to_owned(), OverrideAttributeValue::Int(1)),
+                    ("a".to_owned(), OverrideAttributeValue::Int(2)),
+                ]),
+            )]);
+        let remote_patches_b: SmallMap<CompactString, OverrideAttributeValue> =
+            SmallMap::from_iter([(
+                CompactString::new("remote_patches"),
+                attrs_map([
+                    ("a".to_owned(), OverrideAttributeValue::Int(2)),
+                    ("z".to_owned(), OverrideAttributeValue::Int(1)),
+                ]),
+            )]);
+        assert_eq!(
+            repo_spec(
+                "@@other//tools/build_defs/repo:http.bzl",
+                "http_archive",
+                remote_patches_a.clone(),
+            ),
+            repo_spec(
+                "@@other//tools/build_defs/repo:http.bzl",
+                "http_archive",
+                remote_patches_b.clone(),
+            )
+        );
+        assert_eq!(
+            repo_spec(
+                "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                "other_rule",
+                remote_patches_a,
+            ),
+            repo_spec(
+                "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                "other_rule",
+                remote_patches_b,
+            )
+        );
+
+        let git_a = git_repo_spec(
+            &source(source_a.replace("a.tgz", "repo").as_str()),
+            "https://registry.test",
+            "module".into(),
+            [1; 32],
+            "demo",
+            "1",
+        );
+        let git_b = git_repo_spec(
+            &source(source_b.replace("a.tgz", "repo").as_str()),
+            "https://registry.test",
+            "module".into(),
+            [1; 32],
+            "demo",
+            "1",
+        );
+        assert_ne!(git_a, git_b);
+    }
+
+    #[test]
+    fn selected_patch_order_reaches_root_and_canonical_materialization_requests() {
+        fn definition(spec: RepoSpec) -> HostCanonicalSelectedModuleDefinition {
+            let dep = route_key("dep", "1");
+            let mut selected = route_spec(dep.clone());
+            selected.repo_spec = spec;
+            let routes = selected_routes(
+                &route_graph([
+                    route_root([("dep", dep.clone())], None),
+                    route_module("dep", "1", "dep", true),
+                ]),
+                &HostSelectedRegistryRepoSpecs {
+                    entries: Arc::from([selected]),
+                },
+            )
+            .unwrap();
+            HostCanonicalSelectedModuleDefinition {
+                routes: Arc::new(Ok(routes)),
+                ordinal: 1,
+            }
+        }
+
+        fn root_request(
+            definition: HostCanonicalSelectedModuleDefinition,
+        ) -> Arc<crate::RepositoryMaterializationRequest> {
+            let source = HostSelectedExtensionDefinitionSource::Selected {
+                definition,
+                apparent_repo: ApparentRepoName::new("dep").unwrap(),
+            };
+            let route = crate::RootRepositoryRoute::for_selected_extension_definition(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                &source,
+            )
+            .unwrap();
+            match crate::host_repository_materialization_request(&route.source_capability())
+                .unwrap()
+            {
+                crate::HostRepositoryMaterializationDisposition::Request(request) => request,
+                crate::HostRepositoryMaterializationDisposition::Builtin(_) => {
+                    panic!("selected registry route must materialize")
+                }
+            }
+        }
+
+        fn identity_hash(value: &impl Hash) -> u64 {
+            let mut state = DefaultHasher::new();
+            value.hash(&mut state);
+            state.finish()
+        }
+
+        fn canonical_request(
+            definition: HostCanonicalSelectedModuleDefinition,
+        ) -> Arc<crate::RepositoryMaterializationRequest> {
+            let route = Arc::new(crate::HostCanonicalRepositoryRoute::from_selected(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                definition,
+            ));
+            let input = crate::host_canonical_repository_source_input(route, None).unwrap();
+            match input.view().disposition() {
+                crate::HostRepositorySourceInputDispositionView::Request(request) => {
+                    request.clone()
+                }
+                crate::HostRepositorySourceInputDispositionView::Builtin(_) => {
+                    panic!("selected canonical route must materialize")
+                }
+            }
+        }
+
+        let source_a = r#"{"url":"https://origin.test/a.tgz","integrity":"sha256-a",
+            "patches":{"z.patch":"sha256-z","a.patch":"sha256-a"}}"#;
+        let source_b = r#"{"url":"https://origin.test/a.tgz","integrity":"sha256-a",
+            "patches":{"a.patch":"sha256-a","z.patch":"sha256-z"}}"#;
+        let a = definition(archive_spec(source_a));
+        let b = definition(archive_spec(source_b));
+        let restored = definition(archive_spec(source_a));
+
+        let root_route = |definition| {
+            let source = HostSelectedExtensionDefinitionSource::Selected {
+                definition,
+                apparent_repo: ApparentRepoName::new("dep").unwrap(),
+            };
+            crate::RootRepositoryRoute::for_selected_extension_definition(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                &source,
+            )
+            .unwrap()
+        };
+        let canonical_route = |definition| {
+            crate::HostCanonicalRepositoryRoute::from_selected(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                definition,
+            )
+        };
+
+        assert_ne!(
+            identity_hash(&root_route(a.clone())),
+            identity_hash(&root_route(b.clone()))
+        );
+        assert_eq!(
+            identity_hash(&root_route(a.clone())),
+            identity_hash(&root_route(restored.clone()))
+        );
+        assert_ne!(
+            identity_hash(&canonical_route(a.clone())),
+            identity_hash(&canonical_route(b.clone()))
+        );
+        assert_eq!(
+            identity_hash(&canonical_route(a.clone())),
+            identity_hash(&canonical_route(restored.clone()))
+        );
+
+        assert_ne!(root_request(a.clone()), root_request(b.clone()));
+        assert_eq!(root_request(a.clone()), root_request(restored.clone()));
+        assert_ne!(canonical_request(a.clone()), canonical_request(b));
+        assert_eq!(canonical_request(a), canonical_request(restored));
     }
 
     #[test]

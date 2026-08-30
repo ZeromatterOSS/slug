@@ -26,6 +26,7 @@ use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleSourcePreparation;
 use slug_bzlmod_v2::ModuleSourcePreparationError;
 use slug_bzlmod_v2::ModuleSourcePreparationKey;
+use slug_bzlmod_v2::OverrideAttributeKey;
 use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::ROOT_MODULE_BOOTSTRAP_REMINDER_BYTES;
 use slug_bzlmod_v2::ROOT_MODULE_BOOTSTRAP_REMINDER_SHA256;
@@ -95,6 +96,7 @@ use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
 use slug_workspace_v2::WorkspaceSnapshot;
 use slug_workspace_v2::WorkspaceSnapshotKey;
+use starlark_map::small_map::SmallMap;
 use starlark_map::sorted_map::SortedMap;
 
 fn workspace() -> PathBuf {
@@ -1679,6 +1681,76 @@ fn result_epoch_rejects_wrong_workspace_duplicates_conflicts_and_success_kind_mi
             }
         ) if canonical_repo.as_str() == "local+"
     ));
+}
+
+#[test]
+fn materialization_epoch_dice_identity_tracks_ordered_remote_patches_a_b_a() {
+    fn request(order: &[(&str, &str)]) -> Arc<RepositoryMaterializationRequest> {
+        let patches = order
+            .iter()
+            .map(|(url, integrity)| {
+                (
+                    OverrideAttributeKey::String((*url).into()),
+                    OverrideAttributeValue::String((*integrity).into()),
+                )
+            })
+            .collect::<SmallMap<_, _>>();
+        Arc::new(RepositoryMaterializationRequest {
+            id: RepositoryMaterializationRequestId {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                canonical_repo: slug_identity_v2::CanonicalRepoName::new("dep+").unwrap(),
+            },
+            repo_spec: RepoSpec {
+                rule_id: RepoRuleId {
+                    bzl_file: slug_identity_v2::CanonicalLabel::parse(
+                        "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                    )
+                    .unwrap(),
+                    rule_name: "http_archive".into(),
+                },
+                attributes: Arc::new(SmallMap::from_iter([(
+                    compact_str::CompactString::new("remote_patches"),
+                    OverrideAttributeValue::Map(Arc::new(patches)),
+                )])),
+            },
+            kind: RepositoryMaterializationKind::Immutable,
+        })
+    }
+
+    fn epoch(
+        request: Arc<RepositoryMaterializationRequest>,
+    ) -> RepositoryMaterializationResultEpoch {
+        RepositoryMaterializationResultEpoch::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            [RepositoryMaterializationEpochEntry {
+                request,
+                result: RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Immutable {
+                        source_identity: Arc::from("source"),
+                        generation_root: PathBuf::from("/generation"),
+                        observation_instance: PathObservationInstanceId::new(1),
+                    },
+                ),
+            }],
+        )
+        .unwrap()
+    }
+
+    let a = epoch(request(&[
+        ("https://r/z.patch", "sha256-z"),
+        ("https://r/a.patch", "sha256-a"),
+    ]));
+    let b = epoch(request(&[
+        ("https://r/a.patch", "sha256-a"),
+        ("https://r/z.patch", "sha256-z"),
+    ]));
+    let restored = epoch(request(&[
+        ("https://r/z.patch", "sha256-z"),
+        ("https://r/a.patch", "sha256-a"),
+    ]));
+
+    assert!(!<RepositoryMaterializationResultEpochKey as InjectedKey>::equality(&a, &b));
+    assert!(<RepositoryMaterializationResultEpochKey as InjectedKey>::equality(&a, &restored));
 }
 
 #[tokio::test]

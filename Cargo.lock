@@ -3423,6 +3423,7 @@ dependencies = [
  "dice_futures",
  "dupe",
  "hex",
+ "serde",
  "serde_json",
  "sha2",
  "slug_events_v2",

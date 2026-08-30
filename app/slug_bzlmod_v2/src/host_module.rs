@@ -1209,6 +1209,7 @@ fn hash_repo_spec<H: Hasher>(spec: &RepoSpec, state: &mut H) {
         .collect::<Vec<_>>();
     entry_hashes.sort_unstable();
     entry_hashes.hash(state);
+    spec.publication_identity().hash(state);
 }
 
 impl Hash for SelectedRegistryRepositoryRoute {

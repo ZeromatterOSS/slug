@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -791,11 +793,96 @@ pub struct RegistryMultipleOverride {
     pub registry: CompactString,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[derive(Debug, Clone, Allocative)]
 pub struct RepoSpec {
     pub rule_id: RepoRuleId,
     pub attributes: Arc<SmallMap<CompactString, OverrideAttributeValue>>,
 }
+
+/// Equality identity for repository attributes whose iteration order changes
+/// repository semantics. Ordinary attribute maps keep membership equality.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RepoSpecPublicationIdentity<'a> {
+    ordered_remote_patches: Option<&'a SmallMap<OverrideAttributeKey, OverrideAttributeValue>>,
+}
+
+impl PartialEq for RepoSpecPublicationIdentity<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self.ordered_remote_patches, other.ordered_remote_patches) {
+            (None, None) => true,
+            (Some(left), Some(right)) => {
+                left.len() == right.len()
+                    && left
+                        .keys()
+                        .zip(right.keys())
+                        .all(|(left, right)| left == right)
+            }
+            (None, Some(_)) | (Some(_), None) => false,
+        }
+    }
+}
+
+impl Eq for RepoSpecPublicationIdentity<'_> {}
+
+impl Hash for RepoSpecPublicationIdentity<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self.ordered_remote_patches {
+            None => false.hash(state),
+            Some(patches) => {
+                true.hash(state);
+                patches.len().hash(state);
+                for key in patches.keys() {
+                    key.hash(state);
+                }
+            }
+        }
+    }
+}
+
+impl RepoSpec {
+    pub(crate) fn publication_identity(&self) -> RepoSpecPublicationIdentity<'_> {
+        let bzl_file = &self.rule_id.bzl_file;
+        let has_ordered_remote_patches = matches!(
+            (
+                bzl_file.package().repo().as_str(),
+                bzl_file.package().package().as_str(),
+                bzl_file.target().as_str(),
+                self.rule_id.rule_name.as_str()
+            ),
+            (
+                "bazel_tools",
+                "tools/build_defs/repo",
+                "http.bzl",
+                "http_archive"
+            ) | (
+                "bazel_tools",
+                "tools/build_defs/repo",
+                "git.bzl",
+                "git_repository"
+            )
+        );
+        let ordered_remote_patches = has_ordered_remote_patches
+            .then(|| self.attributes.get("remote_patches"))
+            .flatten()
+            .and_then(|value| match value {
+                OverrideAttributeValue::Map(values) => Some(values.as_ref()),
+                _ => None,
+            });
+        RepoSpecPublicationIdentity {
+            ordered_remote_patches,
+        }
+    }
+}
+
+impl PartialEq for RepoSpec {
+    fn eq(&self, other: &Self) -> bool {
+        self.rule_id == other.rule_id
+            && self.attributes == other.attributes
+            && self.publication_identity() == other.publication_identity()
+    }
+}
+
+impl Eq for RepoSpec {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct RepoRuleId {
