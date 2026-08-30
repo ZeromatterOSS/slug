@@ -1,23 +1,24 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-module-bzl-native-context-architecture`
+Packet: `WP-4-5-7A-module-bzl-native-context-implementation`
 
 Milestone: M7A bootstrap-critical repository/ruleset closure.
 
-Base: accepted module-extension `native.existing_rule[s]` family `cc93ce4e7`,
-accepted repository-rule attribute family `0c3a172ed`, and accepted complete
-Bazel repository package `3023718a0`. All unrelated dirty analysis, loading,
-core, and REAPI work remains parked and read-only.
+Base: independently accepted native-context architecture `612126b6f`, accepted
+module-extension `native.existing_rule[s]` family `cc93ce4e7`, and accepted
+complete Bazel repository package `3023718a0`. All unrelated dirty analysis,
+loading, core, and REAPI work remains parked and read-only.
 
 ## Observable result
 
-Freeze the exact loading-context architecture needed to complete Bazel 9.2's
-module-loaded native family with `native.bazel_version == "9.2.0"` while
+Implement the accepted exact loading-context architecture needed to complete
+Bazel 9.2's module-loaded native family with
+`native.bazel_version == "9.2.0"` while
 keeping that field absent from BUILD-loaded `.bzl` modules. The design must
 separate BUILD and Bzlmod evaluation in root and external recursive DICE keys,
 not infer context at attribute access or publish the value universally.
 
-The implementation successor must make two fresh rules_rust replays advance
+This packet must make two fresh rules_rust replays advance
 beyond `@@bazel_features+//private:globals_repo.bzl:22` and stop identically at
 the next authentic unsupported boundary or succeed. That boundary is evidence,
 not authorization to widen the packet.
@@ -62,7 +63,7 @@ identity; add no side map, interner, cache, string allocation, strong hash, or
 new dependency. Stage 9's Stage 4/5 loading rows remain unchanged because this
 is a V2-owned contextual-key correction, not donor utility adoption.
 
-## Frozen architecture
+## Accepted architecture
 
 1. Add a loading-private two-variant context enum, `Build` and `Bzlmod`, to
    root and external `.bzl` evaluation keys, observation keys, and cycle
@@ -135,7 +136,7 @@ shutdown policy changes. No retained value borrows evaluator scratch.
 
 ## Implementation proof matrix
 
-The successor must prove:
+This packet must prove:
 
 1. the pinned snapshot returns `"9.2.0"` and its route identity remains stable;
 2. direct BUILD `.bzl` globals lack the field while Bzlmod globals expose the
@@ -159,7 +160,7 @@ oracle fixture, copied registry subtree, mutation, manifest, or expected file.
 
 ## Implementation allowlist, caps, and stops
 
-The reviewed implementation successor may touch only:
+This implementation may touch only:
 
 - `app/slug_bzlmod_v2/src/builtin_repository.rs` — snapshot version accessor
   and focused invariant;
