@@ -465,7 +465,11 @@ configured analysis with no FDO/C++/parser special case. Generated path bytes
 and structural identities remain Slug-native, while new-action aquery,
 execution, ActionKey and REAPI projection remain deferred and fail closed.
 Independent terminal review returned `ACCEPT`; author only the bounded
-non-callback vector Args/param-file successor next.
+non-callback vector Args/param-file successor next. That successor is now
+authorized after focused architecture correction rereview returned `ACCEPT`.
+It fills only the already-reserved vector recipe, param-file policy, and Args-
+backed write variants; callbacks, directory expansion, execution and the
+remaining Spawn envelope stay deferred.
 
 Bazel 9.2 remains the sole semantic authority. Zabel
 `0795445f3ab60f4e49070bdd0b94425c5610f73a` supplies peer phase-ownership,

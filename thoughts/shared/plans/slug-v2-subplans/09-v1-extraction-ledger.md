@@ -825,8 +825,12 @@ passes without a C++/FDO/parser branch; typed-action aquery/execution/ActionKey/
 REAPI projection remains explicitly deferred. Validation passed at 1,849
 production, 1,050 proof, and 2,899 total added Rust lines; four core failures
 and three archive-path findings were independently reproduced or identified as
-unchanged frozen-base state. Next: author
-`WP-6-7A-noncallback-vector-args-paramfiles-implementation-r1`.
+unchanged frozen-base state. The active
+`WP-6-7A-noncallback-vector-args-paramfiles-implementation-r1` draft fills the
+accepted retained recipe with sequence/depset vector calls, non-callback
+transforms, param-file policy, and typed Args-backed write. Focused architecture
+correction rereview returned `ACCEPT`; callback/directory/execution breadth
+remains deferred.
 
 ### Stage 6 recursive configured custom-rule analysis
 

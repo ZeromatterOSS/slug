@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-6-7A-fdo-basic-args-run-symlink-implementation-r2](./slug-v2-subplans/current-packet.md).
+[WP-6-7A-noncallback-vector-args-paramfiles-implementation-r1](./slug-v2-subplans/current-packet.md).
 
 Commit `683538254` terminally accepts generic configured fragment projection.
 The successor audit found that authentic rules_cc 0.2.17 forwards a nonempty
@@ -92,8 +92,9 @@ source manifest into configured evaluation, proves actual parent-key DICE
 cutoff, and registers scalar Args/run/symlink actions through one typed generic
 sink. A direct-source rules_cc FDO configured-analysis discriminator passes;
 new-action `aquery`, execution, ActionKey, and REAPI projection remain deferred.
-Independent terminal review returned `ACCEPT`. Author the already-sequenced
-non-callback vector Args/param-file successor next. Bazel 9.2 remains semantic
+Independent terminal review returned `ACCEPT`. The already-sequenced non-
+callback vector Args/param-file successor is now authorized after its focused
+architecture correction rereview returned `ACCEPT`. Bazel 9.2 remains semantic
 authority; Zabel remains peer guidance, and BCR C++ rules remain ordinary
 Starlark consumers.
 
