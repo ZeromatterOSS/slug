@@ -24,3 +24,5 @@ pub use spec::ActionOutputKind;
 pub use spec::ActionSpec;
 pub use spec::ParamFile;
 pub use spec::ParamFileFormat;
+pub use spec::RetainedArtifactInputs;
+pub use spec::RetainedArtifactInputsError;

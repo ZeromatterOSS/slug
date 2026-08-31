@@ -165,7 +165,9 @@ successor rows, local and external handles, structural alias-aware publication
 equality, and a typed File/action-input view over the same owner. Authentic
 rules_cc `all_files` forwarding selects this as the immediate prerequisite to
 generic action builtins. Independent reserved-representation rereview returned
-`ACCEPT`; implement only through the bounded successor packet.
+`ACCEPT`; the bounded
+`WP-6-7A-dense-retained-depset-action-import-implementation-r1` packet is
+implemented, proved and terminally `ACCEPT`.
 
 Before the first broad ruleset consumer depends on nonempty transitive depsets,
 implement one bounded Zabel-informed retained core behind the exact Bazel

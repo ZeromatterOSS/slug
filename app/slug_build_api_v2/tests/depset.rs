@@ -8,6 +8,10 @@
  * above-listed licenses.
  */
 
+use std::hash::Hash;
+use std::hash::Hasher;
+use std::sync::Arc;
+
 use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetError;
 use slug_build_api_v2::DepsetOrder;
@@ -21,8 +25,8 @@ fn leaf(order: DepsetOrder, item: &str) -> Depset<String> {
     Depset::from_direct(order, s(&[item])).unwrap()
 }
 
-fn transitive_child(value: &Depset<String>) -> &Depset<String> {
-    match &value.successors()[0] {
+fn transitive_child(value: &Depset<String>) -> Depset<String> {
+    match value.successors().next().expect("one successor") {
         DepsetSuccessor::Transitive(child) => child,
         DepsetSuccessor::Direct(_) => panic!("expected retained non-singleton child"),
     }
@@ -136,6 +140,114 @@ fn topological_reverses_before_deduplicating_transitive_nodes() {
 }
 
 #[test]
+fn topological_repeated_alias_matches_bazel_a_c_b_result() {
+    let a = leaf(DepsetOrder::Topological, "a");
+    let b = leaf(DepsetOrder::Topological, "b");
+    let c = leaf(DepsetOrder::Topological, "c");
+    let parent = Depset::new(
+        DepsetOrder::Topological,
+        Vec::new(),
+        vec![a, b.clone(), c, b],
+    )
+    .unwrap();
+    assert_eq!(parent.to_list(), s(&["a", "c", "b"]));
+}
+
+#[test]
+fn topological_streaming_distinguishes_nodes_that_share_one_row() {
+    let child = Depset::from_direct(DepsetOrder::Default, s(&["a", "b"])).unwrap();
+    let first = Depset::new(DepsetOrder::Topological, Vec::new(), vec![child.clone()]).unwrap();
+    let second = Depset::new(DepsetOrder::Topological, Vec::new(), vec![child]).unwrap();
+    assert!(first.shares_successors_with(&second));
+    assert!(!first.shares_node_with(&second));
+    let root = Depset::new(DepsetOrder::Topological, s(&["root"]), vec![first, second]).unwrap();
+    let expected = root.to_list();
+    let mut streamed = Vec::new();
+    root.visit(|value| {
+        streamed.push(value.clone());
+        Ok::<_, std::convert::Infallible>(())
+    })
+    .unwrap();
+    assert_eq!(streamed, expected);
+}
+
+#[derive(Clone, Debug)]
+struct TrackedLeaf {
+    id: &'static str,
+    _owner: Arc<()>,
+}
+
+impl PartialEq for TrackedLeaf {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for TrackedLeaf {}
+
+impl Hash for TrackedLeaf {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+#[test]
+fn external_successor_and_row_owners_retain_then_release_leaves() {
+    let tracked_child = |owner: Arc<()>| {
+        Depset::from_direct(
+            DepsetOrder::Default,
+            vec![
+                TrackedLeaf {
+                    id: "a",
+                    _owner: owner.clone(),
+                },
+                TrackedLeaf {
+                    id: "b",
+                    _owner: owner,
+                },
+            ],
+        )
+        .unwrap()
+    };
+
+    {
+        let owner = Arc::new(());
+        let weak = Arc::downgrade(&owner);
+        let child = tracked_child(owner);
+        let parent = Depset::new(
+            DepsetOrder::Default,
+            vec![TrackedLeaf {
+                id: "parent",
+                _owner: Arc::new(()),
+            }],
+            vec![child.clone()],
+        )
+        .unwrap();
+        assert_eq!(parent.storage_stats().external_depsets, 1);
+        assert_eq!(parent.storage_stats().external_rows, 0);
+        drop(child);
+        assert!(weak.upgrade().is_some());
+        drop(parent);
+        assert!(weak.upgrade().is_none());
+    }
+
+    {
+        let owner = Arc::new(());
+        let weak = Arc::downgrade(&owner);
+        let child = tracked_child(owner);
+        let wrapper =
+            Depset::new(DepsetOrder::Topological, Vec::new(), vec![child.clone()]).unwrap();
+        assert!(wrapper.shares_successors_with(&child));
+        assert_eq!(wrapper.storage_stats().external_depsets, 0);
+        assert_eq!(wrapper.storage_stats().external_rows, 1);
+        drop(child);
+        assert!(weak.upgrade().is_some());
+        drop(wrapper);
+        assert!(weak.upgrade().is_none());
+    }
+}
+
+#[test]
 fn topological_deep_diamond_delays_one_shared_node() {
     let shared = Depset::from_direct(DepsetOrder::Topological, s(&["s0", "s1"])).unwrap();
     let left = Depset::new(DepsetOrder::Topological, s(&["left"]), vec![shared.clone()]).unwrap();
@@ -153,7 +265,7 @@ fn composition_retains_shared_child_nodes_without_recursive_cloning() {
 
     assert!(transitive_child(&left).shares_node_with(&shared));
     assert!(transitive_child(&right).shares_node_with(&shared));
-    assert!(transitive_child(&left).shares_node_with(transitive_child(&right)));
+    assert!(transitive_child(&left).shares_node_with(&transitive_child(&right)));
 }
 
 #[test]
@@ -168,12 +280,12 @@ fn singleton_hoisting_preserves_interleaved_successor_order() {
     .unwrap();
     assert_eq!(preorder.to_list(), s(&["d", "a", "b", "x"]));
     assert!(matches!(
-        preorder.successors(),
+        preorder.successors().collect::<Vec<_>>().as_slice(),
         [
             DepsetSuccessor::Direct(d),
             DepsetSuccessor::Transitive(child),
             DepsetSuccessor::Direct(x),
-        ] if d == "d" && child.shares_node_with(&nested) && x == "x"
+        ] if *d == "d" && child.shares_node_with(&nested) && *x == "x"
     ));
 
     let nested = Depset::from_direct(DepsetOrder::Default, s(&["a", "b"])).unwrap();
@@ -189,13 +301,13 @@ fn singleton_hoisting_preserves_interleaved_successor_order() {
     .unwrap();
     assert_eq!(postorder.to_list(), s(&["x", "a", "b", "y", "d"]));
     assert!(matches!(
-        postorder.successors(),
+        postorder.successors().collect::<Vec<_>>().as_slice(),
         [
             DepsetSuccessor::Direct(x),
             DepsetSuccessor::Transitive(child),
             DepsetSuccessor::Direct(y),
             DepsetSuccessor::Direct(d),
-        ] if x == "x" && child.shares_node_with(&nested) && y == "y" && d == "d"
+        ] if *x == "x" && child.shares_node_with(&nested) && *y == "y" && *d == "d"
     ));
 }
 

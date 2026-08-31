@@ -21,7 +21,9 @@ use num_bigint::Sign;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
 use slug_build_api_v2::AnalysisDepset;
-use slug_build_api_v2::AnalysisDepsetInput;
+use slug_build_api_v2::AnalysisDepsetGraphInput;
+use slug_build_api_v2::AnalysisDepsetGraphNode;
+use slug_build_api_v2::AnalysisDepsetGraphRow;
 use slug_build_api_v2::AnalysisDepsetSuccessor;
 use slug_build_api_v2::AnalysisNumber;
 use slug_build_api_v2::AnalysisTargetIdentity;
@@ -196,7 +198,7 @@ impl<'v> StarlarkValue<'v> for AnalysisConfiguredTargetValue {
 pub(crate) struct AnalysisValueMaterializer<'a> {
     heap: &'a FrozenHeap,
     depsets: HashMap<AnalysisDepset, FrozenValue>,
-    file_depsets: HashMap<usize, FrozenValue>,
+    file_depsets: HashMap<(usize, u32), FrozenValue>,
 }
 
 impl<'a> AnalysisValueMaterializer<'a> {
@@ -248,13 +250,12 @@ impl<'a> AnalysisValueMaterializer<'a> {
         }
         let successors = value
             .successors()
-            .iter()
             .map(|successor| match successor {
                 slug_build_api_v2::DepsetSuccessor::Direct(value) => {
                     StarlarkDepsetSuccessorGen::Direct(self.heap.alloc_str(value).to_frozen_value())
                 }
                 slug_build_api_v2::DepsetSuccessor::Transitive(value) => {
-                    StarlarkDepsetSuccessorGen::Transitive(self.file_depset(value))
+                    StarlarkDepsetSuccessorGen::Transitive(self.file_depset(&value))
                 }
             })
             .collect();
@@ -519,10 +520,24 @@ impl<'a> AnalysisValueMaterializer<'a> {
 pub(crate) struct AnalysisValueLowerer<'v> {
     visiting: HashSet<ValueIdentity<'v>>,
     memo: HashMap<ValueIdentity<'v>, AnalysisValue>,
+    lower_depth: usize,
 }
 
 impl<'v> AnalysisValueLowerer<'v> {
     pub(crate) fn lower(&mut self, value: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
+        if self.lower_depth == 0 {
+            self.lower_depth = 1;
+            let prepared = self.prepare_reachable_depsets(value, path);
+            self.lower_depth = 0;
+            prepared?;
+        }
+        self.lower_depth += 1;
+        let result = self.lower_one(value, path);
+        self.lower_depth -= 1;
+        result
+    }
+
+    fn lower_one(&mut self, value: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
         if value.is_none() {
             return Ok(AnalysisValue::none());
         }
@@ -570,14 +585,63 @@ impl<'v> AnalysisValueLowerer<'v> {
         lowered
     }
 
-    fn lower_depset(&mut self, root: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
-        let root_identity = root.identity();
-        self.visiting.remove(&root_identity);
-        let mut stack = vec![(root, path.to_owned(), false)];
+    fn prepare_reachable_depsets(&mut self, root: Value<'v>, path: &str) -> Result<(), String> {
+        let mut roots = Vec::new();
+        let mut seen = HashSet::new();
+        let mut stack = vec![root];
+        while let Some(value) = stack.pop() {
+            if !seen.insert(value.identity()) {
+                continue;
+            }
+            if let Some((_, _, _, retained, _, _)) = StarlarkDepset::parts_from_value(value) {
+                if retained.is_none() {
+                    roots.push(value);
+                }
+                continue;
+            }
+            let provider_fields =
+                if let Some(fields) = StarlarkToolchainInfo::fields_from_value(value) {
+                    Some(fields)
+                } else if let Some((_, fields)) = BuiltinProviderView::fields_from_value(value) {
+                    Some(fields)
+                } else {
+                    starlark_user_provider_fields(value).map(|(_, fields)| fields)
+                };
+            if let Some(fields) = provider_fields {
+                stack.extend(fields.into_iter().map(|(_, value)| value));
+            } else if let Some(values) = ListRef::from_value(value) {
+                stack.extend(values.iter());
+            } else if let Some(values) = TupleRef::from_value(value) {
+                stack.extend(values.iter());
+            } else if let Some(values) = DictRef::from_value(value) {
+                for (key, value) in values.iter() {
+                    stack.push(key);
+                    stack.push(value);
+                }
+            } else if let Some(fields) = StructRef::from_value(value) {
+                stack.extend(fields.iter().map(|(_, value)| value));
+            }
+        }
+        if roots.is_empty() {
+            return Ok(());
+        }
+        self.prepare_depsets(roots, path)
+    }
+
+    fn prepare_depsets(&mut self, roots: Vec<Value<'v>>, path: &str) -> Result<(), String> {
+        let mut local_ids = HashMap::new();
+        let mut local_identities = Vec::new();
+        let mut local_orders = Vec::new();
+        let mut graph = Vec::new();
+        let mut stack = roots
+            .into_iter()
+            .rev()
+            .map(|root| (root, path.to_owned(), false))
+            .collect::<Vec<_>>();
         while let Some((value, path, exiting)) = stack.pop() {
             let identity = value.identity();
             if !exiting {
-                if self.memo.contains_key(&identity) {
+                if local_ids.contains_key(&identity) {
                     continue;
                 }
                 let (_, _, _, retained, _, successors) = StarlarkDepset::parts_from_value(value)
@@ -605,32 +669,55 @@ impl<'v> AnalysisValueLowerer<'v> {
                 .map(|(index, successor)| match successor {
                     StarlarkDepsetSuccessorGen::Direct(value) => self
                         .lower(value, &format!("{path}.successor[{index}]"))
-                        .map(AnalysisDepsetInput::Direct),
-                    StarlarkDepsetSuccessorGen::Transitive(value) => self
-                        .memo
-                        .get(&value.identity())
-                        .and_then(|value| match value.kind() {
-                            AnalysisValueKind::Depset(value) => Some(value.clone()),
-                            _ => None,
-                        })
-                        .map(AnalysisDepsetInput::Transitive)
-                        .ok_or_else(|| format!("{path}: transitive item is not a depset")),
+                        .map(AnalysisDepsetGraphInput::Direct),
+                    StarlarkDepsetSuccessorGen::Transitive(value) => {
+                        let identity = value.identity();
+                        if let Some(node) = local_ids.get(&identity) {
+                            Ok(AnalysisDepsetGraphInput::Local(*node))
+                        } else {
+                            self.memo
+                                .get(&identity)
+                                .and_then(|value| match value.kind() {
+                                    AnalysisValueKind::Depset(value) => Some(value.clone()),
+                                    _ => None,
+                                })
+                                .map(AnalysisDepsetGraphInput::External)
+                                .ok_or_else(|| format!("{path}: transitive item is not a depset"))
+                        }
+                    }
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            let depset = match successors.as_slice() {
-                [AnalysisDepsetInput::Transitive(child)] if order != child.order() => {
-                    AnalysisDepset::from_dereferenced_child(occurrence, order, child)
-                        .map_err(|error| format!("{path}: {error}"))?
+            let row = match successors.as_slice() {
+                [AnalysisDepsetGraphInput::Local(child)] if order != local_orders[*child] => {
+                    AnalysisDepsetGraphRow::Local(*child)
                 }
-                _ => {
-                    AnalysisDepset::from_canonical_successors(occurrence, order, depth, successors)
-                        .map_err(|error| format!("{path}: {error}"))?
+                [AnalysisDepsetGraphInput::External(child)] if order != child.order() => {
+                    AnalysisDepsetGraphRow::External(child.dupe())
                 }
+                _ => AnalysisDepsetGraphRow::Successors(successors),
             };
             self.visiting.remove(&identity);
+            let node = graph.len();
+            local_ids.insert(identity, node);
+            local_identities.push(identity);
+            local_orders.push(order);
+            graph.push(AnalysisDepsetGraphNode::new(occurrence, order, depth, row));
+        }
+        let depsets =
+            AnalysisDepset::from_local_graph(graph).map_err(|error| format!("{path}: {error}"))?;
+        for (identity, depset) in local_identities.into_iter().zip(depsets) {
             self.memo.insert(identity, AnalysisValue::depset(depset));
         }
-        Ok(self.memo.get(&root_identity).expect("root lowered").dupe())
+        Ok(())
+    }
+
+    fn lower_depset(&mut self, root: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
+        let identity = root.identity();
+        self.prepare_depsets(vec![root], path)?;
+        self.memo
+            .get(&identity)
+            .map(Dupe::dupe)
+            .ok_or_else(|| format!("{path}: depset lowering did not retain its root"))
     }
 
     fn lower_recursive(&mut self, value: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
@@ -1005,5 +1092,172 @@ mod tests {
                 );
             });
         }
+    }
+
+    #[test]
+    fn depset_lowering_dense_packs_local_diamond_and_retains_external_child() {
+        let external = AnalysisDepset::new(
+            DepsetOrder::Default,
+            vec![
+                AnalysisValue::string("external-a"),
+                AnalysisValue::string("external-b"),
+            ],
+            Vec::new(),
+        )
+        .unwrap();
+        let lowered = {
+            let heap = FrozenHeap::new();
+            let direct = |value: &str| {
+                StarlarkDepsetSuccessorGen::Direct(heap.alloc_str(value).to_frozen_value())
+            };
+            let local = |successors, depth| {
+                alloc_starlark_depset_parts(
+                    &heap,
+                    DepsetOrder::Default,
+                    Some(CompactString::new("string")),
+                    slug_build_api_v2::AnalysisDepsetOccurrence::new(),
+                    None,
+                    depth,
+                    successors,
+                )
+            };
+            let shared = local(vec![direct("shared-a"), direct("shared-b")], 2);
+            let left = local(
+                vec![
+                    StarlarkDepsetSuccessorGen::Transitive(shared),
+                    direct("left"),
+                ],
+                3,
+            );
+            let right = local(
+                vec![
+                    StarlarkDepsetSuccessorGen::Transitive(shared),
+                    direct("right"),
+                ],
+                3,
+            );
+            let external_value = alloc_starlark_depset(&heap, external.dupe(), Vec::new());
+            let root = local(
+                vec![
+                    StarlarkDepsetSuccessorGen::Transitive(left),
+                    StarlarkDepsetSuccessorGen::Transitive(right),
+                    StarlarkDepsetSuccessorGen::Transitive(external_value),
+                    direct("root"),
+                ],
+                4,
+            );
+            AnalysisValueLowerer::default()
+                .lower(root.to_value(), "$dense")
+                .unwrap()
+        };
+
+        let AnalysisValueKind::Depset(root) = lowered.kind() else {
+            panic!("lowering retained a depset")
+        };
+        let children = root
+            .successors()
+            .filter_map(|successor| match successor {
+                AnalysisDepsetSuccessor::Transitive(child) => Some(child),
+                AnalysisDepsetSuccessor::Direct(_) => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(children.len(), 3);
+        assert!(root.shares_store_with(&children[0]));
+        assert!(root.shares_store_with(&children[1]));
+        assert!(!root.shares_store_with(&children[2]));
+        assert!(children[2].shares_occurrence_with(&external));
+
+        let left_shared = children[0]
+            .successors()
+            .find_map(|successor| match successor {
+                AnalysisDepsetSuccessor::Transitive(child) => Some(child),
+                AnalysisDepsetSuccessor::Direct(_) => None,
+            })
+            .unwrap();
+        let right_shared = children[1]
+            .successors()
+            .find_map(|successor| match successor {
+                AnalysisDepsetSuccessor::Transitive(child) => Some(child),
+                AnalysisDepsetSuccessor::Direct(_) => None,
+            })
+            .unwrap();
+        assert!(left_shared.shares_occurrence_with(&right_shared));
+        assert!(left_shared.shares_store_with(root));
+        assert_eq!(
+            root.to_list()
+                .iter()
+                .map(|value| value.as_str().unwrap())
+                .collect::<Vec<_>>(),
+            [
+                "shared-a",
+                "shared-b",
+                "left",
+                "right",
+                "external-a",
+                "external-b",
+                "root",
+            ]
+        );
+    }
+
+    #[test]
+    fn depset_lowering_packs_child_seen_before_parent_in_one_enclosing_value() {
+        let lowered = {
+            let heap = FrozenHeap::new();
+            let child = alloc_starlark_depset_parts(
+                &heap,
+                DepsetOrder::Default,
+                Some(CompactString::new("string")),
+                slug_build_api_v2::AnalysisDepsetOccurrence::new(),
+                None,
+                2,
+                vec![
+                    StarlarkDepsetSuccessorGen::Direct(heap.alloc_str("child-a").to_frozen_value()),
+                    StarlarkDepsetSuccessorGen::Direct(heap.alloc_str("child-b").to_frozen_value()),
+                ],
+            );
+            let parent = alloc_starlark_depset_parts(
+                &heap,
+                DepsetOrder::Default,
+                Some(CompactString::new("string")),
+                slug_build_api_v2::AnalysisDepsetOccurrence::new(),
+                None,
+                3,
+                vec![
+                    StarlarkDepsetSuccessorGen::Transitive(child),
+                    StarlarkDepsetSuccessorGen::Direct(heap.alloc_str("parent").to_frozen_value()),
+                ],
+            );
+            let enclosing = heap.alloc(AllocTuple([child, parent]));
+            AnalysisValueLowerer::default()
+                .lower(enclosing.to_value(), "$child_parent")
+                .unwrap()
+        };
+        let AnalysisValueKind::Tuple(values) = lowered.kind() else {
+            panic!("enclosing value retained its tuple")
+        };
+        let AnalysisValueKind::Depset(child) = values[0].kind() else {
+            panic!("first tuple field retained child depset")
+        };
+        let AnalysisValueKind::Depset(parent) = values[1].kind() else {
+            panic!("second tuple field retained parent depset")
+        };
+        assert!(child.shares_store_with(parent));
+        let parent_child = parent
+            .successors()
+            .find_map(|successor| match successor {
+                AnalysisDepsetSuccessor::Transitive(child) => Some(child),
+                AnalysisDepsetSuccessor::Direct(_) => None,
+            })
+            .unwrap();
+        assert!(parent_child.shares_occurrence_with(child));
+        assert_eq!(
+            parent
+                .to_list()
+                .iter()
+                .map(|value| value.as_str().unwrap())
+                .collect::<Vec<_>>(),
+            ["child-a", "child-b", "parent"]
+        );
     }
 }

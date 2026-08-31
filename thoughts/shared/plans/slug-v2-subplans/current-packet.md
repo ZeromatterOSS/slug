@@ -1,15 +1,13 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-dense-retained-depset-action-import-r1`
+Packet: `WP-6-7A-dense-retained-depset-action-import-implementation-r1`
 
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 retained-depset gate.
 
-Status: Architecture `ACCEPT`. This docs-only packet is complete; Rust work is
-authorized only through the successor implementation packet under this frozen
-representation.
+Status: Terminal implementation rereview `ACCEPT`. This packet is complete.
 
-Base: `683538254`, which terminally accepts generic configured fragment
-projection. The unrelated dirty
+Base: `c702cafb8`, which records architecture `ACCEPT` for the dense retained
+depset/action-import design. The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked;
 do not edit or stage it.
 
@@ -301,3 +299,86 @@ ownership graph; dereference chains resolve to one frozen row owner; local
 aliases, cross-owner lifetime and no-copy lowering remain expressible; and the
 typed File/action-input adapter adds neither a flattened ABI nor a second
 semantic representation. No compatibility or packet scope widened.
+
+## Implementation evidence
+
+The candidate implements checked `u32` node/range/leaf/external indexes, one
+Arc-owned immutable dense store, compact tagged successor rows, deduplicated
+external depset/canonical-row side tables and canonical cross-store row sharing.
+Generic structural equality remains stack-safe and distinct from
+`AnalysisDepset` occurrence equality and alias-partition-preserving publication
+equality. Existing one-pass `to_list()` traversal remains the cold/warm list
+projection; direct action-input streaming uses topology scratch and no leaf
+vector. Its topological path keys selected entries by parent node occurrence
+plus row offset, including distinct wrappers that share one canonical row.
+
+`AnalysisValueLowerer` now preflights the complete enclosing supported value
+and lowers every reachable evaluator-local depset DAG into one store, while
+already-retained dependency children remain external handles. The focused
+diamond proof shows root/left/right/shared local store identity, shared-child
+occurrence identity, one external occurrence and correct values after the
+`FrozenHeap` is dropped. A separate child-before-parent tuple proof prevents a
+previously memoized local child from being misclassified as external.
+`RetainedArtifactInputs` validates the File element category and streams exact
+ordered unique `AnalysisArtifact` leaves into a synthetic sink without
+creating an `ActionSpec` or flattened action ABI.
+
+The first terminal implementation review returned `REPLAN`: the original
+candidate measured only retained shape, allocated a temporary successor
+vector while traversing, could classify a child observed before its enclosing
+parent as external, and lacked a supported-depth publication-equality proof.
+The correction iterates dense rows directly in reverse, counts the actual
+construction/cold/warm paths, preflights enclosing values, and makes
+publication equality iterative with a 3,500-level regression.
+
+The correction rereview found one remaining nondiscriminating lifecycle test:
+its same-order, zero-direct parent reused the child and bypassed both external
+side tables. The final proof separately forces an external-successor entry and
+an order-only external-row wrapper, verifies retention after the original
+child drops, and verifies release after each forwarding owner drops. Terminal
+rereview then returned `ACCEPT`; no compatibility class or scope widened.
+
+Deterministic test-only legacy-Arc controls record these 64-bit measurements:
+
+- four-node diamond: dense 4 versus legacy 8 allocation objects, 368 versus
+  472 estimated retained bytes; construction 13 versus 13 operations; cold
+  and warm traversal each 19 versus 19 operations;
+- 64-child authenticated ruleset-shaped fan-in: dense 4 versus legacy 130
+  allocation objects, 6,248 versus 8,768 estimated retained bytes;
+  construction 257 versus 257 operations; cold and warm traversal each 386
+  versus 386 operations; and
+- 256-node chain: dense 4 versus legacy 512 allocation objects, 16,488 versus
+  28,672 estimated retained bytes; construction 768 versus 768 operations;
+  cold and warm traversal each 1,026 versus 1,026 operations.
+
+The fan-in shape is pinned beside the test to the authenticated rules_cc FDO
+source SHA-256 `91b7b46c515b4773d5a241e699027212f679ab93160cc79218bd687eac51d5b7`
+and rules_rust 0.73.0 archive SHA-256
+`2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`.
+Wall-clock results are deliberately not acceptance evidence.
+
+All existing Bazel-order tests retain their meaning. Added proof covers the
+exact topological `[a, b, c, b] -> [a, c, b]` alias result, distinct nodes
+sharing a canonical row during streaming, and separate lifecycle paths for an
+external-successor side-table owner and an order-only external-row wrapper;
+each retains its tracked leaf after the source handle drops and releases it
+after the forwarding owner drops. Dense/local/external topology, action
+artifact type rejection and direct import are also covered. `Allocative`
+covers every retained store, node, external-row and public stats type.
+
+Serial correction validation passes `slug_build_api_v2` (49 tests),
+`slug_loading_v2` (456 passed/1 realized-source test ignored plus every
+integration suite), and `slug_analysis_v2` (102 tests), including the three
+dense measurement controls, the 3,500-level publication-equality proof and the
+child-before-parent lowering proof. `cargo fmt --check`, working/staged
+`git diff --check`, and the archive checker's archive/root invariants pass. The
+archive checker has a known pre-existing failure on three tracked V2
+authoring/evidence paths that its stale allowlist does not admit; all three are
+present at base `c702cafb8`, and this packet does not edit the checker.
+Classified packet additions are 1,159 production and 693 proof (1,852
+aggregate), within the 1,250/1,000/2,250 caps.
+`slug_analysis_v2/src/analysis_value.rs` is 1,263 physical lines versus its
+1,409 cap, with 114 production and 167 inline-proof additions versus its
++220/+180 subcaps. `slug_build_api_v2/src/analysis_value.rs` is 1,450 lines
+versus its 2,000 split gate. The unrelated registration proof remains
+unstaged.

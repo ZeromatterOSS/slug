@@ -20,6 +20,10 @@ use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
 use slug_build_api_v2::AnalysisDepset;
+use slug_build_api_v2::AnalysisDepsetGraphInput;
+use slug_build_api_v2::AnalysisDepsetGraphNode;
+use slug_build_api_v2::AnalysisDepsetGraphRow;
+use slug_build_api_v2::AnalysisDepsetOccurrence;
 use slug_build_api_v2::AnalysisTargetIdentity;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::AnalysisValueError;
@@ -527,4 +531,39 @@ fn depset_publication_compares_alias_partition_and_deep_leaf_payload() {
     let first = AnalysisDepset::new(DepsetOrder::Default, vec![target("one")], vec![]).unwrap();
     let second = AnalysisDepset::new(DepsetOrder::Default, vec![target("two")], vec![]).unwrap();
     assert!(!AnalysisValue::depset(first).publication_eq(&AnalysisValue::depset(second)));
+}
+
+#[test]
+fn depset_publication_equality_is_stack_safe_at_supported_depth() {
+    let deep = || {
+        let mut nodes = vec![AnalysisDepsetGraphNode::new(
+            AnalysisDepsetOccurrence::new(),
+            DepsetOrder::Default,
+            2,
+            AnalysisDepsetGraphRow::Successors(vec![
+                AnalysisDepsetGraphInput::Direct(AnalysisValue::string("root-a")),
+                AnalysisDepsetGraphInput::Direct(AnalysisValue::string("root-b")),
+            ]),
+        )];
+        for index in 1..3499 {
+            nodes.push(AnalysisDepsetGraphNode::new(
+                AnalysisDepsetOccurrence::new(),
+                DepsetOrder::Default,
+                index + 2,
+                AnalysisDepsetGraphRow::Successors(vec![
+                    AnalysisDepsetGraphInput::Local(index - 1),
+                    AnalysisDepsetGraphInput::Direct(AnalysisValue::string(format!(
+                        "leaf-{index}"
+                    ))),
+                ]),
+            ));
+        }
+        AnalysisDepset::from_local_graph(nodes)
+            .unwrap()
+            .pop()
+            .unwrap()
+    };
+    let left = AnalysisValue::depset(deep());
+    let right = AnalysisValue::depset(deep());
+    assert!(left.publication_eq(&right));
 }

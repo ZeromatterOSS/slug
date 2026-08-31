@@ -709,7 +709,9 @@ Residual risk: Starlark evaluator integration and Slug-side Bazel oracle executi
 ### Stage 6 Zabel-informed retained depset core design
 
 Status: Architecture accepted in
-`WP-6-7A-dense-retained-depset-action-import-r1`; implementation pending
+`WP-6-7A-dense-retained-depset-action-import-r1`; implementation and proof
+terminally accepted in
+`WP-6-7A-dense-retained-depset-action-import-implementation-r1`
 Primary design reference: Zabel
 `0795445f3ab60f4e49070bdd0b94425c5610f73a` generic/File depset, retained
 nested-set, traversal, fingerprint, action-import, and architecture sources;

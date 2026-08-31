@@ -15,8 +15,20 @@ use slug_build_api_v2::ActionInput;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
+use slug_build_api_v2::AnalysisArtifact;
+use slug_build_api_v2::AnalysisDepset;
+use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::CtxActions;
+use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::ReapiCommandProjection;
+use slug_build_api_v2::RetainedArtifactInputs;
+use slug_identity_v2::CanonicalLabel;
+
+fn source_artifact(name: &str) -> AnalysisArtifact {
+    AnalysisArtifact::Source(
+        CanonicalLabel::parse(&format!("@@//pkg:{name}")).expect("source label"),
+    )
+}
 
 #[test]
 fn ctx_actions_records_basic_action_ir() {
@@ -89,6 +101,66 @@ fn ctx_actions_records_basic_action_ir() {
         registry.actions()[5].kind(),
         ActionKind::ExpandTemplate { substitutions, .. } if substitutions["{NAME}"] == "Slug"
     ));
+}
+
+#[test]
+fn retained_artifact_inputs_stream_ordered_unique_topology_to_sink() {
+    let shared_artifact = source_artifact("shared.h");
+    let shared = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::artifact(shared_artifact.clone())],
+        Vec::new(),
+    )
+    .unwrap();
+    let left_artifact = source_artifact("left.h");
+    let left = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::artifact(left_artifact.clone())],
+        vec![shared.clone()],
+    )
+    .unwrap();
+    let right_artifact = source_artifact("right.h");
+    let right = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::artifact(right_artifact.clone())],
+        vec![shared],
+    )
+    .unwrap();
+    let root_artifact = source_artifact("root.h");
+    let root = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::artifact(root_artifact.clone())],
+        vec![left, right],
+    )
+    .unwrap();
+
+    let inputs = RetainedArtifactInputs::new(root).unwrap();
+    let mut sink = Vec::new();
+    inputs
+        .visit(|artifact| sink.push(artifact.clone()))
+        .unwrap();
+    assert_eq!(
+        sink,
+        [
+            shared_artifact,
+            left_artifact,
+            right_artifact,
+            root_artifact
+        ]
+    );
+
+    let strings = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::string("not-a-file")],
+        Vec::new(),
+    )
+    .unwrap();
+    assert_eq!(
+        RetainedArtifactInputs::new(strings)
+            .unwrap_err()
+            .to_string(),
+        "action inputs require a depset of File, got depset of string"
+    );
 }
 
 #[test]

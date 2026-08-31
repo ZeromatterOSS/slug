@@ -9,8 +9,17 @@
  */
 
 use std::collections::BTreeMap;
+use std::convert::Infallible;
+use std::error::Error;
+use std::fmt;
 
 use allocative::Allocative;
+use dupe::Dupe;
+
+use crate::analysis_value::AnalysisArtifact;
+use crate::analysis_value::AnalysisDepset;
+use crate::analysis_value::AnalysisValueKind;
+use crate::analysis_value::AnalysisValueType;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub enum ActionOutputKind {
@@ -62,6 +71,65 @@ impl ActionInput {
 
     pub fn digest(&self) -> Option<&str> {
         self.digest.as_deref()
+    }
+}
+
+#[derive(Debug, Clone, Dupe, Allocative)]
+pub struct RetainedArtifactInputs(AnalysisDepset);
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct RetainedArtifactInputsError {
+    value_type: AnalysisValueType,
+}
+
+impl RetainedArtifactInputsError {
+    pub fn value_type(&self) -> AnalysisValueType {
+        self.value_type
+    }
+}
+
+impl fmt::Display for RetainedArtifactInputsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "action inputs require a depset of File, got depset of {}",
+            self.value_type
+        )
+    }
+}
+
+impl Error for RetainedArtifactInputsError {}
+
+impl RetainedArtifactInputs {
+    pub fn new(depset: AnalysisDepset) -> Result<Self, RetainedArtifactInputsError> {
+        match depset.element_type() {
+            AnalysisValueType::Empty | AnalysisValueType::Artifact => Ok(Self(depset)),
+            value_type => Err(RetainedArtifactInputsError { value_type }),
+        }
+    }
+
+    pub fn depset(&self) -> &AnalysisDepset {
+        &self.0
+    }
+
+    pub fn visit(
+        &self,
+        mut visitor: impl FnMut(&AnalysisArtifact),
+    ) -> Result<(), RetainedArtifactInputsError> {
+        let mut invalid = None;
+        self.0
+            .visit(|value| {
+                match value.kind() {
+                    AnalysisValueKind::Artifact(artifact) => visitor(artifact),
+                    _ => invalid = Some(value.value_type()),
+                }
+                Ok::<_, Infallible>(())
+            })
+            .unwrap_or_else(|never| match never {});
+        match invalid {
+            Some(value_type) => Err(RetainedArtifactInputsError { value_type }),
+            None => Ok(()),
+        }
     }
 }
 

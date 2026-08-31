@@ -23,9 +23,13 @@ use starlark_map::StarlarkHasher;
 use starlark_map::small_map::SmallMap;
 
 use crate::ActionOutput;
+use crate::depset::DenseDepsetInput;
+use crate::depset::DenseDepsetNodeInput;
+use crate::depset::DenseDepsetRowSource;
 use crate::depset::Depset;
 use crate::depset::DepsetError;
 use crate::depset::DepsetOrder;
+use crate::depset::DepsetStorageStats;
 use crate::depset::DepsetSuccessor;
 use crate::depset::MAX_DEPTH;
 use crate::providers::ProviderCollection;
@@ -517,6 +521,44 @@ pub enum AnalysisDepsetInput {
     Transitive(AnalysisDepset),
 }
 
+#[derive(Debug, Clone)]
+pub enum AnalysisDepsetGraphInput {
+    Direct(AnalysisValue),
+    Local(usize),
+    External(AnalysisDepset),
+}
+
+#[derive(Debug, Clone)]
+pub enum AnalysisDepsetGraphRow {
+    Successors(Vec<AnalysisDepsetGraphInput>),
+    Local(usize),
+    External(AnalysisDepset),
+}
+
+#[derive(Debug, Clone)]
+pub struct AnalysisDepsetGraphNode {
+    occurrence: AnalysisDepsetOccurrence,
+    order: DepsetOrder,
+    depth: usize,
+    row: AnalysisDepsetGraphRow,
+}
+
+impl AnalysisDepsetGraphNode {
+    pub fn new(
+        occurrence: AnalysisDepsetOccurrence,
+        order: DepsetOrder,
+        depth: usize,
+        row: AnalysisDepsetGraphRow,
+    ) -> Self {
+        Self {
+            occurrence,
+            order,
+            depth,
+            row,
+        }
+    }
+}
+
 impl AnalysisDepset {
     pub fn empty(order: DepsetOrder) -> Self {
         static DEFAULT: LazyLock<AnalysisDepset> =
@@ -642,7 +684,7 @@ impl AnalysisDepset {
         if graph_successors.is_empty() {
             return Ok(Self::empty(order));
         }
-        Ok(Self(Depset::from_canonical_successors(
+        Ok(Self(Depset::try_from_canonical_successors(
             order,
             graph_successors,
             depth,
@@ -650,7 +692,7 @@ impl AnalysisDepset {
                 occurrence,
                 element_type,
             },
-        )))
+        )?))
     }
 
     pub fn from_dereferenced_child(
@@ -675,6 +717,133 @@ impl AnalysisDepset {
         )))
     }
 
+    pub fn from_local_graph(
+        inputs: Vec<AnalysisDepsetGraphNode>,
+    ) -> Result<Vec<Self>, AnalysisValueError> {
+        let mut element_types = Vec::with_capacity(inputs.len());
+        let mut orders = Vec::with_capacity(inputs.len());
+        let mut dense = Vec::with_capacity(inputs.len());
+        for input in inputs {
+            if input.depth > MAX_DEPTH {
+                return Err(DepsetError::DepthLimitExceeded {
+                    depth: input.depth,
+                    max: MAX_DEPTH,
+                }
+                .into());
+            }
+            let (element_type, row) = match input.row {
+                AnalysisDepsetGraphRow::Successors(successors) => {
+                    let mut element_type = AnalysisValueType::Empty;
+                    let mut dense_successors = Vec::with_capacity(successors.len());
+                    for successor in successors {
+                        match successor {
+                            AnalysisDepsetGraphInput::Direct(value) => {
+                                if !value.is_valid_depset_leaf() {
+                                    return Err(AnalysisValueError::InvalidDepsetLeaf {
+                                        value_type: value.value_type(),
+                                    });
+                                }
+                                merge_depset_type(&mut element_type, value.value_type())?;
+                                dense_successors.push(DenseDepsetInput::Direct(value));
+                            }
+                            AnalysisDepsetGraphInput::Local(node) => {
+                                let Some(child_type) = element_types.get(node).copied() else {
+                                    return Err(DepsetError::InvalidLocalReference {
+                                        node,
+                                        available: element_types.len(),
+                                    }
+                                    .into());
+                                };
+                                let child_order = orders[node];
+                                if !input.order.compatible_with(child_order) {
+                                    return Err(DepsetError::IncompatibleOrder {
+                                        parent: input.order,
+                                        child: child_order,
+                                    }
+                                    .into());
+                                }
+                                merge_depset_type(&mut element_type, child_type)?;
+                                let node = u32::try_from(node).map_err(|_| {
+                                    DepsetError::StorageLimitExceeded {
+                                        kind: "node",
+                                        count: node,
+                                    }
+                                })?;
+                                dense_successors.push(DenseDepsetInput::Local(node));
+                            }
+                            AnalysisDepsetGraphInput::External(child) => {
+                                if !input.order.compatible_with(child.order()) {
+                                    return Err(DepsetError::IncompatibleOrder {
+                                        parent: input.order,
+                                        child: child.order(),
+                                    }
+                                    .into());
+                                }
+                                merge_depset_type(&mut element_type, child.element_type())?;
+                                dense_successors.push(DenseDepsetInput::External(child.0));
+                            }
+                        }
+                    }
+                    (
+                        element_type,
+                        DenseDepsetRowSource::Successors(dense_successors),
+                    )
+                }
+                AnalysisDepsetGraphRow::Local(node) => {
+                    let Some(element_type) = element_types.get(node).copied() else {
+                        return Err(DepsetError::InvalidLocalReference {
+                            node,
+                            available: element_types.len(),
+                        }
+                        .into());
+                    };
+                    let child_order = orders[node];
+                    if !input.order.compatible_with(child_order) {
+                        return Err(DepsetError::IncompatibleOrder {
+                            parent: input.order,
+                            child: child_order,
+                        }
+                        .into());
+                    }
+                    let node =
+                        u32::try_from(node).map_err(|_| DepsetError::StorageLimitExceeded {
+                            kind: "node",
+                            count: node,
+                        })?;
+                    (element_type, DenseDepsetRowSource::Local(node))
+                }
+                AnalysisDepsetGraphRow::External(child) => {
+                    if !input.order.compatible_with(child.order()) {
+                        return Err(DepsetError::IncompatibleOrder {
+                            parent: input.order,
+                            child: child.order(),
+                        }
+                        .into());
+                    }
+                    (
+                        child.element_type(),
+                        DenseDepsetRowSource::External(child.0),
+                    )
+                }
+            };
+            element_types.push(element_type);
+            orders.push(input.order);
+            dense.push(DenseDepsetNodeInput {
+                order: input.order,
+                row,
+                depth: input.depth,
+                metadata: AnalysisDepsetMetadata {
+                    occurrence: input.occurrence,
+                    element_type,
+                },
+            });
+        }
+        Ok(Depset::from_dense_nodes(dense)?
+            .into_iter()
+            .map(Self)
+            .collect())
+    }
+
     pub fn order(&self) -> DepsetOrder {
         self.0.order()
     }
@@ -684,10 +853,10 @@ impl AnalysisDepset {
     }
 
     pub fn successors(&self) -> impl Iterator<Item = AnalysisDepsetSuccessor<'_>> {
-        self.0.successors().iter().map(|successor| match successor {
+        self.0.successors().map(|successor| match successor {
             DepsetSuccessor::Direct(value) => AnalysisDepsetSuccessor::Direct(value),
             DepsetSuccessor::Transitive(child) => {
-                AnalysisDepsetSuccessor::Transitive(AnalysisDepset(child.clone()))
+                AnalysisDepsetSuccessor::Transitive(AnalysisDepset(child))
             }
         })
     }
@@ -704,9 +873,17 @@ impl AnalysisDepset {
         self.0.to_list()
     }
 
+    pub(crate) fn visit<E>(
+        &self,
+        visitor: impl FnMut(&AnalysisValue) -> Result<(), E>,
+    ) -> Result<(), E> {
+        self.0.visit(visitor)
+    }
+
     pub fn singleton_value(&self) -> Option<&AnalysisValue> {
-        match self.0.successors() {
-            [DepsetSuccessor::Direct(value)] => Some(value),
+        let mut successors = self.0.successors();
+        match (successors.next(), successors.next()) {
+            (Some(DepsetSuccessor::Direct(value)), None) => Some(value),
             _ => None,
         }
     }
@@ -722,45 +899,65 @@ impl AnalysisDepset {
         self.0.shares_successors_with(&other.0)
     }
 
+    pub fn shares_store_with(&self, other: &Self) -> bool {
+        self.0.shares_store_with(&other.0)
+    }
+
+    pub fn storage_stats(&self) -> DepsetStorageStats {
+        self.0.storage_stats()
+    }
+
     pub fn occurrence(&self) -> AnalysisDepsetOccurrence {
         self.0.metadata().occurrence.dupe()
     }
 
-    fn pointer(&self) -> usize {
+    fn pointer(&self) -> (usize, u32) {
         self.0.node_key()
     }
 
     fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
-        let left = self.pointer();
-        let right = other.pointer();
-        if let Some(previous) = state.left_depsets.get(&left) {
-            return *previous == right;
-        }
-        if let Some(previous) = state.right_depsets.get(&right) {
-            return *previous == left;
-        }
-        state.left_depsets.insert(left, right);
-        state.right_depsets.insert(right, left);
+        let mut stack = vec![(self.dupe(), other.dupe())];
+        while let Some((left_depset, right_depset)) = stack.pop() {
+            let left_pointer = left_depset.pointer();
+            let right_pointer = right_depset.pointer();
+            if let Some(previous) = state.left_depsets.get(&left_pointer) {
+                if *previous != right_pointer {
+                    return false;
+                }
+                continue;
+            }
+            if let Some(previous) = state.right_depsets.get(&right_pointer) {
+                if *previous != left_pointer {
+                    return false;
+                }
+                continue;
+            }
+            state.left_depsets.insert(left_pointer, right_pointer);
+            state.right_depsets.insert(right_pointer, left_pointer);
 
-        if self.order() != other.order() || self.element_type() != other.element_type() {
-            return false;
-        }
-        let mut left = self.successors();
-        let mut right = other.successors();
-        loop {
-            match (left.next(), right.next()) {
-                (None, None) => return true,
-                (
-                    Some(AnalysisDepsetSuccessor::Direct(left)),
-                    Some(AnalysisDepsetSuccessor::Direct(right)),
-                ) if left.publication_eq_with(right, state) => {}
-                (
-                    Some(AnalysisDepsetSuccessor::Transitive(left)),
-                    Some(AnalysisDepsetSuccessor::Transitive(right)),
-                ) if left.publication_eq_with(&right, state) => {}
-                _ => return false,
+            if left_depset.order() != right_depset.order()
+                || left_depset.element_type() != right_depset.element_type()
+            {
+                return false;
+            }
+            let mut left = left_depset.successors();
+            let mut right = right_depset.successors();
+            loop {
+                match (left.next(), right.next()) {
+                    (None, None) => break,
+                    (
+                        Some(AnalysisDepsetSuccessor::Direct(left)),
+                        Some(AnalysisDepsetSuccessor::Direct(right)),
+                    ) if left.publication_eq_with(right, state) => {}
+                    (
+                        Some(AnalysisDepsetSuccessor::Transitive(left)),
+                        Some(AnalysisDepsetSuccessor::Transitive(right)),
+                    ) => stack.push((left, right)),
+                    _ => return false,
+                }
             }
         }
+        true
     }
 }
 
@@ -1202,8 +1399,8 @@ fn hash_unordered_entries<H: Hasher>(entries: &[(AnalysisValue, AnalysisValue)],
 
 #[derive(Default)]
 pub(crate) struct PublicationEqState {
-    left_depsets: FxHashMap<usize, usize>,
-    right_depsets: FxHashMap<usize, usize>,
+    left_depsets: FxHashMap<(usize, u32), (usize, u32)>,
+    right_depsets: FxHashMap<(usize, u32), (usize, u32)>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
