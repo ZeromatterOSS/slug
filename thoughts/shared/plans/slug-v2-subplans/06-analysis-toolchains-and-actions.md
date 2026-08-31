@@ -471,6 +471,21 @@ It fills only the already-reserved vector recipe, param-file policy, and Args-
 backed write variants; callbacks, directory expansion, execution and the
 remaining Spawn envelope stay deferred.
 
+The R1 implementation terminal review accepts that retained/action
+architecture but returns `REPLAN` on two bounded integration details. Bazel's
+typed binding rejects an invalid supplied sequence/depset source before
+entering unsupported callback handling, and the existing no-op loading action
+sink needs a one-line signature adapter that R1 did not allowlist. Activate
+only `WP-6-7A-noncallback-vector-args-paramfiles-implementation-r2`: move the
+shared source conversion before callback rejection after the two-position name
+check, formally admit the frozen adapter blob, and change no retained owner,
+compatibility class, parser, C++ branch, callback semantics, or cap.
+Focused correction and complete terminal rereview returned `ACCEPT`. The R2
+implementation passes the focused ordering/consumer proofs, all four full
+owner/direct-dependent suites, the public core check, and hygiene gates at
+891/747/1,638 added Rust lines. The remaining Spawn envelope is the next
+bounded action category; typed standard-provider breadth remains separate.
+
 Bazel 9.2 remains the sole semantic authority. Zabel
 `0795445f3ab60f4e49070bdd0b94425c5610f73a` supplies peer phase-ownership,
 typed-segment and input-topology lessons only; copy no Zig behavior or layout.

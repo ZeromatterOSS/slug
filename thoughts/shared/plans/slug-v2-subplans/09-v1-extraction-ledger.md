@@ -828,9 +828,16 @@ and three archive-path findings were independently reproduced or identified as
 unchanged frozen-base state. The active
 `WP-6-7A-noncallback-vector-args-paramfiles-implementation-r1` draft fills the
 accepted retained recipe with sequence/depset vector calls, non-callback
-transforms, param-file policy, and typed Args-backed write. Focused architecture
-correction rereview returned `ACCEPT`; callback/directory/execution breadth
-remains deferred.
+transforms, param-file policy, and typed Args-backed write. Its terminal review
+accepts the compact recipe and shared publication design but returns `REPLAN`:
+Bazel typed binding validates a supplied sequence/depset source before callback
+handling, and the one-line no-op sink test adapter was outside the proof
+allowlist. Active R2 corrects only that evaluator validation seam and formally
+admits the frozen adapter; it imports no donor utility or semantic owner and
+leaves all retained representation, hashing, clone-cost, and memory-accounting
+decisions unchanged. Focused correction and terminal rereview returned
+`ACCEPT`; all owner/direct-dependent suites and hygiene gates pass within the
+packet caps. Callback/directory/execution breadth remains deferred.
 
 ### Stage 6 recursive configured custom-rule analysis
 

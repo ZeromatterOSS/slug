@@ -602,7 +602,7 @@ def _toolchain_subject(ctx):
     toolchain_call()
     return [DefaultInfo()]
 toolchain_subject = rule(implementation = _toolchain_subject, subrules = [toolchain_call])
-def _missing_action_call(ctx): return ctx.actions.args().add_all([])
+def _missing_action_call(ctx): return ctx.actions.expand_template()
 missing_action_call = subrule(implementation = _missing_action_call)
 def _missing_action_subject(ctx):
     missing_action_call()
@@ -975,7 +975,7 @@ async fn nested_authorization_overrides_and_context_lifetimes_are_enforced() {
             "toolchain_deferred",
             "configured subrule toolchains are deferred",
         ),
-        ("missing_action", "has no attribute `add_all`"),
+        ("missing_action", "has no attribute `expand_template`"),
     ] {
         let error = analyze(
             &Dice::builder().build(DetectCycles::Enabled),

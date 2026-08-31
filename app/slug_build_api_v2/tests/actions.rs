@@ -11,6 +11,8 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use allocative::Allocative;
+use dupe::Dupe;
 use slug_build_api_v2::ActionError;
 use slug_build_api_v2::ActionInput;
 use slug_build_api_v2::ActionKind;
@@ -19,17 +21,31 @@ use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisDepset;
+use slug_build_api_v2::AnalysisDepsetGraphInput;
+use slug_build_api_v2::AnalysisDepsetGraphNode;
+use slug_build_api_v2::AnalysisDepsetGraphRow;
+use slug_build_api_v2::AnalysisDepsetOccurrence;
 use slug_build_api_v2::AnalysisValue;
+use slug_build_api_v2::ArgsWriteSpec;
 use slug_build_api_v2::ArtifactInputSource;
 use slug_build_api_v2::ArtifactInputs;
 use slug_build_api_v2::CtxActions;
 use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::ReapiCommandProjection;
+use slug_build_api_v2::RetainedArgCall;
+use slug_build_api_v2::RetainedArgsDepset;
+use slug_build_api_v2::RetainedArgsRecipe;
 use slug_build_api_v2::RetainedArtifactInputs;
 use slug_build_api_v2::RetainedCommandLine;
 use slug_build_api_v2::RetainedCommandLineSegment;
+use slug_build_api_v2::RetainedParamFileFormat;
 use slug_build_api_v2::RetainedScalarArg;
 use slug_build_api_v2::RetainedScalarValue;
+use slug_build_api_v2::RetainedSpawnArgsSnapshot;
+use slug_build_api_v2::RetainedSpawnParamFilePolicy;
+use slug_build_api_v2::RetainedVectorArg;
+use slug_build_api_v2::RetainedVectorOptions;
+use slug_build_api_v2::RetainedVectorSource;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SpawnSpec;
 use slug_build_api_v2::SymlinkSpec;
@@ -56,21 +72,39 @@ fn artifact_depset(name: &str) -> AnalysisDepset {
     .unwrap()
 }
 
+fn default_vector_options() -> RetainedVectorOptions {
+    RetainedVectorOptions {
+        arg_name: None,
+        format_each: None,
+        before_each: None,
+        join_with: None,
+        format_joined: None,
+        omit_if_empty: true,
+        uniquify: false,
+        expand_directories: true,
+        terminate_with: None,
+    }
+}
+
 fn spawn_action(inputs: AnalysisDepset, tools: AnalysisDepset) -> ActionSpec {
-    let command_line = RetainedCommandLine::new(vec![
-        RetainedCommandLineSegment::LiteralRun(Arc::from(["--literal".into()])),
-        RetainedCommandLineSegment::ArgsSnapshot(Arc::from([
-            RetainedScalarArg::new(
+    let recipe = RetainedArgsRecipe::new(
+        vec![
+            RetainedArgCall::Scalar(RetainedScalarArg::new(
                 Some("--count"),
                 RetainedScalarValue::Integer("7".into()),
                 None::<&str>,
-            ),
-            RetainedScalarArg::new(
+            )),
+            RetainedArgCall::Scalar(RetainedScalarArg::new(
                 None::<&str>,
                 RetainedScalarValue::Artifact(source_artifact("arg.txt")),
                 Some("value=%s%%"),
-            ),
-        ])),
+            )),
+        ],
+        RetainedParamFileFormat::Shell,
+    );
+    let command_line = RetainedCommandLine::new(vec![
+        RetainedCommandLineSegment::LiteralRun(Arc::from(["--literal".into()])),
+        RetainedCommandLineSegment::ArgsSnapshot(RetainedSpawnArgsSnapshot::new(recipe, None)),
     ]);
     ActionSpec::spawn(SpawnSpec::new(
         SpawnExecutable::Path(
@@ -307,6 +341,361 @@ fn spawn_publication_equality_preserves_alias_partitions_across_domains() {
     let split = spawn_action(artifact_depset("shared.h"), artifact_depset("shared.h"));
 
     assert_ne!(aliased, split);
+}
+
+#[test]
+fn vector_args_render_bazel_transform_order_and_empty_groups() {
+    let add_all = RetainedVectorArg::new(
+        RetainedVectorSource::Sequence(
+            vec!["a", "b", "a"]
+                .into_iter()
+                .map(|value| RetainedScalarValue::String(value.into()))
+                .collect::<Vec<_>>()
+                .into(),
+        ),
+        RetainedVectorOptions {
+            arg_name: Some("--all".into()),
+            format_each: Some("item=%s%%".into()),
+            before_each: Some("-B".into()),
+            join_with: None,
+            format_joined: None,
+            omit_if_empty: true,
+            uniquify: true,
+            expand_directories: false,
+            terminate_with: Some("--end".into()),
+        },
+    );
+    let joined_empty = RetainedVectorArg::new(
+        RetainedVectorSource::Sequence(Arc::from([])),
+        RetainedVectorOptions {
+            arg_name: Some("--joined".into()),
+            format_each: None,
+            before_each: None,
+            join_with: Some(":".into()),
+            format_joined: Some("[%s]".into()),
+            omit_if_empty: false,
+            uniquify: false,
+            expand_directories: true,
+            terminate_with: None,
+        },
+    );
+    let mut empty_options = default_vector_options();
+    empty_options.uniquify = true;
+    let empty_strings = RetainedVectorArg::new(
+        RetainedVectorSource::Sequence(vec![RetainedScalarValue::String("".into()); 2].into()),
+        empty_options,
+    );
+    let recipe = RetainedArgsRecipe::new(
+        vec![
+            RetainedArgCall::AddAll(add_all),
+            RetainedArgCall::AddJoined(joined_empty),
+            RetainedArgCall::AddAll(empty_strings),
+        ],
+        RetainedParamFileFormat::Multiline,
+    );
+
+    assert_eq!(
+        recipe.render(),
+        [
+            "--all", "-B", "item=a%", "-B", "item=b%", "--end", "--joined", "[]", "",
+        ]
+    );
+    assert_eq!(
+        recipe.render_write_content(),
+        "--all\n-B\nitem=a%\n-B\nitem=b%\n--end\n--joined\n[]\n\n"
+    );
+
+    let integers = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::integer_from_magnitude(
+            false,
+            [1, 0, 0, 0, 0, 0, 0, 0, 0],
+        )],
+        Vec::new(),
+    )
+    .unwrap();
+    let integer_recipe = RetainedArgsRecipe::new(
+        vec![RetainedArgCall::AddAll(RetainedVectorArg::new(
+            RetainedVectorSource::Depset(RetainedArgsDepset::new(integers).unwrap()),
+            default_vector_options(),
+        ))],
+        RetainedParamFileFormat::Multiline,
+    );
+    assert_eq!(integer_recipe.render(), ["18446744073709551616"]);
+}
+
+#[test]
+fn args_write_formats_and_ignores_spawn_only_param_policy() {
+    let calls = vec![
+        RetainedArgCall::Scalar(RetainedScalarArg::new(
+            Some("--flag"),
+            RetainedScalarValue::String("two words".into()),
+            None::<&str>,
+        )),
+        RetainedArgCall::Scalar(RetainedScalarArg::new(
+            None::<&str>,
+            RetainedScalarValue::String("quote'd".into()),
+            None::<&str>,
+        )),
+    ];
+    let shell = RetainedArgsRecipe::new(calls.clone(), RetainedParamFileFormat::Shell);
+    let multiline = RetainedArgsRecipe::new(calls.clone(), RetainedParamFileFormat::Multiline);
+    let flag_per_line = RetainedArgsRecipe::new(calls, RetainedParamFileFormat::FlagPerLine);
+    assert_eq!(
+        shell.render_write_content(),
+        "--flag\n'two words'\n'quote'\\''d'\n"
+    );
+    assert_eq!(
+        multiline.render_write_content(),
+        "--flag\ntwo words\nquote'd\n"
+    );
+    assert_eq!(
+        flag_per_line.render_write_content(),
+        "--flag=two words\nquote'd\n"
+    );
+
+    let output = ActionOutput::new("pkg/args.params", ActionOutputKind::File);
+    let left = ActionSpec::args_write(ArgsWriteSpec::new(output.clone(), shell.clone(), false));
+    let right = ActionSpec::args_write(ArgsWriteSpec::new(output, shell.clone(), false));
+    assert_eq!(left, right);
+    assert_eq!(left.kind(), &ActionKind::ArgsWrite);
+    assert_eq!(left.mnemonic(), "FileWrite");
+    let write = left.args_write_spec().unwrap();
+    assert_eq!(write.output().path(), "pkg/args.params");
+    assert!(!write.is_executable());
+    assert_eq!(write.execution_requirements().iter().len(), 0);
+    assert_eq!(write.render_content(), shell.render_write_content());
+    assert!(ReapiCommandProjection::from_action(&left).is_err());
+
+    let spawn_left = RetainedSpawnArgsSnapshot::new(
+        shell.clone(),
+        Some(RetainedSpawnParamFilePolicy::new("@%s", false)),
+    );
+    let spawn_right = RetainedSpawnArgsSnapshot::new(
+        shell,
+        Some(RetainedSpawnParamFilePolicy::new("--file=%s", true)),
+    );
+    assert_ne!(
+        RetainedCommandLine::new(vec![RetainedCommandLineSegment::ArgsSnapshot(spawn_left)]),
+        RetainedCommandLine::new(vec![RetainedCommandLineSegment::ArgsSnapshot(spawn_right)])
+    );
+
+    let mut actions = CtxActions::new();
+    let existing = actions.declare_file("pkg/conflict.params").unwrap();
+    actions.write(existing, "string content", false).unwrap();
+    let conflicting = actions.declare_file("pkg/conflict.params").unwrap();
+    let error = actions
+        .register_args_write(ArgsWriteSpec::new(conflicting, multiline, true))
+        .unwrap_err();
+    assert_eq!(
+        error,
+        ActionError::ConflictingOutput {
+            path: "pkg/conflict.params".to_owned()
+        }
+    );
+    assert_eq!(actions.registry().actions().len(), 1);
+    assert!(matches!(
+        actions.registry().actions()[0].kind(),
+        ActionKind::Write { .. }
+    ));
+}
+
+#[test]
+fn vector_depsets_share_publication_alias_state_with_spawn_inputs() {
+    let make = |source: RetainedVectorSource,
+                input: AnalysisDepset,
+                policy: Option<RetainedSpawnParamFilePolicy>| {
+        let vector = RetainedVectorArg::new(source, default_vector_options());
+        ActionSpec::spawn(SpawnSpec::new(
+            SpawnExecutable::Path(NormalizedBazelPath::new(HostPathFlavor::Unix, "tool").unwrap()),
+            RetainedCommandLine::new(vec![RetainedCommandLineSegment::ArgsSnapshot(
+                RetainedSpawnArgsSnapshot::new(
+                    RetainedArgsRecipe::new(
+                        vec![RetainedArgCall::AddAll(vector)],
+                        RetainedParamFileFormat::Shell,
+                    ),
+                    policy,
+                ),
+            )]),
+            ArtifactInputs::new(vec![ArtifactInputSource::Depset(
+                RetainedArtifactInputs::new(input).unwrap(),
+            )]),
+            ArtifactInputs::new(Vec::new()),
+            vec![ActionOutput::new("pkg/out", ActionOutputKind::File)],
+            RetainedActionEnvironment::default(),
+            CanonicalStringMap::default(),
+            "Action",
+            None::<&str>,
+        ))
+    };
+    let shared = artifact_depset("shared");
+    let aliased = make(
+        RetainedVectorSource::Depset(RetainedArgsDepset::new(shared.clone()).unwrap()),
+        shared,
+        None,
+    );
+    let split = make(
+        RetainedVectorSource::Depset(RetainedArgsDepset::new(artifact_depset("shared")).unwrap()),
+        artifact_depset("shared"),
+        None,
+    );
+    assert_ne!(aliased, split);
+    assert_eq!(
+        make(
+            RetainedVectorSource::Depset(
+                RetainedArgsDepset::new(artifact_depset("shared")).unwrap(),
+            ),
+            artifact_depset("other"),
+            None,
+        ),
+        make(
+            RetainedVectorSource::Depset(
+                RetainedArgsDepset::new(artifact_depset("shared")).unwrap(),
+            ),
+            artifact_depset("other"),
+            None,
+        )
+    );
+
+    let flat = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![
+            AnalysisValue::artifact(source_artifact("shared")),
+            AnalysisValue::artifact(source_artifact("other")),
+        ],
+        Vec::new(),
+    )
+    .unwrap();
+    let branched = AnalysisDepset::from_local_graph(vec![
+        AnalysisDepsetGraphNode::new(
+            AnalysisDepsetOccurrence::new(),
+            DepsetOrder::Default,
+            1,
+            AnalysisDepsetGraphRow::Successors(vec![AnalysisDepsetGraphInput::Direct(
+                AnalysisValue::artifact(source_artifact("shared")),
+            )]),
+        ),
+        AnalysisDepsetGraphNode::new(
+            AnalysisDepsetOccurrence::new(),
+            DepsetOrder::Default,
+            1,
+            AnalysisDepsetGraphRow::Successors(vec![AnalysisDepsetGraphInput::Direct(
+                AnalysisValue::artifact(source_artifact("other")),
+            )]),
+        ),
+        AnalysisDepsetGraphNode::new(
+            AnalysisDepsetOccurrence::new(),
+            DepsetOrder::Default,
+            2,
+            AnalysisDepsetGraphRow::Successors(vec![
+                AnalysisDepsetGraphInput::Local(0),
+                AnalysisDepsetGraphInput::Local(1),
+            ]),
+        ),
+    ])
+    .unwrap()
+    .pop()
+    .unwrap();
+    assert_eq!(flat.to_list(), branched.to_list());
+    assert_ne!(
+        make(
+            RetainedVectorSource::Depset(RetainedArgsDepset::new(flat).unwrap()),
+            artifact_depset("input"),
+            None,
+        ),
+        make(
+            RetainedVectorSource::Depset(RetainedArgsDepset::new(branched).unwrap()),
+            artifact_depset("input"),
+            None,
+        )
+    );
+    let topological = AnalysisDepset::new(
+        DepsetOrder::Topological,
+        vec![AnalysisValue::artifact(source_artifact("shared"))],
+        Vec::new(),
+    )
+    .unwrap();
+    let base = || {
+        make(
+            RetainedVectorSource::Depset(
+                RetainedArgsDepset::new(artifact_depset("shared")).unwrap(),
+            ),
+            artifact_depset("input"),
+            None,
+        )
+    };
+    for changed in [
+        make(
+            RetainedVectorSource::Depset(RetainedArgsDepset::new(topological).unwrap()),
+            artifact_depset("input"),
+            None,
+        ),
+        make(
+            RetainedVectorSource::Depset(
+                RetainedArgsDepset::new(artifact_depset("value-change")).unwrap(),
+            ),
+            artifact_depset("input"),
+            None,
+        ),
+        make(
+            RetainedVectorSource::Sequence(
+                vec![RetainedScalarValue::Artifact(source_artifact("shared"))].into(),
+            ),
+            artifact_depset("input"),
+            None,
+        ),
+        make(
+            RetainedVectorSource::Depset(
+                RetainedArgsDepset::new(artifact_depset("shared")).unwrap(),
+            ),
+            artifact_depset("input"),
+            Some(RetainedSpawnParamFilePolicy::new("@%s", false)),
+        ),
+    ] {
+        assert_ne!(base(), changed);
+    }
+}
+
+#[test]
+fn retained_args_graph_values_are_allocative_and_cheap_to_clone() {
+    fn assert_allocative<T: Allocative>() {}
+    fn assert_dupe<T: Dupe>() {}
+    assert_allocative::<RetainedArgsDepset>();
+    assert_allocative::<RetainedArgsRecipe>();
+    assert_allocative::<RetainedCommandLine>();
+    assert_dupe::<RetainedArgsDepset>();
+    assert_dupe::<RetainedArgsRecipe>();
+    assert_dupe::<RetainedCommandLine>();
+}
+
+#[test]
+fn retained_vector_depsets_reject_deferred_types_and_directories() {
+    let labels = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::label(
+            CanonicalLabel::parse("@@//pkg:value").unwrap(),
+        )],
+        Vec::new(),
+    )
+    .unwrap();
+    assert!(RetainedArgsDepset::new(labels).is_err());
+    let owner = slug_build_api_v2::AnalysisConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//pkg:owner").unwrap(),
+        b"cfg".as_slice(),
+    );
+    let directory = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::artifact(AnalysisArtifact::Derived {
+            owner,
+            output: ActionOutput::new("pkg/tree", ActionOutputKind::Directory),
+        })],
+        Vec::new(),
+    )
+    .unwrap();
+    assert_eq!(
+        RetainedArgsDepset::new(directory).unwrap_err().to_string(),
+        "Args vector directory expansion is not supported"
+    );
 }
 
 #[test]

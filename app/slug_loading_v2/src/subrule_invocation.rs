@@ -17,7 +17,6 @@
 
 use std::fmt;
 use std::hash::Hash;
-use std::marker::PhantomData;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -26,8 +25,10 @@ use compact_str::CompactString;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
+use slug_build_api_v2::RetainedParamFileFormat;
 use slug_build_api_v2::RetainedScalarArg;
 use slug_build_api_v2::RetainedScalarValue;
+use slug_build_api_v2::RetainedVectorOptions;
 use slug_identity_v2::CanonicalLabel;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
@@ -49,8 +50,10 @@ use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
 use starlark::values::ValueLike;
+use starlark::values::list::ListRef;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
+use starlark::values::tuple::TupleRef;
 use starlark_map::StarlarkHasher;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
@@ -75,7 +78,12 @@ pub struct AnalysisRunRequest<'v> {
 
 pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
     fn declare_file(&self, path: &str) -> anyhow::Result<AnalysisArtifactValue>;
-    fn write(&self, output: Value<'_>, content: &str, is_executable: bool) -> anyhow::Result<()>;
+    fn write(
+        &self,
+        output: Value<'_>,
+        content: Value<'_>,
+        is_executable: bool,
+    ) -> anyhow::Result<()>;
     fn run_shell(
         &self,
         outputs: Value<'_>,
@@ -98,13 +106,46 @@ pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
     ) -> anyhow::Result<()>;
 }
 
+#[derive(Debug, Clone, Allocative, Trace)]
+pub enum EvaluatorVectorSourceGen<V> {
+    Sequence(Vec<V>),
+    Depset(V),
+}
+
+#[derive(Debug, Clone, Allocative, Trace)]
+pub struct EvaluatorVectorArgGen<V> {
+    pub source: EvaluatorVectorSourceGen<V>,
+    #[trace(unsafe_ignore)]
+    pub options: RetainedVectorOptions,
+}
+
+#[derive(Debug, Clone, Allocative, Trace)]
+pub enum EvaluatorArgCallGen<V> {
+    Scalar(#[trace(unsafe_ignore)] RetainedScalarArg),
+    AddAll(EvaluatorVectorArgGen<V>),
+    AddJoined(EvaluatorVectorArgGen<V>),
+}
+
+#[derive(Debug, Clone, Allocative, Trace)]
+struct StarlarkArgsStateGen<V> {
+    calls: Vec<EvaluatorArgCallGen<V>>,
+    #[trace(unsafe_ignore)]
+    format: Option<RetainedParamFileFormat>,
+    #[trace(unsafe_ignore)]
+    param_file: Option<(CompactString, bool)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct EvaluatorArgsSnapshot<'v> {
+    pub calls: Vec<EvaluatorArgCallGen<Value<'v>>>,
+    pub format: RetainedParamFileFormat,
+    pub param_file: Option<(CompactString, bool)>,
+}
+
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 #[repr(C)]
 pub struct StarlarkArgsGen<V> {
-    #[trace(unsafe_ignore)]
-    values: Mutex<Vec<RetainedScalarArg>>,
-    #[trace(unsafe_ignore)]
-    marker: PhantomData<V>,
+    state: Arc<Mutex<StarlarkArgsStateGen<V>>>,
 }
 
 starlark_complex_value!(pub StarlarkArgs);
@@ -122,13 +163,17 @@ impl<'v> Freeze for StarlarkArgs<'v> {
 }
 
 impl<'v> StarlarkArgs<'v> {
-    pub fn snapshot(value: Value<'v>) -> Option<Arc<[RetainedScalarArg]>> {
+    pub fn snapshot(value: Value<'v>) -> Option<EvaluatorArgsSnapshot<'v>> {
         Self::from_value(value).map(|args| {
-            args.values
+            let state = args
+                .state
                 .lock()
-                .expect("Args mutation lock is not poisoned")
-                .clone()
-                .into()
+                .expect("Args mutation lock is not poisoned");
+            EvaluatorArgsSnapshot {
+                calls: state.calls.clone(),
+                format: state.format.unwrap_or(RetainedParamFileFormat::Shell),
+                param_file: state.param_file.clone(),
+            }
         })
     }
 }
@@ -177,12 +222,201 @@ fn starlark_args_methods(builder: &mut MethodsBuilder) {
         if let Some(format) = format {
             validate_scalar_format(format)?;
         }
-        args.values
+        args.state
             .lock()
             .map_err(|_| anyhow::anyhow!("Args mutation lock is poisoned"))?
-            .push(RetainedScalarArg::new(arg_name, value, format));
+            .calls
+            .push(EvaluatorArgCallGen::Scalar(RetainedScalarArg::new(
+                arg_name, value, format,
+            )));
         Ok(this)
     }
+
+    #[allow(clippy::too_many_arguments)]
+    fn add_all<'v>(
+        this: Value<'v>,
+        arg_name_or_values: Value<'v>,
+        values: Option<Value<'v>>,
+        #[starlark(require = named)] map_each: Option<Value<'v>>,
+        #[starlark(require = named)] format_each: Option<&str>,
+        #[starlark(require = named)] before_each: Option<&str>,
+        #[starlark(require = named, default = true)] omit_if_empty: bool,
+        #[starlark(require = named, default = false)] uniquify: bool,
+        #[starlark(require = named, default = true)] expand_directories: bool,
+        #[starlark(require = named)] terminate_with: Option<&str>,
+        #[starlark(require = named, default = false)] allow_closure: bool,
+    ) -> anyhow::Result<Value<'v>> {
+        let args = StarlarkArgs::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("Args.add_all receiver is invalid"))?;
+        let (arg_name, source) = vector_positionals(arg_name_or_values, values, "add_all")?;
+        reject_callback_options(map_each, allow_closure, "add_all")?;
+        if let Some(format) = format_each {
+            validate_named_format("format_each", format)?;
+        }
+        if omit_if_empty && vector_source_is_empty(&source) {
+            return Ok(this);
+        }
+        args.state
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Args mutation lock is poisoned"))?
+            .calls
+            .push(EvaluatorArgCallGen::AddAll(EvaluatorVectorArgGen {
+                source,
+                options: RetainedVectorOptions {
+                    arg_name: arg_name.map(Into::into),
+                    format_each: format_each.map(Into::into),
+                    before_each: before_each.map(Into::into),
+                    join_with: None,
+                    format_joined: None,
+                    omit_if_empty,
+                    uniquify,
+                    expand_directories,
+                    terminate_with: terminate_with.map(Into::into),
+                },
+            }));
+        Ok(this)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn add_joined<'v>(
+        this: Value<'v>,
+        arg_name_or_values: Value<'v>,
+        values: Option<Value<'v>>,
+        #[starlark(require = named)] join_with: &str,
+        #[starlark(require = named)] map_each: Option<Value<'v>>,
+        #[starlark(require = named)] format_each: Option<&str>,
+        #[starlark(require = named)] format_joined: Option<&str>,
+        #[starlark(require = named, default = true)] omit_if_empty: bool,
+        #[starlark(require = named, default = false)] uniquify: bool,
+        #[starlark(require = named, default = true)] expand_directories: bool,
+        #[starlark(require = named, default = false)] allow_closure: bool,
+    ) -> anyhow::Result<Value<'v>> {
+        let args = StarlarkArgs::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("Args.add_joined receiver is invalid"))?;
+        let (arg_name, source) = vector_positionals(arg_name_or_values, values, "add_joined")?;
+        reject_callback_options(map_each, allow_closure, "add_joined")?;
+        if let Some(format) = format_each {
+            validate_named_format("format_each", format)?;
+        }
+        if let Some(format) = format_joined {
+            validate_named_format("format_joined", format)?;
+        }
+        if omit_if_empty && vector_source_is_empty(&source) {
+            return Ok(this);
+        }
+        args.state
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Args mutation lock is poisoned"))?
+            .calls
+            .push(EvaluatorArgCallGen::AddJoined(EvaluatorVectorArgGen {
+                source,
+                options: RetainedVectorOptions {
+                    arg_name: arg_name.map(Into::into),
+                    format_each: format_each.map(Into::into),
+                    before_each: None,
+                    join_with: Some(join_with.into()),
+                    format_joined: format_joined.map(Into::into),
+                    omit_if_empty,
+                    uniquify,
+                    expand_directories,
+                    terminate_with: None,
+                },
+            }));
+        Ok(this)
+    }
+
+    fn use_param_file<'v>(
+        this: Value<'v>,
+        param_file_arg: &str,
+        #[starlark(require = named, default = false)] use_always: bool,
+    ) -> anyhow::Result<Value<'v>> {
+        let args = StarlarkArgs::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("Args.use_param_file receiver is invalid"))?;
+        validate_named_format("param_file_arg", param_file_arg)?;
+        args.state
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Args mutation lock is poisoned"))?
+            .param_file = Some((param_file_arg.into(), use_always));
+        Ok(this)
+    }
+
+    fn set_param_file_format<'v>(this: Value<'v>, format: &str) -> anyhow::Result<Value<'v>> {
+        let args = StarlarkArgs::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("Args.set_param_file_format receiver is invalid"))?;
+        let format = match format {
+            "shell" => RetainedParamFileFormat::Shell,
+            "multiline" => RetainedParamFileFormat::Multiline,
+            "flag_per_line" => RetainedParamFileFormat::FlagPerLine,
+            _ => anyhow::bail!(
+                "Invalid value for parameter format: expected shell, multiline, or flag_per_line"
+            ),
+        };
+        let mut state = args
+            .state
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Args mutation lock is poisoned"))?;
+        if state.format.is_some() {
+            anyhow::bail!("set_param_file_format() may only be called once")
+        }
+        state.format = Some(format);
+        Ok(this)
+    }
+}
+
+fn vector_source<'v>(
+    values: Value<'v>,
+    operation: &str,
+) -> anyhow::Result<EvaluatorVectorSourceGen<Value<'v>>> {
+    let sequence = ListRef::from_value(values)
+        .map(|values| values.iter().collect())
+        .or_else(|| TupleRef::from_value(values).map(|values| values.iter().collect()));
+    if let Some(values) = sequence {
+        return Ok(EvaluatorVectorSourceGen::Sequence(values));
+    }
+    if crate::provider::StarlarkDepset::parts_from_value(values).is_some() {
+        return Ok(EvaluatorVectorSourceGen::Depset(values));
+    }
+    anyhow::bail!("Args.{operation} values must be a sequence or depset")
+}
+
+fn vector_positionals<'v>(
+    arg_name_or_values: Value<'v>,
+    values: Option<Value<'v>>,
+    operation: &str,
+) -> anyhow::Result<(Option<&'v str>, EvaluatorVectorSourceGen<Value<'v>>)> {
+    if let Some(values) = values {
+        let arg_name = arg_name_or_values
+            .unpack_str()
+            .ok_or_else(|| anyhow::anyhow!("Args.{operation} arg name must be a string"))?;
+        return Ok((Some(arg_name), vector_source(values, operation)?));
+    }
+    Ok((None, vector_source(arg_name_or_values, operation)?))
+}
+
+fn reject_callback_options(
+    map_each: Option<Value<'_>>,
+    allow_closure: bool,
+    operation: &str,
+) -> anyhow::Result<()> {
+    if map_each.is_some_and(|value| !value.is_none()) || allow_closure {
+        anyhow::bail!("Args.{operation} callback forms are not supported")
+    }
+    Ok(())
+}
+
+fn vector_source_is_empty(source: &EvaluatorVectorSourceGen<Value<'_>>) -> bool {
+    match source {
+        EvaluatorVectorSourceGen::Sequence(values) => values.is_empty(),
+        EvaluatorVectorSourceGen::Depset(root) => {
+            crate::provider::StarlarkDepset::parts_from_value(*root)
+                .is_some_and(|(_, _, _, _, depth, _)| depth == 0)
+        }
+    }
+}
+
+fn validate_named_format(name: &str, format: &str) -> anyhow::Result<()> {
+    validate_scalar_format(format)
+        .map_err(|_| anyhow::anyhow!("Args {name} must contain exactly one %s placeholder"))
 }
 
 fn scalar_arg_value(value: Value<'_>) -> anyhow::Result<RetainedScalarValue> {
@@ -674,7 +908,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
     fn write(
         this: Value,
         output: Value,
-        content: &str,
+        content: Value,
         #[starlark(default = false)] is_executable: bool,
     ) -> anyhow::Result<NoneType> {
         let actions = AnalysisActions::from_value(this)
@@ -706,8 +940,11 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         actions.token.require_active("args", actions.context_name)?;
         Ok(heap.alloc_complex(StarlarkArgs {
-            values: Mutex::new(Vec::new()),
-            marker: PhantomData,
+            state: Arc::new(Mutex::new(StarlarkArgsStateGen {
+                calls: Vec::new(),
+                format: None,
+                param_file: None,
+            })),
         }))
     }
 

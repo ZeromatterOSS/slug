@@ -8,17 +8,25 @@
  */
 
 use std::collections::BTreeSet;
+use std::fmt;
 use std::fs;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::time::SystemTime;
 
+use allocative::Allocative;
+use async_trait::async_trait;
 use dice::ActivationData;
 use dice::ActivationKind;
 use dice::ActivationTracker;
+use dice::CancellationContext;
 use dice::DetectCycles;
 use dice::Dice;
 use dice::DiceComputations;
@@ -60,10 +68,12 @@ use slug_analysis_v2::key::StarlarkOptionScope;
 use slug_analysis_v2::key::StarlarkOptionValue;
 use slug_analysis_v2::prepare_configured_node_analysis;
 use slug_build_api_v2::ActionKind;
+use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::AnalysisValueKind;
 use slug_build_api_v2::ArtifactInputSource;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::ProviderId;
+use slug_build_api_v2::RetainedCommandLineSegment;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SymlinkTarget;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
@@ -277,6 +287,76 @@ fn analysis_event<'a>(
         "duplicate evaluated activation: {activations:#?}"
     );
     activation
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+struct ArgsActionInputKey;
+
+impl fmt::Display for ArgsActionInputKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("test-vector-args-action-input")
+    }
+}
+
+#[async_trait]
+impl Key for ArgsActionInputKey {
+    type Value = Arc<ActionSpec>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        panic!("ArgsActionInputKey is injected")
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[derive(Debug, Clone, Allocative)]
+struct ArgsActionParentKey {
+    #[allocative(skip)]
+    evaluations: Arc<AtomicUsize>,
+}
+
+impl PartialEq for ArgsActionParentKey {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.evaluations, &other.evaluations)
+    }
+}
+
+impl Eq for ArgsActionParentKey {}
+
+impl Hash for ArgsActionParentKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.evaluations).hash(state);
+    }
+}
+
+impl fmt::Display for ArgsActionParentKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("test-vector-args-action-parent")
+    }
+}
+
+#[async_trait]
+impl Key for ArgsActionParentKey {
+    type Value = Arc<ActionSpec>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        self.evaluations.fetch_add(1, Ordering::SeqCst);
+        ctx.compute(&ArgsActionInputKey).await.unwrap()
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
 }
 
 fn scratch() -> PathBuf {
@@ -7435,6 +7515,152 @@ subject = rule(implementation = _impl, subrules = [mutate])
 }
 
 #[tokio::test]
+async fn vector_args_param_policy_and_args_write_use_one_generic_recipe() {
+    let workspace = scratch();
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"def _impl(ctx):
+    source = ctx.attr.src
+    tool = ctx.actions.declare_file("tool")
+    first = ctx.actions.declare_file("first.out")
+    second = ctx.actions.declare_file("second.out")
+    params = ctx.actions.declare_file("args.params")
+    ctx.actions.write(tool, "tool", is_executable = True)
+    values = ["a", "b", "a"]
+    args = ctx.actions.args()
+    args.add("scalar")
+    if args.add_all("--all", values, format_each = "v=%s%%", before_each = "-B", uniquify = True, terminate_with = "--end") != args:
+        fail("add_all must chain")
+    values.append("late-list")
+    args.add_all((source,))
+    if args.add_joined("--files", depset([tool]), join_with = ":", format_each = "p=%s", format_joined = "[%s]", expand_directories = False) != args:
+        fail("add_joined must chain")
+    args.add_joined("--empty", [], join_with = ",", omit_if_empty = False)
+    if args.use_param_file("--params=%s", use_always = True) != args:
+        fail("use_param_file must chain")
+    if args.set_param_file_format("flag_per_line") != args:
+        fail("set_param_file_format must chain")
+    ctx.actions.run(outputs = [first], executable = tool, arguments = ["head", args])
+    args.add_all(["late-action"])
+    args.use_param_file("@%s", use_always = False)
+    ctx.actions.run(outputs = [second], executable = tool, arguments = [args])
+    ctx.actions.write(output = params, content = args, is_executable = True)
+    return [DefaultInfo(files = depset([first, second, params]))]
+
+subject = rule(implementation = _impl, attrs = {"src": attr.label(allow_files = True)})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("BUILD.bazel"),
+        "load(':defs.bzl', 'subject')\nsubject(name = 'subject', src = 'source.txt')\n",
+    )
+    .unwrap();
+    fs::write(package.join("source.txt"), "source").unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//pkg:subject").unwrap(),
+        typed_action_test_configuration(),
+    );
+    let result = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+
+    assert_eq!(result.actions().len(), 4);
+    let first = result.actions()[1].spawn_spec().unwrap();
+    assert_eq!(
+        first.render_argv(),
+        [
+            "pkg/tool",
+            "head",
+            "scalar",
+            "--all=-B v=a% -B v=b% --end",
+            "pkg/source.txt",
+            "--files=[p=pkg/tool]",
+            "--empty=",
+        ]
+    );
+    assert!(!first.render_argv().iter().any(|value| value == "late-list"));
+    assert!(
+        !first
+            .render_argv()
+            .iter()
+            .any(|value| value == "late-action")
+    );
+    let RetainedCommandLineSegment::ArgsSnapshot(first_args) = &first.command_line().segments()[1]
+    else {
+        panic!("second command-line segment must retain Args")
+    };
+    assert_eq!(
+        first_args.param_file().unwrap().flag_format(),
+        "--params=%s"
+    );
+    assert!(first_args.param_file().unwrap().use_always());
+
+    let second = result.actions()[2].spawn_spec().unwrap();
+    assert_eq!(
+        second.render_argv().last().map(String::as_str),
+        Some("late-action")
+    );
+    let RetainedCommandLineSegment::ArgsSnapshot(second_args) =
+        &second.command_line().segments()[0]
+    else {
+        panic!("command-line segment must retain Args")
+    };
+    assert_eq!(second_args.param_file().unwrap().flag_format(), "@%s");
+    assert!(!second_args.param_file().unwrap().use_always());
+
+    let write = result.actions()[3].args_write_spec().unwrap();
+    assert!(write.is_executable());
+    assert_eq!(
+        write.render_content(),
+        "scalar\n--all=-B v=a% -B v=b% --end\npkg/source.txt\n--files=[p=pkg/tool]\n--empty=\nlate-action\n"
+    );
+    let warm = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_eq!(result.actions(), warm.actions());
+
+    let separate = analyze_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        &key,
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    let a1_spec: &ActionSpec = &result.actions()[1];
+    let a2_spec: &ActionSpec = &separate.actions()[1];
+    let a1 = Arc::new(a1_spec.clone());
+    let a2 = Arc::new(a2_spec.clone());
+    assert!(!Arc::ptr_eq(&a1, &a2));
+    assert_eq!(a1, a2);
+    let b_spec: &ActionSpec = &result.actions()[2];
+    let b = Arc::new(b_spec.clone());
+    let a3 = a1.clone();
+    let a4 = a2.clone();
+    let cutoff_dice = Dice::builder().build(DetectCycles::Enabled);
+    let evaluations = Arc::new(AtomicUsize::new(0));
+    let parent = ArgsActionParentKey {
+        evaluations: evaluations.clone(),
+    };
+    for (value, expected_evaluations) in [(a1, 1), (a2, 1), (b, 2), (a3, 3), (a4, 3)] {
+        let mut updater = cutoff_dice.updater();
+        updater
+            .changed_to(vec![(ArgsActionInputKey, value)])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        transaction.compute(&parent).await.unwrap();
+        assert_eq!(evaluations.load(Ordering::SeqCst), expected_evaluations);
+    }
+}
+
+#[tokio::test]
 async fn scalar_args_reject_vector_and_invalid_format_before_action_publication() {
     let workspace = scratch();
     let package = workspace.join("pkg");
@@ -7448,6 +7674,47 @@ async fn scalar_args_reject_vector_and_invalid_format_before_action_publication(
 
 def _format(ctx):
     ctx.actions.args().add("value", format = "%s:%s")
+    return []
+
+def _map(value):
+    return value
+
+def _bad_args(ctx):
+    args = ctx.actions.args()
+    mode = ctx.attr.mode
+    if mode == "source_order":
+        args.add_all(1, map_each = _map)
+    elif mode == "name_order":
+        args.add_all(1, [], map_each = _map)
+    elif mode == "callback_order":
+        args.add_all("--x", 1, map_each = _map)
+    elif mode == "callback":
+        args.add_all([], map_each = _map)
+    elif mode == "joined_source_order":
+        args.add_joined(1, join_with = ",", map_each = _map)
+    elif mode == "joined_name_order":
+        args.add_joined(1, [], join_with = ",", map_each = _map)
+    elif mode == "joined_callback_order":
+        args.add_joined("--x", 1, join_with = ",", map_each = _map)
+    elif mode == "joined_callback":
+        args.add_joined([], join_with = ",", map_each = _map)
+    elif mode == "closure":
+        args.add_all([], allow_closure = True)
+    elif mode == "value":
+        out = ctx.actions.declare_file("bad.out")
+        args.add_all([struct(x = 1)])
+        ctx.actions.run(outputs = [out], executable = "tool", arguments = [args])
+    elif mode == "format_each":
+        args.add_all([], format_each = "%s:%s")
+    elif mode == "format_joined":
+        args.add_joined([], join_with = ",", format_joined = "%s:%s")
+    elif mode == "flag_format":
+        args.use_param_file("%s:%s")
+    elif mode == "file_format":
+        args.set_param_file_format("unknown")
+    elif mode == "format_twice":
+        args.set_param_file_format("shell")
+        args.set_param_file_format("multiline")
     return []
 
 def _empty(ctx):
@@ -7466,6 +7733,7 @@ def _cross_owner(ctx):
 
 vector = rule(implementation = _vector)
 bad_format = rule(implementation = _format)
+bad_args = rule(implementation = _bad_args, attrs = {"mode": attr.string()})
 empty = rule(implementation = _empty)
 producer = rule(implementation = _producer)
 cross_owner = rule(implementation = _cross_owner, attrs = {"dep": attr.label()})
@@ -7474,7 +7742,28 @@ cross_owner = rule(implementation = _cross_owner, attrs = {"dep": attr.label()})
     .unwrap();
     fs::write(
         package.join("BUILD.bazel"),
-        "load(':defs.bzl', 'bad_format', 'cross_owner', 'empty', 'producer', 'vector')\nvector(name = 'vector')\nbad_format(name = 'bad_format')\nempty(name = 'empty')\nproducer(name = 'producer')\ncross_owner(name = 'cross_owner', dep = ':producer')\n",
+        r#"load(':defs.bzl', 'bad_args', 'bad_format', 'cross_owner', 'empty', 'producer', 'vector')
+vector(name = 'vector')
+bad_format(name = 'bad_format')
+bad_args(name = 'source_order', mode = 'source_order')
+bad_args(name = 'name_order', mode = 'name_order')
+bad_args(name = 'callback_order', mode = 'callback_order')
+bad_args(name = 'callback', mode = 'callback')
+bad_args(name = 'joined_source_order', mode = 'joined_source_order')
+bad_args(name = 'joined_name_order', mode = 'joined_name_order')
+bad_args(name = 'joined_callback_order', mode = 'joined_callback_order')
+bad_args(name = 'joined_callback', mode = 'joined_callback')
+bad_args(name = 'closure', mode = 'closure')
+bad_args(name = 'value', mode = 'value')
+bad_args(name = 'format_each', mode = 'format_each')
+bad_args(name = 'format_joined', mode = 'format_joined')
+bad_args(name = 'flag_format', mode = 'flag_format')
+bad_args(name = 'file_format', mode = 'file_format')
+bad_args(name = 'format_twice', mode = 'format_twice')
+empty(name = 'empty')
+producer(name = 'producer')
+cross_owner(name = 'cross_owner', dep = ':producer')
+"#,
     )
     .unwrap();
     let dice = Dice::builder().build(DetectCycles::Enabled);
@@ -7484,6 +7773,27 @@ cross_owner = rule(implementation = _cross_owner, attrs = {"dep": attr.label()})
             "supports only strings, integers, and regular Files",
         ),
         ("bad_format", "exactly one %s placeholder"),
+        ("source_order", "values must be a sequence or depset"),
+        ("name_order", "arg name must be a string"),
+        ("callback_order", "values must be a sequence or depset"),
+        ("callback", "callback forms are not supported"),
+        ("joined_source_order", "values must be a sequence or depset"),
+        ("joined_name_order", "arg name must be a string"),
+        (
+            "joined_callback_order",
+            "values must be a sequence or depset",
+        ),
+        ("joined_callback", "callback forms are not supported"),
+        ("closure", "callback forms are not supported"),
+        (
+            "value",
+            "supports only strings, integers, and regular Files",
+        ),
+        ("format_each", "exactly one %s placeholder"),
+        ("format_joined", "exactly one %s placeholder"),
+        ("flag_format", "exactly one %s placeholder"),
+        ("file_format", "Invalid value for parameter format"),
+        ("format_twice", "may only be called once"),
         ("empty", "requires at least one output"),
         ("cross_owner", "requires a declared file"),
     ] {

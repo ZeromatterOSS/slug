@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-6-7A-noncallback-vector-args-paramfiles-implementation-r1](./slug-v2-subplans/current-packet.md).
+[WP-6-7A-noncallback-vector-args-paramfiles-implementation-r2](./slug-v2-subplans/current-packet.md).
 
 Commit `683538254` terminally accepts generic configured fragment projection.
 The successor audit found that authentic rules_cc 0.2.17 forwards a nonempty

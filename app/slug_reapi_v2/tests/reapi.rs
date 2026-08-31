@@ -27,13 +27,16 @@ use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::AnalysisValue;
+use slug_build_api_v2::ArgsWriteSpec;
 use slug_build_api_v2::ArtifactInputs;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
+use slug_build_api_v2::RetainedArgsRecipe;
 use slug_build_api_v2::RetainedCommandLine;
+use slug_build_api_v2::RetainedParamFileFormat;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SpawnSpec;
 use slug_configuration_v2::CanonicalStringMap;
@@ -68,6 +71,14 @@ fn typed_spawn_action() -> ActionSpec {
         CanonicalStringMap::default(),
         "Action",
         None::<&str>,
+    ))
+}
+
+fn typed_args_write_action() -> ActionSpec {
+    ActionSpec::args_write(ArgsWriteSpec::new(
+        ActionOutput::new("pkg/args.params", ActionOutputKind::File),
+        RetainedArgsRecipe::new(Vec::new(), RetainedParamFileFormat::Shell),
+        false,
     ))
 }
 
@@ -174,21 +185,22 @@ fn declarative_write_action_rejects_the_raw_executor_projection() {
 
 #[test]
 fn typed_actions_reject_command_input_tree_and_execution_projection() {
-    let action = typed_spawn_action();
-    assert_eq!(
-        ReapiCommand::from_action(&action).unwrap_err(),
-        "typed Spawn/Symlink REAPI projection is not admitted"
-    );
-    assert_eq!(
-        ReapiCommand::for_execution(&action).unwrap_err(),
-        "typed Spawn/Symlink REAPI projection is not admitted"
-    );
-    assert_eq!(
-        ReapiInputTree::from_action(&action)
-            .unwrap_err()
-            .to_string(),
-        "typed Spawn/Symlink REAPI input trees are not admitted"
-    );
+    for action in [typed_spawn_action(), typed_args_write_action()] {
+        assert_eq!(
+            ReapiCommand::from_action(&action).unwrap_err(),
+            "typed Spawn/Symlink/ArgsWrite REAPI projection is not admitted"
+        );
+        assert_eq!(
+            ReapiCommand::for_execution(&action).unwrap_err(),
+            "typed Spawn/Symlink/ArgsWrite REAPI projection is not admitted"
+        );
+        assert_eq!(
+            ReapiInputTree::from_action(&action)
+                .unwrap_err()
+                .to_string(),
+            "typed Spawn/Symlink/ArgsWrite REAPI input trees are not admitted"
+        );
+    }
 }
 
 #[tokio::test]
@@ -202,13 +214,15 @@ async fn typed_action_execution_rejects_before_transport() {
         retry_attempts: None,
         default_exec_properties: BTreeMap::new(),
     };
-    assert!(
-        slug_reapi_v2::execute_action(&config, &typed_spawn_action())
-            .await
-            .unwrap_err()
-            .to_string()
-            .contains("typed Spawn/Symlink REAPI projection is not admitted")
-    );
+    for action in [typed_spawn_action(), typed_args_write_action()] {
+        assert!(
+            slug_reapi_v2::execute_action(&config, &action)
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("typed Spawn/Symlink/ArgsWrite REAPI projection is not admitted")
+        );
+    }
 }
 
 #[test]

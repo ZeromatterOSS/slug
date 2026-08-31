@@ -177,7 +177,7 @@ impl fmt::Display for InputTreeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::TypedActionUnsupported => {
-                write!(f, "typed Spawn/Symlink REAPI input trees are not admitted")
+                f.write_str("typed Spawn/Symlink/ArgsWrite REAPI input trees are not admitted")
             }
             Self::MissingDigest { path } => write!(f, "REAPI input {path} is missing a digest"),
             Self::InvalidDigest { path, error } => {

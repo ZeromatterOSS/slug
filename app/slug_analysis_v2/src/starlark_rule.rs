@@ -20,15 +20,23 @@ use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::AnalysisValueKind;
+use slug_build_api_v2::ArgsWriteSpec;
 use slug_build_api_v2::ArtifactInputSource;
 use slug_build_api_v2::ArtifactInputs;
 use slug_build_api_v2::CtxActions;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
+use slug_build_api_v2::RetainedArgCall;
+use slug_build_api_v2::RetainedArgsDepset;
+use slug_build_api_v2::RetainedArgsRecipe;
 use slug_build_api_v2::RetainedArtifactInputs;
 use slug_build_api_v2::RetainedCommandLine;
 use slug_build_api_v2::RetainedCommandLineSegment;
+use slug_build_api_v2::RetainedSpawnArgsSnapshot;
+use slug_build_api_v2::RetainedSpawnParamFilePolicy;
+use slug_build_api_v2::RetainedVectorArg;
+use slug_build_api_v2::RetainedVectorSource;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SpawnSpec;
 use slug_build_api_v2::SymlinkSpec;
@@ -56,6 +64,10 @@ use slug_loading_v2::subrule_invocation::AnalysisArtifactValue;
 use slug_loading_v2::subrule_invocation::AnalysisCallToken;
 use slug_loading_v2::subrule_invocation::AnalysisEvaluationContext;
 use slug_loading_v2::subrule_invocation::AnalysisRunRequest;
+use slug_loading_v2::subrule_invocation::EvaluatorArgCallGen;
+use slug_loading_v2::subrule_invocation::EvaluatorArgsSnapshot;
+use slug_loading_v2::subrule_invocation::EvaluatorVectorArgGen;
+use slug_loading_v2::subrule_invocation::EvaluatorVectorSourceGen;
 use slug_loading_v2::subrule_invocation::PreparedSubruleInvocation;
 use slug_loading_v2::subrule_invocation::StarlarkArgs;
 use starlark::PrintHandler;
@@ -684,9 +696,26 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
         }))
     }
 
-    fn write(&self, output: Value<'_>, content: &str, is_executable: bool) -> anyhow::Result<()> {
+    fn write(
+        &self,
+        output: Value<'_>,
+        content: Value<'_>,
+        is_executable: bool,
+    ) -> anyhow::Result<()> {
         let output = self.owned_output(output, "write")?;
-        self.register(|actions| actions.write(output, content, is_executable))
+        if output.kind() != ActionOutputKind::File {
+            anyhow::bail!("ctx.actions.write output must be a regular declared File");
+        }
+        if let Some(content) = content.unpack_str() {
+            return self.register(|actions| actions.write(output, content, is_executable));
+        }
+        let snapshot = StarlarkArgs::snapshot(content)
+            .ok_or_else(|| anyhow::anyhow!("ctx.actions.write content must be a string or Args"))?;
+        let mut lowerer = AnalysisValueLowerer::default();
+        let (recipe, _) = lower_args_snapshot(snapshot, &mut lowerer)?;
+        self.register(|actions| {
+            actions.register_args_write(ArgsWriteSpec::new(output, recipe, is_executable))
+        })
     }
 
     fn run_shell(
@@ -726,8 +755,8 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             } else {
                 anyhow::bail!("ctx.actions.run executable must be a File or string path")
             };
-        let command_line = retained_command_line(request.arguments)?;
         let mut lowerer = AnalysisValueLowerer::default();
+        let command_line = retained_command_line(request.arguments, &mut lowerer)?;
         let inputs = retained_artifact_inputs(request.inputs, false, "inputs", &mut lowerer)?;
         let tools = retained_artifact_inputs(request.tools, true, "tools", &mut lowerer)?;
         let action_environment = configured_environment.for_action(
@@ -822,7 +851,10 @@ fn reject_directory_file(file: &AnalysisArtifactValue, name: &str) -> anyhow::Re
     Ok(())
 }
 
-fn retained_command_line(arguments: Option<Value<'_>>) -> anyhow::Result<RetainedCommandLine> {
+fn retained_command_line<'v>(
+    arguments: Option<Value<'v>>,
+    lowerer: &mut AnalysisValueLowerer<'v>,
+) -> anyhow::Result<RetainedCommandLine> {
     let Some(arguments) = arguments.filter(|value| !value.is_none()) else {
         return Ok(RetainedCommandLine::new(Vec::new()));
     };
@@ -837,7 +869,10 @@ fn retained_command_line(arguments: Option<Value<'_>>) -> anyhow::Result<Retaine
                     std::mem::take(&mut literals).into(),
                 ));
             }
-            segments.push(RetainedCommandLineSegment::ArgsSnapshot(args));
+            let (recipe, policy) = lower_args_snapshot(args, lowerer)?;
+            segments.push(RetainedCommandLineSegment::ArgsSnapshot(
+                RetainedSpawnArgsSnapshot::new(recipe, policy),
+            ));
         } else if let Some(literal) = argument.unpack_str() {
             literals.push(CompactString::new(literal));
         } else {
@@ -848,6 +883,78 @@ fn retained_command_line(arguments: Option<Value<'_>>) -> anyhow::Result<Retaine
         segments.push(RetainedCommandLineSegment::LiteralRun(literals.into()));
     }
     Ok(RetainedCommandLine::new(segments))
+}
+
+fn lower_args_snapshot<'v>(
+    snapshot: EvaluatorArgsSnapshot<'v>,
+    lowerer: &mut AnalysisValueLowerer<'v>,
+) -> anyhow::Result<(RetainedArgsRecipe, Option<RetainedSpawnParamFilePolicy>)> {
+    let calls = snapshot
+        .calls
+        .into_iter()
+        .map(|call| match call {
+            EvaluatorArgCallGen::Scalar(value) => Ok(RetainedArgCall::Scalar(value)),
+            EvaluatorArgCallGen::AddAll(value) => {
+                lower_vector_arg(value, lowerer).map(RetainedArgCall::AddAll)
+            }
+            EvaluatorArgCallGen::AddJoined(value) => {
+                lower_vector_arg(value, lowerer).map(RetainedArgCall::AddJoined)
+            }
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    let policy = snapshot.param_file.map(|(flag_format, use_always)| {
+        RetainedSpawnParamFilePolicy::new(flag_format, use_always)
+    });
+    Ok((RetainedArgsRecipe::new(calls, snapshot.format), policy))
+}
+
+fn lower_vector_arg<'v>(
+    value: EvaluatorVectorArgGen<Value<'v>>,
+    lowerer: &mut AnalysisValueLowerer<'v>,
+) -> anyhow::Result<RetainedVectorArg> {
+    let source = match value.source {
+        EvaluatorVectorSourceGen::Sequence(values) => RetainedVectorSource::Sequence(
+            values
+                .into_iter()
+                .map(vector_scalar_value)
+                .collect::<anyhow::Result<Vec<_>>>()?
+                .into(),
+        ),
+        EvaluatorVectorSourceGen::Depset(value) => {
+            let lowered = lowerer
+                .lower(value, "Args vector depset")
+                .map_err(anyhow::Error::msg)?;
+            let AnalysisValueKind::Depset(depset) = lowered.kind() else {
+                anyhow::bail!("Args vector values must be a sequence or depset")
+            };
+            RetainedVectorSource::Depset(
+                RetainedArgsDepset::new(depset.clone())
+                    .map_err(|error| anyhow::anyhow!(error.to_string()))?,
+            )
+        }
+    };
+    Ok(RetainedVectorArg::new(source, value.options))
+}
+
+fn vector_scalar_value(value: Value<'_>) -> anyhow::Result<slug_build_api_v2::RetainedScalarValue> {
+    if let Some(value) = value.unpack_str() {
+        return Ok(slug_build_api_v2::RetainedScalarValue::String(value.into()));
+    }
+    if value.get_type() == "int" {
+        return Ok(slug_build_api_v2::RetainedScalarValue::Integer(
+            value.to_str().into(),
+        ));
+    }
+    if let Some(file) = AnalysisArtifactValue::from_starlark(value) {
+        reject_directory_file(file, "Args vector value")?;
+        return Ok(slug_build_api_v2::RetainedScalarValue::Artifact(
+            file.artifact().clone(),
+        ));
+    }
+    anyhow::bail!(
+        "Args vector supports only strings, integers, and regular Files, got {}",
+        value.get_type()
+    )
 }
 
 fn retained_artifact_inputs<'v>(

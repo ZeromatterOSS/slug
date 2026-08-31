@@ -34,7 +34,7 @@ impl AnalysisActionSink for NoopActionSink {
     fn write(
         &self,
         _output: Value<'_>,
-        _content: &str,
+        _content: Value<'_>,
         _is_executable: bool,
     ) -> anyhow::Result<()> {
         unreachable!("caller-authentication proof declares no actions")

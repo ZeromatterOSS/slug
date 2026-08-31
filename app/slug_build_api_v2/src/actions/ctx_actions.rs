@@ -18,6 +18,7 @@ use crate::actions::spec::ActionKind;
 use crate::actions::spec::ActionOutput;
 use crate::actions::spec::ActionOutputKind;
 use crate::actions::spec::ActionSpec;
+use crate::actions::spec::ArgsWriteSpec;
 use crate::actions::spec::SpawnSpec;
 use crate::actions::spec::SymlinkSpec;
 
@@ -149,6 +150,10 @@ impl CtxActions {
 
     pub fn register_spawn(&mut self, spec: SpawnSpec) -> Result<usize, ActionError> {
         self.registry.register(ActionSpec::spawn(spec))
+    }
+
+    pub fn register_args_write(&mut self, spec: ArgsWriteSpec) -> Result<usize, ActionError> {
+        self.registry.register(ActionSpec::args_write(spec))
     }
 
     pub fn register_symlink(&mut self, spec: SymlinkSpec) -> Result<usize, ActionError> {

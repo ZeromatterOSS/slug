@@ -17,6 +17,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use compact_str::CompactString;
 use dupe::Dupe;
+use fxhash::FxHashSet;
 use slug_configuration_v2::CanonicalStringMap;
 use slug_configuration_v2::NormalizedAbsoluteBazelPath;
 use slug_configuration_v2::NormalizedBazelPath;
@@ -148,7 +149,7 @@ pub enum RetainedScalarValue {
 }
 
 impl RetainedScalarValue {
-    fn render(&self) -> String {
+    pub fn render(&self) -> String {
         match self {
             Self::String(value) | Self::Integer(value) => value.to_string(),
             Self::Artifact(artifact) => artifact.path().into_owned(),
@@ -176,7 +177,8 @@ impl RetainedScalarArg {
         }
     }
 
-    fn append_rendered(&self, argv: &mut Vec<String>) {
+    fn render_group(&self) -> Vec<String> {
+        let mut argv = Vec::with_capacity(2);
         if let Some(name) = &self.arg_name {
             argv.push(name.to_string());
         }
@@ -185,21 +187,374 @@ impl RetainedScalarArg {
             Some(format) => apply_validated_format(format, &value),
             None => value,
         });
+        argv
+    }
+}
+
+#[derive(Debug, Clone, Dupe, Allocative)]
+pub struct RetainedArgsDepset(AnalysisDepset);
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum RetainedArgsDepsetError {
+    ValueType(AnalysisValueType),
+    Directory,
+}
+
+impl fmt::Display for RetainedArgsDepsetError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ValueType(value_type) => write!(
+                f,
+                "Args vector requires strings, integers, or regular Files, got depset of {value_type}"
+            ),
+            Self::Directory => write!(f, "Args vector directory expansion is not supported"),
+        }
+    }
+}
+
+impl Error for RetainedArgsDepsetError {}
+
+impl RetainedArgsDepset {
+    pub fn new(depset: AnalysisDepset) -> Result<Self, RetainedArgsDepsetError> {
+        match depset.element_type() {
+            AnalysisValueType::Empty | AnalysisValueType::String | AnalysisValueType::Integer => {
+                Ok(Self(depset))
+            }
+            AnalysisValueType::Artifact => {
+                let mut directory = false;
+                depset
+                    .visit(|value| {
+                        if matches!(
+                            value.kind(),
+                            AnalysisValueKind::Artifact(AnalysisArtifact::Derived { output, .. })
+                                if output.kind() == ActionOutputKind::Directory
+                        ) {
+                            directory = true;
+                        }
+                        Ok::<_, Infallible>(())
+                    })
+                    .unwrap_or_else(|never| match never {});
+                if directory {
+                    Err(RetainedArgsDepsetError::Directory)
+                } else {
+                    Ok(Self(depset))
+                }
+            }
+            value_type => Err(RetainedArgsDepsetError::ValueType(value_type)),
+        }
+    }
+
+    fn render(&self) -> Vec<String> {
+        let mut values = Vec::new();
+        self.0
+            .visit(|value| {
+                values.push(match value.kind() {
+                    AnalysisValueKind::String(value) => value.to_owned(),
+                    AnalysisValueKind::Number(value) => {
+                        render_analysis_integer(value.as_integer().expect("validated Args integer"))
+                    }
+                    AnalysisValueKind::Artifact(artifact) => artifact.path().into_owned(),
+                    _ => unreachable!("validated Args depset element type"),
+                });
+                Ok::<_, Infallible>(())
+            })
+            .unwrap_or_else(|never| match never {});
+        values
+    }
+
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        self.0.publication_eq_with(&other.0, state)
+    }
+}
+
+#[derive(Debug, Clone, Allocative)]
+pub enum RetainedVectorSource {
+    Sequence(Arc<[RetainedScalarValue]>),
+    Depset(RetainedArgsDepset),
+}
+
+impl RetainedVectorSource {
+    fn render(&self) -> Vec<String> {
+        match self {
+            Self::Sequence(values) => values.iter().map(RetainedScalarValue::render).collect(),
+            Self::Depset(values) => values.render(),
+        }
+    }
+
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        match (self, other) {
+            (Self::Sequence(left), Self::Sequence(right)) => left == right,
+            (Self::Depset(left), Self::Depset(right)) => left.publication_eq_with(right, state),
+            _ => false,
+        }
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-pub enum RetainedCommandLineSegment {
-    LiteralRun(Arc<[CompactString]>),
-    ArgsSnapshot(Arc<[RetainedScalarArg]>),
+pub struct RetainedVectorOptions {
+    pub arg_name: Option<CompactString>,
+    pub format_each: Option<CompactString>,
+    pub before_each: Option<CompactString>,
+    pub join_with: Option<CompactString>,
+    pub format_joined: Option<CompactString>,
+    pub omit_if_empty: bool,
+    pub uniquify: bool,
+    pub expand_directories: bool,
+    pub terminate_with: Option<CompactString>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative, Dupe)]
+#[derive(Debug, Clone, Allocative)]
+pub struct RetainedVectorArg {
+    source: RetainedVectorSource,
+    options: RetainedVectorOptions,
+}
+
+impl RetainedVectorArg {
+    pub fn new(source: RetainedVectorSource, options: RetainedVectorOptions) -> Self {
+        Self { source, options }
+    }
+
+    fn render_values(&self) -> Vec<String> {
+        let mut values = self.source.render();
+        if let Some(format) = &self.options.format_each {
+            for value in &mut values {
+                *value = apply_validated_format(format, value);
+            }
+        }
+        if self.options.uniquify {
+            let mut seen = FxHashSet::default();
+            values.retain(|value| seen.insert(value.clone()));
+        }
+        values
+    }
+
+    fn render_add_all(&self) -> Vec<String> {
+        let values = self.render_values();
+        if values.is_empty() && self.options.omit_if_empty {
+            return Vec::new();
+        }
+        let mut group = Vec::new();
+        if let Some(name) = &self.options.arg_name {
+            group.push(name.to_string());
+        }
+        for value in values {
+            if let Some(before) = &self.options.before_each {
+                group.push(before.to_string());
+            }
+            group.push(value);
+        }
+        if let Some(terminate) = &self.options.terminate_with {
+            group.push(terminate.to_string());
+        }
+        group
+    }
+
+    fn render_add_joined(&self) -> Vec<String> {
+        let values = self.render_values();
+        if values.is_empty() && self.options.omit_if_empty {
+            return Vec::new();
+        }
+        let mut group = Vec::with_capacity(2);
+        if let Some(name) = &self.options.arg_name {
+            group.push(name.to_string());
+        }
+        let joined = values.join(self.options.join_with.as_deref().unwrap_or_default());
+        group.push(match &self.options.format_joined {
+            Some(format) => apply_validated_format(format, &joined),
+            None => joined,
+        });
+        group
+    }
+
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        self.options == other.options && self.source.publication_eq_with(&other.source, state)
+    }
+}
+
+#[derive(Debug, Clone, Allocative)]
+pub enum RetainedArgCall {
+    Scalar(RetainedScalarArg),
+    AddAll(RetainedVectorArg),
+    AddJoined(RetainedVectorArg),
+}
+
+impl RetainedArgCall {
+    fn render_group(&self) -> Vec<String> {
+        match self {
+            Self::Scalar(value) => value.render_group(),
+            Self::AddAll(value) => value.render_add_all(),
+            Self::AddJoined(value) => value.render_add_joined(),
+        }
+    }
+
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        match (self, other) {
+            (Self::Scalar(left), Self::Scalar(right)) => left == right,
+            (Self::AddAll(left), Self::AddAll(right))
+            | (Self::AddJoined(left), Self::AddJoined(right)) => {
+                left.publication_eq_with(right, state)
+            }
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative, Dupe)]
+pub enum RetainedParamFileFormat {
+    Shell,
+    Multiline,
+    FlagPerLine,
+}
+
+#[derive(Debug, Clone, Allocative, Dupe)]
+pub struct RetainedArgsRecipe {
+    calls: Arc<[RetainedArgCall]>,
+    write_format: RetainedParamFileFormat,
+}
+
+impl RetainedArgsRecipe {
+    pub fn new(
+        calls: impl Into<Arc<[RetainedArgCall]>>,
+        write_format: RetainedParamFileFormat,
+    ) -> Self {
+        Self {
+            calls: calls.into(),
+            write_format,
+        }
+    }
+
+    pub fn render(&self) -> Vec<String> {
+        let mut argv = Vec::new();
+        for call in self.calls.iter() {
+            let group = call.render_group();
+            if self.write_format == RetainedParamFileFormat::FlagPerLine {
+                argv.extend(flag_per_line_group(group));
+            } else {
+                argv.extend(group);
+            }
+        }
+        argv
+    }
+
+    pub fn render_write_content(&self) -> String {
+        let mut lines = Vec::new();
+        for call in self.calls.iter() {
+            let group = call.render_group();
+            match self.write_format {
+                RetainedParamFileFormat::FlagPerLine => lines.extend(flag_per_line_group(group)),
+                RetainedParamFileFormat::Shell => {
+                    lines.extend(group.iter().map(|value| shell_escape(value)));
+                }
+                RetainedParamFileFormat::Multiline => {
+                    lines.extend(group);
+                }
+            }
+        }
+        if lines.is_empty() {
+            String::new()
+        } else {
+            format!("{}\n", lines.join("\n"))
+        }
+    }
+
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        self.write_format == other.write_format
+            && self.calls.len() == other.calls.len()
+            && self
+                .calls
+                .iter()
+                .zip(other.calls.iter())
+                .all(|(left, right)| left.publication_eq_with(right, state))
+    }
+}
+
+fn flag_per_line_group(group: Vec<String>) -> Vec<String> {
+    if group.len() < 2 {
+        return group;
+    }
+    let first = &group[0];
+    let rest = group[1..].join(" ");
+    vec![if first.is_empty() {
+        rest
+    } else {
+        format!("{first}={rest}")
+    }]
+}
+
+impl PartialEq for RetainedArgsRecipe {
+    fn eq(&self, other: &Self) -> bool {
+        self.publication_eq_with(other, &mut PublicationEqState::default())
+    }
+}
+
+impl Eq for RetainedArgsRecipe {}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct RetainedSpawnParamFilePolicy {
+    flag_format: CompactString,
+    use_always: bool,
+}
+
+impl RetainedSpawnParamFilePolicy {
+    pub fn new(flag_format: impl Into<CompactString>, use_always: bool) -> Self {
+        Self {
+            flag_format: flag_format.into(),
+            use_always,
+        }
+    }
+
+    pub fn flag_format(&self) -> &str {
+        &self.flag_format
+    }
+
+    pub fn use_always(&self) -> bool {
+        self.use_always
+    }
+}
+
+#[derive(Debug, Clone, Allocative)]
+pub struct RetainedSpawnArgsSnapshot {
+    recipe: RetainedArgsRecipe,
+    param_file: Option<RetainedSpawnParamFilePolicy>,
+}
+
+impl RetainedSpawnArgsSnapshot {
+    pub fn new(
+        recipe: RetainedArgsRecipe,
+        param_file: Option<RetainedSpawnParamFilePolicy>,
+    ) -> Self {
+        Self { recipe, param_file }
+    }
+
+    pub fn recipe(&self) -> &RetainedArgsRecipe {
+        &self.recipe
+    }
+
+    pub fn param_file(&self) -> Option<&RetainedSpawnParamFilePolicy> {
+        self.param_file.as_ref()
+    }
+
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        self.param_file == other.param_file && self.recipe.publication_eq_with(&other.recipe, state)
+    }
+}
+
+#[derive(Debug, Clone, Allocative)]
+pub enum RetainedCommandLineSegment {
+    LiteralRun(Arc<[CompactString]>),
+    ArgsSnapshot(RetainedSpawnArgsSnapshot),
+}
+
+#[derive(Debug, Clone, Allocative, Dupe)]
 pub struct RetainedCommandLine(Arc<[RetainedCommandLineSegment]>);
 
 impl RetainedCommandLine {
     pub fn new(segments: impl Into<Arc<[RetainedCommandLineSegment]>>) -> Self {
         Self(segments.into())
+    }
+
+    pub fn segments(&self) -> &[RetainedCommandLineSegment] {
+        &self.0
     }
 
     pub fn render(&self) -> Vec<String> {
@@ -209,16 +564,41 @@ impl RetainedCommandLine {
                 RetainedCommandLineSegment::LiteralRun(values) => {
                     argv.extend(values.iter().map(ToString::to_string));
                 }
-                RetainedCommandLineSegment::ArgsSnapshot(values) => {
-                    for value in values.iter() {
-                        value.append_rendered(&mut argv);
-                    }
+                RetainedCommandLineSegment::ArgsSnapshot(snapshot) => {
+                    argv.extend(snapshot.recipe.render());
                 }
             }
         }
         argv
     }
+
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        self.0.len() == other.0.len()
+            && self
+                .0
+                .iter()
+                .zip(other.0.iter())
+                .all(|(left, right)| match (left, right) {
+                    (
+                        RetainedCommandLineSegment::LiteralRun(left),
+                        RetainedCommandLineSegment::LiteralRun(right),
+                    ) => left == right,
+                    (
+                        RetainedCommandLineSegment::ArgsSnapshot(left),
+                        RetainedCommandLineSegment::ArgsSnapshot(right),
+                    ) => left.publication_eq_with(right, state),
+                    _ => false,
+                })
+    }
 }
+
+impl PartialEq for RetainedCommandLine {
+    fn eq(&self, other: &Self) -> bool {
+        self.publication_eq_with(other, &mut PublicationEqState::default())
+    }
+}
+
+impl Eq for RetainedCommandLine {}
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum SpawnExecutable {
@@ -361,12 +741,14 @@ impl SpawnSpec {
     fn publication_eq(&self, other: &Self) -> bool {
         let mut state = PublicationEqState::default();
         self.executable == other.executable
-            && self.command_line == other.command_line
             && self.outputs == other.outputs
             && self.environment == other.environment
             && self.execution_requirements == other.execution_requirements
             && self.mnemonic == other.mnemonic
             && self.progress_message == other.progress_message
+            && self
+                .command_line
+                .publication_eq_with(&other.command_line, &mut state)
             && self.inputs.publication_eq_with(&other.inputs, &mut state)
             && self.tools.publication_eq_with(&other.tools, &mut state)
     }
@@ -420,6 +802,84 @@ impl SymlinkSpec {
     pub fn progress_message(&self) -> Option<&str> {
         self.progress_message.as_deref()
     }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct ArgsWriteSpec {
+    output: ActionOutput,
+    recipe: RetainedArgsRecipe,
+    is_executable: bool,
+    execution_requirements: CanonicalStringMap,
+}
+
+impl ArgsWriteSpec {
+    pub fn new(output: ActionOutput, recipe: RetainedArgsRecipe, is_executable: bool) -> Self {
+        Self {
+            output,
+            recipe,
+            is_executable,
+            execution_requirements: CanonicalStringMap::default(),
+        }
+    }
+
+    pub fn output(&self) -> &ActionOutput {
+        &self.output
+    }
+
+    pub fn recipe(&self) -> &RetainedArgsRecipe {
+        &self.recipe
+    }
+
+    pub fn is_executable(&self) -> bool {
+        self.is_executable
+    }
+
+    pub fn execution_requirements(&self) -> &CanonicalStringMap {
+        &self.execution_requirements
+    }
+
+    pub fn render_content(&self) -> String {
+        self.recipe.render_write_content()
+    }
+}
+
+fn render_analysis_integer(value: &crate::analysis_value::AnalysisInteger) -> String {
+    if value.magnitude().is_empty() {
+        return "0".to_owned();
+    }
+    let mut digits = vec![0u8];
+    for byte in value.magnitude() {
+        let mut carry = u16::from(*byte);
+        for digit in &mut digits {
+            let next = u16::from(*digit) * 256 + carry;
+            *digit = (next % 10) as u8;
+            carry = next / 10;
+        }
+        while carry != 0 {
+            digits.push((carry % 10) as u8);
+            carry /= 10;
+        }
+    }
+    let mut result = String::with_capacity(digits.len() + usize::from(value.is_negative()));
+    if value.is_negative() {
+        result.push('-');
+    }
+    result.extend(digits.iter().rev().map(|digit| char::from(b'0' + *digit)));
+    result
+}
+
+fn shell_escape(value: &str) -> String {
+    let safe =
+        |character: char| character.is_ascii_alphanumeric() || "@%-_+:,./".contains(character);
+    if !value.is_empty()
+        && value
+            .chars()
+            .enumerate()
+            .all(|(index, character)| safe(character) || (character == '~' && index != 0))
+    {
+        return value.to_owned();
+    }
+    format!("'{}'", value.replace('\'', "'\\''"))
 }
 
 fn apply_validated_format(format: &str, value: &str) -> String {
@@ -497,6 +957,7 @@ pub enum ActionKind {
     Spawn,
     ArtifactSymlink,
     AbsoluteSymlink,
+    ArgsWrite,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -518,6 +979,7 @@ enum ActionPayload {
     Legacy(LegacyActionSpec),
     Spawn(SpawnSpec),
     Symlink(SymlinkSpec),
+    ArgsWrite(ArgsWriteSpec),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -530,6 +992,7 @@ pub struct ActionSpec {
 static SPAWN_KIND: ActionKind = ActionKind::Spawn;
 static ARTIFACT_SYMLINK_KIND: ActionKind = ActionKind::ArtifactSymlink;
 static ABSOLUTE_SYMLINK_KIND: ActionKind = ActionKind::AbsoluteSymlink;
+static ARGS_WRITE_KIND: ActionKind = ActionKind::ArgsWrite;
 static EMPTY_STRING_MAP: std::sync::LazyLock<BTreeMap<String, String>> =
     std::sync::LazyLock::new(BTreeMap::new);
 
@@ -561,6 +1024,10 @@ impl ActionSpec {
         Self::typed(ActionPayload::Symlink(spec))
     }
 
+    pub fn args_write(spec: ArgsWriteSpec) -> Self {
+        Self::typed(ActionPayload::ArgsWrite(spec))
+    }
+
     fn typed(payload: ActionPayload) -> Self {
         Self {
             payload,
@@ -577,6 +1044,7 @@ impl ActionSpec {
                 SymlinkTarget::Artifact { .. } => &ARTIFACT_SYMLINK_KIND,
                 SymlinkTarget::AbsolutePath { .. } => &ABSOLUTE_SYMLINK_KIND,
             },
+            ActionPayload::ArgsWrite(_) => &ARGS_WRITE_KIND,
         }
     }
 
@@ -585,41 +1053,42 @@ impl ActionSpec {
             ActionPayload::Legacy(spec) => &spec.mnemonic,
             ActionPayload::Spawn(spec) => spec.mnemonic(),
             ActionPayload::Symlink(_) => "Symlink",
+            ActionPayload::ArgsWrite(_) => "FileWrite",
         }
     }
 
     pub fn argv(&self) -> &[String] {
         match &self.payload {
             ActionPayload::Legacy(spec) => &spec.argv,
-            ActionPayload::Spawn(_) | ActionPayload::Symlink(_) => &[],
+            _ => &[],
         }
     }
 
     pub fn env(&self) -> &BTreeMap<String, String> {
         match &self.payload {
             ActionPayload::Legacy(spec) => &spec.env,
-            ActionPayload::Spawn(_) | ActionPayload::Symlink(_) => &EMPTY_STRING_MAP,
+            _ => &EMPTY_STRING_MAP,
         }
     }
 
     pub fn execution_requirements(&self) -> &BTreeMap<String, String> {
         match &self.payload {
             ActionPayload::Legacy(spec) => &spec.execution_requirements,
-            ActionPayload::Spawn(_) | ActionPayload::Symlink(_) => &EMPTY_STRING_MAP,
+            _ => &EMPTY_STRING_MAP,
         }
     }
 
     pub fn inputs(&self) -> &[ActionInput] {
         match &self.payload {
             ActionPayload::Legacy(spec) => &spec.inputs,
-            ActionPayload::Spawn(_) | ActionPayload::Symlink(_) => &[],
+            _ => &[],
         }
     }
 
     pub fn tools(&self) -> &[ActionInput] {
         match &self.payload {
             ActionPayload::Legacy(spec) => &spec.tools,
-            ActionPayload::Spawn(_) | ActionPayload::Symlink(_) => &[],
+            _ => &[],
         }
     }
 
@@ -628,13 +1097,14 @@ impl ActionSpec {
             ActionPayload::Legacy(spec) => &spec.outputs,
             ActionPayload::Spawn(spec) => spec.outputs(),
             ActionPayload::Symlink(spec) => std::slice::from_ref(spec.output()),
+            ActionPayload::ArgsWrite(spec) => std::slice::from_ref(spec.output()),
         }
     }
 
     pub fn param_files(&self) -> &[ParamFile] {
         match &self.payload {
             ActionPayload::Legacy(spec) => &spec.param_files,
-            ActionPayload::Spawn(_) | ActionPayload::Symlink(_) => &[],
+            _ => &[],
         }
     }
 
@@ -643,6 +1113,7 @@ impl ActionSpec {
             ActionPayload::Legacy(spec) => spec.progress_message.as_deref(),
             ActionPayload::Spawn(spec) => spec.progress_message(),
             ActionPayload::Symlink(spec) => spec.progress_message(),
+            ActionPayload::ArgsWrite(_) => None,
         }
     }
 
@@ -705,14 +1176,21 @@ impl ActionSpec {
     pub fn spawn_spec(&self) -> Option<&SpawnSpec> {
         match &self.payload {
             ActionPayload::Spawn(spec) => Some(spec),
-            ActionPayload::Legacy(_) | ActionPayload::Symlink(_) => None,
+            _ => None,
         }
     }
 
     pub fn symlink_spec(&self) -> Option<&SymlinkSpec> {
         match &self.payload {
             ActionPayload::Symlink(spec) => Some(spec),
-            ActionPayload::Legacy(_) | ActionPayload::Spawn(_) => None,
+            _ => None,
+        }
+    }
+
+    pub fn args_write_spec(&self) -> Option<&ArgsWriteSpec> {
+        match &self.payload {
+            ActionPayload::ArgsWrite(spec) => Some(spec),
+            _ => None,
         }
     }
 
@@ -724,16 +1202,14 @@ impl ActionSpec {
         match &self.payload {
             ActionPayload::Legacy(spec) => spec.argv.clone(),
             ActionPayload::Spawn(spec) => spec.render_argv(),
-            ActionPayload::Symlink(_) => Vec::new(),
+            _ => Vec::new(),
         }
     }
 
     fn legacy_mut(&mut self) -> &mut LegacyActionSpec {
         match &mut self.payload {
             ActionPayload::Legacy(spec) => spec,
-            ActionPayload::Spawn(_) | ActionPayload::Symlink(_) => {
-                panic!("legacy action builders cannot mutate typed action payloads")
-            }
+            _ => panic!("legacy action builders cannot mutate typed action payloads"),
         }
     }
 }
