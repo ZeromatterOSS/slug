@@ -2043,3 +2043,58 @@ and 255 net / 286 gross proof lines. No V1 extraction was required. The next
 support-action successor must continue to reuse the accepted typed owners and
 must not add a parser, global cache, rule-family branch or second runfiles
 representation.
+
+### Stage 6 runfiles support-action utility decision draft (2026-08-31)
+
+Proposed reuse is one shared `Arc<RunfilesSupport>` across the complete provider
+and three typed recipes, with dense runfiles depsets retained once and stable
+Artifact deduplication kept as iterative phase scratch. A narrow private typed
+FilesToRun carrier corrects nested/subrule transport without a generic payload,
+second graph, interner, cache, task, or path-based association. Atomic registry
+preflight owns publication; no lock crosses evaluation or computation.
+
+The proposal is not accepted implementation authority until independent
+retained-representation review returns `ACCEPT`. Bazel 9.2 fixes behavior;
+Zabel is peer ownership/optimization guidance only, and no V1/Buck2/Zabel
+semantic owner or layout is imported.
+
+### Stage 4/6 transitive runfiles package-mapping correction (2026-08-31)
+
+Independent review rejects the three-action/no-mapping draft. Under Bzlmod,
+Bazel's external-repository server setting makes transitive package tracking
+mandatory and produces `RepoMappingManifest` first. A caller-created absence
+token is not semantic evidence.
+
+The corrected prerequisite proposes one dense configured-result package closure
+whose leaves retain canonical package identity, selected mapping entries, and
+generated-owner cohort identity. This follows Zabel's useful separation between
+configured package closure and later manifest derivation while deliberately not
+copying its digest/store representation. No action, mapping bytes, cache,
+interner, new DICE key, or V1 owner is admitted before independent review.
+
+### Stage 4/6 transitive package collector utility correction (2026-08-31)
+
+Source inspected: the complete Legacy/Observed root mapping keys and views,
+root/external PackageRecorder paths, configured condition/platform/toolchain
+preparation, all configured edge producers, pinned Bazel 9.2
+`TransitiveDependencyState`, `TargetProducer`,
+`ConfiguredTargetAndDataProducer`, dependency/config-condition/native-
+toolchain rules, and Zabel `0795445f…` configured/nonconfigured transitive
+package owners as peer guidance.
+
+Decision: reuse Slug's existing root-mapping DICE owner, immutable `Arc` values,
+compact scratch maps/sets and Buck2-derived dense depset. Add one neutral
+package/mapping leaf and one phase-local collector with separate direct-package
+and configured-child inputs; publish only the dense closure on existing
+loading/analysis results. Selector conditions are configured rows, selected
+toolchain implementations contribute, and requested types/candidate platforms
+remain noncontributing resolution topology. Do not import Zabel's repository
+IDs, stores, physical-fingerprint digests, registration family, layout or
+scheduler, and do not add a V1 owner, flattened repository set, cache,
+interner, task, lock or new DICE key. Bazel 9.2 alone fixes package contribution
+and mapping behavior; Zabel informs only phase ownership and compact
+representation.
+
+Implementation status: zero Rust pending independent R3 correction rereview. The
+loading/metadata and configured-collector implementations are separate
+reviewed successors; neither may create an action or complete FilesToRun.

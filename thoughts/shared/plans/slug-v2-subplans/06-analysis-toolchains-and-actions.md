@@ -21746,3 +21746,58 @@ must construct typed support/tree/manifest Artifacts and register their actions
 atomically before an executable FilesToRunProvider becomes complete. Spawn
 expansion remains the following successor; no parser, `set`, `cc_common`,
 `cc_internal`, rule-family, DICE-key or execution special case is admitted.
+
+#### Runfiles support-action design active (2026-08-31)
+
+The zero-Rust successor freezes the Bazel-default non-Windows three-action
+topology: private source manifest, public in-tree manifest, then the special
+RunfilesTree Artifact. One producer-owned support object is shared by those
+typed recipes and the completed FilesToRunProvider; batch registration must be
+transactional, and nested/subrule occurrence transport must preserve the typed
+support rather than reconstructing it from public fields.
+
+Bazel 9.2 remains sole semantic authority. Zabel contributes only peer guidance
+for separating provider normalization, action derivation, and later physical
+realization. Windows, repository mapping, manifest bytes, Spawn expansion,
+aquery, execution, ActionKey and REAPI remain closed. Independent architecture
+review is required before Rust.
+
+#### Runfiles support design REPLAN; transitive package mapping prerequisite active (2026-08-31)
+
+Pinned-source review proved the default BCR graph cannot omit repository
+mapping: Bazel enables external repositories for Bzlmod, retains transitive
+package metadata, and registers `RepoMappingManifest` before the three actions
+named above. The prior no-mapping capability could not authenticate absence and
+is rejected.
+
+Activate the zero-Rust prerequisite that carries each loaded package's selected
+mapping and generated mapping-cohort identity through a dense transitive value
+on every configured result. It adds no action and leaves executable FilesToRun
+incomplete. After acceptance, the support successor must register all four
+actions and require the typed occurrence carrier with no supportless fallback.
+
+#### Transitive package prerequisite REPLAN; complete collector R3 active (2026-08-31)
+
+Independent review rejects the first prerequisite draft. Root BUILD loading
+passes an empty mapping even though `HostRootRepositoryMappingKey` already owns
+the complete post-extension/innate selected mapping. Configured publication
+also creates visibility, package-group, candidate-platform, requested-
+toolchain, selected-implementation and native-toolchain edges after discarding
+some corresponding child results; selector conditions are additional semantic
+configured inputs outside the declared-attribute map.
+
+R2 review then rejects over-including requested toolchain types, registered
+declarations and candidate platforms, and rejects flattening each selector
+package into the parent. Activate corrected R3 only. Legacy/Observed root loading must consume the
+existing complete mapping key with unchanged Need/frontier/event algebra. One
+phase-local Bazel-shaped collector separates directly read package metadata
+from configured-child dense closures and validates every Bazel package-
+contributing edge. Selector conditions enter as one configured child each;
+selected toolchain implementations contribute, while requested types and
+candidate platforms remain noncontributing resolution/query topology under
+pinned `DependencyResolutionHelpers`. Implementation is split into loading/
+metadata and configured-collector commits before the four-action successor.
+Bazel 9.2 remains sole semantic authority. Zabel's configured/nonconfigured
+package-closure separation is peer ownership and compactness guidance only; no
+Zig digest, store, exact-fingerprint node, layout, scheduler or behavior is
+copied.
