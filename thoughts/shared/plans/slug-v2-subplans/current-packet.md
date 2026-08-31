@@ -1,317 +1,371 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-noncallback-vector-args-paramfiles-implementation-r2`
+Packet: `WP-6-7A-complete-noncallback-spawn-envelope-implementation-r3`
 
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 action declaration.
 
-Status: Terminal `ACCEPT`. R1 returned `REPLAN` for two bounded integration
-misses: Bazel's typed binding validates a supplied vector source before the
-unsupported callback boundary, and the existing no-op action-sink test adapter
-was outside the proof allowlist. Focused R2 correction review accepted the
-shared validation-order fix and frozen one-line adapter; terminal rereview then
-accepted the complete implementation and unchanged retained architecture.
+Status: Corrected design `ACCEPT`; Rust implementation authorized. R1 returned
+`REPLAN`: it mistook the execution-time result of `resource_set` for an
+analysis-time dictionary parameter and claimed exact File executable/tool
+behavior without detecting Bazel's executable-attribute-to-FilesToRun
+association. R2 corrected those owners but returned `REPLAN` for treating all
+depset tools alike: Bazel checks every File in a top-level `tools=depset(...)`
+against that association, while a depset nested in a tools sequence bypasses
+per-leaf lookup. R3 preserves that distinction without flattening retained
+depset topology. It accepts only omitted/`None` resource callbacks and only
+File forms admitted by their exact container-specific association rule. This
+remains one bounded generic Spawn-envelope packet over the accepted action
+owner, not a C++/FDO rule packet
+or permission to implement adjacent provider, callback, execution, or
+named-exec-group categories.
 
-Base: `2bf929bd1`, the R1 design commit atop `78b94789c`, which terminally
-accepts typed `DefaultInfo.files`, scalar Args, generic Spawn/artifact-symlink/
-absolute-symlink declaration, configured caller authentication, and action
-publication cutoff. The unrelated dirty
+Base: `a01a23fe7`, which terminally accepts one evaluator-owned Args recipe,
+scalar and non-callback vector transforms, param-file policy/write, generic
+typed `run`, artifact/absolute symlinks, configured action environments, dense
+depset inputs, and atomic action publication. The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked;
 do not edit or stage it.
 
 ## Observable result and category boundary
 
-An ordinary rule or subrule can add sequence or depset values to the existing
-evaluator-local `Args` through non-callback `add_all` and `add_joined`, retain
-the resulting recipe in the already-accepted command-line owner, attach exact
-parameter-file policy, and pass the same Args to `actions.run` or
-`actions.write`. The admitted vector values are strings, integers, and regular
-Files. Sequence membership is snapshotted at the Args call; depset topology is
-lowered once at action registration and retained without flattening.
+Ordinary rules and subrules can declare `actions.run` and `actions.run_shell`
+through the same typed `SpawnSpec` and the same common non-callback envelope.
+The packet completes all fields whose semantic inputs are already owned by the
+default configured action context: arbitrary nonempty output sequences,
+sequence/depset inputs and admitted tools, mixed string/Args arguments,
+string/proven-unassociated File executables, string shell commands,
+`unused_inputs_list` for
+`run`, mnemonic, raw progress message, configured/default plus explicit
+environment, filtered execution requirements with default Bazel 9 target-tag
+propagation, ignored `input_manifests`, omitted/`None` `resource_set`, and
+explicit `None`/omitted default-context selection.
 
-This fills the vector and param-file variants reserved by the accepted generic
-action architecture. It adds no second Args, command-line, depset, File, spawn,
-or write owner. It is not an execution or C++ packet: Bazel 9 BCR Starlark,
-including `cc_internal`, remains an ordinary consumer. Buck2 starlark-rust
-continues to own parsing, binding, evaluation, heap lifetime, method dispatch,
-and `set` semantics.
+“Complete” is deliberately category-qualified. Non-`None` `shadowed_action`,
+named `exec_group`, automatic-exec-group/toolchain selection, FilesToRun and
+runfiles expansion, Files associated with an executable attribute, callable
+`resource_set`, deprecated list-valued shell
+commands, and execution-time helper scripts are separate semantic categories
+and fail closed here. Their parameter positions are admitted with exact
+`None`/default or rejection behavior so a later packet extends the one envelope
+instead of adding another Spawn representation.
+
+Bazel 9 BCR Starlark owns rule control flow, including `cc_internal`.
+`cc_common` and rules_cc action construction are demanding consumers of this
+generic API, never Rust C++ rule bodies or parser branches. Buck2 starlark-rust
+continues to own parsing, binding, evaluation, dispatch, and heap lifetime.
 
 ## Learned facts and authority
 
 Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is the sole
 semantic authority:
 
-- `Args.java` SHA-256
-  `ac704917bb3d6814fdb6f642c42d9300d9cac1d6fc624d769d3d41e42225ef1b`
-  and `CommandLineArgsApi.java` SHA-256
-  `18e3825616f147cdcd83b60444dfc8b961c971a9aec8f7aff4aed74226e1cdf6`
-  fix the one/two positional forms, mutation checks, sequence/depset sources,
-  validation order, formatting, stable-first uniquification, omission,
-  before/terminate placement, joining, directory-expansion default, and
-  param-file mutators.
+- `StarlarkActionFactoryApi.java` SHA-256
+  `0e9173ce523ff5b6a52b09065e0c4e113ae3433d968a6c1bc5d5e0d48ede8a25`
+  fixes the complete `run`/`run_shell` signatures, default values, and public
+  parameter types.
 - `StarlarkActionFactory.java` SHA-256
-  `bee52fa85442fe668c8573bbd2218dd454485ac8d4451ecf3553201fba6169a2`
-  fixes action-time Args snapshotting and the distinct Args-backed
-  `ParameterFileWriteAction` path.
-- `ParamFileInfo.java` SHA-256
-  `a144542b382892258c4043390387e1133db51ba6db187436205db4ce105f697f`
-  fixes flag format, always-use, file type, and flags-only structural policy.
-- `ParameterFile.java` SHA-256
-  `f188a72a4ed5cbc97142c8e3bcf447e4774599b0b1fa7e94ee3d7aa2c48be7ee`
-  fixes newline framing and shell-quoted versus unquoted content; flag-per-line
-  groups flag names and values before unquoted newline framing.
+  `f3e2201e7d8c712318c967b652e685ff3b17b8ba7167dd838b4ea2b96ad71681`
+  fixes mixed command-line construction, shell `$0` padding, common-envelope
+  validation order, tool/input handling, environment choice, execution-info
+  filtering, exec-group selection, unused-input discovery, and resource-set
+  parsing.
+- `TargetUtils.java` SHA-256
+  `d28d06e0803c4442aef9315a29019f4d1a3653bcc6ef9c488535a7036b97290d`
+  fixes legal execution-info keys, explicit-value precedence, target-tag
+  propagation, duplicate collapse, and sorted output.
+- `SpawnAction.java`, `StarlarkAction.java`, and `AbstractAction.java` SHA-256
+  values `2f71947da1863b6e6264cfb0480b47b39b9e527135b10cfefacfb4ba3700b5fa`,
+  `75a798c4e6225078ed803c87a427a052debf856e0ad47d3e44330a5457e4d7b7`, and
+  `02e6f567792d285a7139f956238ea990118160ce333d1ac8d88f7a43efbb188a` fix retained Spawn fields, shell and progress-message
+  ownership, input discovery, and the later presentation substitution seam.
 - `StarlarkRuleImplementationFunctionsTest.java` SHA-256
-  `89e6caf0c6d234be610ccb597a015610568c27f8071d572e55a7378a106597d8`
-  pins add-all/joined order, empty behavior, uniquification, mixed segments,
-  parameter-file policy, invalid formats, and Args-backed write.
-- `ArgsParamFileTest.java` SHA-256
-  `06f3e840ec2e4ffcf0173d51eaf23bc1cff3d9ff86ed3e729c702f2d945e32c4`
-  pins shell, multiline, flag-per-line and set-format-once behavior.
+  `c87d218a50c8380178cae400876c906155e3a4fbe84b731537c085adcbe36260`
+  pins shell padding, environment, execution-info filtering, mnemonic,
+  progress-message templates, mixed arguments, depset inputs, and default
+  Bazel 9 rejection of list-valued shell commands.
+- `StarlarkRuleContextTest.java` SHA-256
+  `5d3973895db273a1d5d705489d820910ed0353db87a2d33f9e847ede87f61510`
+  pins unused-input discovery, callable resource-set results, and
+  FilesToRun-backed executable behavior. The resource dictionary is the
+  callback's execution-time return value, never the public parameter.
+- `StarlarkRuleContext.java` and `StarlarkAttributesCollection.java` SHA-256
+  values `5200266852f65ca66a958a3adaf82a29f9b5cbbd1a604a4e91d7815476985072`
+  and `9b3b300d7e9c25dceafc8a9450dd2511f9b0b83088e11421b6dc3b5086cc7442`
+  fix the producer-owned executable-Artifact to FilesToRun association used by
+  both executable and direct-list tool lowering.
+- `StarlarkSubrule.java` SHA-256
+  `9d2115fdf86f1807abaf0405d3a5b36fbb3d9f8abd87aa82440f72e6e46657b6`
+  fixes the stricter subrule boundary: a File corresponding to dependency
+  runfiles is rejected rather than recovered and must be passed as
+  FilesToRunProvider.
+- `AutoExecGroupsTest.java` SHA-256
+  `c45c938a358c46bfdcc71becabf3a0332bf80441b24b32b71eed1c38e3a7cc4e`
+  proves that named/automatic exec-group compatibility is a real configured
+  topology boundary and therefore is not guessed by this default-context
+  packet.
 
-Reuse those source regressions; no fresh oracle is needed unless implementation
-exposes an observable they do not discriminate. Java object identity,
-interner behavior, implementation class names, and private builder layout are
+No fresh Bazel oracle is required unless implementation exposes an observable
+not discriminated by those sources/tests. Java weak interning, object layout,
+builder classes, helper-script counters, and implementation class names are
 not compatibility surfaces.
 
-Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` remains concept-
-only peer guidance for evaluator-owned mutation, action-time finalization,
-typed segments, and compact immutable recipes. Copy no Zig code, names,
-layout, diagnostics, fingerprints, or tests. Buck2-derived utility guidance
-selects compact `Arc` slices, `CompactString`, `Dupe`, `Allocative`, and the
-already-retained dense depset. Import no Buck2 command line, action, interner,
-cache, parser, or `transitive_set` owner.
+Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is concept-only
+peer guidance. Its `ARCHITECTURE.md` and
+`src/analysis/{logical_actions,starlark_action_registration}.zig` demonstrate
+one producer-owned Spawn row, explicit-over-tag execution-info merging,
+configured inherited-environment policy, compact retained flags, and atomic
+registration. Copy no Zig code, layout, fingerprints, diagnostics, caches, or
+tests. Buck2 commit `088c75c7e36805df99c3de29062baa95db700b8b` supplies only
+retained-utility guidance: reuse Slug's existing `Arc` slices,
+`CompactString`, `CanonicalStringMap`, `Dupe`, `Allocative`, and dense depset;
+import no Buck action, command-line, registry, scheduler, or user semantics.
 
 ## Compatibility classification
 
-**Exact:** active-context/receiver and evaluator mutability checks; same-object
-chaining; `add_all` and `add_joined` one/two positional forms over lists,
-tuples, and depsets of admitted strings, integers, or regular Files;
-`format_each`, `before_each`, `omit_if_empty`, `uniquify`, `terminate_with`,
-`join_with`, and `format_joined` order; the single-`%s`/`%%` formatter;
-sequence membership snapshot, action-time snapshot, and post-registration
-isolation; `expand_directories=True` or false when no directory File occurs;
-directory File rejection before publication; `use_param_file` flag format and
-always-use state; shell, multiline, and flag-per-line format selection and
-set-once validation; param-file newline/quoting/grouping bytes for Args-backed
-write; string-versus-Args write dispatch; output ownership, executable bit,
-default FileWrite mnemonic, and atomic publication; and publication equality
-for separately allocated dense depset recipes including alias topology.
+**Exact:** active-context and receiver checks; named parameter/default binding;
+nonempty ordered output sequences; admitted File/depset input and tool order,
+where File executables, direct sequence tools, and every leaf of a top-level
+tools depset are proven absent from the configured executable-attribute
+association before publication, while nested sequence depsets are retained
+without that lookup;
+mixed string/Args segment order and Args snapshotting; run executable and
+run-shell command validation order; `$0` padding based on a nonempty top-level
+arguments sequence even when an Args expands empty; default `Action` mnemonic
+and alphanumeric validation; raw progress-message retention; explicit and
+default action-environment composition; string/string dict validation;
+execution-requirement legal-key filtering; default-true legal target-tag
+propagation with explicit values winning and canonical key order;
+`unused_inputs_list` File/`None`; ignored sequence/`None` `input_manifests`;
+omitted/explicit `None` resource callback equivalence and public rejection of
+non-callable resource values before method entry; `None` or
+omitted default exec context; atomic output conflict behavior; and publication
+equality/cutoff for every retained field.
 
-**Slug-native:** evaluator-to-analysis borrowed snapshot mechanics; Rust valid-
-Unicode strings; compact recipe storage; structural action identity; generated
-File path bytes and any rendered vector/param-file bytes containing them; and
-the typed non-executed Args-write action representation. The transformation
-algorithm and typed artifact relationships are exact; only configured output
-spelling remains Slug-native.
+**Slug-native:** Rust valid-Unicode strings; configured generated paths and
+shell executable spelling; compact immutable envelope layout; structural
+action identity; symbolic retention of a shell command rather than Bazel's
+analysis-time helper-script Artifact; and progress-message output/input bytes
+when generated path spelling participates. The raw template and substitution
+rules remain exact; presentation is not moved into semantic identity.
 
-**Unsupported/deferred:** `map_each`, `allow_closure`, `DirectoryExpander`, and
-directory/tree artifact expansion; Labels and arbitrary Starlark values in
-vector sources; runtime platform command-length selection when
-`use_always=False`; materialization of spawn param files; aquery, execution,
-ActionKey, or REAPI projection for typed Spawn/Symlink/ArgsWrite actions;
-explicit Args-write mnemonic/execution requirements; callbacks; Args-backed
-template expansion; FilesToRun/runfiles; and remaining spawn-envelope or
-symlink forms. A deferred value or callback fails during Args lowering or
-action registration and publishes no action.
+**Unsupported/deferred:** FilesToRunProvider executables/tools and runfiles;
+File executables/direct-list tools authenticated by the executable-attribute
+association (detected and rejected rather than silently stripped);
+named `exec_group`, automatic exec groups, non-`None` toolchain-driven group
+selection, and nondefault Starlark-semantics flags; non-`None`
+`shadowed_action` and action-introspection providers; callable `resource_set`
+and its execution-time resource dictionary; list-valued
+`run_shell(command=...)` when Bazel 9's default
+incompatible flag is disabled; directory/tree inputs and expansion;
+execution-time shell helper scripts and unused-input pruning; spawn param-file
+materialization; aquery, ActionKey, REAPI, or execution projection of typed
+Spawn; and C++-specific action families. Every non-`None` deferred value fails
+before publication; existing REAPI/InputTree/execution gates remain closed.
 
 ## Frozen ownership and implementation
 
-### Evaluator-local recipe and synchronous lowering
+### One typed invocation and one common envelope
 
-Replace the scalar-only vector inside `StarlarkArgs` with one evaluator-local
-ordered call recipe. Scalar calls keep their accepted owned retained values.
-Vector calls retain an evaluator-local source plus owned options:
+Replace `SpawnSpec.executable` with one closed launcher union:
 
 ```text
-EvaluatorArgCall = Scalar(RetainedScalarArg)
-                 | Vector {
-                     kind: AddAll | AddJoined,
-                     source: Sequence([Value]) | Depset(Value),
-                     arg_name, format_each, before_each,
-                     join_with, format_joined,
-                     omit_if_empty, uniquify, terminate_with,
-                   }
-EvaluatorParamState = { file_type, flag_format?, always, flags_only }
+RetainedSpawnInvocation = Executable(SpawnExecutable)
+                        | Shell { command: CompactString, pad_dollar_zero: bool }
+
+SpawnSpec = {
+  invocation,
+  command_line: RetainedCommandLine,
+  inputs: ArtifactInputs,
+  tools: ArtifactInputs,
+  outputs: Arc<[ActionOutput]>,
+  unused_inputs_list: Option<AnalysisArtifact>,
+  environment: RetainedActionEnvironment,
+  execution_requirements: CanonicalStringMap,
+  mnemonic: CompactString,
+  progress_message: Option<CompactString>,
+}
 ```
 
-The Starlark value traces every stored `Value`; no unsafe trace omission may
-hide a vector source. A list/tuple copies its element occurrences when
-`add_all`/`add_joined` is called, so later container mutation is invisible. A
-depset retains only its evaluator occurrence until a consuming action call.
-The Args object still refuses freezing.
+There is no retained resource field in this non-callback packet. The public
+parameter is bound as `StarlarkCallable | None`: omitted and explicit `None`
+share Bazel's fixed default, a direct dictionary/non-callable fails in
+starlark-rust binding, and an admitted callable value is rejected as the first
+unsupported callback-owned step before any publication. A later execution
+packet owns callback retention, `(os_name, input_count)` invocation, dictionary
+validation, and resource values together.
 
-The starlark-rust method signature uses `Value` for Bazel's sequence-or-depset
-union. The shared positional helper therefore validates and captures that
-source after the two-position arg-name check but before callback rejection.
-For either positional form an invalid source wins over a valid callback, while
-an invalid two-position arg name wins over both. This reproduces Bazel's typed
-binder plus `Args` method ordering without changing the parser or retaining a
-callback.
+Both evaluator methods build an evaluator-borrowed request and call the same
+analysis sink. The sink lowers all values, filters/merges execution
+requirements, validates deferred fields, constructs the complete `SpawnSpec`,
+then acquires the short action-registry lock exactly once. `run_shell` no
+longer publishes the legacy `ActionKind::RunShell` payload. Keep legacy helpers
+only where unrelated scaffolding still consumes them; no evaluator path may
+publish a second Spawn owner.
 
-At `run` or Args-backed `write`, clone only a request-local snapshot of the
-evaluator recipe and synchronously hand it to the existing analysis-owned sink.
-The analysis lowerer converts each admitted scalar and the depset root into
-owned build-API values before return. No `Value`, heap, evaluator, mutable
-container, callable, repository mapping, or call token enters `ActionSpec`.
-Lowering and rendering occur before the short `CtxActions` registry lock.
+Follow Bazel's admitted method-body ordering after starlark-rust binding:
+command-line values first; run executable or run-shell command next; then
+inputs, outputs, unused list, tools, mnemonic, progress message, environment,
+execution requirements, default-context selectors, shadow/resource policy,
+and finally publication. Validation failure leaves no declared action.
 
-### One retained command-line and dense-depset owner
+### Producer-owned executable provenance, tags, and default action context
 
-Extend the existing retained command-line variants, rather than adding a
-parallel vector:
+Before evaluator entry, derive immutable executable-Artifact sets from the
+already-prepared configured dependencies whose attribute declaration has
+`executable=True`: one root-rule set and one set per subrule identity for its
+hidden dependencies. This is the bounded Slug equivalent of Bazel's
+context-local `StarlarkAttributesCollection` association and is
+configuration-result state, not a filesystem lookup or global registry. A
+root dependency must not affect a subrule set, and one subrule's hidden
+dependency must not affect the root or a sibling. Add only the executable
+Artifact identity; do not copy or synthesize FilesToRun or runfiles payloads.
 
-```text
-RetainedArgsRecipe = {
-  calls: Arc<[RetainedArgCall]>,
-  write_format: RetainedParamFileFormat,
-}
-RetainedSpawnArgsSnapshot = {
-  recipe: RetainedArgsRecipe,
-  param_file: Option<RetainedSpawnParamFilePolicy>,
-}
-RetainedArgCall = Scalar(RetainedScalarArg)
-                | AddAll(RetainedVectorArg)
-                | AddJoined(RetainedVectorArg)
-RetainedVectorSource = Sequence(Arc<[RetainedScalarValue]>)
-                     | Depset(RetainedArgsDepset)
-RetainedParamFileFormat = Shell | Multiline | FlagPerLine
-```
+For `run(executable=File)`, direct sequence File entries in `tools`, and every
+File leaf of a top-level `tools=depset(...)`, consult the current evaluator
+call scope's set before retaining the action. Visit top-level depset leaves as
+validation scratch through the accepted dense traversal; do not flatten,
+rebuild, or replace the retained depset node. An absent entry proves the
+admitted no-associated-runfiles case and retains the File normally. A present
+entry fails closed as the deferred FilesToRun category; it must never publish
+the Artifact alone. In contrast, a depset that is itself one member of a tools
+sequence remains a transitive tool depset without per-element association
+lookup, matching Bazel's branch ordering. The evaluator request carries
+a closed root-or-specific-subrule identity so later FilesToRun work can keep
+Bazel's context-local lookup and distinct subrule rejection without replacing
+the common Spawn owner.
 
-`RetainedArgsDepset` directly wraps the accepted `AnalysisDepset`, validates
-empty/string/integer/artifact element types, and iteratively visits it only for
-scratch rendering. It never flattens the semantic ABI. Rendering performs, in
-order: scalar projection, `format_each`, stable-first uniquification,
-`before_each`, omission decision, arg-name/terminator insertion, or join then
-`format_joined`. Empty strings remain values. `add_joined(...,
-omit_if_empty=False)` emits the empty joined argument.
+The loaded rule's already-resolved builtin `tags` attribute is the natural
+producer for tag-derived execution requirements. Before evaluator entry,
+extract only legal Bazel execution tags and give the synchronous sink one
+immutable `CanonicalStringMap`. At action registration, filter the explicit
+dict, then add missing tag keys with empty values. Do not read the filesystem,
+environment, CLI globals, or reconstruct tags from `ctx.attr` strings.
 
-Command-line publication equality becomes manual. One shared
-`PublicationEqState` compares every vector-depset source together with Spawn
-inputs and tools, preserving dense rows, order, values, roots, and alias
-partitions. Sequence and depset sources remain structurally distinct. Ordinary
-`AnalysisDepset::Eq` remains occurrence identity.
+The existing `ConfiguredActionOwnerContext` remains the sole selected-platform
+and toolchain owner. This packet accepts only its default group. Explicit
+`exec_group=None` and `toolchain=None`/omission select that context. A Label or
+string toolchain value may be validated only where the existing canonical
+label/package-context owner can do so without guessing; otherwise fail closed
+and leave that form with automatic-exec-group work. Never synthesize a named
+context, infer one from tool paths, or add a command-side platform lookup.
 
-`use_param_file` snapshots a structurally distinct policy on each consuming
-Spawn only; a later Args mutation affects only later Spawn actions.
-`set_param_file_format` sets the common recipe encoding at most once whether or
-not a Spawn policy is present. Args-backed write consumes the common calls and
-format but deliberately drops `param_file_arg` and `use_always`, matching
-`StarlarkActionFactory.write`. Do not import Bazel's weak interner or retain
-both policy and pre-rendered bytes.
-
-### Typed Args-backed write
-
-Add one `ArgsWriteSpec` payload to the closed `ActionPayload` union. It owns one
-authenticated output, one `RetainedArgsRecipe` without Spawn-only param policy,
-the executable bit, default FileWrite mnemonic, and an empty canonical
-execution-requirement map. String content continues through the existing
-FileWrite action unchanged. Args content uses only `ArgsWriteSpec`; it does not
-populate legacy content, argv, input, or param-file vectors. Two writes whose
-Args differ only in `use_param_file` flag format or `use_always` compare equal;
-the corresponding Spawn snapshots compare unequal.
-
-The build API may expose a non-digest rendered-content helper for tests and
-future aquery work. It emits exact selected format bytes, but REAPI Command,
-InputTree, action planning, execution, and digest construction reject
-`ArgsWriteSpec` before producing bytes. Spawn param-file policy remains
-declarative; runtime spill choice and derived param-file paths are not guessed.
+`input_manifests` is type-checked and discarded exactly as Bazel documents;
+it never enters equality. A non-`None` shadowed action or callable resource set
+is rejected before any evaluator value could cross the sink boundary.
 
 ## Request, revision, and memory behavior
 
 No new DICE key, observed input, environment read, filesystem read, async task,
-cache, interner, or global registry is added. Args objects and evaluator source
-occurrences are phase scratch and die with evaluation. Lowering/rendering
-vectors and stable-first seen sets are action-call or consumer scratch.
-Retained recipes, scalar values, dense depsets, policy, and ArgsWriteSpec are
-immutable configured-analysis state and participate in result equality/cutoff.
-Cancellation before registry publication leaves no partial action. Concurrent
-requests have independent evaluators and sinks; they share only immutable
-already-published configuration/depset values. Release follows the existing
-analysis-result/action owners, with no separate eviction or shutdown work.
+cache, interner, or global registry is added. Rule tags, context-scoped
+executable-attribute provenance, configuration action environment, selected
+default action context, Files, depsets, and target owner are already inputs of
+the configured-analysis computation, so changes
+invalidate through existing keys and structural result equality.
 
-## Allowlist, caps, and stops
+Evaluator requests, dictionaries, and top-level tool-depset association walks
+are phase scratch. The sink copies them before return. Retained invocation,
+command-line recipe, inputs/tools, outputs, unused-input artifact, environment,
+requirements, mnemonic, and progress template are immutable configured-analysis state and
+participate in equality/cutoff. Rendering vectors and validation maps are
+action-call scratch. No `Value`, callable, heap, mutable dict/list, mapping
+closure, call token, or lock guard enters `ActionSpec`. Cancellation before
+the single registry publication leaves no partial action; concurrent requests
+share only immutable configured inputs and retain no transfer-owned task.
+
+## Evidence, allowlist, caps, and stops
+
+Adapt the named Bazel tests into existing Rust integration tests; no copied
+workspace fixture is needed. Each adaptation records its source method in the
+test name/comment and compares structured semantics or exact diagnostics, not
+Java object identity. Callback/resource execution and FilesToRun/runfiles
+expansion,
+shadowed actions, named exec groups, helper-script thresholds, and disabled
+incompatible flags are skipped because their owning phases/categories are
+explicitly deferred, not because their behavior is assumed.
 
 Production files:
 
 - `app/slug_loading_v2/src/subrule_invocation.rs`;
-- `app/slug_analysis_v2/src/starlark_rule.rs`;
-- `app/slug_build_api_v2/src/actions/{spec.rs,ctx_actions.rs,registry.rs,reapi_projection.rs,mod.rs}`
+- `app/slug_analysis_v2/src/{dice.rs,starlark_rule.rs}`; `dice.rs` may only
+  forward already-resolved executable-attribute provenance into prepared
+  analysis state and may add no DICE key or computation;
+- `app/slug_build_api_v2/src/actions/{spec.rs,ctx_actions.rs,registry.rs,mod.rs}`
   and `app/slug_build_api_v2/src/lib.rs`;
-- `app/slug_reapi_v2/src/{command.rs,input_tree.rs}` only for explicit
-  fail-closed handling of the new payload if the existing typed gate is not
-  already exhaustive.
+- `app/slug_reapi_v2/src/{command.rs,input_tree.rs}` only if exhaustive
+  fail-closed matching requires a compile adapter.
 
 Proof files:
 
 - `app/slug_build_api_v2/tests/actions.rs`;
 - `app/slug_analysis_v2/tests/starlark_rule.rs` and `tests/subrule.rs`;
-- `app/slug_loading_v2/src/builtin_restriction_tests.rs` only to change the
-  unused no-op sink's `content` parameter from `&str` to `Value`; its frozen
-  base SHA-256 is
-  `959a3cc8a243cb7efcf1b44e479d74168beb22d389997b2d262f3b5791126a60`;
-- focused loading tests colocated in `subrule_invocation.rs` only if binding
-  order cannot be proved through analysis tests;
-- `app/slug_reapi_v2/tests/reapi.rs`.
+- focused loading tests colocated in `subrule_invocation.rs` only when binding
+  behavior cannot be proved through analysis;
+- `app/slug_reapi_v2/tests/reapi.rs` only for the existing typed rejection.
 
 Plans may touch this manifest, canonical Live Status, Stage 6, and Stage 9.
 Do not touch the parked loading proof. Add no crate dependency, DICE key,
-starlark-rust parser/evaluator change, FDO/C++ branch, executor behavior,
-fallback, JVM, Java helper, or donor code.
+starlark-rust parser/evaluator change, provider/runfiles/action-introspection
+owner, exec-group topology, callback retention/evaluation, execution behavior,
+fallback, JVM, Java helper, donor code, or C++/FDO branch.
 
-Cap added Rust at 900 production, 800 proof, and 1,700 total lines. No touched
-production file may cross 2,000 lines; `starlark_rule.rs` remains cohesive as
-the analysis-owned synchronous lowering sink, while its large integration test
-file is a pre-existing proof owner. `REPLAN` before exceeding a cap, adding a
-production file, retaining any evaluator value, flattening a depset into the
-semantic ABI, duplicating the command-line/write owner, or needing callback,
-directory-expansion, execution, or repository-mapping semantics.
-
-## Evidence and validation gates
+Cap added Rust at 950 production, 800 proof, and 1,750 total lines. No touched
+production file may cross 2,000 lines and no changed function may cross 150
+lines; factor small validation/lowering helpers within the allowlist rather
+than centralizing other builtins. `spec.rs` remains the closed typed action
+schema, `starlark_rule.rs` the synchronous lowerer, and
+`subrule_invocation.rs` the evaluator ABI. `REPLAN` before exceeding a cap,
+adding a production file, duplicating Spawn state, retaining an evaluator
+value, moving presentation into identity, bypassing configured tag/environment
+owners, or requiring any deferred category.
 
 Focused proof must discriminate:
 
-1. list/tuple snapshot versus later mutation, depset dense topology, scalar
-   type rejection, one/two positional forms, and same-object chaining;
-2. every admitted transform and its order, empty/empty-string behavior,
-   stable-first uniquification, formats with `%s`/`%%`, mixed scalar/vector/
-   literal segments, and cold/warm identical rendering;
-3. regular source/generated Files with generated bytes classified Slug-native,
-   plus fail-closed directory, callback, closure, arbitrary value, and invalid
-   source cases before action publication; both positional forms prove invalid
-   source before callback, while invalid two-position arg name wins first;
-4. action-time and post-registration isolation for calls and param policy;
-5. shell, multiline, and flag-per-line bytes; invalid flag format, invalid
-   file format, and set-format-twice errors; Spawn always true/false structural
-   distinction without a runtime-spill claim; and ArgsWrite publication/render
-   equality when only `param_file_arg` or `use_always` changes;
-6. Args-backed write versus unchanged string FileWrite, output ownership,
-   executable bit, default mnemonic, one semantic payload, and atomic conflict
-   rejection;
-7. publication equality/cutoff for separately allocated equal vector depsets,
-   then inequality for topology/value/order/source-kind/alias/policy changes;
-8. `Allocative`, cheap-clone, evaluator/action release, and no retained
-   Starlark value or parallel rendered vector; and
-9. REAPI Command/InputTree/execution rejection before digest/action-plan bytes,
-   with existing FileWrite and typed Spawn/Symlink behavior unchanged.
+1. run and run-shell publish the same typed payload, preserve every output and
+   mixed command-line segment, and differ structurally by invocation kind;
+2. shell `$0` padding follows top-level arguments-sequence emptiness, including
+   an empty-rendering Args, and default/list command behavior matches Bazel 9;
+3. explicit inputs/tools/depsets, executable, unused-input File,
+   mnemonic, progress template, environment, and requirements each affect
+   equality while ignored manifests and equivalent defaults do not;
+4. legal/illegal requirement keys, legal/illegal target tags, duplicates,
+   explicit-over-tag precedence, stable key order, and A/B/A configured
+   analysis cutoff;
+5. omitted/explicit-`None` resource values are equal, direct dictionaries and
+   other non-callables fail in binding, and callable rejection occurs before
+   publication;
+6. locally declared/unassociated File executable and direct-list tool forms
+   publish, current-context executable-attribute-associated Files and
+   FilesToRun-like values fail closed without partial actions, root and sibling
+   subrule provenance cannot cross scopes, an associated leaf in a top-level
+   tools depset fails closed, and the same leaf in a sequence-nested depset is
+   retained without per-element association inference;
+7. `None`/omitted default-context fields are equal, while named group,
+   shadowed action, and other deferred forms fail closed without partial
+   actions;
+8. post-registration list/dict/Args mutation cannot affect retained actions,
+   release retains no Starlark value, and compact values implement
+   `Allocative`/cheap clone where applicable; and
+9. REAPI Command/InputTree/execution still reject the enriched typed Spawn
+   before digest/action-plan bytes, with FileWrite/Symlink/ArgsWrite unchanged.
 
 Run serial focused loading/build-API/analysis/REAPI tests, then full
-`slug_build_api_v2`, `slug_loading_v2`, `slug_analysis_v2`, and `slug_reapi_v2`
-tests. Run `cargo check -p slug_core_v2` as the direct public dependent; rebuild
-`slug_cli_v2` only if a CLI smoke is selected. Finish with `cargo fmt --all --
---check`, `cargo metadata --format-version 1 --no-deps`,
-`scripts/v2_archive_status.sh`, `git diff --check`, cap accounting, and parked-
-file integrity.
+`slug_build_api_v2`, `slug_loading_v2`, `slug_analysis_v2`, and
+`slug_reapi_v2` suites. Run `cargo check -p slug_core_v2` as the direct public
+dependent; rebuild `slug_cli_v2` only if a CLI smoke is selected. Finish with
+`cargo fmt --all -- --check`, `cargo metadata --format-version 1 --no-deps`,
+`scripts/v2_archive_status.sh`, `git diff --check`, cap/physical-size
+accounting, and parked-file SHA-256 verification.
 
-R1 terminal review accepted the retained recipe/snapshot split, shared
-publication state, ArgsWrite policy separation, atomic lowering, REAPI
-boundary, caps, and generic no-C++ architecture, but returned `REPLAN` on the
-binding-order and allowlist misses above. Focused R2 correction review and the
-complete terminal rereview both returned `ACCEPT`. Focused/full validation
-passes 60 build-API, 541 loading with one ignored, 106 analysis, and 22 REAPI
-tests with one ignored, plus the public core check, formatting, metadata,
-diff-check, frozen-base archive classification, and parked-file integrity.
-Added Rust is 891 production, 747 proof, and 1,638 total lines; every touched
-production file remains below 2,000 lines.
+Independent corrected design review must confirm that the category boundary is
+honest, the typed launcher/envelope avoids future builtin churn,
+scope-separated executable provenance and tag ownership are producer-correct,
+`resource_set` is not misrepresented as a dictionary parameter, validation
+ordering is bounded,
+deferred fields fail closed, and caps are credible before Rust edits. The R3
+focused correction review returned `ACCEPT`. Independent terminal review
+is mandatory for the retained public action representation. A material miss is
+`REPLAN`; one focused correction may be reviewed before implementation resumes.
 
-Terminal `ACCEPT` updates the canonical M7 row and Stage 6/9 record, commits the
-packet without the parked proof, and selects
-`WP-6-7A-complete-noncallback-spawn-envelope-implementation-r1`.
+Terminal `ACCEPT` updates canonical M7 and Stage 6/9, commits the packet without
+the parked proof, and selects the next bounded bootstrap-critical consumer or
+the typed standard-provider/exec-group category from actual BCR reachability.

@@ -485,6 +485,26 @@ implementation passes the focused ordering/consumer proofs, all four full
 owner/direct-dependent suites, the public core check, and hygiene gates at
 891/747/1,638 added Rust lines. The remaining Spawn envelope is the next
 bounded action category; typed standard-provider breadth remains separate.
+Commit `a01a23fe7` freezes that accepted implementation. The first complete-
+envelope design returned `REPLAN`: Bazel's public `resource_set` parameter is
+callable-or-`None`, not the callback-result dictionary, and an Artifact used as
+an executable or direct-list tool may be associated with FilesToRun through an
+`executable=True` configured attribute. R2 then returned `REPLAN` because
+Bazel checks executable association for each File in a top-level tools depset
+but deliberately skips that lookup for a depset nested inside a tools
+sequence. Activate only
+`WP-6-7A-complete-noncallback-spawn-envelope-implementation-r3`: unify
+`run_shell` with the typed Spawn owner, admit only omitted/`None` resource
+callbacks, and derive producer-owned executable-Artifact provenance so only
+Files admitted by Bazel's exact container-specific association branch are
+retained bare. Top-level depset leaves are visited as validation scratch
+without flattening retained topology; nested depsets are not inferred.
+Associated Files and direct
+FilesToRun values fail closed for the later typed standard-provider/runfiles
+category. Named/automatic exec groups, shadowed actions, resource callbacks,
+execution, and C++ action families remain separate fail-closed categories.
+Independent focused R3 correction review returned `ACCEPT`; implement only
+that frozen envelope before selecting typed standard-provider/runfiles breadth.
 
 Bazel 9.2 remains the sole semantic authority. Zabel
 `0795445f3ab60f4e49070bdd0b94425c5610f73a` supplies peer phase-ownership,

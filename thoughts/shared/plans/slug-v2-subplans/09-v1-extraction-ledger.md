@@ -837,7 +837,21 @@ admits the frozen adapter; it imports no donor utility or semantic owner and
 leaves all retained representation, hashing, clone-cost, and memory-accounting
 decisions unchanged. Focused correction and terminal rereview returned
 `ACCEPT`; all owner/direct-dependent suites and hygiene gates pass within the
-packet caps. Callback/directory/execution breadth remains deferred.
+packet caps. Commit `a01a23fe7` freezes the implementation. The first
+default-context Spawn-envelope design returned `REPLAN` for treating
+`resource_set` as a direct dictionary and for failing to detect
+executable-attribute-backed FilesToRun association. R2 corrected those owners
+but returned `REPLAN` because top-level and sequence-nested tools depsets take
+different Bazel association branches. Active R3 extends only the one retained
+action owner, accepts omitted/`None` resource callbacks, forwards
+scope-separated executable-Artifact provenance, validates top-level depset
+leaves without flattening, and leaves nested depsets uninferred. Associated
+Files fail closed instead of losing runfiles. It reuses the same compact Rust
+utilities and imports no V1, Buck2, or Zabel action representation. Callback,
+provider/runfiles expansion, named-exec-group, directory, and execution breadth
+remains deferred.
+Independent focused R3 correction review returned `ACCEPT`; no V1 extraction
+decision or peer semantic ownership changes.
 
 ### Stage 6 recursive configured custom-rule analysis
 
