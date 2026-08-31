@@ -1,386 +1,303 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-generic-fragment-projection-r4`
+Packet: `WP-6-7A-dense-retained-depset-action-import-r1`
 
-Milestone: M7A bootstrap-critical generic Starlark/ruleset closure.
+Milestone: M7A generic Starlark/ruleset closure; Stage 6 retained-depset gate.
 
-Status: R1-R3 architecture reviews `REPLAN`; R4 architecture review `ACCEPT`;
-implementation/proof complete; terminal implementation review `ACCEPT`.
+Status: Architecture `ACCEPT`. This docs-only packet is complete; Rust work is
+authorized only through the successor implementation packet under this frozen
+representation.
 
-Base: `da6865a3b`, which terminally accepts generic direct subrule invocation
-and value materialization. The unrelated dirty
+Base: `683538254`, which terminally accepts generic configured fragment
+projection. The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked;
 do not edit or stage it.
 
 ## Observable result
 
-Supply cached `ctx.fragments` collections to ordinary rule implementations and
-direct/nested subrule implementations from the already-selected structural
-`SlugConfiguration`. Implement the complete first authentic C++ fragment
-consumer category used by rules_cc 0.2.17 `create_fdo_context`: one shared
-typed `cpp` fragment value with
-`compilation_mode`, `propeller_optimize_absolute_cc_profile`,
-`propeller_optimize_absolute_ld_profile`, `fdo_path`, `cs_fdo_path`, and
-`proto_profile` methods.
+Replace the current retained per-node `Arc` depset scaffold with one compact,
+immutable, Bazel-specialized dense store. Preserve Bazel order, validation,
+leaf equality, node occurrence identity, local alias topology, diamonds and
+cross-owner sharing. Add a typed File/action-input import view over that same
+retained topology so an action consumer can collect authenticated
+`AnalysisArtifact` inputs without first publishing a flat Starlark list.
 
-This is generic configured-analysis plumbing, not a `cc_common`, `cc_internal`,
-rules_cc, parser, or native C++ rule special case. The authentic BCR subrule is
-the discriminator. A target-configured default rule returns under `fastbuild`;
-the selected `cc_toolchain` implementation is Exec-configured, where Bazel
-copies default `host_compilation_mode=opt` into `compilation_mode` and reaches
-the deferred action families. Typed long-form target and host compilation-mode
-producers plus that bounded Target-to-Exec projection keep those routes
-distinct and leave the next missing capability deterministic.
+This is the prerequisite named by the Stage 6 and extraction-ledger gates
+before a broad ruleset consumer uses nonempty transitive depsets. Authentic
+rules_cc 0.2.17 is the discriminator: its FDO subrule forwards `all_files`
+through `tools=[all_files]`. It is not a `cc_common`, `cc_internal`, parser,
+`set`, action-builtin, rules_cc, aquery, executor, REAPI, or ActionKey packet.
+The next packet, after acceptance of this representation, is the generic
+non-callback `Args`/`run`/artifact-symlink builtin category.
 
-## Learned facts and authority
+## Authority and learned facts
 
-Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is the
-sole semantic authority:
+Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is the sole
+semantic authority. Its depset/nested-set tests and source determine public
+construction validation, order compatibility, traversal, duplicate handling,
+depth and error behavior. Existing `depset-orders-and-rejections` oracle
+evidence remains authoritative where it discriminates the same behavior.
 
-- `FragmentCollection.java:24-54` creates one immutable rule collection,
-  exposes every configured active fragment name through `dir`, and delegates
-  access checks to `RuleContext.getStarlarkFragment`;
-- `RuleContext.java:512-533` returns no field for an unknown fragment, rejects
-  a known fragment not declared by the rule/aspect, and returns the configured
-  fragment only after that declaration check;
-- `StarlarkSubrule.java:562-592` owns a separate token-scoped subrule
-  collection: unknown names are absent, known-but-undeclared names fail, and
-  `dir` is exactly the subrule's own declared set;
-- `StarlarkSubruleTest.java:1450-1630` distinguishes unknown fragments,
-  rule/subrule authorization isolation, declared access, and subrule `dir`;
-- `StarlarkRuleContext.java` constructs and retains one root fragment
-  collection rather than allocating it on each field access;
-- `CppConfiguration.java:166-306,326-330,617-689,958-968` derives the six admitted
-  method results from `CoreOptions`/`CppOptions`, validates FDO path forms, and
-  applies the private Starlarkification allowlist; and
-- `builtin_exec_platforms.bzl:221-280` propagates `host_compilation_mode` and
-  replaces `compilation_mode` with it while forming the Exec configuration; and
-- `BuiltinRestriction.java:35-225` defines the default restricted-API caller
-  allowlist from the innermost executing `.bzl` definition and repository
-  mapping.
+starlark-rust from Buck2 remains Slug's parser, binder, evaluator, heap, `set`
+implementation and public `depset` call surface. This packet changes only
+Slug-owned retained analysis values behind that facade. It adds no parser,
+alternate binder, custom `set`, or Buck2 `transitive_set` API.
 
-The authenticated BCR source is the rules_cc 0.2.17 file already realized at
-`target/v2o/ob/registry-yanked-lockfile-mode/bazel/external/rules_cc+/cc/private/rules_impl/fdo/fdo_context.bzl`,
-SHA-256
-`91b7b46c515b4773d5a241e699027212f679ab93160cc79218bd687eac51d5b7`.
-Its `_create_fdo_context` reads `ctx.fragments.cpp`, exits unless
-`compilation_mode() == "opt"`, then calls the other five methods before reaching
-`ctx.actions.args`, `run`, `symlink`, or `cc_common.absolute_symlink`.
+Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer design and
+optimization guidance, not semantic authority or a source of truth. Its dense
+retained rows, distinct generic/File paths, external producer references,
+late materialization and direct action import motivate the architecture. Copy
+no Zig code, names, layout, diagnostics, tests, fingerprints or behavior.
 
-Buck2/starlark-rust remains the unchanged parser, binder, evaluator, heap and
-method-dispatch implementation. Its `StarlarkValue::{get_attr,has_attr,dir_attr}`
-contract means field presence and `dir` must be implemented together; `dir_attr`
-cannot report an evaluation error. Do not add a parser, builtin registry,
-custom `set`, or alternate call binder.
-
-Zabel is peer concept and optimization guidance only. Its evaluator-local
-typed `CppFragmentOptions`, separate active/declared fragment sets, one cached
-collection, and rule/subrule authorization split support the ownership choice.
-Copy no Zig code, names, layout, errors, tests, or behavior. In particular,
-Bazel 9.2 decides values, caller restrictions and error precedence.
+Buck2-derived utility guidance governs the Rust substrate: preserve cheap
+`Arc`/`Dupe` ownership, compact immutable slices, `Allocative` accounting and
+`FxHashMap`/`FxHashSet` phase scratch. Add no global interner or retained
+scratch cache.
 
 ## Compatibility boundary
 
-**Exact:** successful `cpp` access only after the applicable rule or subrule
-declaration; unknown and undeclared access both reject; separate rule and
-subrule declaration authorization; root `dir(ctx.fragments)` over active
-configured fragment names; subrule `dir(ctx.fragments)` over exactly its
-declarations; one cached collection per context; one evaluator-local `cpp`
-value shared by authorized contexts; all six named zero-argument methods; default
-target-default `fastbuild` and Exec-default `opt` plus
-`None`/`None`/`None`/`None`/`True` results; typed `fastbuild`/`dbg`/`opt` target
-and host compilation-mode projection; copying host mode into compilation mode
-at the admitted Target-to-Exec transition; context and nested-call lifetime
-behavior; the complete Bazel 9.2 default private Starlark API allowlist for
-every admitted method; and structural configuration equality/invalidation for
-both new command producers and their Exec result.
+**Exact:** all four Bazel depset orders; default/order compatibility; empty and
+singleton behavior; construction normalization and validation precedence;
+duplicate direct leaves; equal leaves in distinct nodes; repeated child
+aliases; diamonds; multi-child depth and the configured maximum-depth failure;
+stack-safe traversal at the supported limit; topological alias result
+`[a, b, c, b] -> [a, c, b]`; cold and repeated `to_list()`; provider
+freeze/materialization; cross-owner forwarding; structural publication
+equality that distinguishes alias partitions; and the ordered unique File
+sequence observed by an action-input consumer.
 
-**Slug-native:** Rust enum/optional/string representation; root diagnostic
-wrapping after the exact declaration fact; evaluator bridge type names; and the
-already-admitted collision-safe structural configuration identity.
+**Slug-native:** Rust store and index layout, allocation boundaries, builder
+scratch structures, structural-equality implementation, lifecycle mechanics,
+measurement counters, invocation/evaluator-local caches, and direct typed
+File/action-input import without a public flattened intermediate.
 
-**Unsupported/deferred:** short `-c`; every Exec-transition rewrite except the
-already-owned target-platform/Starlark projection and this packet's exact
-host-to-compilation-mode copy; absolute-path FDO/CS-FDO/Propeller command
-producers and Bazel `PathFragment` normalization; non-default `proto_profile`;
-other C++ fragment methods; every non-`cpp` configured fragment value; aspects;
-toolchain lookup; `ctx.actions.args`, `run`, `symlink`, `declare_symlink`, tree
-and template actions; `cc_common.absolute_symlink`; exact Bazel configuration
-checksum/output paths; and complete rules_cc analysis. Existing accepted label-
-valued `--fdo_optimize=//...` remains structurally valid but projects `fdo_path`
-as `None`, matching Bazel's distinction between label-backed FDO state and the
-absolute path getter. An absolute-path input continues to fail closed rather
-than being normalized from an unowned host path model.
+**Unsupported/deferred:** the internal bytes or fingerprints of Bazel's Java
+`NestedSet`; exact Bazel configuration/output identity; Bazel ActionKey; REAPI
+digests; aquery and execution for new action kinds; directory/tree-artifact
+input expansion; `Args.map_each`, callbacks, param files and command-line
+fingerprints; public Buck2 transitive sets, projections, reductions, BFS/DFS or
+implicit coercion; and the generic action builtins selected as the successor.
 
-The exact claim deliberately excludes the wording/error-class distinction
-between an unknown subrule fragment and a known-but-undeclared subrule fragment,
-plus `hasattr(ctx.fragments, name)` for fragment collections. starlark-rust's
-dynamic `StarlarkValue::get_attr` returns `Option<Value>` and cannot raise the
-Bazel-specific undeclared error. Both accesses still reject and `dir` remains
-exact; the diagnostic/`hasattr` distinction is unsupported rather than silently
-claimed. A known but unimplemented fragment value is likewise outside the
-admitted value surface even though its name remains in the exact `dir` inventory.
+## Retained architecture
 
-No claim is made that the six-method surface completes `CppConfiguration`.
-This packet completes the one coherent FDO fragment-method category consumed
-before the authentic subrule's first action call. Later fragment categories
-extend the same projection/collection architecture without changing context
-ownership.
+### One immutable store and checked handles
 
-## Architecture
+Use one `Arc<DenseDepsetStore<T, M>>` per constructed local graph. The store
+owns compact immutable slices for nodes, ordered successor entries, leaves,
+external depset handles, external canonical-row handles and per-node metadata.
+A public retained `Depset<T, M>` handle is a cheap duplicate of that store plus
+a checked `u32` root node id. Index conversion is checked at construction;
+overflow fails closed. No semantic operation relies on pointer addresses or
+allocation order.
 
-### Structural producer and typed projection
+Each node contains one canonical **successor-row reference**: either a local
+range or an external store plus range. Construction resolves an external-row
+chain to its underlying owner, so dereference wrappers do not grow traversal
+chains. This preserves Bazel's order-only single-child wrapper and the existing
+`shares_successors_with` fact without copying the row or inserting another
+semantic successor node. Every entry in the referenced ordered row is tagged
+exactly one of:
 
-Add `CompilationMode` and `HostCompilationMode` to the closed
-`NativeCommandOption` table and classify both as `CoreOptions`. Accept only long
-forms and only the three Bazel 9 enum spellings. Extend
-`SlugConfiguration::to_exec_for_platform` to replace `compilation_mode` with
-the structural `host_compilation_mode` value in the same options-vector pass
-that installs the selected execution platform. Do not rewrite or silently
-claim any other Bazel Exec-transition field. The existing command parser,
-scoped configuration construction and DICE request key perform all mutation/
-invalidation; add no environment reader, fallback, graph key, cache, lock,
-registry or process-global state.
+- `Leaf(leaf_index)`, indexing the row owner's compact leaf slice;
+- `Local(node_id)`, indexing another node in the row-owning store; or
+- `External(external_index)`, indexing a compact side table of retained depset
+  handles.
 
-Create a small `slug_configuration_v2::native::cpp_fragment` leaf rather than
-growing the already-large `configuration.rs`. `CppFragmentProjection` holds a
-cheap clone of `SlugConfiguration`, reads the sole canonical option vector on
-demand, and exposes typed Rust results for the six admitted methods. It is
-phase scratch, not a parallel retained C++ options store. Expose only the
-minimal private option/enum accessors required by this sibling module.
+This single tagged index row is required: separate leaf and edge ranges must
+not lose the declaration-time interleaving used by Bazel traversal. Leaf,
+local-node and external indexes in a row are interpreted against that row's
+owning store. Node metadata is stored by local node id. A handle's occurrence
+identity is `(store, root)` for topology/lifecycle operations only; semantic or
+publication equality never uses pointer identity as its answer. Arc-bearing
+external references live once in side tables rather than widening every row
+entry.
 
-Every optional absolute-path method must distinguish the existing label-valued
-FDO option from a future absolute-path producer. Do not reinterpret a label,
-display string, workspace path, or host path as Bazel's normalized
-`PathFragment`. Unsupported stored shapes fail closed while constructing the
-projection, before Starlark execution.
+`shares_successors_with` means the two handles resolve to the same canonical
+row owner and range, including across an order-only wrapper store. Structural
+equality remains a separate operation. Local aliases point to one local node
+id; external aliases retain one external handle. Equal leaf values share
+traversal equality but do not collapse distinct node occurrences or alias
+partitions. External row and successor references may point only to an already
+frozen store, so construction cannot form retained cycles.
 
-### Generic fragment values
+### Phase-scratch construction and lowering
 
-Add an `analysis_fragments.rs` evaluator-ABI leaf in `slug_loading_v2` with two
-concrete collection facades matching Bazel's separate ownership:
+A phase-scratch builder memoizes each source node occurrence into one local id,
+emits deterministic ordered successor rows, and freezes all vectors to compact
+immutable slices once. Construction is iterative where depth can be
+user-shaped. It does not recursively copy transitive children. Dependency- or
+provider-owned depsets enter as `External` handles rather than being cloned
+into the new store. An order-only dereference wrapper retains the child's
+canonical external row reference rather than copying its entries.
 
-- `RuleFragmentCollection` stores the root `AnalysisCallToken`, immutable rule
-  declarations, and shared frozen `cpp` value. A type-static fallible `cpp`
-  attribute performs the live-token and rule-declaration check; starlark-rust
-  merges it into `dir` while `dir_attr` supplies the other 11 active names;
-- `SubruleFragmentCollection` stores the call token, the subrule's immutable
-  declaration set, and shared frozen `cpp` value. Its dynamic `get_attr` returns
-  `cpp` only when declared and otherwise returns `None`; its `dir_attr` is the
-  declaration set. Future admitted fragment values extend this one dynamic
-  match and do not require concrete types for declaration-set combinations;
-- `CppFragmentValue` stores only `CppFragmentProjection` plus the immutable
-  caller-authorization inputs needed by its methods;
-- root collections use one phase-scratch `SmallSet<CompactString>` created from
-  the rule's retained fragment slice, while subrule collections clone the
-  already-retained `Arc<SmallSet<CompactString>>`; and
-- admitted field lookup checks the applicable live token and declaration
-  authorization. It never checks only membership in the active configured
-  fragment set.
+Keep the existing starlark-rust `StarlarkDepset` facade. When analysis lowers a
+locally constructed Starlark DAG, lower the whole local occurrence graph once
+into one `AnalysisDepset` dense store. A transitive depset already materialized
+by a dependency is an external handle. Retain no evaluator `Value`, heap,
+evaluator pointer or call token in `AnalysisDepset`, actions, DICE keys or
+configured results.
 
-Freeze the pinned Bazel 9.2 active Starlark fragment-name inventory separately
-from implemented values: `android`, `apple`, `bazel_android`, `bazel_py`,
-`coverage`, `cpp`, `j2objc`, `java`, `objc`, `platform`, `proto`, and `py`.
-Root `dir_attr` plus the static `cpp` attribute returns those active names even
-when the rule declared none; attempting `ctx.fragments.cpp` still enforces the
-rule declaration with a fallible native attribute. Only `cpp` has an admitted
-value in this packet. A declared access to another known name remains outside
-the admitted fragment-value surface; an unknown field remains absent through
-starlark-rust's ordinary attribute error. Subrule `dir_attr` returns its
-declaration set exactly, including unknown or unimplemented names, as Bazel 9.2
-does. Do not allocate error-placeholder values or claim that mere field access
-to an unimplemented fragment succeeds.
+Construction validation stays at the existing public boundary and preserves
+Bazel's error precedence. The dense builder receives only already-validated,
+typed order/element facts; representation work must not move a failure from
+construction to consumption.
 
-The collection is allocated once into each root/subrule context. The frozen
-`cpp` object is allocated once per analysis evaluator and shared by those
-collections. No evaluator `Value`, heap, token or collection is retained in a
-DICE key or configured result.
+### Traversal, equality and caches
 
-### Caller restriction and context ownership
+Traverse iteratively using `FxHashSet`/`FxHashMap` scratch for visited node
+occurrences and leaf equality. Preserve the existing four-order algorithms and
+topological alias semantics. A consumer chooses no order: it receives the
+declared Bazel order retained by the root. Repeated consumption may use only a
+bounded invocation- or evaluator-local projection cache. No flattened vector,
+visited set or fingerprint is stored in the retained graph, a DICE key or
+process-global state.
 
-Retain the flat filename-to-`BzlModuleIdentity` manifest already used by loading
-macros on `StarlarkRuleImplementation`; include it in semantic equality because
-it controls private API authorization. Analysis resolves the innermost
-`Evaluator::native_caller_function_filename()` through that immutable manifest
-and applies a V2-owned generic translation of Bazel's default
-`BuiltinRestriction`. A direct native/module-scope call without an innermost
-`.bzl` definition fails closed. A helper defined in a loaded module is checked
-against that helper's identity, not the owning rule/subrule identity.
+`AnalysisDepset` occurrence equality remains distinct from structural
+publication equality. Publication equality recursively compares metadata,
+ordered tagged rows, leaf values and external subgraphs while memoizing node
+pairs. It must preserve the alias partition: two occurrences referencing the
+same child are not equal to two separately constructed equal children merely
+because their flattened lists match. The comparison is stack-safe and handles
+diamonds without exponential revisits.
 
-Freeze this exact Bazel 9.2 allowlist inventory in one typed constant table:
+### Typed File/action-input view
 
-- the 18 main-repository package prefixes:
-  `third_party/bazel_rules/rules_cc`, `tools/build_defs/cc`,
-  `third_party/bazel_rules/rules_java/java`, `third_party/protobuf`,
-  `third_party/bazel_rules/rules_rust/rust/private`, `third_party/crubit`,
-  `tools/build_defs/go`, `tools/build_defs/build_info`,
-  `bazel_internal/test_rules/cc`, `tools/build_defs/android`,
-  `third_party/bazel_rules/rules_android`, `third_party/apple_crosstool`,
-  `third_party/bazel_rules/rules_apple`,
-  `third_party/cpptoolchains/portable_llvm/build_defs`,
-  `third_party/gpus/cuda`, `tools/build_defs/packaging`, `test`, and
-  `bazel_internal/test_rules`;
-- the 11 external module/prefix pairs: `rules_cc/`, `rules_java/java`,
-  `protobuf/`, `com_google_protobuf/`, `rules_rust/rust/private`,
-  `bazel_tools/tools/build_defs/build_info`, `rules_android/`,
-  `build_bazel_rules_android/`, `rules_apple/`,
-  `build_bazel_rules_apple/`, and `rules_shell/`; and
-- the separate unconditional canonical `_builtins` repository branch.
+Add a narrow retained File-set view backed by the same dense core. It
+authenticates each leaf as an `AnalysisArtifact` and feeds ordered unique
+artifacts directly into a synthetic action-input sink through topology-aware
+traversal. It exposes neither raw store indexes nor a public flattened vector.
+Generic `Depset<T, M>` remains the semantic owner; the File view is a typed
+consumer adapter, not a second retained representation or cache.
 
-Implement Bazel's repository matching classes explicitly: exact main
-repository, an apparent external name mapped to main by the executing module's
-repository mapping, exact canonical `bazel_tools`, and version-insensitive
-canonical module repositories beginning `<module>+`. A bare name, filesystem
-path substring, or unrelated prefix such as `rules_cc_evil+` never authorizes.
+The seam may touch `actions/spec.rs` only to define the typed input-set import
+boundary. This packet stops at a synthetic sink and does not register or
+execute `run`, `symlink`, or another new action kind. The following generic
+action-builtin packet consumes this seam for both `inputs` and `tools`, then
+extends it category-wise rather than adding a C++-specific branch.
 
-This restriction belongs to a reusable loading/analysis helper, not
-`CppFragmentValue` string heuristics. Table-driven proof must exercise every
-inventory row plus every repository matching class, exact-prefix negatives,
-helper-defined caller selection, and repository-mapping A/B/A identity/
-authorization restoration. The authentic rules_cc 0.2.17 caller must pass
-through its retained canonical identity, never a filesystem substring test.
+## Evidence contract
 
-Extend `PreparedSubruleInvocation` with its existing declared fragment set.
-Extend `AnalysisEvaluationContext` with the shared fragment value and the
-caller-identity manifest. Root construction receives the rule declarations and
-definition provenance. Subrule dispatch allocates one restricted generic
-context with its own cached collection. Preserve the accepted call stack,
-action owner, direct/nested authorization, context locking and RAII invalidation
-unchanged.
+1. Preserve every existing generic depset, analysis-value and provider test
+   with the same observable meaning; reuse existing Bazel 9.2 oracle evidence.
+2. Prove one local store for a multi-node construction, same-store local alias
+   reuse, cheap external-store sharing without recursive copying, and
+   cross-store order-only wrappers sharing the same canonical successor row.
+   The direct evaluator-lowering proof must start with one locally constructed
+   Starlark diamond plus one already-retained dependency child and show one
+   local store, preserved local aliases, an external retained handle, and no
+   evaluator value reachable from the retained result.
+3. Prove occurrence identity and publication equality separately, including
+   equal lists with different alias partitions and equal distinct leaves.
+4. Prove all orders, mixed/default compatibility, empties, duplicates,
+   diamonds, the topological `[a, b, c, b] -> [a, c, b]` result, exact
+   construction errors, multi-child depth and supported-limit stack safety.
+5. Prove Starlark provider materialization and direct typed action-input import
+   produce the exact ordered unique File sequence without calling a public
+   `to_list()` seam.
+6. Prove dropping every root releases local leaves and external owners; no
+   evaluator value or scratch cache survives the owning phase.
+7. Add `Allocative` coverage and deterministic test counters. Against a
+   test-only legacy-Arc control on chain, diamond and authentic-shaped
+   rules_cc/rules_rust fan-in graphs, retained bytes and allocation objects
+   must decrease. Construction, cold traversal and warm traversal operation
+   counts must each stay within 10% of the control. Wall-clock timing is
+   informative only and never a flaky acceptance gate.
 
-### Natural successor boundary
+The legacy DAG exists only as a test measurement control. It is not a
+production fallback, feature flag or compatibility path. Failure to meet a
+measurement threshold is `REPLAN`, not permission to retain both production
+representations.
 
-A target-configured default proof must return from the authentic-shaped FDO
-function under `fastbuild`. The authentic selected Exec-configured rules_cc
-route must project default host `opt`, pass all six method calls, and stop at the
-first deferred action family. `--compilation_mode=dbg` changes only the target
-route; `--host_compilation_mode=fastbuild` changes only the Exec route and makes
-it take the early return. That terminal selects the generic
-`Args`/`run`/`symlink` action packet; it does not justify a rules_cc branch.
+## Writable allowlist and caps
 
-## Frozen scope
+Production:
 
-Production allowlist:
+- `app/slug_build_api_v2/src/depset.rs`
+- `app/slug_build_api_v2/src/analysis_value.rs`
+- `app/slug_build_api_v2/src/actions/mod.rs`
+- `app/slug_build_api_v2/src/actions/spec.rs` only for the typed File-set seam
+- `app/slug_build_api_v2/src/lib.rs`
+- `app/slug_loading_v2/src/provider.rs`
+- `app/slug_analysis_v2/src/analysis_value.rs` only for the whole-local-DAG
+  lowering owner; base blob `251853de3c9319901e33b54d1d6034bb4e4c9477`,
+  1,009 physical lines, at most +220 production/+180 inline proof and 1,409
+  physical lines after the packet
 
-- `app/slug_configuration_v2/src/command.rs`
-- `app/slug_configuration_v2/src/native/configuration.rs`
-- `app/slug_configuration_v2/src/native/cpp_fragment.rs` (new)
-- `app/slug_configuration_v2/src/native/mod.rs`
-- `app/slug_configuration_v2/src/native/value.rs`
-- `app/slug_configuration_v2/src/lib.rs`
-- `app/slug_loading_v2/src/analysis_fragments.rs` (new)
-- `app/slug_loading_v2/src/builtin_restriction.rs` (new)
-- `app/slug_loading_v2/src/lib.rs`
-- `app/slug_loading_v2/src/package.rs`
-- `app/slug_loading_v2/src/subrule_invocation.rs`
-- `app/slug_analysis_v2/src/starlark_rule.rs`
+Proof:
 
-Proof allowlist:
+- existing depset, analysis-value, action and provider test modules in those
+  crates;
+- inline proof in the admitted `slug_analysis_v2/src/analysis_value.rs` lowering
+  owner for the local-diamond/external-child/no-evaluator-retention facts; and
+- a test-only legacy control colocated with the depset tests.
 
-- `app/slug_configuration_v2/src/native/tests.rs`
-- `app/slug_commands_v2/tests/commands.rs`
-- `app/slug_loading_v2/src/builtin_restriction_tests.rs` (new)
-- `app/slug_loading_v2/src/host_package_load_tests.rs`
-- `app/slug_analysis_v2/tests/subrule.rs`
-- `app/slug_server_v2/src/tests.rs`
+Plans:
 
-Plan/evidence allowlist:
+- the canonical plan;
+- Stage 6;
+- the Stage 9 extraction ledger; and
+- this manifest.
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
-- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`
-- `thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md`
+Caps are 1,250 production additions, 1,000 proof additions and 2,250 aggregate
+additions, excluding plan text. Add no dependency, DICE key, global cache,
+lock, interner, parser or production fallback. If `analysis_value.rs` would
+exceed 2,000 physical lines in `slug_build_api_v2`, split one cohesive leaf
+within the allowlist and return to architecture review before implementation.
+The separate `slug_analysis_v2` lowering owner is governed by its explicit
+1,409-line cap above.
 
-Production additions cap: 950 lines. Proof additions cap: 850 lines. Plans and
-generated lockfiles are excluded. Any other path, a new dependency, a retained
-representation wider than two pointer words, a second configuration store, a
-new DICE key/cache/lock/interner, or an inability to preserve exact private
-caller provenance is `REPLAN`.
+## Validation
 
-## Required proof
+Run serially:
 
-1. Configuration unit tests prove target/host defaults, all three modes and
-   invalid spellings, target/Exec separation, host-to-compilation copying,
-   re-projection, all six method defaults, label-valued FDO distinction, and
-   fail-closed unowned absolute paths.
-2. Restricted-API table tests prove every frozen allowlist row, `_builtins`,
-   exact `bazel_tools`, main prefixes, mapping-to-main, version-insensitive
-   module repos, exact-prefix negatives, helper-definition selection, and
-   mapping A/B/A without filesystem substring authorization.
-3. Root analysis proves cached collection identity, active-name `dir`, unknown
-   absence, the exact 12-name inventory, declaration rejection, explicit
-   unsupported known-fragment failure, declared `cpp`, every zero-argument
-   method, and wrong arity.
-4. Subrule analysis proves its exact `dir`, rule/subrule declaration isolation,
-   admitted access success/failure, the explicitly unsupported specialized
-   error/`hasattr` distinction, nested declarations, distinct collection
-   identity, shared `cpp` identity, escaped-context rejection, and extracted
-   fragment behavior.
-5. An authenticated-source regression checks the realized rules_cc file hash
-   and the source-ordered six-method call ledger.
-6. An authentic-shaped `create_fdo_context` proof distinguishes target-default
-   early return, selected-Exec default action terminal,
-   `--compilation_mode=dbg` target-only behavior, and
-   `--host_compilation_mode=fastbuild` Exec-only early return.
-7. Stable-daemon target/host C0/C1/C0 proves command and Exec-projection
-   identity, invalidation and restoration with no cross-request fragment reuse.
-8. `cargo test -p slug_configuration_v2`,
-   `cargo test -p slug_loading_v2`,
-   `cargo test -p slug_analysis_v2`, and the named server/CLI dependents pass
-   serially. Rebuild `slug_cli_v2` before binary smokes and clean stale `slugd`
-   before and after daemon-sensitive validation.
-9. A staged-only diff audit proves both line caps, allowlists and the exclusion
-   of the parked registration proof. Independent terminal review must return
-   `ACCEPT` before commit.
+- focused depset, analysis-value, action and provider tests;
+- `cargo test -p slug_build_api_v2`;
+- `cargo test -p slug_loading_v2`;
+- `cargo test -p slug_analysis_v2`;
+- the V2 archive/clean-root checker;
+- `cargo fmt --check` and `git diff --check`; and
+- staged-only allowlist, cap and unrelated-dirty-file audits.
 
-## Implementation evidence
-
-The candidate uses 665 production additions and 648 proof additions, excluding
-plans and the parked registration proof. It adds no dependency, DICE key,
-cache, lock, interner, parser, rules_cc branch, or second configuration store.
-The `cpp` projection is constructed only when the root rule or an attached
-subrule declares `cpp`; unused invalid C++ state therefore preserves the
-previous ordinary-rule/config-setting behavior.
-
-Serial validation passed `slug_configuration_v2` (49 tests),
-`slug_loading_v2` (456 unit tests plus all integration suites, with the
-realized-source proof run explicitly under `--ignored`), `slug_analysis_v2`
-(100 tests), and `slug_commands_v2` (25 tests). The authentic-shaped fragment
-proof, prior FDO daemon A/B/A proof, and new target/Exec fragment C0/C1/C0 proof
-pass individually. A serial full `slug_server_v2` run passed 55/56 and exposed
-the eager unused-projection regression; after the lazy-construction correction,
-both the previously failing FDO test and new fragment daemon test pass. CLI
-library tests and command-boundary tests pass. The broad CLI integration suite
-remains independently red in existing selected-BCR unsupported-entry and
-unavailable-DICE fixture paths; no fragment/command diagnostic appears in
-those failures, so this packet does not claim to repair that baseline.
-
-Independent terminal review returned `ACCEPT`: the staged candidate preserves
-one structural configuration owner, lazy evaluator-local projection, exact
-Target/Exec mode copying, separate root/subrule authorization, authenticated
-caller provenance, the pinned allowlist, and fail-closed absolute-path state.
-The reviewed accounting is 665 production and 648 proof additions, with only
-the unrelated registration proof left unstaged.
+Add fresh Bazel oracle evidence only for a demonstrated semantic gap. Do not
+rerun an already discriminating fixture solely because the representation
+changed.
 
 ## Review gate
 
-The architecture reviewer must answer:
+The independent reserved-representation reviewer must answer:
 
-- Does the packet preserve one structural configuration owner and one
-  evaluator-local projection without adding a parallel retained representation?
-- Are root/subrule authorization, `dir`, caching and lifetime facts separated
-  exactly as Bazel 9.2 requires?
-- Does the two-facade design fit starlark-rust without declaration-set type
-  explosion, and is the narrowed subrule diagnostic/`hasattr` boundary honest?
-- Does the complete frozen private-caller inventory and repository-branch proof
-  make the exact admitted-method claim defensible?
-- Does the bounded host-to-compilation Exec projection preserve target/Exec
-  separation without silently claiming the rest of Bazel's transition?
-- Are all six FDO-facing methods handled as one coherent category while
-  absolute-path producers remain an explicit, honest unsupported boundary?
-- Can later fragments and action builtins extend these seams without a parser,
-  rules_cc, `cc_common`, or C++-specific configured-analysis branch?
+- Does one dense store plus local/external canonical row references and tagged
+  ordered rows preserve direct/transitive interleaving, order-only row sharing,
+  local aliases, cross-owner sharing and occurrence identity?
+- Are semantic/publication equality, leaf deduplication, topology identity and
+  flattening kept as distinct domains?
+- Can Starlark lowering complete without retaining evaluator objects or
+  recursively copying external graphs?
+- Is the typed File/action-input adapter genuinely backed by the same retained
+  owner and free of an implicit flattened ABI?
+- Are lifecycle, `Allocative`, deterministic measurement and cache bounds
+  sufficient to reject a representation regression?
+- Can the next complete Args/run/symlink category reuse the seam without a
+  rules_cc, `cc_common`, `cc_internal`, parser or builtin-specific branch?
 
-Only `ACCEPT` activates implementation. Any ambiguity in caller provenance,
-path normalization, semantic equality, or evaluator-value retention is
-`REPLAN`.
+Only `ACCEPT` activates Rust work. `REPLAN` is mandatory if implementation
+would retain evaluator state, add global/unbounded caches, recursively copy
+children, make flattened vectors the action ABI, use pointer identity as
+semantic equality, change public error timing/precedence, permit unchecked
+indexes, keep a production fallback, add a DICE key, or miss a measurement
+threshold.
+
+## Architecture review evidence
+
+The first independent review returned `REPLAN` because the writable allowlist
+omitted `slug_analysis_v2/src/analysis_value.rs`, the sole owner capable of
+lowering a whole evaluator-local DAG. The correction admitted that exact base
+blob with bounded production/proof/physical caps and added a discriminating
+local-diamond plus retained-external-child proof.
+
+The independent rereview returned `ACCEPT`. It confirmed that checked local
+indexes plus external depset/canonical-row side tables form an acyclic retained
+ownership graph; dereference chains resolve to one frozen row owner; local
+aliases, cross-owner lifetime and no-copy lowering remain expressible; and the
+typed File/action-input adapter adds neither a flattened ABI nor a second
+semantic representation. No compatibility or packet scope widened.

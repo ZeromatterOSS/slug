@@ -36,7 +36,22 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-4-5-7A-generic-fragment-projection-r4](./slug-v2-subplans/current-packet.md).
+[WP-6-7A-dense-retained-depset-action-import-r1](./slug-v2-subplans/current-packet.md).
+
+Commit `683538254` terminally accepts generic configured fragment projection.
+The successor audit found that authentic rules_cc 0.2.17 forwards a nonempty
+transitive `all_files` depset through action tools, activating the retained
+depset gate already named by Stages 6 and 9 before generic action construction.
+The docs-only packet freezes one dense retained topology and typed File/action-
+input import seam. Independent reserved-representation rereview returned
+`ACCEPT` after admitting the sole whole-local-DAG lowering owner and its direct
+retention proof. Materialize the bounded Rust implementation packet next; the
+generic non-callback Args/run/artifact-symlink category follows it. Bazel 9.2
+remains semantic authority, Zabel remains peer design guidance, and
+`cc_common`/`cc_internal` remain ordinary BCR Starlark consumers rather than
+Rust-native or parser special cases.
+
+### Previous accepted packet record
 
 Commit `da6865a3b` terminally accepts the complete generic direct-call/value/
 lifetime category on top of configured hidden dependencies: compact tagged

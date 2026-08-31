@@ -159,6 +159,14 @@ shape fits instead of default owned `String`, `Vec`, or std hash collections.
 
 #### 6.2A Zabel-informed retained depset core gate
 
+Accepted architecture: `WP-6-7A-dense-retained-depset-action-import-r1` at
+base `683538254`. It freezes one immutable dense store with ordered tagged
+successor rows, local and external handles, structural alias-aware publication
+equality, and a typed File/action-input view over the same owner. Authentic
+rules_cc `all_files` forwarding selects this as the immediate prerequisite to
+generic action builtins. Independent reserved-representation rereview returned
+`ACCEPT`; implement only through the bounded successor packet.
+
 Before the first broad ruleset consumer depends on nonempty transitive depsets,
 implement one bounded Zabel-informed retained core behind the exact Bazel
 `depset` facade. Bazel 9.2 remains the semantic oracle. Use Zabel commit
