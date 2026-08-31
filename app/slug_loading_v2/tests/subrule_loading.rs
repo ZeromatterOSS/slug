@@ -128,7 +128,7 @@ fn raw_snapshot(text: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnapshot> {
 fn try_load_package(
     workspace: &Path,
     package: &Path,
-) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
+) -> anyhow::Result<slug_loading_v2::LegacyLoadedPackage> {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let text = snapshot(workspace);
     let raw = raw_snapshot(&text);
@@ -171,12 +171,12 @@ fn try_load_package(
         })
 }
 
-fn load_package(workspace: &Path, package: &Path) -> slug_loading_v2::LoadedPackage {
+fn load_package(workspace: &Path, package: &Path) -> slug_loading_v2::LegacyLoadedPackage {
     try_load_package(workspace, package).unwrap()
 }
 
 fn starlark_rule<'a>(
-    package: &'a slug_loading_v2::LoadedPackage,
+    package: &'a slug_loading_v2::LegacyLoadedPackage,
     name: &str,
 ) -> &'a slug_loading_v2::package::StarlarkRuleImplementation {
     let target = package

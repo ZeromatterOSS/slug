@@ -197,8 +197,12 @@ pub use module_extension_repository_validation::HostValidatedModuleExtensionRepo
 pub use module_extension_repository_validation::ObservedHostSelectedExtensionOwnerCertificate;
 #[doc(hidden)]
 pub use module_extension_repository_validation::ObservedHostValidatedGeneratedRepositorySpecs;
+#[doc(hidden)]
+pub use package::LegacyLoadedPackage;
 pub use package::LoadedPackage;
 pub use package::NativeTargetAttributes;
+#[doc(hidden)]
+pub use package::PackageEvaluation;
 pub use package::PackageTarget;
 pub use package::PackageTargetKind;
 pub use package::RuleCapability;

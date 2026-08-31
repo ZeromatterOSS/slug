@@ -15,6 +15,7 @@ pub mod ctx;
 pub mod depset;
 pub mod providers;
 pub mod runfiles;
+pub mod runfiles_packages;
 
 pub use actions::ActionError;
 pub use actions::ActionInput;
@@ -102,3 +103,6 @@ pub use providers::RunfilesSupport;
 pub use providers::RunfilesSymlink;
 pub use providers::RunfilesSymlinkDepset;
 pub use runfiles::RunfilesError;
+pub use runfiles_packages::RunfilesPackageDepset;
+pub use runfiles_packages::RunfilesPackageMetadata;
+pub use runfiles_packages::RunfilesRepositoryMapping;

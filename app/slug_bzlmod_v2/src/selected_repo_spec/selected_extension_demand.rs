@@ -34,6 +34,32 @@ impl HostSelectedExtensionOwner {
     pub fn kind(&self) -> HostSelectedExtensionOwnerKind {
         self.id.kind
     }
+
+    #[doc(hidden)]
+    pub fn unique_name(&self) -> &CanonicalRepoName {
+        &self.unique_name
+    }
+
+    #[cfg(test)]
+    pub(crate) fn testing(unique_name: &str) -> Self {
+        Self::testing_with_kind(unique_name, HostSelectedExtensionOwnerKind::ModuleExtension)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn testing_with_kind(
+        unique_name: &str,
+        kind: HostSelectedExtensionOwnerKind,
+    ) -> Self {
+        Self {
+            id: HostSelectedExtensionId {
+                bzl_file: CanonicalLabel::parse("@@//:extension.bzl").unwrap(),
+                extension_name: "extension".into(),
+                isolation: None,
+                kind,
+            },
+            unique_name: CanonicalRepoName::new(unique_name).unwrap(),
+        }
+    }
 }
 
 #[doc(hidden)]

@@ -66,6 +66,8 @@ impl fmt::Display for BzlModuleEvalKey {
     }
 }
 
+/// Pre-Host local package adapter. Its value is a `LegacyLoadedPackage`, not a
+/// complete repository-mapping-aware `LoadedPackage`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct PackageLoadKey {
     pub workspace: std::path::PathBuf,

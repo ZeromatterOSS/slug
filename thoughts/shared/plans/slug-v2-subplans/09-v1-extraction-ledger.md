@@ -2114,3 +2114,11 @@ entering configured package-closure consumers at compile time.
 Independent R4 design correction review returned `ACCEPT`; implementation may
 now apply only this type isolation and the missing innate-owner proof before
 terminal correction review.
+
+Implementation candidate: the common evaluation core preserves the prior
+structural equality cutoff and frozen-module lifetime, the complete wrapper
+adds one `Arc<RunfilesPackageMetadata>`, and the legacy wrapper adds no bytes.
+The existing 28-test bzl-invalidation suite and full loading/query dependents
+pass; no retained collection, clone, cache, interner, task, lock, or key was
+added. Independent terminal correction review returned `ACCEPT`; the
+configured collector is now the active successor.

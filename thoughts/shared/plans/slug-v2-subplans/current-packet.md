@@ -5,9 +5,9 @@ Packet: `WP-4-6-7A-transitive-runfiles-package-mapping-owner-design-r4`
 Milestone: M7A generic Starlark/ruleset closure; Stage 4 configured analysis
 and Stage 6 runfiles-support prerequisites.
 
-Status: R4 correction design accepted; loading/metadata correction active after
-terminal implementation review returned `REPLAN` on the R3 candidate. Base
-`c1c8ce277`. The first
+Status: R4 loading/metadata correction terminally accepted; configured
+collector implementation active. Design base `c1c8ce277`, R4 correction-design
+commit `6795dae56`. The first
 support-action draft was rejected because Bazel 9 Bzlmod always registers a
 preceding repository-mapping manifest. The first prerequisite draft was then
 rejected because it did not route the complete selected root mapping and
@@ -22,7 +22,11 @@ query/runtime adapters. R4 type-isolates that legacy result and adds the
 missing innate-owner discriminator before correction rereview. The configured
 collector and every action remain unchanged. Independent R4 design correction
 review returned `ACCEPT` after admitting the existing bzl-invalidation suite's
-mechanical result-signature changes.
+mechanical result-signature changes. The implementation now type-isolates the
+legacy result, adds the innate-owner proof, and synchronizes the typed query
+fixture with the accepted root-mapping predecessor without adding a production
+fallback. Independent terminal correction review returned `ACCEPT` after all
+owner and direct-dependent gates passed within caps.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked;
@@ -397,11 +401,11 @@ projection already computed below them.
 
 After design `ACCEPT`, land two independently reviewed implementation commits:
 
-1. **Loading/metadata owner:** retained build-API types, generated-owner group
+1. **Loading/metadata owner — terminally accepted:** retained build-API types, generated-owner group
    projection, complete Legacy/Observed root mapping route, external mapping
    forwarding, `LoadedPackage` equality, and focused loading/Bzlmod proofs.
    This commit changes no configured result or action.
-2. **Configured collector:** mandatory `ConfiguredNodeResult` closure,
+2. **Configured collector — active:** mandatory `ConfiguredNodeResult` closure,
    phase-local collector, native/null/Starlark preparation carriers, complete
    edge coverage, DICE invalidation, and retained-size proofs. This commit
    changes no provider public field or action count.
@@ -450,6 +454,10 @@ Proof allowlist:
   `app/slug_loading_v2/tests/{build_file_loading.rs,subrule_loading.rs,bzl_invalidation.rs}`
   only for explicit legacy result signatures; the existing bzl-invalidation
   DICE invalidation/equality-cutoff suite must pass unchanged;
+- `app/slug_query_v2/tests/loading_query.rs` only to inject legacy snapshots
+  derived from the same immutable Host epoch, admit the selected root-mapping
+  predecessor in its activation guard, and normalize module-free fixtures to
+  the built-in `bazel_tools` module; query labels/order/errors remain unchanged;
 - `app/slug_analysis_v2/tests/{configured_target.rs,starlark_rule.rs}`; and
 - focused private DICE tests colocated in `app/slug_analysis_v2/src/dice.rs`.
 

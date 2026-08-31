@@ -30,6 +30,8 @@ use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::OverrideAttributeValue;
+use slug_bzlmod_v2::RegistryRequestGeneration;
+use slug_bzlmod_v2::RegistryUrls;
 use slug_bzlmod_v2::RepoRuleId;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
@@ -40,8 +42,8 @@ use slug_bzlmod_v2::RepositoryMaterializationResult;
 use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
 use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
 use slug_bzlmod_v2::RepositoryMaterializationSuccess;
-use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
+use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
 use slug_identity_v2::CanonicalLabel;
@@ -59,7 +61,6 @@ use slug_loading_v2::keys::WorkspaceDirectoryKey;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshotKey;
 use slug_loading_v2::keys::WorkspaceDirectoryValue;
-use slug_loading_v2::keys::WorkspaceFileKey;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
@@ -93,7 +94,6 @@ use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
-use slug_workspace_v2::WorkspaceRawFileKey;
 use slug_workspace_v2::WorkspaceRawFileValue;
 use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
@@ -3865,7 +3865,11 @@ impl RootQueryEpochBuilder {
         let mut builder = Self::default();
         builder.directory("/", variant);
         builder.directory("/workspace", variant);
-        builder.file("/workspace/MODULE.bazel", "", variant);
+        builder.file(
+            "/workspace/MODULE.bazel",
+            "module(name = \"bazel_tools\")\n",
+            variant,
+        );
         builder.missing("/workspace/REPO.bazel");
         builder.missing("/workspace/.bazelignore");
         builder
@@ -3875,7 +3879,7 @@ impl RootQueryEpochBuilder {
         let mut builder = Self::base(variant);
         builder.file(
             "/workspace/MODULE.bazel",
-            "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+            "module(name = \"bazel_tools\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
             variant,
         );
         builder.directory("/workspace/dep", variant);
@@ -3922,7 +3926,7 @@ impl RootQueryEpochBuilder {
         builder.file(
             "/workspace/MODULE.bazel",
             &format!(
-                "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0.0\", repo_name = \"{apparent}\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n"
+                "module(name = \"bazel_tools\")\nbazel_dep(name = \"dep\", version = \"1.0.0\", repo_name = \"{apparent}\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n"
             ),
             variant,
         );
@@ -4087,6 +4091,33 @@ impl RootQueryEpochBuilder {
     }
 }
 
+fn legacy_snapshots_from_epoch(
+    epoch: &PathObservationEpoch,
+) -> (Arc<WorkspaceSnapshot>, Arc<WorkspaceRawSnapshot>) {
+    let mut text = Vec::new();
+    let mut raw = Vec::new();
+    for (demand, result) in epoch.observations().iter() {
+        let PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) = result.as_ref()
+        else {
+            continue;
+        };
+        let path = demand.path().as_path().to_path_buf();
+        let source = std::str::from_utf8(bytes)
+            .expect("root query fixture file bytes are UTF-8")
+            .to_owned();
+        text.push((path.clone(), WorkspaceFileValue::Present(Arc::new(source))));
+        raw.push((path, WorkspaceRawFileValue::Present(bytes.clone())));
+    }
+    (
+        Arc::new(WorkspaceSnapshot {
+            files: Arc::new(text.into_iter().collect()),
+        }),
+        Arc::new(WorkspaceRawSnapshot {
+            files: Arc::new(raw.into_iter().collect()),
+        }),
+    )
+}
+
 fn root_query_workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
 }
@@ -4126,16 +4157,11 @@ impl ActivationTracker for RootAnchorTracker {
         _deps: &mut dyn Iterator<Item = &DynKey>,
         _activation: ActivationData,
     ) {
-        if key.downcast_ref::<RootModuleGraphKey>().is_some()
-            || key.downcast_ref::<PackageLoadKey>().is_some()
+        if key.downcast_ref::<PackageLoadKey>().is_some()
             || key.downcast_ref::<SubtreePackageSetKey>().is_some()
-            || key.downcast_ref::<WorkspaceSnapshotKey>().is_some()
-            || key.downcast_ref::<WorkspaceRawSnapshotKey>().is_some()
             || key
                 .downcast_ref::<WorkspaceDirectorySnapshotKey>()
                 .is_some()
-            || key.downcast_ref::<WorkspaceFileKey>().is_some()
-            || key.downcast_ref::<WorkspaceRawFileKey>().is_some()
             || key.downcast_ref::<WorkspaceDirectoryKey>().is_some()
         {
             self.forbidden.fetch_add(1, Ordering::Relaxed);
@@ -4189,6 +4215,23 @@ async fn root_query_transaction_with_policy(
         ..Default::default()
     };
     let mut updater = dice.updater_with_data(user_data);
+    let (legacy_files, legacy_raw_files) = legacy_snapshots_from_epoch(&epoch);
+    updater
+        .changed_to(vec![(
+            WorkspaceSnapshotKey {
+                workspace: root_query_workspace().as_path().to_path_buf(),
+            },
+            legacy_files,
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: root_query_workspace().as_path().to_path_buf(),
+            },
+            legacy_raw_files,
+        )])
+        .unwrap();
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
@@ -4210,6 +4253,13 @@ async fn root_query_transaction_with_policy(
         BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
         LockfileMode::Update,
+    )
+    .unwrap();
+    inject_registry_request_inputs(
+        &mut updater,
+        root_query_workspace().as_path(),
+        RegistryUrls::new(["https://registry.invalid"]),
+        RegistryRequestGeneration(1),
     )
     .unwrap();
     let mut attributes = SmallMap::new();

@@ -84,7 +84,7 @@ impl std::fmt::Display for AttributeConsumerKey {
 
 #[async_trait]
 impl Key for AttributeConsumerKey {
-    type Value = Arc<Result<slug_loading_v2::LoadedPackage, String>>;
+    type Value = Arc<Result<slug_loading_v2::LegacyLoadedPackage, String>>;
 
     async fn compute(
         &self,
@@ -115,7 +115,7 @@ impl Key for AttributeConsumerKey {
 
 #[async_trait]
 impl Key for AttributeObserverKey {
-    type Value = Arc<Result<slug_loading_v2::LoadedPackage, String>>;
+    type Value = Arc<Result<slug_loading_v2::LegacyLoadedPackage, String>>;
 
     async fn compute(
         &self,
@@ -443,7 +443,7 @@ fn load_package(
     workspace: &Path,
     package: &Path,
     bzl_paths: &[PathBuf],
-) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
+) -> anyhow::Result<slug_loading_v2::LegacyLoadedPackage> {
     runtime.block_on(load_package_request(
         dice, workspace, package, bzl_paths, None, false,
     ))
@@ -456,7 +456,7 @@ async fn load_package_request(
     bzl_paths: &[PathBuf],
     tracker: Option<Arc<dyn ActivationTracker>>,
     consume_metadata: bool,
-) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
+) -> anyhow::Result<slug_loading_v2::LegacyLoadedPackage> {
     load_package_request_with_event_capture(
         dice,
         workspace,
@@ -477,7 +477,7 @@ async fn load_package_request_with_event_capture(
     tracker: Option<Arc<dyn ActivationTracker>>,
     consume_metadata: bool,
     capture_events: bool,
-) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
+) -> anyhow::Result<slug_loading_v2::LegacyLoadedPackage> {
     let paths = [
         vec![
             workspace.join("MODULE.bazel"),

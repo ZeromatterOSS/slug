@@ -331,6 +331,14 @@ impl EpochBuilder {
         epoch.missing("/workspace/MODULE.bazel.lock");
         epoch.missing("/workspace/REPO.bazel");
         epoch.missing("/workspace/.bazelignore");
+        epoch.directory("/workspace/dep", variant);
+        epoch.file(
+            "/workspace/dep/MODULE.bazel",
+            "module(name = 'dep', version = '1.0.0')\n",
+            variant,
+        );
+        epoch.missing("/workspace/dep/REPO.bazel");
+        epoch.missing("/workspace/dep/.bazelignore");
         epoch.listing("/workspace", &["dep", "pkg"]);
         epoch
     }

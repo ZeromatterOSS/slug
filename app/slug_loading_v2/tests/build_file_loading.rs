@@ -125,14 +125,14 @@ fn raw_snapshot_from_text(snapshot: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnaps
     })
 }
 
-fn load_package(workspace: &Path, package: &Path) -> slug_loading_v2::LoadedPackage {
+fn load_package(workspace: &Path, package: &Path) -> slug_loading_v2::LegacyLoadedPackage {
     try_load_package(workspace, package).unwrap()
 }
 
 fn try_load_package(
     workspace: &Path,
     package: &Path,
-) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
+) -> anyhow::Result<slug_loading_v2::LegacyLoadedPackage> {
     try_load_package_with_extra_bzl(workspace, package, &[])
 }
 
@@ -140,7 +140,7 @@ fn try_load_package_with_extra_bzl(
     workspace: &Path,
     package: &Path,
     extra_bzl: &[PathBuf],
-) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
+) -> anyhow::Result<slug_loading_v2::LegacyLoadedPackage> {
     try_load_package_with_event_capture(workspace, package, extra_bzl, None, false)
 }
 
@@ -150,7 +150,7 @@ fn try_load_package_with_event_capture(
     extra_bzl: &[PathBuf],
     tracker: Option<Arc<dyn ActivationTracker>>,
     capture_events: bool,
-) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
+) -> anyhow::Result<slug_loading_v2::LegacyLoadedPackage> {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut paths = vec![
         workspace.join(MODULE_FILE),
@@ -236,7 +236,7 @@ async fn load_package_with_retained_dice(
     dice: &Arc<Dice>,
     workspace: &Path,
     package: &Path,
-) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
+) -> anyhow::Result<slug_loading_v2::LegacyLoadedPackage> {
     let files = [
         workspace.join(MODULE_FILE),
         package.join(BUILD_FILE_PRIMARY),
@@ -3371,7 +3371,7 @@ probe_rule(name = "probe")
     .unwrap();
 
     let loaded = try_load_package(&workspace, &workspace).unwrap();
-    let requirements = |loaded: &slug_loading_v2::LoadedPackage, name: &str| {
+    let requirements = |loaded: &slug_loading_v2::LegacyLoadedPackage, name: &str| {
         loaded
             .targets
             .iter()
@@ -3383,7 +3383,7 @@ probe_rule(name = "probe")
             })
             .unwrap()
     };
-    let dependencies = |loaded: &slug_loading_v2::LoadedPackage, name: &str| {
+    let dependencies = |loaded: &slug_loading_v2::LegacyLoadedPackage, name: &str| {
         loaded
             .targets
             .iter()

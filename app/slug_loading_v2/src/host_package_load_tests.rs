@@ -21,6 +21,7 @@ use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_build_api_v2::ProviderIdentity;
+use slug_build_api_v2::RunfilesRepositoryMapping;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::HostRepositoryMaterializationDisposition;
@@ -77,6 +78,12 @@ use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
+use slug_workspace_v2::WorkspaceFileValue;
+use slug_workspace_v2::WorkspaceRawFileValue;
+use slug_workspace_v2::WorkspaceRawSnapshot;
+use slug_workspace_v2::WorkspaceRawSnapshotKey;
+use slug_workspace_v2::WorkspaceSnapshot;
+use slug_workspace_v2::WorkspaceSnapshotKey;
 use starlark::environment::FrozenModule;
 use starlark::environment::Globals;
 use starlark::environment::Module;
@@ -94,6 +101,7 @@ use starlark::values::structs::StructRef;
 use starlark::values::tuple::AllocTuple;
 use starlark::values::tuple::TupleRef;
 use starlark_map::small_map::SmallMap;
+use starlark_map::sorted_map::SortedMap;
 
 use super::BzlLoadManifest;
 use super::BzlModuleIdentity;
@@ -312,10 +320,16 @@ impl EpochBuilder {
     }
 
     fn workspace_sources(module: &str, build: &str, bzl: &[(&str, &str)], variant: i64) -> Self {
+        let module = if module.contains("module(") {
+            module.to_owned()
+        } else {
+            format!("module(name='bazel_tools')\n{module}")
+        };
         let mut builder = Self::default();
         builder.directory("/", variant);
         builder.directory("/workspace", variant);
-        builder.file("/workspace/MODULE.bazel", module, variant);
+        builder.file("/workspace/MODULE.bazel", &module, variant);
+        builder.missing("/workspace/MODULE.bazel.lock");
         builder.missing("/workspace/REPO.bazel");
         builder.missing("/workspace/.bazelignore");
         builder.directory("/workspace/pkg", variant);
@@ -517,6 +531,18 @@ async fn transaction_with_policy(
     tracker: Option<Arc<EventTracker>>,
     force_outer: bool,
 ) -> DiceTransaction {
+    let module_path = workspace().as_path().join("MODULE.bazel");
+    let module_source = epoch
+        .get(&EpochBuilder::demand(
+            "/workspace/MODULE.bazel",
+            PathObservationOperation::FileBytes,
+        ))
+        .and_then(|result| match result.as_ref() {
+            PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) => {
+                String::from_utf8(bytes.to_vec()).ok()
+            }
+            _ => None,
+        });
     let mut user_data = UserComputationData {
         cycle_detector: Some(bzl_load_cycle_detector()),
         activation_tracker: tracker.map(|tracker| tracker as Arc<dyn ActivationTracker>),
@@ -540,6 +566,38 @@ async fn transaction_with_policy(
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceSnapshotKey {
+                workspace: workspace().as_path().to_path_buf(),
+            },
+            Arc::new(WorkspaceSnapshot {
+                files: Arc::new(SortedMap::from_iter(module_source.map(|source| {
+                    (module_path, WorkspaceFileValue::Present(Arc::new(source)))
+                }))),
+            }),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace().as_path().to_path_buf(),
+            },
+            Arc::new(WorkspaceRawSnapshot {
+                files: Arc::new(SortedMap::from_iter([(
+                    workspace().as_path().join("MODULE.bazel.lock"),
+                    WorkspaceRawFileValue::Absent,
+                )])),
+            }),
+        )])
+        .unwrap();
+    inject_registry_request_inputs(
+        &mut updater,
+        workspace().as_path(),
+        RegistryUrls::new(["https://registry.invalid"]),
+        RegistryRequestGeneration(1),
+    )
+    .unwrap();
     let mut attributes = SmallMap::new();
     attributes.insert("path".into(), OverrideAttributeValue::String("dep".into()));
     let request = Arc::new(RepositoryMaterializationRequest {
@@ -1142,6 +1200,18 @@ async fn root_package_loads_selected_registry_bzl_through_admitted_route() {
         .as_ref()
         .as_ref()
         .unwrap_or_else(|error| panic!("{error}"));
+    assert!(loaded.runfiles_package().package().repo().is_root());
+    assert_eq!(
+        loaded
+            .runfiles_package()
+            .mapping()
+            .entries()
+            .iter()
+            .find(|(apparent, _)| apparent.as_str() == "dep_alias")
+            .map(|(_, canonical)| canonical.as_str()),
+        Some("dep+")
+    );
+    assert_eq!(loaded.runfiles_package().mapping().compact_group(), None);
     assert_eq!(
         loaded
             .targets
@@ -1170,7 +1240,11 @@ async fn root_package_loads_selected_registry_bzl_through_admitted_route() {
         .iter()
         .position(|dep| dep.starts_with("observed-external-bzl-module:"))
         .unwrap();
-    assert!(root_bzl < route && route < bzl);
+    let mapping = row
+        .iter()
+        .position(|dep| dep.starts_with("observed-host-root-repository-mapping:"))
+        .unwrap();
+    assert!(root_bzl < route && route < bzl && bzl < mapping);
     let events = tracker.take();
     assert!(events.iter().any(|entry| {
         entry.key.starts_with("observed-host-bzl-module:")
@@ -1197,6 +1271,119 @@ async fn root_package_loads_selected_registry_bzl_through_admitted_route() {
     let warm = transaction.compute(&key).await.unwrap();
     assert!(RootPackageLoadObservationKey::equality(&cold, &warm));
     assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
+}
+
+fn extension_mapping_root(imported: &str) -> String {
+    format!(
+        "module(name='bazel_tools')\np=use_extension('//:ext.bzl','extension')\nuse_repo(p, generated='{imported}')\n"
+    )
+}
+
+fn extension_mapping_only_epoch(imported: &str, variant: i64) -> PathObservationEpoch {
+    let root = extension_mapping_root(imported);
+    let mut epoch =
+        EpochBuilder::workspace_sources(&root, "filegroup(name='stable')\n", &[], variant);
+    epoch.file(
+        "/workspace/ext.bzl",
+        "extension=module_extension(implementation=lambda ctx: None)\n",
+        variant,
+    );
+    epoch.build()
+}
+
+async fn root_mapping_packages(
+    dice: &Arc<Dice>,
+    imported: &str,
+    variant: i64,
+) -> (HostPackageOutcome, ObservedHostPackageOutcome) {
+    let mut transaction = transaction(
+        dice,
+        extension_mapping_only_epoch(imported, variant),
+        false,
+        None,
+    )
+    .await;
+    let legacy = transaction.compute(&package_key()).await.unwrap();
+    let observed = transaction.compute(&observed_package_key()).await.unwrap();
+    (legacy, observed)
+}
+
+fn legacy_loaded_package(value: &HostPackageOutcome) -> &crate::LoadedPackage {
+    let LoadingPreparationOutcome::Complete(value) = value else {
+        panic!("root package must complete: {value:?}")
+    };
+    value
+        .as_ref()
+        .as_ref()
+        .unwrap_or_else(|error| panic!("{error}"))
+}
+
+#[tokio::test]
+async fn extension_mapping_only_change_invalidates_legacy_and_observed_root_packages_a_b_a() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let (legacy_a, observed_a) = root_mapping_packages(&dice, "plain_a", 910).await;
+    let (legacy_b, observed_b) = root_mapping_packages(&dice, "plain_b", 911).await;
+    let (legacy_restored, observed_restored) = root_mapping_packages(&dice, "plain_a", 910).await;
+
+    let legacy_a_loaded = legacy_loaded_package(&legacy_a);
+    let legacy_b_loaded = legacy_loaded_package(&legacy_b);
+    assert_ne!(
+        legacy_a_loaded.runfiles_package(),
+        legacy_b_loaded.runfiles_package(),
+        "the selected extension import must change retained package metadata"
+    );
+    assert!(!RootPackageLoadKey::equality(&legacy_a, &legacy_b));
+    assert!(RootPackageLoadKey::equality(&legacy_a, &legacy_restored));
+    assert!(!RootPackageLoadObservationKey::equality(
+        &observed_a,
+        &observed_b
+    ));
+    assert_eq!(
+        observed_package(&observed_a).result(),
+        observed_package(&observed_restored).result(),
+        "observed result must restore"
+    );
+    assert_eq!(
+        observed_package(&observed_a).observations(),
+        observed_package(&observed_restored).observations(),
+        "observed epoch must restore"
+    );
+    assert!(RootPackageLoadObservationKey::equality(
+        &observed_a,
+        &observed_restored
+    ));
+
+    let legacy_a = legacy_a_loaded;
+    let legacy_b = legacy_b_loaded;
+    assert_eq!(
+        legacy_a
+            .runfiles_package()
+            .mapping()
+            .entries()
+            .iter()
+            .find(|(apparent, _)| apparent.as_str() == "generated")
+            .map(|(_, canonical)| canonical.as_str()),
+        Some("+extension+plain_a")
+    );
+    assert_eq!(
+        legacy_b
+            .runfiles_package()
+            .mapping()
+            .entries()
+            .iter()
+            .find(|(apparent, _)| apparent.as_str() == "generated")
+            .map(|(_, canonical)| canonical.as_str()),
+        Some("+extension+plain_b")
+    );
+    assert_eq!(legacy_a.targets, legacy_b.targets, "BUILD bytes stay fixed");
+    assert_eq!(
+        observed_package(&observed_a)
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap(),
+        legacy_a
+    );
 }
 
 #[tokio::test]
@@ -1684,7 +1871,7 @@ async fn host_native_toolchain_targets_preserve_root_load_lifecycle_and_ownershi
 
 #[tokio::test]
 async fn host_package_retained_graph_replays_all_input_lifecycles() {
-    let module = "";
+    let module = "module(name='bazel_tools')\n";
     let package_epoch = |build: Option<(&str, &str)>, bzl: &[(&str, &str)], variant| {
         let mut builder = EpochBuilder::default();
         builder.directory("/", variant);
@@ -33421,7 +33608,7 @@ outer = macro(implementation = _outer_impl, attrs = {
         .eval_module(ast, &build_file_loading_globals())
         .unwrap();
     drop(evaluator);
-    let package = recorder.finish(
+    let package = recorder.finish_legacy(
         PathBuf::from("/workspace"),
         PathBuf::from("/workspace/BUILD.bazel"),
         Arc::from([]),
@@ -33821,8 +34008,11 @@ fn symbolic_macro_visibility_separates_call_site_and_definition_packages() {
     )
     .unwrap();
     let module = Module::new();
-    let recorder =
-        PackageRecorder::new_host(Arc::new(SmallMap::new()), call_site.clone(), Arc::from([]));
+    let recorder = PackageRecorder::new_host(
+        Arc::new(SmallMap::new()),
+        call_site.clone(),
+        Arc::new(RunfilesRepositoryMapping::empty()),
+    );
     let loader = LocalBzlLoader {
         modules: vec![("//macros:defs.bzl", defs)],
     };

@@ -32,12 +32,15 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_build_api_v2::RunfilesRepositoryMapping;
 use slug_bzlmod_v2::HostRepositorySourceFileValue;
 use slug_bzlmod_v2::HostRepositorySourceObservation;
 use slug_bzlmod_v2::HostRepositorySourceObservationError;
 use slug_bzlmod_v2::HostRepositorySourceReadKey;
 use slug_bzlmod_v2::HostRepositorySourceReadObservationKey;
 use slug_bzlmod_v2::HostRepositorySourceRoute;
+use slug_bzlmod_v2::HostRootRepositoryMappingKey;
+use slug_bzlmod_v2::HostRootRepositoryMappingObservationKey;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequest;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequests;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequestsError;
@@ -130,6 +133,7 @@ use crate::load_label::LoadLabel;
 use crate::package::FrozenModuleExtensionDefinition;
 use crate::package::HostGlobAttemptControl;
 use crate::package::HostGlobAttemptError;
+use crate::package::LegacyLoadedPackage;
 use crate::package::LoadedPackage;
 use crate::package::ModuleExtensionDefinitionProjection;
 use crate::package::ModuleExtensionTagCoercionError;
@@ -711,7 +715,7 @@ fn host_package_attempt_source_name(input: &HostPackageAttemptInput<'_>) -> Stri
 fn evaluate_host_package_attempt(
     input: &HostPackageAttemptInput<'_>,
     prepared: Arc<SmallMap<HostGlobLoadingRequest, HostGlobPrepared>>,
-    repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
+    repository_mapping: Arc<RunfilesRepositoryMapping>,
 ) -> HostPackageAttemptStep {
     let source_name = host_package_attempt_source_name(input);
     let ast = match AstModule::parse_with_string_encoding(
@@ -837,7 +841,7 @@ async fn evaluate_host_package_attempts_driver(
     ctx: &mut DiceComputations<'_>,
     input: HostPackageAttemptInput<'_>,
     mode: HostPackageLoadMode,
-    repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
+    repository_mapping: Arc<RunfilesRepositoryMapping>,
 ) -> HostPackageAttemptDriverOutcome {
     let mut prepared = Arc::new(SmallMap::new());
     let mut observations = PathObservationEpoch::empty();
@@ -906,7 +910,7 @@ async fn evaluate_host_package_attempts(
         ctx,
         input,
         HostPackageLoadMode::Legacy,
-        Arc::from([]),
+        Arc::new(RunfilesRepositoryMapping::empty()),
     )
     .await
     {
@@ -1926,6 +1930,12 @@ enum RootPackageLoadErrorInner {
         package: PackagePath,
         error: HostLoadLabelError,
     },
+    RepositoryMapping {
+        message: Arc<str>,
+    },
+    RepositoryMappingInfrastructure {
+        message: Arc<str>,
+    },
     Bzl {
         origin: Arc<str>,
         load: Arc<str>,
@@ -1976,6 +1986,12 @@ impl fmt::Display for RootPackageLoadError {
             }
             RootPackageLoadErrorInner::LoadLabel { package, error } => {
                 write!(f, "resolving a load in //{package}: {error}")
+            }
+            RootPackageLoadErrorInner::RepositoryMapping { message } => {
+                write!(f, "resolving the root repository mapping: {message}")
+            }
+            RootPackageLoadErrorInner::RepositoryMappingInfrastructure { message } => {
+                write!(f, "computing the root repository mapping: {message}")
             }
             RootPackageLoadErrorInner::Bzl {
                 origin,
@@ -4434,6 +4450,15 @@ fn external_repository_mapping(
     }
 }
 
+fn external_runfiles_repository_mapping(
+    route: &HostRepositorySourceRoute,
+) -> Arc<RunfilesRepositoryMapping> {
+    Arc::new(RunfilesRepositoryMapping::new(
+        external_repository_mapping(route),
+        route.runfiles_mapping_compact_group(),
+    ))
+}
+
 fn external_load_resolution_error(
     source: CanonicalLabel,
     load: &str,
@@ -5324,6 +5349,104 @@ async fn load_root_package_external_bzl(
     })
 }
 
+async fn load_root_runfiles_repository_mapping(
+    key: &RootPackageLoadKey,
+    ctx: &mut DiceComputations<'_>,
+    mode: HostPackageLoadMode,
+    observations: &mut PathObservationEpoch,
+) -> Result<Arc<RunfilesRepositoryMapping>, RootPackageLoadDriverOutcome> {
+    let result = match mode {
+        HostPackageLoadMode::Legacy => match ctx
+            .compute(&HostRootRepositoryMappingKey::new(key.workspace.dupe()))
+            .await
+        {
+            Err(error) => {
+                return Err(root_package_load_terminal(
+                    RootPackageLoadErrorInner::RepositoryMappingInfrastructure {
+                        message: Arc::from(error.to_string()),
+                    },
+                    observations,
+                ));
+            }
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return Err(SourcePreparationOutcome::Need(need));
+            }
+            Ok(SourcePreparationOutcome::Complete(result)) => result,
+        },
+        HostPackageLoadMode::Observed => match ctx
+            .compute(&HostRootRepositoryMappingObservationKey::new(
+                key.workspace.dupe(),
+            ))
+            .await
+        {
+            Err(error) => {
+                return Err(root_package_load_terminal(
+                    RootPackageLoadErrorInner::RepositoryMappingInfrastructure {
+                        message: Arc::from(error.to_string()),
+                    },
+                    observations,
+                ));
+            }
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return Err(SourcePreparationOutcome::Need(need));
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return Err(match error.selected_frontier() {
+                    HostSelectedObservationFrontier::Path(error) => {
+                        SourcePreparationOutcome::Complete(Err(error))
+                    }
+                    HostSelectedObservationFrontier::Infrastructure(message) => {
+                        root_package_load_terminal(
+                            RootPackageLoadErrorInner::RepositoryMappingInfrastructure { message },
+                            observations,
+                        )
+                    }
+                });
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                *observations = merge_root_package_observations(
+                    mode,
+                    observations.dupe(),
+                    observed.observations(),
+                )
+                .map_err(|error| SourcePreparationOutcome::Complete(Err(error)))?;
+                observed.result().dupe()
+            }
+        },
+    };
+    let mapping = result.as_ref().as_ref().map_err(|error| {
+        root_package_load_terminal(
+            RootPackageLoadErrorInner::RepositoryMapping {
+                message: Arc::from(error.to_string()),
+            },
+            observations,
+        )
+    })?;
+    let view = mapping.view().ok_or_else(|| {
+        root_package_load_terminal(
+            RootPackageLoadErrorInner::RepositoryMapping {
+                message: Arc::from("selected root mapping has no root repository view"),
+            },
+            observations,
+        )
+    })?;
+    if !view.canonical_repo().is_root() || !view.mapping_context().is_root() {
+        return Err(root_package_load_terminal(
+            RootPackageLoadErrorInner::RepositoryMapping {
+                message: Arc::from("selected root mapping has a nonroot context"),
+            },
+            observations,
+        ));
+    }
+    Ok(Arc::new(RunfilesRepositoryMapping::new(
+        view.mapping()
+            .map(|(apparent, canonical)| (apparent.clone(), canonical.clone()))
+            .collect::<Vec<_>>()
+            .into(),
+        None,
+    )))
+}
+
 async fn compute_root_package(
     key: &RootPackageLoadKey,
     ctx: &mut DiceComputations<'_>,
@@ -5523,6 +5646,11 @@ async fn compute_root_package(
         };
         loaded_modules.push((load, module));
     }
+    let repository_mapping =
+        match load_root_runfiles_repository_mapping(key, ctx, mode, &mut observations).await {
+            Ok(mapping) => mapping,
+            Err(outcome) => return outcome,
+        };
     let package_dir = source.package_root().as_path().join(key.package.as_str());
     let attempts = evaluate_host_package_attempts_driver(
         ctx,
@@ -5542,7 +5670,7 @@ async fn compute_root_package(
             capture_events,
         },
         mode,
-        Arc::from([]),
+        repository_mapping,
     )
     .await;
     let (terminal, incoming) = match attempts {
@@ -6248,7 +6376,7 @@ fn evaluate_repository_package(
     match evaluate_host_package_attempt(
         &input,
         Arc::new(SmallMap::new()),
-        external_repository_mapping(&key.route),
+        external_runfiles_repository_mapping(&key.route),
     ) {
         HostPackageAttemptStep::Pending {
             event_batch: batch, ..
@@ -6613,7 +6741,7 @@ impl BzlModuleEvaluator {
         &self,
         transaction: &mut DiceTransaction,
         package: impl AsRef<Path>,
-    ) -> anyhow::Result<LoadedPackage> {
+    ) -> anyhow::Result<LegacyLoadedPackage> {
         let package = package.as_ref().to_path_buf();
         self.ensure_package(&package)?;
         let workspace = self.workspace.clone();
@@ -6940,7 +7068,7 @@ impl Key for BzlModuleEvalKey {
 
 #[async_trait]
 impl Key for PackageLoadKey {
-    type Value = LoadResult<LoadedPackage>;
+    type Value = LoadResult<LegacyLoadedPackage>;
 
     async fn compute(
         &self,
@@ -7105,7 +7233,7 @@ impl Key for PackageLoadKey {
                     .map(|entry| entry.identity.clone())
                     .collect::<Vec<_>>();
                 let load_fingerprint = package_load_fingerprint(&loaded_modules);
-                Ok(recorder.finish(
+                Ok(recorder.finish_legacy(
                     self.package.clone(),
                     build_file,
                     direct_load_roots.into(),
@@ -7414,6 +7542,25 @@ mod module_extension_definition_loading_tests {
     use crate::module_extension::test_support::InvokePreparedKey;
 
     const WORKSPACE: &str = "/extension-definition-loading";
+
+    #[test]
+    fn pre_host_package_key_cannot_publish_complete_metadata() {
+        fn assert_legacy_value<K: Key<Value = LoadResult<LegacyLoadedPackage>>>() {}
+        fn assert_allocative<T: allocative::Allocative>() {}
+        assert_legacy_value::<PackageLoadKey>();
+        assert_allocative::<crate::PackageEvaluation>();
+        assert_allocative::<LegacyLoadedPackage>();
+        assert_allocative::<LoadedPackage>();
+        assert_eq!(
+            std::mem::size_of::<LegacyLoadedPackage>(),
+            std::mem::size_of::<crate::PackageEvaluation>()
+        );
+        assert_eq!(
+            std::mem::size_of::<LoadedPackage>(),
+            std::mem::size_of::<crate::PackageEvaluation>()
+                + std::mem::size_of::<std::sync::Arc<slug_build_api_v2::RunfilesPackageMetadata>>()
+        );
+    }
 
     #[derive(Debug, Clone)]
     struct BzlActivation {

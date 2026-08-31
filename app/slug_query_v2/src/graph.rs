@@ -37,6 +37,7 @@ use slug_loading_v2::AttributeQueryValue;
 use slug_loading_v2::ConfiguredDependencyDefault;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::LoadingPreparationOutcome;
+use slug_loading_v2::PackageEvaluation;
 use slug_loading_v2::PackageGroupContents;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::RepositoryPackageLoadKey;
@@ -855,7 +856,7 @@ async fn compute_package_graph(
 fn package_graph_from_loaded(
     workspace: &Path,
     package: &Path,
-    loaded: &LoadedPackage,
+    loaded: &PackageEvaluation,
 ) -> Result<UnconfiguredPackageGraph, QueryError> {
     let package_name = path_to_package(package)?;
     let build_basename = loaded
@@ -1937,7 +1938,7 @@ fn external_alias_actual_label(
 }
 
 fn effective_visibility(
-    loaded: &slug_loading_v2::LoadedPackage,
+    loaded: &PackageEvaluation,
     target: &slug_loading_v2::PackageTarget,
 ) -> Result<RuleVisibility, QueryError> {
     loaded.effective_visibility(target).ok_or_else(|| {

@@ -106,6 +106,7 @@ use slug_identity_v2::PackagePath;
 use slug_identity_v2::TargetName;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::BzlModuleEvaluator;
+use slug_loading_v2::LegacyLoadedPackage;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::LoadingPreparationOutcome;
 use slug_loading_v2::ObservedRootPackageLoad;
@@ -2435,7 +2436,7 @@ impl NativeDemandSessionOwner {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequestedPackageEvaluation {
     pub target_pattern: String,
-    pub package: LoadedPackage,
+    pub package: LegacyLoadedPackage,
     pub analysis: Option<ConfiguredNodeResult>,
     pub revision: WorkspaceRevision,
 }

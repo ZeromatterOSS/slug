@@ -11,6 +11,7 @@
 use std::cell::OnceCell;
 use std::cell::RefCell;
 use std::fmt;
+use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -21,6 +22,8 @@ use compact_str::CompactString;
 use dupe::Dupe;
 use slug_build_api_v2::ProviderId;
 use slug_build_api_v2::ProviderIdentity;
+use slug_build_api_v2::RunfilesPackageMetadata;
+use slug_build_api_v2::RunfilesRepositoryMapping;
 use slug_bzlmod_v2::BuiltinBazelToolsSnapshot;
 use slug_bzlmod_v2::NonrootAttributeValue;
 use slug_identity_v2::ApparentLabel;
@@ -137,7 +140,7 @@ pub struct PackageFile {
 /// This remains a loading-stage value: configured targets, providers, and
 /// action declarations are built by Stage 6.
 #[derive(Debug, Clone, Allocative)]
-pub struct LoadedPackage {
+pub struct PackageEvaluation {
     pub package_dir: PathBuf,
     pub build_file: PathBuf,
     pub default_visibility: RuleVisibility,
@@ -159,7 +162,7 @@ pub struct LoadedPackage {
     retained_bzl_modules: Arc<[FrozenBzlLifetimeEntry]>,
 }
 
-impl PartialEq for LoadedPackage {
+impl PartialEq for PackageEvaluation {
     fn eq(&self, other: &Self) -> bool {
         self.package_dir == other.package_dir
             && self.build_file == other.build_file
@@ -175,9 +178,45 @@ impl PartialEq for LoadedPackage {
     }
 }
 
-impl Eq for LoadedPackage {}
+impl Eq for PackageEvaluation {}
+
+/// Host-prepared package result with complete selected repository metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct LoadedPackage {
+    evaluation: PackageEvaluation,
+    runfiles_package: Arc<RunfilesPackageMetadata>,
+}
+
+/// Pre-Host evaluator result. This cannot enter complete-metadata consumers.
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct LegacyLoadedPackage {
+    evaluation: PackageEvaluation,
+}
+
+impl Deref for LoadedPackage {
+    type Target = PackageEvaluation;
+
+    fn deref(&self) -> &Self::Target {
+        &self.evaluation
+    }
+}
+
+impl Deref for LegacyLoadedPackage {
+    type Target = PackageEvaluation;
+
+    fn deref(&self) -> &Self::Target {
+        &self.evaluation
+    }
+}
 
 impl LoadedPackage {
+    pub fn runfiles_package(&self) -> &Arc<RunfilesPackageMetadata> {
+        &self.runfiles_package
+    }
+}
+
+impl PackageEvaluation {
     pub fn native_attributes(&self, target: &str) -> Option<&NativeRuleAttributes> {
         let target_index = self
             .targets
@@ -1134,12 +1173,27 @@ impl fmt::Display for HostGlobControlTransfer {
 
 impl std::error::Error for HostGlobControlTransfer {}
 
+#[derive(Debug)]
+enum PackageRecorderRepositoryMapping {
+    Legacy(Arc<[(ApparentRepoName, CanonicalRepoName)]>),
+    Complete(Arc<RunfilesRepositoryMapping>),
+}
+
+impl PackageRecorderRepositoryMapping {
+    fn entries(&self) -> &[(ApparentRepoName, CanonicalRepoName)] {
+        match self {
+            Self::Legacy(entries) => entries,
+            Self::Complete(mapping) => mapping.entries(),
+        }
+    }
+}
+
 #[derive(Debug, ProvidesStaticType)]
 pub(crate) struct PackageRecorder {
     glob_source: PackageGlobSource,
     package: CompactString,
     package_identifier: PackageIdentifier,
-    repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
+    repository_mapping: PackageRecorderRepositoryMapping,
     print_capture: Option<Rc<LoadingPrintCapture>>,
     state: RefCell<PackageState>,
 }
@@ -1155,7 +1209,7 @@ impl PackageRecorder {
                 PackagePath::parse(&package).expect("validated BUILD package path"),
             ),
             package,
-            repository_mapping: Arc::from([]),
+            repository_mapping: PackageRecorderRepositoryMapping::Legacy(Arc::from([])),
             print_capture: None,
             state: RefCell::new(PackageState::default()),
         }
@@ -1164,7 +1218,7 @@ impl PackageRecorder {
     pub(crate) fn new_host(
         prepared: Arc<SmallMap<HostGlobLoadingRequest, HostGlobPrepared>>,
         package_identifier: PackageIdentifier,
-        repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
+        repository_mapping: Arc<RunfilesRepositoryMapping>,
     ) -> Self {
         let package = CompactString::new(package_identifier.package().as_str());
         Self {
@@ -1174,7 +1228,7 @@ impl PackageRecorder {
             }),
             package,
             package_identifier,
-            repository_mapping,
+            repository_mapping: PackageRecorderRepositoryMapping::Complete(repository_mapping),
             print_capture: None,
             state: RefCell::new(PackageState::default()),
         }
@@ -1639,7 +1693,7 @@ impl PackageRecorder {
         }
         package_context_label_with_repository(
             &self.package_identifier,
-            &self.repository_mapping,
+            self.repository_mapping.entries(),
             value,
         )
     }
@@ -1976,6 +2030,63 @@ impl PackageRecorder {
         load_fingerprint: [u8; 32],
         retained_bzl_modules: Arc<[FrozenBzlLifetimeEntry]>,
     ) -> LoadedPackage {
+        let (evaluation, package_identifier, repository_mapping) = self.finish_evaluation(
+            package_dir,
+            build_file,
+            direct_load_roots,
+            reachable_loads,
+            load_fingerprint,
+            retained_bzl_modules,
+        );
+        let PackageRecorderRepositoryMapping::Complete(repository_mapping) = repository_mapping
+        else {
+            panic!("legacy PackageRecorder must use finish_legacy")
+        };
+        LoadedPackage {
+            evaluation,
+            runfiles_package: Arc::new(RunfilesPackageMetadata::new(
+                package_identifier,
+                repository_mapping,
+            )),
+        }
+    }
+
+    pub(crate) fn finish_legacy(
+        self,
+        package_dir: PathBuf,
+        build_file: PathBuf,
+        direct_load_roots: Arc<[BzlModuleIdentity]>,
+        reachable_loads: Arc<[BzlModuleIdentity]>,
+        load_fingerprint: [u8; 32],
+        retained_bzl_modules: Arc<[FrozenBzlLifetimeEntry]>,
+    ) -> LegacyLoadedPackage {
+        let (evaluation, _, repository_mapping) = self.finish_evaluation(
+            package_dir,
+            build_file,
+            direct_load_roots,
+            reachable_loads,
+            load_fingerprint,
+            retained_bzl_modules,
+        );
+        let PackageRecorderRepositoryMapping::Legacy(_) = repository_mapping else {
+            panic!("Host PackageRecorder must use finish")
+        };
+        LegacyLoadedPackage { evaluation }
+    }
+
+    fn finish_evaluation(
+        self,
+        package_dir: PathBuf,
+        build_file: PathBuf,
+        direct_load_roots: Arc<[BzlModuleIdentity]>,
+        reachable_loads: Arc<[BzlModuleIdentity]>,
+        load_fingerprint: [u8; 32],
+        retained_bzl_modules: Arc<[FrozenBzlLifetimeEntry]>,
+    ) -> (
+        PackageEvaluation,
+        PackageIdentifier,
+        PackageRecorderRepositoryMapping,
+    ) {
         if let PackageGlobSource::Host(host) = &self.glob_source {
             debug_assert!(host.control.borrow().is_none());
         }
@@ -1989,7 +2100,7 @@ impl PackageRecorder {
                         (
                             package_context_label_with_repository(
                                 &self.package_identifier,
-                                &self.repository_mapping,
+                                self.repository_mapping.entries(),
                                 name,
                             )
                             .expect("recorded target names are valid package-context labels"),
@@ -2054,7 +2165,7 @@ impl PackageRecorder {
             })
             .collect::<Vec<_>>()
             .into();
-        LoadedPackage {
+        let evaluation = PackageEvaluation {
             package_dir,
             build_file,
             default_visibility: state.default_visibility,
@@ -2075,7 +2186,8 @@ impl PackageRecorder {
             reachable_loads,
             load_fingerprint,
             retained_bzl_modules,
-        }
+        };
+        (evaluation, self.package_identifier, self.repository_mapping)
     }
 }
 
