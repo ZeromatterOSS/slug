@@ -438,7 +438,22 @@ operations are exact. Callback mappers, directory expansion, resource callbacks
 and new execution/REAPI behavior stay explicitly deferred and fail closed.
 Focused R2 rereview and the post-preflight command-surface narrowing rereview
 both returned `ACCEPT`; implement only the configured-action-environment
-prerequisite before selecting the scalar FDO action successor.
+prerequisite before selecting the scalar FDO action successor. That prerequisite
+is accepted in `71d34affa`.
+
+The scalar R1 candidate passes its serial Rust validation but terminal review
+returns `REPLAN`. The authenticated FDO body exposes a pre-existing generic
+provider defect: target-shaped source/generated files rematerialize
+`DefaultInfo.files` as strings rather than Files. Configured evaluation also
+lacks the recursive source manifest required by the already-designed private
+caller check, and the action A/B/A proof did not count parent DICE computes.
+Independent architecture review returned `ACCEPT`; activate only
+`WP-6-7A-fdo-basic-args-run-symlink-implementation-r2`. It retains typed `AnalysisArtifact` leaves in the one
+dense `DefaultInfo.files` depset for every file-target/rule producer, hands the
+immutable source manifest into generic configured evaluation, and proves real
+publication cutoff. Runfiles, OutputGroup, executable and FilesToRun typed
+migration remain the next standard-provider category; add no FDO, rules_cc,
+`cc_common`, parser or C++ branch.
 
 Bazel 9.2 remains the sole semantic authority. Zabel
 `0795445f3ab60f4e49070bdd0b94425c5610f73a` supplies peer phase-ownership,

@@ -797,8 +797,24 @@ the existing depset publication comparator for manual Spawn/ActionSpec equality,
 and admits the generic custom tuple allowlist plus Starlark-function depth check
 that authentic rules_cc invokes before its absolute symlink. No parser, set,
 FDO, C++ action, second graph walk, or Zabel semantic owner is introduced. The
-focused correction rereview returned `ACCEPT`; implementation is authorized
-only within that contract.
+focused correction rereview returned `ACCEPT` and authorized the now-frozen R1
+implementation only within that contract.
+
+R1 implementation terminal review subsequently returned `REPLAN`: the action
+owners themselves pass, but unchanged authentic rules_cc demonstrates that the
+older string-backed `DefaultInfo.files` target projection bypasses typed
+artifact identity, configured evaluation lacks its loaded recursive source
+manifest, and equality-only A/B/A evidence does not prove DICE cutoff.
+
+The active R2 correction reuses the already accepted dense `AnalysisDepset`,
+`AnalysisArtifact`, iterative materializer, shared publication-equality state,
+compact immutable source manifest and parent-key DICE test patterns. It imports
+no V1/Buck2/Zabel provider, graph, interner, parser, action, scheduler, cache or
+identity. Bazel 9.2 `FileConfiguredTarget`, `DefaultInfo`, `FileProvider` and
+the existing Args/action sources remain authority; Zabel remains peer
+architecture/optimization guidance only. Independent architecture acceptance
+returned `ACCEPT`; correct the frozen R1 Rust candidate only within that
+contract.
 
 ### Stage 6 recursive configured custom-rule analysis
 
