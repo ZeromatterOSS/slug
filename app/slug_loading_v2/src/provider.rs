@@ -1691,11 +1691,14 @@ impl<'v> StarlarkValue<'v> for AnalysisBuiltinCallable {
                 }))
             }
             "ToolchainInfo" => {
-                if eval
-                    .extra
-                    .and_then(|extra| extra.downcast_ref::<ToolchainInfoAnalysisContext>())
-                    .is_none()
-                {
+                if eval.extra.is_none_or(|extra| {
+                    extra
+                        .downcast_ref::<ToolchainInfoAnalysisContext>()
+                        .is_none()
+                        && extra
+                            .downcast_ref::<crate::subrule_invocation::AnalysisEvaluationContext>()
+                            .is_none()
+                }) {
                     return Err(starlark::Error::new_other(anyhow::anyhow!(
                         "unsupported analysis builtin ToolchainInfo"
                     )));

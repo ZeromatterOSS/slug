@@ -136,12 +136,20 @@ pub(crate) struct SubruleAttribute {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
-pub(crate) struct SubruleIdentity {
+pub struct SubruleIdentity {
     pub(crate) defining_label: CanonicalLabel,
     pub(crate) exported_name: CompactString,
 }
 
 impl SubruleIdentity {
+    pub fn defining_label(&self) -> &CanonicalLabel {
+        &self.defining_label
+    }
+
+    pub fn exported_name(&self) -> &str {
+        &self.exported_name
+    }
+
     fn hidden_label(&self) -> CompactString {
         if self.defining_label.package().repo().is_root() {
             CompactString::new(format!(
@@ -244,6 +252,7 @@ pub enum ConfiguredDependencyDefault<'a> {
 /// Borrowed view over an ordinary late-bound or lifted hidden dependency.
 #[derive(Clone, Copy, Debug)]
 pub struct ConfiguredDependencyAttribute<'a> {
+    owner: Option<&'a Arc<SubruleIdentity>>,
     name: &'a str,
     user_name: Option<&'a str>,
     kind: AttributeKind,
@@ -261,6 +270,7 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
         schema: &'a AttributeSchema,
     ) -> Self {
         Self {
+            owner: None,
             name: schema.declaration_name(),
             user_name: None,
             kind: schema.kind(),
@@ -284,6 +294,7 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
             }
         };
         Self {
+            owner: Some(&attribute.owner),
             name: attribute.rule_name.as_str(),
             user_name: Some(attribute.user_name.as_str()),
             kind: attribute.kind,
@@ -335,6 +346,11 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
     pub fn is_hidden(self) -> bool {
         self.user_name.is_some()
     }
+
+    #[doc(hidden)]
+    pub fn owner(self) -> Option<&'a Arc<SubruleIdentity>> {
+        self.owner
+    }
 }
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
@@ -358,10 +374,18 @@ impl<'v> StarlarkValue<'v> for DeferredSubruleRuleImplementation {
     fn invoke(
         &self,
         _me: Value<'v>,
-        _args: &Arguments<'v, '_>,
-        _eval: &mut Evaluator<'v, '_, '_>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        let _lifetime_only = self.implementation;
+        if crate::subrule_invocation::AnalysisEvaluationContext::from_evaluator(eval).is_ok() {
+            let positions = args.positions(eval.heap())?.collect::<Vec<_>>();
+            let names = args.names_map()?;
+            let kwargs = (!names.is_empty()).then(|| eval.heap().alloc(names));
+            return self
+                .implementation
+                .to_value()
+                .invoke_pos_kwargs(&positions, kwargs, eval);
+        }
         let message = match &self.first_subrule {
             Some(subrule) => format!(
                 "configured analysis of subrule '{subrule}' reached the deferred invocation boundary"
@@ -693,14 +717,30 @@ impl<'v> StarlarkValue<'v> for FrozenSubruleDefinition {
     fn invoke(
         &self,
         _me: Value<'v>,
-        _args: &Arguments<'v, '_>,
-        _eval: &mut Evaluator<'v, '_, '_>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = self.implementation;
-        Err(starlark::Error::new_other(anyhow::anyhow!(
-            "configured analysis of subrule '{}' does not yet support hidden late-bound dependency resolution",
-            self.identity.exported_name
-        )))
+        let context =
+            crate::subrule_invocation::AnalysisEvaluationContext::cloned_from_evaluator(eval)?;
+        let direct = self
+            .direct_subrules
+            .iter()
+            .map(|value| {
+                identity_from_value(value.to_value()).ok_or_else(|| {
+                    starlark::Error::new_other(anyhow::anyhow!(
+                        "subrule '{}' retained an invalid direct subrule",
+                        self.identity.exported_name
+                    ))
+                })
+            })
+            .collect::<starlark::Result<Vec<_>>>()?;
+        context.invoke(
+            &self.identity,
+            direct.into(),
+            self.implementation,
+            args,
+            eval,
+        )
     }
 }
 

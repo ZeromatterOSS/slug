@@ -29,19 +29,20 @@ use slug_loading_v2::BzlModuleIdentity;
 use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::PackageTargetKind;
+use slug_loading_v2::SubruleIdentity;
 use slug_loading_v2::package::resolve_rule_definition_label;
 use slug_loading_v2::provider::StarlarkDefaultInfo;
-use slug_loading_v2::provider::ToolchainInfoAnalysisContext;
 use slug_loading_v2::provider::starlark_label;
+use slug_loading_v2::subrule_invocation::AnalysisActions;
+use slug_loading_v2::subrule_invocation::AnalysisArtifactValue;
+use slug_loading_v2::subrule_invocation::AnalysisCallToken;
+use slug_loading_v2::subrule_invocation::AnalysisEvaluationContext;
+use slug_loading_v2::subrule_invocation::PreparedSubruleInvocation;
 use starlark::PrintHandler;
 use starlark::any::ProvidesStaticType;
-use starlark::environment::Methods;
-use starlark::environment::MethodsBuilder;
-use starlark::environment::MethodsStatic;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::starlark_complex_value;
-use starlark::starlark_module;
 use starlark::values::Coerce;
 use starlark::values::Freeze;
 use starlark::values::FreezeResult;
@@ -55,11 +56,9 @@ use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::dict::AllocDict;
 use starlark::values::list::ListRef;
-use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark_map::small_map::SmallMap;
 
-use crate::analysis_value::AnalysisArtifactValue;
 use crate::analysis_value::AnalysisValueLowerer;
 use crate::analysis_value::AnalysisValueMaterializer;
 use crate::build_setting;
@@ -101,6 +100,9 @@ impl fmt::Display for LoadedRuleError {
 struct AnalysisContextGen<V> {
     #[allocative(skip)]
     actions: Arc<Mutex<CtxActions>>,
+    #[allocative(skip)]
+    #[trace(unsafe_ignore)]
+    token: AnalysisCallToken,
     retained_owner: AnalysisConfiguredTargetKey,
     target_label: slug_identity_v2::CanonicalLabel,
     package_path: String,
@@ -122,6 +124,7 @@ impl<'v> Freeze for AnalysisContext<'v> {
     fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
         Ok(AnalysisContextGen {
             actions: self.actions,
+            token: self.token,
             retained_owner: self.retained_owner,
             target_label: self.target_label,
             package_path: self.package_path,
@@ -148,29 +151,36 @@ where
     Self: ProvidesStaticType<'v>,
 {
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        self.token.require_active(attribute, "rule context").ok()?;
         match attribute {
             "label" => Some(slug_loading_v2::provider::alloc_starlark_label(
                 heap,
                 self.target_label.clone(),
             )),
-            "actions" => Some(heap.alloc_simple(AnalysisActions {
-                actions: self.actions.clone(),
-                package_path: self.package_path.clone(),
-                owner: self.retained_owner.clone(),
-            })),
+            "actions" => Some(heap.alloc_simple(AnalysisActions::new(
+                self.actions.clone(),
+                self.package_path.clone(),
+                self.retained_owner.clone(),
+                self.token.clone(),
+                "rule context",
+            ))),
             "attr" => Some(heap.alloc_simple(AnalysisAttributes {
+                token: self.token.clone(),
                 dependencies: self.dependencies.clone(),
                 attributes: self.resolved_attributes.clone(),
             })),
             "outputs" => Some(heap.alloc_simple(AnalysisOutputs {
+                token: self.token.clone(),
                 attributes: self.resolved_attributes.clone(),
                 package_path: self.package_path.clone(),
                 owner: self.retained_owner.clone(),
             })),
-            "toolchains" => self
-                .toolchain
-                .clone()
-                .map(|toolchain| heap.alloc_simple(AnalysisToolchains(toolchain))),
+            "toolchains" => self.toolchain.clone().map(|toolchain| {
+                heap.alloc_simple(AnalysisToolchains {
+                    token: self.token.clone(),
+                    toolchains: toolchain,
+                })
+            }),
             "build_setting_value" => self.build_setting_value.map(|value| value.to_value()),
             _ => None,
         }
@@ -182,6 +192,14 @@ pub(crate) struct PreparedDependency {
     pub(crate) key: ConfiguredNodeKey,
     pub(crate) providers: ProviderCollection,
     pub(crate) attribute: CompactString,
+    pub(crate) target_shape: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct PreparedConfiguredAttribute {
+    pub(crate) owner: Option<Arc<SubruleIdentity>>,
+    pub(crate) user_name: Option<CompactString>,
+    pub(crate) value: AnalysisValue,
 }
 
 #[derive(Debug, Clone, Allocative)]
@@ -205,6 +223,8 @@ struct PreparedAnalysisToolchains {
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct AnalysisAttributes {
+    #[allocative(skip)]
+    token: AnalysisCallToken,
     dependencies: Arc<[AnalysisDependency]>,
     attributes: Arc<[ResolvedRuleAttribute]>,
 }
@@ -220,6 +240,9 @@ starlark::starlark_simple_value!(AnalysisAttributes);
 #[starlark_value(type = "analysis_attrs")]
 impl<'v> StarlarkValue<'v> for AnalysisAttributes {
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        self.token
+            .require_active(attribute, "rule context attributes")
+            .ok()?;
         let value = self
             .attributes
             .iter()
@@ -237,6 +260,8 @@ impl<'v> StarlarkValue<'v> for AnalysisAttributes {
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct AnalysisOutputs {
+    #[allocative(skip)]
+    token: AnalysisCallToken,
     attributes: Arc<[ResolvedRuleAttribute]>,
     package_path: String,
     owner: AnalysisConfiguredTargetKey,
@@ -253,6 +278,9 @@ starlark::starlark_simple_value!(AnalysisOutputs);
 #[starlark_value(type = "analysis_outputs")]
 impl<'v> StarlarkValue<'v> for AnalysisOutputs {
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        self.token
+            .require_active(attribute, "rule context outputs")
+            .ok()?;
         let attribute = self
             .attributes
             .iter()
@@ -404,7 +432,11 @@ fn allocate_analysis_attribute<'v>(
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct AnalysisToolchains(PreparedAnalysisToolchains);
+struct AnalysisToolchains {
+    #[allocative(skip)]
+    token: AnalysisCallToken,
+    toolchains: PreparedAnalysisToolchains,
+}
 
 impl AnalysisToolchains {
     fn transform(&self, index: Value<'_>) -> starlark::Result<slug_identity_v2::CanonicalLabel> {
@@ -416,7 +448,7 @@ impl AnalysisToolchains {
                 "ctx.toolchains indices must be Labels or Strings"
             )));
         };
-        resolve_rule_definition_label(raw, &self.0.definition_source)
+        resolve_rule_definition_label(raw, &self.toolchains.definition_source)
             .map_err(starlark::Error::new_other)
     }
 
@@ -424,7 +456,7 @@ impl AnalysisToolchains {
         &self,
         label: &slug_identity_v2::CanonicalLabel,
     ) -> Option<&PreparedAnalysisToolchainRow> {
-        self.0
+        self.toolchains
             .rows
             .iter()
             .find(|row| &row.requested == label || &row.actual == label)
@@ -442,6 +474,7 @@ starlark::starlark_simple_value!(AnalysisToolchains);
 #[starlark_value(type = "toolchains")]
 impl<'v> StarlarkValue<'v> for AnalysisToolchains {
     fn at(&self, index: Value<'v>, _heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        self.token.require_active("[]", "rule context toolchains")?;
         let label = self.transform(index)?;
         let row = self.row(&label).ok_or_else(|| {
             starlark::Error::new_other(anyhow::anyhow!(
@@ -452,6 +485,7 @@ impl<'v> StarlarkValue<'v> for AnalysisToolchains {
     }
 
     fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
+        self.token.require_active("in", "rule context toolchains")?;
         Ok(self.row(&self.transform(other)?).is_some())
     }
 }
@@ -460,120 +494,6 @@ impl<'v> StarlarkValue<'v> for AnalysisToolchains {
 struct AnalysisDependency {
     attribute: CompactString,
     target: FrozenValue,
-}
-
-#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct AnalysisActions {
-    #[allocative(skip)]
-    actions: Arc<Mutex<CtxActions>>,
-    package_path: String,
-    owner: AnalysisConfiguredTargetKey,
-}
-
-impl fmt::Display for AnalysisActions {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("<ctx.actions>")
-    }
-}
-
-starlark::starlark_simple_value!(AnalysisActions);
-
-#[starlark_module]
-fn analysis_actions_methods(builder: &mut MethodsBuilder) {
-    fn declare_file(this: Value, path: &str) -> anyhow::Result<AnalysisArtifactValue> {
-        let actions = AnalysisActions::from_value(this)
-            .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
-        let path = if actions.package_path.is_empty() {
-            path.to_owned()
-        } else {
-            format!("{}/{}", actions.package_path, path)
-        };
-        let output = actions
-            .actions
-            .lock()
-            .map_err(|_| anyhow::anyhow!("ctx.actions state lock is poisoned"))?
-            .declare_file(path)
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-        Ok(AnalysisArtifactValue::new(AnalysisArtifact::Derived {
-            owner: actions.owner.clone(),
-            output,
-        }))
-    }
-
-    fn write(
-        this: Value,
-        output: Value,
-        content: &str,
-        #[starlark(default = false)] is_executable: bool,
-    ) -> anyhow::Result<NoneType> {
-        let actions = AnalysisActions::from_value(this)
-            .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
-        let output = AnalysisArtifactValue::from_value(output)
-            .ok_or_else(|| anyhow::anyhow!("ctx.actions.write requires a declared file"))?;
-        let output = output
-            .output_for_owner(&actions.owner)
-            .ok_or_else(|| anyhow::anyhow!("ctx.actions.write requires a declared file"))?;
-        actions
-            .actions
-            .lock()
-            .map_err(|_| anyhow::anyhow!("ctx.actions state lock is poisoned"))?
-            .write(output.clone(), content, is_executable)
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-        Ok(NoneType)
-    }
-
-    fn run_shell<'v>(
-        this: Value<'v>,
-        outputs: Value<'v>,
-        command: &str,
-        arguments: Value<'v>,
-        heap: Heap<'v>,
-    ) -> anyhow::Result<NoneType> {
-        let actions = AnalysisActions::from_value(this)
-            .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
-        let mut declared = Vec::new();
-        for item in outputs
-            .iterate(heap)
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?
-        {
-            let file = AnalysisArtifactValue::from_value(item).ok_or_else(|| {
-                anyhow::anyhow!("ctx.actions.run_shell outputs must be declared files")
-            })?;
-            declared.push(
-                file.output_for_owner(&actions.owner)
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("ctx.actions.run_shell outputs must be declared files")
-                    })?
-                    .clone(),
-            );
-        }
-        let output = declared
-            .into_iter()
-            .next()
-            .ok_or_else(|| anyhow::anyhow!("ctx.actions.run_shell requires at least one output"))?;
-        let mut args = Vec::new();
-        for item in arguments
-            .iterate(heap)
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?
-        {
-            args.push(item.to_str());
-        }
-        actions
-            .actions
-            .lock()
-            .map_err(|_| anyhow::anyhow!("ctx.actions state lock is poisoned"))?
-            .run_shell(output, command, args, Vec::new())
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-        Ok(NoneType)
-    }
-}
-
-#[starlark_value(type = "analysis_actions")]
-impl<'v> StarlarkValue<'v> for AnalysisActions {
-    fn get_methods() -> Option<&'static Methods> {
-        static METHODS: MethodsStatic = MethodsStatic::new();
-        METHODS.methods(analysis_actions_methods)
-    }
 }
 
 /// Synchronously evaluate one loaded rule after DICE has prepared all direct
@@ -673,6 +593,7 @@ pub(crate) fn evaluate_loaded_rule(
     package_path: &str,
     dependencies: Vec<PreparedDependency>,
     resolved_attributes: Vec<ResolvedRuleAttribute>,
+    configured_attributes: Vec<PreparedConfiguredAttribute>,
     action_context: Arc<ConfiguredActionOwnerContext>,
     toolchain: Option<PreparedToolchain>,
     print_handler: Option<&dyn PrintHandler>,
@@ -713,8 +634,12 @@ pub(crate) fn evaluate_loaded_rule(
         let dependencies = dependencies
             .into_iter()
             .map(|dependency| {
-                let target =
-                    materializer.configured_dependency(&dependency.key, dependency.providers)?;
+                let target = if dependency.target_shape {
+                    materializer
+                        .configured_dependency_target(&dependency.key, dependency.providers)?
+                } else {
+                    materializer.configured_dependency(&dependency.key, dependency.providers)?
+                };
                 Ok(AnalysisDependency {
                     attribute: dependency.attribute,
                     target,
@@ -732,10 +657,39 @@ pub(crate) fn evaluate_loaded_rule(
             .transpose()?;
         (dependencies, toolchain)
     };
+    let prepared_subrules = {
+        let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
+        implementation
+            .subrule_invocations()
+            .map(|(identity, _, _)| {
+                let hidden = configured_attributes
+                    .iter()
+                    .filter(|attribute| attribute.owner.as_ref() == Some(&identity))
+                    .map(|attribute| {
+                        Ok((
+                            attribute
+                                .user_name
+                                .clone()
+                                .expect("subrule attributes retain their user-facing name"),
+                            materializer.value(&attribute.value)?,
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+                Ok(PreparedSubruleInvocation::new(identity, hidden))
+            })
+            .collect::<Result<Vec<_>, String>>()?
+    };
     let returned = {
-        let toolchain_info_context = ToolchainInfoAnalysisContext;
+        let analysis_context = AnalysisEvaluationContext::new(
+            implementation.direct_subrule_identities(),
+            prepared_subrules,
+            key.label().clone(),
+            package_path.to_owned(),
+            retained_owner.clone(),
+            actions.clone(),
+        );
         let mut evaluator = Evaluator::new(&module);
-        evaluator.extra = Some(&toolchain_info_context);
+        evaluator.extra = Some(&analysis_context);
         if let Some(print_handler) = print_handler {
             evaluator.set_print_handler(print_handler);
         }
@@ -746,6 +700,7 @@ pub(crate) fn evaluate_loaded_rule(
             .map_err(|error| error.to_string())?;
         let context = module.heap().alloc(AnalysisContextGen {
             actions: actions.clone(),
+            token: analysis_context.root_token(),
             retained_owner: retained_owner.clone(),
             target_label: key.label().clone(),
             package_path: package_path.to_owned(),
@@ -794,7 +749,7 @@ pub(crate) fn evaluate_loaded_rule(
                 .transpose()?;
             let executable = executable
                 .map(|executable| {
-                    AnalysisArtifactValue::from_value(executable)
+                    AnalysisArtifactValue::from_starlark(executable)
                         .and_then(|value| value.output_for_owner(&retained_owner))
                         .map(|output| output.path().to_owned())
                         .ok_or_else(|| "DefaultInfo.executable must be a declared file".to_owned())

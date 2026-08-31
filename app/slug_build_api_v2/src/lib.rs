@@ -35,6 +35,7 @@ pub use analysis_value::AnalysisDepsetOccurrence;
 pub use analysis_value::AnalysisDepsetSuccessor;
 pub use analysis_value::AnalysisInteger;
 pub use analysis_value::AnalysisNumber;
+pub use analysis_value::AnalysisTargetIdentity;
 pub use analysis_value::AnalysisValue;
 pub use analysis_value::AnalysisValueError;
 pub use analysis_value::AnalysisValueKind;

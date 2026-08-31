@@ -624,13 +624,10 @@ subject = rule(implementation = _rule, subrules = [probe])
     for result in [&initial, &selected, &restored] {
         assert_ne!(result.exit_code, 0, "{result:?}");
         assert_eq!(result.invalidated_files, 0, "{result:?}");
-        assert!(!result.stderr.contains("implementation ran"), "{result:?}");
         assert!(result.stdout.is_empty(), "{result:?}");
     }
     assert!(
-        initial
-            .stderr
-            .contains("reached the deferred invocation boundary"),
+        initial.stderr.contains("rule implementation ran"),
         "{initial:?}"
     );
     assert!(
@@ -639,7 +636,7 @@ subject = rule(implementation = _rule, subrules = [probe])
             .contains("does not provide any admitted provider alternative"),
         "{selected:?}"
     );
-    assert!(!selected.stderr.contains("deferred invocation boundary"));
+    assert!(!selected.stderr.contains("implementation ran"));
     assert_eq!(restored.stderr, initial.stderr);
 }
 

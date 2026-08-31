@@ -21,6 +21,20 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use slug_build_api_v2::ActionOutput;
+use slug_build_api_v2::ActionOutputKind;
+use slug_build_api_v2::AnalysisArtifact;
+use slug_build_api_v2::AnalysisConfiguredTargetKey;
+use slug_build_api_v2::AnalysisTargetIdentity;
+use slug_build_api_v2::AnalysisValue;
+use slug_build_api_v2::ConfiguredTargetValue;
+use slug_build_api_v2::DefaultInfo;
+use slug_build_api_v2::Depset;
+use slug_build_api_v2::DepsetOrder;
+use slug_build_api_v2::ProviderCollection;
+use slug_build_api_v2::ProviderIdentity;
+use slug_build_api_v2::ProviderOccurrence;
+use slug_build_api_v2::ProviderValue;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
@@ -95,6 +109,7 @@ use crate::result::ConfiguredToolchainSelection;
 use crate::result::PlatformSemanticFact;
 use crate::result::ToolchainTopology;
 use crate::starlark_rule::LoadedRuleError;
+use crate::starlark_rule::PreparedConfiguredAttribute;
 use crate::starlark_rule::PreparedDependency;
 use crate::starlark_rule::PreparedToolchain;
 use crate::starlark_rule::evaluate_loaded_rule;
@@ -1507,6 +1522,7 @@ async fn root_declared_dependency_keys(
                         )
                     ),
                 validation: None,
+                configured_row: None,
             });
         }
     }
@@ -1681,11 +1697,193 @@ impl ComputedAnalysis for Arc<ConfiguredNodeResult> {
     }
 }
 
+fn analysis_configured_key(key: &ConfiguredTargetKey) -> AnalysisConfiguredTargetKey {
+    AnalysisConfiguredTargetKey::new(
+        key.label().clone(),
+        key.configuration().complete_identity_bytes(),
+    )
+}
+
+fn configured_dependency_file_path(result: &ConfiguredNodeResult) -> String {
+    let label = result.key().label();
+    let package = label.package().package().as_str();
+    if package.is_empty() {
+        label.target().as_str().to_owned()
+    } else {
+        format!("{package}/{}", label.target())
+    }
+}
+
+fn materialized_target_providers(result: &ConfiguredNodeResult) -> ProviderCollection {
+    if !matches!(
+        result.kind(),
+        ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
+    ) {
+        return result.providers().clone();
+    }
+    let files = Depset::from_direct(
+        DepsetOrder::Default,
+        vec![configured_dependency_file_path(result)],
+    )
+    .expect("a singleton file-target depset is valid");
+    ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::from_files(
+        files,
+    ))])
+    .expect("the materialized file-target provider view has DefaultInfo")
+}
+
+fn configured_target_analysis_value(result: &ConfiguredNodeResult) -> AnalysisValue {
+    let identity = result.actual_configured_target().map_or_else(
+        || AnalysisTargetIdentity::null(result.key().label().clone()),
+        |key| AnalysisTargetIdentity::from(analysis_configured_key(key)),
+    );
+    AnalysisValue::configured_target(ConfiguredTargetValue::new(
+        identity,
+        materialized_target_providers(result),
+    ))
+}
+
+fn derived_artifact(owner: &ConfiguredTargetKey, path: impl Into<String>) -> AnalysisArtifact {
+    AnalysisArtifact::Derived {
+        owner: analysis_configured_key(owner),
+        output: ActionOutput::new(path, ActionOutputKind::File),
+    }
+}
+
+fn configured_dependency_artifact(
+    result: &ConfiguredNodeResult,
+    explicit_path: Option<&str>,
+) -> Result<AnalysisArtifact, AnalysisError> {
+    match result.kind() {
+        ConfiguredNodeKind::SourceFile => {
+            Ok(AnalysisArtifact::Source(result.key().label().clone()))
+        }
+        ConfiguredNodeKind::GeneratedFile => {
+            let producer = result
+                .edges()
+                .iter()
+                .find(|edge| {
+                    matches!(
+                        edge.kind(),
+                        crate::configured_target::ConfiguredEdgeKind::GeneratedBy
+                    )
+                })
+                .and_then(|edge| edge.configured_target())
+                .ok_or_else(|| {
+                    AnalysisError::message(format!(
+                        "generated configured dependency {} has no generating target",
+                        result.key().label()
+                    ))
+                })?;
+            let path = configured_dependency_file_path(result);
+            Ok(derived_artifact(producer, path))
+        }
+        _ => {
+            let owner = result.actual_configured_target().ok_or_else(|| {
+                AnalysisError::message(format!(
+                    "configured dependency {} has no configured target identity",
+                    result.key().label()
+                ))
+            })?;
+            let path = explicit_path.ok_or_else(|| {
+                AnalysisError::message(format!(
+                    "configured dependency {} did not retain a file path",
+                    result.key().label()
+                ))
+            })?;
+            Ok(derived_artifact(owner, path))
+        }
+    }
+}
+
+fn configured_attribute_item(
+    row: &crate::subrule::ConfiguredDependencyRow,
+    result: &ConfiguredNodeResult,
+) -> Result<AnalysisValue, AnalysisError> {
+    if row.executable() {
+        let executable = if matches!(
+            result.kind(),
+            ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
+        ) {
+            configured_dependency_artifact(result, None)?
+        } else {
+            let path = result
+                .providers()
+                .default_info()
+                .and_then(|info| info.files_to_run.executable.as_deref())
+                .expect("configured executable validation ran before projection");
+            configured_dependency_artifact(result, Some(path))?
+        };
+        return Ok(AnalysisValue::provider(ProviderOccurrence::new(
+            ProviderIdentity::builtin("FilesToRunProvider"),
+            [
+                ("executable", AnalysisValue::artifact(executable)),
+                ("runfiles_manifest", AnalysisValue::none()),
+                ("repo_mapping_manifest", AnalysisValue::none()),
+            ],
+        )));
+    }
+    if row.allow_single_file() {
+        let path = if matches!(
+            result.kind(),
+            ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
+        ) {
+            None
+        } else {
+            result
+                .providers()
+                .default_info()
+                .and_then(|info| info.files.to_list().into_iter().next())
+        };
+        return configured_dependency_artifact(result, path.as_deref())
+            .map(AnalysisValue::artifact);
+    }
+    Ok(configured_target_analysis_value(result))
+}
+
+fn prepare_configured_attributes<T: ComputedAnalysis>(
+    rows: &[crate::subrule::ConfiguredDependencyRow],
+    keys: &[DeclaredDependencyKey],
+    computed: &SmallMap<ConfiguredNodeKey, T>,
+) -> Result<Vec<PreparedConfiguredAttribute>, AnalysisError> {
+    rows.iter()
+        .map(|row| {
+            let values = keys
+                .iter()
+                .filter(|dependency| dependency.configured_row == Some(row.index))
+                .map(|dependency| {
+                    let result = computed.get(&dependency.node).ok_or_else(|| {
+                        AnalysisError::new(format!(
+                            "internal error: configured attribute result missing for `{}`",
+                            dependency.node
+                        ))
+                    })?;
+                    configured_attribute_item(row, result.result())
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let value = match row.kind {
+                AttributeKind::Label => values
+                    .into_iter()
+                    .next()
+                    .unwrap_or_else(AnalysisValue::none),
+                AttributeKind::LabelList => AnalysisValue::list(values),
+                _ => unreachable!("configured dependency row kinds were validated"),
+            };
+            Ok(PreparedConfiguredAttribute {
+                owner: row.owner.clone(),
+                user_name: row.user_name.clone(),
+                value,
+            })
+        })
+        .collect()
+}
+
 fn finish_analysis<T>(
     package: &LoadedPackage,
     configured_target: &ConfiguredTargetKey,
     resolved_attributes: Vec<ResolvedRuleAttribute>,
     declared_dependency_keys: &[DeclaredDependencyKey],
+    configured_rows: &[crate::subrule::ConfiguredDependencyRow],
     computed: &SmallMap<ConfiguredNodeKey, T>,
     candidate_execution_platforms: Option<Vec<ConfiguredTargetKey>>,
     action_context: Arc<ConfiguredActionOwnerContext>,
@@ -1708,6 +1906,28 @@ where
     for label in visibility_labels {
         require_root_delegating_reference(label, "declaring visibility")?;
     }
+    let mut resolved_attributes = resolved_attributes;
+    for row in configured_rows.iter().filter(|row| row.owner.is_none()) {
+        let attribute = resolved_attributes
+            .iter_mut()
+            .find(|attribute| attribute.declaration_name == row.attribute)
+            .ok_or_else(|| {
+                AnalysisError::message(format!(
+                    "configured rule attribute `{}` is missing from resolved attributes",
+                    row.attribute
+                ))
+            })?;
+        attribute.value = match row.kind {
+            AttributeKind::Label => row
+                .labels
+                .first()
+                .cloned()
+                .map(CoercedAttributeValue::Label)
+                .unwrap_or(CoercedAttributeValue::None),
+            AttributeKind::LabelList => CoercedAttributeValue::LabelList(row.labels.clone().into()),
+            _ => unreachable!("configured dependency row kinds were validated"),
+        };
+    }
     let mut dependencies = Vec::new();
     let mut edges = Vec::with_capacity(declared_dependency_keys.len() + visibility_labels.len());
     for dependency in declared_dependency_keys {
@@ -1719,42 +1939,54 @@ where
         })?;
         validate_configured_dependency(dependency, result.result())?;
     }
+    let configured_attributes =
+        prepare_configured_attributes(configured_rows, declared_dependency_keys, computed)?;
     for dependency in declared_dependency_keys {
-        if dependency.hidden {
-            continue;
-        }
         let result = computed.get(&dependency.node).ok_or_else(|| {
             AnalysisError::new(format!(
                 "internal error: dependency result missing for `{}`",
                 dependency.node
             ))
         })?;
-        let kind = match (&dependency.node, &dependency.transition_output) {
-            (ConfiguredNodeKey::Null(_), _) => crate::configured_target::ConfiguredEdgeKind::Source,
-            (ConfiguredNodeKey::Configured(_), Some(output)) => {
-                crate::configured_target::ConfiguredEdgeKind::TransitionedAttribute {
-                    attribute: dependency.attribute.clone(),
-                    index: dependency.attribute_index,
-                    output: output.clone(),
-                }
+        let kind = if dependency.hidden {
+            crate::configured_target::ConfiguredEdgeKind::ImplicitAttribute {
+                attribute: dependency.attribute.clone(),
+                index: dependency.attribute_index,
+                tool: dependency.exec_configuration,
             }
-            (ConfiguredNodeKey::Configured(_), None) => {
-                crate::configured_target::ConfiguredEdgeKind::OrdinaryAttribute {
-                    attribute: dependency.attribute.clone(),
-                    index: dependency.attribute_index,
+        } else {
+            match (&dependency.node, &dependency.transition_output) {
+                (ConfiguredNodeKey::Null(_), _) => {
+                    crate::configured_target::ConfiguredEdgeKind::Source
+                }
+                (ConfiguredNodeKey::Configured(_), Some(output)) => {
+                    crate::configured_target::ConfiguredEdgeKind::TransitionedAttribute {
+                        attribute: dependency.attribute.clone(),
+                        index: dependency.attribute_index,
+                        output: output.clone(),
+                    }
+                }
+                (ConfiguredNodeKey::Configured(_), None) => {
+                    crate::configured_target::ConfiguredEdgeKind::OrdinaryAttribute {
+                        attribute: dependency.attribute.clone(),
+                        index: dependency.attribute_index,
+                    }
                 }
             }
         };
-        dependencies.push(PreparedDependency {
-            key: result
-                .result()
-                .actual_configured_target()
-                .cloned()
-                .map(ConfiguredNodeKey::configured)
-                .unwrap_or_else(|| result.result().key().clone()),
-            providers: result.result().providers().clone(),
-            attribute: dependency.attribute.clone(),
-        });
+        if !dependency.hidden {
+            dependencies.push(PreparedDependency {
+                key: result
+                    .result()
+                    .actual_configured_target()
+                    .cloned()
+                    .map(ConfiguredNodeKey::configured)
+                    .unwrap_or_else(|| result.result().key().clone()),
+                providers: result.result().providers().clone(),
+                attribute: dependency.attribute.clone(),
+                target_shape: dependency.configured_row.is_some(),
+            });
+        }
         edges.push(crate::configured_target::ConfiguredEdge::new(
             result.result().key().clone(),
             kind,
@@ -1812,6 +2044,7 @@ where
         label.package().package().as_str(),
         dependencies,
         resolved_attributes,
+        configured_attributes,
         action_context,
         toolchain,
         print_capture
@@ -4560,7 +4793,7 @@ impl ConfiguredNodeAnalysisKey {
             .configuration()
             .slug_configuration()
             .expect("production analysis retains structural configuration");
-        let mut configured_rows =
+        let configured_rows =
             match configured_dependency_rows(implementation, structural_configuration) {
                 Ok(rows) => rows,
                 Err(error) => return root_analysis_driver_complete(Err(error)),
@@ -4569,7 +4802,7 @@ impl ConfiguredNodeAnalysisKey {
         let target_only_prepared = if has_exec_dependency {
             None
         } else {
-            for row in configured_rows.drain(..) {
+            for row in &configured_rows {
                 declared_dependency_keys.extend(row.into_keys(|label, _| {
                     ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
                         label,
@@ -4679,7 +4912,7 @@ impl ConfiguredNodeAnalysisKey {
                     ))));
                 }
             };
-            for row in configured_rows {
+            for row in &configured_rows {
                 declared_dependency_keys.extend(row.into_keys(|label, exec| {
                     ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
                         label,
@@ -4872,6 +5105,7 @@ impl ConfiguredNodeAnalysisKey {
             configured_target,
             resolved_attributes,
             &declared_dependency_keys,
+            &configured_rows,
             &computed,
             candidate_execution_platforms,
             action_context,

@@ -30,24 +30,25 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, FDO command configuration and selected-toolchain context accepted; configured hidden dependencies active** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; generic selected-toolchain context in `ebd19e3b1`; real starlark-rust `set` in `cb71a302d` | hidden target/Exec dependency configuration, validation and query facts precede invocation; evaluator values and configured-edge publication remain the direct-call successor | validate and accept generic configured hidden Target/Exec dependencies, then stop before invocation |
+| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, FDO command configuration, selected-toolchain context, configured hidden dependencies, and direct subrule calls accepted** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; generic selected-toolchain context in `ebd19e3b1`; configured hidden dependencies in `2bf86bfa8`; terminally accepted direct invocation/value materialization in the current packet; real starlark-rust `set` in `cb71a302d` | fragment projection and generic action builtin categories follow | select the fragment-projection category required by authentic rules_cc `create_fdo_context` |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r5](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-subrule-direct-call-and-value-materialization-r3](./slug-v2-subplans/current-packet.md).
 
-Commit `ebd19e3b1` terminally accepts the generic selected-toolchain context,
-structural Target-or-Exec requester ownership and the bounded hermetic REAPI
-semantic-consumer proof. The configured-hidden R4 candidate is rebased on that
-prerequisite at 1,144 production and 932 proof additions, but terminal review
-found that it partitioned interleaved Target/Exec rows and exhausted the
-one-shot cycle guard before declared-child analysis. The 1,218-production/
-1,062-proof R5 candidate preserves one ordinal row stream and places
-selected-toolchain plus declared-child computation under one parent guard. It
-continues to stop before invocation/value materialization and imports no parser,
-C++ or ruleset-specific behavior.
+Commit `2bf86bfa8` terminally accepts generic configured hidden Target/Exec
+dependencies, validation and loading-query facts. The current R3 successor now
+terminally accepts the complete generic direct-call/value/lifetime category:
+two-word Arc-backed Null/configured Target identity, source/generated bounded
+file providers, all admitted hidden shapes, nested authorization, call-token
+invalidation, shared action ownership, generic nested-provider lowering and
+successful implicit/tool edge publication. Its correction rereview returned
+`ACCEPT` after the immutable dispatcher payload became Arc-shared and the
+high-count/absence/source-executable/alias/order proof gaps were closed. Parser,
+`set`, C++ and ruleset-specific behavior remain untouched; fragment projection
+is the next category.
 
 Commit `c83e70f0f` terminally accepts the repository-context attribute
 implementation. One authenticated immutable input serves ordinary and innate

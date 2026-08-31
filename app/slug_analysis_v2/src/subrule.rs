@@ -18,6 +18,7 @@ use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::AllowSingleFile;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::ConfiguredDependencyDefault;
+use slug_loading_v2::SubruleIdentity;
 use slug_loading_v2::package::StarlarkRuleImplementation;
 
 use crate::dice::AnalysisError;
@@ -44,11 +45,16 @@ pub(crate) struct DeclaredDependencyKey {
     pub(crate) exec_configuration: bool,
     pub(crate) source_admitted: bool,
     pub(crate) validation: Option<ConfiguredDependencyValidation>,
+    pub(crate) configured_row: Option<u32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ConfiguredDependencyRow {
+    pub(crate) index: u32,
     pub(crate) attribute: CompactString,
+    pub(crate) user_name: Option<CompactString>,
+    pub(crate) owner: Option<Arc<SubruleIdentity>>,
+    pub(crate) kind: AttributeKind,
     pub(crate) labels: Vec<CanonicalLabel>,
     pub(crate) hidden: bool,
     pub(crate) exec_configuration: bool,
@@ -56,13 +62,25 @@ pub(crate) struct ConfiguredDependencyRow {
 }
 
 impl ConfiguredDependencyRow {
+    pub(crate) fn allow_single_file(&self) -> bool {
+        matches!(
+            self.validation.allow_single_file,
+            Some(AllowSingleFile::True | AllowSingleFile::Extensions(_))
+        )
+    }
+
+    pub(crate) fn executable(&self) -> bool {
+        self.validation.executable
+    }
+
     pub(crate) fn into_keys(
-        self,
+        &self,
         make_node: impl Fn(CanonicalLabel, bool) -> ConfiguredNodeKey,
     ) -> Vec<DeclaredDependencyKey> {
-        let validation = self.validation;
+        let validation = self.validation.clone();
         self.labels
-            .into_iter()
+            .iter()
+            .cloned()
             .enumerate()
             .map(|(index, label)| DeclaredDependencyKey {
                 attribute: self.attribute.clone(),
@@ -73,6 +91,7 @@ impl ConfiguredDependencyRow {
                 exec_configuration: self.exec_configuration,
                 source_admitted: validation.admits_file(),
                 validation: Some(validation.clone()),
+                configured_row: Some(self.index),
             })
             .collect()
     }
@@ -94,7 +113,8 @@ pub(crate) fn configured_dependency_rows(
 ) -> Result<Vec<ConfiguredDependencyRow>, AnalysisError> {
     implementation
         .configured_dependency_attributes()
-        .map(|attribute| {
+        .enumerate()
+        .map(|(index, attribute)| {
             if !matches!(
                 attribute.kind(),
                 AttributeKind::Label | AttributeKind::LabelList
@@ -129,7 +149,11 @@ pub(crate) fn configured_dependency_rows(
                 )));
             }
             Ok(ConfiguredDependencyRow {
+                index: u32::try_from(index).expect("configured dependency row fits u32"),
                 attribute: attribute.name().into(),
+                user_name: attribute.user_name().map(CompactString::new),
+                owner: attribute.owner().cloned(),
+                kind: attribute.kind(),
                 labels,
                 hidden: attribute.is_hidden(),
                 exec_configuration: attribute.exec_configuration(),

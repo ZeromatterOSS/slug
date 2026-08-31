@@ -48,6 +48,10 @@ pub mod repository_rule_context;
 mod root_subtree_package_set;
 mod starlark_label;
 mod subrule;
+#[doc(hidden)]
+pub mod subrule_invocation;
+#[doc(hidden)]
+pub use subrule::SubruleIdentity;
 mod testing_bootstrap;
 #[cfg(test)]
 mod testing_bootstrap_tests;

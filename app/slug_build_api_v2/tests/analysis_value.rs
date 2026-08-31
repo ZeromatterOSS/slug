@@ -11,12 +11,16 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::mem::size_of;
+use std::sync::Arc;
 
+use dupe::Dupe;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
 use slug_build_api_v2::AnalysisDepset;
+use slug_build_api_v2::AnalysisTargetIdentity;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::AnalysisValueError;
 use slug_build_api_v2::AnalysisValueType;
@@ -68,6 +72,51 @@ fn target(field: &str) -> AnalysisValue {
         AnalysisConfiguredTargetKey::new(label("@@//pkg:dep"), b"full-config".as_slice()),
         providers,
     ))
+}
+
+fn source_target(field: &str) -> AnalysisValue {
+    let providers = ProviderCollection::new(vec![
+        ProviderValue::DefaultInfo(DefaultInfo::empty()),
+        ProviderValue::Occurrence(ProviderOccurrence::new(
+            ProviderIdentity::user(ProviderId::new("//rules:defs.bzl", "Info").unwrap()),
+            [("value", AnalysisValue::string(field))],
+        )),
+    ])
+    .unwrap();
+    AnalysisValue::configured_target(ConfiguredTargetValue::new(
+        AnalysisTargetIdentity::null(label("@@//pkg:dep")),
+        providers,
+    ))
+}
+
+#[test]
+fn null_and_configured_target_identities_are_compact_and_collision_free() {
+    assert!(size_of::<AnalysisTargetIdentity>() <= 2 * size_of::<usize>());
+    assert!(size_of::<ConfiguredTargetValue>() <= 3 * size_of::<usize>());
+
+    let null = AnalysisTargetIdentity::null(label("@@//pkg:dep"));
+    let configured = AnalysisTargetIdentity::Configured(AnalysisConfiguredTargetKey::new(
+        label("@@//pkg:dep"),
+        Arc::<[u8]>::from([]),
+    ));
+    assert_eq!(null.label(), configured.label());
+    assert!(null.configured().is_none());
+    assert!(configured.configured().is_some());
+    assert_ne!(null, configured);
+    let cloned = null.dupe();
+    let (AnalysisTargetIdentity::Null(left), AnalysisTargetIdentity::Null(right)) =
+        (&null, &cloned)
+    else {
+        unreachable!("both identities are Null")
+    };
+    assert!(Arc::ptr_eq(left, right));
+
+    let null_value = source_target("same");
+    let configured_value = target("same");
+    assert_ne!(null_value, configured_value);
+    assert_ne!(hash(&null_value), hash(&configured_value));
+    assert!(!null_value.publication_eq(&configured_value));
+    assert_eq!(null_value, null_value.clone());
 }
 
 #[test]

@@ -262,6 +262,44 @@ impl AnalysisConfiguredTargetKey {
     }
 }
 
+/// Collision-free retained identity for a target-shaped analysis value.
+///
+/// Configured rule/generated targets keep their complete structural key. A
+/// source file is a Null configured-graph node and therefore carries no
+/// invented configuration bytes. Both variants stay pointer-sized so adding
+/// the Null case does not copy canonical-label strings into every value.
+#[derive(Debug, Clone, Dupe, Eq, PartialEq, Hash, Allocative)]
+pub enum AnalysisTargetIdentity {
+    Configured(AnalysisConfiguredTargetKey),
+    Null(Arc<CanonicalLabel>),
+}
+
+impl AnalysisTargetIdentity {
+    pub fn null(label: CanonicalLabel) -> Self {
+        Self::Null(Arc::new(label))
+    }
+
+    pub fn label(&self) -> &CanonicalLabel {
+        match self {
+            Self::Configured(key) => key.label(),
+            Self::Null(label) => label,
+        }
+    }
+
+    pub fn configured(&self) -> Option<&AnalysisConfiguredTargetKey> {
+        match self {
+            Self::Configured(key) => Some(key),
+            Self::Null(_) => None,
+        }
+    }
+}
+
+impl From<AnalysisConfiguredTargetKey> for AnalysisTargetIdentity {
+    fn from(value: AnalysisConfiguredTargetKey) -> Self {
+        Self::Configured(value)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
 pub enum AnalysisArtifact {
     Source(CanonicalLabel),
@@ -273,19 +311,19 @@ pub enum AnalysisArtifact {
 
 #[derive(Debug, Clone, Allocative)]
 pub struct ConfiguredTargetValue {
-    identity: AnalysisConfiguredTargetKey,
+    identity: AnalysisTargetIdentity,
     providers: ProviderCollection,
 }
 
 impl ConfiguredTargetValue {
-    pub fn new(identity: AnalysisConfiguredTargetKey, providers: ProviderCollection) -> Self {
+    pub fn new(identity: impl Into<AnalysisTargetIdentity>, providers: ProviderCollection) -> Self {
         Self {
-            identity,
+            identity: identity.into(),
             providers,
         }
     }
 
-    pub fn identity(&self) -> &AnalysisConfiguredTargetKey {
+    pub fn identity(&self) -> &AnalysisTargetIdentity {
         &self.identity
     }
 

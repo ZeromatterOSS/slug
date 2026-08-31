@@ -24,6 +24,7 @@ use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::AnalysisDepsetInput;
 use slug_build_api_v2::AnalysisDepsetSuccessor;
 use slug_build_api_v2::AnalysisNumber;
+use slug_build_api_v2::AnalysisTargetIdentity;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::AnalysisValueKind;
 use slug_build_api_v2::ConfiguredTargetValue;
@@ -43,6 +44,7 @@ use slug_loading_v2::provider::alloc_starlark_user_provider;
 use slug_loading_v2::provider::starlark_label;
 use slug_loading_v2::provider::starlark_provider_identity;
 use slug_loading_v2::provider::starlark_user_provider_fields;
+use slug_loading_v2::subrule_invocation::AnalysisArtifactValue;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::StarlarkHasher;
 use starlark::values::FrozenHeap;
@@ -66,77 +68,26 @@ use starlark::values::tuple::TupleRef;
 use starlark_map::small_map::SmallMap;
 
 use crate::key::ConfiguredNodeKey;
-#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-pub(crate) struct AnalysisArtifactValue {
-    artifact: AnalysisArtifact,
-}
-impl AnalysisArtifactValue {
-    pub(crate) fn new(artifact: AnalysisArtifact) -> Self {
-        Self { artifact }
-    }
-    pub(crate) fn output_for_owner(
-        &self,
-        expected: &AnalysisConfiguredTargetKey,
-    ) -> Option<&slug_build_api_v2::ActionOutput> {
-        match &self.artifact {
-            AnalysisArtifact::Derived { owner, output } if owner == expected => Some(output),
-            AnalysisArtifact::Source(_) => None,
-            AnalysisArtifact::Derived { .. } => None,
-        }
-    }
-    pub(crate) fn path(&self) -> String {
-        match &self.artifact {
-            AnalysisArtifact::Source(label) => {
-                let package = label.package().package().as_str();
-                if package.is_empty() {
-                    label.target().as_str().to_owned()
-                } else {
-                    format!("{package}/{}", label.target())
-                }
-            }
-            AnalysisArtifact::Derived { output, .. } => output.path().to_owned(),
-        }
-    }
-}
-impl fmt::Display for AnalysisArtifactValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.path())
-    }
-}
-starlark::starlark_simple_value!(AnalysisArtifactValue);
-#[starlark_value(type = "File")]
-impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
-    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
-        self.artifact.hash(hasher);
-        Ok(())
-    }
-    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
-        Ok(Self::from_value(other).is_some_and(|other| self.artifact == other.artifact))
-    }
-
-    fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match name {
-            "path" => Some(heap.alloc_str(&self.path()).to_value()),
-            "label" => Some(slug_loading_v2::provider::alloc_starlark_label(
-                heap,
-                match &self.artifact {
-                    AnalysisArtifact::Source(label) => label.clone(),
-                    AnalysisArtifact::Derived { owner, .. } => owner.label().clone(),
-                },
-            )),
-            _ => None,
-        }
-    }
-
-    fn dir_attr(&self) -> Vec<String> {
-        vec!["label".to_owned(), "path".to_owned()]
-    }
-}
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct BuiltinProviderView {
     identity: ProviderIdentity,
     fields: SmallMap<CompactString, FrozenValue>,
+}
+
+impl BuiltinProviderView {
+    fn fields_from_value(
+        value: Value<'_>,
+    ) -> Option<(ProviderIdentity, Vec<(CompactString, Value<'_>)>)> {
+        let view = Self::from_value(value)?;
+        Some((
+            view.identity.clone(),
+            view.fields
+                .iter()
+                .map(|(name, value)| (name.clone(), value.to_value()))
+                .collect(),
+        ))
+    }
 }
 
 impl fmt::Display for BuiltinProviderView {
@@ -544,6 +495,24 @@ impl<'a> AnalysisValueMaterializer<'a> {
             providers,
         ))
     }
+
+    pub(crate) fn configured_dependency_target(
+        &mut self,
+        key: &ConfiguredNodeKey,
+        providers: ProviderCollection,
+    ) -> Result<FrozenValue, String> {
+        let identity = key.configured_target().map_or_else(
+            || AnalysisTargetIdentity::null(key.label().clone()),
+            |configured| {
+                AnalysisConfiguredTargetKey::new(
+                    configured.label().clone(),
+                    configured.configuration().complete_identity_bytes(),
+                )
+                .into()
+            },
+        );
+        self.target(&ConfiguredTargetValue::new(identity, providers))
+    }
 }
 
 #[derive(Default)]
@@ -576,8 +545,8 @@ impl<'v> AnalysisValueLowerer<'v> {
         if let Some(value) = starlark_label(value) {
             return Ok(AnalysisValue::label(value));
         }
-        if let Some(value) = AnalysisArtifactValue::from_value(value) {
-            return Ok(AnalysisValue::artifact(value.artifact.clone()));
+        if let Some(value) = AnalysisArtifactValue::from_starlark(value) {
+            return Ok(AnalysisValue::artifact(value.artifact().clone()));
         }
         if let Some(value) = AnalysisConfiguredTargetValue::from_value(value) {
             return Ok(AnalysisValue::configured_target(value.retained.clone()));
@@ -670,6 +639,8 @@ impl<'v> AnalysisValueLowerer<'v> {
         }
         let provider = if let Some(fields) = StarlarkToolchainInfo::fields_from_value(value) {
             Some((ProviderIdentity::builtin("ToolchainInfo"), fields))
+        } else if let Some((identity, fields)) = BuiltinProviderView::fields_from_value(value) {
+            Some((identity, fields))
         } else {
             starlark_user_provider_fields(value)
                 .map(|(id, fields)| (ProviderIdentity::user(id), fields))
@@ -737,6 +708,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use slug_build_api_v2::DefaultInfo;
+    use slug_build_api_v2::DepsetOrder;
     use slug_build_api_v2::FilesToRunProvider;
     use slug_build_api_v2::OutputGroupInfo;
     use slug_build_api_v2::PlatformInfo;
@@ -896,6 +868,93 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn null_target_and_artifact_backed_builtin_provider_survive_nested_round_trip() {
+        let label = slug_identity_v2::CanonicalLabel::parse("@@//pkg:source.txt").unwrap();
+        let file_providers = |path: &str| {
+            ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::from_files(
+                Depset::from_direct(DepsetOrder::Default, vec![path.to_owned()]).unwrap(),
+            ))])
+            .unwrap()
+        };
+        let source = AnalysisValue::configured_target(ConfiguredTargetValue::new(
+            slug_build_api_v2::AnalysisTargetIdentity::null(label.clone()),
+            file_providers("pkg/source.txt"),
+        ));
+        let generated = AnalysisValue::configured_target(ConfiguredTargetValue::new(
+            AnalysisConfiguredTargetKey::new(
+                slug_identity_v2::CanonicalLabel::parse("@@//pkg:generated.txt").unwrap(),
+                b"configured".as_slice(),
+            ),
+            file_providers("pkg/generated.txt"),
+        ));
+        let executable = AnalysisValue::provider(ProviderOccurrence::new(
+            ProviderIdentity::builtin("FilesToRunProvider"),
+            [
+                (
+                    "executable",
+                    AnalysisValue::artifact(AnalysisArtifact::Source(label)),
+                ),
+                ("runfiles_manifest", AnalysisValue::none()),
+                ("repo_mapping_manifest", AnalysisValue::none()),
+            ],
+        ));
+        let nested = AnalysisValue::provider(ProviderOccurrence::new(
+            ProviderIdentity::user(ProviderId::new("//rules:defs.bzl", "Info").unwrap()),
+            [
+                ("source_target", source),
+                ("generated_target", generated),
+                ("executable", executable),
+            ],
+        ));
+
+        let first_heap = FrozenHeap::new();
+        let first = AnalysisValueMaterializer::new(&first_heap)
+            .value(&nested)
+            .unwrap();
+        let lowered = AnalysisValueLowerer::default()
+            .lower(first.to_value(), "$nested")
+            .unwrap();
+        assert!(nested.publication_eq(&lowered));
+
+        let second_heap = FrozenHeap::new();
+        let second = AnalysisValueMaterializer::new(&second_heap)
+            .value(&lowered)
+            .unwrap();
+        let lowered_again = AnalysisValueLowerer::default()
+            .lower(second.to_value(), "$nested_again")
+            .unwrap();
+        assert!(lowered.publication_eq(&lowered_again));
+        let AnalysisValueKind::Provider(info) = lowered_again.kind() else {
+            panic!("round trip retained the user provider")
+        };
+        for (field, expected, null_identity) in [
+            ("source_target", "pkg/source.txt", true),
+            ("generated_target", "pkg/generated.txt", false),
+        ] {
+            let AnalysisValueKind::ConfiguredTarget(target) = info.field(field).unwrap().kind()
+            else {
+                panic!("round trip retained the nested {field} Target")
+            };
+            assert_eq!(
+                matches!(
+                    target.identity(),
+                    slug_build_api_v2::AnalysisTargetIdentity::Null(_)
+                ),
+                null_identity
+            );
+            assert_eq!(
+                target
+                    .providers()
+                    .default_info()
+                    .expect("round trip retained file DefaultInfo")
+                    .files
+                    .to_list(),
+                [expected]
+            );
+        }
     }
 
     #[test]

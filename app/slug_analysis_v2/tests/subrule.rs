@@ -15,6 +15,8 @@ use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredNodeAnalysisObservationKey;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::analysis_cycle_detector;
+use slug_build_api_v2::AnalysisValueKind;
+use slug_build_api_v2::ProviderId;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
@@ -235,14 +237,14 @@ fn grte_configuration(value: &str) -> ConfigurationKey {
     )
 }
 
-async fn analyze(
+async fn analyze_result(
     dice: &Arc<Dice>,
     epoch: PathObservationEpoch,
     target: &str,
     configuration: ConfigurationKey,
     tracker: Arc<Tracker>,
     route: AnalysisRoute,
-) -> String {
+) -> Result<Arc<slug_analysis_v2::ConfiguredNodeResult>, String> {
     let data = UserComputationData {
         cycle_detector: Some(analysis_cycle_detector()),
         activation_tracker: Some(tracker),
@@ -344,7 +346,11 @@ async fn analyze(
             let AnalysisPreparationOutcome::Complete(result) = outcome else {
                 panic!("legacy analysis returned Need: {outcome:?}")
             };
-            result.as_ref().as_ref().unwrap_err().to_string()
+            result
+                .as_ref()
+                .as_ref()
+                .map(Arc::clone)
+                .map_err(ToString::to_string)
         }
         AnalysisRoute::Observed => {
             let key = ConfiguredNodeAnalysisObservationKey::new(workspace(), target).unwrap();
@@ -352,9 +358,26 @@ async fn analyze(
             let AnalysisPreparationOutcome::Complete(Ok(result)) = outcome else {
                 panic!("observed analysis did not complete: {outcome:?}")
             };
-            result.as_ref().as_ref().unwrap_err().to_string()
+            result
+                .as_ref()
+                .as_ref()
+                .map(Arc::clone)
+                .map_err(ToString::to_string)
         }
     }
+}
+
+async fn analyze(
+    dice: &Arc<Dice>,
+    epoch: PathObservationEpoch,
+    target: &str,
+    configuration: ConfigurationKey,
+    tracker: Arc<Tracker>,
+    route: AnalysisRoute,
+) -> String {
+    analyze_result(dice, epoch, target, configuration, tracker, route)
+        .await
+        .unwrap_err()
 }
 
 #[derive(Clone, Copy)]
@@ -366,6 +389,7 @@ enum AnalysisRoute {
 fn semantic_epoch() -> Epoch {
     let defs = r#"
 ProfileInfo = provider()
+ReturnedInfo = provider()
 def _profile(ctx): return [DefaultInfo(), ProfileInfo()]
 def _plain(ctx): return [DefaultInfo()]
 def _multi(ctx):
@@ -382,7 +406,32 @@ profile = rule(implementation = _profile)
 plain = rule(implementation = _plain)
 multi = rule(implementation = _multi)
 tool = rule(implementation = _tool, executable = True)
-def _subrule(ctx, **kwargs): fail("subrule implementation ran")
+def _subrule(ctx, prefix, suffix = "", **kwargs):
+    if prefix != "positional" or suffix != "named": fail("user arguments were not bound")
+    if ctx.label.name != "subject": fail("subrule context label was not materialized")
+    expected = ["_literal", "_list", "_source", "_source_provider", "_exported", "_exec", "_late", "_or", "_unrestricted", "_none", "_empty", "_generated", "_generated_provider", "_alias"]
+    if kwargs.keys() != expected: fail("hidden kwargs lost descriptor order: " + repr(kwargs.keys()))
+    if len(kwargs["_list"]) != 2: fail("label_list was not materialized")
+    if kwargs["_none"] != None: fail("absent label was not materialized as None")
+    if kwargs["_empty"] != []: fail("absent label_list was not materialized as empty")
+    if kwargs["_source"].path != "files/inferred.txt": fail("single file was not materialized")
+    if kwargs["_generated"].path != "deps/generated.bin": fail("generated file was not materialized")
+    if kwargs["_exec"].executable.path != "deps/tool": fail("executable provider was not materialized")
+    if kwargs["_exported"].executable.path != "files/exported.sh": fail("source executable provider was not materialized")
+    if ProfileInfo not in kwargs["_literal"]: fail("Target provider membership was not materialized")
+    if kwargs["_alias"].label.name != "literal" or ProfileInfo not in kwargs["_alias"]: fail("alias actual Target was not materialized")
+    if DefaultInfo not in kwargs["_source_provider"]: fail("source Target has no inherent DefaultInfo")
+    if kwargs["_source_provider"][DefaultInfo].files.to_list() != ["files/inferred.txt"]: fail("source Target DefaultInfo was not materialized")
+    if DefaultInfo not in kwargs["_generated_provider"]: fail("generated Target has no inherent DefaultInfo")
+    if kwargs["_generated_provider"][DefaultInfo].files.to_list() != ["deps/generated.bin"]: fail("generated Target DefaultInfo was not materialized")
+    out = ctx.actions.declare_file("subrule.txt")
+    ctx.actions.write(out, "subrule")
+    return ReturnedInfo(
+        source_target = kwargs["_source_provider"],
+        generated_target = kwargs["_generated_provider"],
+        executable = kwargs["_exec"],
+        output = out,
+    )
 configured = subrule(
     implementation = _subrule,
     attrs = {
@@ -395,11 +444,16 @@ configured = subrule(
         "_late": attr.label(default = configuration_field(fragment = "cpp", name = "fdo_profile"), providers = [ProfileInfo]),
         "_or": attr.label(default = "//deps:plain", providers = [[ProfileInfo], [DefaultInfo]]),
         "_unrestricted": attr.label(default = "//deps:plain"),
+        "_none": attr.label(default = None, allow_files = True),
+        "_empty": attr.label_list(default = [], allow_files = True),
         "_generated": attr.label(default = "//deps:generated.bin", allow_single_file = [".bin"]),
+        "_generated_provider": attr.label(default = "//deps:generated.bin", allow_files = True, providers = [DefaultInfo]),
         "_alias": attr.label(default = "//deps:alias_profile", providers = [ProfileInfo]),
     },
 )
-def _subject(ctx): fail("rule implementation ran")
+def _subject(ctx):
+    result = configured("positional", suffix = "named")
+    return [DefaultInfo(), result]
 subject = rule(implementation = _subject, subrules = [configured])
 bad_provider = subrule(implementation = _subrule, attrs = {
     "_bad": attr.label_list(default = ["//deps:literal", "//deps:plain"], providers = [ProfileInfo]),
@@ -439,7 +493,97 @@ target_first = subrule(implementation = _subrule, attrs = {
     "_exec": attr.label(default = "//deps:plain", cfg = "exec", executable = True),
 })
 target_first_subject = rule(implementation = _subject, subrules = [target_first])
-ordinary = rule(implementation = _subject, attrs = {
+def _leaf_call(ctx, value): return value
+leaf_call = subrule(implementation = _leaf_call)
+def _parent_call(ctx):
+    value = leaf_call("nested")
+    if ctx.label.name != "nested": fail("parent context was not restored after child")
+    return value
+parent_call = subrule(implementation = _parent_call, subrules = [leaf_call])
+def _nested_subject(ctx):
+    if parent_call() != "nested": fail("nested subrule result was not returned")
+    if parent_call() != "nested": fail("repeated nested subrule result was not returned")
+    return [DefaultInfo()]
+nested_subject = rule(implementation = _nested_subject, subrules = [parent_call])
+def _rogue(ctx): return None
+rogue = subrule(implementation = _rogue)
+def _undeclared_subject(ctx):
+    rogue()
+    return [DefaultInfo()]
+undeclared_subject = rule(implementation = _undeclared_subject)
+def _bad_parent(ctx): return rogue()
+bad_parent = subrule(implementation = _bad_parent)
+def _bad_nested_subject(ctx):
+    bad_parent()
+    return [DefaultInfo()]
+bad_nested_subject = rule(implementation = _bad_nested_subject, subrules = [bad_parent])
+def _override(ctx, **kwargs): return None
+override_call = subrule(implementation = _override, attrs = {
+    "_dep": attr.label(default = "//deps:plain"),
+})
+def _override_subject(ctx):
+    override_call(_dep = None)
+    return [DefaultInfo()]
+override_subject = rule(implementation = _override_subject, subrules = [override_call])
+def _use_outer_actions(ctx, outer): return outer.declare_file("forbidden.txt")
+use_outer_actions = subrule(implementation = _use_outer_actions)
+def _outer_lock_subject(ctx):
+    use_outer_actions(ctx.actions)
+    return [DefaultInfo()]
+outer_lock_subject = rule(implementation = _outer_lock_subject, subrules = [use_outer_actions])
+def _return_ctx(ctx): return ctx
+return_ctx = subrule(implementation = _return_ctx)
+def _escaped_ctx_subject(ctx):
+    escaped = return_ctx()
+    value = escaped.label
+    return [DefaultInfo()]
+escaped_ctx_subject = rule(implementation = _escaped_ctx_subject, subrules = [return_ctx])
+def _return_actions(ctx): return ctx.actions
+return_actions = subrule(implementation = _return_actions)
+def _escaped_actions_subject(ctx):
+    escaped = return_actions()
+    escaped.declare_file("forbidden.txt")
+    return [DefaultInfo()]
+escaped_actions_subject = rule(implementation = _escaped_actions_subject, subrules = [return_actions])
+def _inspect_parent(ctx, parent): return parent.label
+inspect_parent = subrule(implementation = _inspect_parent)
+def _parent_lock(ctx): return inspect_parent(ctx)
+parent_lock = subrule(implementation = _parent_lock, subrules = [inspect_parent])
+def _parent_lock_subject(ctx):
+    parent_lock()
+    return [DefaultInfo()]
+parent_lock_subject = rule(implementation = _parent_lock_subject, subrules = [parent_lock])
+def _repeat_context(ctx, old = None):
+    if old != None: return old.label
+    return ctx
+repeat_context = subrule(implementation = _repeat_context)
+def _repeat_context_subject(ctx):
+    old = repeat_context()
+    repeat_context(old)
+    return [DefaultInfo()]
+repeat_context_subject = rule(implementation = _repeat_context_subject, subrules = [repeat_context])
+def _fragment_call(ctx): return ctx.fragments.cpp
+fragment_call = subrule(implementation = _fragment_call, fragments = ["cpp"])
+def _fragment_subject(ctx):
+    fragment_call()
+    return [DefaultInfo()]
+fragment_subject = rule(implementation = _fragment_subject, subrules = [fragment_call])
+def _toolchain_call(ctx): return ctx.toolchains["//subject:type"]
+toolchain_call = subrule(implementation = _toolchain_call)
+def _toolchain_subject(ctx):
+    toolchain_call()
+    return [DefaultInfo()]
+toolchain_subject = rule(implementation = _toolchain_subject, subrules = [toolchain_call])
+def _missing_action_call(ctx): return ctx.actions.args()
+missing_action_call = subrule(implementation = _missing_action_call)
+def _missing_action_subject(ctx):
+    missing_action_call()
+    return [DefaultInfo()]
+missing_action_subject = rule(implementation = _missing_action_subject, subrules = [missing_action_call])
+def _ordinary(ctx):
+    if ctx.attr._libc_top.label.name != "everything": fail("ordinary target late-bound value was not materialized")
+    return [DefaultInfo()]
+ordinary = rule(implementation = _ordinary, attrs = {
     "_libc_top": attr.label(default = configuration_field(fragment = "cpp", name = "libc_top")),
     "_zipper": attr.label(default = configuration_field(fragment = "cpp", name = "zipper"), cfg = "exec", executable = True),
 })
@@ -466,7 +610,38 @@ generate = rule(implementation = _generate, attrs = {"out": attr.output()})
     epoch.file("/workspace/files/exported.sh", "#!/bin/sh\n");
     epoch.package(
         "subject",
-        "load('//rules:defs.bzl', 'bad_executable_subject', 'bad_extension_subject', 'bad_file_provider_subject', 'bad_file_subject', 'bad_provider_subject', 'exec_first_subject', 'multi_single_subject', 'ordinary', 'subject', 'target_first_subject', 'zero_single_subject')\nsubject(name='subject')\nbad_provider_subject(name='bad_provider')\nzero_single_subject(name='zero_single')\nmulti_single_subject(name='multi_single')\nbad_extension_subject(name='bad_extension')\nbad_executable_subject(name='bad_executable')\nbad_file_subject(name='bad_file')\nbad_file_provider_subject(name='bad_file_provider')\nexec_first_subject(name='exec_first')\ntarget_first_subject(name='target_first')\nordinary(name='ordinary')\n",
+        "load('//rules:defs.bzl', 'bad_executable_subject', 'bad_extension_subject', 'bad_file_provider_subject', 'bad_file_subject', 'bad_nested_subject', 'bad_provider_subject', 'escaped_actions_subject', 'escaped_ctx_subject', 'exec_first_subject', 'fragment_subject', 'missing_action_subject', 'multi_single_subject', 'nested_subject', 'ordinary', 'outer_lock_subject', 'override_subject', 'parent_lock_subject', 'repeat_context_subject', 'subject', 'target_first_subject', 'toolchain_subject', 'undeclared_subject', 'zero_single_subject')\nsubject(name='subject')\nbad_provider_subject(name='bad_provider')\nzero_single_subject(name='zero_single')\nmulti_single_subject(name='multi_single')\nbad_extension_subject(name='bad_extension')\nbad_executable_subject(name='bad_executable')\nbad_file_subject(name='bad_file')\nbad_file_provider_subject(name='bad_file_provider')\nexec_first_subject(name='exec_first')\ntarget_first_subject(name='target_first')\nnested_subject(name='nested')\nundeclared_subject(name='undeclared')\nbad_nested_subject(name='bad_nested')\noverride_subject(name='override')\nouter_lock_subject(name='outer_lock')\nescaped_ctx_subject(name='escaped_ctx')\nescaped_actions_subject(name='escaped_actions')\nparent_lock_subject(name='parent_lock')\nrepeat_context_subject(name='repeat_context')\nfragment_subject(name='fragment')\ntoolchain_subject(name='toolchain_deferred')\nmissing_action_subject(name='missing_action')\nordinary(name='ordinary')\n",
+    );
+    epoch
+}
+
+fn high_count_invocation_epoch(count: usize) -> Epoch {
+    let mut defs = String::from("def _call(ctx, value): return value\n");
+    for index in 0..count {
+        defs.push_str(&format!("call_{index} = subrule(implementation = _call)\n"));
+    }
+    defs.push_str("def _subject(ctx):\n");
+    for index in 0..count {
+        defs.push_str(&format!(
+            "    if call_{index}({index}) != {index}: fail(\"high-count call {index} failed\")\n"
+        ));
+    }
+    defs.push_str("    return [DefaultInfo()]\n");
+    defs.push_str("subject = rule(implementation = _subject, subrules = [");
+    for index in 0..count {
+        if index != 0 {
+            defs.push_str(", ");
+        }
+        defs.push_str(&format!("call_{index}"));
+    }
+    defs.push_str("])\n");
+
+    let mut epoch = Epoch::fixture();
+    epoch.package("rules", "");
+    epoch.file("/workspace/rules/high_count.bzl", &defs);
+    epoch.package(
+        "subject",
+        "load('//rules:high_count.bzl', 'subject')\nsubject(name='many')\n",
     );
     epoch
 }
@@ -491,7 +666,7 @@ def _subrule(ctx, **kwargs): fail("subrule implementation ran")
 direct_dep = subrule(implementation = _subrule, attrs = {{"_dep": attr.label(default = "{direct}")}})
 cross_a_dep = subrule(implementation = _subrule, attrs = {{"_dep": attr.label(default = "//subject:cross_b")}})
 cross_b_dep = subrule(implementation = _subrule, attrs = {{"_dep": attr.label(default = "{cross}")}})
-def _subject(ctx): fail("rule implementation ran")
+def _subject(ctx): return [DefaultInfo()]
 direct_rule = rule(implementation = _subject, subrules = [direct_dep], toolchains = ["//subject:type"])
 cross_a_rule = rule(implementation = _subject, subrules = [cross_a_dep], toolchains = ["//subject:type"])
 cross_b_rule = rule(implementation = _subject, subrules = [cross_b_dep], toolchains = ["//subject:type"])
@@ -511,12 +686,40 @@ cross_b_rule = rule(implementation = _subject, subrules = [cross_b_dep], toolcha
     epoch
 }
 
+fn invocation_revision_epoch(fail: bool) -> Epoch {
+    let terminal = if fail {
+        "fail(\"revision B\")"
+    } else {
+        "return out"
+    };
+    let defs = format!(
+        r#"def _call(ctx):
+    out = ctx.actions.declare_file("revision.txt")
+    ctx.actions.write(out, "revision")
+    {terminal}
+call = subrule(implementation = _call)
+def _subject(ctx):
+    call()
+    return [DefaultInfo()]
+subject = rule(implementation = _subject, subrules = [call])
+"#,
+    );
+    let mut epoch = Epoch::fixture();
+    epoch.package("rules", "");
+    epoch.file("/workspace/rules/revision.bzl", &defs);
+    epoch.package(
+        "subject",
+        "load('//rules:revision.bzl', 'subject')\nsubject(name='revision')\n",
+    );
+    epoch
+}
+
 #[tokio::test]
-async fn configured_subrule_dependencies_validate_before_the_invocation_boundary() {
+async fn configured_subrule_dependencies_materialize_and_invoke() {
     let epoch = semantic_epoch();
     let tracker = Arc::new(Tracker::default());
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let error = analyze(
+    let result = analyze_result(
         &dice,
         epoch.build(),
         "@@//subject:subject",
@@ -524,12 +727,78 @@ async fn configured_subrule_dependencies_validate_before_the_invocation_boundary
         tracker.clone(),
         AnalysisRoute::Legacy,
     )
-    .await;
-    assert!(
-        error.contains("reached the deferred invocation boundary"),
-        "{error}"
+    .await
+    .unwrap();
+    assert_eq!(result.actions().len(), 1);
+    assert_eq!(
+        result.actions()[0].context().owner().label().to_string(),
+        "@@//subject:subject"
     );
-    assert!(!error.contains("implementation ran"), "{error}");
+    assert_eq!(result.providers().len(), 2);
+    let returned = result
+        .providers()
+        .user(&ProviderId::new("//rules:defs.bzl", "ReturnedInfo").unwrap())
+        .expect("subrule result provider was lowered");
+    for (field, expected_path, null_identity) in [
+        ("source_target", "files/inferred.txt", true),
+        ("generated_target", "deps/generated.bin", false),
+    ] {
+        let AnalysisValueKind::ConfiguredTarget(target) =
+            returned.field(field).expect("returned Target field").kind()
+        else {
+            panic!("{field} retained its Target shape")
+        };
+        assert_eq!(
+            matches!(
+                target.identity(),
+                slug_build_api_v2::AnalysisTargetIdentity::Null(_)
+            ),
+            null_identity,
+            "{field} identity"
+        );
+        assert_eq!(
+            target
+                .providers()
+                .default_info()
+                .expect("file Target retained materialized DefaultInfo")
+                .files
+                .to_list(),
+            [expected_path]
+        );
+    }
+    let implicit = result
+        .edges()
+        .iter()
+        .filter(|edge| {
+            matches!(
+                edge.kind(),
+                slug_analysis_v2::ConfiguredEdgeKind::ImplicitAttribute { .. }
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(implicit.len(), 13);
+    assert_eq!(
+        implicit
+            .iter()
+            .map(|edge| edge.target().label().to_string())
+            .collect::<Vec<_>>(),
+        [
+            "@@//deps:literal",
+            "@@//deps:literal",
+            "@@//deps:other",
+            "@@//files:inferred.txt",
+            "@@//files:inferred.txt",
+            "@@//files:exported.sh",
+            "@@//deps:tool",
+            "@@//deps:profile",
+            "@@//deps:plain",
+            "@@//deps:plain",
+            "@@//deps:generated.bin",
+            "@@//deps:generated.bin",
+            "@@//deps:alias_profile",
+        ]
+    );
+    assert_eq!(implicit.iter().filter(|edge| edge.tool()).count(), 2);
     let activations = tracker.0.lock().unwrap();
     assert!(
         activations
@@ -550,6 +819,82 @@ async fn configured_subrule_dependencies_validate_before_the_invocation_boundary
             .to_string(),
         "@@//.slug_test_host:host"
     );
+}
+
+#[tokio::test]
+async fn nested_authorization_overrides_and_context_lifetimes_are_enforced() {
+    let nested = analyze_result(
+        &Dice::builder().build(DetectCycles::Enabled),
+        semantic_epoch().build(),
+        "@@//subject:nested",
+        configuration(None),
+        Arc::new(Tracker::default()),
+        AnalysisRoute::Legacy,
+    )
+    .await;
+    assert!(nested.is_ok(), "{nested:?}");
+
+    for (target, expected) in [
+        ("undeclared", "rule must declare 'rogue' in 'subrules'"),
+        (
+            "bad_nested",
+            "subrule bad_parent must declare rogue in 'subrules'",
+        ),
+        ("override", "implicit dependency and cannot be overridden"),
+        (
+            "outer_lock",
+            "cannot access field or method 'declare_file' of rule context",
+        ),
+        (
+            "escaped_ctx",
+            "cannot access field or method 'label' of subrule context",
+        ),
+        (
+            "escaped_actions",
+            "cannot access field or method 'declare_file' of subrule context",
+        ),
+        (
+            "parent_lock",
+            "cannot access field or method 'label' of subrule context",
+        ),
+        (
+            "repeat_context",
+            "cannot access field or method 'label' of subrule context",
+        ),
+        ("fragment", "configured subrule fragments are deferred"),
+        (
+            "toolchain_deferred",
+            "configured subrule toolchains are deferred",
+        ),
+        ("missing_action", "has no attribute `args`"),
+    ] {
+        let error = analyze(
+            &Dice::builder().build(DetectCycles::Enabled),
+            semantic_epoch().build(),
+            &format!("@@//subject:{target}"),
+            configuration(None),
+            Arc::new(Tracker::default()),
+            AnalysisRoute::Legacy,
+        )
+        .await;
+        assert!(error.contains(expected), "{target}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn high_count_nonrecursive_subrule_calls_share_one_dispatch_payload() {
+    for route in [AnalysisRoute::Legacy, AnalysisRoute::Observed] {
+        let result = analyze_result(
+            &Dice::builder().build(DetectCycles::Enabled),
+            high_count_invocation_epoch(256).build(),
+            "@@//subject:many",
+            configuration(None),
+            Arc::new(Tracker::default()),
+            route,
+        )
+        .await;
+        assert!(result.is_ok(), "{result:?}");
+    }
 }
 
 #[tokio::test]
@@ -593,7 +938,7 @@ async fn configured_subrule_validation_rejects_each_child_before_invocation() {
 async fn ordinary_configuration_fields_use_the_same_dependency_owner() {
     let tracker = Arc::new(Tracker::default());
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let error = analyze(
+    let result = analyze_result(
         &dice,
         semantic_epoch().build(),
         "@@//subject:ordinary",
@@ -602,13 +947,7 @@ async fn ordinary_configuration_fields_use_the_same_dependency_owner() {
         AnalysisRoute::Legacy,
     )
     .await;
-    assert!(
-        error.contains(
-            "rule attribute '_libc_top' reached the deferred late-bound value materialization boundary"
-        ),
-        "{error}"
-    );
-    assert!(!error.contains("implementation ran"), "{error}");
+    assert!(result.is_ok(), "{result:?}");
     assert!(
         tracker
             .0
@@ -663,7 +1002,7 @@ async fn hidden_dependency_cycles_terminate_and_repair_in_both_key_families() {
             .expect("configured hidden-dependency cycle must terminate");
             assert!(cyclic.contains("configured alias cycle"), "{cyclic}");
 
-            let repaired = analyze(
+            let repaired = analyze_result(
                 &dice,
                 cycle_epoch(true).build(),
                 &format!("@@//subject:{target}"),
@@ -672,11 +1011,62 @@ async fn hidden_dependency_cycles_terminate_and_repair_in_both_key_families() {
                 route,
             )
             .await;
+            assert!(repaired.is_ok(), "{repaired:?}");
+
+            let cyclic_again = analyze(
+                &dice,
+                cycle_epoch(false).build(),
+                &format!("@@//subject:{target}"),
+                configuration(None),
+                Arc::new(Tracker::default()),
+                route,
+            )
+            .await;
             assert!(
-                repaired.contains("reached the deferred invocation boundary"),
-                "{repaired}"
+                cyclic_again.contains("configured alias cycle"),
+                "{cyclic_again}"
             );
-            assert!(!repaired.contains("configured alias cycle"), "{repaired}");
         }
+    }
+}
+
+#[tokio::test]
+async fn invocation_state_and_actions_restore_across_same_dice_a_b_a() {
+    for route in [AnalysisRoute::Legacy, AnalysisRoute::Observed] {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let first = analyze_result(
+            &dice,
+            invocation_revision_epoch(false).build(),
+            "@@//subject:revision",
+            configuration(None),
+            Arc::new(Tracker::default()),
+            route,
+        )
+        .await
+        .unwrap();
+        assert_eq!(first.actions().len(), 1);
+
+        let error = analyze(
+            &dice,
+            invocation_revision_epoch(true).build(),
+            "@@//subject:revision",
+            configuration(None),
+            Arc::new(Tracker::default()),
+            route,
+        )
+        .await;
+        assert!(error.contains("revision B"), "{error}");
+
+        let restored = analyze_result(
+            &dice,
+            invocation_revision_epoch(false).build(),
+            "@@//subject:revision",
+            configuration(None),
+            Arc::new(Tracker::default()),
+            route,
+        )
+        .await
+        .unwrap();
+        assert_eq!(restored.actions().len(), 1);
     }
 }

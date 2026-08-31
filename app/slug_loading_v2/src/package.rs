@@ -116,6 +116,7 @@ use crate::subrule::ConfiguredDependencyAttribute;
 use crate::subrule::LateBoundRuleAttribute;
 use crate::subrule::SubruleAttribute;
 use crate::subrule::SubruleAttributeDefault;
+use crate::subrule::SubruleIdentity;
 use crate::subrule::attached_subrules;
 use crate::subrule::configuration_field_global;
 use crate::subrule::fail_closed_rule_implementation;
@@ -834,6 +835,44 @@ impl StarlarkRuleImplementation {
             .direct
             .iter()
             .map(|identity| identity.exported_name.as_str())
+    }
+
+    #[doc(hidden)]
+    pub fn direct_subrule_identities(&self) -> Arc<[Arc<SubruleIdentity>]> {
+        self.attached_subrules.direct.clone()
+    }
+
+    #[doc(hidden)]
+    pub fn subrule_invocations(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            Arc<SubruleIdentity>,
+            Arc<[Arc<SubruleIdentity>]>,
+            FrozenValue,
+        ),
+    > + '_ {
+        self.attached_subrules
+            .definitions
+            .iter()
+            .zip(self.subrule_callables.iter().copied())
+            .map(|(definition, callable)| {
+                (
+                    definition.identity.clone(),
+                    definition.direct_subrules.clone(),
+                    callable,
+                )
+            })
+    }
+
+    #[doc(hidden)]
+    pub fn subrule_identity_attribute_spans(
+        &self,
+    ) -> impl Iterator<Item = (Arc<SubruleIdentity>, u32, u32)> + '_ {
+        self.attached_subrules
+            .spans
+            .iter()
+            .map(|span| (span.owner.clone(), span.start, span.len))
     }
 
     pub fn subrule_callables(

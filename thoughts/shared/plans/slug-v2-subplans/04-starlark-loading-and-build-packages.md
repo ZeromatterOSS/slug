@@ -91,19 +91,26 @@ boundaries, but independent review returned `REPLAN` until a real non-default
 native producer existed. Commit `4425d3bfb` accepts that bounded thirteen-option
 CLI-to-DICE closure. The R4 packet-only gate then proved that configured Exec
 rule children require the generic selected-toolchain/action-context cutover.
-Commit `ebd19e3b1` now accepts that prerequisite with the requester's exact
-structural Target-or-Exec configuration, selected implementation Exec
-configuration and bounded direct REAPI semantic-consumer proof. R4 terminal
-review rejected its Target-before-Exec partition and split one-shot cycle-guard
-ownership. Run only the revised
-`WP-4-5-7A-subrule-configured-hidden-dependencies-and-query-r5`:
-share one typed configuration-field identity, resolve literal and ten `cpp`
-projections through the accepted target/selected-Exec child pipeline, validate
-provider/file/executable shape, preserve one interleaved descriptor-order
-stream, guard selected-toolchain and declared-child analysis as one parent
-operation, and publish root loading-query facts. Stop before Starlark value
-materialization or invocation; XML/aspects remain deferred and no rules_cc/C++
-special case is permitted.
+Commit `ebd19e3b1` accepts that prerequisite with structural Target-or-Exec
+configuration and selected implementation Exec configuration. Commit
+`2bf86bfa8` then accepts the corrected configured-hidden successor: one
+descriptor-order stream, one aggregate cycle guard, typed literal/ten-`cpp`
+projection, provider/file/executable validation, and root loading-query facts.
+
+`WP-4-5-7A-subrule-direct-call-and-value-materialization-r3` is terminally
+accepted after one implementation `REPLAN` and corrected rereview. R1 required
+a tagged Null/configured analysis Target identity; R2's inline multi-String
+label was not compact. R3 uses an Arc-backed Null label with a two-word identity
+ceiling and one admitted source-boundary allocation/clone. The accepted generic
+category supplies ordinary/hidden evaluator values, all absence/file/executable
+shapes, materialization-only source/generated `DefaultInfo`, argument binding
+and override checks, nested authorization, an Arc-shared immutable dispatcher,
+call-scoped restricted context/action lifetime, generic provider round trips,
+and successful implicit/tool configured edges. The 256-call proof covers both
+analysis routes; full loading/analysis and staged-only gates pass at
+1,230-production/469-proof additions. Fragment/toolchain projection,
+`args`/`run`/`symlink`, XML/aspects, and every rules_cc/C++ special case remain
+deferred. Select fragment projection next.
 
 ## Accepted `.bzl` load-visibility design; implementation activated (2026-08-27)
 

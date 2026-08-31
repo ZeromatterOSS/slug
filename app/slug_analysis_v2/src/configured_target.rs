@@ -53,6 +53,11 @@ pub enum ConfiguredEdgeKind {
         index: u32,
         output: CanonicalLabel,
     },
+    ImplicitAttribute {
+        attribute: CompactString,
+        index: u32,
+        tool: bool,
+    },
     AliasActual,
     GeneratedBy,
     Source,
@@ -77,7 +82,8 @@ impl ConfiguredEdgeKind {
     pub fn implicit(&self) -> bool {
         matches!(
             self,
-            Self::PackageGroupInclude { .. }
+            Self::ImplicitAttribute { .. }
+                | Self::PackageGroupInclude { .. }
                 | Self::ToolchainRequirement
                 | Self::SelectedToolchainImplementation
                 | Self::CandidateExecutionPlatform { .. }
@@ -88,6 +94,6 @@ impl ConfiguredEdgeKind {
         )
     }
     pub const fn tool(&self) -> bool {
-        false
+        matches!(self, Self::ImplicitAttribute { tool: true, .. })
     }
 }
