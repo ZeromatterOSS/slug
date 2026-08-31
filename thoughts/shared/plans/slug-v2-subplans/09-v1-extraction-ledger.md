@@ -2060,9 +2060,11 @@ corrected four-action proposal also adds one private source-manifest Artifact,
 one typed action-family enum and a special RunfilesTree output discriminator;
 it imports no V1/Buck2/Zabel semantic owner, representation or layout.
 
-Independent retained-representation review returned `ACCEPT`; the corrected
-proposal is implementation authority. Bazel 9.2 fixes behavior; Zabel is peer
-ownership/optimization guidance only. Existing `Arc`, `Dupe`,
+Independent retained-representation review returned `ACCEPT` for R2. R3 adds
+only the pinned-source-required unresolved-symlink Artifact admission to the
+existing runfiles importer; focused correction rereview returned `ACCEPT`.
+Bazel 9.2 fixes behavior; Zabel is peer ownership/optimization guidance only.
+Existing `Arc`, `Dupe`,
 `Allocative`, compact maps, retained Artifact, action registry, and dense
 depset utilities are sufficient; add no interner, cache, global state, task,
 lock, flattened repository list, full-child retention or second runfiles
@@ -2134,3 +2136,12 @@ added. Independent terminal correction review returned `ACCEPT`. The
 configured collector landed in `2483dd7e2` with one dense closure per result,
 typed prepared carriers, iterative composition, and no second graph. The
 corrected four-action support design is now the active successor.
+Its implementation candidate uses only the accepted Rust-native typed owners,
+passes the required serial validation and cap/hygiene gates, and introduces no
+V1 extraction or semantic owner. R3 terminal review nevertheless returned
+`REPLAN`: the analysis seam discarded `HostPathFlavor`, permitting the
+non-Windows graph for Windows. R4 retains the existing typed
+flavor/environment pair and fails closed before provider/registry publication.
+The flavor is an eligibility gate, not a new retained recipe field; no new
+collection, clone, cache, interner, task, lock, key, graph, or memory owner is
+added. Focused R4 review is required before Rust resumes.

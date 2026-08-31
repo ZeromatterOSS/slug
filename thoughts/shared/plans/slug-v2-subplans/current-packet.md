@@ -1,14 +1,24 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-four-runfiles-support-actions-design-r2`
+Packet: `WP-6-7A-four-runfiles-support-actions-design-r4`
 
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 typed
 DefaultInfo/FilesToRun/runfiles support.
 
-Status: zero-Rust design independently `ACCEPT`; implementation active at
-base `2483dd7e2`. The loading/package-metadata owner
+Status: formal R4 `REPLAN`; Rust changes are paused pending focused independent
+review of the Host-path-flavor correction. The implementation candidate is
+based on design commit `2ac91f25c`. The loading/package-metadata owner
 landed in `80a6bfd3a`, and the complete configured transitive-package collector
-landed with terminal review `ACCEPT` in `2483dd7e2`. The former three-action
+landed with terminal review `ACCEPT` in `2483dd7e2`. R3 terminal implementation
+review returned `REPLAN`: its analysis seam discarded `HostPathFlavor` and
+could therefore publish the non-Windows graph for an explicitly unsupported
+Windows configuration. All other reviewed ownership, equality, atomicity,
+topology, isolation, and cap boundaries are retained. The candidate had passed
+the required serial build-API, loading, analysis, query, core/REAPI, format,
+metadata, cap, archive-status, and hygiene gates before this correction. Warm
+A/B/A validation found and corrected one raw runfiles-depset comparison by
+making the existing `RunfilesSupport` owner use graph-aware publication
+equality. The former three-action
 draft is rejected: Bazel 9 Bzlmod always supplies transitive package metadata
 and registers `RepoMappingManifest` before the other three default support
 actions.
@@ -111,11 +121,36 @@ symlink, while the non-Windows symlink-tree input set is only the source
 manifest. `RunfilesTree` inputs are runfiles Artifacts plus the public manifest
 and repository-mapping manifest.
 
+R3 corrects one pre-implementation mismatch found by applying that pinned
+source to the live importer: `RetainedRunfiles::from_parts` currently rejects
+every derived output except `File`, so Starlark cannot place an unresolved
+`Symlink` Artifact in `runfiles.files` even though
+`SourceManifestActionTest.testUnresolvedSymlink` proves that Bazel admits and
+filters exactly that case. Extend the existing regular-runfiles check to admit
+`File | Symlink` and continue rejecting `Directory | RunfilesTree`. This is
+the same retained runfiles owner, not a second representation or action
+special case.
+
+R4 corrects the terminally reviewed implementation seam. The existing typed
+configured-action input is an optional `(HostPathFlavor,
+RetainedActionEnvironment)` pair. R3 projected only the environment before
+calling the support finalizer, so `HostPathFlavor::Windows` could reach the
+non-Windows four-action constructor. Preserve the pair intact. For an eligible
+executable target, reject `HostPathFlavor::Windows` deterministically before
+constructing a completed provider candidate or registering an action. The
+typed action constructor also receives the flavor and rejects Windows before
+constructing any recipe as a defensive build-API boundary. A non-executable
+target returns before consuming the typed configuration, so it neither
+requires Host facts nor registers support actions. This correction admits no
+Windows link topology, Host probe, cache, DICE key, fallback, or inferred
+platform state.
+
 Upstream content/escaping tests are not implementation gates because manifest
-serialization is deferred. Windows tests are skipped because Windows link
-inputs and junction semantics are unsupported. Fileset tests are skipped as an
-unadmitted runfiles shape. The fresh aquery plus pinned constructors are the
-accepted graph/order evidence; no copied expected asset is added.
+serialization is deferred. Windows link inputs and junction semantics remain
+unsupported; R4 adds only a forced-Windows rejection regression, not a Windows
+topology oracle. Fileset tests are skipped as an unadmitted runfiles shape. The
+fresh aquery plus pinned constructors are the accepted graph/order evidence;
+no copied expected asset is added.
 
 Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer
 architecture and optimization guidance only. Its useful lesson is the phase
@@ -128,12 +163,14 @@ claim. V1 supplies no semantic owner. Buck2-derived compact collections,
 
 ## Compatibility classification
 
-**Exact:** the default non-Windows support eligibility; four action mnemonics,
-registration order, relative output suffixes, output roles, action dependency
-graph, repository-mapping semantic inputs, source-manifest symlink-Artifact
-filter, configured symlink-tree environment, public FilesToRun manifest views,
-and failure-before-publication behavior. A source/exported file's existing
-supportless FilesToRun provider remains a separate exact non-rule category.
+**Exact:** the default non-Windows support eligibility and forced-Windows
+failure-before-publication boundary; four action mnemonics, registration order,
+relative output suffixes, output roles, action dependency graph,
+repository-mapping semantic inputs, source-manifest symlink-Artifact
+admission/filter, configured symlink-tree environment, public FilesToRun
+manifest views, and failure-before-publication behavior. A source/exported
+file's existing supportless FilesToRun provider remains a separate exact
+non-rule category.
 
 **Slug-native:** collision-safe structural action/configuration identity;
 configuration-relative output paths rather than exact `bazel-out` bytes; a
@@ -147,9 +184,10 @@ materialization, execution, action cache, REAPI/CAS projection; Windows,
 filesets, aspects, `run_under`, sibling-repository output layout, nondefault
 manifest/link/compact-mapping flags, remotable source manifests, support
 `args`, run-environment/test-action consumers, and exact Bazel output-root
-identity. Deferral never permits partial action registration, reconstructed
-support, an empty package substitute, or published incomplete executable
-FilesToRun state.
+identity. Windows remains unsupported/deferred and fails closed; no Windows
+support topology is implied. Deferral never permits partial action
+registration, reconstructed support, an empty package substitute, or published
+incomplete executable FilesToRun state.
 
 ## Frozen ownership and retained model
 
@@ -217,27 +255,41 @@ The special output kind prevents later execution/REAPI code from treating the
 tree as a regular file or directory. Existing projection code must explicitly
 reject it; this packet does not project it.
 
+`RunfilesSupportActionSpec::default_actions` accepts the existing
+`HostPathFlavor` alongside the configured action environment and rejects
+`HostPathFlavor::Windows` before allocating the shared support recipes. Unix is
+the only admitted default topology. The flavor remains an eligibility gate,
+not a retained action field: once Unix is admitted, the four recipes retain
+exactly the previously frozen semantic inputs, so no new equality/hash or
+memory owner is introduced.
+
 ### Producer and atomic publication
 
 The natural producer is post-evaluation provider normalization inside
 `evaluate_loaded_rule`. It already owns the returned provider collection, the
-rule's action registry, configured action environment/owner, effective
-DefaultInfo, and the mandatory current-node `RunfilesPackageDepset` supplied by
-the accepted collector.
+rule's action registry, configured `(HostPathFlavor,
+RetainedActionEnvironment)` pair and action owner, effective DefaultInfo, and
+the mandatory current-node `RunfilesPackageDepset` supplied by the accepted
+collector.
 
 Move the support finalizer into a new cohesive
 `slug_analysis_v2::runfiles_support` module so the 1,955-line
 `starlark_rule.rs` does not cross the 2,000-line complexity trigger. The
 finalizer:
 
-1. validates eligibility, owner consistency, effective runfiles, derived
-   output paths/kinds, and all four complete typed recipes;
-2. builds the completed DefaultInfo candidate without publishing it;
-3. calls `ActionRegistry::register_batch`, which preflights every action,
+1. returns immediately for a non-executable target without consuming typed
+   action configuration;
+2. for an eligible executable, consumes the existing typed configuration pair
+   and rejects `HostPathFlavor::Windows` before constructing support, a
+   completed provider candidate, or any recipe;
+3. validates owner consistency, effective runfiles, derived output paths/kinds,
+   and all four complete typed recipes;
+4. builds the completed DefaultInfo candidate without publishing it;
+5. calls `ActionRegistry::register_batch`, which preflights every action,
    every output, existing conflicts, and intra-batch conflicts before mutating
    either registry vector or owner map;
-4. replaces DefaultInfo infallibly only after the batch commits; and
-5. snapshots user actions followed by the exact four-action suffix into the
+6. replaces DefaultInfo infallibly only after the batch commits; and
+7. snapshots user actions followed by the exact four-action suffix into the
    configured result.
 
 Any error drops the evaluation-local candidate; the registry and original
@@ -263,8 +315,11 @@ covers all retained additions. No async transfer or shutdown owner is added.
 
 ## Implementation succession, allowlist, and caps
 
-Independent design review returned `ACCEPT`. Commit this zero-Rust contract,
-then land one independently reviewed implementation commit.
+R2 design review and the focused R3 symlink-Artifact correction rereview
+returned `ACCEPT`. R3 terminal implementation review returned `REPLAN` only
+for the discarded Host path flavor. R4 is a docs-only correction until focused
+independent review returns `ACCEPT`; then land one independently reviewed
+implementation commit preserving every other accepted R3 boundary.
 
 Production allowlist:
 
@@ -272,6 +327,8 @@ Production allowlist:
 - `app/slug_build_api_v2/src/actions/{mod.rs,ctx_actions.rs,registry.rs,spec.rs,reapi_projection.rs}`;
 - `app/slug_build_api_v2/src/{analysis_value.rs,lib.rs}`;
 - `app/slug_build_api_v2/src/providers/mod.rs`;
+- `app/slug_build_api_v2/src/runfiles.rs` only to admit derived `Symlink`
+  Artifacts while continuing to reject `Directory` and `RunfilesTree`;
 - new `app/slug_analysis_v2/src/runfiles_support.rs`;
 - `app/slug_analysis_v2/src/{lib.rs,analysis_value.rs,starlark_rule.rs}`; and
 - compiler-required exhaustive matches in direct build-API dependents only.
@@ -279,7 +336,9 @@ Production allowlist:
 Proof allowlist:
 
 - `app/slug_build_api_v2/tests/{actions.rs,analysis_value.rs,providers.rs}`;
-- `app/slug_analysis_v2/tests/starlark_rule.rs`; and
+- `app/slug_analysis_v2/tests/{starlark_rule.rs,subrule.rs}`; the latter only
+  supplies the already-required retained Host fact to its executable-subrule
+  transport fixture; and
 - existing focused configured-analysis DICE tests only for mapping/runfiles
   A/B/A publication evidence.
 
@@ -317,7 +376,11 @@ fields, or changing accepted runfiles/package semantics.
    siblings; and
 8. retained-size/accounting and mechanical scans prove one shared support,
    dense package/runfiles reuse, no flat repository list, no full-child
-   retention, and no second carrier/graph/cache/interner.
+   retention, and no second carrier/graph/cache/interner; and
+9. a forced-Windows executable deterministically errors before completed
+   provider or action-registry publication, while an otherwise equivalent
+   non-executable target succeeds without consuming the typed configuration or
+   registering support actions.
 
 Run serial:
 
@@ -330,10 +393,13 @@ Run serial:
 - metadata, archive-status, cap/physical-size, parked-file SHA-256, and
   `git diff --check` gates.
 
-Independent architecture review must return `ACCEPT` or `REPLAN` on the
-carrier visibility/equality/hash law, shared-support shape, exact action
-topology, atomic registry/provider publication, special output kind, natural
-owner, retained memory, downstream boundary, caps, and successor sufficiency.
-Independent terminal review must then inspect the implementation diff and all
-recorded proof. A second material contract correction is `REPLAN` rather than
-another in-place expansion.
+Focused R4 architecture review must return `ACCEPT` or `REPLAN` on preserving
+the existing typed Host flavor/environment owner, rejecting Windows before
+support/provider/registry construction, keeping the non-executable path lazy,
+the forced-Windows proof, and adding no retained owner or cap expansion. The
+later terminal review must also inspect the already accepted carrier
+visibility/equality/hash law, shared-support shape, exact action topology,
+atomic registry/provider publication, special output kind, natural owner,
+retained memory, downstream boundary, caps, and successor sufficiency, plus
+the implementation diff and all recorded proof. Any further material contract
+correction is `REPLAN` rather than another in-place expansion.

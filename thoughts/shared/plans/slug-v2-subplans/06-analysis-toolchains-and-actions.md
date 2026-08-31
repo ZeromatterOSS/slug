@@ -21813,9 +21813,9 @@ contributions while excluding resolution-only requested/candidate topology.
 The implementation adds no action, provider fallback, new DICE key, flat
 repository list or second graph.
 
-#### Corrected four-action runfiles support design active (2026-08-31)
+#### R4 four-action runfiles support correction active (2026-08-31)
 
-Activate `WP-6-7A-four-runfiles-support-actions-design-r2` at
+Activate `WP-6-7A-four-runfiles-support-actions-design-r4` at
 `2483dd7e2`. Under Bazel 9 Bzlmod defaults, executable support is one atomic
 `RepoMappingManifest`, `SourceSymlinkManifest`, `SymlinkTree`, and
 `RunfilesTree` suffix. One `Arc<RunfilesSupport>` must be shared by all
@@ -21830,5 +21830,18 @@ category without adding manifest bytes, aquery, execution, REAPI, parser,
 `set`, `cc_common`, `cc_internal`, ruleset or C++ branches. Spawn
 expansion remains next. Bazel 9.2 alone fixes behavior; Zabel remains peer
 phase/compactness guidance and supplies no semantic owner or copied code.
-Independent architecture review returned `ACCEPT`; the bounded implementation
-is active.
+R2 architecture review returned `ACCEPT`. R3 corrects the existing runfiles
+importer to admit unresolved-symlink Artifacts, as required by pinned
+`SourceManifestActionTest`, while still rejecting directory/runfiles-tree
+Artifacts. Focused correction rereview returned `ACCEPT`; implementation is
+complete and passes the required serial owner/downstream, warm A/B/A, cap,
+format, archive-status, and hygiene gates. One focused correction makes the
+existing support owner use graph-aware equality for rebuilt dense runfiles
+topologies. R3 terminal review returned `REPLAN` because the analysis seam
+discarded the existing `HostPathFlavor`, allowing the non-Windows graph to be
+published for an explicitly unsupported Windows configuration. R4 preserves
+the typed `(HostPathFlavor, RetainedActionEnvironment)` pair, rejects Windows
+before support/provider/registry construction, and keeps non-executable
+normalization lazy. It adds only forced-Windows failure evidence; no Windows
+topology, Host observation, cache, key, fallback, retained owner, or cap is
+admitted. Focused independent R4 review is required before Rust resumes.

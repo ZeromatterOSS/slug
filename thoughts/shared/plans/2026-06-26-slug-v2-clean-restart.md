@@ -40,12 +40,19 @@ and must name the same packet.
 
 Commits `80a6bfd3a` and `2483dd7e2` terminally accept the complete
 loading/package-metadata owner and configured transitive-package collector.
-The active zero-Rust successor registers the Bazel-default non-Windows
+The active `WP-6-7A-four-runfiles-support-actions-design-r4` packet registers
+the Bazel-default non-Windows
 `RepoMappingManifest`, `SourceSymlinkManifest`, `SymlinkTree`, and
 `RunfilesTree` suffix atomically, shares one typed support object with the
 completed FilesToRun provider, and preserves that provider through a private
-occurrence carrier. Independent architecture review returned `ACCEPT`;
-implementation is active and Spawn expansion follows. This remains generic graph/provider/action
+occurrence carrier. R2 architecture review and the focused R3 unresolved-
+symlink Artifact correction rereview returned `ACCEPT`. R3 terminal review
+returned `REPLAN` because the implementation discarded `HostPathFlavor` and
+could admit its non-Windows graph on Windows. R4 is a docs-only correction
+pending focused review: retain the existing typed flavor/environment pair,
+reject Windows before provider or registry publication, and prove the lazy
+non-executable path. After implementation and terminal acceptance, Spawn
+expansion follows. This remains generic graph/provider/action
 infrastructure, not a `cc_common`, `cc_internal`, rules_cc, parser, or C++
 rule packet. Bazel 9.2 is semantic authority; Zabel is peer architecture and
 optimization guidance only.
