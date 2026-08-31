@@ -69,6 +69,7 @@ use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::RetainedArtifactInputs;
 use slug_build_api_v2::RetainedCommandLine;
 use slug_build_api_v2::RetainedSpawnInvocation;
+use slug_build_api_v2::RunfilesPackageDepset;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SpawnSpec;
 use slug_configuration_v2::CanonicalStringMap;
@@ -87,6 +88,10 @@ use slug_identity_v2::RepositoryMappingId;
 use slug_loading_v2::RuleCapability;
 use slug_loading_v2::TestRuleKind;
 use slug_workspace_v2::NormalizedAbsolutePath;
+
+fn no_runfiles_packages() -> RunfilesPackageDepset {
+    RunfilesPackageDepset::empty()
+}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
 struct ContextInputKey;
@@ -479,7 +484,7 @@ fn publication_result(marker: &str, nested: bool) -> Arc<ConfiguredNodeResult> {
         None::<&str>,
     ));
     Arc::new(
-        ConfiguredNodeResult::new_rule(owner, providers, None)
+        ConfiguredNodeResult::new_rule(owner, providers, None, no_runfiles_packages())
             .with_action_specs(vec![action], vec![context])
             .unwrap(),
     )
@@ -586,7 +591,7 @@ fn file_write_result(
     let (context, topology) = default_action_context(&owner, platform_label);
     let providers =
         ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
-    ConfiguredNodeResult::new_rule(owner, providers, None)
+    ConfiguredNodeResult::new_rule(owner, providers, None, no_runfiles_packages())
         .with_action_specs(
             vec![ActionSpec::new(
                 ActionKind::Write {
@@ -749,10 +754,15 @@ fn configured_edges_preserve_transition_convergence_order_and_fixed_bits() {
 
     let providers =
         ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
-    let ordered = ConfiguredNodeResult::new_rule(target.clone(), providers.clone(), None)
-        .with_edges(vec![first.clone(), second.clone()]);
-    let reordered =
-        ConfiguredNodeResult::new_rule(target, providers, None).with_edges(vec![second, first]);
+    let ordered = ConfiguredNodeResult::new_rule(
+        target.clone(),
+        providers.clone(),
+        None,
+        no_runfiles_packages(),
+    )
+    .with_edges(vec![first.clone(), second.clone()]);
+    let reordered = ConfiguredNodeResult::new_rule(target, providers, None, no_runfiles_packages())
+        .with_edges(vec![second, first]);
     assert_ne!(ordered, reordered);
     assert_eq!(
         ordered.edges()[0].kind(),
@@ -789,7 +799,7 @@ fn configured_node_result_keeps_provider_collection_outputs_and_diagnostics() {
     );
     let expected_owner = owner.clone();
     let (context, _) = default_action_context(&owner, "@@//:platform");
-    let result = ConfiguredNodeResult::new_rule(owner, providers, None)
+    let result = ConfiguredNodeResult::new_rule(owner, providers, None, no_runfiles_packages())
         .with_action_specs(
             vec![ActionSpec::new(
                 ActionKind::Write {
@@ -852,9 +862,18 @@ fn configured_node_result_capability_is_borrowed_and_participates_in_equality() 
         test_kind: Some(TestRuleKind::Test),
     };
 
-    let absent = ConfiguredNodeResult::new_rule(key.clone(), providers.clone(), None);
-    let executable_result =
-        ConfiguredNodeResult::new_rule(key.clone(), providers.clone(), Some(executable.clone()));
+    let absent = ConfiguredNodeResult::new_rule(
+        key.clone(),
+        providers.clone(),
+        None,
+        no_runfiles_packages(),
+    );
+    let executable_result = ConfiguredNodeResult::new_rule(
+        key.clone(),
+        providers.clone(),
+        Some(executable.clone()),
+        no_runfiles_packages(),
+    );
     let renamed = ConfiguredNodeResult::new_rule(
         key.clone(),
         providers.clone(),
@@ -862,8 +881,10 @@ fn configured_node_result_capability_is_borrowed_and_participates_in_equality() 
             rule_class: "other_rule".into(),
             ..executable.clone()
         }),
+        no_runfiles_packages(),
     );
-    let test_result = ConfiguredNodeResult::new_rule(key, providers, Some(test));
+    let test_result =
+        ConfiguredNodeResult::new_rule(key, providers, Some(test), no_runfiles_packages());
 
     assert_eq!(executable_result.rule_capability(), Some(&executable));
     assert_ne!(absent, executable_result);
@@ -901,8 +922,13 @@ fn toolchain_topology_is_ordered_role_checked_and_structurally_equal() {
     let providers =
         ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
     let key = ConfiguredTargetKey::new(canonical("@@//:root"), target_config());
-    let plain = ConfiguredNodeResult::new_rule(key.clone(), providers.clone(), None);
-    let retained = ConfiguredNodeResult::new_rule(key, providers, None)
+    let plain = ConfiguredNodeResult::new_rule(
+        key.clone(),
+        providers.clone(),
+        None,
+        no_runfiles_packages(),
+    );
+    let retained = ConfiguredNodeResult::new_rule(key, providers, None, no_runfiles_packages())
         .with_toolchain_topology(topology.clone());
     assert_ne!(plain, retained);
     assert_eq!(retained.toolchain_topology(), Some(&topology));
@@ -985,12 +1011,17 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
     };
     let providers =
         ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
-    let result = ConfiguredNodeResult::new_rule(owner.clone(), providers.clone(), None)
-        .with_action_specs(
-            vec![spec("a"), spec("b"), spec("c").with_exec_group("named")],
-            vec![default.clone(), named.clone()],
-        )
-        .unwrap();
+    let result = ConfiguredNodeResult::new_rule(
+        owner.clone(),
+        providers.clone(),
+        None,
+        no_runfiles_packages(),
+    )
+    .with_action_specs(
+        vec![spec("a"), spec("b"), spec("c").with_exec_group("named")],
+        vec![default.clone(), named.clone()],
+    )
+    .unwrap();
     assert_eq!(
         result
             .actions()
@@ -1110,15 +1141,25 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
     )
     .unwrap();
     assert_eq!(
-        ConfiguredNodeResult::new_rule(owner.clone(), providers.clone(), None)
-            .with_action_specs(vec![spec("out")], vec![wrong_context])
-            .unwrap_err(),
+        ConfiguredNodeResult::new_rule(
+            owner.clone(),
+            providers.clone(),
+            None,
+            no_runfiles_packages(),
+        )
+        .with_action_specs(vec![spec("out")], vec![wrong_context])
+        .unwrap_err(),
         "configured action context has mismatched owner"
     );
     assert_eq!(
-        ConfiguredNodeResult::new_rule(owner.clone(), providers.clone(), None)
-            .with_action_specs(vec![spec("out")], vec![default.clone(), default.clone()])
-            .unwrap_err(),
+        ConfiguredNodeResult::new_rule(
+            owner.clone(),
+            providers.clone(),
+            None,
+            no_runfiles_packages(),
+        )
+        .with_action_specs(vec![spec("out")], vec![default.clone(), default.clone()])
+        .unwrap_err(),
         "configured action contexts contain duplicate group"
     );
     assert!(
@@ -1176,6 +1217,7 @@ fn configured_file_write_view_uses_retained_context_and_rejects_shapes() {
         baseline.configured_target_key().unwrap().clone(),
         baseline.providers().clone(),
         None,
+        no_runfiles_packages(),
     );
     assert_eq!(empty.configured_file_write_actions().unwrap().len(), 0);
     let unresolved = Arc::new(

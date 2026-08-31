@@ -19,12 +19,16 @@ use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
+use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderOccurrence;
+use slug_build_api_v2::RunfilesPackageDepset;
+use slug_build_api_v2::RunfilesPackageMetadata;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::RuleCapability;
 
 use crate::configured_target::ConfiguredEdge;
+use crate::configured_target::ConfiguredEdgeKind;
 use crate::key::ConfigurationKind;
 use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
@@ -71,6 +75,7 @@ pub enum ConfiguredNodeKind {
     ConstraintSetting,
     ToolchainType,
     ToolchainDeclaration,
+    ConfigSetting,
 }
 
 #[derive(Debug, Clone, Allocative)]
@@ -726,6 +731,105 @@ pub struct ConfiguredNodeResult {
     rule_capability: Option<RuleCapability>,
     toolchain_topology: Option<ToolchainTopology>,
     platform_semantic_fact: Option<PlatformSemanticFact>,
+    runfiles_packages: RunfilesPackageDepset,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub(crate) struct RunfilesPackageClosureRow {
+    key: ConfiguredNodeKey,
+    packages: RunfilesPackageDepset,
+}
+
+impl RunfilesPackageClosureRow {
+    pub(crate) fn new(key: ConfiguredNodeKey, packages: RunfilesPackageDepset) -> Self {
+        Self { key, packages }
+    }
+
+    pub(crate) fn from_result(result: &ConfiguredNodeResult) -> Self {
+        Self::new(result.key.clone(), result.runfiles_packages.clone())
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct RunfilesPackageCollector {
+    direct: Vec<Arc<RunfilesPackageMetadata>>,
+    configured: Vec<RunfilesPackageClosureRow>,
+}
+
+impl RunfilesPackageCollector {
+    pub(crate) fn add_direct(&mut self, package: Arc<RunfilesPackageMetadata>) {
+        self.direct.push(package);
+    }
+
+    pub(crate) fn add_configured(&mut self, row: RunfilesPackageClosureRow) {
+        self.configured.push(row);
+    }
+
+    pub(crate) fn finish(
+        mut self,
+        edges: &[ConfiguredEdge],
+    ) -> Result<RunfilesPackageDepset, String> {
+        self.direct
+            .sort_by(|left, right| left.package().cmp(right.package()));
+        for pair in self.direct.windows(2) {
+            if pair[0].package() == pair[1].package() && pair[0] != pair[1] {
+                return Err(format!(
+                    "runfiles package {} has inconsistent metadata",
+                    pair[1].package()
+                ));
+            }
+        }
+        self.direct
+            .dedup_by(|left, right| left.package() == right.package());
+
+        self.configured
+            .sort_by(|left, right| left.key.cmp(&right.key));
+        for pair in self.configured.windows(2) {
+            if pair[0].key == pair[1].key && pair[0].packages != pair[1].packages {
+                return Err(format!(
+                    "configured dependency {} has inconsistent package closures",
+                    pair[1].key
+                ));
+            }
+        }
+        self.configured
+            .dedup_by(|left, right| left.key == right.key);
+
+        for edge in edges
+            .iter()
+            .filter(|edge| runfiles_package_contributing_edge(edge.kind()))
+        {
+            if self
+                .configured
+                .binary_search_by(|row| row.key.cmp(edge.target()))
+                .is_err()
+            {
+                return Err(format!(
+                    "package-contributing edge {} has no runfiles package closure",
+                    edge.target()
+                ));
+            }
+        }
+
+        RunfilesPackageDepset::new(
+            DepsetOrder::Default,
+            self.direct,
+            self.configured
+                .into_iter()
+                .map(|row| row.packages)
+                .collect(),
+        )
+        .map_err(|error| format!("building runfiles package closure: {error}"))
+    }
+}
+
+fn runfiles_package_contributing_edge(kind: &ConfiguredEdgeKind) -> bool {
+    !matches!(
+        kind,
+        ConfiguredEdgeKind::ToolchainRequirement
+            | ConfiguredEdgeKind::CandidateExecutionPlatform { .. }
+            | ConfiguredEdgeKind::HostPlatform
+    )
 }
 
 impl ConfiguredNodeResult {
@@ -733,6 +837,7 @@ impl ConfiguredNodeResult {
         key: ConfiguredTargetKey,
         providers: ProviderCollection,
         rule_capability: Option<RuleCapability>,
+        runfiles_packages: RunfilesPackageDepset,
     ) -> Self {
         Self {
             actual_configured_target: Some(key.clone()),
@@ -746,6 +851,7 @@ impl ConfiguredNodeResult {
             rule_capability,
             toolchain_topology: None,
             platform_semantic_fact: None,
+            runfiles_packages,
         }
     }
 
@@ -754,6 +860,7 @@ impl ConfiguredNodeResult {
         kind: ConfiguredNodeKind,
         providers: ProviderCollection,
         rule_capability: Option<RuleCapability>,
+        runfiles_packages: RunfilesPackageDepset,
     ) -> Self {
         assert_ne!(
             kind,
@@ -773,6 +880,7 @@ impl ConfiguredNodeResult {
             rule_capability,
             toolchain_topology: None,
             platform_semantic_fact: None,
+            runfiles_packages,
         }
     }
 
@@ -854,6 +962,10 @@ impl ConfiguredNodeResult {
 
     pub fn platform_semantic_fact(&self) -> Option<&PlatformSemanticFact> {
         self.platform_semantic_fact.as_ref()
+    }
+
+    pub fn runfiles_packages(&self) -> &RunfilesPackageDepset {
+        &self.runfiles_packages
     }
 
     pub fn with_action_specs(

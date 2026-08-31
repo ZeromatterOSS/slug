@@ -76,6 +76,7 @@ use slug_build_api_v2::ProviderId;
 use slug_build_api_v2::RetainedCommandLineSegment;
 use slug_build_api_v2::RetainedRunfiles;
 use slug_build_api_v2::RetainedSpawnInvocation;
+use slug_build_api_v2::RunfilesPackageDepset;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SymlinkTarget;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
@@ -1389,6 +1390,15 @@ fn provider_value(result: &ConfiguredNodeResult, provider: &ProviderId) -> Strin
         .as_str()
         .unwrap()
         .to_owned()
+}
+
+fn runfiles_package_names(result: &ConfiguredNodeResult) -> BTreeSet<String> {
+    result
+        .runfiles_packages()
+        .to_list()
+        .into_iter()
+        .map(|package| package.package().to_string())
+        .collect()
 }
 
 fn candidate_labels(result: &ConfiguredNodeResult) -> Vec<String> {
@@ -2717,6 +2727,7 @@ async fn selected_platform_terminals_suppress_implementation_and_rule_evaluation
         platform.clone(),
         seed.providers().clone(),
         None,
+        RunfilesPackageDepset::empty(),
     ));
     let platform_key =
         ConfiguredNodeAnalysisObservationKey::new(root.clone(), platform.clone()).unwrap();
@@ -3174,8 +3185,9 @@ async fn root_toolchain_resolution_loads_reachable_cross_package_references() {
     )
     .unwrap();
     fs::write(workspace.join("tools/BUILD.bazel"), "toolchain_type(name = \"type\")\ntoolchain(name = \"tc\", toolchain_type = \":type\", toolchain = \"//impl:chosen\", exec_compatible_with = [\"//constraints:linux\"])\n").unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
     let result = root_target_request(
-        &Dice::builder().build(DetectCycles::Enabled),
+        &dice,
         &workspace,
         "@@//:request",
         Arc::new(RootActivationTracker::default()),
@@ -3188,6 +3200,34 @@ async fn root_toolchain_resolution_loads_reachable_cross_package_references() {
             &ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap()
         ),
         "cross"
+    );
+    assert_eq!(
+        runfiles_package_names(&result),
+        BTreeSet::from(["@@//", "@@//impl"].map(str::to_owned))
+    );
+    let configuration = test_configuration();
+    let configured = |label: &str| {
+        ConfiguredTargetKey::new(CanonicalLabel::parse(label).unwrap(), configuration.clone())
+    };
+    let declaration = analyze_request(&dice, &workspace, &configured("@@//tools:tc"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        runfiles_package_names(&declaration),
+        BTreeSet::from(["@@//constraints", "@@//tools"].map(str::to_owned))
+    );
+    let platform = analyze_request(
+        &dice,
+        &workspace,
+        &configured("@@//platforms:p"),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        runfiles_package_names(&platform),
+        BTreeSet::from(["@@//constraints", "@@//platforms"].map(str::to_owned))
     );
 }
 
@@ -6157,6 +6197,117 @@ ordinary_rule(
         vis_top.edges()[0].target(),
         &ConfiguredNodeKey::null(CanonicalLabel::parse("@@//:vis_leaf").unwrap())
     );
+}
+
+#[tokio::test]
+async fn configured_runfiles_packages_cover_semantic_children_without_topology_inputs() {
+    let workspace = scratch();
+    for package in [
+        "cond", "dep", "gen", "hidden", "leaf", "src", "vis", "vis_leaf",
+    ] {
+        fs::create_dir(workspace.join(package)).unwrap();
+    }
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _rule(ctx):
+    return [DefaultInfo()]
+closure_rule = rule(
+    implementation = _rule,
+    attrs = {
+        "deps": attr.label_list(allow_files = True),
+        "out": attr.output(),
+        "_hidden": attr.label(default = "//hidden:child"),
+    },
+)
+leaf_rule = rule(implementation = _rule)
+producer_rule = rule(implementation = _rule, attrs = {"out": attr.output()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "closure_rule")
+closure_rule(
+    name = "root",
+    deps = select({
+        "//cond:on": ["//dep:alias", "//gen:producer.out", "//src:file.txt"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//vis:top"],
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("cond/BUILD.bazel"),
+        "config_setting(name = \"on\", values = {\"compilation_mode\": \"fastbuild\"})\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("dep/BUILD.bazel"),
+        "alias(name = \"alias\", actual = \"//leaf:child\")\n",
+    )
+    .unwrap();
+    for package in ["leaf", "hidden"] {
+        fs::write(
+            workspace.join(format!("{package}/BUILD.bazel")),
+            "load(\"//:defs.bzl\", \"leaf_rule\")\nleaf_rule(name = \"child\")\n",
+        )
+        .unwrap();
+    }
+    fs::write(
+        workspace.join("gen/BUILD.bazel"),
+        "load(\"//:defs.bzl\", \"producer_rule\")\nproducer_rule(name = \"producer\", out = \"producer.out\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("src/BUILD.bazel"),
+        "exports_files([\"file.txt\"])\n",
+    )
+    .unwrap();
+    fs::write(workspace.join("src/file.txt"), "source\n").unwrap();
+    fs::write(
+        workspace.join("vis/BUILD.bazel"),
+        "package_group(name = \"top\", includes = [\"//vis_leaf:leaf\"])\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("vis_leaf/BUILD.bazel"),
+        "package_group(name = \"leaf\", packages = [\"//...\"])\n",
+    )
+    .unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let result = root_target_request(
+        &dice,
+        &workspace,
+        "@@//:root",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        runfiles_package_names(&result),
+        [
+            "@@//",
+            "@@//cond",
+            "@@//dep",
+            "@@//gen",
+            "@@//hidden",
+            "@@//leaf",
+            "@@//src",
+            "@@//vis",
+            "@@//vis_leaf",
+        ]
+        .map(str::to_owned)
+        .into()
+    );
+    assert!(!runfiles_package_names(&result).contains("@@//.slug_test_host"));
+    assert!(result.actions().is_empty());
+    let stats = result.runfiles_packages().storage_stats();
+    assert!(stats.external_depsets > 0);
+    assert!(stats.leaves <= 9);
 }
 
 #[tokio::test]

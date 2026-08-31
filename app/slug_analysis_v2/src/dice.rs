@@ -104,6 +104,8 @@ use crate::result::ConfiguredToolchainResolution;
 use crate::result::ConfiguredToolchainResolutionRow;
 use crate::result::ConfiguredToolchainSelection;
 use crate::result::PlatformSemanticFact;
+use crate::result::RunfilesPackageClosureRow;
+use crate::result::RunfilesPackageCollector;
 use crate::result::ToolchainTopology;
 use crate::starlark_rule::LoadedRuleError;
 use crate::starlark_rule::PreparedConfiguredAttribute;
@@ -1183,15 +1185,23 @@ fn starlark_rule_implementation<'a>(
     Ok(implementation)
 }
 
+struct PreparedConfiguredConditions {
+    values: Vec<ConfiguredAttributeCondition>,
+    packages: Arc<[ConfiguredNodeKey]>,
+}
+
 async fn prepare_configured_attribute_conditions(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
     configuration: &ConfigurationKey,
     selector_labels: Vec<CanonicalLabel>,
-) -> AnalysisSemanticOutcome<Vec<ConfiguredAttributeCondition>> {
+) -> AnalysisSemanticOutcome<PreparedConfiguredConditions> {
     if selector_labels.is_empty() {
-        return analysis_semantic_complete(Ok(Vec::new()));
+        return analysis_semantic_complete(Ok(PreparedConfiguredConditions {
+            values: Vec::new(),
+            packages: Arc::from([]),
+        }));
     }
 
     let condition_configuration = configuration.clone();
@@ -1256,16 +1266,25 @@ async fn prepare_configured_attribute_conditions(
         return analysis_semantic_complete(Err(error));
     }
 
-    load_configured_condition_declarations(ctx, mode, workspace, selector_labels, &truth).await
+    load_configured_condition_declarations(
+        ctx,
+        mode,
+        workspace,
+        configuration,
+        selector_labels,
+        &truth,
+    )
+    .await
 }
 
 async fn load_configured_condition_declarations(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
+    configuration: &ConfigurationKey,
     labels: Vec<CanonicalLabel>,
     truth: &SmallMap<CanonicalLabel, bool>,
-) -> AnalysisSemanticOutcome<Vec<ConfiguredAttributeCondition>> {
+) -> AnalysisSemanticOutcome<PreparedConfiguredConditions> {
     let packages = labels
         .iter()
         .map(|label| label.package().clone())
@@ -1362,7 +1381,20 @@ async fn load_configured_condition_declarations(
         });
     }
 
-    analysis_semantic_complete(Ok(conditions))
+    let packages = conditions
+        .iter()
+        .map(|condition| {
+            ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
+                condition.label.clone(),
+                configuration.clone(),
+            ))
+        })
+        .collect::<Vec<_>>();
+
+    analysis_semantic_complete(Ok(PreparedConfiguredConditions {
+        values: conditions,
+        packages: packages.into(),
+    }))
 }
 
 async fn prepare_configured_rule_attributes(
@@ -1371,7 +1403,7 @@ async fn prepare_configured_rule_attributes(
     workspace: &NormalizedAbsolutePath,
     package: &LoadedPackage,
     configured_target: &ConfiguredTargetKey,
-) -> AnalysisSemanticOutcome<Vec<ResolvedRuleAttribute>> {
+) -> AnalysisSemanticOutcome<(Vec<ResolvedRuleAttribute>, Arc<[ConfiguredNodeKey]>)> {
     let implementation = match starlark_rule_implementation(package, configured_target) {
         Ok(implementation) => implementation,
         Err(error) => return analysis_semantic_complete(Err(error)),
@@ -1413,7 +1445,7 @@ async fn prepare_configured_rule_attributes(
         .iter()
         .zip(implementation.schema())
         .map(|(attribute, schema)| {
-            resolve_configured_attribute(attribute.value.as_ref(), &conditions)
+            resolve_configured_attribute(attribute.value.as_ref(), &conditions.values)
                 .map(|value| ResolvedRuleAttribute {
                     declaration_name: attribute.declaration_name.clone(),
                     kind: schema.kind(),
@@ -1429,7 +1461,7 @@ async fn prepare_configured_rule_attributes(
                 })
         })
         .collect::<Result<Vec<_>, _>>();
-    analysis_semantic_complete(resolved)
+    analysis_semantic_complete(resolved.map(|values| (values, conditions.packages)))
 }
 
 async fn root_declared_dependency_keys(
@@ -1694,6 +1726,46 @@ impl ComputedAnalysis for Arc<ConfiguredNodeResult> {
     }
 }
 
+fn collect_runfiles_packages<'a>(
+    package: &LoadedPackage,
+    edges: &[crate::configured_target::ConfiguredEdge],
+    children: impl IntoIterator<Item = &'a ConfiguredNodeResult>,
+    extra_rows: impl IntoIterator<Item = RunfilesPackageClosureRow>,
+) -> Result<slug_build_api_v2::RunfilesPackageDepset, AnalysisError> {
+    let mut collector = RunfilesPackageCollector::default();
+    collector.add_direct(package.runfiles_package().clone());
+    for row in children
+        .into_iter()
+        .map(RunfilesPackageClosureRow::from_result)
+        .chain(extra_rows)
+    {
+        collector.add_configured(row);
+    }
+    collector.finish(edges).map_err(AnalysisError::message)
+}
+
+fn native_configured_result(
+    package: &LoadedPackage,
+    key: ConfiguredNodeKey,
+    kind: ConfiguredNodeKind,
+    providers: ProviderCollection,
+    rule_capability: Option<slug_loading_v2::RuleCapability>,
+    edges: Vec<crate::configured_target::ConfiguredEdge>,
+    children: &[Arc<ConfiguredNodeResult>],
+    extra_rows: &[RunfilesPackageClosureRow],
+) -> Result<ConfiguredNodeResult, AnalysisError> {
+    let runfiles_packages = collect_runfiles_packages(
+        package,
+        &edges,
+        children.iter().map(Arc::as_ref),
+        extra_rows.iter().cloned(),
+    )?;
+    Ok(
+        ConfiguredNodeResult::new_native(key, kind, providers, rule_capability, runfiles_packages)
+            .with_edges(edges),
+    )
+}
+
 fn analysis_configured_key(key: &ConfiguredTargetKey) -> AnalysisConfiguredTargetKey {
     AnalysisConfiguredTargetKey::new(
         key.label().clone(),
@@ -1905,6 +1977,7 @@ fn finish_analysis<T>(
     declared_dependency_keys: &[DeclaredDependencyKey],
     configured_rows: &[crate::subrule::ConfiguredDependencyRow],
     computed: &SmallMap<ConfiguredNodeKey, T>,
+    selector_packages: &[ConfiguredNodeKey],
     candidate_execution_platforms: Option<Vec<ConfiguredTargetKey>>,
     action_context: Arc<ConfiguredActionOwnerContext>,
     toolchain: Option<PreparedToolchain>,
@@ -2068,6 +2141,35 @@ where
                 )
             }),
     );
+    let mut runfiles_collector = RunfilesPackageCollector::default();
+    runfiles_collector.add_direct(package.runfiles_package().clone());
+    let mut add_computed = |key: &ConfiguredNodeKey| -> Result<(), AnalysisError> {
+        let result = computed.get(key).ok_or_else(|| {
+            AnalysisError::message(format!(
+                "internal error: semantic dependency runfiles closure missing for `{key}`"
+            ))
+        })?;
+        runfiles_collector.add_configured(RunfilesPackageClosureRow::from_result(result.result()));
+        Ok(())
+    };
+    for dependency in declared_dependency_keys {
+        add_computed(&dependency.node)?;
+    }
+    for label in visibility_labels {
+        add_computed(&ConfiguredNodeKey::null(label.clone()))?;
+    }
+    for selector in selector_packages {
+        add_computed(selector)?;
+    }
+    drop(add_computed);
+    if let Some(toolchain) = &toolchain {
+        for row in toolchain.runfiles_packages.iter() {
+            runfiles_collector.add_configured(row.clone());
+        }
+    }
+    let runfiles_packages = runfiles_collector
+        .finish(&edges)
+        .map_err(AnalysisError::message)?;
     let print_capture = capture_events.then(AnalysisPrintCapture::default);
     let label = configured_target.label();
     let value = evaluate_loaded_rule(
@@ -2080,6 +2182,7 @@ where
         configured_attributes,
         action_context,
         toolchain,
+        runfiles_packages,
         print_capture
             .as_ref()
             .map(|capture| capture as &dyn PrintHandler),
@@ -2935,7 +3038,7 @@ fn native_references(target: &slug_loading_v2::PackageTarget) -> Vec<CanonicalLa
     }
 }
 
-async fn compute_toolchain_analysis_input(
+async fn compute_analysis_input(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     key: ConfiguredNodeAnalysisKey,
@@ -3105,15 +3208,17 @@ async fn prepare_toolchain_target_settings(
                 "registered toolchain is not toolchain: {label}"
             ))));
         };
-        let value =
-            match resolve_configured_attribute(target_settings.value(), &selector_conditions) {
-                Ok(value) => value,
-                Err(error) => {
-                    return analysis_semantic_complete(Err(AnalysisError::message(format!(
-                        "resolving target_settings for {label}: {error}"
-                    ))));
-                }
-            };
+        let value = match resolve_configured_attribute(
+            target_settings.value(),
+            &selector_conditions.values,
+        ) {
+            Ok(value) => value,
+            Err(error) => {
+                return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                    "resolving target_settings for {label}: {error}"
+                ))));
+            }
+        };
         let CoercedAttributeValue::LabelList(settings) = value else {
             return analysis_semantic_complete(Err(AnalysisError::message(format!(
                 "toolchain target_settings did not resolve to a label list: {label}"
@@ -3132,6 +3237,7 @@ async fn prepare_toolchain_target_settings(
             .into_iter()
             .filter(|label| {
                 !selector_conditions
+                    .values
                     .iter()
                     .any(|condition| &condition.label == label)
             })
@@ -3153,8 +3259,9 @@ async fn prepare_toolchain_target_settings(
         .map(|(label, settings)| {
             let eligible = settings.iter().all(|setting| {
                 selector_conditions
+                    .values
                     .iter()
-                    .chain(&selected_conditions)
+                    .chain(&selected_conditions.values)
                     .find(|condition| &condition.label == setting)
                     .is_some_and(|condition| condition.matches)
             });
@@ -3202,7 +3309,7 @@ async fn prepare_selected_toolchain_context(
             Box::pin(async move {
                 (
                     index,
-                    compute_toolchain_analysis_input(
+                    compute_analysis_input(
                         ctx,
                         mode,
                         key,
@@ -3259,6 +3366,7 @@ async fn prepare_selected_toolchain_context(
     }
 
     let mut rows = Vec::with_capacity(resolution.rows().len());
+    let mut runfiles_packages = Vec::with_capacity(computed.len());
     for (index, row) in resolution.rows().iter().enumerate() {
         let selected = match (row.declaration(), row.implementation()) {
             (None, None) => None,
@@ -3266,6 +3374,7 @@ async fn prepare_selected_toolchain_context(
                 let result = computed
                     .get(&index)
                     .expect("selected toolchain result remains ordered");
+                runfiles_packages.push(RunfilesPackageClosureRow::from_result(result));
                 if !matches!(
                     result.kind(),
                     ConfiguredNodeKind::Rule | ConfiguredNodeKind::Alias
@@ -3328,7 +3437,10 @@ async fn prepare_selected_toolchain_context(
     )
     .map(Arc::new)
     .map_err(AnalysisError::message);
-    toolchain_outcome(action_context.map(|action_context| PreparedToolchain { action_context }))
+    toolchain_outcome(action_context.map(|action_context| PreparedToolchain {
+        action_context,
+        runfiles_packages: runfiles_packages.into(),
+    }))
 }
 fn resolution_success_eq(
     left: &ConfiguredToolchainResolutionOutcome,
@@ -4152,6 +4264,167 @@ impl fmt::Display for ConfiguredToolchainResolutionObservationKey {
 mod tests {
     use super::*;
 
+    fn runfiles_metadata(package: &str) -> Arc<slug_build_api_v2::RunfilesPackageMetadata> {
+        Arc::new(slug_build_api_v2::RunfilesPackageMetadata::new(
+            PackageIdentifier::parse_bazel_package_identifier(package).unwrap(),
+            Arc::new(slug_build_api_v2::RunfilesRepositoryMapping::new(
+                Arc::from([]),
+                None,
+            )),
+        ))
+    }
+
+    fn configured_key(label: &str) -> ConfiguredNodeKey {
+        ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
+            CanonicalLabel::parse(label).unwrap(),
+            ConfigurationKey::target("collector").unwrap(),
+        ))
+    }
+
+    #[test]
+    fn runfiles_collector_orders_deduplicates_and_keeps_dense_children() {
+        let child_a = slug_build_api_v2::RunfilesPackageDepset::from_direct(
+            slug_build_api_v2::DepsetOrder::Default,
+            vec![
+                runfiles_metadata("//child_a/one"),
+                runfiles_metadata("//child_a/two"),
+            ],
+        )
+        .unwrap();
+        let child_z = slug_build_api_v2::RunfilesPackageDepset::from_direct(
+            slug_build_api_v2::DepsetOrder::Default,
+            vec![
+                runfiles_metadata("//child_z/one"),
+                runfiles_metadata("//child_z/two"),
+            ],
+        )
+        .unwrap();
+        let key_a = configured_key("@@//a:target");
+        let key_z = configured_key("@@//z:target");
+        let edges = vec![
+            crate::ConfiguredEdge::new(
+                key_z.clone(),
+                crate::ConfiguredEdgeKind::OrdinaryAttribute {
+                    attribute: CompactString::new("deps"),
+                    index: 1,
+                },
+            ),
+            crate::ConfiguredEdge::new(
+                key_a.clone(),
+                crate::ConfiguredEdgeKind::OrdinaryAttribute {
+                    attribute: CompactString::new("deps"),
+                    index: 0,
+                },
+            ),
+        ];
+        let mut collector = RunfilesPackageCollector::default();
+        collector.add_direct(runfiles_metadata("//direct_z"));
+        collector.add_direct(runfiles_metadata("//direct_a"));
+        collector.add_direct(runfiles_metadata("//direct_a"));
+        collector.add_configured(RunfilesPackageClosureRow::new(key_z, child_z.clone()));
+        collector.add_configured(RunfilesPackageClosureRow::new(key_a.clone(), child_a));
+        collector.add_configured(RunfilesPackageClosureRow::new(key_a, child_z));
+
+        let error = collector.finish(&edges).unwrap_err();
+        assert!(error.contains("inconsistent package closures"));
+
+        let mut collector = RunfilesPackageCollector::default();
+        collector.add_direct(runfiles_metadata("//direct_z"));
+        collector.add_direct(runfiles_metadata("//direct_a"));
+        collector.add_direct(runfiles_metadata("//direct_a"));
+        collector.add_configured(RunfilesPackageClosureRow::new(
+            configured_key("@@//a:target"),
+            slug_build_api_v2::RunfilesPackageDepset::from_direct(
+                slug_build_api_v2::DepsetOrder::Default,
+                vec![
+                    runfiles_metadata("//child_a/one"),
+                    runfiles_metadata("//child_a/two"),
+                ],
+            )
+            .unwrap(),
+        ));
+        collector.add_configured(RunfilesPackageClosureRow::new(
+            configured_key("@@//a:target"),
+            slug_build_api_v2::RunfilesPackageDepset::from_direct(
+                slug_build_api_v2::DepsetOrder::Default,
+                vec![
+                    runfiles_metadata("//child_a/one"),
+                    runfiles_metadata("//child_a/two"),
+                ],
+            )
+            .unwrap(),
+        ));
+        collector.add_configured(RunfilesPackageClosureRow::new(
+            configured_key("@@//z:target"),
+            slug_build_api_v2::RunfilesPackageDepset::from_direct(
+                slug_build_api_v2::DepsetOrder::Default,
+                vec![
+                    runfiles_metadata("//child_z/one"),
+                    runfiles_metadata("//child_z/two"),
+                ],
+            )
+            .unwrap(),
+        ));
+        let closure = collector.finish(&edges).unwrap();
+        assert_eq!(
+            closure
+                .successors()
+                .map(|successor| match successor {
+                    slug_build_api_v2::DepsetSuccessor::Direct(package) => {
+                        format!("direct:{}", package.package())
+                    }
+                    slug_build_api_v2::DepsetSuccessor::Transitive(packages) =>
+                        format!("child:{}", packages.to_list()[0].package()),
+                })
+                .collect::<Vec<_>>(),
+            [
+                "child:@@//child_a/one",
+                "child:@@//child_z/one",
+                "direct:@@//direct_a",
+                "direct:@@//direct_z",
+            ]
+        );
+        assert_eq!(
+            closure
+                .to_list()
+                .into_iter()
+                .map(|package| package.package().to_string())
+                .collect::<Vec<_>>(),
+            [
+                "@@//child_a/one",
+                "@@//child_a/two",
+                "@@//child_z/one",
+                "@@//child_z/two",
+                "@@//direct_a",
+                "@@//direct_z",
+            ]
+        );
+        assert_eq!(closure.storage_stats().external_depsets, 2);
+    }
+
+    #[test]
+    fn runfiles_collector_requires_contributing_edges_but_excludes_candidates() {
+        let target = configured_key("@@//dep:target");
+        let contributing =
+            crate::ConfiguredEdge::new(target.clone(), crate::ConfiguredEdgeKind::AliasActual);
+        let mut collector = RunfilesPackageCollector::default();
+        collector.add_direct(runfiles_metadata("//owner"));
+        assert!(
+            collector
+                .finish(&[contributing])
+                .unwrap_err()
+                .contains("has no runfiles")
+        );
+
+        let candidate = crate::ConfiguredEdge::new(
+            target,
+            crate::ConfiguredEdgeKind::CandidateExecutionPlatform { index: 0 },
+        );
+        let mut collector = RunfilesPackageCollector::default();
+        collector.add_direct(runfiles_metadata("//owner"));
+        assert_eq!(collector.finish(&[candidate]).unwrap().to_list().len(), 1);
+    }
+
     #[test]
     fn absent_legacy_starlark_option_removal_preserves_configuration() {
         let retained = CanonicalLabel::parse("@@//:retained").unwrap();
@@ -4421,13 +4694,15 @@ impl ConfiguredNodeAnalysisKey {
                     ResolvedPathState::Present(metadata)
                         if metadata.kind() == PathNodeKind::RegularFile =>
                     {
-                        return root_analysis_driver_complete(Ok(
-                            ConfiguredNodeResult::new_native(
-                                self.node.clone(),
-                                ConfiguredNodeKind::SourceFile,
-                                native_empty_providers(),
-                                None,
-                            ),
+                        return root_analysis_driver_complete(native_configured_result(
+                            package,
+                            self.node.clone(),
+                            ConfiguredNodeKind::SourceFile,
+                            native_empty_providers(),
+                            None,
+                            Vec::new(),
+                            &[],
+                            &[],
                         ));
                     }
                     ResolvedPathState::Missing => {
@@ -4463,12 +4738,63 @@ impl ConfiguredNodeAnalysisKey {
                         return root_analysis_driver_complete(Err(error));
                     }
                 }
-                let edges = includes
+                let inputs = includes
+                    .iter()
+                    .cloned()
+                    .enumerate()
+                    .map(|(index, label)| {
+                        ConfiguredNodeAnalysisKey::new(
+                            self.workspace.dupe(),
+                            ConfiguredNodeKey::null(label),
+                        )
+                        .map(|key| (index, key))
+                    })
+                    .collect::<Result<Vec<_>, _>>();
+                let inputs = match inputs {
+                    Ok(inputs) => inputs,
+                    Err(error) => return root_analysis_driver_complete(Err(error)),
+                };
+                let cycle_guard = ctx.cycle_guard::<ConfiguredAnalysisCycleGuard>();
+                let child_future = ctx.compute_join(inputs, |ctx, (index, key)| {
+                    Box::pin(async move {
+                        (
+                            index,
+                            compute_analysis_input(
+                                ctx,
+                                mode,
+                                key,
+                                "analyzing package-group include through DICE",
+                            )
+                            .await,
+                        )
+                    })
+                });
+                let outcomes = match cycle_guard {
+                    Ok(Some(guard)) => match guard.guard_this(child_future).await {
+                        Ok(outcomes) => outcomes,
+                        Err(cycle) => {
+                            return root_analysis_driver_complete(Err(AnalysisError::message(
+                                cycle.to_string(),
+                            )));
+                        }
+                    },
+                    Ok(None) => child_future.await,
+                    Err(error) => {
+                        return root_analysis_driver_complete(Err(AnalysisError::message(
+                            format!("reading configured-analysis cycle guard: {error}"),
+                        )));
+                    }
+                };
+                let mut children = Vec::with_capacity(outcomes.len());
+                for (_, outcome) in outcomes {
+                    children.push(root_value!(outcome));
+                }
+                let edges = children
                     .iter()
                     .enumerate()
-                    .map(|(index, include)| {
+                    .map(|(index, child)| {
                         crate::configured_target::ConfiguredEdge::new(
-                            ConfiguredNodeKey::null(include.clone()),
+                            child.key().clone(),
                             crate::configured_target::ConfiguredEdgeKind::PackageGroupInclude {
                                 index: u32::try_from(index)
                                     .expect("package-group include index fits u32"),
@@ -4476,13 +4802,100 @@ impl ConfiguredNodeAnalysisKey {
                         )
                     })
                     .collect();
-                return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
+                return root_analysis_driver_complete(native_configured_result(
+                    package,
                     self.node.clone(),
                     ConfiguredNodeKind::PackageGroup,
                     native_empty_providers(),
                     None,
-                )
-                .with_edges(edges)));
+                    edges,
+                    &children,
+                    &[],
+                ));
+            }
+            (
+                ConfiguredNodeKey::Configured(configured_target),
+                Some(PackageTargetKind::ConfigSetting { declaration }),
+            ) if matches!(
+                configured_target.configuration().kind(),
+                ConfigurationKind::Target | ConfigurationKind::Exec
+            ) =>
+            {
+                let inputs = declaration
+                    .flag_values()
+                    .value()
+                    .iter()
+                    .enumerate()
+                    .map(|(index, (label, _))| {
+                        (index, CompactString::new("flag_values"), label.clone())
+                    })
+                    .chain(
+                        declaration
+                            .constraint_values()
+                            .value()
+                            .iter()
+                            .cloned()
+                            .enumerate()
+                            .map(|(index, label)| {
+                                (index, CompactString::new("constraint_values"), label)
+                            }),
+                    )
+                    .collect::<Vec<_>>();
+                let cycle_guard = ctx.cycle_guard::<ConfiguredAnalysisCycleGuard>();
+                let child_future = ctx.compute_join(inputs, |ctx, (index, attribute, label)| {
+                    let configuration = configured_target.configuration().clone();
+                    Box::pin(async move {
+                        let child = compute_configured_child(
+                            ctx,
+                            mode,
+                            self.workspace.dupe(),
+                            label,
+                            configuration,
+                        )
+                        .await;
+                        (index, attribute, child)
+                    })
+                });
+                let outcomes = match cycle_guard {
+                    Ok(Some(guard)) => match guard.guard_this(child_future).await {
+                        Ok(outcomes) => outcomes,
+                        Err(cycle) => {
+                            return root_analysis_driver_complete(Err(AnalysisError::message(
+                                cycle.to_string(),
+                            )));
+                        }
+                    },
+                    Ok(None) => child_future.await,
+                    Err(error) => {
+                        return root_analysis_driver_complete(Err(AnalysisError::message(
+                            format!("reading configured-analysis cycle guard: {error}"),
+                        )));
+                    }
+                };
+                let mut edges = Vec::with_capacity(outcomes.len());
+                let mut children = Vec::with_capacity(outcomes.len());
+                for (index, attribute, outcome) in outcomes {
+                    let child = root_value!(outcome);
+                    edges.push(crate::configured_target::ConfiguredEdge::new(
+                        child.key().clone(),
+                        crate::configured_target::ConfiguredEdgeKind::OrdinaryAttribute {
+                            attribute,
+                            index: u32::try_from(index)
+                                .expect("config_setting dependency index fits u32"),
+                        },
+                    ));
+                    children.push(child);
+                }
+                return root_analysis_driver_complete(native_configured_result(
+                    package,
+                    self.node.clone(),
+                    ConfiguredNodeKind::ConfigSetting,
+                    native_empty_providers(),
+                    target.and_then(|target| target.rule_capability()).cloned(),
+                    edges,
+                    &children,
+                    &[],
+                ));
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),
@@ -4501,12 +4914,16 @@ impl ConfiguredNodeAnalysisKey {
                         "constraint setting defaults are unsupported: {label}"
                     ))));
                 }
-                return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
+                return root_analysis_driver_complete(native_configured_result(
+                    package,
                     self.node.clone(),
                     ConfiguredNodeKind::ConstraintSetting,
                     native_empty_providers(),
                     target.and_then(|target| target.rule_capability()).cloned(),
-                )));
+                    Vec::new(),
+                    &[],
+                    &[],
+                ));
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),
@@ -4536,16 +4953,20 @@ impl ConfiguredNodeAnalysisKey {
                         "constraint value {label} references a non-constraint setting {constraint_setting}"
                     ))));
                 }
-                return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
+                let edges = vec![crate::configured_target::ConfiguredEdge::new(
+                    child.key().clone(),
+                    crate::configured_target::ConfiguredEdgeKind::ConstraintSetting,
+                )];
+                return root_analysis_driver_complete(native_configured_result(
+                    package,
                     self.node.clone(),
                     ConfiguredNodeKind::ConstraintValue,
                     native_empty_providers(),
                     target.and_then(|target| target.rule_capability()).cloned(),
-                )
-                .with_edges(vec![crate::configured_target::ConfiguredEdge::new(
-                    child.key().clone(),
-                    crate::configured_target::ConfiguredEdgeKind::ConstraintSetting,
-                )])));
+                    edges,
+                    &[child],
+                    &[],
+                ));
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),
@@ -4563,6 +4984,7 @@ impl ConfiguredNodeAnalysisKey {
                 };
                 let mut seen_settings = SmallSet::with_capacity(constraint_values.len());
                 let mut edges = Vec::with_capacity(constraint_values.len());
+                let mut children = Vec::with_capacity(constraint_values.len());
                 for (index, constraint_value) in constraint_values.iter().enumerate() {
                     let child = root_value!(
                         compute_configured_child(
@@ -4600,15 +5022,21 @@ impl ConfiguredNodeAnalysisKey {
                                 .expect("platform constraint index fits u32"),
                         },
                     ));
+                    children.push(child);
                 }
-                return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
-                    self.node.clone(),
-                    ConfiguredNodeKind::Platform,
-                    native_empty_providers(),
-                    target.and_then(|target| target.rule_capability()).cloned(),
-                )
-                .with_edges(edges)
-                .with_platform_semantic_fact(fact)));
+                return root_analysis_driver_complete(
+                    native_configured_result(
+                        package,
+                        self.node.clone(),
+                        ConfiguredNodeKind::Platform,
+                        native_empty_providers(),
+                        target.and_then(|target| target.rule_capability()).cloned(),
+                        edges,
+                        &children,
+                        &[],
+                    )
+                    .map(|result| result.with_platform_semantic_fact(fact)),
+                );
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),
@@ -4618,16 +5046,24 @@ impl ConfiguredNodeAnalysisKey {
                 ConfigurationKind::Target | ConfigurationKind::Exec
             ) =>
             {
-                return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
+                return root_analysis_driver_complete(native_configured_result(
+                    package,
                     self.node.clone(),
                     ConfiguredNodeKind::ToolchainType,
                     native_empty_providers(),
                     target.and_then(|target| target.rule_capability()).cloned(),
-                )));
+                    Vec::new(),
+                    &[],
+                    &[],
+                ));
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),
                 Some(PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+                    toolchain_type,
+                    exec_compatible_with,
+                    target_compatible_with,
+                    target_settings,
                     ..
                 })),
             ) if matches!(
@@ -4635,12 +5071,134 @@ impl ConfiguredNodeAnalysisKey {
                 ConfigurationKind::Target | ConfigurationKind::Exec
             ) =>
             {
-                return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
+                let selector_labels = target_settings
+                    .value()
+                    .selector_key_labels()
+                    .into_iter()
+                    .collect::<SmallSet<_>>()
+                    .into_iter()
+                    .collect();
+                let conditions = match prepare_configured_attribute_conditions(
+                    ctx,
+                    mode,
+                    &self.workspace,
+                    configured_target.configuration(),
+                    selector_labels,
+                )
+                .await
+                {
+                    LoadingPreparationOutcome::Need(need) => {
+                        return LoadingPreparationOutcome::Need(need);
+                    }
+                    LoadingPreparationOutcome::Complete(Err(error)) => {
+                        return LoadingPreparationOutcome::Complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                        return root_analysis_driver_complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
+                };
+                let selected_settings =
+                    match resolve_configured_attribute(target_settings.value(), &conditions.values)
+                    {
+                        Ok(CoercedAttributeValue::LabelList(labels)) => labels,
+                        Ok(_) => {
+                            return root_analysis_driver_complete(Err(AnalysisError::message(
+                                "native toolchain target_settings must resolve to a label list",
+                            )));
+                        }
+                        Err(error) => {
+                            return root_analysis_driver_complete(Err(AnalysisError::message(
+                                format!("resolving native toolchain target_settings: {error}"),
+                            )));
+                        }
+                    };
+                let configuration = configured_target.configuration();
+                let configured_key = |label| {
+                    ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
+                        label,
+                        configuration.clone(),
+                    ))
+                };
+                let mut inputs = vec![(
+                    Some((CompactString::new("toolchain_type"), 0)),
+                    configured_key(toolchain_type.clone()),
+                )];
+                let exec_constraints = exec_compatible_with.value().as_ref();
+                let target_constraints = target_compatible_with.value().as_ref();
+                for (attribute, labels) in [
+                    ("exec_compatible_with", exec_constraints),
+                    ("target_compatible_with", target_constraints),
+                    ("target_settings", selected_settings.as_ref()),
+                ] {
+                    for (index, label) in labels.iter().cloned().enumerate() {
+                        inputs.push((
+                            Some((CompactString::new(attribute), index)),
+                            configured_key(label),
+                        ));
+                    }
+                }
+                inputs.extend(conditions.packages.iter().cloned().map(|key| (None, key)));
+                let cycle_guard = ctx.cycle_guard::<ConfiguredAnalysisCycleGuard>();
+                let child_future = ctx.compute_join(inputs, |ctx, (edge, node)| {
+                    let key = ConfiguredNodeAnalysisKey::new(self.workspace.dupe(), node.clone())
+                        .expect("native toolchain child carries structural configuration");
+                    Box::pin(async move {
+                        let child = compute_analysis_input(
+                            ctx,
+                            mode,
+                            key,
+                            "analyzing native toolchain dependency through DICE",
+                        )
+                        .await;
+                        (edge, node, child)
+                    })
+                });
+                let outcomes = match cycle_guard {
+                    Ok(Some(guard)) => match guard.guard_this(child_future).await {
+                        Ok(outcomes) => outcomes,
+                        Err(cycle) => {
+                            return root_analysis_driver_complete(Err(AnalysisError::message(
+                                cycle.to_string(),
+                            )));
+                        }
+                    },
+                    Ok(None) => child_future.await,
+                    Err(error) => {
+                        return root_analysis_driver_complete(Err(AnalysisError::message(
+                            format!("reading configured-analysis cycle guard: {error}"),
+                        )));
+                    }
+                };
+                let mut edges = Vec::with_capacity(outcomes.len());
+                let mut children = Vec::with_capacity(outcomes.len());
+                let mut selector_rows = Vec::new();
+                for (edge, _, outcome) in outcomes {
+                    let child = root_value!(outcome);
+                    if let Some((attribute, index)) = edge {
+                        edges.push(crate::configured_target::ConfiguredEdge::new(
+                            child.key().clone(),
+                            crate::configured_target::ConfiguredEdgeKind::OrdinaryAttribute {
+                                attribute,
+                                index: u32::try_from(index)
+                                    .expect("native toolchain attribute index fits u32"),
+                            },
+                        ));
+                        children.push(child);
+                    } else {
+                        selector_rows.push(RunfilesPackageClosureRow::from_result(&child));
+                    }
+                }
+                return root_analysis_driver_complete(native_configured_result(
+                    package,
                     self.node.clone(),
                     ConfiguredNodeKind::ToolchainDeclaration,
                     native_empty_providers(),
                     target.and_then(|target| target.rule_capability()).cloned(),
-                )));
+                    edges,
+                    &children,
+                    &selector_rows,
+                ));
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),
@@ -4680,22 +5238,30 @@ impl ConfiguredNodeAnalysisKey {
                         )));
                     }
                 };
-                return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
-                    self.node.clone(),
-                    ConfiguredNodeKind::Alias,
-                    child.providers().clone(),
-                    target.and_then(|target| target.rule_capability()).cloned(),
-                )
-                .with_edges(vec![crate::configured_target::ConfiguredEdge::new(
+                let edges = vec![crate::configured_target::ConfiguredEdge::new(
                     child.key().clone(),
                     crate::configured_target::ConfiguredEdgeKind::AliasActual,
-                )])
-                .with_actual_configured_target(
-                    child
-                        .actual_configured_target()
-                        .expect("configured alias child publishes actual identity")
-                        .clone(),
-                )));
+                )];
+                return root_analysis_driver_complete(
+                    native_configured_result(
+                        package,
+                        self.node.clone(),
+                        ConfiguredNodeKind::Alias,
+                        child.providers().clone(),
+                        target.and_then(|target| target.rule_capability()).cloned(),
+                        edges,
+                        std::slice::from_ref(&child),
+                        &[],
+                    )
+                    .map(|result| {
+                        result.with_actual_configured_target(
+                            child
+                                .actual_configured_target()
+                                .expect("configured alias child publishes actual identity")
+                                .clone(),
+                        )
+                    }),
+                );
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),
@@ -4717,16 +5283,20 @@ impl ConfiguredNodeAnalysisKey {
                     )
                     .await
                 );
-                return root_analysis_driver_complete(Ok(ConfiguredNodeResult::new_native(
+                let edges = vec![crate::configured_target::ConfiguredEdge::new(
+                    child.key().clone(),
+                    crate::configured_target::ConfiguredEdgeKind::GeneratedBy,
+                )];
+                return root_analysis_driver_complete(native_configured_result(
+                    package,
                     self.node.clone(),
                     ConfiguredNodeKind::GeneratedFile,
                     native_empty_providers(),
                     None,
-                )
-                .with_edges(vec![crate::configured_target::ConfiguredEdge::new(
-                    child.key().clone(),
-                    crate::configured_target::ConfiguredEdgeKind::GeneratedBy,
-                )])));
+                    edges,
+                    &[child],
+                    &[],
+                ));
             }
             (ConfiguredNodeKey::Configured(_), Some(PackageTargetKind::StarlarkRule(_))) => {}
             (ConfiguredNodeKey::Configured(_), None) => {
@@ -4780,7 +5350,7 @@ impl ConfiguredNodeAnalysisKey {
                 ),
             ));
         }
-        let resolved_attributes = match prepare_configured_rule_attributes(
+        let (resolved_attributes, selector_packages) = match prepare_configured_rule_attributes(
             ctx,
             mode,
             &self.workspace,
@@ -4934,7 +5504,7 @@ impl ConfiguredNodeAnalysisKey {
             LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
         };
         let selected_platform = resolution.execution_platform();
-        let prepared = if has_exec_dependency {
+        let mut prepared = if has_exec_dependency {
             let exec_configuration = match structural_configuration
                 .to_exec_for_platform(selected_platform.actual().label())
             {
@@ -4979,6 +5549,31 @@ impl ConfiguredNodeAnalysisKey {
         } else {
             target_only_prepared.expect("target-only dependencies were prepared before resolution")
         };
+        let target = package
+            .targets
+            .iter()
+            .find(|target| target.name == configured_target.label().target().as_str())
+            .expect("configured Starlark rule remains loaded");
+        for label in package
+            .effective_visibility(target)
+            .as_ref()
+            .map_or(&[][..], |visibility| visibility.dependency_labels())
+        {
+            let node = ConfiguredNodeKey::null(label.clone());
+            let key = match ConfiguredNodeAnalysisKey::new(self.workspace.dupe(), node.clone()) {
+                Ok(key) => key,
+                Err(error) => return root_analysis_driver_complete(Err(error)),
+            };
+            prepared.insert(node, key);
+        }
+        for selector in selector_packages.iter() {
+            let key = match ConfiguredNodeAnalysisKey::new(self.workspace.dupe(), selector.clone())
+            {
+                Ok(key) => key,
+                Err(error) => return root_analysis_driver_complete(Err(error)),
+            };
+            prepared.insert(selector.clone(), key);
+        }
         let cycle_guard = ctx.cycle_guard::<ConfiguredAnalysisCycleGuard>();
         let child_future = async {
             let prepared_toolchain = if resolution.rows().is_empty() {
@@ -5140,6 +5735,7 @@ impl ConfiguredNodeAnalysisKey {
             &declared_dependency_keys,
             &configured_rows,
             &computed,
+            &selector_packages,
             candidate_execution_platforms,
             action_context,
             prepared_toolchain,

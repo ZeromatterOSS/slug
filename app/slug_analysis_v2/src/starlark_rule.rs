@@ -43,6 +43,7 @@ use slug_build_api_v2::RetainedSpawnParamFilePolicy;
 use slug_build_api_v2::RetainedVectorArg;
 use slug_build_api_v2::RetainedVectorSource;
 use slug_build_api_v2::RunfilesConflictPolicy;
+use slug_build_api_v2::RunfilesPackageDepset;
 use slug_build_api_v2::RunfilesSymlink;
 use slug_build_api_v2::RunfilesSymlinkDepset;
 use slug_build_api_v2::SpawnExecutable;
@@ -385,6 +386,7 @@ pub(crate) struct PreparedConfiguredAttribute {
 #[derive(Debug, Clone, Allocative)]
 pub(crate) struct PreparedToolchain {
     pub(crate) action_context: Arc<ConfiguredActionOwnerContext>,
+    pub(crate) runfiles_packages: Arc<[crate::result::RunfilesPackageClosureRow]>,
 }
 
 #[derive(Debug, Clone, Allocative)]
@@ -1697,6 +1699,7 @@ pub(crate) fn evaluate_loaded_rule(
     configured_attributes: Vec<PreparedConfiguredAttribute>,
     action_context: Arc<ConfiguredActionOwnerContext>,
     toolchain: Option<PreparedToolchain>,
+    runfiles_packages: RunfilesPackageDepset,
     print_handler: Option<&dyn PrintHandler>,
 ) -> Result<ConfiguredNodeResult, LoadedRuleError> {
     let target = package
@@ -1945,7 +1948,7 @@ pub(crate) fn evaluate_loaded_rule(
         .registry()
         .actions()
         .to_vec();
-    let result = ConfiguredNodeResult::new_rule(key, providers, rule_capability)
+    let result = ConfiguredNodeResult::new_rule(key, providers, rule_capability, runfiles_packages)
         .with_action_specs(actions, action_contexts)
         .map_err(LoadedRuleError::from)?;
     Ok(result.with_declared_outputs(declared_outputs))
