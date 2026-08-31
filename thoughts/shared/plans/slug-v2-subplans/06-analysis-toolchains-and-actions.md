@@ -506,6 +506,25 @@ execution, and C++ action families remain separate fail-closed categories.
 Independent focused R3 correction review returned `ACCEPT`; implement only
 that frozen envelope before selecting typed standard-provider/runfiles breadth.
 
+Commit `bfe6f2690` terminally accepts that envelope. One pre-method binding
+pass now preserves Bazel's public parameter order and outer-shape diagnostic
+precedence before the common typed sink; the terminal correction rereview is
+`ACCEPT`. Both action methods publish the same compact immutable Spawn schema,
+with shell invocation, scoped executable provenance, environment, requirements,
+unused-input discovery and every admitted argument/input/tool/output field in
+publication equality. FilesToRun/runfiles, callbacks, named exec groups and
+execution projection still fail closed. Select the typed FilesToRun/runfiles
+standard-provider category next from actual BCR consumers, without a
+`cc_common`, rules_cc, parser or C++ branch.
+
+The complete typed DefaultInfo/runfiles/FilesToRun category architecture is
+independently accepted in
+`WP-6-7A-typed-files-to-run-runfiles-category-architecture-r1`. It freezes one
+effective provider model, typed runfiles occurrences, producer-owned support
+artifacts and scoped Spawn expansion, split into four bounded successors. The
+first successor may migrate only the provider core and must retain an explicit
+incomplete-support guard until runfiles-tree production is admitted.
+
 Bazel 9.2 remains the sole semantic authority. Zabel
 `0795445f3ab60f4e49070bdd0b94425c5610f73a` supplies peer phase-ownership,
 typed-segment and input-topology lessons only; copy no Zig behavior or layout.

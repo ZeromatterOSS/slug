@@ -853,6 +853,19 @@ remains deferred.
 Independent focused R3 correction review returned `ACCEPT`; no V1 extraction
 decision or peer semantic ownership changes.
 
+Commit `bfe6f2690` terminally accepts the complete default-context
+non-callback Spawn envelope. The corrected evaluator binding pass, one typed
+run/run-shell owner, scoped executable provenance, compact retained values and
+publication proofs require no V1 extraction and import no Buck2/Zabel semantic
+owner. Typed FilesToRun/runfiles expansion is now the next standard-provider
+category; callbacks, named exec groups and execution remain separate.
+
+The zero-Rust category architecture is independently `ACCEPT`. It reuses the
+existing dense depset/artifact utilities and one provider/action owner; no V1,
+Buck2, or Zabel representation is extracted. Four bounded successors cover
+typed provider core, runfiles values/DefaultInfo, support actions, and Spawn
+expansion without future schema replacement.
+
 ### Stage 6 recursive configured custom-rule analysis
 
 Status: Partially landed
