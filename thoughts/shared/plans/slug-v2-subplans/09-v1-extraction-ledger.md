@@ -2095,6 +2095,22 @@ interner, task, lock or new DICE key. Bazel 9.2 alone fixes package contribution
 and mapping behavior; Zabel informs only phase ownership and compact
 representation.
 
-Implementation status: zero Rust pending independent R3 correction rereview. The
-loading/metadata and configured-collector implementations are separate
-reviewed successors; neither may create an action or complete FilesToRun.
+Implementation status: independent R3 correction rereview returned `ACCEPT`.
+The loading/metadata implementation candidate reuses the existing immutable
+mapping slices, `Arc` ownership, `CompactString`, `Allocative`, and accepted
+dense depset alias. It adds no flat set, cache, interner, global owner, lock, or
+new DICE key. The configured collector remains the separate reviewed successor;
+neither implementation may create an action or complete FilesToRun.
+
+R4 correction: terminal implementation review found that the older
+`PackageLoadKey` could still construct an empty-mapping `LoadedPackage` for
+legacy query/runtime adapters. Extract the existing immutable evaluation
+fields into one `Allocative` core and use distinct complete and legacy wrappers;
+only the complete wrapper retains `Arc<RunfilesPackageMetadata>`. This is a
+bounded type-isolation refactor, not a second retained graph or mapping owner.
+It preserves Arc-owned frozen-module lifetimes, adds no collection, interner,
+cache, task, lock, key, or deep clone, and prevents the legacy result from
+entering configured package-closure consumers at compile time.
+Independent R4 design correction review returned `ACCEPT`; implementation may
+now apply only this type isolation and the missing innate-owner proof before
+terminal correction review.

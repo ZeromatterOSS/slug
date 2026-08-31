@@ -1,11 +1,13 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-6-7A-transitive-runfiles-package-mapping-owner-design-r3`
+Packet: `WP-4-6-7A-transitive-runfiles-package-mapping-owner-design-r4`
 
 Milestone: M7A generic Starlark/ruleset closure; Stage 4 configured analysis
 and Stage 6 runfiles-support prerequisites.
 
-Status: third corrected design draft; zero Rust. Base `f346c209a`. The first
+Status: R4 correction design accepted; loading/metadata correction active after
+terminal implementation review returned `REPLAN` on the R3 candidate. Base
+`c1c8ce277`. The first
 support-action draft was rejected because Bazel 9 Bzlmod always registers a
 preceding repository-mapping manifest. The first prerequisite draft was then
 rejected because it did not route the complete selected root mapping and
@@ -13,8 +15,14 @@ assumed that every published or semantic configured dependency was still
 available at node finalization. R2 then over-included resolution-only requested
 toolchain/candidate-platform inputs and flattened selector packages into the
 parent. R3 limits rows to Bazel package-contributing prerequisites and makes
-each selector condition one configured child. Do not begin Rust before
-independent `ACCEPT`.
+each selector condition one configured child. Independent design review
+returned `ACCEPT`, but implementation review found that the still-public
+legacy `PackageLoadKey` could publish an empty-mapping `LoadedPackage` through
+query/runtime adapters. R4 type-isolates that legacy result and adds the
+missing innate-owner discriminator before correction rereview. The configured
+collector and every action remain unchanged. Independent R4 design correction
+review returned `ACCEPT` after admitting the existing bzl-invalidation suite's
+mechanical result-signature changes.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked;
@@ -152,8 +160,11 @@ Bazel package-root/build-filename metadata unused by mapping projection; exact
 NestedSet interning/fingerprint bytes; manifest content and ISO-8859-1 writing;
 the action's Bazel ActionKey; all four support actions; physical
 materialization; aquery/execution/REAPI; Windows; and nondefault compact-
-manifest mode. No deferred boundary permits a `None`, empty, digest-only,
-repository-only, edge-only, or root-only substitute.
+manifest mode. Complete runfiles metadata on the pre-Host legacy evaluator/
+query adapter is also unsupported; its distinct result type is not accepted by
+configured or runfiles consumers. No deferred boundary permits a `None`,
+empty, digest-only, repository-only, edge-only, or root-only substitute where
+complete metadata is required.
 
 ## Frozen retained model
 
@@ -230,6 +241,58 @@ group into one `RunfilesPackageMetadata` retained by `LoadedPackage`.
 `LoadedPackage::PartialEq` includes it. Analysis must consume this retained
 metadata and must not reconstruct mappings from labels, command mappings, or
 module graphs.
+
+### R4 legacy-result isolation
+
+The older `PackageLoadKey` remains an active local evaluator/query adapter but
+does not use the Host source-preparation protocol and cannot lawfully claim the
+complete selected root mapping. R4 therefore does not synthesize, guess, or
+default that metadata. Split the evaluator-owned fields into one immutable
+`PackageEvaluation` core, then expose two noninterconvertible phase results:
+
+```text
+LoadedPackage = {
+  evaluation: PackageEvaluation,
+  runfiles_package: Arc<RunfilesPackageMetadata>,
+}
+LegacyLoadedPackage = {
+  evaluation: PackageEvaluation,
+}
+```
+
+Both wrappers may dereference to the common evaluation fields for read-only
+callers. Neither dereferences or converts to the other. Only the Host root and
+external package finalizers may construct `LoadedPackage`, and those
+finalizers require a selected `RunfilesRepositoryMapping`. `PackageLoadKey`
+and `BzlModuleEvaluator::evaluate_package` return `LegacyLoadedPackage`;
+legacy query graph helpers accept only the common evaluation core. Configured
+analysis, Host inventory, registration expansion, and all runfiles collectors
+continue to require `LoadedPackage`, so a legacy result cannot cross the
+complete-metadata boundary at compile time.
+
+Remove `RunfilesRepositoryMapping::empty()` from `PackageRecorder::new` and
+keep any legacy label-resolution entries in an explicitly evaluation-local
+carrier. Do not add a default metadata constructor, conversion, optional
+runfiles field, command-side lookup, second DICE key, or fallback to
+`RootModuleGraph.repository_mapping`. Migrating the legacy adapter itself to
+the Need-aware Host route remains deferred because its callers do not own the
+Host preparation/restart contract; the type boundary prevents that deferred
+surface from widening the exact configured-loading claim.
+
+Fallback ledger: the legacy adapter violates the complete-selected-mapping
+invariant and is retained only for callers that have not adopted Host
+preparation/restart. A later loading/query Host-cutover packet owns its
+deletion once every caller supplies that protocol. Until then, the distinct
+result type plus a mechanical assertion that no `PackageLoadKey` value is a
+`LoadedPackage` prevents permanence or accidental configured consumption.
+
+This correction changes no BUILD evaluation, query formatting, DICE key
+identity, observation, action, provider, or execution behavior. The complete
+Host result remains DICE-retained semantic memory; the legacy core remains its
+existing DICE-retained adapter value. Both own frozen evaluator lifetimes and
+borrow no command scratch. Equality cutoff stays full structural equality for
+the applicable wrapper, with complete mapping metadata compared only on
+`LoadedPackage`.
 
 Required root proof includes a no-external-load package whose BUILD bytes stay
 constant while an extension/innate root mapping changes A/B/A. Both Legacy and
@@ -361,8 +424,14 @@ Loading/metadata production allowlist:
 - `app/slug_bzlmod_v2/src/{canonical_repository_route.rs,selected_repo_spec/selected_extension_demand.rs}`
   only for the read-only generated-owner projection;
 - `app/slug_bzlmod_v2/src/source_preparation/canonical_repository_source.rs`;
-- `app/slug_loading_v2/src/{bzl_module.rs,package.rs}`; and
-- compiler-required loading constructor call sites only.
+- `app/slug_loading_v2/src/{bzl_module.rs,package.rs}`;
+- `app/slug_loading_v2/src/{lib.rs,keys.rs}` only for the explicit legacy
+  result export/key documentation;
+- `app/slug_query_v2/src/{graph.rs,loading_environment.rs}` only for legacy
+  result/common-core signatures; and
+- compiler-required loading/runtime constructor call sites only, including
+  `app/slug_core_v2/src/runtime/dice.rs` if its inferred result requires an
+  explicit type annotation.
 
 Configured-collector production allowlist:
 
@@ -376,7 +445,11 @@ Proof allowlist:
 
 - new `app/slug_build_api_v2/tests/runfiles_packages.rs`;
 - colocated Bzlmod projection tests;
-- `app/slug_loading_v2/src/host_package_load_tests.rs`;
+- `app/slug_loading_v2/src/{host_package_load_tests.rs,host_package_inventory_tests.rs}`;
+- existing
+  `app/slug_loading_v2/tests/{build_file_loading.rs,subrule_loading.rs,bzl_invalidation.rs}`
+  only for explicit legacy result signatures; the existing bzl-invalidation
+  DICE invalidation/equality-cutoff suite must pass unchanged;
 - `app/slug_analysis_v2/tests/{configured_target.rs,starlark_rule.rs}`; and
 - focused private DICE tests colocated in `app/slug_analysis_v2/src/dice.rs`.
 
@@ -385,8 +458,10 @@ production Rust, 700 net / 850 gross proof Rust, and 1,750 net / 2,150 gross
 total Rust. The retained build-API owner stays below 260 physical lines and
 each new helper below 160 lines. No touched production file may newly cross
 2,000 lines. Existing oversized loading/DICE owners receive bounded fields,
-projections, carriers, and helpers only. `REPLAN` before structural refactoring,
-a new crate/dependency/key, or cap excess.
+projections, carriers, and helpers only. The R4 `PackageEvaluation` extraction
+is the sole admitted structural refactor and must remain within `package.rs`;
+`REPLAN` before any other structural refactor, a new crate/dependency/key, or
+cap excess.
 
 Add no parser/provider public field/action/executor file, action kind,
 filesystem observation, ruleset branch, V1 extraction, exact-fingerprint node,
@@ -405,7 +480,9 @@ or second retained graph.
    or owner kinds do not share;
 4. Legacy and Observed root packages consume the complete selected mapping and
    restore on mapping-only A/B/A with unchanged BUILD bytes and exact observed
-   frontier/event behavior;
+   frontier/event behavior; the separate `PackageLoadKey` result has no
+   runfiles metadata accessor or conversion to `LoadedPackage`, and a
+   compile-time consumer proof keeps it out of configured analysis;
 5. source, package-group, alias, generated, constraint, platform, native
    toolchain, selector-condition, visibility, hidden/subrule, ordinary
    Starlark, and selected-implementation package-contributing paths publish
@@ -436,8 +513,11 @@ accounting, independent terminal review, and parked-file SHA-256 verification.
 
 ## Review gate
 
-Independent review must return `ACCEPT` or `REPLAN` on complete root mapping
-ownership, Bazel direct/configured contribution fidelity, every admitted
+Independent R4 design review must first return `ACCEPT` or `REPLAN` on the
+legacy/common/complete type boundary, direct-consumer allowlist, no-behavior-
+change claim, retained lifetime/equality, and proof. Independent terminal
+review must then return `ACCEPT` or `REPLAN` on complete root mapping ownership,
+Bazel direct/configured contribution fidelity, every admitted
 semantic and published edge, requested/final alias handling, dense topology,
 DICE invalidation, natural owners, absence of fallback/parallel state,
 successor sufficiency, proof, and caps. Commit the accepted zero-Rust design
