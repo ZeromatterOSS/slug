@@ -789,6 +789,17 @@ environment A/B/A; concurrent one-read Host latching; public dependent tests;
 and 597 production / 489 proof / 1,086 total Rust-line caps. Independent
 terminal review returned `ACCEPT`.
 
+The active bounded basic Args/run/symlink successor's first pre-review returned
+`REPLAN` while accepting the environment dependency and borrowed sink. Its
+focused correction binds mutable Args to the starlark-rust evaluator heap,
+rejects Windows short-path candidates without a filesystem observation, reuses
+the existing depset publication comparator for manual Spawn/ActionSpec equality,
+and admits the generic custom tuple allowlist plus Starlark-function depth check
+that authentic rules_cc invokes before its absolute symlink. No parser, set,
+FDO, C++ action, second graph walk, or Zabel semantic owner is introduced. The
+focused correction rereview returned `ACCEPT`; implementation is authorized
+only within that contract.
+
 ### Stage 6 recursive configured custom-rule analysis
 
 Status: Partially landed
