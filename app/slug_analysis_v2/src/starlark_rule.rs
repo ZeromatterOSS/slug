@@ -24,12 +24,15 @@ use slug_build_api_v2::CtxActions;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
+use slug_configuration_v2::CppFragmentProjection;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::BzlModuleIdentity;
 use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::SubruleIdentity;
+use slug_loading_v2::analysis_fragments::CppFragmentValue;
+use slug_loading_v2::analysis_fragments::RuleFragmentCollection;
 use slug_loading_v2::package::resolve_rule_definition_label;
 use slug_loading_v2::provider::StarlarkDefaultInfo;
 use slug_loading_v2::provider::starlark_label;
@@ -58,6 +61,7 @@ use starlark::values::dict::AllocDict;
 use starlark::values::list::ListRef;
 use starlark::values::starlark_value;
 use starlark_map::small_map::SmallMap;
+use starlark_map::small_set::SmallSet;
 
 use crate::analysis_value::AnalysisValueLowerer;
 use crate::analysis_value::AnalysisValueMaterializer;
@@ -110,6 +114,7 @@ struct AnalysisContextGen<V> {
     dependencies: Arc<[AnalysisDependency]>,
     resolved_attributes: Arc<[ResolvedRuleAttribute]>,
     build_setting_value: Option<V>,
+    fragments: V,
     #[trace(unsafe_ignore)]
     toolchain: Option<PreparedAnalysisToolchains>,
 }
@@ -134,6 +139,7 @@ impl<'v> Freeze for AnalysisContext<'v> {
                 .build_setting_value
                 .map(|value| value.freeze(freezer))
                 .transpose()?,
+            fragments: self.fragments.freeze(freezer)?,
             toolchain: self.toolchain,
         })
     }
@@ -182,6 +188,7 @@ where
                 })
             }),
             "build_setting_value" => self.build_setting_value.map(|value| value.to_value()),
+            "fragments" => Some(self.fragments.to_value()),
             _ => None,
         }
     }
@@ -625,6 +632,26 @@ pub(crate) fn evaluate_loaded_rule(
     let action_contexts = vec![action_context];
     let actions = Arc::new(Mutex::new(CtxActions::new()));
     let module = Module::new();
+    let needs_cpp_fragment = implementation
+        .required_fragments()
+        .iter()
+        .any(|fragment| fragment == "cpp")
+        || implementation
+            .subrule_invocations()
+            .any(|(_, _, _, fragments)| fragments.contains("cpp"));
+    let cpp_fragment = if needs_cpp_fragment {
+        let structural_configuration =
+            key.configuration().slug_configuration().ok_or_else(|| {
+                "configured fragment projection requires structural configuration".to_owned()
+            })?;
+        module.frozen_heap().alloc(CppFragmentValue::new(
+            CppFragmentProjection::new(structural_configuration.clone())
+                .map_err(|error| error.to_string())?,
+            implementation.source_identities_by_filename().clone(),
+        ))
+    } else {
+        FrozenValue::new_none()
+    };
     let retained_owner = AnalysisConfiguredTargetKey::new(
         key.label().clone(),
         key.configuration().complete_identity_bytes(),
@@ -661,7 +688,7 @@ pub(crate) fn evaluate_loaded_rule(
         let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
         implementation
             .subrule_invocations()
-            .map(|(identity, _, _)| {
+            .map(|(identity, _, _, fragments)| {
                 let hidden = configured_attributes
                     .iter()
                     .filter(|attribute| attribute.owner.as_ref() == Some(&identity))
@@ -675,7 +702,7 @@ pub(crate) fn evaluate_loaded_rule(
                         ))
                     })
                     .collect::<Result<Vec<_>, String>>()?;
-                Ok(PreparedSubruleInvocation::new(identity, hidden))
+                Ok(PreparedSubruleInvocation::new(identity, hidden, fragments))
             })
             .collect::<Result<Vec<_>, String>>()?
     };
@@ -687,6 +714,7 @@ pub(crate) fn evaluate_loaded_rule(
             package_path.to_owned(),
             retained_owner.clone(),
             actions.clone(),
+            cpp_fragment,
         );
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&analysis_context);
@@ -698,6 +726,18 @@ pub(crate) fn evaluate_loaded_rule(
             .map(|value| build_setting::alloc_value(value, module.heap(), &mut evaluator))
             .transpose()
             .map_err(|error| error.to_string())?;
+        let root_fragment_declarations = Arc::new(
+            implementation
+                .required_fragments()
+                .iter()
+                .cloned()
+                .collect::<SmallSet<_>>(),
+        );
+        let fragments = module.heap().alloc_simple(RuleFragmentCollection::new(
+            analysis_context.root_token(),
+            root_fragment_declarations,
+            cpp_fragment,
+        ));
         let context = module.heap().alloc(AnalysisContextGen {
             actions: actions.clone(),
             token: analysis_context.root_token(),
@@ -707,6 +747,7 @@ pub(crate) fn evaluate_loaded_rule(
             dependencies,
             resolved_attributes: resolved_attributes.into(),
             build_setting_value,
+            fragments,
             toolchain,
         });
         let result =

@@ -43,7 +43,9 @@ use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark_map::StarlarkHasher;
 use starlark_map::small_map::SmallMap;
+use starlark_map::small_set::SmallSet;
 
+use crate::analysis_fragments::SubruleFragmentCollection;
 use crate::provider::alloc_starlark_label;
 use crate::subrule::SubruleIdentity;
 
@@ -189,16 +191,19 @@ impl Drop for CallFrameGuard {
 pub struct PreparedSubruleInvocation {
     identity: Arc<SubruleIdentity>,
     hidden: Arc<[(CompactString, FrozenValue)]>,
+    fragments: Arc<SmallSet<CompactString>>,
 }
 
 impl PreparedSubruleInvocation {
     pub fn new(
         identity: Arc<SubruleIdentity>,
         hidden: impl Into<Arc<[(CompactString, FrozenValue)]>>,
+        fragments: Arc<SmallSet<CompactString>>,
     ) -> Self {
         Self {
             identity,
             hidden: hidden.into(),
+            fragments,
         }
     }
 }
@@ -216,6 +221,7 @@ struct AnalysisEvaluationPayload {
     package_path: String,
     owner: AnalysisConfiguredTargetKey,
     actions: Arc<Mutex<CtxActions>>,
+    cpp_fragment: FrozenValue,
 }
 
 impl AnalysisEvaluationContext {
@@ -226,6 +232,7 @@ impl AnalysisEvaluationContext {
         package_path: String,
         owner: AnalysisConfiguredTargetKey,
         actions: Arc<Mutex<CtxActions>>,
+        cpp_fragment: FrozenValue,
     ) -> Self {
         let stack = Arc::new(Mutex::new(AnalysisCallStack {
             next: 1,
@@ -246,6 +253,7 @@ impl AnalysisEvaluationContext {
                 package_path,
                 owner,
                 actions,
+                cpp_fragment,
             }),
         }
     }
@@ -339,12 +347,18 @@ impl AnalysisEvaluationContext {
         let _guard = CallFrameGuard {
             token: token.clone(),
         };
+        let fragments = eval.frozen_heap().alloc(SubruleFragmentCollection::new(
+            token.clone(),
+            prepared.fragments.clone(),
+            self.payload.cpp_fragment,
+        ));
         let context = eval.heap().alloc(SubruleContext {
             token: token.clone(),
             target_label: self.payload.target_label.clone(),
             package_path: self.payload.package_path.clone(),
             owner: self.payload.owner.clone(),
             actions: self.payload.actions.clone(),
+            fragments,
             name: identity.exported_name.clone(),
         });
         let mut positions = Vec::with_capacity(args.len()? + 1);
@@ -369,6 +383,8 @@ struct SubruleContext {
     owner: AnalysisConfiguredTargetKey,
     #[allocative(skip)]
     actions: Arc<Mutex<CtxActions>>,
+    #[allocative(skip)]
+    fragments: FrozenValue,
     name: CompactString,
 }
 
@@ -409,9 +425,9 @@ fn subrule_context_methods(builder: &mut MethodsBuilder) {
     }
 
     #[starlark(attribute)]
-    fn fragments(this: &SubruleContext) -> anyhow::Result<NoneType> {
+    fn fragments<'v>(this: &SubruleContext) -> anyhow::Result<Value<'v>> {
         this.token.require_active("fragments", "subrule context")?;
-        anyhow::bail!("configured subrule fragments are deferred")
+        Ok(this.fragments.to_value())
     }
 
     #[starlark(attribute)]

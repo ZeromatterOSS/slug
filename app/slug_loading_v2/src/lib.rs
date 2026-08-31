@@ -8,7 +8,10 @@
  * above-listed licenses.
  */
 
+#[doc(hidden)]
+pub mod analysis_fragments;
 pub mod attrs;
+mod builtin_restriction;
 pub mod bzl_module;
 mod bzl_visibility;
 mod canonical_repository_load_route;

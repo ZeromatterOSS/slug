@@ -1669,6 +1669,185 @@ fn retry7_descriptor_default_bindings_are_exact_and_disjoint() {
     assert!(seen.into_iter().all(|entry| entry));
 }
 
+#[test]
+fn cpp_fragment_projection_distinguishes_target_and_exec_compilation_modes() {
+    use std::sync::Arc;
+
+    use slug_identity_v2::CanonicalLabel;
+
+    use super::CppFragmentProjection;
+    use super::SlugConfiguration;
+    use super::host::AutoCpuToken;
+    use super::host::HostConversionInputs;
+    use super::host::HostPathFlavor;
+    use crate::CommandConfigurationOccurrence;
+    use crate::CommandConfigurationOverlay;
+    use crate::NativeCommandOption;
+
+    let base = SlugConfiguration::default_target(
+        &HostConversionInputs::new(
+            Some(AutoCpuToken::K8),
+            Some(HostPathFlavor::Unix),
+            None,
+            Arc::from([]),
+            Arc::from([]),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let target = CppFragmentProjection::new(base.clone()).unwrap();
+    assert_eq!(target.compilation_mode().unwrap(), "fastbuild");
+    assert_eq!(target.fdo_path().unwrap(), None);
+    assert_eq!(target.cs_fdo_path().unwrap(), None);
+    assert_eq!(
+        target.propeller_optimize_absolute_cc_profile().unwrap(),
+        None
+    );
+    assert_eq!(
+        target.propeller_optimize_absolute_ld_profile().unwrap(),
+        None
+    );
+    assert!(target.proto_profile().unwrap());
+
+    let platform = CanonicalLabel::parse("@@platforms//host:exec").unwrap();
+    let exec = base.to_exec_for_platform(&platform).unwrap();
+    assert_eq!(
+        CppFragmentProjection::new(exec)
+            .unwrap()
+            .compilation_mode()
+            .unwrap(),
+        "opt"
+    );
+
+    let overlay: CommandConfigurationOverlay = vec![
+        CommandConfigurationOccurrence::native(
+            NativeCommandOption::CompilationMode,
+            Some("dbg"),
+            false,
+        ),
+        CommandConfigurationOccurrence::native(
+            NativeCommandOption::HostCompilationMode,
+            Some("fastbuild"),
+            false,
+        ),
+    ]
+    .into();
+    let changed = base
+        .with_command_configuration(base.starlark_options().clone(), &overlay)
+        .unwrap();
+    assert_eq!(
+        CppFragmentProjection::new(changed.clone())
+            .unwrap()
+            .compilation_mode()
+            .unwrap(),
+        "dbg"
+    );
+    assert_eq!(
+        CppFragmentProjection::new(changed.to_exec_for_platform(&platform).unwrap())
+            .unwrap()
+            .compilation_mode()
+            .unwrap(),
+        "fastbuild"
+    );
+
+    for mode in ["fastbuild", "dbg", "opt"] {
+        let target_overlay: CommandConfigurationOverlay =
+            vec![CommandConfigurationOccurrence::native(
+                NativeCommandOption::CompilationMode,
+                Some(mode),
+                false,
+            )]
+            .into();
+        let configured = base
+            .with_command_configuration(base.starlark_options().clone(), &target_overlay)
+            .unwrap();
+        assert_eq!(
+            CppFragmentProjection::new(configured)
+                .unwrap()
+                .compilation_mode()
+                .unwrap(),
+            mode
+        );
+
+        let host_overlay: CommandConfigurationOverlay =
+            vec![CommandConfigurationOccurrence::native(
+                NativeCommandOption::HostCompilationMode,
+                Some(mode),
+                false,
+            )]
+            .into();
+        let configured = base
+            .with_command_configuration(base.starlark_options().clone(), &host_overlay)
+            .unwrap();
+        let first = configured.to_exec_for_platform(&platform).unwrap();
+        let second = configured.to_exec_for_platform(&platform).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(
+            CppFragmentProjection::new(first)
+                .unwrap()
+                .compilation_mode()
+                .unwrap(),
+            mode
+        );
+    }
+
+    let label_fdo: CommandConfigurationOverlay = vec![CommandConfigurationOccurrence::native(
+        NativeCommandOption::FdoOptimize,
+        Some("//profiles:opt"),
+        false,
+    )]
+    .into();
+    let label_fdo = base
+        .with_command_configuration(base.starlark_options().clone(), &label_fdo)
+        .unwrap();
+    assert_eq!(
+        CppFragmentProjection::new(label_fdo)
+            .unwrap()
+            .fdo_path()
+            .unwrap(),
+        None
+    );
+
+    let absolute_fdo: CommandConfigurationOverlay = vec![CommandConfigurationOccurrence::native(
+        NativeCommandOption::FdoOptimize,
+        Some("/profiles/profile.afdo"),
+        false,
+    )]
+    .into();
+    let absolute_fdo = base
+        .with_command_configuration(base.starlark_options().clone(), &absolute_fdo)
+        .unwrap();
+    assert!(CppFragmentProjection::new(absolute_fdo).is_err());
+    for unowned in [
+        "cs_fdo_absolute_path",
+        "propeller_optimize_absolute_cc_profile",
+        "propeller_optimize_absolute_ld_profile",
+    ] {
+        assert_eq!(NativeCommandOption::from_name(unowned), None);
+    }
+
+    let invalid: CommandConfigurationOverlay = vec![CommandConfigurationOccurrence::native(
+        NativeCommandOption::CompilationMode,
+        Some("release"),
+        false,
+    )]
+    .into();
+    assert!(
+        base.with_command_configuration(base.starlark_options().clone(), &invalid)
+            .is_err()
+    );
+    let invalid_host: CommandConfigurationOverlay = vec![CommandConfigurationOccurrence::native(
+        NativeCommandOption::HostCompilationMode,
+        Some("release"),
+        false,
+    )]
+    .into();
+    assert!(
+        base.with_command_configuration(base.starlark_options().clone(), &invalid_host)
+            .is_err()
+    );
+}
+
 // Phase 2 removes only this compile gate after supplying the child-private API.
 // These tests are the reviewed implementation contract, not executable stubs.
 mod retry7_private_kernel_contract {
@@ -2677,6 +2856,7 @@ mod retry7_private_kernel_contract {
                 "pub use configuration_field::ConfigurationField;",
                 "pub use configuration_field::ConfigurationFieldIdentity;",
                 "pub use configuration_field::CppConfigurationField;",
+                "pub use cpp_fragment::CppFragmentProjection;",
                 "pub use matching::NativeConfigSettingMatchError;",
                 "pub use registry::NATIVE_OPTION_DESCRIPTORS;",
                 "pub use registry::NativeOptionDescriptor;",

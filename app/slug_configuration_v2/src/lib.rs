@@ -9,6 +9,7 @@ pub use command::NativeCommandOption;
 pub use native::ConfigurationField;
 pub use native::ConfigurationFieldIdentity;
 pub use native::CppConfigurationField;
+pub use native::CppFragmentProjection;
 pub use native::NativeStringListOption;
 pub use native::PreparedCommandNativeOptions;
 pub use native::SlugConfiguration;

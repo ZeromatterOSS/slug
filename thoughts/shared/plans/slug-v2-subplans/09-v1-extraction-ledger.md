@@ -1861,3 +1861,30 @@ reject Buck2/Zabel semantic ownership, IDs, stores and schedulers. Add no
 cache, interner, retained standard collection or provider-shaped placeholder.
 Pinned Bazel 9.2 alone fixes selection behavior; retained-size, unchanged-Arc,
 invalidation, cancellation and repair checks are required implementation proof.
+
+### Stage 4/5/7A configured-fragment utility decision (2026-08-30)
+
+Source inspected: pinned Bazel 9.2 `FragmentCollection`, `RuleContext`,
+`StarlarkSubrule`, `CppConfiguration`, `BuiltinRestriction`, and Exec-transition
+sources; authenticated rules_cc 0.2.17 `fdo_context.bzl`; the retained
+starlark-rust evaluator/method-dispatch and Buck2-derived compact collection
+owners; and Zabel's evaluator-local fragment projection as peer guidance only.
+
+Decision: implement one V2-owned evaluator-local `CppFragmentProjection` over
+the sole structural `SlugConfiguration`, one shared frozen `cpp` value, and
+separate cached rule/subrule collection facades with their own declaration
+authorization. Reuse `Arc`, `Dupe`, `CompactString`, and `SmallSet`; import no
+V1, Bazel Java, Buck2 semantic owner, or Zabel code/layout. Add no parser,
+interner, DICE key, cache, lock, parallel C++ options store, rules_cc branch, or
+`cc_common`/`cc_internal` special case. Bazel 9.2 alone fixes the 12-name active
+inventory, complete default private-API allowlist, six admitted FDO-facing
+methods, and bounded host-compilation-to-Exec projection. Absolute-path profile
+producers, other fragments, other Exec rewrites, and action builtins remain
+explicit successors. Hash/ledger, caller provenance, target/Exec separation,
+stable-daemon C0/C1/C0, retained-size, cap, and staged-only review are the
+acceptance evidence.
+
+Implementation status: complete and terminally accepted at 665 production and
+648 proof additions. The retained utility use remains bounded to the reviewed
+compact/shared ownership shapes; no V1 or peer-implementation semantics entered
+the production path.

@@ -112,6 +112,30 @@ analysis routes; full loading/analysis and staged-only gates pass at
 `args`/`run`/`symlink`, XML/aspects, and every rules_cc/C++ special case remain
 deferred. Select fragment projection next.
 
+R1 fragment architecture received `REPLAN`: it incorrectly treated target
+`compilation_mode` as the selected Exec toolchain's mode and under-proved
+Bazel's default private API allowlist. R2 received `REPLAN` after a newer Bazel
+sibling checkout contaminated two Rust allowlist rows. R3 received `REPLAN`
+because starlark-rust dynamic attribute lookup cannot raise Bazel's specialized
+known-but-undeclared error. The corrected
+`WP-4-5-7A-generic-fragment-projection-r4` freezes the pinned 9.2 inventory and
+the 12 active fragment names, uses separate root/subrule facades, and explicitly
+defers only the subrule diagnostic/`hasattr` distinction while preserving
+declaration success/failure and exact `dir`. Independent architecture and
+terminal implementation reviews returned `ACCEPT`; the implementation/proof is
+complete at 665 production and 648 proof additions.
+It selects the full six-method FDO fragment category consumed by authentic
+rules_cc before its first action call, not a `cc_common` or rules_cc special
+case. One structural `SlugConfiguration` owner feeds one evaluator-local typed
+`cpp` value; cached rule and subrule collections retain separate declaration
+authorization and Bazel-specific `dir` behavior. The packet also requires the
+complete inventoried private Starlark API caller restriction, typed long-form
+target/host compilation modes, and Bazel's bounded host-to-compilation Exec
+rewrite. Absolute-path FDO producers remain fail-closed until Bazel
+`PathFragment` ownership is designed; target default returns before actions,
+while selected-Exec default `opt` selects the generic action-builtin successor.
+Bazel 9.2 is the authority and Zabel is peer design/optimization guidance only.
+
 ## Accepted `.bzl` load-visibility design; implementation activated (2026-08-27)
 
 The authenticated rules_cc traversal first requires Bazel's default-enabled

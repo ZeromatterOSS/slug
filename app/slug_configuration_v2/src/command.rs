@@ -25,6 +25,8 @@ use serde::Serialize;
 )]
 #[serde(rename_all = "snake_case")]
 pub enum NativeCommandOption {
+    CompilationMode,
+    HostCompilationMode,
     FdoOptimize,
     XbinaryFdo,
     FdoProfile,
@@ -43,6 +45,8 @@ pub enum NativeCommandOption {
 impl NativeCommandOption {
     pub fn from_name(name: &str) -> Option<Self> {
         Some(match name {
+            "compilation_mode" => Self::CompilationMode,
+            "host_compilation_mode" => Self::HostCompilationMode,
             "fdo_optimize" => Self::FdoOptimize,
             "xbinary_fdo" => Self::XbinaryFdo,
             "fdo_profile" => Self::FdoProfile,
@@ -62,6 +66,8 @@ impl NativeCommandOption {
 
     pub const fn canonical_name(self) -> &'static str {
         match self {
+            Self::CompilationMode => "compilation_mode",
+            Self::HostCompilationMode => "host_compilation_mode",
             Self::FdoOptimize => "fdo_optimize",
             Self::XbinaryFdo => "xbinary_fdo",
             Self::FdoProfile => "fdo_profile",

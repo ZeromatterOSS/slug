@@ -237,6 +237,27 @@ fn grte_configuration(value: &str) -> ConfigurationKey {
     )
 }
 
+fn compilation_configuration(mode: &str, host_mode: &str) -> ConfigurationKey {
+    let base = configuration(None).slug_configuration().unwrap().clone();
+    let overlay: CommandConfigurationOverlay = vec![
+        CommandConfigurationOccurrence::native(
+            NativeCommandOption::CompilationMode,
+            Some(mode),
+            false,
+        ),
+        CommandConfigurationOccurrence::native(
+            NativeCommandOption::HostCompilationMode,
+            Some(host_mode),
+            false,
+        ),
+    ]
+    .into();
+    ConfigurationKey::from_slug(
+        base.with_command_configuration(base.starlark_options().clone(), &overlay)
+            .unwrap(),
+    )
+}
+
 async fn analyze_result(
     dice: &Arc<Dice>,
     epoch: PathObservationEpoch,
@@ -380,7 +401,7 @@ async fn analyze(
         .unwrap_err()
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum AnalysisRoute {
     Legacy,
     Observed,
@@ -388,6 +409,7 @@ enum AnalysisRoute {
 
 fn semantic_epoch() -> Epoch {
     let defs = r#"
+load("//tools/build_defs/cc:helper.bzl", "allowed_mode")
 ProfileInfo = provider()
 ReturnedInfo = provider()
 def _profile(ctx): return [DefaultInfo(), ProfileInfo()]
@@ -568,6 +590,10 @@ def _fragment_subject(ctx):
     fragment_call()
     return [DefaultInfo()]
 fragment_subject = rule(implementation = _fragment_subject, subrules = [fragment_call])
+def _allowed_helper_subject(ctx):
+    if allowed_mode(ctx.fragments.cpp) != "fastbuild": fail("allowed helper saw wrong mode")
+    return [DefaultInfo()]
+allowed_helper_subject = rule(implementation = _allowed_helper_subject, fragments = ["cpp"])
 def _toolchain_call(ctx): return ctx.toolchains["//subject:type"]
 toolchain_call = subrule(implementation = _toolchain_call)
 def _toolchain_subject(ctx):
@@ -597,6 +623,10 @@ generate = rule(implementation = _generate, attrs = {"out": attr.output()})
     let mut epoch = Epoch::fixture();
     epoch.package("rules", "");
     epoch.file("/workspace/rules/defs.bzl", defs);
+    epoch.file(
+        "/workspace/rules/denied_helper.bzl",
+        "def denied_mode(cpp): return cpp.compilation_mode()\n",
+    );
     epoch.package(
         "deps",
         "load('//rules:defs.bzl', 'generate', 'multi', 'plain', 'profile', 'tool')\nprofile(name='literal')\nprofile(name='other')\nprofile(name='profile')\nprofile(name='everything')\nplain(name='plain')\nmulti(name='multi')\ntool(name='tool')\ngenerate(name='generator', out='generated.bin')\nalias(name='alias_profile', actual=':literal')\n",
@@ -608,9 +638,78 @@ generate = rule(implementation = _generate, attrs = {"out": attr.output()})
     epoch.file("/workspace/files/inferred.txt", "source");
     epoch.file("/workspace/files/wrong.bin", "wrong");
     epoch.file("/workspace/files/exported.sh", "#!/bin/sh\n");
+    epoch.directory("/workspace/tools");
+    epoch.directory("/workspace/tools/build_defs");
+    epoch.package("tools/build_defs/cc", "");
+    epoch.file(
+        "/workspace/tools/build_defs/cc/helper.bzl",
+        "def allowed_mode(cpp): return cpp.compilation_mode()\n",
+    );
+    epoch.file(
+        "/workspace/tools/build_defs/cc/fragments.bzl",
+        r#"load("//rules:denied_helper.bzl", "denied_mode")
+def _sub(ctx):
+    if dir(ctx.fragments) != ["cpp", "py"]: fail("subrule fragment dir mismatch: %s" % dir(ctx.fragments))
+    return ctx.fragments.cpp
+sub = subrule(implementation = _sub, fragments = ["cpp", "py"])
+def _impl(ctx):
+    expected = ["android", "apple", "bazel_android", "bazel_py", "coverage", "cpp", "j2objc", "java", "objc", "platform", "proto", "py"]
+    if dir(ctx.fragments) != expected: fail("rule fragment dir mismatch: %s" % dir(ctx.fragments))
+    cpp = ctx.fragments.cpp
+    if cpp != sub(): fail("rule and subrule did not share the cpp fragment")
+    if cpp.compilation_mode() != "fastbuild": fail("unexpected target compilation mode")
+    if cpp.propeller_optimize_absolute_cc_profile() != None: fail("unexpected propeller cc path")
+    if cpp.propeller_optimize_absolute_ld_profile() != None: fail("unexpected propeller ld path")
+    if cpp.fdo_path() != None: fail("unexpected fdo path")
+    if cpp.cs_fdo_path() != None: fail("unexpected cs fdo path")
+    if cpp.proto_profile() != True: fail("unexpected proto profile")
+    return [DefaultInfo()]
+fragment_methods = rule(implementation = _impl, fragments = ["cpp"], subrules = [sub])
+def _undeclared(ctx):
+    value = ctx.fragments.cpp
+    return [DefaultInfo()]
+undeclared_fragment = rule(implementation = _undeclared)
+def _sub_undeclared(ctx): return ctx.fragments.cpp
+sub_undeclared = subrule(implementation = _sub_undeclared)
+def _sub_undeclared_rule(ctx):
+    sub_undeclared()
+    return [DefaultInfo()]
+undeclared_sub_fragment = rule(implementation = _sub_undeclared_rule, subrules = [sub_undeclared])
+def _arity(ctx):
+    ctx.fragments.cpp.compilation_mode("extra")
+    return [DefaultInfo()]
+fragment_arity = rule(implementation = _arity, fragments = ["cpp"])
+def _denied_helper(ctx):
+    denied_mode(ctx.fragments.cpp)
+    return [DefaultInfo()]
+denied_helper = rule(implementation = _denied_helper, fragments = ["cpp"])
+def _create_fdo_context(ctx):
+    cpp_config = ctx.fragments.cpp
+    if cpp_config.compilation_mode() != "opt": return None
+    cpp_config.propeller_optimize_absolute_cc_profile()
+    cpp_config.propeller_optimize_absolute_ld_profile()
+    cpp_config.fdo_path()
+    cpp_config.cs_fdo_path()
+    cpp_config.proto_profile()
+    ctx.actions.args()
+create_fdo_context = subrule(implementation = _create_fdo_context, fragments = ["cpp"])
+def _opt(ctx):
+    create_fdo_context()
+    return [DefaultInfo()]
+fragment_opt_terminal = rule(implementation = _opt, subrules = [create_fdo_context])
+def _exec_probe(ctx, **kwargs): return None
+exec_probe = subrule(implementation = _exec_probe, attrs = {
+    "_probe": attr.label(default = "//subject:fragment_opt_terminal", cfg = "exec"),
+})
+def _exec_parent(ctx):
+    exec_probe()
+    return [DefaultInfo()]
+fragment_exec_parent = rule(implementation = _exec_parent, subrules = [exec_probe])
+"#,
+    );
     epoch.package(
         "subject",
-        "load('//rules:defs.bzl', 'bad_executable_subject', 'bad_extension_subject', 'bad_file_provider_subject', 'bad_file_subject', 'bad_nested_subject', 'bad_provider_subject', 'escaped_actions_subject', 'escaped_ctx_subject', 'exec_first_subject', 'fragment_subject', 'missing_action_subject', 'multi_single_subject', 'nested_subject', 'ordinary', 'outer_lock_subject', 'override_subject', 'parent_lock_subject', 'repeat_context_subject', 'subject', 'target_first_subject', 'toolchain_subject', 'undeclared_subject', 'zero_single_subject')\nsubject(name='subject')\nbad_provider_subject(name='bad_provider')\nzero_single_subject(name='zero_single')\nmulti_single_subject(name='multi_single')\nbad_extension_subject(name='bad_extension')\nbad_executable_subject(name='bad_executable')\nbad_file_subject(name='bad_file')\nbad_file_provider_subject(name='bad_file_provider')\nexec_first_subject(name='exec_first')\ntarget_first_subject(name='target_first')\nnested_subject(name='nested')\nundeclared_subject(name='undeclared')\nbad_nested_subject(name='bad_nested')\noverride_subject(name='override')\nouter_lock_subject(name='outer_lock')\nescaped_ctx_subject(name='escaped_ctx')\nescaped_actions_subject(name='escaped_actions')\nparent_lock_subject(name='parent_lock')\nrepeat_context_subject(name='repeat_context')\nfragment_subject(name='fragment')\ntoolchain_subject(name='toolchain_deferred')\nmissing_action_subject(name='missing_action')\nordinary(name='ordinary')\n",
+        "load('//rules:defs.bzl', 'allowed_helper_subject', 'bad_executable_subject', 'bad_extension_subject', 'bad_file_provider_subject', 'bad_file_subject', 'bad_nested_subject', 'bad_provider_subject', 'escaped_actions_subject', 'escaped_ctx_subject', 'exec_first_subject', 'fragment_subject', 'missing_action_subject', 'multi_single_subject', 'nested_subject', 'ordinary', 'outer_lock_subject', 'override_subject', 'parent_lock_subject', 'repeat_context_subject', 'subject', 'target_first_subject', 'toolchain_subject', 'undeclared_subject', 'zero_single_subject')\nload('//tools/build_defs/cc:fragments.bzl', 'denied_helper', 'fragment_arity', 'fragment_exec_parent', 'fragment_methods', 'fragment_opt_terminal', 'undeclared_fragment', 'undeclared_sub_fragment')\nsubject(name='subject')\nbad_provider_subject(name='bad_provider')\nzero_single_subject(name='zero_single')\nmulti_single_subject(name='multi_single')\nbad_extension_subject(name='bad_extension')\nbad_executable_subject(name='bad_executable')\nbad_file_subject(name='bad_file')\nbad_file_provider_subject(name='bad_file_provider')\nexec_first_subject(name='exec_first')\ntarget_first_subject(name='target_first')\nnested_subject(name='nested')\nundeclared_subject(name='undeclared')\nbad_nested_subject(name='bad_nested')\noverride_subject(name='override')\nouter_lock_subject(name='outer_lock')\nescaped_ctx_subject(name='escaped_ctx')\nescaped_actions_subject(name='escaped_actions')\nparent_lock_subject(name='parent_lock')\nrepeat_context_subject(name='repeat_context')\nfragment_subject(name='fragment')\nallowed_helper_subject(name='allowed_helper')\nfragment_methods(name='fragment_methods')\ndenied_helper(name='denied_helper')\nundeclared_fragment(name='undeclared_fragment')\nundeclared_sub_fragment(name='undeclared_sub_fragment')\nfragment_arity(name='fragment_arity')\nfragment_opt_terminal(name='fragment_opt_terminal')\nfragment_exec_parent(name='fragment_exec_parent')\ntoolchain_subject(name='toolchain_deferred')\nmissing_action_subject(name='missing_action')\nordinary(name='ordinary')\n",
     );
     epoch
 }
@@ -834,6 +933,17 @@ async fn nested_authorization_overrides_and_context_lifetimes_are_enforced() {
     .await;
     assert!(nested.is_ok(), "{nested:?}");
 
+    let fragment = analyze_result(
+        &Dice::builder().build(DetectCycles::Enabled),
+        semantic_epoch().build(),
+        "@@//subject:fragment",
+        configuration(None),
+        Arc::new(Tracker::default()),
+        AnalysisRoute::Legacy,
+    )
+    .await;
+    assert!(fragment.is_ok(), "{fragment:?}");
+
     for (target, expected) in [
         ("undeclared", "rule must declare 'rogue' in 'subrules'"),
         (
@@ -861,7 +971,6 @@ async fn nested_authorization_overrides_and_context_lifetimes_are_enforced() {
             "repeat_context",
             "cannot access field or method 'label' of subrule context",
         ),
-        ("fragment", "configured subrule fragments are deferred"),
         (
             "toolchain_deferred",
             "configured subrule toolchains are deferred",
@@ -879,6 +988,109 @@ async fn nested_authorization_overrides_and_context_lifetimes_are_enforced() {
         .await;
         assert!(error.contains(expected), "{target}: {error}");
     }
+}
+
+#[tokio::test]
+async fn configured_fragment_facades_project_methods_and_fail_closed() {
+    for route in [AnalysisRoute::Legacy, AnalysisRoute::Observed] {
+        for target in ["fragment_methods", "allowed_helper"] {
+            let result = analyze_result(
+                &Dice::builder().build(DetectCycles::Enabled),
+                semantic_epoch().build(),
+                &format!("@@//subject:{target}"),
+                configuration(None),
+                Arc::new(Tracker::default()),
+                route,
+            )
+            .await;
+            assert!(result.is_ok(), "{route:?}/{target}: {result:?}");
+        }
+    }
+
+    for (target, expected) in [
+        (
+            "undeclared_fragment",
+            "has to declare 'cpp' as a required fragment",
+        ),
+        ("undeclared_sub_fragment", "has no attribute `cpp`"),
+        ("fragment_arity", "expected 0, got 1"),
+        ("denied_helper", "cannot use private API"),
+    ] {
+        let error = analyze(
+            &Dice::builder().build(DetectCycles::Enabled),
+            semantic_epoch().build(),
+            &format!("@@//subject:{target}"),
+            configuration(None),
+            Arc::new(Tracker::default()),
+            AnalysisRoute::Legacy,
+        )
+        .await;
+        assert!(error.contains(expected), "{target}: {error}");
+    }
+
+    let target_opt = analyze(
+        &Dice::builder().build(DetectCycles::Enabled),
+        semantic_epoch().build(),
+        "@@//subject:fragment_opt_terminal",
+        compilation_configuration("opt", "fastbuild"),
+        Arc::new(Tracker::default()),
+        AnalysisRoute::Legacy,
+    )
+    .await;
+    assert!(
+        target_opt.contains("has no attribute `args`"),
+        "{target_opt}"
+    );
+
+    let target_dbg = analyze_result(
+        &Dice::builder().build(DetectCycles::Enabled),
+        semantic_epoch().build(),
+        "@@//subject:fragment_opt_terminal",
+        compilation_configuration("dbg", "opt"),
+        Arc::new(Tracker::default()),
+        AnalysisRoute::Legacy,
+    )
+    .await;
+    assert!(target_dbg.is_ok(), "{target_dbg:?}");
+
+    let exec_default = analyze(
+        &Dice::builder().build(DetectCycles::Enabled),
+        semantic_epoch().build(),
+        "@@//subject:fragment_exec_parent",
+        compilation_configuration("fastbuild", "opt"),
+        Arc::new(Tracker::default()),
+        AnalysisRoute::Legacy,
+    )
+    .await;
+    assert!(
+        exec_default.contains("has no attribute `args`"),
+        "{exec_default}"
+    );
+
+    let target_dbg_exec_opt = analyze(
+        &Dice::builder().build(DetectCycles::Enabled),
+        semantic_epoch().build(),
+        "@@//subject:fragment_exec_parent",
+        compilation_configuration("dbg", "opt"),
+        Arc::new(Tracker::default()),
+        AnalysisRoute::Legacy,
+    )
+    .await;
+    assert!(
+        target_dbg_exec_opt.contains("has no attribute `args`"),
+        "{target_dbg_exec_opt}"
+    );
+
+    let exec_fastbuild = analyze_result(
+        &Dice::builder().build(DetectCycles::Enabled),
+        semantic_epoch().build(),
+        "@@//subject:fragment_exec_parent",
+        compilation_configuration("opt", "fastbuild"),
+        Arc::new(Tracker::default()),
+        AnalysisRoute::Legacy,
+    )
+    .await;
+    assert!(exec_fastbuild.is_ok(), "{exec_fastbuild:?}");
 }
 
 #[tokio::test]

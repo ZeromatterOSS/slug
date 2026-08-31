@@ -30,25 +30,43 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, FDO command configuration, selected-toolchain context, configured hidden dependencies, and direct subrule calls accepted** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; generic selected-toolchain context in `ebd19e3b1`; configured hidden dependencies in `2bf86bfa8`; terminally accepted direct invocation/value materialization in the current packet; real starlark-rust `set` in `cb71a302d` | fragment projection and generic action builtin categories follow | select the fragment-projection category required by authentic rules_cc `create_fdo_context` |
+| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, FDO command configuration, selected-toolchain context, configured hidden dependencies, direct subrule calls, and the first generic fragment category accepted** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; generic selected-toolchain context in `ebd19e3b1`; configured hidden dependencies in `2bf86bfa8`; direct invocation/value materialization in `da6865a3b`; real starlark-rust `set` in `cb71a302d`; terminally accepted pinned-9.2 six-method fragment/Exec category | the authentic rules_cc FDO route now stops at generic action construction rather than fragment access | land the accepted fragment packet, then select the generic action-builtin successor |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-5-7A-subrule-direct-call-and-value-materialization-r3](./slug-v2-subplans/current-packet.md).
+[WP-4-5-7A-generic-fragment-projection-r4](./slug-v2-subplans/current-packet.md).
 
-Commit `2bf86bfa8` terminally accepts generic configured hidden Target/Exec
-dependencies, validation and loading-query facts. The current R3 successor now
-terminally accepts the complete generic direct-call/value/lifetime category:
-two-word Arc-backed Null/configured Target identity, source/generated bounded
-file providers, all admitted hidden shapes, nested authorization, call-token
-invalidation, shared action ownership, generic nested-provider lowering and
-successful implicit/tool edge publication. Its correction rereview returned
-`ACCEPT` after the immutable dispatcher payload became Arc-shared and the
-high-count/absence/source-executable/alias/order proof gaps were closed. Parser,
-`set`, C++ and ruleset-specific behavior remain untouched; fragment projection
-is the next category.
+Commit `da6865a3b` terminally accepts the complete generic direct-call/value/
+lifetime category on top of configured hidden dependencies: compact tagged
+Target identity, all admitted hidden shapes, nested authorization, call-token
+invalidation, shared action ownership, generic provider lowering, and ordered
+implicit/tool edge publication. Parser, `set`, C++ and ruleset-specific behavior
+remain untouched.
+
+R1 received `REPLAN`: Bazel's Exec transition copies
+`host_compilation_mode` into `compilation_mode`, while Slug preserved target
+mode, and the proposed proof did not discriminate every branch/entry of Bazel's
+default private API allowlist. R2 received `REPLAN` because its audit used a
+newer sibling Bazel checkout for two Rust allowlist entries instead of the
+pinned 9.2 tree. R3 received `REPLAN` because starlark-rust cannot raise a
+custom error from per-instance dynamic attribute lookup. The corrected R4
+freezes the exact 18 main/11 external 9.2 entries plus `_builtins`, separately
+inventories all 12 active fragment names, and uses distinct root/subrule
+facades. Root uses a fallible static `cpp` field; subrules retain one dynamic,
+future-extensible declaration-set facade and explicitly defer only the
+unknown-versus-undeclared diagnostic/`hasattr` distinction. Its implemented
+candidate projects one shared typed `cpp` value from the sole structural
+configuration owner into separately
+authorized, cached rule and subrule fragment collections. The bounded category
+contains all six FDO-facing methods read by authentic rules_cc 0.2.17 before its
+first action call, typed long-form target/host compilation-mode producers, the
+bounded host-to-compilation Exec rewrite, and Bazel 9.2's fully inventoried default
+private caller restriction. Absolute-path FDO producers, other Exec rewrites,
+other fragments and generic action builtins remain explicit later boundaries. `cc_common` and
+`cc_internal` remain ordinary BCR Starlark consumers/discriminators, never
+parser or Rust-native C++ rule branches; Zabel remains peer guidance only.
 
 Commit `c83e70f0f` terminally accepts the repository-context attribute
 implementation. One authenticated immutable input serves ordinary and innate

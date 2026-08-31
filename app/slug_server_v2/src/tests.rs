@@ -567,6 +567,112 @@ fn retained_daemon_native_fdo_overlay_restores_a_b_a_without_source_invalidation
 }
 
 #[test]
+fn retained_daemon_fragment_modes_restore_target_and_exec_c0_c1_c0() {
+    let workspace = scratch("fragment-mode-target-exec-a-b-a");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    write(
+        &workspace.join("tools/build_defs/cc/defs.bzl"),
+        r#"def _mode(ctx):
+    fail("fragment-mode=" + ctx.fragments.cpp.compilation_mode())
+mode = rule(implementation = _mode, fragments = ["cpp"])
+def _exec_probe(ctx, **kwargs): return None
+exec_probe = subrule(implementation = _exec_probe, attrs = {
+    "_mode": attr.label(default = "//tools/build_defs/cc:mode", cfg = "exec"),
+})
+def _exec_parent(ctx):
+    exec_probe()
+    return [DefaultInfo()]
+exec_parent = rule(implementation = _exec_parent, subrules = [exec_probe])
+"#,
+    );
+    write(
+        &workspace.join("tools/build_defs/cc/BUILD.bazel"),
+        "load(':defs.bzl', 'exec_parent', 'mode')\nmode(name = 'mode')\nexec_parent(name = 'exec')\n",
+    );
+
+    let overlay = |target_mode: Option<&str>, host_mode: Option<&str>| {
+        let mut occurrences = Vec::new();
+        if let Some(mode) = target_mode {
+            occurrences.push(CommandConfigurationOccurrence::native(
+                NativeCommandOption::CompilationMode,
+                Some(mode),
+                false,
+            ));
+        }
+        if let Some(mode) = host_mode {
+            occurrences.push(CommandConfigurationOccurrence::native(
+                NativeCommandOption::HostCompilationMode,
+                Some(mode),
+                false,
+            ));
+        }
+        CommandConfigurationOverlay::from(occurrences)
+    };
+    let run = |daemon: &mut Daemon, label: &str, overlay| {
+        daemon.build_with_bzlmod_inputs(
+            &[target(label)],
+            &remote_disabled(),
+            &[],
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            Vec::new(),
+            overlay,
+        )
+    };
+
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let target_c0 = run(
+        &mut daemon,
+        "//tools/build_defs/cc:mode",
+        overlay(None, None),
+    );
+    let exec_c0 = run(
+        &mut daemon,
+        "//tools/build_defs/cc:exec",
+        overlay(None, None),
+    );
+    let target_c1 = run(
+        &mut daemon,
+        "//tools/build_defs/cc:mode",
+        overlay(Some("dbg"), Some("fastbuild")),
+    );
+    let exec_c1 = run(
+        &mut daemon,
+        "//tools/build_defs/cc:exec",
+        overlay(Some("dbg"), Some("fastbuild")),
+    );
+    let target_restored = run(
+        &mut daemon,
+        "//tools/build_defs/cc:mode",
+        overlay(None, None),
+    );
+    let exec_restored = run(
+        &mut daemon,
+        "//tools/build_defs/cc:exec",
+        overlay(None, None),
+    );
+
+    for result in [
+        &target_c0,
+        &exec_c0,
+        &target_c1,
+        &exec_c1,
+        &target_restored,
+        &exec_restored,
+    ] {
+        assert_ne!(result.exit_code, 0, "{result:?}");
+        assert_eq!(result.invalidated_files, 0, "{result:?}");
+    }
+    assert!(target_c0.stderr.contains("fragment-mode=fastbuild"));
+    assert!(exec_c0.stderr.contains("fragment-mode=opt"));
+    assert!(target_c1.stderr.contains("fragment-mode=dbg"));
+    assert!(exec_c1.stderr.contains("fragment-mode=fastbuild"));
+    assert_eq!(target_restored.stderr, target_c0.stderr);
+    assert_eq!(exec_restored.stderr, exec_c0.stderr);
+}
+
+#[test]
 fn retained_daemon_subrule_dependency_error_precedence_restores_a_b_a() {
     let workspace = scratch("subrule-dependency-a-b-a");
     write_configured_module(&workspace, "module(name = \"demo\")\n");

@@ -754,6 +754,7 @@ pub struct StarlarkRuleImplementation {
     #[allocative(skip)]
     implementation: FrozenValue,
     definition_source: Arc<BzlModuleIdentity>,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
     dependencies: Arc<[CanonicalLabel]>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     advertised_providers: Arc<[ProviderIdentity]>,
@@ -774,6 +775,7 @@ impl PartialEq for StarlarkRuleImplementation {
         // The semantic attachment projection below owns package equality.
         self.dependencies == other.dependencies
             && self.definition_source == other.definition_source
+            && self.source_identities_by_filename == other.source_identities_by_filename
             && self.required_toolchains == other.required_toolchains
             && self.advertised_providers == other.advertised_providers
             && self.required_fragments == other.required_fragments
@@ -795,6 +797,11 @@ impl StarlarkRuleImplementation {
 
     pub fn definition_source(&self) -> &Arc<BzlModuleIdentity> {
         &self.definition_source
+    }
+
+    #[doc(hidden)]
+    pub fn source_identities_by_filename(&self) -> &Arc<[(CompactString, BzlModuleIdentity)]> {
+        &self.source_identities_by_filename
     }
 
     pub fn dependencies(&self) -> &[CanonicalLabel] {
@@ -850,6 +857,7 @@ impl StarlarkRuleImplementation {
             Arc<SubruleIdentity>,
             Arc<[Arc<SubruleIdentity>]>,
             FrozenValue,
+            Arc<SmallSet<CompactString>>,
         ),
     > + '_ {
         self.attached_subrules
@@ -861,6 +869,7 @@ impl StarlarkRuleImplementation {
                     definition.identity.clone(),
                     definition.direct_subrules.clone(),
                     callable,
+                    definition.fragments.clone(),
                 )
             })
     }
@@ -1569,6 +1578,7 @@ impl PackageRecorder {
         name: String,
         implementation: FrozenValue,
         definition_source: Arc<BzlModuleIdentity>,
+        source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
         required_toolchains: Arc<[ToolchainTypeRequirement]>,
         advertised_providers: Arc<[ProviderIdentity]>,
         required_fragments: Arc<[CompactString]>,
@@ -1604,6 +1614,7 @@ impl PackageRecorder {
             PackageTargetKind::StarlarkRule(StarlarkRuleImplementation {
                 implementation,
                 definition_source,
+                source_identities_by_filename,
                 dependencies: dependencies.into(),
                 required_toolchains,
                 advertised_providers,
@@ -3476,6 +3487,8 @@ struct RuleDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     definition_source: Arc<BzlModuleIdentity>,
     #[trace(unsafe_ignore)]
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    #[trace(unsafe_ignore)]
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     #[trace(unsafe_ignore)]
     advertised_providers: Arc<[ProviderIdentity]>,
@@ -3501,6 +3514,7 @@ struct RuleDefinitionGen<V> {
 pub(crate) struct FrozenRuleDefinition {
     implementation: FrozenValue,
     definition_source: Arc<BzlModuleIdentity>,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     advertised_providers: Arc<[ProviderIdentity]>,
     required_fragments: Arc<[CompactString]>,
@@ -3751,11 +3765,6 @@ impl FrozenRuleDefinition {
     }
 
     fn reject_deferred_attribute_invocation(&self) -> anyhow::Result<()> {
-        if !self.required_fragments.is_empty() {
-            anyhow::bail!(
-                "target invocation for rules requiring configuration fragments is not supported"
-            );
-        }
         if let Some(attribute) = self.schema.iter().find(|attribute| {
             !attribute.required_providers.is_empty() || attribute.attached_aspect.is_some()
         }) {
@@ -3799,6 +3808,7 @@ impl<'v> Freeze for RuleDefinition<'v> {
         Ok(FrozenRuleDefinition {
             implementation,
             definition_source: self.definition_source,
+            source_identities_by_filename: self.source_identities_by_filename,
             required_toolchains: self.required_toolchains,
             advertised_providers: self.advertised_providers,
             required_fragments: self.required_fragments,
@@ -6249,6 +6259,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         let visibility = names.get("visibility").copied();
         let implementation = self.implementation;
         let definition_source = self.definition_source.clone();
+        let source_identities_by_filename = self.source_identities_by_filename.clone();
         let required_toolchains = self.required_toolchains.clone();
         let advertised_providers = self.advertised_providers.clone();
         let required_fragments = self.required_fragments.clone();
@@ -6466,6 +6477,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     name.to_owned(),
                     implementation,
                     definition_source,
+                    source_identities_by_filename,
                     required_toolchains,
                     advertised_providers,
                     required_fragments,
@@ -7589,13 +7601,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             )
             .collect::<Vec<_>>();
         let (attached_subrules, subrule_callables) = attached_subrules(subrules)?;
+        let context = BzlEvaluationContext::from_evaluator(eval)?;
         Ok(RuleDefinition {
             implementation,
-            definition_source: Arc::new(
-                BzlEvaluationContext::from_evaluator(eval)?
-                    .source_identity_for_call(eval)?
-                    .clone(),
-            ),
+            definition_source: Arc::new(context.source_identity_for_call(eval)?.clone()),
+            source_identities_by_filename: context.source_identities_by_filename(),
             required_toolchains: toolchain_requirements(toolchains, eval)?,
             advertised_providers: advertised_provider_ids(provides, "rule provides")?,
             required_fragments: required_configuration_fragments(fragments),

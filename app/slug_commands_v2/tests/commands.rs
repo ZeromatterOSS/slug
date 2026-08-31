@@ -184,6 +184,8 @@ fn build_classifies_ordered_contextual_configuration_occurrences() {
 #[test]
 fn build_and_cquery_capture_the_closed_native_fdo_sequence_in_raw_order() {
     let flags = [
+        "--compilation_mode=dbg",
+        "--host_compilation_mode=fastbuild",
         "--fdo_optimize=//profiles:opt",
         "--xbinary_fdo=@profiles//:xbinary",
         "--fdo_profile=",
@@ -210,6 +212,12 @@ fn build_and_cquery_capture_the_closed_native_fdo_sequence_in_raw_order() {
     assert_eq!(build.configuration_overlay, cquery.configuration_overlay);
 
     let expected = [
+        (NativeCommandOption::CompilationMode, Some("dbg"), false),
+        (
+            NativeCommandOption::HostCompilationMode,
+            Some("fastbuild"),
+            false,
+        ),
         (
             NativeCommandOption::FdoOptimize,
             Some("//profiles:opt"),
@@ -277,6 +285,8 @@ fn build_and_cquery_capture_the_closed_native_fdo_sequence_in_raw_order() {
 
     for flag in [
         "--fdo_optimize",
+        "--compilation_mode",
+        "--host_compilation_mode",
         "--fdo_profile",
         "--copt",
         "--nocollect_code_coverage=true",

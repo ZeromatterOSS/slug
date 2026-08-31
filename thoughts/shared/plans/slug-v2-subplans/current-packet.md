@@ -1,432 +1,386 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-7A-subrule-direct-call-and-value-materialization-r3`
+Packet: `WP-4-5-7A-generic-fragment-projection-r4`
 
 Milestone: M7A bootstrap-critical generic Starlark/ruleset closure.
 
-Status: terminal correction review `ACCEPT`; implementation and proof complete.
+Status: R1-R3 architecture reviews `REPLAN`; R4 architecture review `ACCEPT`;
+implementation/proof complete; terminal implementation review `ACCEPT`.
 
-Base: `2bf86bfa8`, which accepts the source-ordered configured hidden Target/Exec
-dependency producer on top of the generic selected-toolchain context. The
-unrelated dirty registration-expansion proof remains parked. Stage and validate
-only this packet's exact hunks.
+Base: `da6865a3b`, which terminally accepts generic direct subrule invocation
+and value materialization. The unrelated dirty
+`app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked;
+do not edit or stage it.
 
 ## Observable result
 
-After the accepted configured dependency batch succeeds, invoke an attached
-subrule from its owning rule implementation. Materialize every admitted hidden
-`label` or `label_list` argument as Bazel's call boundary requires: configured
-target, ordered configured-target list, one Artifact for `allow_single_file`, or
-one `FilesToRunProvider` for `executable`. Materialize ordinary admitted
-`configuration_field` defaults through the same dependency view so `ctx.attr`
-does not retain a second late-bound path.
+Supply cached `ctx.fragments` collections to ordinary rule implementations and
+direct/nested subrule implementations from the already-selected structural
+`SlugConfiguration`. Implement the complete first authentic C++ fragment
+consumer category used by rules_cc 0.2.17 `create_fdo_context`: one shared
+typed `cpp` fragment value with
+`compilation_mode`, `propeller_optimize_absolute_cc_profile`,
+`propeller_optimize_absolute_ld_profile`, `fdo_path`, `cs_fdo_path`, and
+`proto_profile` methods.
 
-Complete the direct-call category rather than recognizing only
-`create_fdo_context`: preserve caller positional and named arguments, reject a
-hidden-name override, enforce direct rule/subrule declarations for nested
-calls, inject a restricted call-scoped context, restore its caller after success
-or failure, lock the enclosing rule context while a subrule is active, and
-reject escaped context/action access. Successful rule analysis
-publishes the already-validated hidden rows as ordered implicit configured
-edges and marks exactly Exec-transition rows as tools. Existing ordinary rule
-evaluation, provider lowering and action ownership remain the sole completion
-path.
-
-The restricted context exposes the rule label and the existing generic
-`declare_file`, `write`, and `run_shell` action namespace. `fragments` and
-`toolchains` are present as explicit deferred capabilities, so a consumer fails
-at the first missing category instead of at subrule invocation. This packet
-does not claim complete FDO or rules_cc analysis.
+This is generic configured-analysis plumbing, not a `cc_common`, `cc_internal`,
+rules_cc, parser, or native C++ rule special case. The authentic BCR subrule is
+the discriminator. A target-configured default rule returns under `fastbuild`;
+the selected `cc_toolchain` implementation is Exec-configured, where Bazel
+copies default `host_compilation_mode=opt` into `compilation_mode` and reaches
+the deferred action families. Typed long-form target and host compilation-mode
+producers plus that bounded Target-to-Exec projection keep those routes
+distinct and leave the next missing capability deterministic.
 
 ## Learned facts and authority
 
 Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is the
 sole semantic authority:
 
-- `StarlarkSubrule.java:132-216` checks rule-versus-caller declaration,
-  rejects hidden overrides, materializes executable/list/single-file/ordinary
-  label values, prepends `SubruleContext`, locks the outer rule context, invokes
-  the implementation, and restores state in `finally`;
-- `StarlarkSubrule.java:310-446` defines the restricted label/actions/
-  toolchains/fragments surface, active-context check, executable provenance,
-  automatic exec-group action selection, and post-call invalidation;
-- `StarlarkSubruleTest.java:90-423,451-723,801-1219,1235-1449` proves export and
-  declaration checks, nested authorization, positional context injection,
-  label/actions exposure, escaped-context rejection, hidden invisibility and
-  override rejection, all four admitted hidden value shapes, and action/
-  toolchain boundaries; and
-- `Attribute.java:2113-2127` plus `ExecutionTransitionFactory.isTool()` define
-  the implicit/tool classification published only after successful analysis.
+- `FragmentCollection.java:24-54` creates one immutable rule collection,
+  exposes every configured active fragment name through `dir`, and delegates
+  access checks to `RuleContext.getStarlarkFragment`;
+- `RuleContext.java:512-533` returns no field for an unknown fragment, rejects
+  a known fragment not declared by the rule/aspect, and returns the configured
+  fragment only after that declaration check;
+- `StarlarkSubrule.java:562-592` owns a separate token-scoped subrule
+  collection: unknown names are absent, known-but-undeclared names fail, and
+  `dir` is exactly the subrule's own declared set;
+- `StarlarkSubruleTest.java:1450-1630` distinguishes unknown fragments,
+  rule/subrule authorization isolation, declared access, and subrule `dir`;
+- `StarlarkRuleContext.java` constructs and retains one root fragment
+  collection rather than allocating it on each field access;
+- `CppConfiguration.java:166-306,326-330,617-689,958-968` derives the six admitted
+  method results from `CoreOptions`/`CppOptions`, validates FDO path forms, and
+  applies the private Starlarkification allowlist; and
+- `builtin_exec_platforms.bzl:221-280` propagates `host_compilation_mode` and
+  replaces `compilation_mode` with it while forming the Exec configuration; and
+- `BuiltinRestriction.java:35-225` defines the default restricted-API caller
+  allowlist from the innermost executing `.bzl` definition and repository
+  mapping.
 
-The accepted predecessor already owns configuration-field projection,
-Target/selected-Exec child identity, validation order, source/generated file
-cardinality, provider predicates, executable availability, alias normalization,
-cycle handling and revision behavior. This packet consumes those facts; it
-does not recompute or revalidate them in an evaluator callback.
+The authenticated BCR source is the rules_cc 0.2.17 file already realized at
+`target/v2o/ob/registry-yanked-lockfile-mode/bazel/external/rules_cc+/cc/private/rules_impl/fdo/fdo_context.bzl`,
+SHA-256
+`91b7b46c515b4773d5a241e699027212f679ab93160cc79218bd687eac51d5b7`.
+Its `_create_fdo_context` reads `ctx.fragments.cpp`, exits unless
+`compilation_mode() == "opt"`, then calls the other five methods before reaching
+`ctx.actions.args`, `run`, `symlink`, or `cc_common.absolute_symlink`.
 
-Buck2/starlark-rust supplies the unchanged parser, function binder, heap and
-evaluation stack. Use its `Arguments`/`invoke_pos_kwargs` path rather than
-parsing or rebinding Starlark calls. Compact immutable `Arc<[T]>`,
-`CompactString`, `SmallMap` and `Dupe` remain preferred; add no new interner,
-cache or retained copy.
+Buck2/starlark-rust remains the unchanged parser, binder, evaluator, heap and
+method-dispatch implementation. Its `StarlarkValue::{get_attr,has_attr,dir_attr}`
+contract means field presence and `dir` must be implemented together; `dir_attr`
+cannot report an evaluation error. Do not add a parser, builtin registry,
+custom `set`, or alternate call binder.
 
-Zabel is concept/optimization guidance only. Its clean direct-subrule design
-supports four useful decisions: authenticate producer-owned declarations before
-materialization, keep the dispatcher request/evaluator-local rather than adding
-a subrule key, use sparse definition spans, and make the subrule context borrow
-the enclosing action owner while its lifetime token is active. Copy no Zig
-code, names, layouts, errors or behavioral claims. In particular, Bazel 9.2—not
-Zabel—decides declaration, argument, lifetime and provider semantics.
+Zabel is peer concept and optimization guidance only. Its evaluator-local
+typed `CppFragmentOptions`, separate active/declared fragment sets, one cached
+collection, and rule/subrule authorization split support the ownership choice.
+Copy no Zig code, names, layout, errors, tests, or behavior. In particular,
+Bazel 9.2 decides values, caller restrictions and error precedence.
 
 ## Compatibility boundary
 
-**Exact:** direct calls only from a declaring rule or a currently active
-declaring parent subrule; enclosing rule-context locking and nested caller
-restoration; context as the first
-implementation positional; preservation of caller positional/named arguments;
-hidden arguments appended in descriptor order; hidden-name override rejection;
-ordinary target, ordered target-list, single Artifact and executable
-`FilesToRunProvider` argument shapes; `None`/empty-list absence; rule label;
-hidden invisibility from `ctx.attr`; successful ordered implicit edges; and
-`tool = true` exactly for Exec-transition hidden rows.
+**Exact:** successful `cpp` access only after the applicable rule or subrule
+declaration; unknown and undeclared access both reject; separate rule and
+subrule declaration authorization; root `dir(ctx.fragments)` over active
+configured fragment names; subrule `dir(ctx.fragments)` over exactly its
+declarations; one cached collection per context; one evaluator-local `cpp`
+value shared by authorized contexts; all six named zero-argument methods; default
+target-default `fastbuild` and Exec-default `opt` plus
+`None`/`None`/`None`/`None`/`True` results; typed `fastbuild`/`dbg`/`opt` target
+and host compilation-mode projection; copying host mode into compilation mode
+at the admitted Target-to-Exec transition; context and nested-call lifetime
+behavior; the complete Bazel 9.2 default private Starlark API allowlist for
+every admitted method; and structural configuration equality/invalidation for
+both new command producers and their Exec result.
 
-**Slug-native:** evaluator bridge type names and diagnostic wrapping;
-tagged structural Null/configured target identity; source/generated artifact identity where Bazel
-configuration/output bytes are outside the accepted compatibility surface; the
-already-admitted `declare_file`/`write`/`run_shell` action subset; and internal
-edge representation.
+**Slug-native:** Rust enum/optional/string representation; root diagnostic
+wrapping after the exact declaration fact; evaluator bridge type names; and the
+already-admitted collision-safe structural configuration identity.
 
-**Unsupported/deferred:** subrules attached to aspects; macro/finalizer calls;
-subrule fragments and toolchain lookup; automatic exec-group action selection;
-`ctx.actions.args`, `run`, `symlink`, `declare_symlink`, tree/template actions,
-and `cc_common.absolute_symlink`; complete Artifact/runfiles membership and
-manifest projection outside the four admitted hidden argument shapes; XML;
-broader `configuration_field` fragments; exact Bazel configuration/output
-bytes; and rules_cc/C++ semantics. `cc_common` and `cc_internal` remain BCR
-Starlark consumers and discriminators, never Rust parser or C++ special cases.
+**Unsupported/deferred:** short `-c`; every Exec-transition rewrite except the
+already-owned target-platform/Starlark projection and this packet's exact
+host-to-compilation-mode copy; absolute-path FDO/CS-FDO/Propeller command
+producers and Bazel `PathFragment` normalization; non-default `proto_profile`;
+other C++ fragment methods; every non-`cpp` configured fragment value; aspects;
+toolchain lookup; `ctx.actions.args`, `run`, `symlink`, `declare_symlink`, tree
+and template actions; `cc_common.absolute_symlink`; exact Bazel configuration
+checksum/output paths; and complete rules_cc analysis. Existing accepted label-
+valued `--fdo_optimize=//...` remains structurally valid but projects `fdo_path`
+as `None`, matching Bazel's distinction between label-backed FDO state and the
+absolute path getter. An absolute-path input continues to fail closed rather
+than being normalized from an unowned host path model.
 
-## Category architecture and successors
+The exact claim deliberately excludes the wording/error-class distinction
+between an unknown subrule fragment and a known-but-undeclared subrule fragment,
+plus `hasattr(ctx.fragments, name)` for fragment collections. starlark-rust's
+dynamic `StarlarkValue::get_attr` returns `Option<Value>` and cannot raise the
+Bazel-specific undeclared error. Both accesses still reject and `dir` remains
+exact; the diagnostic/`hasattr` distinction is unsupported rather than silently
+claimed. A known but unimplemented fragment value is likewise outside the
+admitted value surface even though its name remains in the exact `dir` inventory.
 
-Keep one analysis-evaluation capability installed in `Evaluator.extra`. It
-authorizes the existing analysis-only provider constructors and contains an
-optional phase-scratch subrule dispatcher. Loading-time evaluators install no
-such capability, so frozen rule/subrule values continue to fail closed outside
-configured analysis. Do not add a process-global builtin registry or replace
-starlark-rust's parser, binder, `set`, provider, depset or collection semantics.
+No claim is made that the six-method surface completes `CppConfiguration`.
+This packet completes the one coherent FDO fragment-method category consumed
+before the authentic subrule's first action call. Later fragment categories
+extend the same projection/collection architecture without changing context
+ownership.
 
-Because the frozen callable's `StarlarkValue::invoke` necessarily lives in
-`slug_loading_v2`, put the smallest shared evaluator ABI leaf in the new
-`subrule_invocation.rs`: lifetime-aware analysis capability, call state/tokens,
-restricted context, and the common Starlark Artifact/action facades. Move the
-existing Artifact/action facade implementation out of `slug_analysis_v2`
-instead of duplicating it. The leaf may depend only on existing build-API and
-identity types; it owns no graph lookup, configured result, DICE handle or
-retained provider data. Analysis constructs it from prepared values and the
-one enclosing `CtxActions` owner. This avoids an upward crate callback, raw
-pointer, new crate, or second action implementation.
+## Architecture
 
-The dispatcher is the permanent direct-call seam. It consumes producer-owned
-subrule identities/callables plus evaluator-local prepared values and exposes
-typed context fields. Later category packets extend only those fields or the
-shared action namespace:
+### Structural producer and typed projection
 
-1. fragment projection supplies declared typed fragment values to rule and
-   subrule contexts from the structural configuration owner;
-2. the action family supplies `args`, `run`, `symlink` and related artifact/
-   input provenance through `CtxActions`; and
-3. `cc_common.absolute_symlink` becomes one ordinary BCR-loaded builtin call
-   into the admitted symlink action capability, not a parser or rule-class
-   branch.
+Add `CompilationMode` and `HostCompilationMode` to the closed
+`NativeCommandOption` table and classify both as `CoreOptions`. Accept only long
+forms and only the three Bazel 9 enum spellings. Extend
+`SlugConfiguration::to_exec_for_platform` to replace `compilation_mode` with
+the structural `host_compilation_mode` value in the same options-vector pass
+that installs the selected execution platform. Do not rewrite or silently
+claim any other Bazel Exec-transition field. The existing command parser,
+scoped configuration construction and DICE request key perform all mutation/
+invalidation; add no environment reader, fallback, graph key, cache, lock,
+registry or process-global state.
 
-Those successors must reuse the same call state, action owner, artifact values,
-provider materializer and result lowering. They may not create a second
-evaluator, re-run the rule implementation, retain evaluator values in DICE, or
-introduce a C++-specific configured dependency path. This packet leaves a
-deterministic missing-fragment or missing-action-family terminal for the first
-authentic rules_cc consumer.
+Create a small `slug_configuration_v2::native::cpp_fragment` leaf rather than
+growing the already-large `configuration.rs`. `CppFragmentProjection` holds a
+cheap clone of `SlugConfiguration`, reads the sole canonical option vector on
+demand, and exposes typed Rust results for the six admitted methods. It is
+phase scratch, not a parallel retained C++ options store. Expose only the
+minimal private option/enum accessors required by this sibling module.
 
-## Natural owners and call flow
+Every optional absolute-path method must distinguish the existing label-valued
+FDO option from a future absolute-path producer. Do not reinterpret a label,
+display string, workspace path, or host path as Bazel's normalized
+`PathFragment`. Unsupported stored shapes fail closed while constructing the
+projection, before Starlark execution.
 
-`StarlarkRuleImplementation` remains the loaded, DICE-retained owner of direct
-and transitive subrule identities, sparse hidden spans, callables, typed
-dependency descriptors and the original rule implementation. Keep its current
-semantic equality independent of frozen pointer addresses. A frozen rule
-implementation wrapper remains the fail-closed entry: it delegates to the
-original implementation only when the configured-analysis capability is
-installed after all predecessor preparation and validation.
+### Generic fragment values
 
-The moved Artifact/action facades remain evaluator ABI, not loading semantics:
-their only mutable reference is the existing `Arc<Mutex<CtxActions>>`; their
-artifact owner is the existing `AnalysisConfiguredTargetKey`; and their call
-token is phase scratch. Both the outer rule context and restricted subrule
-contexts allocate these same facade types with different active tokens. No
-method body, artifact identity or action registry is duplicated.
+Add an `analysis_fragments.rs` evaluator-ABI leaf in `slug_loading_v2` with two
+concrete collection facades matching Bazel's separate ownership:
 
-`finish_analysis` converts validated child results into two phase-scratch
-views in one source pass. Ordinary rows enter the existing `PreparedDependency`
-view and update the corresponding resolved late-bound attribute to the selected
-label/list shape. Hidden rows are grouped by their retained definition span and
-materialized according to descriptor policy. Preserve requested descriptor
-order while using the child's normalized/actual provider result. Do not perform
-graph lookup, provider validation or artifact discovery inside Starlark
-invocation.
+- `RuleFragmentCollection` stores the root `AnalysisCallToken`, immutable rule
+  declarations, and shared frozen `cpp` value. A type-static fallible `cpp`
+  attribute performs the live-token and rule-declaration check; starlark-rust
+  merges it into `dir` while `dir_attr` supplies the other 11 active names;
+- `SubruleFragmentCollection` stores the call token, the subrule's immutable
+  declaration set, and shared frozen `cpp` value. Its dynamic `get_attr` returns
+  `cpp` only when declared and otherwise returns `None`; its `dir_attr` is the
+  declaration set. Future admitted fragment values extend this one dynamic
+  match and do not require concrete types for declaration-set combinations;
+- `CppFragmentValue` stores only `CppFragmentProjection` plus the immutable
+  caller-authorization inputs needed by its methods;
+- root collections use one phase-scratch `SmallSet<CompactString>` created from
+  the rule's retained fragment slice, while subrule collections clone the
+  already-retained `Arc<SmallSet<CompactString>>`; and
+- admitted field lookup checks the applicable live token and declaration
+  authorization. It never checks only membership in the active configured
+  fragment set.
 
-`slug_build_api_v2::ConfiguredTargetValue` uses one compact
-`AnalysisTargetIdentity` enum: `Configured(AnalysisConfiguredTargetKey)` or
-`Null(Arc<CanonicalLabel>)`. Existing configured callers convert without
-behavior change; direct source files use the Null branch. Both payloads are
-pointer-sized and cheap to `Dupe`; the enum must remain at most two pointer
-words. The discriminant participates
-in ordinary equality, hashing, publication equality and nested
-`AnalysisValue` identity, so `Null(Arc(label))` can never collide with
-`Configured(key)` even if a configured byte slice is empty. Both branches expose
-their canonical label; only the configured branch exposes configuration bytes.
-Do not synthesize bytes, erase the tag during lowering, or infer the branch from
-provider contents. The enum is the natural retained identity for every
-configured-target-like analysis value; it is not subrule metadata.
+Freeze the pinned Bazel 9.2 active Starlark fragment-name inventory separately
+from implemented values: `android`, `apple`, `bazel_android`, `bazel_py`,
+`coverage`, `cpp`, `j2objc`, `java`, `objc`, `platform`, `proto`, and `py`.
+Root `dir_attr` plus the static `cpp` attribute returns those active names even
+when the rule declared none; attempting `ctx.fragments.cpp` still enforces the
+rule declaration with a fallible native attribute. Only `cpp` has an admitted
+value in this packet. A declared access to another known name remains outside
+the admitted fragment-value surface; an unknown field remains absent through
+starlark-rust's ordinary attribute error. Subrule `dir_attr` returns its
+declaration set exactly, including unknown or unimplemented names, as Bazel 9.2
+does. Do not allocate error-placeholder values or claim that mere field access
+to an unimplemented fragment succeeds.
 
-The evaluator-local dispatcher maps retained subrule identity to its loaded
-callable and prepared hidden rows. On a call it:
+The collection is allocated once into each root/subrule context. The frozen
+`cpp` object is allocated once per analysis evaluator and shared by those
+collections. No evaluator `Value`, heap, token or collection is retained in a
+DICE key or configured result.
 
-1. checks root-direct or active-parent-direct authorization before creating a
-   context;
-2. expands caller arguments through starlark-rust, rejects any prepared hidden
-   name already present, and appends hidden named values in descriptor order;
-3. pushes a fresh monotonically unique call token, allocates one restricted
-   context borrowing the enclosing label/action owner, and invokes the retained
-   implementation with that context followed by caller positionals; and
-4. invalidates the token and restores the previous active caller with an RAII
-   guard on success, Starlark error or panic unwind.
+### Caller restriction and context ownership
 
-The outer rule context, restricted subrule context, and every attr/output/
-toolchain/action facade derived from either carry the applicable fresh token and
-compare it with the dispatcher's current token on access. The rule context is
-inactive during any subrule; a parent subrule is inactive while its child runs;
-both become active again at the correct return boundary. An escaped context or
-bound facade/method never reactivates during a later call of the same subrule.
-Use one evaluator-local `Arc<Mutex<_>>` call stack/token state because the
-shared Artifact/action facades are ordinary starlark-rust heap values and must
-satisfy that heap's `Send + Sync` storage contract. The Arc is never shared
-across evaluators or retained in DICE: every lock is a short stack inspection
-or push/pop, is released before invoking Starlark, and is never held while
-acquiring the existing action-registry mutex. No lock is held across DICE
-computation.
+Retain the flat filename-to-`BzlModuleIdentity` manifest already used by loading
+macros on `StarlarkRuleImplementation`; include it in semantic equality because
+it controls private API authorization. Analysis resolves the innermost
+`Evaluator::native_caller_function_filename()` through that immutable manifest
+and applies a V2-owned generic translation of Bazel's default
+`BuiltinRestriction`. A direct native/module-scope call without an innermost
+`.bzl` definition fails closed. A helper defined in a loaded module is checked
+against that helper's identity, not the owning rule/subrule identity.
 
-## Value and edge materialization
+Freeze this exact Bazel 9.2 allowlist inventory in one typed constant table:
 
-Refactor predecessor validation to return or record the already-proved value
-projection without changing its error order. A regular `label`/`label_list`
-row receives the same configured-target wrapper/provider collection used by
-ordinary `ctx.attr`; a direct source node uses the retained Null identity and a
-generated node keeps its configured identity. Both gain only the bounded
-file-target provider view required by that wrapper. `allow_single_file` receives the
-one validated source or owner-derived output Artifact. `executable` receives a
-`FilesToRunProvider` whose `executable` field is that real evaluator Artifact,
-not the current display-path string. Keep the retained build-API provider
-representation unchanged: improve the evaluator projection with the child
-identity/artifact already available at this boundary rather than widening
-execution, REAPI or provider storage.
+- the 18 main-repository package prefixes:
+  `third_party/bazel_rules/rules_cc`, `tools/build_defs/cc`,
+  `third_party/bazel_rules/rules_java/java`, `third_party/protobuf`,
+  `third_party/bazel_rules/rules_rust/rust/private`, `third_party/crubit`,
+  `tools/build_defs/go`, `tools/build_defs/build_info`,
+  `bazel_internal/test_rules/cc`, `tools/build_defs/android`,
+  `third_party/bazel_rules/rules_android`, `third_party/apple_crosstool`,
+  `third_party/bazel_rules/rules_apple`,
+  `third_party/cpptoolchains/portable_llvm/build_defs`,
+  `third_party/gpus/cuda`, `tools/build_defs/packaging`, `test`, and
+  `bazel_internal/test_rules`;
+- the 11 external module/prefix pairs: `rules_cc/`, `rules_java/java`,
+  `protobuf/`, `com_google_protobuf/`, `rules_rust/rust/private`,
+  `bazel_tools/tools/build_defs/build_info`, `rules_android/`,
+  `build_bazel_rules_android/`, `rules_apple/`,
+  `build_bazel_rules_apple/`, and `rules_shell/`; and
+- the separate unconditional canonical `_builtins` repository branch.
 
-The generic analysis lowerer must recognize evaluator `BuiltinProviderView`
-values and lower their existing provider identity plus recursively lowered
-fields into the existing `AnalysisValue::Provider` representation. This is
-required when a subrule result such as `FilesToRunProvider` is nested inside a
-user provider; it is not a new retained provider variant or a subrule-specific
-serialization path. Rematerialization uses the same generic provider branch.
+Implement Bazel's repository matching classes explicitly: exact main
+repository, an apparent external name mapped to main by the executing module's
+repository mapping, exact canonical `bazel_tools`, and version-insensitive
+canonical module repositories beginning `<module>+`. A bare name, filesystem
+path substring, or unrelated prefix such as `rules_cc_evil+` never authorizes.
 
-Absence materializes as `None` for `label` and an empty list for `label_list`.
-Each label-list member remains distinct and ordered. Alias provider access uses
-the actual configured child while the configured edge preserves the accepted
-normalized graph target. No evaluator value survives lowering of the rule's
-returned providers/actions.
+This restriction belongs to a reusable loading/analysis helper, not
+`CppFragmentValue` string heuristics. Table-driven proof must exercise every
+inventory row plus every repository matching class, exact-prefix negatives,
+helper-defined caller selection, and repository-mapping A/B/A identity/
+authorization restoration. The authentic rules_cc 0.2.17 caller must pass
+through its retained canonical identity, never a filesystem substring test.
 
-Add `ConfiguredEdgeKind::ImplicitAttribute { attribute, index, tool }`.
-`implicit()` is true and `tool()` returns the stored bit. Emit one edge for
-every hidden descriptor child only after `evaluate_loaded_rule` succeeds, in
-the same source/element order used by preparation. Failed invocation publishes
-no configured result, edge, action or provider. Loading-query implicit edges
-remain unchanged.
+Extend `PreparedSubruleInvocation` with its existing declared fragment set.
+Extend `AnalysisEvaluationContext` with the shared fragment value and the
+caller-identity manifest. Root construction receives the rule declarations and
+definition provenance. Subrule dispatch allocates one restricted generic
+context with its own cached collection. Preserve the accepted call stack,
+action owner, direct/nested authorization, context locking and RAII invalidation
+unchanged.
 
-## DICE, memory and revision behavior
+### Natural successor boundary
 
-`ConfiguredNodeAnalysisKey` and its Observed counterpart remain the sole
-retained computations. This packet adds no compute, key, cycle edge, cache,
-registry, task, watcher or request carrier. All child preparation stays under
-the predecessor's single aggregate cycle guard. The synchronous evaluator runs
-only after those futures finish and holds no DICE handle or lock.
+A target-configured default proof must return from the authentic-shaped FDO
+function under `fastbuild`. The authentic selected Exec-configured rules_cc
+route must project default host `opt`, pass all six method calls, and stop at the
+first deferred action family. `--compilation_mode=dbg` changes only the target
+route; `--host_compilation_mode=fastbuild` changes only the Exec route and makes
+it take the early return. That terminal selects the generic
+`Args`/`run`/`symlink` action packet; it does not justify a rules_cc branch.
 
-Loaded definitions and structural configurations remain DICE-retained semantic
-inputs. The tagged analysis-target identity is retained only when an
-`AnalysisValue`/provider result actually contains that target, and participates
-in the existing result equality/publication cutoff. Creating a retained Null
-Target admits one Arc allocation and one canonical-label clone at the
-source-to-analysis-value boundary; every later clone is an Arc bump. Do not
-allocate that identity for validation-only rows or values that never become a
-Target. Prepared value rows,
-dispatcher maps, call stack/tokens, context/action
-facades and Starlark values are phase/evaluator scratch. Successful providers,
-actions and configured edges are lowered into the existing immutable
-`ConfiguredNodeResult`; no retained value borrows the evaluator heap. Error and
-cancellation drop all scratch before publication. Same-DICE source/command
-A/B/A must invalidate and restore call results and errors with no stale token,
-edge, action or provider.
+## Frozen scope
 
-No request option, host observation or filesystem input changes. Concurrent
-requests receive separate evaluators and dispatch state while sharing only the
-already-immutable loaded package and configured child results through DICE.
+Production allowlist:
 
-## Proof contract
+- `app/slug_configuration_v2/src/command.rs`
+- `app/slug_configuration_v2/src/native/configuration.rs`
+- `app/slug_configuration_v2/src/native/cpp_fragment.rs` (new)
+- `app/slug_configuration_v2/src/native/mod.rs`
+- `app/slug_configuration_v2/src/native/value.rs`
+- `app/slug_configuration_v2/src/lib.rs`
+- `app/slug_loading_v2/src/analysis_fragments.rs` (new)
+- `app/slug_loading_v2/src/builtin_restriction.rs` (new)
+- `app/slug_loading_v2/src/lib.rs`
+- `app/slug_loading_v2/src/package.rs`
+- `app/slug_loading_v2/src/subrule_invocation.rs`
+- `app/slug_analysis_v2/src/starlark_rule.rs`
 
-Reuse the pinned Bazel tests above; add no Java helper or copied fixture. Prove
-both Legacy and Observed routes where the graph family matters:
+Proof allowlist:
 
-- direct success, undeclared root call, undeclared sibling/parent/child calls,
-  declared nested success, repeated calls and a high-count nonrecursive
-  declaration set;
-- positional/named passthrough, context-first binding, hidden override
-  rejection before implementation side effects, and descriptor-order hidden
-  kwargs;
-- context label/action access, enclosing rule-context inactivity, parent
-  inactivity during a child call, caller restoration after child failure,
-  escaped contexts and saved bound-facade/action rejection, and a later call of
-  the same subrule not reactivating an escaped value;
-- absent/single/list configured targets, source and generated single Artifacts,
-  executable source/rule `FilesToRunProvider` with Artifact executable, aliases,
-  nesting each admitted value in a returned user provider, and ordinary
-  late-bound `ctx.attr` values through the shared materializer;
-- tagged Arc-backed Null/configured identity collision resistance,
-  two-pointer-word identity size, cheap clone after the single admitted
-  source-boundary allocation/label clone, configured-call
-  compatibility, exact label projection, equality/hash/publication inequality,
-  and nested lower/rematerialize preservation for a Null source Target;
-- successful implicit edge order/target/implicit/tool projection, including
-  interleaved Target/Exec rows and list indices; no edge/action/result on
-  invocation failure;
-- one successful existing action from a subrule retaining the enclosing owner,
-  plus explicit fragment/toolchain/missing-action-family terminals; and
-- same-DICE source A/B/A success/error restoration with no stale call state,
-  providers, actions or configured edges.
+- `app/slug_configuration_v2/src/native/tests.rs`
+- `app/slug_commands_v2/tests/commands.rs`
+- `app/slug_loading_v2/src/builtin_restriction_tests.rs` (new)
+- `app/slug_loading_v2/src/host_package_load_tests.rs`
+- `app/slug_analysis_v2/tests/subrule.rs`
+- `app/slug_server_v2/src/tests.rs`
 
-Run the full existing subrule predecessor suite unchanged so dependency error
-precedence, cycle termination/repair and target-only outer-frontier order remain
-proved. Existing analysis-value/provider tests cover generic configured target
-and provider lowering; extend them only for Artifact-backed executable
-projection. No benchmark is required because this adds no retained cache and
-does not alter the dependency hot path; retained-size and clone audits are
-required.
+Plan/evidence allowlist:
 
-## Frozen implementation envelope
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
+- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`
+- `thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md`
 
-Allowed production paths at `2bf86bfa8`:
+Production additions cap: 950 lines. Proof additions cap: 850 lines. Plans and
+generated lockfiles are excluded. Any other path, a new dependency, a retained
+representation wider than two pointer words, a second configuration store, a
+new DICE key/cache/lock/interner, or an inability to preserve exact private
+caller provenance is `REPLAN`.
 
-- `app/slug_build_api_v2/src/analysis_value.rs`, only the tagged target identity
-  and `ConfiguredTargetValue` integration,
-  `26e2f0cec569af165e88d79d55583f19ec65d9d3`, plus the export hunk in
-  `src/lib.rs`, `cb299989b487bb3f0150bd7f6f7ecc2c244b70f2`;
-- new `app/slug_loading_v2/src/subrule_invocation.rs` plus module/export hunks
-  in `src/lib.rs`, `4add32e3499539a6e0246a7c54e290393c1059ed`;
-- `app/slug_loading_v2/src/subrule.rs`,
-  `326fa12b214f384577ccce979b6e4590000cb8bb`; `src/package.rs`, only the
-  frozen rule-wrapper/accessor hunk,
-  `7831cacf526d2c3d87e28cf6ce51b4985b9758ef`; and `src/provider.rs`, only
-  analysis-capability recognition,
-  `b8913126566d8e4ff4448720c134b6db136dba0c`;
-- `app/slug_analysis_v2/src/subrule.rs`,
-  `1e86fe17b31de983a048da8d3a94d7f72740db0b`; `src/starlark_rule.rs`,
-  `17fb9818dca737e0a67bac23533e79a7f9066030`; `src/analysis_value.rs`, only
-  generic configured-target/Artifact-backed executable projection,
-  `ac78d30616431f65411be9d5b430dc858fcfc884`; `src/dice.rs`, only
-  finish/value/edge orchestration hunks,
-  `917add337f30586b13a20bf94acd14a052d37d52`; and
-  `src/configured_target.rs`,
-  `76aef751ae0f786958213aca3038e7c6db3f0e16`.
+## Required proof
 
-Allowed proof paths are `app/slug_build_api_v2/tests/analysis_value.rs`,
-`3cc11fafdc101c06b08f5d8403933b66e0e0d83b`,
-`app/slug_analysis_v2/tests/subrule.rs`,
-`d25cc60d45df2de4f08fa8b54c5830752b2ce833`, the single existing
-`retained_daemon_subrule_dependency_error_precedence_restores_a_b_a` assertion
-hunk in `app/slug_server_v2/src/tests.rs`,
-`b8dcd3af0feb612ca67a201da5a2e68047e50b00`, and focused existing unit-test
-modules in the listed production files. The daemon correction must only replace
-the obsolete initial/restored deferred-boundary expectation with rule-body
-execution, move the shared implementation-body rejection to selected B only,
-and retain the selected dependency-validation precedence and initial/restored
-A/B/A equality proof. Every other dirty hunk/file is excluded. Initial caps:
-1,350 production additions, 1,400 proof additions, 2,750 aggregate additions;
-no new production function above 140 lines and no new retained
-descriptor/provider copy. `package.rs` and `dice.rs` exceed 2,000 lines, so keep
-only adapter/orchestration hunks there. Put the evaluator bridge in the new
-loading module and cohesive materialization in the existing analysis
-subrule/value owners.
+1. Configuration unit tests prove target/host defaults, all three modes and
+   invalid spellings, target/Exec separation, host-to-compilation copying,
+   re-projection, all six method defaults, label-valued FDO distinction, and
+   fail-closed unowned absolute paths.
+2. Restricted-API table tests prove every frozen allowlist row, `_builtins`,
+   exact `bazel_tools`, main prefixes, mapping-to-main, version-insensitive
+   module repos, exact-prefix negatives, helper-definition selection, and
+   mapping A/B/A without filesystem substring authorization.
+3. Root analysis proves cached collection identity, active-name `dir`, unknown
+   absence, the exact 12-name inventory, declaration rejection, explicit
+   unsupported known-fragment failure, declared `cpp`, every zero-argument
+   method, and wrong arity.
+4. Subrule analysis proves its exact `dir`, rule/subrule declaration isolation,
+   admitted access success/failure, the explicitly unsupported specialized
+   error/`hasattr` distinction, nested declarations, distinct collection
+   identity, shared `cpp` identity, escaped-context rejection, and extracted
+   fragment behavior.
+5. An authenticated-source regression checks the realized rules_cc file hash
+   and the source-ordered six-method call ledger.
+6. An authentic-shaped `create_fdo_context` proof distinguishes target-default
+   early return, selected-Exec default action terminal,
+   `--compilation_mode=dbg` target-only behavior, and
+   `--host_compilation_mode=fastbuild` Exec-only early return.
+7. Stable-daemon target/host C0/C1/C0 proves command and Exec-projection
+   identity, invalidation and restoration with no cross-request fragment reuse.
+8. `cargo test -p slug_configuration_v2`,
+   `cargo test -p slug_loading_v2`,
+   `cargo test -p slug_analysis_v2`, and the named server/CLI dependents pass
+   serially. Rebuild `slug_cli_v2` before binary smokes and clean stale `slugd`
+   before and after daemon-sensitive validation.
+9. A staged-only diff audit proves both line caps, allowlists and the exclusion
+   of the parked registration proof. Independent terminal review must return
+   `ACCEPT` before commit.
 
-The Buck2 utility review classifies most work as call-flow/evaluator scratch and
-the tagged identity as one bounded retained-representation correction. Reuse
-the existing `AnalysisConfiguredTargetKey` Arc and wrap the one cloned Null
-`CanonicalLabel` in an Arc at the admitted source boundary; derive
-`Dupe`/`Allocative`, add no later string/configuration copy, interner, cache or
-side lookup, and assert the two-word enum plus `ConfiguredTargetValue` sizes.
-`REPLAN` rather than altering retained `FilesToRunProvider`, adding an
-interner/cache, or introducing a broad Starlark-runtime crate move.
+## Implementation evidence
 
-## Validation and stops
+The candidate uses 665 production additions and 648 proof additions, excluding
+plans and the parked registration proof. It adds no dependency, DICE key,
+cache, lock, interner, parser, rules_cc branch, or second configuration store.
+The `cpp` projection is constructed only when the root rule or an attached
+subrule declares `cpp`; unused invalid C++ state therefore preserves the
+previous ordinary-rule/config-setting behavior.
 
-R1 independent review returned `REPLAN`: it required source Targets to survive
-nested lowering/rematerialization but `ConfiguredTargetValue` could represent
-only configured keys, while forbidding a retained correction. R2 embedded
-`CanonicalLabel` directly, but correction review returned `REPLAN` because that
-multi-String value inflated every identity, cloned deeply and could not derive
-`Dupe`. R3 uses the Arc-backed tagged identity and accounts for its sole
-boundary allocation/clone. Before implementation, obtain independent
-correction review of that identity and the cross-crate
-evaluator capability, call-token lifetime, ordinary/hidden shared value owner,
-Artifact-backed executable projection, successful edge publication and exact
-scope. Independent terminal implementation review remains mandatory.
+Serial validation passed `slug_configuration_v2` (49 tests),
+`slug_loading_v2` (456 unit tests plus all integration suites, with the
+realized-source proof run explicitly under `--ignored`), `slug_analysis_v2`
+(100 tests), and `slug_commands_v2` (25 tests). The authentic-shaped fragment
+proof, prior FDO daemon A/B/A proof, and new target/Exec fragment C0/C1/C0 proof
+pass individually. A serial full `slug_server_v2` run passed 55/56 and exposed
+the eager unused-projection regression; after the lazy-construction correction,
+both the previously failing FDO test and new fragment daemon test pass. CLI
+library tests and command-boundary tests pass. The broad CLI integration suite
+remains independently red in existing selected-BCR unsupported-entry and
+unavailable-DICE fixture paths; no fragment/command diagnostic appears in
+those failures, so this packet does not claim to repair that baseline.
 
-The first terminal implementation review returned `REPLAN`: file nodes passed
-validation with inherent `DefaultInfo` but their materialized Target copied the
-node's intentionally empty provider collection; each frozen-subrule call cloned
-the full prepared dispatcher map and target/package strings; and the proof did
-not discriminate high-count calls, absence shapes, source executables, alias
-actual access or hidden descriptor order. The bounded correction creates a
-materialization-only singleton-file `DefaultInfo` for source/generated Target
-values without altering their configured result, Arc-shares the immutable
-dispatcher payload so a call clones only two Arcs, and adds all missing direct
-discriminators plus nested source/generated provider rematerialization.
-Terminal correction rereview returns `ACCEPT`: the bounded provider view,
-Null/configured identities, Arc-only call clone, 256-call two-route proof,
-absence/source-executable/alias/order discriminators, scope isolation and
-1,230-production/469-proof/1,699-aggregate accounting all satisfy the packet.
+Independent terminal review returned `ACCEPT`: the staged candidate preserves
+one structural configuration owner, lazy evaluator-local projection, exact
+Target/Exec mode copying, separate root/subrule authorization, authenticated
+caller provenance, the pinned allowlist, and fail-closed absolute-path state.
+The reviewed accounting is 665 production and 648 proof additions, with only
+the unrelated registration proof left unstaged.
 
-Run formatting and `git diff --check`; focused loading/analysis-value/subrule/
-configured-edge tests; the complete serial `slug_loading_v2` and
-`slug_analysis_v2` suites; named build/cquery/query/server dependents; relevant
-multi-crate checks; retained-size/cap/clone audits; forbidden-surface scans;
-base/worktree-blob isolation; archive checker; and an index-only repeat with
-only packet hunks. Clean stale `slugd` around daemon tests and rebuild
-`slug_cli_v2` before any `SLUG_V2_BIN` replay.
+## Review gate
 
-`REPLAN` for a new DICE key/compute/cache/registry; evaluator values retained in
-DICE; an unsafe/raw callback bridge; a lock across DICE compute; a second rule
-evaluation or action owner; failure publication; loss of dependency-error
-precedence; any retained provider change beyond the exact tagged target
-identity; fabricated configuration bytes; loss of the Null/configured tag
-during lowering/rematerialization; a parser/binder/`set`
-fork; C++/rules_cc special casing; silently exposing fragments/toolchains or
-unlisted action families; inability to invalidate escaped contexts on every
-exit; dirty-hunk overlap; unlisted files/cap overflow; Java; or an exact claim
-without Bazel 9.2 evidence.
+The architecture reviewer must answer:
 
-## Immediate predecessor and successor
+- Does the packet preserve one structural configuration owner and one
+  evaluator-local projection without adding a parallel retained representation?
+- Are root/subrule authorization, `dir`, caching and lifetime facts separated
+  exactly as Bazel 9.2 requires?
+- Does the two-facade design fit starlark-rust without declaration-set type
+  explosion, and is the narrowed subrule diagnostic/`hasattr` boundary honest?
+- Does the complete frozen private-caller inventory and repository-branch proof
+  make the exact admitted-method claim defensible?
+- Does the bounded host-to-compilation Exec projection preserve target/Exec
+  separation without silently claiming the rest of Bazel's transition?
+- Are all six FDO-facing methods handled as one coherent category while
+  absolute-path producers remain an explicit, honest unsupported boundary?
+- Can later fragments and action builtins extend these seams without a parser,
+  rules_cc, `cc_common`, or C++-specific configured-analysis branch?
 
-Commit `2bf86bfa8` accepted configured hidden Target/Exec dependencies,
-validation and loading-query facts with one source-ordered stream and one
-aggregate parent cycle guard. It deliberately stopped before evaluator values,
-invocation and configured hidden edges; this packet is that named successor.
-
-After acceptance, run the fragment-projection category needed by the authentic
-rules_cc `create_fdo_context` call, then the generic action category
-(`args`/`run`/`symlink` and artifact/input provenance), then the
-`cc_common.absolute_symlink` BCR consumer. Reaudit the authentic repository
-after each category and select the first new generic terminal; do not infer a
-native C++ rule path merely because the consumer is rules_cc.
+Only `ACCEPT` activates implementation. Any ambiguity in caller provenance,
+path normalization, semantic equality, or evaluator-value retention is
+`REPLAN`.

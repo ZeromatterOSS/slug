@@ -580,15 +580,28 @@ impl SlugConfiguration {
             actual => return Err(SlugConfigurationError::ExecProjectionRequiresTarget { actual }),
         };
         let mut options = self.0.options.to_vec();
-        let record = options
-            .iter_mut()
-            .find(|record| {
-                record.class_name == PLATFORM_OPTIONS && record.canonical_name == TARGET_PLATFORMS
-            })
-            .ok_or(SlugConfigurationError::UnknownNativeOption)?;
-        record.value = OptionValue::Label(Some(LabelValue::Labels(LabelValues(Arc::from([
-            ResolvedOptionLabel::from_canonical(platform),
-        ])))));
+        let host_compilation_mode = self
+            .option_value(CORE_OPTIONS, "host_compilation_mode")?
+            .clone();
+        let mut found_platform = false;
+        let mut found_compilation_mode = false;
+        for record in &mut options {
+            if record.class_name == PLATFORM_OPTIONS && record.canonical_name == TARGET_PLATFORMS {
+                found_platform = true;
+                record.value =
+                    OptionValue::Label(Some(LabelValue::Labels(LabelValues(Arc::from([
+                        ResolvedOptionLabel::from_canonical(platform),
+                    ])))));
+            } else if record.class_name == CORE_OPTIONS
+                && record.canonical_name == "compilation_mode"
+            {
+                found_compilation_mode = true;
+                record.value = host_compilation_mode.clone();
+            }
+        }
+        if !found_platform || !found_compilation_mode {
+            return Err(SlugConfigurationError::UnknownNativeOption);
+        }
         Ok(finish_configuration(
             SlugConfigurationKind::Exec,
             options.into(),
@@ -927,7 +940,7 @@ impl SlugConfiguration {
         super::matching::matches(&self.0.options, values, define_values)
     }
 
-    fn validate_cpp_field_state(&self) -> Result<(), SlugConfigurationError> {
+    pub(super) fn validate_cpp_field_state(&self) -> Result<(), SlugConfigurationError> {
         let optimize = self.cpp_text("fdo_optimize")?;
         if optimize.is_some_and(|value| !value.starts_with("//")) {
             return Err(SlugConfigurationError::InvalidCppConfiguration {
@@ -1008,7 +1021,7 @@ impl SlugConfiguration {
         }
     }
 
-    fn option_value(
+    pub(super) fn option_value(
         &self,
         class_name: &'static str,
         canonical_name: &'static str,
@@ -1040,7 +1053,12 @@ fn command_native_descriptor(
 fn typed_native_command_descriptor(
     option: NativeCommandOption,
 ) -> Result<(usize, &'static NativeOptionDescriptor), SlugConfigurationError> {
-    let class_name = if option == NativeCommandOption::CollectCodeCoverage {
+    let class_name = if matches!(
+        option,
+        NativeCommandOption::CollectCodeCoverage
+            | NativeCommandOption::CompilationMode
+            | NativeCommandOption::HostCompilationMode
+    ) {
         CORE_OPTIONS
     } else {
         CPP_OPTIONS

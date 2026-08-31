@@ -3176,11 +3176,11 @@ ASPECT_TUPLE = aspect(implementation = aspect_impl, fragments = ("cpp", "apple",
 }
 
 #[tokio::test]
-async fn configured_fragment_rule_invocation_fails_closed_before_publication() {
+async fn configured_fragment_rule_invocation_retains_declaration_for_analysis() {
     let files: &[(&str, &[u8])] = &[
         (
             "BUILD.bazel",
-            b"load(':defs.bzl', 'probe')\nprobe(name = 'blocked')\n",
+            b"load(':defs.bzl', 'probe')\nprobe(name = 'blocked', visibility = ['//visibility:public'])\n",
         ),
         (
             "defs.bzl",
@@ -3188,10 +3188,11 @@ async fn configured_fragment_rule_invocation_fails_closed_before_publication() {
         ),
     ];
     let outcome = load_repository_package_fixture(files, 427).await;
-    let error = repository_package_error(&outcome);
-    assert!(error.contains(
-        "target invocation for rules requiring configuration fragments is not supported"
-    ));
+    let package = repository_package_terminal(&outcome);
+    let crate::package::PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+        panic!("probe did not retain its Starlark rule")
+    };
+    assert_eq!(rule.required_fragments(), ["cpp"]);
 }
 
 fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
