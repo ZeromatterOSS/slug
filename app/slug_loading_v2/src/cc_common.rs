@@ -11,6 +11,7 @@
 use std::fmt;
 
 use allocative::Allocative;
+use compact_str::CompactString;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
@@ -28,9 +29,15 @@ use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::list::AllocList;
 use starlark::values::list::ListRef;
+use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
+use starlark::values::tuple::TupleRef;
 
+use crate::builtin_restriction::CustomAllowlistEntry;
+use crate::builtin_restriction::check_custom_allowlist;
+use crate::builtin_restriction::source_identities_for_evaluator;
 use crate::provider::BzlEvaluationContext;
+use crate::subrule_invocation::AnalysisActions;
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct CcCommonModule;
@@ -126,6 +133,37 @@ where
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn absolute_symlink<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = named)] ctx: Value<'v>,
+        #[starlark(require = named)] output: Value<'v>,
+        #[starlark(require = named)] target_path: &str,
+        #[starlark(require = named)] progress_message: Option<&str>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        let actions = ctx
+            .get_attr("actions", eval.heap())
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?
+            .and_then(AnalysisActions::from_value)
+            .ok_or_else(|| anyhow::anyhow!("absolute_symlink requires a rule or subrule ctx"))?;
+        actions.register_absolute_symlink(output, target_path, progress_message)?;
+        Ok(NoneType)
+    }
+
+    fn check_private_api<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = named)] allowlist: Value<'v>,
+        #[starlark(require = named, default = 1)] depth: i32,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        let depth = usize::try_from(depth)
+            .map_err(|_| anyhow::anyhow!("check_private_api depth must be nonnegative"))?;
+        let entries = custom_allowlist(allowlist)?;
+        let identities = source_identities_for_evaluator(eval)?;
+        check_custom_allowlist(eval, &identities, &entries, depth)?;
+        Ok(NoneType)
+    }
+
     fn freeze<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         value: Value<'v>,
@@ -149,6 +187,37 @@ fn cc_internal_methods(builder: &mut MethodsBuilder) {
             .heap()
             .alloc_complex(EmptyCcHeaderInfoGen { empty_headers }))
     }
+}
+
+fn custom_allowlist(value: Value<'_>) -> anyhow::Result<Vec<CustomAllowlistEntry>> {
+    let values = if let Some(values) = ListRef::from_value(value) {
+        values.iter().collect::<Vec<_>>()
+    } else if let Some(values) = TupleRef::from_value(value) {
+        values.iter().collect::<Vec<_>>()
+    } else {
+        anyhow::bail!("check_private_api allowlist must be a sequence of tuples")
+    };
+    values
+        .into_iter()
+        .map(|value| {
+            let pair = TupleRef::from_value(value).ok_or_else(|| {
+                anyhow::anyhow!("check_private_api allowlist entries must be two-string tuples")
+            })?;
+            let [apparent_repo, package_prefix] = pair.iter().collect::<Vec<_>>()[..] else {
+                anyhow::bail!("check_private_api allowlist entries must be two-string tuples")
+            };
+            let apparent_repo = apparent_repo.unpack_str().ok_or_else(|| {
+                anyhow::anyhow!("check_private_api allowlist entries must be two-string tuples")
+            })?;
+            let package_prefix = package_prefix.unpack_str().ok_or_else(|| {
+                anyhow::anyhow!("check_private_api allowlist entries must be two-string tuples")
+            })?;
+            Ok(CustomAllowlistEntry {
+                apparent_repo: CompactString::new(apparent_repo),
+                package_prefix: CompactString::new(package_prefix),
+            })
+        })
+        .collect()
 }
 
 #[starlark_module]

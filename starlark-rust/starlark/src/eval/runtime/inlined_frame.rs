@@ -73,6 +73,15 @@ impl InlinedFrames {
         }
     }
 
+    /// Source filenames for compiler-inlined callers, nearest caller first.
+    pub(crate) fn source_filenames_innermost_first(self) -> Vec<String> {
+        self.to_inlined_frames()
+            .into_iter()
+            .rev()
+            .map(|frame| frame.span.span.to_file_span().file.filename().to_owned())
+            .collect()
+    }
+
     fn to_inlined_frames(self) -> Vec<FrozenRef<'static, InlinedFrame>> {
         let mut r = Vec::new();
         let mut frames_iter = self;

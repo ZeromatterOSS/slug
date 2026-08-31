@@ -314,11 +314,15 @@ impl<'a> AnalysisValueMaterializer<'a> {
         })
     }
 
-    fn builtin(&mut self, identity: &ProviderIdentity, value: &ProviderValue) -> FrozenValue {
+    fn builtin(
+        &mut self,
+        identity: &ProviderIdentity,
+        value: &ProviderValue,
+    ) -> Result<FrozenValue, String> {
         let mut fields = SmallMap::new();
         match value {
             ProviderValue::DefaultInfo(info) => {
-                fields.insert("files".into(), self.file_depset(&info.files));
+                fields.insert("files".into(), self.depset(info.files())?);
                 fields.insert(
                     "default_runfiles".into(),
                     self.runfiles(&info.default_runfiles),
@@ -347,7 +351,7 @@ impl<'a> AnalysisValueMaterializer<'a> {
                 );
             }
             ProviderValue::FilesToRunProvider(info) => {
-                return self.files_to_run(info);
+                return Ok(self.files_to_run(info));
             }
             ProviderValue::PlatformInfo(info) => {
                 fields.insert(
@@ -365,10 +369,10 @@ impl<'a> AnalysisValueMaterializer<'a> {
             }
             ProviderValue::Occurrence(_) => unreachable!("occurrences use the shared classes"),
         }
-        self.heap.alloc(BuiltinProviderView {
+        Ok(self.heap.alloc(BuiltinProviderView {
             identity: identity.clone(),
             fields,
-        })
+        }))
     }
 
     fn target(&mut self, target: &ConfiguredTargetValue) -> Result<FrozenValue, String> {
@@ -376,7 +380,7 @@ impl<'a> AnalysisValueMaterializer<'a> {
         for (identity, provider) in target.providers().iter() {
             let value = match provider {
                 ProviderValue::Occurrence(occurrence) => self.provider(occurrence)?,
-                provider => self.builtin(identity, provider),
+                provider => self.builtin(identity, provider)?,
             };
             providers.insert(identity.clone(), value);
         }
@@ -835,8 +839,14 @@ mod tests {
             ProviderIdentity::builtin("ToolchainInfo"),
             [("marker", AnalysisValue::string("toolchain"))],
         );
+        let executable_artifact = AnalysisArtifact::Source(
+            slug_identity_v2::CanonicalLabel::parse("@@//bin:tool").unwrap(),
+        );
         let providers = ProviderCollection::new(vec![
-            ProviderValue::DefaultInfo(DefaultInfo::from_executable("bin/tool".to_owned(), None)),
+            ProviderValue::DefaultInfo(
+                DefaultInfo::from_executable("bin/tool".to_owned(), executable_artifact, None)
+                    .unwrap(),
+            ),
             ProviderValue::OutputGroupInfo(OutputGroupInfo::new(BTreeMap::from([(
                 "validation".to_owned(),
                 Depset::from_direct(
@@ -904,10 +914,15 @@ mod tests {
             default.dir_attr(),
             ["data_runfiles", "default_runfiles", "files", "files_to_run"]
         );
+        let default_files =
+            StarlarkDepset::direct_from_value(field(default, "files").to_value()).unwrap();
         assert_eq!(
-            StarlarkDepset::direct_from_value(field(default, "files").to_value()).unwrap()[0]
-                .unpack_str(),
-            Some("bin/tool")
+            AnalysisArtifactValue::from_value(default_files[0])
+                .unwrap()
+                .artifact()
+                .path()
+                .as_ref(),
+            "bin/tool"
         );
         let files_to_run =
             BuiltinProviderView::from_value(field(default, "files_to_run").to_value()).unwrap();
@@ -960,22 +975,38 @@ mod tests {
     #[test]
     fn null_target_and_artifact_backed_builtin_provider_survive_nested_round_trip() {
         let label = slug_identity_v2::CanonicalLabel::parse("@@//pkg:source.txt").unwrap();
-        let file_providers = |path: &str| {
-            ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::from_files(
-                Depset::from_direct(DepsetOrder::Default, vec![path.to_owned()]).unwrap(),
-            ))])
+        let file_providers = |artifact: AnalysisArtifact| {
+            let files = AnalysisDepset::new(
+                DepsetOrder::Default,
+                vec![AnalysisValue::artifact(artifact)],
+                Vec::new(),
+            )
+            .unwrap();
+            ProviderCollection::new(vec![ProviderValue::DefaultInfo(
+                DefaultInfo::from_files(files).unwrap(),
+            )])
             .unwrap()
         };
         let source = AnalysisValue::configured_target(ConfiguredTargetValue::new(
             slug_build_api_v2::AnalysisTargetIdentity::null(label.clone()),
-            file_providers("pkg/source.txt"),
+            file_providers(AnalysisArtifact::Source(label.clone())),
         ));
+        let generated_owner = AnalysisConfiguredTargetKey::new(
+            slug_identity_v2::CanonicalLabel::parse("@@//pkg:generator").unwrap(),
+            b"configured".as_slice(),
+        );
         let generated = AnalysisValue::configured_target(ConfiguredTargetValue::new(
             AnalysisConfiguredTargetKey::new(
                 slug_identity_v2::CanonicalLabel::parse("@@//pkg:generated.txt").unwrap(),
                 b"configured".as_slice(),
             ),
-            file_providers("pkg/generated.txt"),
+            file_providers(AnalysisArtifact::Derived {
+                owner: generated_owner,
+                output: slug_build_api_v2::ActionOutput::new(
+                    "pkg/generated.txt",
+                    slug_build_api_v2::ActionOutputKind::File,
+                ),
+            }),
         ));
         let executable = AnalysisValue::provider(ProviderOccurrence::new(
             ProviderIdentity::builtin("FilesToRunProvider"),
@@ -1032,15 +1063,13 @@ mod tests {
                 ),
                 null_identity
             );
-            assert_eq!(
-                target
-                    .providers()
-                    .default_info()
-                    .expect("round trip retained file DefaultInfo")
-                    .files
-                    .to_list(),
-                [expected]
-            );
+            let artifacts = target
+                .providers()
+                .default_info()
+                .expect("round trip retained file DefaultInfo")
+                .file_artifacts();
+            assert_eq!(artifacts.len(), 1);
+            assert_eq!(artifacts[0].path().as_ref(), expected);
         }
     }
 

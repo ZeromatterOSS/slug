@@ -32151,7 +32151,7 @@ fn bazel_cc_common_private_bridge_is_bzl_only_owner_checked_and_opaque() {
         repository_mapping: Arc::from([]),
     };
     let module = eval_bzl_with_identity(
-        "INTERNAL=cc_common.internal_DO_NOT_USE()\nHAS_BRIDGE=hasattr(cc_common, 'internal_DO_NOT_USE')\nHAS_INTERNAL_METHOD=hasattr(INTERNAL, 'check_private_api')\n",
+        "INTERNAL=cc_common.internal_DO_NOT_USE()\nHAS_BRIDGE=hasattr(cc_common, 'internal_DO_NOT_USE')\nHAS_PRIVATE_CHECK=hasattr(INTERNAL, 'check_private_api')\nHAS_ABSOLUTE_SYMLINK=hasattr(INTERNAL, 'absolute_symlink')\n",
         owner("@@rules_cc+//cc/private:cc_internal.bzl"),
     )
     .unwrap();
@@ -32161,8 +32161,12 @@ fn bazel_cc_common_private_bridge_is_bzl_only_owner_checked_and_opaque() {
     );
     assert_eq!(module.get("HAS_BRIDGE").unwrap().unpack_bool(), Some(true));
     assert_eq!(
-        module.get("HAS_INTERNAL_METHOD").unwrap().unpack_bool(),
-        Some(false)
+        module.get("HAS_PRIVATE_CHECK").unwrap().unpack_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        module.get("HAS_ABSOLUTE_SYMLINK").unwrap().unpack_bool(),
+        Some(true)
     );
 
     for source in [

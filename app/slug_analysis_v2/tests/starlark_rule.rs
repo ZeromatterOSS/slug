@@ -61,7 +61,11 @@ use slug_analysis_v2::key::StarlarkOptionValue;
 use slug_analysis_v2::prepare_configured_node_analysis;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::AnalysisValueKind;
+use slug_build_api_v2::ArtifactInputSource;
+use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::ProviderId;
+use slug_build_api_v2::SpawnExecutable;
+use slug_build_api_v2::SymlinkTarget;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
@@ -83,6 +87,8 @@ use slug_bzlmod_v2::inject_root_package_policy_inputs;
 use slug_configuration_v2::CommandConfigurationOccurrence;
 use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_configuration_v2::SlugConfiguration;
+use slug_configuration_v2::native::host::ActionEnvironmentHost;
+use slug_configuration_v2::native::host::ActionEnvironmentHostOs;
 use slug_configuration_v2::native::host::AutoCpuToken;
 use slug_configuration_v2::native::host::HostConversionInputs;
 use slug_configuration_v2::native::host::HostPathFlavor;
@@ -281,6 +287,13 @@ fn scratch() -> PathBuf {
     let root = std::env::temp_dir().join(format!("slug-analysis-rule-{nanos}"));
     fs::create_dir_all(&root).unwrap();
     root
+}
+
+fn default_file_paths(info: &DefaultInfo) -> Vec<String> {
+    info.file_artifacts()
+        .into_iter()
+        .map(|artifact| artifact.path().into_owned())
+        .collect()
 }
 
 fn directory_snapshot(root: &std::path::Path) -> WorkspaceDirectorySnapshot {
@@ -700,6 +713,25 @@ fn default_test_configuration() -> SlugConfiguration {
 fn test_configuration() -> ConfigurationKey {
     ConfigurationKey::from_slug(
         default_test_configuration()
+            .with_host_platform_label(&CanonicalLabel::parse("@@//.slug_test_host:host").unwrap()),
+    )
+}
+
+fn typed_action_test_configuration() -> ConfigurationKey {
+    let host = HostConversionInputs::new(
+        Some(AutoCpuToken::K8),
+        Some(HostPathFlavor::Unix),
+        None,
+        Arc::from([]),
+        Arc::from([]),
+    )
+    .unwrap()
+    .with_action_environment_host(ActionEnvironmentHost::without_environment(
+        ActionEnvironmentHostOs::Linux,
+    ));
+    ConfigurationKey::from_slug(
+        SlugConfiguration::default_target(&host)
+            .unwrap()
             .with_host_platform_label(&CanonicalLabel::parse("@@//.slug_test_host:host").unwrap()),
     )
 }
@@ -6359,7 +6391,7 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
 
     assert_eq!(result.declared_outputs(), &["pkg/write_file.txt"]);
     assert_eq!(
-        result.providers().default_info().unwrap().files.to_list(),
+        default_file_paths(result.providers().default_info().unwrap()),
         ["pkg/write_file.txt"]
     );
     assert_eq!(result.actions().len(), 1);
@@ -6929,7 +6961,7 @@ missing = rule(implementation = _missing, executable = True)
         .await
         .unwrap();
     let implicit = implicit.providers().default_info().unwrap();
-    assert_eq!(implicit.files.to_list(), ["implicit"]);
+    assert_eq!(default_file_paths(implicit), ["implicit"]);
     assert_eq!(implicit.executable.as_deref(), Some("implicit"));
     assert_eq!(
         implicit.files_to_run.executable.as_deref(),
@@ -6942,7 +6974,7 @@ missing = rule(implementation = _missing, executable = True)
         .await
         .unwrap();
     let explicit = explicit.providers().default_info().unwrap();
-    assert_eq!(explicit.files.to_list(), ["explicit.txt"]);
+    assert_eq!(default_file_paths(explicit), ["explicit.txt"]);
     assert_eq!(explicit.executable.as_deref(), Some("explicit"));
     assert_eq!(explicit.default_runfiles.files.to_list(), ["explicit"]);
     assert_eq!(explicit.data_runfiles.files.to_list(), ["explicit"]);
@@ -7028,11 +7060,11 @@ async fn executable_default_info_recomputes_and_restores_structural_results() {
         .unwrap();
 
     assert_eq!(
-        initial.providers().default_info().unwrap().files.to_list(),
+        default_file_paths(initial.providers().default_info().unwrap()),
         ["probe"]
     );
     assert_eq!(
-        changed.providers().default_info().unwrap().files.to_list(),
+        default_file_paths(changed.providers().default_info().unwrap()),
         ["probe.txt"]
     );
     assert_ne!(initial, changed);
@@ -7181,7 +7213,7 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     );
     assert_eq!(result.declared_outputs(), ["parent/parent.txt"]);
     assert_eq!(
-        result.providers().default_info().unwrap().files.to_list(),
+        default_file_paths(result.providers().default_info().unwrap()),
         ["parent/parent.txt"]
     );
     assert_eq!(result.actions().len(), 1);
@@ -7222,6 +7254,253 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     );
     assert_eq!(leaf.actions().len(), 1);
     assert_eq!(leaf.actions()[0].outputs()[0].path(), "leaf/second.txt");
+}
+
+#[tokio::test]
+async fn args_run_and_symlink_snapshot_through_the_generic_action_sink() {
+    let workspace = scratch();
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"def _mutate(ctx, args):
+    if args.add("from-subrule") != args:
+        fail("Args.add must return the same object")
+
+mutate = subrule(implementation = _mutate)
+
+def _impl(ctx):
+    source = ctx.actions.declare_file("source.tool")
+    first = ctx.actions.declare_file("first.out")
+    second = ctx.actions.declare_file("second.out")
+    later = ctx.actions.declare_file("later.out")
+    link = ctx.actions.declare_file("linked.out")
+    ctx.actions.write(source, "tool", is_executable = True)
+    args = ctx.actions.args()
+    if args.add("first") != args:
+        fail("one-position Args.add did not chain")
+    args.add("--number", 7, format = "n=%s")
+    args.add("--file", source, format = "f=%s%%")
+    args.add(source.basename)
+    args.add(source.dirname)
+    args.add(source.path)
+    args.add(source.short_path)
+    mutate(args)
+    ctx.actions.run(
+        outputs = [first, second],
+        executable = source,
+        arguments = ["head", args, "literal/looks/like/a/path"],
+        inputs = [source],
+        tools = [depset([source])],
+        env = {"K": "V"},
+        mnemonic = "Compile",
+        progress_message = "first snapshot",
+        use_default_shell_env = True,
+    )
+    args.add("late")
+    ctx.actions.run(
+        outputs = [later],
+        executable = "tools/../tools/runner",
+        arguments = [args],
+        env = {"ONLY": "action"},
+    )
+    ctx.actions.symlink(
+        output = link,
+        target_file = source,
+        is_executable = True,
+        progress_message = "link source",
+    )
+    return [DefaultInfo(files = depset([first, second, later, link]))]
+
+subject = rule(implementation = _impl, subrules = [mutate])
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("BUILD.bazel"),
+        "load(':defs.bzl', 'subject')\nsubject(name = 'subject')\n",
+    )
+    .unwrap();
+
+    let result = analyze_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        &ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//pkg:subject").unwrap(),
+            typed_action_test_configuration(),
+        ),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(result.actions().len(), 4);
+    assert!(matches!(
+        result.actions()[0].kind(),
+        ActionKind::Write { .. }
+    ));
+    let first = result.actions()[1].spawn_spec().unwrap();
+    assert!(matches!(first.executable(), SpawnExecutable::Artifact(_)));
+    assert_eq!(
+        first.render_argv(),
+        [
+            "pkg/source.tool",
+            "head",
+            "first",
+            "--number",
+            "n=7",
+            "--file",
+            "f=pkg/source.tool%",
+            "source.tool",
+            "pkg",
+            "pkg/source.tool",
+            "pkg/source.tool",
+            "from-subrule",
+            "literal/looks/like/a/path",
+        ]
+    );
+    assert_eq!(
+        first
+            .outputs()
+            .iter()
+            .map(|output| output.path())
+            .collect::<Vec<_>>(),
+        ["pkg/first.out", "pkg/second.out"]
+    );
+    assert_eq!(first.inputs().sources().len(), 1);
+    assert!(matches!(
+        first.inputs().sources()[0],
+        ArtifactInputSource::Direct(_)
+    ));
+    assert!(matches!(
+        first.tools().sources()[0],
+        ArtifactInputSource::Depset(_)
+    ));
+    assert_eq!(first.environment().fixed().get("K"), Some("V"));
+    assert_eq!(first.mnemonic(), "Compile");
+    assert_eq!(first.progress_message(), Some("first snapshot"));
+
+    let later = result.actions()[2].spawn_spec().unwrap();
+    assert!(
+        matches!(later.executable(), SpawnExecutable::Path(path) if path.as_str() == "tools/runner")
+    );
+    assert_eq!(later.render_argv().last().map(String::as_str), Some("late"));
+    assert!(!first.render_argv().iter().any(|value| value == "late"));
+    assert_eq!(later.environment().fixed().get("ONLY"), Some("action"));
+    assert_eq!(later.environment().fixed().iter().len(), 1);
+
+    let link = result.actions()[3].symlink_spec().unwrap();
+    assert_eq!(link.progress_message(), Some("link source"));
+    assert!(matches!(
+        link.target(),
+        SymlinkTarget::Artifact {
+            require_executable: true,
+            use_exec_root_for_source: false,
+            ..
+        }
+    ));
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//pkg:subject").unwrap(),
+        typed_action_test_configuration(),
+    );
+    let warm = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_eq!(result.actions()[1], warm.actions()[1]);
+    let warm_again = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_eq!(warm.actions()[1], warm_again.actions()[1]);
+    let definitions = package.join("defs.bzl");
+    let original = fs::read_to_string(&definitions).unwrap();
+    let changed = original.replace(
+        "tools = [depset([source])],",
+        "tools = [depset([source]), depset([source])],",
+    );
+    assert_ne!(original, changed);
+    fs::write(&definitions, changed).unwrap();
+    let topology_changed = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_ne!(result.actions()[1], topology_changed.actions()[1]);
+    fs::write(&definitions, original).unwrap();
+    let restored = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_eq!(result.actions()[1], restored.actions()[1]);
+}
+
+#[tokio::test]
+async fn scalar_args_reject_vector_and_invalid_format_before_action_publication() {
+    let workspace = scratch();
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"def _vector(ctx):
+    ctx.actions.args().add(["not", "scalar"])
+    return []
+
+def _format(ctx):
+    ctx.actions.args().add("value", format = "%s:%s")
+    return []
+
+def _empty(ctx):
+    ctx.actions.run(outputs = [], executable = "tool")
+    return []
+
+def _producer(ctx):
+    out = ctx.actions.declare_file("producer.out")
+    ctx.actions.write(out, "producer")
+    return [DefaultInfo(files = depset([out]))]
+
+def _cross_owner(ctx):
+    foreign = ctx.attr.dep[DefaultInfo].files.to_list()[0]
+    ctx.actions.run(outputs = [foreign], executable = "tool")
+    return []
+
+vector = rule(implementation = _vector)
+bad_format = rule(implementation = _format)
+empty = rule(implementation = _empty)
+producer = rule(implementation = _producer)
+cross_owner = rule(implementation = _cross_owner, attrs = {"dep": attr.label()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("BUILD.bazel"),
+        "load(':defs.bzl', 'bad_format', 'cross_owner', 'empty', 'producer', 'vector')\nvector(name = 'vector')\nbad_format(name = 'bad_format')\nempty(name = 'empty')\nproducer(name = 'producer')\ncross_owner(name = 'cross_owner', dep = ':producer')\n",
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for (target, expected) in [
+        (
+            "vector",
+            "supports only strings, integers, and regular Files",
+        ),
+        ("bad_format", "exactly one %s placeholder"),
+        ("empty", "requires at least one output"),
+        ("cross_owner", "requires a declared file"),
+    ] {
+        let error = analyze_request(
+            &dice,
+            &workspace,
+            &ConfiguredTargetKey::new(
+                CanonicalLabel::parse(&format!("@@//pkg:{target}")).unwrap(),
+                typed_action_test_configuration(),
+            ),
+            None,
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(error.contains(expected), "{error}");
+    }
 }
 
 #[tokio::test]

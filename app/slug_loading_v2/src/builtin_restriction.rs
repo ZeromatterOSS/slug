@@ -6,11 +6,31 @@ use compact_str::CompactString;
 use starlark::eval::Evaluator;
 
 use crate::BzlModuleIdentity;
+use crate::provider::BzlEvaluationContext;
+use crate::subrule_invocation::AnalysisEvaluationContext;
 
 #[derive(Clone, Copy)]
 struct AllowlistEntry {
     apparent_repo: &'static str,
     package_prefix: &'static str,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct CustomAllowlistEntry {
+    pub(crate) apparent_repo: CompactString,
+    pub(crate) package_prefix: CompactString,
+}
+
+pub(crate) fn source_identities_for_evaluator(
+    eval: &Evaluator<'_, '_, '_>,
+) -> anyhow::Result<Arc<[(CompactString, BzlModuleIdentity)]>> {
+    if let Ok(context) = BzlEvaluationContext::from_evaluator(eval) {
+        return Ok(context.source_identities_by_filename());
+    }
+    if let Ok(context) = AnalysisEvaluationContext::from_evaluator(eval) {
+        return Ok(context.source_identities_by_filename().clone());
+    }
+    anyhow::bail!("source-sensitive builtin requires loading or configured evaluation")
 }
 
 const INTERNAL_STARLARK_API_ALLOWLIST: &[AllowlistEntry] = &[
@@ -139,6 +159,40 @@ pub(crate) fn check_default_allowlist(
     let filename = eval
         .native_caller_function_filename()
         .ok_or_else(|| anyhow::anyhow!("restricted private API requires a .bzl function caller"))?;
+    let identity = identity_for_filename(&filename, identities)?;
+    if allows(identity) {
+        return Ok(());
+    }
+    anyhow::bail!("file '{}' cannot use private API", identity.label)
+}
+
+pub(crate) fn check_custom_allowlist(
+    eval: &Evaluator<'_, '_, '_>,
+    identities: &Arc<[(CompactString, BzlModuleIdentity)]>,
+    allowlist: &[CustomAllowlistEntry],
+    depth: usize,
+) -> anyhow::Result<()> {
+    let Some(filename) = eval.native_caller_function_filename_at_depth(depth) else {
+        // Bazel admits execution callbacks with no enclosing Starlark function.
+        return Ok(());
+    };
+    let identity = identity_for_filename(&filename, identities)?;
+    if allowlist.iter().any(|entry| {
+        repository_matches(identity, &entry.apparent_repo)
+            && package_starts_with(
+                identity.label.package().package().as_str(),
+                &entry.package_prefix,
+            )
+    }) {
+        return Ok(());
+    }
+    anyhow::bail!("file '{}' cannot use private API", identity.label)
+}
+
+fn identity_for_filename<'a>(
+    filename: &str,
+    identities: &'a Arc<[(CompactString, BzlModuleIdentity)]>,
+) -> anyhow::Result<&'a BzlModuleIdentity> {
     let mut matches = identities
         .iter()
         .filter_map(|(candidate, identity)| (candidate.as_str() == filename).then_some(identity));
@@ -150,10 +204,7 @@ pub(crate) fn check_default_allowlist(
     if matches.next().is_some() {
         anyhow::bail!("ambiguous Starlark caller in the Bzl manifest: {filename}");
     }
-    if allows(identity) {
-        return Ok(());
-    }
-    anyhow::bail!("file '{}' cannot use private API", identity.label)
+    Ok(identity)
 }
 
 fn allows(identity: &BzlModuleIdentity) -> bool {
@@ -182,10 +233,11 @@ fn repository_matches(identity: &BzlModuleIdentity, apparent: &str) -> bool {
         return apparent == "bazel_tools";
     }
     !apparent.is_empty()
-        && repo
-            .as_str()
-            .strip_prefix(apparent)
-            .is_some_and(|suffix| suffix.starts_with('+'))
+        && (repo.as_str() == apparent
+            || repo
+                .as_str()
+                .strip_prefix(apparent)
+                .is_some_and(|suffix| suffix.starts_with('+')))
 }
 
 fn package_starts_with(package: &str, prefix: &str) -> bool {

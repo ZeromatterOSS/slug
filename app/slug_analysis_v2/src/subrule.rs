@@ -247,7 +247,12 @@ fn validate_single_file(
         result
             .providers()
             .default_info()
-            .map(|info| info.files.to_list())
+            .map(|info| {
+                info.file_artifacts()
+                    .into_iter()
+                    .map(|artifact| artifact.path().into_owned())
+                    .collect()
+            })
             .unwrap_or_default()
     };
     let [file] = files.as_slice() else {

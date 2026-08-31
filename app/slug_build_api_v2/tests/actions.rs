@@ -9,25 +9,86 @@
  */
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use slug_build_api_v2::ActionError;
 use slug_build_api_v2::ActionInput;
 use slug_build_api_v2::ActionKind;
+use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::AnalysisValue;
+use slug_build_api_v2::ArtifactInputSource;
+use slug_build_api_v2::ArtifactInputs;
 use slug_build_api_v2::CtxActions;
 use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::ReapiCommandProjection;
 use slug_build_api_v2::RetainedArtifactInputs;
+use slug_build_api_v2::RetainedCommandLine;
+use slug_build_api_v2::RetainedCommandLineSegment;
+use slug_build_api_v2::RetainedScalarArg;
+use slug_build_api_v2::RetainedScalarValue;
+use slug_build_api_v2::SpawnExecutable;
+use slug_build_api_v2::SpawnSpec;
+use slug_build_api_v2::SymlinkSpec;
+use slug_build_api_v2::SymlinkTarget;
+use slug_configuration_v2::CanonicalStringMap;
+use slug_configuration_v2::HostPathFlavor;
+use slug_configuration_v2::NormalizedAbsoluteBazelPath;
+use slug_configuration_v2::NormalizedBazelPath;
+use slug_configuration_v2::RetainedActionEnvironment;
 use slug_identity_v2::CanonicalLabel;
 
 fn source_artifact(name: &str) -> AnalysisArtifact {
     AnalysisArtifact::Source(
         CanonicalLabel::parse(&format!("@@//pkg:{name}")).expect("source label"),
     )
+}
+
+fn artifact_depset(name: &str) -> AnalysisDepset {
+    AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::artifact(source_artifact(name))],
+        Vec::new(),
+    )
+    .unwrap()
+}
+
+fn spawn_action(inputs: AnalysisDepset, tools: AnalysisDepset) -> ActionSpec {
+    let command_line = RetainedCommandLine::new(vec![
+        RetainedCommandLineSegment::LiteralRun(Arc::from(["--literal".into()])),
+        RetainedCommandLineSegment::ArgsSnapshot(Arc::from([
+            RetainedScalarArg::new(
+                Some("--count"),
+                RetainedScalarValue::Integer("7".into()),
+                None::<&str>,
+            ),
+            RetainedScalarArg::new(
+                None::<&str>,
+                RetainedScalarValue::Artifact(source_artifact("arg.txt")),
+                Some("value=%s%%"),
+            ),
+        ])),
+    ]);
+    ActionSpec::spawn(SpawnSpec::new(
+        SpawnExecutable::Path(
+            NormalizedBazelPath::new(HostPathFlavor::Unix, "tools/runner").unwrap(),
+        ),
+        command_line,
+        ArtifactInputs::new(vec![ArtifactInputSource::Depset(
+            RetainedArtifactInputs::new(inputs).unwrap(),
+        )]),
+        ArtifactInputs::new(vec![ArtifactInputSource::Depset(
+            RetainedArtifactInputs::new(tools).unwrap(),
+        )]),
+        vec![ActionOutput::new("pkg/out", ActionOutputKind::File)],
+        RetainedActionEnvironment::default().for_action(false, [("K", "V")]),
+        CanonicalStringMap::default(),
+        "Compile",
+        Some("building output"),
+    ))
 }
 
 #[test]
@@ -164,6 +225,127 @@ fn retained_artifact_inputs_stream_ordered_unique_topology_to_sink() {
 }
 
 #[test]
+fn typed_spawn_retains_one_recipe_and_publication_equal_depsets() {
+    let left = spawn_action(artifact_depset("input.h"), artifact_depset("tool.h"));
+    let right = spawn_action(artifact_depset("input.h"), artifact_depset("tool.h"));
+
+    assert_eq!(left, right);
+    assert_eq!(left.kind(), &ActionKind::Spawn);
+    assert_eq!(left.mnemonic(), "Compile");
+    assert_eq!(left.progress_message(), Some("building output"));
+    assert_eq!(
+        left.render_argv(),
+        [
+            "tools/runner",
+            "--literal",
+            "--count",
+            "7",
+            "value=pkg/arg.txt%"
+        ]
+    );
+    assert!(left.argv().is_empty());
+    assert!(left.inputs().is_empty());
+    assert!(left.tools().is_empty());
+    assert!(left.env().is_empty());
+    assert!(left.execution_requirements().is_empty());
+    assert!(left.param_files().is_empty());
+    let typed = left.spawn_spec().unwrap();
+    assert_eq!(typed.inputs().sources().len(), 1);
+    assert_eq!(typed.tools().sources().len(), 1);
+    assert_eq!(typed.environment().fixed().get("K"), Some("V"));
+
+    assert_ne!(
+        left,
+        spawn_action(artifact_depset("other.h"), artifact_depset("tool.h"))
+    );
+    assert!(ReapiCommandProjection::from_action(&right).is_err());
+}
+
+#[test]
+fn spawn_publication_equality_covers_every_ordinary_field() {
+    let make = |executable: &str,
+                argument: &str,
+                output: &str,
+                environment: &str,
+                requirement: &str,
+                mnemonic: &str,
+                progress: &str| {
+        ActionSpec::spawn(SpawnSpec::new(
+            SpawnExecutable::Path(
+                NormalizedBazelPath::new(HostPathFlavor::Unix, executable).unwrap(),
+            ),
+            RetainedCommandLine::new(vec![RetainedCommandLineSegment::LiteralRun(Arc::from([
+                argument.into(),
+            ]))]),
+            ArtifactInputs::new(Vec::new()),
+            ArtifactInputs::new(Vec::new()),
+            vec![ActionOutput::new(output, ActionOutputKind::File)],
+            RetainedActionEnvironment::default().for_action(false, [("K", environment)]),
+            CanonicalStringMap::from_pairs([("requirement", requirement)]),
+            mnemonic,
+            Some(progress),
+        ))
+    };
+    let base = make("tool", "arg", "out", "env", "req", "Mnemonic", "progress");
+    for changed in [
+        make("other", "arg", "out", "env", "req", "Mnemonic", "progress"),
+        make("tool", "other", "out", "env", "req", "Mnemonic", "progress"),
+        make("tool", "arg", "other", "env", "req", "Mnemonic", "progress"),
+        make("tool", "arg", "out", "other", "req", "Mnemonic", "progress"),
+        make("tool", "arg", "out", "env", "other", "Mnemonic", "progress"),
+        make("tool", "arg", "out", "env", "req", "Other", "progress"),
+        make("tool", "arg", "out", "env", "req", "Mnemonic", "other"),
+    ] {
+        assert_ne!(base, changed);
+    }
+}
+
+#[test]
+fn spawn_publication_equality_preserves_alias_partitions_across_domains() {
+    let shared = artifact_depset("shared.h");
+    let aliased = spawn_action(shared.clone(), shared);
+    let split = spawn_action(artifact_depset("shared.h"), artifact_depset("shared.h"));
+
+    assert_ne!(aliased, split);
+}
+
+#[test]
+fn typed_symlink_variants_are_structurally_distinct_and_fail_reapi_projection() {
+    let output = ActionOutput::new("pkg/link", ActionOutputKind::File);
+    let artifact = ActionSpec::symlink(SymlinkSpec::new(
+        output.clone(),
+        SymlinkTarget::Artifact {
+            input: source_artifact("source"),
+            require_executable: true,
+            use_exec_root_for_source: false,
+        },
+        Some("artifact link"),
+    ));
+    let absolute = ActionSpec::symlink(SymlinkSpec::new(
+        output,
+        SymlinkTarget::AbsolutePath {
+            target: NormalizedAbsoluteBazelPath::new(HostPathFlavor::Unix, "/pkg/source").unwrap(),
+        },
+        Some("absolute link"),
+    ));
+
+    assert_eq!(artifact.kind(), &ActionKind::ArtifactSymlink);
+    assert_eq!(absolute.kind(), &ActionKind::AbsoluteSymlink);
+    assert_ne!(artifact, absolute);
+    assert!(artifact.argv().is_empty());
+    assert!(absolute.inputs().is_empty());
+    assert!(matches!(
+        artifact.symlink_spec().unwrap().target(),
+        SymlinkTarget::Artifact {
+            require_executable: true,
+            ..
+        }
+    ));
+    assert!(ReapiCommandProjection::from_action(&artifact).is_err());
+    assert!(ReapiCommandProjection::from_action(&absolute).is_err());
+}
+
+#[test]
 fn run_shell_pads_empty_dollar_zero_when_arguments_are_present() {
     let mut actions = CtxActions::new();
     let out = actions.declare_file("pkg/out.txt").unwrap();
@@ -243,7 +425,7 @@ fn run_actions_project_to_reapi_command_shape() {
         .with_argv(vec!["tool".to_owned(), "--flag".to_owned()])
         .with_env(env.clone())
         .with_exec_properties(exec_properties.clone());
-    let projection = ReapiCommandProjection::from_action(&action);
+    let projection = ReapiCommandProjection::from_action(&action).unwrap();
 
     assert_eq!(
         projection.argv,

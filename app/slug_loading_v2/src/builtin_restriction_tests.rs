@@ -6,8 +6,72 @@ use sha2::Sha256;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
+use starlark::environment::FrozenModule;
+use starlark::environment::Module;
+use starlark::eval::Evaluator;
+use starlark::eval::FileLoader;
+use starlark::syntax::AstModule;
+use starlark::syntax::Dialect;
+use starlark::values::FrozenValue;
+use starlark::values::Value;
 
 use super::*;
+use crate::package::loading_globals;
+use crate::provider::BzlEvaluationContext;
+use crate::subrule_invocation::AnalysisActionSink;
+use crate::subrule_invocation::AnalysisArtifactValue;
+use crate::subrule_invocation::AnalysisEvaluationContext;
+use crate::subrule_invocation::AnalysisRunRequest;
+
+#[derive(Debug)]
+struct NoopActionSink;
+
+impl AnalysisActionSink for NoopActionSink {
+    fn declare_file(&self, _path: &str) -> anyhow::Result<AnalysisArtifactValue> {
+        unreachable!("caller-authentication proof declares no actions")
+    }
+
+    fn write(
+        &self,
+        _output: Value<'_>,
+        _content: &str,
+        _is_executable: bool,
+    ) -> anyhow::Result<()> {
+        unreachable!("caller-authentication proof declares no actions")
+    }
+
+    fn run_shell(
+        &self,
+        _outputs: Value<'_>,
+        _command: &str,
+        _arguments: Value<'_>,
+    ) -> anyhow::Result<()> {
+        unreachable!("caller-authentication proof declares no actions")
+    }
+
+    fn run(&self, _request: AnalysisRunRequest<'_>) -> anyhow::Result<()> {
+        unreachable!("caller-authentication proof declares no actions")
+    }
+
+    fn artifact_symlink(
+        &self,
+        _output: Value<'_>,
+        _target_file: Value<'_>,
+        _is_executable: bool,
+        _progress_message: Option<&str>,
+    ) -> anyhow::Result<()> {
+        unreachable!("caller-authentication proof declares no actions")
+    }
+
+    fn absolute_symlink(
+        &self,
+        _output: Value<'_>,
+        _target_path: &str,
+        _progress_message: Option<&str>,
+    ) -> anyhow::Result<()> {
+        unreachable!("caller-authentication proof declares no actions")
+    }
+}
 
 fn identity(repo: &str, package: &str, mapping: &[(&str, &str)]) -> BzlModuleIdentity {
     BzlModuleIdentity {
@@ -96,6 +160,154 @@ fn caller_manifest_participates_structurally() {
     assert!(allows(&first[0].1));
     assert!(!allows(&second[0].1));
     assert!(allows(&first[0].1));
+}
+
+struct OneModuleLoader {
+    path: &'static str,
+    module: FrozenModule,
+}
+
+impl FileLoader for OneModuleLoader {
+    fn load(&self, path: &str) -> starlark::Result<FrozenModule> {
+        if path == self.path {
+            Ok(self.module.clone())
+        } else {
+            Err(starlark::Error::new_other(anyhow::anyhow!(
+                "unexpected test load {path}"
+            )))
+        }
+    }
+}
+
+fn freeze_restriction_source(
+    filename: &str,
+    source: &str,
+    context: &BzlEvaluationContext,
+    loader: Option<&dyn FileLoader>,
+) -> FrozenModule {
+    let ast = AstModule::parse(filename, source.to_owned(), &Dialect::Bazel).unwrap();
+    let module = Module::new();
+    let mut eval = Evaluator::new(&module);
+    eval.extra = Some(context);
+    if let Some(loader) = loader {
+        eval.set_loader(loader);
+    }
+    eval.eval_module(ast, &loading_globals()).unwrap();
+    drop(eval);
+    module.freeze().unwrap()
+}
+
+fn invoke_restriction_function(
+    module: &FrozenModule,
+    name: &str,
+    context: &BzlEvaluationContext,
+) -> Result<(), String> {
+    let function = module.get(name).unwrap();
+    let heap = Module::new();
+    let mut eval = Evaluator::new(&heap);
+    eval.extra = Some(context);
+    eval.eval_function(function.value(), &[], &[])
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
+fn invoke_configured_restriction_function(
+    module: &FrozenModule,
+    name: &str,
+    context: &AnalysisEvaluationContext,
+) -> Result<(), String> {
+    let function = module.get(name).unwrap();
+    let heap = Module::new();
+    let mut eval = Evaluator::new(&heap);
+    eval.extra = Some(context);
+    eval.eval_function(function.value(), &[], &[])
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
+#[test]
+fn custom_private_api_checks_tuple_coercion_depth_and_caller_identity() {
+    let allowed = identity("rules_cc+0.2.17", "cc/private", &[]);
+    let denied = identity("consumer+1.0", "app", &[]);
+    let identities: Arc<[(CompactString, BzlModuleIdentity)]> = Arc::from([
+        ("allowed.bzl".into(), allowed.clone()),
+        ("denied.bzl".into(), denied),
+    ]);
+    let context = BzlEvaluationContext::macro_runtime_context(allowed, identities);
+    let allowed_module = freeze_restriction_source(
+        "allowed.bzl",
+        concat!(
+            "_cc_internal = cc_common.internal_DO_NOT_USE()\n",
+            "_allow = [(\"rules_cc\", \"cc/private\")]\n",
+            "module_scope_ok = _cc_internal.check_private_api(allowlist = _allow, depth = 0)\n",
+            "def checked_default():\n",
+            "    return _cc_internal.check_private_api(allowlist = _allow)\n",
+            "def checked_zero():\n",
+            "    return _cc_internal.check_private_api(allowlist = _allow, depth = 0)\n",
+            "def checked_two():\n",
+            "    return _cc_internal.check_private_api(allowlist = _allow, depth = 2)\n",
+            "def allowed_default():\n",
+            "    return checked_default()\n",
+            "def allowed_middle():\n",
+            "    return checked_two()\n",
+            "def allowed_outer():\n",
+            "    return allowed_middle()\n",
+            "def negative():\n",
+            "    return _cc_internal.check_private_api(allowlist = _allow, depth = -1)\n",
+            "def malformed():\n",
+            "    return _cc_internal.check_private_api(allowlist = [(\"rules_cc\",)])\n",
+        ),
+        &context,
+        None,
+    );
+
+    for function in ["checked_zero", "allowed_default", "allowed_outer"] {
+        invoke_restriction_function(&allowed_module, function, &context).unwrap();
+    }
+    let configured_context = AnalysisEvaluationContext::new(
+        Arc::from([]),
+        std::iter::empty(),
+        CanonicalLabel::parse("@@//:configured").unwrap(),
+        Arc::new(NoopActionSink),
+        FrozenValue::new_none(),
+        context.source_identities_by_filename(),
+    );
+    invoke_configured_restriction_function(&allowed_module, "allowed_default", &configured_context)
+        .unwrap();
+    assert!(
+        invoke_restriction_function(&allowed_module, "negative", &context)
+            .unwrap_err()
+            .contains("depth must be nonnegative")
+    );
+    assert!(
+        invoke_restriction_function(&allowed_module, "malformed", &context)
+            .unwrap_err()
+            .contains("two-string tuples")
+    );
+
+    let loader = OneModuleLoader {
+        path: ":allowed.bzl",
+        module: allowed_module,
+    };
+    let denied_module = freeze_restriction_source(
+        "denied.bzl",
+        concat!(
+            "load(\":allowed.bzl\", \"checked_default\")\n",
+            "def denied_caller():\n",
+            "    return checked_default()\n",
+        ),
+        &context,
+        Some(&loader),
+    );
+    let error = invoke_restriction_function(&denied_module, "denied_caller", &context).unwrap_err();
+    assert!(error.contains("@@consumer+1.0//app:defs.bzl"), "{error}");
+    let error = invoke_configured_restriction_function(
+        &denied_module,
+        "denied_caller",
+        &configured_context,
+    )
+    .unwrap_err();
+    assert!(error.contains("@@consumer+1.0//app:defs.bzl"), "{error}");
 }
 
 #[test]

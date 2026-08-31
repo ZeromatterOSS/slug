@@ -18,6 +18,11 @@ use compact_str::CompactString;
 use dupe::Dupe;
 use starlark_map::small_map::SmallMap;
 
+use crate::actions::ActionOutputKind;
+use crate::analysis_value::AnalysisArtifact;
+use crate::analysis_value::AnalysisDepset;
+use crate::analysis_value::AnalysisValue;
+use crate::analysis_value::AnalysisValueType;
 use crate::analysis_value::ProviderIdentity;
 use crate::analysis_value::ProviderOccurrence;
 use crate::analysis_value::PublicationEqState;
@@ -62,6 +67,8 @@ pub enum ProviderError {
     EmptyProviderName,
     DuplicateProvider { name: ProviderName },
     MissingDefaultInfo,
+    InvalidDefaultInfoFiles { element_type: AnalysisValueType },
+    InvalidDefaultInfoArtifactKind { kind: ActionOutputKind },
 }
 
 impl fmt::Display for ProviderError {
@@ -72,6 +79,14 @@ impl fmt::Display for ProviderError {
             Self::MissingDefaultInfo => {
                 f.write_str("collection did not receive a `DefaultInfo` provider")
             }
+            Self::InvalidDefaultInfoFiles { element_type } => write!(
+                f,
+                "DefaultInfo.files must be a depset of Files, got {element_type:?}"
+            ),
+            Self::InvalidDefaultInfoArtifactKind { kind } => write!(
+                f,
+                "DefaultInfo.files contains unsupported {kind:?} artifact"
+            ),
         }
     }
 }
@@ -163,7 +178,7 @@ impl FilesToRunProvider {
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct DefaultInfo {
-    pub files: FileDepset,
+    files: AnalysisDepset,
     pub default_runfiles: Runfiles,
     pub data_runfiles: Runfiles,
     pub executable: Option<String>,
@@ -173,7 +188,7 @@ pub struct DefaultInfo {
 impl DefaultInfo {
     pub fn empty() -> Self {
         Self {
-            files: Depset::empty(),
+            files: AnalysisDepset::empty(DepsetOrder::Default),
             default_runfiles: Runfiles::empty(),
             data_runfiles: Runfiles::empty(),
             executable: None,
@@ -181,25 +196,55 @@ impl DefaultInfo {
         }
     }
 
-    pub fn from_files(files: FileDepset) -> Self {
-        Self {
+    pub fn from_files(files: AnalysisDepset) -> Result<Self, ProviderError> {
+        Self::ensure_artifact_files(&files)?;
+        Ok(Self {
             files,
             ..Self::empty()
-        }
+        })
+    }
+
+    pub fn files(&self) -> &AnalysisDepset {
+        &self.files
+    }
+
+    pub fn file_artifacts(&self) -> Vec<AnalysisArtifact> {
+        self.files
+            .to_list()
+            .into_iter()
+            .map(|value| match value.kind() {
+                crate::analysis_value::AnalysisValueKind::Artifact(artifact) => artifact.clone(),
+                _ => unreachable!("DefaultInfo checked constructors retain only Files"),
+            })
+            .collect()
     }
 
     /// Creates the bounded analysis representation of an executable
     /// `DefaultInfo`. Explicit files retain the rule's declared file set;
     /// otherwise the executable is its sole default file and runfile.
-    pub fn from_executable(executable: String, files: Option<FileDepset>) -> Self {
-        let executable_files = Depset::from_direct(DepsetOrder::Default, vec![executable.clone()])
-            .expect("a singleton executable depset is valid");
+    pub fn from_executable(
+        executable: String,
+        executable_artifact: AnalysisArtifact,
+        files: Option<AnalysisDepset>,
+    ) -> Result<Self, ProviderError> {
+        if let Some(files) = &files {
+            Self::ensure_artifact_files(files)?;
+        }
+        let executable_files = AnalysisDepset::new(
+            DepsetOrder::Default,
+            vec![AnalysisValue::artifact(executable_artifact)],
+            Vec::new(),
+        )
+        .expect("a singleton executable artifact depset is valid");
+        let executable_runfiles =
+            Depset::from_direct(DepsetOrder::Default, vec![executable.clone()])
+                .expect("a singleton executable runfiles depset is valid");
         let runfiles = Runfiles {
-            files: executable_files.clone(),
+            files: executable_runfiles,
             ..Runfiles::empty()
         };
-        Self {
-            files: files.unwrap_or_else(|| executable_files.clone()),
+        Ok(Self {
+            files: files.unwrap_or(executable_files),
             default_runfiles: runfiles.clone(),
             data_runfiles: runfiles,
             executable: Some(executable.clone()),
@@ -207,7 +252,38 @@ impl DefaultInfo {
                 executable: Some(executable),
                 ..FilesToRunProvider::empty()
             },
+        })
+    }
+
+    fn ensure_artifact_files(files: &AnalysisDepset) -> Result<(), ProviderError> {
+        match files.element_type() {
+            AnalysisValueType::Empty => return Ok(()),
+            AnalysisValueType::Artifact => {}
+            element_type => {
+                return Err(ProviderError::InvalidDefaultInfoFiles { element_type });
+            }
         }
+        for value in files.to_list() {
+            if let crate::analysis_value::AnalysisValueKind::Artifact(AnalysisArtifact::Derived {
+                output,
+                ..
+            }) = value.kind()
+                && output.kind() != ActionOutputKind::File
+            {
+                return Err(ProviderError::InvalidDefaultInfoArtifactKind {
+                    kind: output.kind(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        self.files.publication_eq_with(&other.files, state)
+            && self.default_runfiles == other.default_runfiles
+            && self.data_runfiles == other.data_runfiles
+            && self.executable == other.executable
+            && self.files_to_run == other.files_to_run
     }
 }
 
@@ -289,7 +365,9 @@ impl ProviderValue {
 
     fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         match (self, other) {
-            (Self::DefaultInfo(left), Self::DefaultInfo(right)) => left == right,
+            (Self::DefaultInfo(left), Self::DefaultInfo(right)) => {
+                left.publication_eq_with(right, state)
+            }
             (Self::OutputGroupInfo(left), Self::OutputGroupInfo(right)) => left == right,
             (Self::RunEnvironmentInfo(left), Self::RunEnvironmentInfo(right)) => left == right,
             (Self::FilesToRunProvider(left), Self::FilesToRunProvider(right)) => left == right,

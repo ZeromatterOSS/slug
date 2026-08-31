@@ -11,5 +11,6 @@ allocative = { workspace = true }
 compact_str = { workspace = true }
 dupe = { workspace = true }
 fxhash = { workspace = true }
+slug_configuration_v2 = { workspace = true }
 slug_identity_v2 = { workspace = true }
 starlark_map = { workspace = true }

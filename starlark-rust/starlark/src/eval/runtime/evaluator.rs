@@ -545,17 +545,28 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
     /// Return the source filename of the innermost executing Starlark `def`.
     /// A direct module-scope native call has no such frame.
     pub fn native_caller_function_filename(&self) -> Option<String> {
-        (1..self.call_stack.count()).find_map(|n| {
+        self.native_caller_function_filename_at_depth(0)
+    }
+
+    /// Return the source filename of the depth-th innermost executing Starlark function.
+    pub fn native_caller_function_filename_at_depth(&self, depth: usize) -> Option<String> {
+        let mut physical_defs = (1..self.call_stack.count()).filter_map(|n| {
             let caller = self.call_stack.top_nth_function_opt(n)?;
-            let def_info = if let Some(caller) = caller.downcast_ref::<Def>() {
-                caller.def_info
-            } else if let Some(caller) = caller.downcast_ref::<FrozenDef>() {
-                caller.def_info
+            if let Some(caller) = caller.downcast_ref::<Def>() {
+                Some(caller.def_info.codemap.filename().to_owned())
             } else {
-                return None;
-            };
-            Some(def_info.codemap.filename().to_owned())
-        })
+                caller
+                    .downcast_ref::<FrozenDef>()
+                    .map(|caller| caller.def_info.codemap.filename().to_owned())
+            }
+        });
+
+        let immediate_physical = physical_defs.next()?;
+        let logical_inlined = self
+            .call_stack
+            .native_call_inlined_source_filenames()
+            .unwrap_or_else(|| vec![immediate_physical]);
+        logical_inlined.into_iter().chain(physical_defs).nth(depth)
     }
 
     /// Return the typed source filename containing the current native call.
@@ -1181,6 +1192,16 @@ mod tests {
                 None => "<none>".to_owned(),
             })
         }
+
+        fn capture_caller_depths(eval: &mut Evaluator) -> anyhow::Result<String> {
+            Ok((0..4)
+                .map(|depth| {
+                    eval.native_caller_function_filename_at_depth(depth)
+                        .unwrap_or_else(|| "<none>".to_owned())
+                })
+                .collect::<Vec<_>>()
+                .join("|"))
+        }
     }
 
     #[test]
@@ -1196,8 +1217,15 @@ mod tests {
                 "    context = capture_native_context()\n",
                 "    return context\n",
                 "\n",
+                "def inner():\n",
+                "    return capture_caller_depths()\n",
+                "\n",
+                "def outer():\n",
+                "    return inner()\n",
+                "\n",
                 "inside = legacy_macro(\"target\")\n",
                 "direct = capture_native_context()\n",
+                "depths = outer()\n",
             )
             .to_owned(),
             &Dialect::Standard,
@@ -1210,10 +1238,14 @@ mod tests {
         let inside = inside.unpack_str().unwrap();
         assert!(
             inside.starts_with(
-                "legacy_macro|target|native_call_context.star@native_call_context.star:5:"
+                "legacy_macro|target|native_call_context.star@native_call_context.star:11:"
             ),
             "{inside}"
         );
         assert_eq!(module.get("direct").unwrap().unpack_str(), Some("<none>"));
+        assert_eq!(
+            module.get("depths").unwrap().unpack_str(),
+            Some("native_call_context.star|native_call_context.star|<none>|<none>")
+        );
     }
 }

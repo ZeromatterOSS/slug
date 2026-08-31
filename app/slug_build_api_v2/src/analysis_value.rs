@@ -7,6 +7,7 @@
  * may select, at your option, one of the above-listed licenses.
  */
 
+use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
 use std::hash::Hash;
@@ -311,6 +312,26 @@ pub enum AnalysisArtifact {
         owner: AnalysisConfiguredTargetKey,
         output: ActionOutput,
     },
+}
+
+impl AnalysisArtifact {
+    /// Returns the Bazel-path projection used by phase-scratch consumers.
+    ///
+    /// The artifact remains the semantic owner; this projection is never
+    /// retained as a parallel identity.
+    pub fn path(&self) -> Cow<'_, str> {
+        match self {
+            Self::Source(label) => {
+                let package = label.package().package().as_str();
+                if package.is_empty() {
+                    Cow::Borrowed(label.target().as_str())
+                } else {
+                    Cow::Owned(format!("{package}/{}", label.target()))
+                }
+            }
+            Self::Derived { output, .. } => Cow::Borrowed(output.path()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Allocative)]
@@ -915,7 +936,7 @@ impl AnalysisDepset {
         self.0.node_key()
     }
 
-    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+    pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         let mut stack = vec![(self.dupe(), other.dupe())];
         while let Some((left_depset, right_depset)) = stack.pop() {
             let left_pointer = left_depset.pointer();

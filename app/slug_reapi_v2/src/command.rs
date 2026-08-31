@@ -32,15 +32,15 @@ pub struct ReapiCommand {
 }
 
 impl ReapiCommand {
-    pub fn from_action(action: &ActionSpec) -> Self {
-        let projection = ReapiCommandProjection::from_action(action);
-        Self {
+    pub fn from_action(action: &ActionSpec) -> Result<Self, String> {
+        let projection = ReapiCommandProjection::from_action(action).map_err(str::to_owned)?;
+        Ok(Self {
             argv: projection.argv,
             env: projection.env,
             output_files: projection.output_files,
             output_directories: projection.output_directories,
             platform_properties: projection.platform_properties,
-        }
+        })
     }
     pub(crate) fn file_write(
         output: &str,
@@ -68,7 +68,7 @@ impl ReapiCommand {
     /// actions are still declarative, so this is the first V2-owned lowering
     /// point rather than a direct-local shortcut.
     pub fn for_execution(action: &ActionSpec) -> Result<Self, String> {
-        let mut command = Self::from_action(action);
+        let mut command = Self::from_action(action)?;
         if !command.argv.is_empty() {
             return Ok(command);
         }

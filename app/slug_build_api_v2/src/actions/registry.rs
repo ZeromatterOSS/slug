@@ -89,8 +89,11 @@ fn validate_action(action: &ActionSpec) -> Result<(), ActionError> {
     }
     if matches!(
         action.kind(),
-        crate::actions::spec::ActionKind::Run | crate::actions::spec::ActionKind::RunShell { .. }
+        crate::actions::spec::ActionKind::Run
+            | crate::actions::spec::ActionKind::RunShell { .. }
+            | crate::actions::spec::ActionKind::Spawn
     ) && action.argv().is_empty()
+        && action.render_argv().is_empty()
     {
         return Err(ActionError::MissingArgv {
             mnemonic: action.mnemonic().to_owned(),

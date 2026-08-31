@@ -215,6 +215,19 @@ impl<'v> CheapCallStack<'v> {
         Some(self.stack[index].function)
     }
 
+    /// Logical source filenames represented by the native call-site span,
+    /// ordered from the innermost Starlark body through compiler-inlined
+    /// callers. The enclosing non-inlined call stack is intentionally omitted.
+    pub(crate) fn native_call_inlined_source_filenames(&self) -> Option<Vec<String>> {
+        let span = self
+            .count
+            .checked_sub(1)
+            .and_then(|index| self.stack[index].span)?;
+        let mut filenames = vec![span.span.to_file_span().file.filename().to_owned()];
+        filenames.extend(span.inlined_frames.source_filenames_innermost_first());
+        Some(filenames)
+    }
+
     pub(crate) fn to_diagnostic_frames(&self, inlined_frames: InlinedFrames) -> CallStack {
         // The first entry is just the entire module, so skip it
         let mut frames = Vec::new();

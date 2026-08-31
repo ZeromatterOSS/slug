@@ -18,6 +18,8 @@ use crate::actions::spec::ActionKind;
 use crate::actions::spec::ActionOutput;
 use crate::actions::spec::ActionOutputKind;
 use crate::actions::spec::ActionSpec;
+use crate::actions::spec::SpawnSpec;
+use crate::actions::spec::SymlinkSpec;
 
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct CtxActions {
@@ -143,6 +145,14 @@ impl CtxActions {
             "Symlink",
             vec![output],
         ))
+    }
+
+    pub fn register_spawn(&mut self, spec: SpawnSpec) -> Result<usize, ActionError> {
+        self.registry.register(ActionSpec::spawn(spec))
+    }
+
+    pub fn register_symlink(&mut self, spec: SymlinkSpec) -> Result<usize, ActionError> {
+        self.registry.register(ActionSpec::symlink(spec))
     }
 
     pub fn registry(&self) -> &ActionRegistry {

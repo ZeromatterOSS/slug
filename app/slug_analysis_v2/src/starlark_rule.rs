@@ -20,11 +20,25 @@ use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::AnalysisValueKind;
+use slug_build_api_v2::ArtifactInputSource;
+use slug_build_api_v2::ArtifactInputs;
 use slug_build_api_v2::CtxActions;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
+use slug_build_api_v2::RetainedArtifactInputs;
+use slug_build_api_v2::RetainedCommandLine;
+use slug_build_api_v2::RetainedCommandLineSegment;
+use slug_build_api_v2::SpawnExecutable;
+use slug_build_api_v2::SpawnSpec;
+use slug_build_api_v2::SymlinkSpec;
+use slug_build_api_v2::SymlinkTarget;
+use slug_configuration_v2::CanonicalStringMap;
 use slug_configuration_v2::CppFragmentProjection;
+use slug_configuration_v2::HostPathFlavor;
+use slug_configuration_v2::NormalizedAbsoluteBazelPath;
+use slug_configuration_v2::NormalizedBazelPath;
+use slug_configuration_v2::RetainedActionEnvironment;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::BzlModuleIdentity;
 use slug_loading_v2::CoercedAttributeValue;
@@ -36,11 +50,14 @@ use slug_loading_v2::analysis_fragments::RuleFragmentCollection;
 use slug_loading_v2::package::resolve_rule_definition_label;
 use slug_loading_v2::provider::StarlarkDefaultInfo;
 use slug_loading_v2::provider::starlark_label;
+use slug_loading_v2::subrule_invocation::AnalysisActionSink;
 use slug_loading_v2::subrule_invocation::AnalysisActions;
 use slug_loading_v2::subrule_invocation::AnalysisArtifactValue;
 use slug_loading_v2::subrule_invocation::AnalysisCallToken;
 use slug_loading_v2::subrule_invocation::AnalysisEvaluationContext;
+use slug_loading_v2::subrule_invocation::AnalysisRunRequest;
 use slug_loading_v2::subrule_invocation::PreparedSubruleInvocation;
+use slug_loading_v2::subrule_invocation::StarlarkArgs;
 use starlark::PrintHandler;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Module;
@@ -58,8 +75,10 @@ use starlark::values::Trace;
 use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::dict::AllocDict;
+use starlark::values::dict::DictRef;
 use starlark::values::list::ListRef;
 use starlark::values::starlark_value;
+use starlark::values::tuple::TupleRef;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -103,7 +122,7 @@ impl fmt::Display for LoadedRuleError {
 #[repr(C)]
 struct AnalysisContextGen<V> {
     #[allocative(skip)]
-    actions: Arc<Mutex<CtxActions>>,
+    action_sink: Arc<dyn AnalysisActionSink>,
     #[allocative(skip)]
     #[trace(unsafe_ignore)]
     token: AnalysisCallToken,
@@ -128,7 +147,7 @@ impl<'v> Freeze for AnalysisContext<'v> {
 
     fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
         Ok(AnalysisContextGen {
-            actions: self.actions,
+            action_sink: self.action_sink,
             token: self.token,
             retained_owner: self.retained_owner,
             target_label: self.target_label,
@@ -164,9 +183,7 @@ where
                 self.target_label.clone(),
             )),
             "actions" => Some(heap.alloc_simple(AnalysisActions::new(
-                self.actions.clone(),
-                self.package_path.clone(),
-                self.retained_owner.clone(),
+                self.action_sink.clone(),
                 self.token.clone(),
                 "rule context",
             ))),
@@ -593,6 +610,315 @@ mod toolchain_materialization_tests {
     }
 }
 
+#[derive(Debug)]
+struct SynchronousAnalysisActionSink {
+    actions: Arc<Mutex<CtxActions>>,
+    package_path: String,
+    owner: AnalysisConfiguredTargetKey,
+    typed_configuration: Result<Option<(HostPathFlavor, RetainedActionEnvironment)>, String>,
+}
+
+impl SynchronousAnalysisActionSink {
+    fn owned_output(&self, value: Value<'_>, operation: &str) -> anyhow::Result<ActionOutput> {
+        AnalysisArtifactValue::from_starlark(value)
+            .and_then(|file| file.output_for_owner(&self.owner))
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("ctx.actions.{operation} requires a declared file"))
+    }
+
+    fn outputs(&self, value: Value<'_>, operation: &str) -> anyhow::Result<Vec<ActionOutput>> {
+        let values = sequence_values(value).ok_or_else(|| {
+            anyhow::anyhow!("ctx.actions.{operation} outputs must be a sequence of declared Files")
+        })?;
+        let outputs = values
+            .into_iter()
+            .map(|value| self.owned_output(value, operation))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        if outputs.is_empty() {
+            anyhow::bail!("ctx.actions.{operation} requires at least one output");
+        }
+        Ok(outputs)
+    }
+
+    fn typed_configuration(&self) -> anyhow::Result<(HostPathFlavor, &RetainedActionEnvironment)> {
+        let configured = self
+            .typed_configuration
+            .as_ref()
+            .map_err(|error| anyhow::anyhow!("{error}"))?;
+        let (flavor, environment) = configured.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("typed actions require structural action configuration")
+        })?;
+        Ok((*flavor, environment))
+    }
+
+    fn register(
+        &self,
+        register: impl FnOnce(&mut CtxActions) -> Result<usize, slug_build_api_v2::ActionError>,
+    ) -> anyhow::Result<()> {
+        let mut actions = self
+            .actions
+            .lock()
+            .map_err(|_| anyhow::anyhow!("ctx.actions state lock is poisoned"))?;
+        register(&mut actions)
+            .map(|_| ())
+            .map_err(|error| anyhow::anyhow!(error.to_string()))
+    }
+}
+
+impl AnalysisActionSink for SynchronousAnalysisActionSink {
+    fn declare_file(&self, path: &str) -> anyhow::Result<AnalysisArtifactValue> {
+        let path = if self.package_path.is_empty() {
+            path.to_owned()
+        } else {
+            format!("{}/{path}", self.package_path)
+        };
+        let output = self
+            .actions
+            .lock()
+            .map_err(|_| anyhow::anyhow!("ctx.actions state lock is poisoned"))?
+            .declare_file(path)
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        Ok(AnalysisArtifactValue::new(AnalysisArtifact::Derived {
+            owner: self.owner.clone(),
+            output,
+        }))
+    }
+
+    fn write(&self, output: Value<'_>, content: &str, is_executable: bool) -> anyhow::Result<()> {
+        let output = self.owned_output(output, "write")?;
+        self.register(|actions| actions.write(output, content, is_executable))
+    }
+
+    fn run_shell(
+        &self,
+        outputs: Value<'_>,
+        command: &str,
+        arguments: Value<'_>,
+    ) -> anyhow::Result<()> {
+        let output = self
+            .outputs(outputs, "run_shell")?
+            .into_iter()
+            .next()
+            .expect("outputs checked nonempty");
+        let arguments = sequence_values(arguments)
+            .ok_or_else(|| anyhow::anyhow!("ctx.actions.run_shell arguments must be a sequence"))?
+            .into_iter()
+            .map(|value| value.to_str())
+            .collect();
+        self.register(|actions| actions.run_shell(output, command, arguments, Vec::new()))
+    }
+
+    fn run(&self, request: AnalysisRunRequest<'_>) -> anyhow::Result<()> {
+        let outputs = self.outputs(request.outputs, "run")?;
+        let (path_flavor, configured_environment) = self.typed_configuration()?;
+        let executable =
+            if let Some(file) = AnalysisArtifactValue::from_starlark(request.executable) {
+                reject_directory_file(file, "ctx.actions.run executable")?;
+                SpawnExecutable::Artifact(file.artifact().clone())
+            } else if let Some(path) = request.executable.unpack_str() {
+                if path.is_empty() {
+                    anyhow::bail!("ctx.actions.run executable path must not be empty");
+                }
+                SpawnExecutable::Path(
+                    NormalizedBazelPath::new(path_flavor, path)
+                        .map_err(|error| anyhow::anyhow!(error.to_string()))?,
+                )
+            } else {
+                anyhow::bail!("ctx.actions.run executable must be a File or string path")
+            };
+        let command_line = retained_command_line(request.arguments)?;
+        let mut lowerer = AnalysisValueLowerer::default();
+        let inputs = retained_artifact_inputs(request.inputs, false, "inputs", &mut lowerer)?;
+        let tools = retained_artifact_inputs(request.tools, true, "tools", &mut lowerer)?;
+        let action_environment = configured_environment.for_action(
+            request.use_default_shell_env,
+            string_dict(request.env, "ctx.actions.run env")?,
+        );
+        let mnemonic = request.mnemonic.unwrap_or("Action");
+        if mnemonic.is_empty()
+            || !mnemonic
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric())
+        {
+            anyhow::bail!("ctx.actions.run mnemonic must be nonempty and alphanumeric");
+        }
+        let spec = SpawnSpec::new(
+            executable,
+            command_line,
+            inputs,
+            tools,
+            outputs,
+            action_environment,
+            CanonicalStringMap::default(),
+            mnemonic,
+            request.progress_message,
+        );
+        self.register(|actions| actions.register_spawn(spec))
+    }
+
+    fn artifact_symlink(
+        &self,
+        output: Value<'_>,
+        target_file: Value<'_>,
+        is_executable: bool,
+        progress_message: Option<&str>,
+    ) -> anyhow::Result<()> {
+        let output = self.owned_output(output, "symlink")?;
+        if output.kind() != ActionOutputKind::File {
+            anyhow::bail!("ctx.actions.symlink output must be a regular declared File");
+        }
+        let input = AnalysisArtifactValue::from_starlark(target_file)
+            .ok_or_else(|| anyhow::anyhow!("ctx.actions.symlink target_file must be a File"))?;
+        reject_directory_file(input, "ctx.actions.symlink target_file")?;
+        let spec = SymlinkSpec::new(
+            output,
+            SymlinkTarget::Artifact {
+                input: input.artifact().clone(),
+                require_executable: is_executable,
+                use_exec_root_for_source: false,
+            },
+            progress_message,
+        );
+        self.register(|actions| actions.register_symlink(spec))
+    }
+
+    fn absolute_symlink(
+        &self,
+        output: Value<'_>,
+        target_path: &str,
+        progress_message: Option<&str>,
+    ) -> anyhow::Result<()> {
+        let output = self.owned_output(output, "absolute_symlink")?;
+        if output.kind() != ActionOutputKind::File {
+            anyhow::bail!("absolute_symlink output must be a regular declared File");
+        }
+        let (path_flavor, _) = self.typed_configuration()?;
+        let target = NormalizedAbsoluteBazelPath::new(path_flavor, target_path)
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        let spec = SymlinkSpec::new(
+            output,
+            SymlinkTarget::AbsolutePath { target },
+            progress_message,
+        );
+        self.register(|actions| actions.register_symlink(spec))
+    }
+}
+
+fn sequence_values(value: Value<'_>) -> Option<Vec<Value<'_>>> {
+    if let Some(values) = ListRef::from_value(value) {
+        Some(values.iter().collect())
+    } else {
+        TupleRef::from_value(value).map(|values| values.iter().collect())
+    }
+}
+
+fn reject_directory_file(file: &AnalysisArtifactValue, name: &str) -> anyhow::Result<()> {
+    if matches!(
+        file.artifact(),
+        AnalysisArtifact::Derived { output, .. } if output.kind() == ActionOutputKind::Directory
+    ) {
+        anyhow::bail!("{name} must be a regular File")
+    }
+    Ok(())
+}
+
+fn retained_command_line(arguments: Option<Value<'_>>) -> anyhow::Result<RetainedCommandLine> {
+    let Some(arguments) = arguments.filter(|value| !value.is_none()) else {
+        return Ok(RetainedCommandLine::new(Vec::new()));
+    };
+    let arguments = sequence_values(arguments)
+        .ok_or_else(|| anyhow::anyhow!("ctx.actions.run arguments must be a sequence"))?;
+    let mut segments = Vec::new();
+    let mut literals = Vec::new();
+    for argument in arguments {
+        if let Some(args) = StarlarkArgs::snapshot(argument) {
+            if !literals.is_empty() {
+                segments.push(RetainedCommandLineSegment::LiteralRun(
+                    std::mem::take(&mut literals).into(),
+                ));
+            }
+            segments.push(RetainedCommandLineSegment::ArgsSnapshot(args));
+        } else if let Some(literal) = argument.unpack_str() {
+            literals.push(CompactString::new(literal));
+        } else {
+            anyhow::bail!("ctx.actions.run arguments entries must be strings or Args")
+        }
+    }
+    if !literals.is_empty() {
+        segments.push(RetainedCommandLineSegment::LiteralRun(literals.into()));
+    }
+    Ok(RetainedCommandLine::new(segments))
+}
+
+fn retained_artifact_inputs<'v>(
+    value: Option<Value<'v>>,
+    allow_nested_depsets: bool,
+    name: &str,
+    lowerer: &mut AnalysisValueLowerer<'v>,
+) -> anyhow::Result<ArtifactInputs> {
+    let Some(value) = value.filter(|value| !value.is_none()) else {
+        return Ok(ArtifactInputs::new(Vec::new()));
+    };
+    let lowered = lowerer
+        .lower(value, &format!("ctx.actions.run {name}"))
+        .map_err(anyhow::Error::msg)?;
+    let values = match lowered.kind() {
+        AnalysisValueKind::Depset(depset) => {
+            return Ok(ArtifactInputs::new(vec![ArtifactInputSource::Depset(
+                RetainedArtifactInputs::new(depset.clone())
+                    .map_err(|error| anyhow::anyhow!(error.to_string()))?,
+            )]));
+        }
+        AnalysisValueKind::List(values) | AnalysisValueKind::Tuple(values) => values,
+        _ => anyhow::bail!("ctx.actions.run {name} must be a sequence or depset of Files"),
+    };
+    let sources = values
+        .iter()
+        .map(|value| match value.kind() {
+            AnalysisValueKind::Artifact(artifact) => {
+                Ok(ArtifactInputSource::Direct(artifact.clone()))
+            }
+            AnalysisValueKind::Depset(depset) if allow_nested_depsets => {
+                RetainedArtifactInputs::new(depset.clone())
+                    .map(ArtifactInputSource::Depset)
+                    .map_err(|error| anyhow::anyhow!(error.to_string()))
+            }
+            _ => Err(anyhow::anyhow!(
+                "ctx.actions.run {name} entries must be Files{}",
+                if allow_nested_depsets {
+                    " or depsets of Files"
+                } else {
+                    ""
+                }
+            )),
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    Ok(ArtifactInputs::new(sources))
+}
+
+fn string_dict(
+    value: Option<Value<'_>>,
+    name: &str,
+) -> anyhow::Result<Vec<(CompactString, CompactString)>> {
+    let Some(value) = value.filter(|value| !value.is_none()) else {
+        return Ok(Vec::new());
+    };
+    let values = DictRef::from_value(value)
+        .ok_or_else(|| anyhow::anyhow!("{name} must be a dictionary of strings"))?;
+    values
+        .iter()
+        .map(|(key, value)| {
+            let key = key
+                .unpack_str()
+                .ok_or_else(|| anyhow::anyhow!("{name} keys must be strings"))?;
+            let value = value
+                .unpack_str()
+                .ok_or_else(|| anyhow::anyhow!("{name} values must be strings"))?;
+            Ok((CompactString::new(key), CompactString::new(value)))
+        })
+        .collect()
+}
+
 pub(crate) fn evaluate_loaded_rule(
     package: &LoadedPackage,
     target_name: &str,
@@ -656,6 +982,26 @@ pub(crate) fn evaluate_loaded_rule(
         key.label().clone(),
         key.configuration().complete_identity_bytes(),
     );
+    let typed_configuration = key
+        .configuration()
+        .slug_configuration()
+        .map(|configuration| -> Result<_, String> {
+            Ok((
+                configuration
+                    .configured_action_path_flavor()
+                    .map_err(|error| error.to_string())?,
+                configuration
+                    .configured_action_environment()
+                    .map_err(|error| error.to_string())?,
+            ))
+        })
+        .transpose();
+    let action_sink: Arc<dyn AnalysisActionSink> = Arc::new(SynchronousAnalysisActionSink {
+        actions: actions.clone(),
+        package_path: package_path.to_owned(),
+        owner: retained_owner.clone(),
+        typed_configuration,
+    });
     let (dependencies, toolchain) = {
         let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
         let dependencies = dependencies
@@ -711,10 +1057,9 @@ pub(crate) fn evaluate_loaded_rule(
             implementation.direct_subrule_identities(),
             prepared_subrules,
             key.label().clone(),
-            package_path.to_owned(),
-            retained_owner.clone(),
-            actions.clone(),
+            action_sink.clone(),
             cpp_fragment,
+            implementation.source_identities_by_filename().clone(),
         );
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&analysis_context);
@@ -739,7 +1084,7 @@ pub(crate) fn evaluate_loaded_rule(
             cpp_fragment,
         ));
         let context = module.heap().alloc(AnalysisContextGen {
-            actions: actions.clone(),
+            action_sink,
             token: analysis_context.root_token(),
             retained_owner: retained_owner.clone(),
             target_label: key.label().clone(),
@@ -771,38 +1116,55 @@ pub(crate) fn evaluate_loaded_rule(
                             "DefaultInfo.files must be the result of depset([...])".to_owned()
                         );
                     };
-                    let declared_outputs =
-                        files
-                            .to_list()
-                            .into_iter()
-                            .map(|value| match value.kind() {
-                                AnalysisValueKind::Artifact(AnalysisArtifact::Derived {
-                                    output,
-                                    ..
-                                }) => Ok(output.path().to_owned()),
-                                _ => Err("DefaultInfo.files depset must contain declared files"
-                                    .to_owned()),
-                            })
-                            .collect::<Result<Vec<_>, _>>()?;
-                    slug_build_api_v2::Depset::from_direct(files.order(), declared_outputs)
-                        .map_err(|error| error.to_string())
+                    for value in files.to_list() {
+                        match value.kind() {
+                            AnalysisValueKind::Artifact(AnalysisArtifact::Source(_)) => {}
+                            AnalysisValueKind::Artifact(AnalysisArtifact::Derived {
+                                output,
+                                ..
+                            }) if output.kind() == ActionOutputKind::File => {}
+                            AnalysisValueKind::Artifact(AnalysisArtifact::Derived { .. }) => {
+                                return Err("DefaultInfo.files depset must contain regular files"
+                                    .to_owned());
+                            }
+                            _ => {
+                                return Err(
+                                    "DefaultInfo.files must be a depset of Files".to_owned()
+                                );
+                            }
+                        }
+                    }
+                    Ok(files.clone())
                 })
                 .transpose()?;
             let executable = executable
-                .map(|executable| {
-                    AnalysisArtifactValue::from_starlark(executable)
-                        .and_then(|value| value.output_for_owner(&retained_owner))
-                        .map(|output| output.path().to_owned())
-                        .ok_or_else(|| "DefaultInfo.executable must be a declared file".to_owned())
+                .map(|executable| -> Result<(String, AnalysisArtifact), String> {
+                    let value = AnalysisArtifactValue::from_starlark(executable)
+                        .filter(|value| {
+                            value
+                                .output_for_owner(&retained_owner)
+                                .is_some_and(|output| output.kind() == ActionOutputKind::File)
+                        })
+                        .ok_or_else(|| {
+                            "DefaultInfo.executable must be a declared file".to_owned()
+                        })?;
+                    Ok((
+                        value.artifact().path().into_owned(),
+                        value.artifact().clone(),
+                    ))
                 })
                 .transpose()?;
             let default_info = match executable {
-                Some(executable) => {
-                    slug_build_api_v2::DefaultInfo::from_executable(executable, files)
+                Some((executable, artifact)) => {
+                    slug_build_api_v2::DefaultInfo::from_executable(executable, artifact, files)
+                        .map_err(|error| error.to_string())?
                 }
-                None => slug_build_api_v2::DefaultInfo::from_files(
-                    files.unwrap_or_else(slug_build_api_v2::Depset::empty),
-                ),
+                None => slug_build_api_v2::DefaultInfo::from_files(files.unwrap_or_else(|| {
+                    slug_build_api_v2::AnalysisDepset::empty(
+                        slug_build_api_v2::DepsetOrder::Default,
+                    )
+                }))
+                .map_err(|error| error.to_string())?,
             };
             provider_values.push(ProviderValue::DefaultInfo(default_info));
         } else {
@@ -844,8 +1206,10 @@ pub(crate) fn evaluate_loaded_rule(
     let declared_outputs = providers
         .default_info()
         .expect("ProviderCollection validated DefaultInfo")
-        .files
-        .to_list();
+        .file_artifacts()
+        .into_iter()
+        .map(|artifact| artifact.path().into_owned())
+        .collect();
     let actions = actions
         .lock()
         .map_err(|_| "ctx.actions state lock is poisoned".to_owned())?

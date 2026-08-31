@@ -23,7 +23,10 @@ pub struct ReapiCommandProjection {
 }
 
 impl ReapiCommandProjection {
-    pub fn from_action(action: &ActionSpec) -> Self {
+    pub fn from_action(action: &ActionSpec) -> Result<Self, &'static str> {
+        if action.is_typed_payload() {
+            return Err("typed Spawn/Symlink REAPI projection is not admitted");
+        }
         let mut output_files = Vec::new();
         let mut output_directories = Vec::new();
         for output in action.outputs() {
@@ -35,12 +38,12 @@ impl ReapiCommandProjection {
             }
         }
 
-        Self {
+        Ok(Self {
             argv: action.argv().to_vec(),
             env: action.env().clone(),
             output_files,
             output_directories,
             platform_properties: action.exec_properties().clone(),
-        }
+        })
     }
 }

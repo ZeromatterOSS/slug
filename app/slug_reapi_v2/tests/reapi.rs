@@ -27,11 +27,18 @@ use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::AnalysisValue;
+use slug_build_api_v2::ArtifactInputs;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
+use slug_build_api_v2::RetainedCommandLine;
+use slug_build_api_v2::SpawnExecutable;
+use slug_build_api_v2::SpawnSpec;
+use slug_configuration_v2::CanonicalStringMap;
+use slug_configuration_v2::NormalizedBazelPath;
+use slug_configuration_v2::RetainedActionEnvironment;
 use slug_configuration_v2::SlugConfiguration;
 use slug_configuration_v2::native::host::AutoCpuToken;
 use slug_configuration_v2::native::host::HostConversionInputs;
@@ -43,9 +50,26 @@ use slug_reapi_v2::GeneratedOutput;
 use slug_reapi_v2::ReapiActionIdentity;
 use slug_reapi_v2::ReapiCommand;
 use slug_reapi_v2::ReapiDigest;
+use slug_reapi_v2::ReapiInputTree;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteExecutionResult;
 use slug_reapi_v2::RemoteMode;
+
+fn typed_spawn_action() -> ActionSpec {
+    ActionSpec::spawn(SpawnSpec::new(
+        SpawnExecutable::Path(
+            NormalizedBazelPath::new(HostPathFlavor::Unix, "tools/runner").unwrap(),
+        ),
+        RetainedCommandLine::new(Vec::new()),
+        ArtifactInputs::new(Vec::new()),
+        ArtifactInputs::new(Vec::new()),
+        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+        RetainedActionEnvironment::default(),
+        CanonicalStringMap::default(),
+        "Action",
+        None::<&str>,
+    ))
+}
 
 #[test]
 fn bare_remote_executor_supplies_cache_endpoint() {
@@ -99,7 +123,7 @@ fn action_ir_projects_to_reapi_command_and_identity() {
     .with_env(env.clone())
     .with_exec_properties(props.clone());
 
-    let command = ReapiCommand::from_action(&action);
+    let command = ReapiCommand::from_action(&action).unwrap();
     assert_eq!(command.argv[0], "/bin/sh");
     assert_eq!(command.env, env);
     assert_eq!(command.output_files, vec!["pkg/out.txt".to_owned()]);
@@ -145,6 +169,45 @@ fn declarative_write_action_rejects_the_raw_executor_projection() {
     assert_eq!(
         ReapiCommand::for_execution(&action).unwrap_err(),
         "raw FileWrite REAPI lowering is forbidden"
+    );
+}
+
+#[test]
+fn typed_actions_reject_command_input_tree_and_execution_projection() {
+    let action = typed_spawn_action();
+    assert_eq!(
+        ReapiCommand::from_action(&action).unwrap_err(),
+        "typed Spawn/Symlink REAPI projection is not admitted"
+    );
+    assert_eq!(
+        ReapiCommand::for_execution(&action).unwrap_err(),
+        "typed Spawn/Symlink REAPI projection is not admitted"
+    );
+    assert_eq!(
+        ReapiInputTree::from_action(&action)
+            .unwrap_err()
+            .to_string(),
+        "typed Spawn/Symlink REAPI input trees are not admitted"
+    );
+}
+
+#[tokio::test]
+async fn typed_action_execution_rejects_before_transport() {
+    let config = RemoteConfig {
+        executor: Some("grpc://127.0.0.1:1".to_owned()),
+        cache: None,
+        instance_name: None,
+        headers: BTreeMap::new(),
+        timeout_seconds: Some(30),
+        retry_attempts: None,
+        default_exec_properties: BTreeMap::new(),
+    };
+    assert!(
+        slug_reapi_v2::execute_action(&config, &typed_spawn_action())
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("typed Spawn/Symlink REAPI projection is not admitted")
     );
 }
 

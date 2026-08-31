@@ -443,9 +443,11 @@ def _subrule(ctx, prefix, suffix = "", **kwargs):
     if ProfileInfo not in kwargs["_literal"]: fail("Target provider membership was not materialized")
     if kwargs["_alias"].label.name != "literal" or ProfileInfo not in kwargs["_alias"]: fail("alias actual Target was not materialized")
     if DefaultInfo not in kwargs["_source_provider"]: fail("source Target has no inherent DefaultInfo")
-    if kwargs["_source_provider"][DefaultInfo].files.to_list() != ["files/inferred.txt"]: fail("source Target DefaultInfo was not materialized")
+    source_files = kwargs["_source_provider"][DefaultInfo].files.to_list()
+    if len(source_files) != 1 or source_files[0].path != "files/inferred.txt": fail("source Target DefaultInfo was not materialized as File")
     if DefaultInfo not in kwargs["_generated_provider"]: fail("generated Target has no inherent DefaultInfo")
-    if kwargs["_generated_provider"][DefaultInfo].files.to_list() != ["deps/generated.bin"]: fail("generated Target DefaultInfo was not materialized")
+    generated_files = kwargs["_generated_provider"][DefaultInfo].files.to_list()
+    if len(generated_files) != 1 or generated_files[0].path != "deps/generated.bin": fail("generated Target DefaultInfo was not materialized as File")
     out = ctx.actions.declare_file("subrule.txt")
     ctx.actions.write(out, "subrule")
     return ReturnedInfo(
@@ -600,7 +602,7 @@ def _toolchain_subject(ctx):
     toolchain_call()
     return [DefaultInfo()]
 toolchain_subject = rule(implementation = _toolchain_subject, subrules = [toolchain_call])
-def _missing_action_call(ctx): return ctx.actions.args()
+def _missing_action_call(ctx): return ctx.actions.args().add_all([])
 missing_action_call = subrule(implementation = _missing_action_call)
 def _missing_action_subject(ctx):
     missing_action_call()
@@ -855,15 +857,13 @@ async fn configured_subrule_dependencies_materialize_and_invoke() {
             null_identity,
             "{field} identity"
         );
-        assert_eq!(
-            target
-                .providers()
-                .default_info()
-                .expect("file Target retained materialized DefaultInfo")
-                .files
-                .to_list(),
-            [expected_path]
-        );
+        let files = target
+            .providers()
+            .default_info()
+            .expect("file Target retained materialized DefaultInfo")
+            .file_artifacts();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].path().as_ref(), expected_path);
     }
     let implicit = result
         .edges()
@@ -975,7 +975,7 @@ async fn nested_authorization_overrides_and_context_lifetimes_are_enforced() {
             "toolchain_deferred",
             "configured subrule toolchains are deferred",
         ),
-        ("missing_action", "has no attribute `args`"),
+        ("missing_action", "has no attribute `add_all`"),
     ] {
         let error = analyze(
             &Dice::builder().build(DetectCycles::Enabled),
@@ -1028,7 +1028,7 @@ async fn configured_fragment_facades_project_methods_and_fail_closed() {
         assert!(error.contains(expected), "{target}: {error}");
     }
 
-    let target_opt = analyze(
+    let target_opt = analyze_result(
         &Dice::builder().build(DetectCycles::Enabled),
         semantic_epoch().build(),
         "@@//subject:fragment_opt_terminal",
@@ -1037,10 +1037,7 @@ async fn configured_fragment_facades_project_methods_and_fail_closed() {
         AnalysisRoute::Legacy,
     )
     .await;
-    assert!(
-        target_opt.contains("has no attribute `args`"),
-        "{target_opt}"
-    );
+    assert!(target_opt.is_ok(), "{target_opt:?}");
 
     let target_dbg = analyze_result(
         &Dice::builder().build(DetectCycles::Enabled),
@@ -1053,7 +1050,7 @@ async fn configured_fragment_facades_project_methods_and_fail_closed() {
     .await;
     assert!(target_dbg.is_ok(), "{target_dbg:?}");
 
-    let exec_default = analyze(
+    let exec_default = analyze_result(
         &Dice::builder().build(DetectCycles::Enabled),
         semantic_epoch().build(),
         "@@//subject:fragment_exec_parent",
@@ -1062,12 +1059,9 @@ async fn configured_fragment_facades_project_methods_and_fail_closed() {
         AnalysisRoute::Legacy,
     )
     .await;
-    assert!(
-        exec_default.contains("has no attribute `args`"),
-        "{exec_default}"
-    );
+    assert!(exec_default.is_ok(), "{exec_default:?}");
 
-    let target_dbg_exec_opt = analyze(
+    let target_dbg_exec_opt = analyze_result(
         &Dice::builder().build(DetectCycles::Enabled),
         semantic_epoch().build(),
         "@@//subject:fragment_exec_parent",
@@ -1076,10 +1070,7 @@ async fn configured_fragment_facades_project_methods_and_fail_closed() {
         AnalysisRoute::Legacy,
     )
     .await;
-    assert!(
-        target_dbg_exec_opt.contains("has no attribute `args`"),
-        "{target_dbg_exec_opt}"
-    );
+    assert!(target_dbg_exec_opt.is_ok(), "{target_dbg_exec_opt:?}");
 
     let exec_fastbuild = analyze_result(
         &Dice::builder().build(DetectCycles::Enabled),

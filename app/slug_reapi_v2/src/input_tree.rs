@@ -91,6 +91,9 @@ impl ReapiBlob {
 
 impl ReapiInputTree {
     pub fn from_action(action: &ActionSpec) -> Result<Self, InputTreeError> {
+        if action.is_typed_payload() {
+            return Err(InputTreeError::TypedActionUnsupported);
+        }
         let mut entries = BTreeMap::new();
         for input in action.inputs() {
             insert_action_input(&mut entries, input, InputTreeEntryKind::Input)?;
@@ -163,6 +166,7 @@ impl ReapiInputTree {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum InputTreeError {
+    TypedActionUnsupported,
     MissingDigest { path: String },
     InvalidDigest { path: String, error: String },
     ConflictingPath { path: String },
@@ -172,6 +176,9 @@ pub enum InputTreeError {
 impl fmt::Display for InputTreeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::TypedActionUnsupported => {
+                write!(f, "typed Spawn/Symlink REAPI input trees are not admitted")
+            }
             Self::MissingDigest { path } => write!(f, "REAPI input {path} is missing a digest"),
             Self::InvalidDigest { path, error } => {
                 write!(f, "REAPI input {path} has an invalid digest: {error}")

@@ -10,6 +10,8 @@ use super::configuration::SlugConfiguration;
 use super::configuration::SlugConfigurationError;
 use super::host::ActionEnvironmentHost;
 use super::host::ActionEnvironmentHostOs;
+use super::host::HostPathFlavor;
+use super::path::NormalizedBazelPath;
 use super::value::EnvValue;
 use super::value::NativeOccurrence;
 use super::value::NativeValue;
@@ -139,6 +141,17 @@ impl RetainedActionEnvironment {
 }
 
 impl SlugConfiguration {
+    pub fn configured_action_path_flavor(&self) -> Result<HostPathFlavor, SlugConfigurationError> {
+        let host = self
+            .action_environment_host()
+            .ok_or(action_environment_error("missing retained Host facts"))?;
+        Ok(if host.os() == ActionEnvironmentHostOs::Windows {
+            HostPathFlavor::Windows
+        } else {
+            HostPathFlavor::Unix
+        })
+    }
+
     pub fn configured_action_environment(
         &self,
     ) -> Result<RetainedActionEnvironment, SlugConfigurationError> {
@@ -286,78 +299,13 @@ fn windows_shell_prefix(shell: &str) -> String {
 }
 
 fn normalize_windows_path(path: &str) -> Result<String, SlugConfigurationError> {
-    if path
-        .split(['/', '\\'])
-        .filter(|segment| !segment.is_empty())
-        .any(is_windows_short_path)
-    {
-        return Err(action_environment_error(
-            "Windows BAZEL_SH short paths require a Host filesystem observation",
-        ));
-    }
-    let needs_normalize = path.contains('\\')
-        || path.contains("//")
-        || path.split('/').any(|segment| matches!(segment, "." | ".."))
-        || (path.len() > 1 && path.ends_with('/'));
-    if !needs_normalize {
-        return Ok(path.to_owned());
-    }
-    let bytes = path.as_bytes();
-    let rooted = bytes
-        .first()
-        .is_some_and(|value| matches!(value, b'/' | b'\\'));
-    let drive = bytes.len() >= 3
-        && bytes[0].is_ascii_alphabetic()
-        && bytes[1] == b':'
-        && matches!(bytes[2], b'/' | b'\\');
-    let absolute = rooted || drive;
-    let mut raw = path
-        .split(['/', '\\'])
-        .filter(|segment| !segment.is_empty());
-    if drive {
-        let _ = raw.next();
-    }
-    let mut segments = Vec::new();
-    for segment in raw {
-        match segment {
-            "." => {}
-            ".." if segments.last().is_some_and(|last| *last != "..") => {
-                segments.pop();
-            }
-            ".." if absolute => {}
-            _ => segments.push(segment),
-        }
-    }
-    let prefix = if drive {
-        format!("{}:/", char::from(bytes[0]).to_ascii_uppercase())
-    } else if rooted {
-        "/".to_owned()
-    } else {
-        String::new()
-    };
-    Ok(format!("{prefix}{}", segments.join("/")))
-}
-
-fn is_windows_short_path(segment: &str) -> bool {
-    let chars = segment.chars().collect::<Vec<_>>();
-    if chars.len() > 12 {
-        return false;
-    }
-    chars.iter().enumerate().any(|(tilde, value)| {
-        if *value != '~' || !(1..=6).contains(&tilde) {
-            return false;
-        }
-        let tail = &chars[tilde + 1..];
-        let digits = tail
-            .iter()
-            .take_while(|value| value.is_ascii_digit())
-            .count();
-        if !(1..=6).contains(&digits) || tilde + digits >= 8 {
-            return false;
-        }
-        let extension = &tail[digits..];
-        extension.is_empty() || (extension[0] == '.' && extension.len() <= 4)
-    })
+    NormalizedBazelPath::new(HostPathFlavor::Windows, path)
+        .map(|path| path.as_str().to_owned())
+        .map_err(|_| {
+            action_environment_error(
+                "Windows BAZEL_SH short paths require a Host filesystem observation",
+            )
+        })
 }
 
 fn parent_directory(path: &str) -> Option<&str> {

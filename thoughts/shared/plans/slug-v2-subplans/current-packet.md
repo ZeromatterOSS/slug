@@ -4,9 +4,9 @@ Packet: `WP-6-7A-fdo-basic-args-run-symlink-implementation-r2`
 
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 action declaration.
 
-Status: R1 implementation terminal review returned `REPLAN`. Independent R2
-architecture review returned `ACCEPT`; corrective implementation is authorized
-only within this contract.
+Status: Implementation `ACCEPT`. R1 terminal review returned `REPLAN`, the
+independent R2 architecture review accepted the correction contract, and the
+independent R2 terminal review accepted the completed implementation.
 
 Base implementation: `71d34affa`; accepted R1 design commit: `265581695`. The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked;
@@ -596,7 +596,19 @@ Independent terminal review is mandatory for this public cross-crate retained
 identity. One focused correction is allowed. A second material contract or
 implementation correction is `REPLAN`.
 
-Terminal `ACCEPT` updates the canonical M7 row, this manifest, and the Stage 9
-generic Args/spawn/symlink row, then commits the complete packet without the
-parked proof. The next packet remains
-`WP-6-7A-noncallback-vector-args-paramfiles-implementation-r1`.
+Terminal review returned `ACCEPT` with no material findings. The complete
+candidate measured 1,849 added production Rust lines, 1,050 added proof Rust
+lines, and 2,899 total added Rust lines; the two giant-file deltas were +19 and
++3. Full build-API, loading, serial analysis, configuration, and REAPI suites
+passed. Four core failures were reproduced unchanged at the frozen base. The
+authenticated rules_cc source ledger passed, and the relocated unchanged FDO
+body consumed a direct source target through typed `DefaultInfo.files` and
+completed configured analysis. Its `aquery` stopped at the declared unsupported
+typed-action projection boundary. The archive checker reported only three
+unchanged pre-existing non-V2 thought paths. Formatting, metadata, diff, parked-
+file integrity, CLI build, and slugd cleanup checks passed.
+
+This terminal acceptance updates the canonical M7 row and the Stage 6/9
+records, then commits the complete packet without the parked proof. The next
+packet remains `WP-6-7A-noncallback-vector-args-paramfiles-implementation-r1`;
+author its complete packet contract before implementation.

@@ -3322,10 +3322,13 @@ impl BuildCommandEvaluation {
         {
             return Err("run manifests are unsupported");
         }
-        let singleton = |files: &slug_build_api_v2::Depset<String>| matches!(files.to_list().as_slice(), [only] if only == executable);
-        if !singleton(&default_info.files)
-            || !singleton(&default_info.default_runfiles.files)
-            || !singleton(&default_info.data_runfiles.files)
+        let default_files = default_info.file_artifacts();
+        let default_singleton =
+            matches!(default_files.as_slice(), [only] if only.path().as_ref() == executable);
+        let runfiles_singleton = |files: &slug_build_api_v2::Depset<String>| matches!(files.to_list().as_slice(), [only] if only == executable);
+        if !default_singleton
+            || !runfiles_singleton(&default_info.default_runfiles.files)
+            || !runfiles_singleton(&default_info.data_runfiles.files)
         {
             return Err("run files and runfiles must contain only the executable");
         }

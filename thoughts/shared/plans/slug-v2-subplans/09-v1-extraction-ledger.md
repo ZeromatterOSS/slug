@@ -816,6 +816,18 @@ architecture/optimization guidance only. Independent architecture acceptance
 returned `ACCEPT`; correct the frozen R1 Rust candidate only within that
 contract.
 
+R2 terminal status: `ACCEPT`. The implementation publishes typed
+source/generated/declared `DefaultInfo.files`, hands the recursive source
+manifest into configured evaluation, proves parent-key DICE cutoff, and owns
+scalar Args/run/artifact/absolute-symlink state in one generic retained action
+model. The authenticated direct-source rules_cc FDO configured-analysis route
+passes without a C++/FDO/parser branch; typed-action aquery/execution/ActionKey/
+REAPI projection remains explicitly deferred. Validation passed at 1,849
+production, 1,050 proof, and 2,899 total added Rust lines; four core failures
+and three archive-path findings were independently reproduced or identified as
+unchanged frozen-base state. Next: author
+`WP-6-7A-noncallback-vector-args-paramfiles-implementation-r1`.
+
 ### Stage 6 recursive configured custom-rule analysis
 
 Status: Partially landed

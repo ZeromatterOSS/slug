@@ -49,13 +49,15 @@ use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
+use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
 use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::AnalysisValueKind;
+use slug_build_api_v2::ArtifactInputSource;
+use slug_build_api_v2::ArtifactInputs;
 use slug_build_api_v2::ConfiguredTargetValue;
 use slug_build_api_v2::DefaultInfo;
-use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::ParamFile;
 use slug_build_api_v2::ParamFileFormat;
@@ -64,6 +66,13 @@ use slug_build_api_v2::ProviderId;
 use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
+use slug_build_api_v2::RetainedArtifactInputs;
+use slug_build_api_v2::RetainedCommandLine;
+use slug_build_api_v2::SpawnExecutable;
+use slug_build_api_v2::SpawnSpec;
+use slug_configuration_v2::CanonicalStringMap;
+use slug_configuration_v2::NormalizedBazelPath;
+use slug_configuration_v2::RetainedActionEnvironment;
 use slug_configuration_v2::SlugConfiguration;
 use slug_configuration_v2::native::host::AutoCpuToken;
 use slug_configuration_v2::native::host::HostConversionInputs;
@@ -141,6 +150,76 @@ impl Key for ContextParentKey {
     ) -> Self::Value {
         self.evaluations.fetch_add(1, Ordering::SeqCst);
         ctx.compute(&ContextInputKey).await.unwrap()
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+struct PublicationInputKey;
+
+impl fmt::Display for PublicationInputKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("test-action-provider-publication-input")
+    }
+}
+
+#[async_trait]
+impl Key for PublicationInputKey {
+    type Value = Arc<ConfiguredNodeResult>;
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        panic!("PublicationInputKey is injected")
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[derive(Debug, Clone, Allocative)]
+struct PublicationParentKey {
+    #[allocative(skip)]
+    evaluations: Arc<AtomicUsize>,
+}
+
+impl PartialEq for PublicationParentKey {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.evaluations, &other.evaluations)
+    }
+}
+
+impl Eq for PublicationParentKey {}
+
+impl Hash for PublicationParentKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.evaluations).hash(state);
+    }
+}
+
+impl fmt::Display for PublicationParentKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("test-action-provider-publication-parent")
+    }
+}
+
+#[async_trait]
+impl Key for PublicationParentKey {
+    type Value = Arc<ConfiguredNodeResult>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        self.evaluations.fetch_add(1, Ordering::SeqCst);
+        ctx.compute(&PublicationInputKey).await.unwrap()
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -357,6 +436,100 @@ fn default_action_context(
         Arc::new(context),
         ToolchainTopology::new(vec![platform], Some(toolchain)).unwrap(),
     )
+}
+
+fn publication_depset(marker: &str, nested: bool) -> AnalysisDepset {
+    let artifact = AnalysisValue::artifact(AnalysisArtifact::Source(canonical(&format!(
+        "@@//inputs:{marker}.txt"
+    ))));
+    if nested {
+        let child = AnalysisDepset::new(DepsetOrder::Default, vec![artifact], Vec::new()).unwrap();
+        AnalysisDepset::new(DepsetOrder::Default, Vec::new(), vec![child]).unwrap()
+    } else {
+        AnalysisDepset::new(DepsetOrder::Default, vec![artifact], Vec::new()).unwrap()
+    }
+}
+
+fn publication_result(marker: &str, nested: bool) -> Arc<ConfiguredNodeResult> {
+    let files = publication_depset(marker, nested);
+    let providers = ProviderCollection::new(vec![ProviderValue::DefaultInfo(
+        DefaultInfo::from_files(files.clone()).unwrap(),
+    )])
+    .unwrap();
+    let owner = ConfiguredTargetKey::new(
+        canonical("@@//:publication"),
+        structural_configurations()[0].clone(),
+    );
+    let (context, _) = default_action_context(&owner, "@@//:publication_platform");
+    let action = ActionSpec::spawn(SpawnSpec::new(
+        SpawnExecutable::Path(
+            NormalizedBazelPath::new(HostPathFlavor::Unix, "tools/runner").unwrap(),
+        ),
+        RetainedCommandLine::new(Vec::new()),
+        ArtifactInputs::new(vec![ArtifactInputSource::Depset(
+            RetainedArtifactInputs::new(files).unwrap(),
+        )]),
+        ArtifactInputs::new(Vec::new()),
+        vec![ActionOutput::new("publication.out", ActionOutputKind::File)],
+        RetainedActionEnvironment::default().for_action(false, Vec::<(String, String)>::new()),
+        CanonicalStringMap::default(),
+        "PublicationProof",
+        None::<&str>,
+    ));
+    Arc::new(
+        ConfiguredNodeResult::new_rule(owner, providers, None)
+            .with_action_specs(vec![action], vec![context])
+            .unwrap(),
+    )
+}
+
+#[tokio::test]
+async fn action_and_default_files_publication_equality_cut_off_parent_dice() {
+    let a1 = publication_result("a", false);
+    let a2 = publication_result("a", false);
+    let b = publication_result("b", true);
+    let a3 = publication_result("a", false);
+    let a4 = publication_result("a", false);
+    assert_eq!(a1, a2);
+    assert_ne!(a1, b);
+    assert_eq!(a1, a3);
+    assert_eq!(a1, a4);
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let evaluations = Arc::new(AtomicUsize::new(0));
+    let parent = PublicationParentKey {
+        evaluations: evaluations.clone(),
+    };
+
+    let mut updater = dice.updater();
+    updater.changed_to(vec![(PublicationInputKey, a1)]).unwrap();
+    let mut transaction = updater.commit().await;
+    let first = transaction.compute(&parent).await.unwrap();
+    assert_eq!(evaluations.load(Ordering::SeqCst), 1);
+
+    let mut updater = dice.updater();
+    updater.changed_to(vec![(PublicationInputKey, a2)]).unwrap();
+    let mut transaction = updater.commit().await;
+    assert_eq!(transaction.compute(&parent).await.unwrap(), first);
+    assert_eq!(evaluations.load(Ordering::SeqCst), 1);
+
+    let mut updater = dice.updater();
+    updater.changed_to(vec![(PublicationInputKey, b)]).unwrap();
+    let mut transaction = updater.commit().await;
+    assert_ne!(transaction.compute(&parent).await.unwrap(), first);
+    assert_eq!(evaluations.load(Ordering::SeqCst), 2);
+
+    let mut updater = dice.updater();
+    updater.changed_to(vec![(PublicationInputKey, a3)]).unwrap();
+    let mut transaction = updater.commit().await;
+    assert_eq!(transaction.compute(&parent).await.unwrap(), first);
+    assert_eq!(evaluations.load(Ordering::SeqCst), 3);
+
+    let mut updater = dice.updater();
+    updater.changed_to(vec![(PublicationInputKey, a4)]).unwrap();
+    let mut transaction = updater.commit().await;
+    assert_eq!(transaction.compute(&parent).await.unwrap(), first);
+    assert_eq!(evaluations.load(Ordering::SeqCst), 3);
 }
 
 fn action_context(
@@ -591,9 +764,16 @@ fn configured_edges_preserve_transition_convergence_order_and_fixed_bits() {
 
 #[test]
 fn configured_node_result_keeps_provider_collection_outputs_and_diagnostics() {
-    let files = Depset::from_direct(DepsetOrder::Default, vec!["pkg/out.txt".to_owned()]).unwrap();
+    let files = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::artifact(AnalysisArtifact::Source(
+            canonical("@@//pkg:out.txt"),
+        ))],
+        Vec::new(),
+    )
+    .unwrap();
     let providers = ProviderCollection::new(vec![
-        ProviderValue::DefaultInfo(DefaultInfo::from_files(files)),
+        ProviderValue::DefaultInfo(DefaultInfo::from_files(files).unwrap()),
         ProviderValue::Occurrence(ProviderOccurrence::new(
             ProviderIdentity::user(ProviderId::unqualified("MyInfo").unwrap()),
             [("value", AnalysisValue::string("custom"))],
@@ -641,10 +821,9 @@ fn configured_node_result_keeps_provider_collection_outputs_and_diagnostics() {
     );
     assert_eq!(result.actions()[0].mnemonic(), "FileWrite");
     assert_eq!(result.declared_outputs(), &["pkg/out.txt".to_owned()]);
-    assert_eq!(
-        result.providers().default_info().unwrap().files.to_list(),
-        vec!["pkg/out.txt".to_owned()]
-    );
+    let default_files = result.providers().default_info().unwrap().file_artifacts();
+    assert_eq!(default_files.len(), 1);
+    assert_eq!(default_files[0].path().as_ref(), "pkg/out.txt");
     assert_eq!(
         result.diagnostics()[0].severity(),
         DiagnosticSeverity::Warning

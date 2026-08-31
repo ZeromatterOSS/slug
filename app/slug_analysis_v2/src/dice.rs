@@ -25,11 +25,11 @@ use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
+use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::AnalysisTargetIdentity;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::ConfiguredTargetValue;
 use slug_build_api_v2::DefaultInfo;
-use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderIdentity;
@@ -1714,32 +1714,38 @@ fn configured_dependency_file_path(result: &ConfiguredNodeResult) -> String {
     }
 }
 
-fn materialized_target_providers(result: &ConfiguredNodeResult) -> ProviderCollection {
+fn materialized_target_providers(
+    result: &ConfiguredNodeResult,
+) -> Result<ProviderCollection, AnalysisError> {
     if !matches!(
         result.kind(),
         ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
     ) {
-        return result.providers().clone();
+        return Ok(result.providers().clone());
     }
-    let files = Depset::from_direct(
+    let artifact = configured_dependency_artifact(result, None)?;
+    let files = AnalysisDepset::new(
         DepsetOrder::Default,
-        vec![configured_dependency_file_path(result)],
+        vec![AnalysisValue::artifact(artifact)],
+        Vec::new(),
     )
-    .expect("a singleton file-target depset is valid");
-    ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::from_files(
-        files,
-    ))])
-    .expect("the materialized file-target provider view has DefaultInfo")
+    .map_err(|error| AnalysisError::message(error.to_string()))?;
+    ProviderCollection::new(vec![ProviderValue::DefaultInfo(
+        DefaultInfo::from_files(files)
+            .map_err(|error| AnalysisError::message(error.to_string()))?,
+    )])
+    .map_err(|error| AnalysisError::message(error.to_string()))
 }
 
-fn configured_target_analysis_value(result: &ConfiguredNodeResult) -> AnalysisValue {
+fn configured_target_analysis_value(
+    result: &ConfiguredNodeResult,
+) -> Result<AnalysisValue, AnalysisError> {
     let identity = result.actual_configured_target().map_or_else(
         || AnalysisTargetIdentity::null(result.key().label().clone()),
         |key| AnalysisTargetIdentity::from(analysis_configured_key(key)),
     );
-    AnalysisValue::configured_target(ConfiguredTargetValue::new(
-        identity,
-        materialized_target_providers(result),
+    Ok(AnalysisValue::configured_target(
+        ConfiguredTargetValue::new(identity, materialized_target_providers(result)?),
     ))
 }
 
@@ -1759,22 +1765,28 @@ fn configured_dependency_artifact(
             Ok(AnalysisArtifact::Source(result.key().label().clone()))
         }
         ConfiguredNodeKind::GeneratedFile => {
-            let producer = result
+            let mut producers = result
                 .edges()
                 .iter()
-                .find(|edge| {
+                .filter(|edge| {
                     matches!(
                         edge.kind(),
                         crate::configured_target::ConfiguredEdgeKind::GeneratedBy
                     )
                 })
-                .and_then(|edge| edge.configured_target())
-                .ok_or_else(|| {
-                    AnalysisError::message(format!(
-                        "generated configured dependency {} has no generating target",
-                        result.key().label()
-                    ))
-                })?;
+                .filter_map(|edge| edge.configured_target());
+            let producer = producers.next().ok_or_else(|| {
+                AnalysisError::message(format!(
+                    "generated configured dependency {} has no generating target",
+                    result.key().label()
+                ))
+            })?;
+            if producers.next().is_some() {
+                return Err(AnalysisError::message(format!(
+                    "generated configured dependency {} has ambiguous generating targets",
+                    result.key().label()
+                )));
+            }
             let path = configured_dependency_file_path(result);
             Ok(derived_artifact(producer, path))
         }
@@ -1824,21 +1836,28 @@ fn configured_attribute_item(
         )));
     }
     if row.allow_single_file() {
-        let path = if matches!(
+        let artifact = if matches!(
             result.kind(),
             ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
         ) {
-            None
+            configured_dependency_artifact(result, None)?
         } else {
-            result
+            let artifacts = result
                 .providers()
                 .default_info()
-                .and_then(|info| info.files.to_list().into_iter().next())
+                .map(DefaultInfo::file_artifacts)
+                .unwrap_or_default();
+            let [artifact] = artifacts.as_slice() else {
+                return Err(AnalysisError::message(format!(
+                    "configured dependency {} did not retain exactly one File",
+                    result.key().label()
+                )));
+            };
+            artifact.clone()
         };
-        return configured_dependency_artifact(result, path.as_deref())
-            .map(AnalysisValue::artifact);
+        return Ok(AnalysisValue::artifact(artifact));
     }
-    Ok(configured_target_analysis_value(result))
+    configured_target_analysis_value(result)
 }
 
 fn prepare_configured_attributes<T: ComputedAnalysis>(

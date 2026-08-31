@@ -2861,6 +2861,9 @@ mod retry7_private_kernel_contract {
                 "pub use configuration_field::CppConfigurationField;",
                 "pub use cpp_fragment::CppFragmentProjection;",
                 "pub use matching::NativeConfigSettingMatchError;",
+                "pub use path::BazelPathError;",
+                "pub use path::NormalizedAbsoluteBazelPath;",
+                "pub use path::NormalizedBazelPath;",
                 "pub use registry::NATIVE_OPTION_DESCRIPTORS;",
                 "pub use registry::NativeOptionDescriptor;",
             ]

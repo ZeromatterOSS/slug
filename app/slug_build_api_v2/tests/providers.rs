@@ -10,6 +10,11 @@
 
 use std::collections::BTreeMap;
 
+use slug_build_api_v2::ActionOutput;
+use slug_build_api_v2::ActionOutputKind;
+use slug_build_api_v2::AnalysisArtifact;
+use slug_build_api_v2::AnalysisConfiguredTargetKey;
+use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::Depset;
@@ -24,6 +29,7 @@ use slug_build_api_v2::ProviderName;
 use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::RunEnvironmentInfo;
+use slug_identity_v2::CanonicalLabel;
 
 fn files(items: &[&str]) -> Depset<String> {
     Depset::from_direct(
@@ -31,6 +37,33 @@ fn files(items: &[&str]) -> Depset<String> {
         items.iter().map(|item| item.to_string()).collect(),
     )
     .unwrap()
+}
+
+fn source_artifact(path: &str) -> AnalysisArtifact {
+    let (package, target) = path.rsplit_once('/').unwrap_or(("", path));
+    AnalysisArtifact::Source(
+        CanonicalLabel::parse(&format!("@@//{package}:{target}"))
+            .expect("test path forms a source label"),
+    )
+}
+
+fn artifact_files(items: &[&str]) -> AnalysisDepset {
+    AnalysisDepset::new(
+        DepsetOrder::Default,
+        items
+            .iter()
+            .map(|path| AnalysisValue::artifact(source_artifact(path)))
+            .collect(),
+        Vec::new(),
+    )
+    .unwrap()
+}
+
+fn default_paths(info: &DefaultInfo) -> Vec<String> {
+    info.file_artifacts()
+        .into_iter()
+        .map(|artifact| artifact.path().into_owned())
+        .collect()
 }
 
 fn user_provider(
@@ -82,7 +115,9 @@ fn provider_collection_rejects_duplicate_provider_keys() {
 #[test]
 fn provider_collection_exposes_bazel_native_and_user_providers() {
     let collection = ProviderCollection::new(vec![
-        ProviderValue::DefaultInfo(DefaultInfo::from_files(files(&["pkg/custom.txt"]))),
+        ProviderValue::DefaultInfo(
+            DefaultInfo::from_files(artifact_files(&["pkg/custom.txt"])).unwrap(),
+        ),
         user_provider(
             ProviderId::unqualified("MyInfo").unwrap(),
             [("value", AnalysisValue::string("custom"))],
@@ -109,16 +144,18 @@ fn provider_collection_exposes_bazel_native_and_user_providers() {
         ProviderId::unqualified("MyInfo").unwrap()
     )));
     assert_eq!(
-        collection.default_info().unwrap().files.to_list(),
-        vec!["pkg/custom.txt".to_owned()]
+        default_paths(collection.default_info().unwrap()),
+        ["pkg/custom.txt"]
     );
 }
 
 #[test]
 fn executable_default_info_uses_the_executable_for_implicit_files_and_runfiles() {
-    let info = DefaultInfo::from_executable("pkg/tool".to_owned(), None);
+    let info =
+        DefaultInfo::from_executable("pkg/tool".to_owned(), source_artifact("pkg/tool"), None)
+            .unwrap();
 
-    assert_eq!(info.files.to_list(), ["pkg/tool"]);
+    assert_eq!(default_paths(&info), ["pkg/tool"]);
     assert_eq!(info.executable.as_deref(), Some("pkg/tool"));
     assert_eq!(info.files_to_run.executable.as_deref(), Some("pkg/tool"));
     assert_eq!(info.default_runfiles.files.to_list(), ["pkg/tool"]);
@@ -131,12 +168,58 @@ fn executable_default_info_uses_the_executable_for_implicit_files_and_runfiles()
 
 #[test]
 fn executable_default_info_preserves_an_explicit_files_override() {
-    let info =
-        DefaultInfo::from_executable("pkg/tool".to_owned(), Some(files(&["pkg/explicit.txt"])));
+    let info = DefaultInfo::from_executable(
+        "pkg/tool".to_owned(),
+        source_artifact("pkg/tool"),
+        Some(artifact_files(&["pkg/explicit.txt"])),
+    )
+    .unwrap();
 
-    assert_eq!(info.files.to_list(), ["pkg/explicit.txt"]);
+    assert_eq!(default_paths(&info), ["pkg/explicit.txt"]);
     assert_eq!(info.default_runfiles.files.to_list(), ["pkg/tool"]);
     assert_eq!(info.data_runfiles.files.to_list(), ["pkg/tool"]);
+}
+
+#[test]
+fn default_info_rejects_non_file_depsets() {
+    let strings = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::string("pkg/not-a-file")],
+        Vec::new(),
+    )
+    .unwrap();
+
+    let error = DefaultInfo::from_files(strings).unwrap_err();
+    assert_eq!(
+        error,
+        ProviderError::InvalidDefaultInfoFiles {
+            element_type: slug_build_api_v2::AnalysisValueType::String,
+        }
+    );
+}
+
+#[test]
+fn default_info_rejects_directory_artifacts_in_the_regular_file_slice() {
+    let directory = AnalysisArtifact::Derived {
+        owner: AnalysisConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//pkg:owner").unwrap(),
+            b"configured".as_slice(),
+        ),
+        output: ActionOutput::new("pkg/tree", ActionOutputKind::Directory),
+    };
+    let files = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::artifact(directory)],
+        Vec::new(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        DefaultInfo::from_files(files).unwrap_err(),
+        ProviderError::InvalidDefaultInfoArtifactKind {
+            kind: ActionOutputKind::Directory,
+        }
+    );
 }
 
 #[test]

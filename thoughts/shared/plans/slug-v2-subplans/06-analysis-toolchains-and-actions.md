@@ -455,6 +455,18 @@ publication cutoff. Runfiles, OutputGroup, executable and FilesToRun typed
 migration remain the next standard-provider category; add no FDO, rules_cc,
 `cc_common`, parser or C++ branch.
 
+The R2 implementation terminally passes. One checked dense
+`DefaultInfo.files` owner now retains typed source/generated/declared artifacts;
+configured evaluation receives the immutable recursive source manifest; the
+A1/A2/B/A3/A4 proof counts real parent-key recomputation; and scalar Args,
+Spawn, artifact symlink, and authenticated absolute symlink publication share
+the generic typed action sink. The direct-source rules_cc FDO body reaches
+configured analysis with no FDO/C++/parser special case. Generated path bytes
+and structural identities remain Slug-native, while new-action aquery,
+execution, ActionKey and REAPI projection remain deferred and fail closed.
+Independent terminal review returned `ACCEPT`; author only the bounded
+non-callback vector Args/param-file successor next.
+
 Bazel 9.2 remains the sole semantic authority. Zabel
 `0795445f3ab60f4e49070bdd0b94425c5610f73a` supplies peer phase-ownership,
 typed-segment and input-topology lessons only; copy no Zig behavior or layout.
