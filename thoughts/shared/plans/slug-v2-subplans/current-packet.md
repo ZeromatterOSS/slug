@@ -1,532 +1,339 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-6-7A-transitive-runfiles-package-mapping-owner-design-r4`
+Packet: `WP-6-7A-four-runfiles-support-actions-design-r2`
 
-Milestone: M7A generic Starlark/ruleset closure; Stage 4 configured analysis
-and Stage 6 runfiles-support prerequisites.
+Milestone: M7A generic Starlark/ruleset closure; Stage 6 typed
+DefaultInfo/FilesToRun/runfiles support.
 
-Status: R4 loading/metadata correction terminally accepted; configured
-collector implementation active. Design base `c1c8ce277`, R4 correction-design
-commit `6795dae56`. The first
-support-action draft was rejected because Bazel 9 Bzlmod always registers a
-preceding repository-mapping manifest. The first prerequisite draft was then
-rejected because it did not route the complete selected root mapping and
-assumed that every published or semantic configured dependency was still
-available at node finalization. R2 then over-included resolution-only requested
-toolchain/candidate-platform inputs and flattened selector packages into the
-parent. R3 limits rows to Bazel package-contributing prerequisites and makes
-each selector condition one configured child. Independent design review
-returned `ACCEPT`, but implementation review found that the still-public
-legacy `PackageLoadKey` could publish an empty-mapping `LoadedPackage` through
-query/runtime adapters. R4 type-isolates that legacy result and adds the
-missing innate-owner discriminator before correction rereview. The configured
-collector and every action remain unchanged. Independent R4 design correction
-review returned `ACCEPT` after admitting the existing bzl-invalidation suite's
-mechanical result-signature changes. The implementation now type-isolates the
-legacy result, adds the innate-owner proof, and synchronizes the typed query
-fixture with the accepted root-mapping predecessor without adding a production
-fallback. Independent terminal correction review returned `ACCEPT` after all
-owner and direct-dependent gates passed within caps.
+Status: zero-Rust design independently `ACCEPT`; implementation active at
+base `2483dd7e2`. The loading/package-metadata owner
+landed in `80a6bfd3a`, and the complete configured transitive-package collector
+landed with terminal review `ACCEPT` in `2483dd7e2`. The former three-action
+draft is rejected: Bazel 9 Bzlmod always supplies transitive package metadata
+and registers `RepoMappingManifest` before the other three default support
+actions.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked;
-do not edit or stage it.
+do not edit or stage it. Remove only the untracked lockfile produced by the
+fresh read-only Bazel oracle before committing this packet.
 
-## Result and stop boundary
+## Observable result and stop boundary
 
-Design one Bazel-shaped transitive package collector for the admitted
-aspect-free configured graph. Every completed configured result retains one
-typed dense package/repository-mapping closure. The collector starts with the
-current loaded package, records any additional package metadata read directly
-for semantic analysis, and records the complete closures of configured child
-results. Direct packages and configured children remain separate until one
-deterministic final composition.
-
-Root package loading must obtain its complete selected repository mapping from
-the existing `HostRootRepositoryMappingKey` or observation sibling before
-`PackageRecorder` finishes. External packages continue to use their already-
-selected repository-source route. A mapping-only transition therefore changes
-`LoadedPackage`, invalidates configured analysis, and changes the retained
-package closure without a BUILD-byte change.
-
-This packet creates no Artifact or action and leaves every executable
-`FilesToRunProvider` incomplete. After the owner is accepted and implemented,
-the support successor registers four actions in Bazel order:
+For every admitted Starlark configured target whose effective `DefaultInfo`
+has an executable and nonempty default runfiles, normalization registers one
+transactional four-action suffix after the rule implementation's actions:
 
 1. `RepoMappingManifest`;
 2. `SourceSymlinkManifest`;
 3. `SymlinkTree`; and
 4. `RunfilesTree`.
 
-Spawn expansion remains the following successor. The packet is generic graph
-and provider infrastructure. It adds no `cc_common`, `cc_internal`, rules_cc,
-parser, evaluator builtin, C++ rule, or BCR special case. Bazel 9 rule bodies
-remain BCR Starlark and Buck2-derived starlark-rust remains the sole
-parser/evaluator/`set` owner.
+Only after all four actions validate does the target publish a complete
+`FilesToRunProvider`. One `Arc<RunfilesSupport>` is shared by that provider and
+all four typed recipes. A private typed occurrence carrier preserves the full
+provider through configured-dependency, nested-value, and subrule transport;
+public fields are views and are never used to reconstruct support.
 
-## Authority and authenticated evidence
+This closes the representation and publication architecture for the current
+DefaultInfo/FilesToRun/runfiles-support category. Spawn expansion is the next
+packet and consumes the complete carrier. Later manifest writers, ActionKey
+projections, aquery, execution, REAPI, test actions, `args`, and run-environment
+support must extend these same typed owners rather than introduce a second
+provider carrier, support graph, or action representation.
+
+The packet is generic provider/action infrastructure. It adds no parser,
+evaluator builtin, `set`, `cc_common`, `cc_internal`, rules_cc, C++ rule,
+ruleset branch, or BCR special case. Bazel 9 rule bodies remain BCR Starlark;
+Buck2-derived starlark-rust remains the sole language/parser/evaluator owner.
+
+## Learned facts and authenticated evidence
 
 Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is the sole
-semantic authority. Pinned sources are:
+semantic authority. Pinned sources and SHA-256 values are:
 
-- `Package.java` SHA-256
-  `23a35af653e4e6d807f8b5e94f7085ccc0109e0d04316c7a45a66c631096638c`;
-- `TransitiveDependencyState.java` SHA-256
-  `9321dc738cc8346570af3495a1d6efa99997c7798934d84eb2b1c0809717f8fd`;
-- `ConfiguredTargetFunction.java` SHA-256
-  `8c05a1be0f3049811c957667544ad7d52b03350b1a0226039a2d5c781e668682`;
-- `DependencyResolver.java` SHA-256
-  `60f470668b8b2828c3253cc4e4f45bcf12514d7e1635e288cb7668a824ef86f5`;
-- `DependencyResolutionHelpers.java` SHA-256
-  `9736c25c376501594d9a123132ae25e3d8fe842cde3e33cb50eb39a62897aa97`;
-- `TargetProducer.java` SHA-256
-  `cb3d2851c64b978ecff9fb602351e31cfc3843897e3f56dd04c5f6b4e2f5c912`;
-- `ConfiguredTargetAndDataProducer.java` SHA-256
-  `eccb7fcd55955c40dfe7d88cb959164082db8603ec70bfb2bab258b8935741c0`;
-- `ConfigConditionsProducer.java` SHA-256
-  `42d72a2123f04c2925750ccc001d64acfb37d58a7dafc490fddb0af30bca564d`;
-- `ToolchainRule.java` SHA-256
-  `b9a3772db2ffacb005b051bd72a2fe7322cd27e9ffcb45e2293e87b04fb244d1`;
-- `ConfigRuleClasses.java` SHA-256
-  `c9f58ee6f8e657fe041ebfebc5289adc2d5eb07c9fecad7d7fd8dd1c804d6ba5`;
-- `SkyframeExecutor.java` SHA-256
-  `7d53250e5db42a98930ea3941362faaf42fab790d9d2efb5c3db9fe8c2d23867`;
-- `BazelRepositoryModule.java` SHA-256
-  `5d08f39631f3e656eb637c63c82d7c7894d06501e5a0664c02d49b6b5fb42782`;
-- `RepoMappingManifestAction.java` SHA-256
+- `RunfilesSupport.java`
+  `429c7eb2809a46192d2fd757cece70cfeb0046a5396bbd8c5d4f15b9c6900659`;
+- `RepoMappingManifestAction.java`
   `e8663c7ed8a341ae3337386a82ce29dfb2e35daca3bba211409a920e5b1ad23a`;
+- `SourceManifestAction.java`
+  `0a8b6d868d9702b3d6f08b7b33e46bd9de29353f37422064e4c62e13adb91a23`;
+- `SymlinkTreeAction.java`
+  `0279cdada9345d698dd86b803098c259caff20a4faea519ff8bb774b2ad153de`;
+- `RunfilesTreeAction.java`
+  `c882aff3494ac8acfbe204f65b6d220caf0fda815f8f37965befd575a8293780`;
+- `FilesToRunProvider.java`
+  `17f3bf0b0428f8ae8c73364209ca51ffbc95afd70fe1ea7a3109ae114d8f7501`;
+- `StarlarkRuleConfiguredTargetUtil.java`
+  `fbb2c4e8bf0b1fb49ba63f8a1b5f352c1c0ffbd71373c7d6dca3108c0785a1b6`;
+- `CoreOptions.java`
+  `89835ed74107b21f7c51b4723e16be8b96b3c1bf43855fc63220b1dd21f5c67a`;
+- `RunfilesRepoMappingManifestTest.java`
+  `8df1c7f6cc4558fe35405f43e7130ffc4f0588f41e75f18709adf520146545df`;
+- `SourceManifestActionTest.java`
+  `d8befe916188a8f41b34690245d57fa914b2846d9384dff14b09f9abf18dd9a5`;
   and
-- `RunfilesRepoMappingManifestTest.java` SHA-256
-  `8df1c7f6cc4558fe35405f43e7130ffc4f0588f41e75f18709adf520146545df`.
+- `SymlinkTreeActionTest.java`
+  `06d5b4e258e819629440a9fb572c007be17bc52e72cc6cf3886fe5f35b6fe4b5`.
 
-`BazelRepositoryModule.workspaceInit` enables external repositories.
-`SkyframeExecutor.shouldStoreTransitivePackagesInLoadingAndAnalysis` therefore
-keeps package tracking enabled for the Bzlmod/BCR server lifetime.
-`TargetProducer` adds the metadata of each target package read directly.
-`ConfiguredTargetAndDataProducer` adds the complete package nested set of each
-configured prerequisite. `ConfigConditionsProducer` and dependency-map
-construction share the same `TransitiveDependencyState`; package ownership is
-broader than Starlark-visible attributes or Slug's current `computed` map.
-`DependencyResolutionHelpers.addToolchainDeps` adds selected implementation
-labels to that dependency map. Requested toolchain types and candidate
-execution platforms remain inputs to separate toolchain-resolution SkyKeys and
-are not configured prerequisites in the parent collector.
+`RunfilesSupport.create` first registers the repository-mapping manifest, then
+declares the special runfiles-tree Artifact, then registers source manifest
+and non-Windows symlink-tree actions under the default
+`build_runfile_manifests=true` and `build_runfile_links=true` options, and
+finally registers `RunfilesTreeAction`. `StarlarkRuleConfiguredTargetUtil`
+creates support for an executable or test when computed default runfiles are
+nonempty and only then publishes FilesToRun support. Under the accepted Bzlmod
+boundary, the predecessor's complete `RunfilesPackageDepset` makes repository
+mapping non-null.
 
-`PackageCollector.buildSet` sorts direct metadata by `PackageIdentifier`, then
-adds configured-child nested sets in configured-target-key order, then applied
-aspects. `RepoMappingManifestAction` fingerprints that nested set and later
-derives a canonical-repository-sorted mapping table. This packet owns the
-aspect-free direct and configured inputs, not action bytes.
+Fresh public evidence reuses
+`tests/v2_oracle/fixtures/default-info-runfiles-executable` and adds no fixture.
+From its workspace, Bazel 9.2 command
+`bazel --batch aquery --lockfile_mode=off --output=text //pkg:probe` succeeds
+and reports, after the user `FileWrite`, exactly:
 
-The root mapping authority is the existing `HostRootRepositoryMappingKey`.
-Its `HostRootRepositoryMapping::view().mapping()` exposes the selected ordered
-mapping after extension and innate `use_repo_rule` usages have been applied.
-`RootModuleGraph.repository_mapping`/`root_mapping()` is only the earlier
-direct-module view and is forbidden as the retained root package mapping.
+```text
+RepoMappingManifest      [] -> pkg/probe.txt.repo_mapping
+SourceSymlinkManifest    [] -> pkg/probe.txt.runfiles_manifest
+SymlinkTree              [pkg/probe.txt.runfiles_manifest]
+                         -> pkg/probe.txt.runfiles/MANIFEST
+RunfilesTree             [pkg/probe.txt,
+                          pkg/probe.txt.repo_mapping,
+                          pkg/probe.txt.runfiles/MANIFEST]
+                         -> pkg/probe.txt.runfiles
+```
+
+All four aquery rows report the host execution platform; `SymlinkTree` reports
+the configured `PATH`. The fixture has no symlink Artifact, so the source
+manifest's filtered input set is empty. Pinned source additionally proves that
+source-manifest inputs are only runfiles Artifacts whose Artifact kind is
+symlink, while the non-Windows symlink-tree input set is only the source
+manifest. `RunfilesTree` inputs are runfiles Artifacts plus the public manifest
+and repository-mapping manifest.
+
+Upstream content/escaping tests are not implementation gates because manifest
+serialization is deferred. Windows tests are skipped because Windows link
+inputs and junction semantics are unsupported. Fileset tests are skipped as an
+unadmitted runfiles shape. The fresh aquery plus pinned constructors are the
+accepted graph/order evidence; no copied expected asset is added.
 
 Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer
-architecture and optimization guidance only. Authenticated peer sources are:
-
-- `session_configured_transitive_package_repositories.zig` SHA-256
-  `4d1e884ea1b9daad77ac71a2f7dff7c1bead7b9e8fad0057cfe5530b2bec2ec2`;
-- `session_nonconfigurable_transitive_package_repositories.zig` SHA-256
-  `8665924bc4032dadbf976f754ba11a7f9731d792387f963e50743bc70bbd528c`;
-  and
-- `analysis_py_internal_create_repo_mapping_manifest_bazel_fixture_test.sh`
-  SHA-256
-  `fac48e707b856be8fc11e7e7259f2310e7ae09ecf1e721b79db444d7e5469cbf`.
-
-Zabel usefully separates configured package closure, repository-view-owned
-mappings, and later action projection, and preserves requested/final child
-ownership. Slug adopts those ownership and compactness lessons only. Copy no
-Zig code, IDs, stores, exact-fingerprint nodes, digests, scheduler, cache,
-layout, errors, action keys, or behavior.
+architecture and optimization guidance only. Its useful lesson is the phase
+separation between provider normalization, complete package closure, action
+projection, and later physical realization. Slug independently implements
+that separation behind its accepted Rust owners. Copy no Zig behavior, code,
+IDs, stores, digests, scheduler, cache, layout, action key, or compatibility
+claim. V1 supplies no semantic owner. Buck2-derived compact collections,
+`Arc`, `Dupe`, dense depsets, and `Allocative` remain bounded utility reuse.
 
 ## Compatibility classification
 
-**Exact:** canonical package/repository identities; complete selected ordered
-apparent-to-canonical mappings; root mapping after selected module-extension
-and innate usages; one direct current-package contribution; every directly
-read semantic package contribution; every admitted configured prerequisite's
-complete package closure; direct-package sorting by `PackageIdentifier`;
-canonical-label-first configured-child ordering; duplicate package
-elimination; generated mapping cohort identity; mapping-only and child-only
-invalidation; and non-null package tracking under Bzlmod.
+**Exact:** the default non-Windows support eligibility; four action mnemonics,
+registration order, relative output suffixes, output roles, action dependency
+graph, repository-mapping semantic inputs, source-manifest symlink-Artifact
+filter, configured symlink-tree environment, public FilesToRun manifest views,
+and failure-before-publication behavior. A source/exported file's existing
+supportless FilesToRun provider remains a separate exact non-rule category.
 
-**Slug-native:** structural configuration comparison after canonical labels
-where Bazel orders by execution-platform label and options checksum; compact
-Rust storage; structural DICE identity; and the opaque Rust spelling of a
-generated mapping cohort. These divergences may change exact nested-set bytes
-but may not omit a package, mapping, or dependency.
+**Slug-native:** collision-safe structural action/configuration identity;
+configuration-relative output paths rather than exact `bazel-out` bytes; a
+Rust `RunfilesTree` output-kind discriminator rather than Bazel's Artifact
+subclass; compact Rust storage and publication equality; and the current
+selected default action-owner context used for configured action rows.
 
-**Unsupported/deferred:** aspects and applied-aspect package closure; exact
-Bazel package-root/build-filename metadata unused by mapping projection; exact
-NestedSet interning/fingerprint bytes; manifest content and ISO-8859-1 writing;
-the action's Bazel ActionKey; all four support actions; physical
-materialization; aquery/execution/REAPI; Windows; and nondefault compact-
-manifest mode. Complete runfiles metadata on the pre-Host legacy evaluator/
-query adapter is also unsupported; its distinct result type is not accepted by
-configured or runfiles consumers. No deferred boundary permits a `None`,
-empty, digest-only, repository-only, edge-only, or root-only substitute where
-complete metadata is required.
+**Unsupported/deferred:** manifest contents and ISO-8859-1 encoding; exact
+NestedSet fingerprints and all four Bazel ActionKeys; aquery formatting;
+materialization, execution, action cache, REAPI/CAS projection; Windows,
+filesets, aspects, `run_under`, sibling-repository output layout, nondefault
+manifest/link/compact-mapping flags, remotable source manifests, support
+`args`, run-environment/test-action consumers, and exact Bazel output-root
+identity. Deferral never permits partial action registration, reconstructed
+support, an empty package substitute, or published incomplete executable
+FilesToRun state.
 
-## Frozen retained model
+## Frozen ownership and retained model
 
-Add one neutral build-API owner:
+### Private FilesToRun occurrence carrier
 
-```text
-RunfilesRepositoryMapping = {
-  entries: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
-  compact_group: Option<CompactString>,
-}
-RunfilesPackageMetadata = {
-  package: PackageIdentifier,
-  mapping: Arc<RunfilesRepositoryMapping>,
-}
-RunfilesPackageDepset = Depset<Arc<RunfilesPackageMetadata>>
-```
+Extend `ProviderOccurrence` with a private
+`Option<Arc<FilesToRunProvider>>` carrier. `ProviderOccurrence::new` always
+creates `None`; only `FilesToRunProvider::to_occurrence`, after constructing
+the builtin identity and public fields, may attach `Some`. There is no public
+setter, generic `Any`, downcast registry, path association, or reconstruction.
+`FilesToRunProvider::from_occurrence` first validates the builtin identity and
+then clones the typed carrier. A caller that fabricates public builtin fields
+cannot create a valid FilesToRun value.
 
-The configured-analysis crate owns its phase-local row so the neutral build API
-does not depend upward on analysis identity:
+Publication equality compares the carrier with the same
+`PublicationEqState` used for public fields so files/runfiles alias partitions
+remain semantic. Ordinary `PartialEq` includes the carrier. `Hash` continues
+to hash identity and public fields only; omitting the private carrier creates
+lawful collisions and is not an identity digest. The `Arc` is required to
+break the recursive `AnalysisValue`/provider type graph and makes transport a
+cheap clone. Materialization reads the carrier and therefore preserves support
+through dependency, nested, and subrule values.
 
-```text
-RunfilesPackageClosureRow = {
-  key: ConfiguredNodeKey,
-  packages: RunfilesPackageDepset,
-}
-```
+### Shared support and typed action family
 
-`compact_group` is present only for repositories generated by one selected
-module-extension or innate owner and uses that owner's existing collision-free
-unique name. Root, selected modules, built-in `bazel_tools`, and ordinary local
-routes use `None`. Equal mapping bytes from different owners remain identity-
-distinct; repositories from one generated owner share a group. This preserves
-the identity partition needed by later compact serialization without making
-the group a repository identity or public name.
-
-`RunfilesPackageMetadata::PartialEq` compares package, mapping entries, and
-compact group. Its `Hash` intentionally hashes only `PackageIdentifier`, like
-Bazel's cheap `Package.Metadata.hashCode`; full equality resolves lawful
-collisions. All retained types implement `Allocative` and use cheap `Arc`
-clones.
-
-Use the accepted Buck2-derived dense depset and iterative traversal. Add no
-retained standard hash collection, flattened repository list, exact-fingerprint
-side graph, digest surrogate, interner, cache, global state, task, or lock.
-
-## Complete root mapping route
-
-`HostRepositorySourceRoute` exposes the generated-owner compact group as a
-read-only projection of its already-selected route. It performs no repository
-selection, source read, or DICE computation. External `PackageRecorder`
-construction receives the selected mapping entries and group together.
-
-Add one private mode-aware root-mapping child in `slug_loading_v2::bzl_module`:
-
-- Legacy computes `HostRootRepositoryMappingKey`;
-- Observed computes `HostRootRepositoryMappingObservationKey`;
-- `Need` propagates unchanged;
-- observed path frontiers remain outer outcomes;
-- infrastructure/semantic mapping failures become typed root-package load
-  errors without panics; and
-- observed mapping epochs merge through the existing root-package observation
-  union before publication.
-
-Invoke this child after the existing root source and direct-load preparation
-has succeeded and immediately before package evaluation. This preserves the
-accepted source/load error frontier while ensuring even a root BUILD with no
-external `load()` depends on the complete selected mapping. Collect
-`HostRootRepositoryMapping::view().mapping()` in its owned order and pass it to
-`evaluate_host_package_attempts_driver` instead of `Arc::from([])`. Root uses
-`compact_group = None`.
-
-`PackageRecorder::finish` moves package identity, mapping entries, and compact
-group into one `RunfilesPackageMetadata` retained by `LoadedPackage`.
-`LoadedPackage::PartialEq` includes it. Analysis must consume this retained
-metadata and must not reconstruct mappings from labels, command mappings, or
-module graphs.
-
-### R4 legacy-result isolation
-
-The older `PackageLoadKey` remains an active local evaluator/query adapter but
-does not use the Host source-preparation protocol and cannot lawfully claim the
-complete selected root mapping. R4 therefore does not synthesize, guess, or
-default that metadata. Split the evaluator-owned fields into one immutable
-`PackageEvaluation` core, then expose two noninterconvertible phase results:
+Extend the existing `RunfilesSupport`, rather than replacing it, with the
+private/input source-manifest Artifact required by Bazel's topology. The
+active default path requires:
 
 ```text
-LoadedPackage = {
-  evaluation: PackageEvaluation,
-  runfiles_package: Arc<RunfilesPackageMetadata>,
-}
-LegacyLoadedPackage = {
-  evaluation: PackageEvaluation,
+RunfilesSupport = {
+  runfiles,
+  tree:                  <executable>.runfiles          [RunfilesTree],
+  input_manifest:        <executable>.runfiles_manifest [File],
+  manifest:              Some(<executable>.runfiles/MANIFEST) [File],
+  repo_mapping_manifest: Some(<executable>.repo_mapping) [File],
 }
 ```
 
-Both wrappers may dereference to the common evaluation fields for read-only
-callers. Neither dereferences or converts to the other. Only the Host root and
-external package finalizers may construct `LoadedPackage`, and those
-finalizers require a selected `RunfilesRepositoryMapping`. `PackageLoadKey`
-and `BzlModuleEvaluator::evaluate_package` return `LegacyLoadedPackage`;
-legacy query graph helpers accept only the common evaluation core. Configured
-analysis, Host inventory, registration expansion, and all runfiles collectors
-continue to require `LoadedPackage`, so a legacy result cannot cross the
-complete-metadata boundary at compile time.
+The existing optional public manifest fields remain reserved for later
+nondefault flags, but this packet has no `None` branch for an admitted
+executable rule. `DefaultInfo` gains a typed completion operation that keeps
+its files/default/data runfiles and executable unchanged and replaces only
+the incomplete FilesToRun value with one containing this support.
 
-Remove `RunfilesRepositoryMapping::empty()` from `PackageRecorder::new` and
-keep any legacy label-resolution entries in an explicitly evaluation-local
-carrier. Do not add a default metadata constructor, conversion, optional
-runfiles field, command-side lookup, second DICE key, or fallback to
-`RootModuleGraph.repository_mapping`. Migrating the legacy adapter itself to
-the Need-aware Host route remains deferred because its callers do not own the
-Host preparation/restart contract; the type boundary prevents that deferred
-surface from widening the exact configured-loading claim.
+Add `ActionOutputKind::RunfilesTree` and one cohesive typed
+`RunfilesSupportActionSpec` enum in a new action-family module. Its four
+variants retain the shared support and only variant-specific semantic facts:
 
-Fallback ledger: the legacy adapter violates the complete-selected-mapping
-invariant and is retained only for callers that have not adopted Host
-preparation/restart. A later loading/query Host-cutover packet owns its
-deletion once every caller supplies that protocol. Until then, the distinct
-result type plus a mechanical assertion that no `PackageLoadKey` value is a
-`LoadedPackage` prevents permanence or accidental configured consumption.
+- repository mapping retains `RunfilesPackageDepset`, runfiles topology,
+  workspace/repository prefix, and `compact=true`; its declared Artifact input
+  list is empty;
+- source manifest retains runfiles and the repository-mapping path and visits
+  only symlink Artifacts as declared inputs;
+- symlink tree retains source manifest, repository-mapping path, runfiles,
+  configured action environment, and default create mode; its non-Windows
+  declared input is only source manifest; and
+- runfiles tree retains the complete runfiles topology and both manifests; its
+  inputs are runfiles Artifacts plus public and repository manifests and its
+  only output has `RunfilesTree` kind.
 
-This correction changes no BUILD evaluation, query formatting, DICE key
-identity, observation, action, provider, or execution behavior. The complete
-Host result remains DICE-retained semantic memory; the legacy core remains its
-existing DICE-retained adapter value. Both own frozen evaluator lifetimes and
-borrow no command scratch. Equality cutoff stays full structural equality for
-the applicable wrapper, with complete mapping metadata compared only on
-`LoadedPackage`.
+`ActionSpec` receives one typed payload variant and accessors for this action
+family; do not encode these recipes through legacy argv/env/string fields.
+The special output kind prevents later execution/REAPI code from treating the
+tree as a regular file or directory. Existing projection code must explicitly
+reject it; this packet does not project it.
 
-Required root proof includes a no-external-load package whose BUILD bytes stay
-constant while an extension/innate root mapping changes A/B/A. Both Legacy and
-Observed roots must invalidate/restore, Observed must retain exact epoch/event
-algebra, and the old empty/direct-module mapping path must be absent.
+### Producer and atomic publication
 
-## Bazel-shaped analysis collector
+The natural producer is post-evaluation provider normalization inside
+`evaluate_loaded_rule`. It already owns the returned provider collection, the
+rule's action registry, configured action environment/owner, effective
+DefaultInfo, and the mandatory current-node `RunfilesPackageDepset` supplied by
+the accepted collector.
 
-Add one phase-local `RunfilesPackageCollector` inside configured analysis. It
-owns two scratch sequences:
+Move the support finalizer into a new cohesive
+`slug_analysis_v2::runfiles_support` module so the 1,955-line
+`starlark_rule.rs` does not cross the 2,000-line complexity trigger. The
+finalizer:
 
-```text
-direct: RunfilesPackageMetadata
-configured: RunfilesPackageClosureRow
-```
+1. validates eligibility, owner consistency, effective runfiles, derived
+   output paths/kinds, and all four complete typed recipes;
+2. builds the completed DefaultInfo candidate without publishing it;
+3. calls `ActionRegistry::register_batch`, which preflights every action,
+   every output, existing conflicts, and intra-batch conflicts before mutating
+   either registry vector or owner map;
+4. replaces DefaultInfo infallibly only after the batch commits; and
+5. snapshots user actions followed by the exact four-action suffix into the
+   configured result.
 
-`add_direct` accepts metadata only from a `LoadedPackage` whose target read
-corresponds to a Bazel `TargetProducer` direct contribution in the current
-semantic computation; incidental implementation reads do not silently widen
-membership. `add_configured` accepts only a completed child result or an
-authenticated prepared carrier derived from one. Before
-publication, sort/deduplicate direct values by package identifier and
-configured rows by `ConfiguredNodeKey`; equal keys with unequal closures are an
-internal error, never first-wins. Compose direct leaves followed by dense
-transitive children without flattening.
+Any error drops the evaluation-local candidate; the registry and original
+provider collection remain unchanged. No action becomes visible without a
+complete provider and no complete provider becomes visible without all four
+actions. The existing action mutex is held only for this synchronous preflight
+and append; no DICE computation, await, filesystem read, or callback occurs
+while locked.
 
-Every `ConfiguredNodeResult` constructor requires the completed depset; there
-is no default-empty path. A single finalization helper receives the node's
-edges, closure rows, and extra semantic rows. Every Bazel package-contributing
-edge target must have a matching closure row. Extra semantic configured
-dependencies may contribute a row without becoming a public query edge.
-`ToolchainRequirement` and `CandidateExecutionPlatform` are explicitly
-noncontributing topology edges: pinned Bazel resolves them in separate
-toolchain SkyKeys, while only selected implementation labels enter
-`DependencyResolutionHelpers.addToolchainDeps` and the parent's dependency
-map. No other edge kind may omit a row. The helper performs no DICE compute,
-await, source read, mapping lookup, or lock acquisition.
+No new DICE key, cache, global state, task, lock, filesystem observation, or
+request overlay is added. Existing loaded-package and configured-analysis keys
+own invalidation. A package/mapping/runfiles/configuration change changes the
+retained recipe and configured result; equality cutoff restores identical A/B/A
+state. Overlapping requests retain their own immutable results and share only
+existing DICE values.
 
-### Nonconfigured and native nodes
+The support object, provider carrier, typed recipes, action outputs, and
+package depset are DICE-retained semantic memory. `Arc` shares the support and
+dense topologies; no full child result, flattened repository list, duplicate
+runfiles graph, or evaluator value is retained. Batch vectors/maps and Artifact
+deduplication are phase scratch released after finalization. `Allocative`
+covers all retained additions. No async transfer or shutdown owner is added.
 
-- source/exported file: direct current package only;
-- package group: compute every included null-config package group under the
-  existing configured-analysis cycle guard, publish include edges from those
-  results, and add each closure;
-- constraint setting/toolchain type: direct current package only;
-- constraint value: add the already-computed setting child closure;
-- platform: add every already-computed constraint-value child closure;
-- alias: add the requested alias child's closure, which already contains its
-  requested package and finalized actual closure;
-- generated file: add the generating rule's closure; and
-- native toolchain declaration: compute and publish configured children for
-  `toolchain_type`, `exec_compatible_with`, `target_compatible_with`, and
-  selected `target_settings` dependencies in deterministic attribute/index
-  order. Bazel's `toolchain` attribute is `NODEP_LABEL`; the implementation
-  label is deliberately not a declaration child and enters only when selected
-  for a consuming rule.
+## Implementation succession, allowlist, and caps
 
-No native branch may publish an edge before its child result is available.
-Package-group and native-toolchain cycles use the existing analysis cycle
-guard and fail; they never publish a partial closure.
+Independent design review returned `ACCEPT`. Commit this zero-Rust contract,
+then land one independently reviewed implementation commit.
 
-### Starlark rule preparation
+Production allowlist:
 
-Replace the assumption that `computed` is complete with typed carriers from
-each semantic preparation stage:
-
-- each configured selector condition exposes one configured-child row keyed by
-  its `config_setting`; that row's dense closure contains the condition
-  target's package as its direct leaf and the closures of configured flag and
-  constraint attribute prerequisites. The parent adds only this configured
-  row, never a flattened direct condition-package leaf. Target-platform lookup
-  used only to test constraint matching is not a package contribution;
-- declared, transitioned, hidden, and subrule attributes contribute the child
-  closures already held in `computed`;
-- declaring visibility labels are explicitly computed as null-config children
-  under the same cycle guard before `finish_analysis` and contribute their
-  closures;
-- configured execution-platform and toolchain-resolution results remain typed
-  topology/selection inputs but do not enter the parent's package collector;
-  the candidate and requested-type edges are noncontributing for the pinned
-  reason above; and
-- `PreparedToolchain` retains closure rows for selected implementation results
-  beside the action context instead of discarding them.
-
-The parent collector merges selector-condition, declared/hidden, visibility,
-and selected-implementation rows. Duplicate rows deduplicate by configured key
-only after full closure equality. Public edge construction and package closure
-construction consume the same prepared rows for every contributing edge;
-selected implementation and visibility edges cannot drift from closure
-ownership. Candidate-platform and requested-type changes still invalidate
-toolchain topology through their existing DICE keys but do not change the
-package depset unless they change the selected implementation.
-
-Prepared carriers retain only immutable keys and dense package depsets, not
-full child results or evaluator values. They are `Allocative`, cheap to clone,
-and remain inside existing analysis/result owners. No new DICE key is added:
-existing loading, condition, platform, resolution, and configured-analysis
-keys remain the invalidation edges; their values gain only the semantic package
-projection already computed below them.
-
-## Bounded implementation succession
-
-After design `ACCEPT`, land two independently reviewed implementation commits:
-
-1. **Loading/metadata owner — terminally accepted:** retained build-API types, generated-owner group
-   projection, complete Legacy/Observed root mapping route, external mapping
-   forwarding, `LoadedPackage` equality, and focused loading/Bzlmod proofs.
-   This commit changes no configured result or action.
-2. **Configured collector — active:** mandatory `ConfiguredNodeResult` closure,
-   phase-local collector, native/null/Starlark preparation carriers, complete
-   edge coverage, DICE invalidation, and retained-size proofs. This commit
-   changes no provider public field or action count.
-
-Only after both commits are terminally accepted may the four-action runfiles
-support packet activate. It must share one typed support object across all
-recipes and the completed `FilesToRunProvider`, and the private FilesToRun
-occurrence carrier becomes mandatory after builtin identity validation. There
-is no supportless compatibility fallback.
-
-## Allowlist and caps
-
-Design/ledger files may update this manifest, the canonical plan, Stage 6, and
-Stage 9.
-
-Loading/metadata production allowlist:
-
-- new `app/slug_build_api_v2/src/runfiles_packages.rs`;
-- `app/slug_build_api_v2/src/lib.rs`;
-- `app/slug_bzlmod_v2/src/{canonical_repository_route.rs,selected_repo_spec/selected_extension_demand.rs}`
-  only for the read-only generated-owner projection;
-- `app/slug_bzlmod_v2/src/source_preparation/canonical_repository_source.rs`;
-- `app/slug_loading_v2/src/{bzl_module.rs,package.rs}`;
-- `app/slug_loading_v2/src/{lib.rs,keys.rs}` only for the explicit legacy
-  result export/key documentation;
-- `app/slug_query_v2/src/{graph.rs,loading_environment.rs}` only for legacy
-  result/common-core signatures; and
-- compiler-required loading/runtime constructor call sites only, including
-  `app/slug_core_v2/src/runtime/dice.rs` if its inferred result requires an
-  explicit type annotation.
-
-Configured-collector production allowlist:
-
-- `app/slug_analysis_v2/src/{result.rs,dice.rs,starlark_rule.rs}`;
-- `app/slug_analysis_v2/src/configured_target.rs` only if existing edge kinds
-  cannot name native toolchain attributes; and
-- compiler-required `ConfiguredNodeResult` constructor call sites in
-  `app/slug_analysis_v2/src` only.
+- new `app/slug_build_api_v2/src/actions/runfiles_support.rs`;
+- `app/slug_build_api_v2/src/actions/{mod.rs,ctx_actions.rs,registry.rs,spec.rs,reapi_projection.rs}`;
+- `app/slug_build_api_v2/src/{analysis_value.rs,lib.rs}`;
+- `app/slug_build_api_v2/src/providers/mod.rs`;
+- new `app/slug_analysis_v2/src/runfiles_support.rs`;
+- `app/slug_analysis_v2/src/{lib.rs,analysis_value.rs,starlark_rule.rs}`; and
+- compiler-required exhaustive matches in direct build-API dependents only.
 
 Proof allowlist:
 
-- new `app/slug_build_api_v2/tests/runfiles_packages.rs`;
-- colocated Bzlmod projection tests;
-- `app/slug_loading_v2/src/{host_package_load_tests.rs,host_package_inventory_tests.rs}`;
-- existing
-  `app/slug_loading_v2/tests/{build_file_loading.rs,subrule_loading.rs,bzl_invalidation.rs}`
-  only for explicit legacy result signatures; the existing bzl-invalidation
-  DICE invalidation/equality-cutoff suite must pass unchanged;
-- `app/slug_query_v2/tests/loading_query.rs` only to inject legacy snapshots
-  derived from the same immutable Host epoch, admit the selected root-mapping
-  predecessor in its activation guard, and normalize module-free fixtures to
-  the built-in `bazel_tools` module; query labels/order/errors remain unchanged;
-- `app/slug_analysis_v2/tests/{configured_target.rs,starlark_rule.rs}`; and
-- focused private DICE tests colocated in `app/slug_analysis_v2/src/dice.rs`.
+- `app/slug_build_api_v2/tests/{actions.rs,analysis_value.rs,providers.rs}`;
+- `app/slug_analysis_v2/tests/starlark_rule.rs`; and
+- existing focused configured-analysis DICE tests only for mapping/runfiles
+  A/B/A publication evidence.
 
-Across both implementation commits: at most 1,050 net / 1,300 gross
-production Rust, 700 net / 850 gross proof Rust, and 1,750 net / 2,150 gross
-total Rust. The retained build-API owner stays below 260 physical lines and
-each new helper below 160 lines. No touched production file may newly cross
-2,000 lines. Existing oversized loading/DICE owners receive bounded fields,
-projections, carriers, and helpers only. The R4 `PackageEvaluation` extraction
-is the sole admitted structural refactor and must remain within `package.rs`;
-`REPLAN` before any other structural refactor, a new crate/dependency/key, or
-cap excess.
+Caps are 750 net / 900 gross production Rust, 600 net / 750 gross proof Rust,
+and 1,350 net / 1,650 gross total Rust. Each new module stays below 300 lines
+and each new helper below 150 lines. `starlark_rule.rs` must remain below 2,000
+physical lines. No new crate, dependency, DICE key, public wire/schema,
+parser/evaluator file, ruleset branch, executor, manifest writer, or structural
+refactor is allowed. `REPLAN` before exceeding a cap, adding a second retained
+graph/carrier, exposing the private carrier, reconstructing support from public
+fields, or changing accepted runfiles/package semantics.
 
-Add no parser/provider public field/action/executor file, action kind,
-filesystem observation, ruleset branch, V1 extraction, exact-fingerprint node,
-or second retained graph.
+## Required proof and validation
 
-## Required proof
+1. an executable target publishes the exact four-action suffix, paths, kinds,
+   input graph, configured environment, complete public fields, and no earlier
+   support action;
+2. `Arc::ptr_eq` proves one support allocation is shared by the completed
+   provider and every recipe, while structural equality changes for runfiles,
+   mapping, package, manifest, environment, or output changes;
+3. builtin identity plus the private carrier round-trips incomplete and
+   complete FilesToRun values through nested/configured/subrule materialization;
+   public-field fabrication and user providers with the same name fail closed;
+4. conflicts against each of the four existing output paths and an
+   intra-batch duplicate leave action count/owner map unchanged and do not
+   publish completed FilesToRun;
+5. non-executable/empty categories add no support action, existing file-target
+   supportless FilesToRun behavior stays unchanged, and executable/test error
+   behavior remains exact;
+6. source-manifest input filtering distinguishes regular, symlink, and tree
+   Artifacts; non-Windows SymlinkTree and RunfilesTree inputs match pinned
+   source and the fresh aquery;
+7. warm same-DICE mapping-only and runfiles-only A/B/A changes alter then
+   restore the configured action/provider result without replaying unrelated
+   siblings; and
+8. retained-size/accounting and mechanical scans prove one shared support,
+   dense package/runfiles reuse, no flat repository list, no full-child
+   retention, and no second carrier/graph/cache/interner.
 
-1. full metadata equality distinguishes mapping entries and compact groups
-   while the package-only hash remains lawful;
-2. dense composition preserves sorted direct leaves, sorted configured
-   children, exact duplicate elimination, shared diamonds, alias requested/
-   final ownership, and depth-3,500 safety;
-3. root/selected/builtin mappings are identity-distinct, multiple repositories
-   from one ordinary module-extension owner share its group, an innate owner
-   independently projects its own group, and equal bytes from different owners
-   or owner kinds do not share;
-4. Legacy and Observed root packages consume the complete selected mapping and
-   restore on mapping-only A/B/A with unchanged BUILD bytes and exact observed
-   frontier/event behavior; the separate `PackageLoadKey` result has no
-   runfiles metadata accessor or conversion to `LoadedPackage`, and a
-   compile-time consumer proof keeps it out of configured analysis;
-5. source, package-group, alias, generated, constraint, platform, native
-   toolchain, selector-condition, visibility, hidden/subrule, ordinary
-   Starlark, and selected-implementation package-contributing paths publish
-   complete closures;
-6. a mechanical assertion proves every package-contributing edge has a
-   matching child closure, while selector conditions remain retained without
-   inventing query edges; a pinned Bazel oracle proves candidate-platform and
-   requested-toolchain topology alone do not enter the package closure;
-7. warm same-DICE A/B/A direct-package, child-package, mapping, candidate,
-   visibility, condition, and selected-toolchain changes invalidate then
-   restore without replaying unrelated siblings; candidate/requested changes
-   that preserve selection restore the identical package closure;
-8. Bazel 9.2 oracle fixtures discriminate ordinary, visibility/package-group,
-   select/config-setting, alias/final, generated, platform/native toolchain,
-   selected-toolchain-runfiles, external mapping, and shared-diamond package
-   membership for the admitted aspect-free graph;
-9. every executable FilesToRun remains incomplete and action count, public
-   provider fields, query formatting, and execution behavior do not change;
-   and
-10. retained-size accounting proves Arc/dense sharing and absence of a flat
-    repository list, full-child retention, or parallel graph.
+Run serial:
 
-Run serial focused and full `slug_build_api_v2`, `slug_bzlmod_v2`,
-`slug_loading_v2`, and `slug_analysis_v2` suites plus `cargo check -p
-slug_core_v2`. Finish each implementation commit with `cargo fmt --all --
---check`, metadata, archive status, `git diff --check`, cap/physical-size
-accounting, independent terminal review, and parked-file SHA-256 verification.
+- `cargo test -p slug_build_api_v2 --quiet`;
+- `cargo test -p slug_loading_v2 --quiet`;
+- `cargo test -p slug_analysis_v2 --quiet`;
+- `cargo test -p slug_query_v2 --quiet`;
+- `cargo check -p slug_core_v2 -p slug_reapi_v2`;
+- `cargo fmt --all -- --check`;
+- metadata, archive-status, cap/physical-size, parked-file SHA-256, and
+  `git diff --check` gates.
 
-## Review gate
-
-Independent R4 design review must first return `ACCEPT` or `REPLAN` on the
-legacy/common/complete type boundary, direct-consumer allowlist, no-behavior-
-change claim, retained lifetime/equality, and proof. Independent terminal
-review must then return `ACCEPT` or `REPLAN` on complete root mapping ownership,
-Bazel direct/configured contribution fidelity, every admitted
-semantic and published edge, requested/final alias handling, dense topology,
-DICE invalidation, natural owners, absence of fallback/parallel state,
-successor sufficiency, proof, and caps. Commit the accepted zero-Rust design
-before implementation.
+Independent architecture review must return `ACCEPT` or `REPLAN` on the
+carrier visibility/equality/hash law, shared-support shape, exact action
+topology, atomic registry/provider publication, special output kind, natural
+owner, retained memory, downstream boundary, caps, and successor sufficiency.
+Independent terminal review must then inspect the implementation diff and all
+recorded proof. A second material contract correction is `REPLAN` rather than
+another in-place expansion.

@@ -30,36 +30,25 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, FDO command configuration, selected-toolchain context, configured hidden dependencies, direct subrule calls, the first generic fragment category, dense retained depsets, configured action environments, scalar/vector Args, param-file/write, common non-callback Spawn, typed FilesToRun/runfiles/complete DefaultInfo, and symlink declaration accepted** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; generic selected-toolchain context in `ebd19e3b1`; configured hidden dependencies in `2bf86bfa8`; direct invocation/value materialization in `da6865a3b`; real starlark-rust `set` in `cb71a302d`; generic fragment projection in `683538254`; dense depset/action-input owner in `7b0db03e1`; configured-action-environment owner in `71d34affa`; scalar generic actions in `78b94789c`; vector Args and parameter files in `a01a23fe7`; complete default-context non-callback Spawn envelope in `bfe6f2690`; terminally accepted typed FilesToRun provider core in `8e7234b82`; terminally accepted typed runfiles and complete DefaultInfo in `f346c209a`; terminally accepted complete loading/package-mapping owner | configured transitive package collection, four support actions, Spawn expansion, other standard-provider breadth, named exec groups/callbacks, and execution projection remain | implement the configured transitive-package collector |
+| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, FDO command configuration, selected-toolchain context, configured hidden dependencies, direct subrule calls, the first generic fragment category, dense retained depsets, configured action environments, scalar/vector Args, param-file/write, common non-callback Spawn, typed FilesToRun/runfiles/complete DefaultInfo, symlink declaration, and complete runfiles-package ownership accepted** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; generic selected-toolchain context in `ebd19e3b1`; configured hidden dependencies in `2bf86bfa8`; direct invocation/value materialization in `da6865a3b`; real starlark-rust `set` in `cb71a302d`; generic fragment projection in `683538254`; dense depset/action-input owner in `7b0db03e1`; configured-action-environment owner in `71d34affa`; scalar generic actions in `78b94789c`; vector Args and parameter files in `a01a23fe7`; complete default-context non-callback Spawn envelope in `bfe6f2690`; terminally accepted typed FilesToRun provider core in `8e7234b82`; typed runfiles and complete DefaultInfo in `f346c209a`; complete loading/package metadata in `80a6bfd3a`; configured transitive-package closure in `2483dd7e2` | four runfiles-support actions, Spawn expansion, other standard-provider breadth, named exec groups/callbacks, and execution projection remain | implement the accepted four-action runfiles-support packet |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[Transitive runfiles package-mapping owner design](./slug-v2-subplans/current-packet.md).
+[Four runfiles-support actions design](./slug-v2-subplans/current-packet.md).
 
-Two independent reviews have corrected the prerequisite. The first rejected a
-three-action/no-repository-mapping support slice because Bazel 9 Bzlmod always
-tracks transitive packages and registers `RepoMappingManifest` first. The
-second found that root loading still used an empty/direct-module mapping and
-that visibility, package-group, selector, platform and toolchain preparation
-discarded configured child closures before node publication. R2 then
-over-included resolution-only requested-type/candidate-platform inputs and
-flattened selector packages into the parent. R3 routes the existing
-complete `HostRootRepositoryMappingKey` projection and introduces one Bazel-
-shaped direct/configured package collector limited to exact package-
-contributing prerequisites. Its typed dense result is mandatory on every
-configured node. FilesToRun remains incomplete and no action is admitted. R3
-design review returned `ACCEPT`, but implementation review returned `REPLAN`
-because active legacy `PackageLoadKey` query/runtime adapters could still
-publish an empty-mapping `LoadedPackage`. Active R4 extracts a common package-
-evaluation core and gives the legacy adapter a distinct result that cannot
-enter complete Host/configured metadata consumers; it also adds the missing
-innate-owner cohort discriminator. The following successors implement the configured
-collector, then all four support actions, then Spawn expansion. This is generic
-graph/provider infrastructure, not a `cc_common`, `cc_internal`, rules_cc,
-parser, or C++ rule packet. Bazel 9.2 is semantic authority; Zabel is peer
-architecture and optimization guidance only.
+Commits `80a6bfd3a` and `2483dd7e2` terminally accept the complete
+loading/package-metadata owner and configured transitive-package collector.
+The active zero-Rust successor registers the Bazel-default non-Windows
+`RepoMappingManifest`, `SourceSymlinkManifest`, `SymlinkTree`, and
+`RunfilesTree` suffix atomically, shares one typed support object with the
+completed FilesToRun provider, and preserves that provider through a private
+occurrence carrier. Independent architecture review returned `ACCEPT`;
+implementation is active and Spawn expansion follows. This remains generic graph/provider/action
+infrastructure, not a `cc_common`, `cc_internal`, rules_cc, parser, or C++
+rule packet. Bazel 9.2 is semantic authority; Zabel is peer architecture and
+optimization guidance only.
 
 Commit `683538254` terminally accepts generic configured fragment projection.
 The successor audit found that authentic rules_cc 0.2.17 forwards a nonempty

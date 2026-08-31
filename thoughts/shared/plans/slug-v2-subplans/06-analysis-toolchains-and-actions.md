@@ -21801,3 +21801,34 @@ Bazel 9.2 remains sole semantic authority. Zabel's configured/nonconfigured
 package-closure separation is peer ownership and compactness guidance only; no
 Zig digest, store, exact-fingerprint node, layout, scheduler or behavior is
 copied.
+
+#### Complete transitive package collector accepted (2026-08-31)
+
+Commits `80a6bfd3a` and `2483dd7e2` terminally accept the complete
+loading/package-metadata owner and configured collector. Every admitted
+aspect-free configured result now retains its Bazel-shaped dense package
+closure, including selector, visibility, package-group, alias/final,
+constraint/platform, native-toolchain and selected-implementation
+contributions while excluding resolution-only requested/candidate topology.
+The implementation adds no action, provider fallback, new DICE key, flat
+repository list or second graph.
+
+#### Corrected four-action runfiles support design active (2026-08-31)
+
+Activate `WP-6-7A-four-runfiles-support-actions-design-r2` at
+`2483dd7e2`. Under Bazel 9 Bzlmod defaults, executable support is one atomic
+`RepoMappingManifest`, `SourceSymlinkManifest`, `SymlinkTree`, and
+`RunfilesTree` suffix. One `Arc<RunfilesSupport>` must be shared by all
+typed recipes and completed FilesToRun; a private typed occurrence carrier
+preserves the full provider through dependency/subrule transport without
+public-field reconstruction. A dedicated support finalizer owns transactional
+registry/provider publication, and a special RunfilesTree output kind reserves
+the later execution/ActionKey seam.
+
+This closes the current DefaultInfo/FilesToRun/runfiles-support representation
+category without adding manifest bytes, aquery, execution, REAPI, parser,
+`set`, `cc_common`, `cc_internal`, ruleset or C++ branches. Spawn
+expansion remains next. Bazel 9.2 alone fixes behavior; Zabel remains peer
+phase/compactness guidance and supplies no semantic owner or copied code.
+Independent architecture review returned `ACCEPT`; the bounded implementation
+is active.

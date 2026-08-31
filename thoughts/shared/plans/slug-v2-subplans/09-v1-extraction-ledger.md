@@ -2047,16 +2047,26 @@ representation.
 ### Stage 6 runfiles support-action utility decision draft (2026-08-31)
 
 Proposed reuse is one shared `Arc<RunfilesSupport>` across the complete provider
-and three typed recipes, with dense runfiles depsets retained once and stable
+and four typed recipes, with dense runfiles/package depsets retained once and stable
 Artifact deduplication kept as iterative phase scratch. A narrow private typed
 FilesToRun carrier corrects nested/subrule transport without a generic payload,
 second graph, interner, cache, task, or path-based association. Atomic registry
 preflight owns publication; no lock crosses evaluation or computation.
 
-The proposal is not accepted implementation authority until independent
-retained-representation review returns `ACCEPT`. Bazel 9.2 fixes behavior;
-Zabel is peer ownership/optimization guidance only, and no V1/Buck2/Zabel
-semantic owner or layout is imported.
+The former three-action proposal is rejected because Bazel 9 Bzlmod registers
+`RepoMappingManifest` first. Commits `80a6bfd3a` and `2483dd7e2`
+terminally accept its complete package-metadata/collector prerequisite. The
+corrected four-action proposal also adds one private source-manifest Artifact,
+one typed action-family enum and a special RunfilesTree output discriminator;
+it imports no V1/Buck2/Zabel semantic owner, representation or layout.
+
+Independent retained-representation review returned `ACCEPT`; the corrected
+proposal is implementation authority. Bazel 9.2 fixes behavior; Zabel is peer
+ownership/optimization guidance only. Existing `Arc`, `Dupe`,
+`Allocative`, compact maps, retained Artifact, action registry, and dense
+depset utilities are sufficient; add no interner, cache, global state, task,
+lock, flattened repository list, full-child retention or second runfiles
+graph.
 
 ### Stage 4/6 transitive runfiles package-mapping correction (2026-08-31)
 
@@ -2120,5 +2130,7 @@ structural equality cutoff and frozen-module lifetime, the complete wrapper
 adds one `Arc<RunfilesPackageMetadata>`, and the legacy wrapper adds no bytes.
 The existing 28-test bzl-invalidation suite and full loading/query dependents
 pass; no retained collection, clone, cache, interner, task, lock, or key was
-added. Independent terminal correction review returned `ACCEPT`; the
-configured collector is now the active successor.
+added. Independent terminal correction review returned `ACCEPT`. The
+configured collector landed in `2483dd7e2` with one dense closure per result,
+typed prepared carriers, iterative composition, and no second graph. The
+corrected four-action support design is now the active successor.
