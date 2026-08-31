@@ -48,12 +48,15 @@ use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
+use starlark::values::UnpackValue;
 use starlark::values::Value;
 use starlark::values::ValueLike;
+use starlark::values::dict::DictRef;
 use starlark::values::list::ListRef;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark::values::tuple::TupleRef;
+use starlark::values::typing::StarlarkCallable;
 use starlark_map::StarlarkHasher;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
@@ -61,6 +64,7 @@ use starlark_map::small_set::SmallSet;
 use crate::BzlModuleIdentity;
 use crate::analysis_fragments::SubruleFragmentCollection;
 use crate::provider::alloc_starlark_label;
+use crate::starlark_label::StarlarkLabel;
 use crate::subrule::SubruleIdentity;
 
 #[derive(Debug, Clone, Copy)]
@@ -74,6 +78,38 @@ pub struct AnalysisRunRequest<'v> {
     pub mnemonic: Option<&'v str>,
     pub progress_message: Option<&'v str>,
     pub use_default_shell_env: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+pub enum AnalysisActionCallScope {
+    Root,
+    Subrule(Arc<SubruleIdentity>),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum AnalysisSpawnInvocation<'v> {
+    Executable(Value<'v>),
+    Shell(Value<'v>),
+}
+
+#[derive(Debug, Clone)]
+pub struct AnalysisSpawnRequest<'v> {
+    pub scope: AnalysisActionCallScope,
+    pub invocation: AnalysisSpawnInvocation<'v>,
+    pub outputs: Value<'v>,
+    pub inputs: Option<Value<'v>>,
+    pub unused_inputs_list: Option<Value<'v>>,
+    pub tools: Option<Value<'v>>,
+    pub arguments: Option<Value<'v>>,
+    pub mnemonic: Option<&'v str>,
+    pub progress_message: Option<&'v str>,
+    pub use_default_shell_env: bool,
+    pub env: Option<Value<'v>>,
+    pub execution_requirements: Option<Value<'v>>,
+    pub exec_group: Option<&'v str>,
+    pub shadowed_action: Option<Value<'v>>,
+    pub has_resource_set: bool,
+    pub toolchain: Option<Value<'v>>,
 }
 
 pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
@@ -91,6 +127,12 @@ pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
         arguments: Value<'_>,
     ) -> anyhow::Result<()>;
     fn run(&self, request: AnalysisRunRequest<'_>) -> anyhow::Result<()>;
+    fn spawn(&self, _request: AnalysisSpawnRequest<'_>) -> anyhow::Result<()> {
+        anyhow::bail!("typed Spawn actions are unavailable in this analysis context")
+    }
+    fn is_files_to_run_provider(&self, _value: Value<'_>) -> bool {
+        false
+    }
     fn artifact_symlink(
         &self,
         output: Value<'_>,
@@ -778,6 +820,7 @@ impl AnalysisEvaluationContext {
             action_sink: self.payload.action_sink.clone(),
             fragments,
             name: identity.exported_name.clone(),
+            identity: identity.clone(),
         });
         let mut positions = Vec::with_capacity(args.len()? + 1);
         positions.push(context);
@@ -802,6 +845,7 @@ struct SubruleContext {
     #[allocative(skip)]
     fragments: FrozenValue,
     name: CompactString,
+    identity: Arc<SubruleIdentity>,
 }
 
 impl fmt::Display for SubruleContext {
@@ -835,6 +879,7 @@ fn subrule_context_methods(builder: &mut MethodsBuilder) {
             action_sink: this.action_sink.clone(),
             token: this.token.clone(),
             context_name: "subrule context",
+            scope: AnalysisActionCallScope::Subrule(this.identity.clone()),
         }))
     }
 
@@ -858,6 +903,7 @@ pub struct AnalysisActions {
     #[allocative(skip)]
     token: AnalysisCallToken,
     context_name: &'static str,
+    scope: AnalysisActionCallScope,
 }
 
 impl AnalysisActions {
@@ -865,11 +911,13 @@ impl AnalysisActions {
         action_sink: Arc<dyn AnalysisActionSink>,
         token: AnalysisCallToken,
         context_name: &'static str,
+        scope: AnalysisActionCallScope,
     ) -> Self {
         Self {
             action_sink,
             token,
             context_name,
+            scope,
         }
     }
 
@@ -893,6 +941,309 @@ impl fmt::Display for AnalysisActions {
 }
 
 starlark::starlark_simple_value!(AnalysisActions);
+
+fn action_sequence<'v>(value: Value<'v>, name: &str) -> anyhow::Result<Vec<Value<'v>>> {
+    ListRef::from_value(value)
+        .map(|values| values.iter().collect())
+        .or_else(|| TupleRef::from_value(value).map(|values| values.iter().collect()))
+        .ok_or_else(|| anyhow::anyhow!("{name} must be a sequence"))
+}
+
+fn bind_action_outputs(value: Value<'_>, operation: &str) -> anyhow::Result<()> {
+    let values = action_sequence(value, &format!("ctx.actions.{operation} outputs"))?;
+    if values
+        .iter()
+        .any(|value| AnalysisArtifactValue::from_starlark(*value).is_none())
+    {
+        anyhow::bail!("ctx.actions.{operation} outputs must contain Files")
+    }
+    Ok(())
+}
+
+fn bind_action_inputs<'v>(
+    value: Option<Value<'v>>,
+    operation: &str,
+) -> anyhow::Result<Option<Value<'v>>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if let Ok(values) = action_sequence(value, "inputs") {
+        if values
+            .iter()
+            .any(|value| AnalysisArtifactValue::from_starlark(*value).is_none())
+        {
+            anyhow::bail!("ctx.actions.{operation} inputs must contain Files")
+        }
+        return Ok(Some(value));
+    }
+    if crate::provider::StarlarkDepset::parts_from_value(value).is_some() {
+        return Ok(Some(value));
+    }
+    anyhow::bail!("ctx.actions.{operation} inputs must be a sequence or depset")
+}
+
+fn bind_action_tools<'v>(
+    value: Option<Value<'v>>,
+    operation: &str,
+) -> anyhow::Result<Option<Value<'v>>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if action_sequence(value, "tools").is_ok()
+        || crate::provider::StarlarkDepset::parts_from_value(value).is_some()
+    {
+        return Ok(Some(value));
+    }
+    anyhow::bail!("ctx.actions.{operation} tools must be a sequence or depset")
+}
+
+fn bind_action_arguments<'v>(
+    value: Option<Value<'v>>,
+    operation: &str,
+) -> anyhow::Result<Option<Value<'v>>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    action_sequence(value, &format!("ctx.actions.{operation} arguments"))?;
+    Ok(Some(value))
+}
+
+fn bind_optional_file<'v>(
+    value: Option<Value<'v>>,
+    name: &str,
+) -> anyhow::Result<Option<Value<'v>>> {
+    let Some(value) = value.filter(|value| !value.is_none()) else {
+        return Ok(None);
+    };
+    if AnalysisArtifactValue::from_starlark(value).is_none() {
+        anyhow::bail!("{name} must be a File or None")
+    }
+    Ok(Some(value))
+}
+
+fn bind_optional_string<'v>(
+    value: Option<Value<'v>>,
+    name: &str,
+) -> anyhow::Result<Option<&'v str>> {
+    let Some(value) = value.filter(|value| !value.is_none()) else {
+        return Ok(None);
+    };
+    value
+        .unpack_str()
+        .map(Some)
+        .ok_or_else(|| anyhow::anyhow!("{name} must be a string or None"))
+}
+
+fn bind_optional_bool(value: Option<Value<'_>>, name: &str) -> anyhow::Result<bool> {
+    let Some(value) = value else {
+        return Ok(false);
+    };
+    value
+        .unpack_bool()
+        .ok_or_else(|| anyhow::anyhow!("{name} must be a bool"))
+}
+
+fn bind_optional_dict<'v>(
+    value: Option<Value<'v>>,
+    name: &str,
+) -> anyhow::Result<Option<Value<'v>>> {
+    let Some(value) = value.filter(|value| !value.is_none()) else {
+        return Ok(None);
+    };
+    DictRef::from_value(value)
+        .map(|_| Some(value))
+        .ok_or_else(|| anyhow::anyhow!("{name} must be a dictionary or None"))
+}
+
+fn bind_input_manifests(value: Option<Value<'_>>, operation: &str) -> anyhow::Result<()> {
+    let Some(value) = value.filter(|value| !value.is_none()) else {
+        return Ok(());
+    };
+    action_sequence(value, &format!("ctx.actions.{operation} input_manifests"))?;
+    Ok(())
+}
+
+fn bind_executable(value: Value<'_>, sink: &dyn AnalysisActionSink) -> anyhow::Result<()> {
+    if AnalysisArtifactValue::from_starlark(value).is_some()
+        || value.unpack_str().is_some()
+        || sink.is_files_to_run_provider(value)
+    {
+        return Ok(());
+    }
+    anyhow::bail!("ctx.actions.run executable must be a File, string, or FilesToRunProvider")
+}
+
+fn bind_shell_command(value: Value<'_>) -> anyhow::Result<()> {
+    if value.unpack_str().is_some() {
+        return Ok(());
+    }
+    let values = action_sequence(value, "ctx.actions.run_shell command")?;
+    if values.iter().any(|value| value.unpack_str().is_none()) {
+        anyhow::bail!("ctx.actions.run_shell command sequence must contain strings")
+    }
+    Ok(())
+}
+
+fn bind_resource_set(value: Option<Value<'_>>, operation: &str) -> anyhow::Result<bool> {
+    let Some(value) = value.filter(|value| !value.is_none()) else {
+        return Ok(false);
+    };
+    let callable: Option<StarlarkCallable<'_>> = StarlarkCallable::unpack_value(value)
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    if callable.is_some() {
+        return Ok(true);
+    }
+    anyhow::bail!("ctx.actions.{operation} resource_set must be callable or None")
+}
+
+fn bind_toolchain<'v>(
+    value: Option<Value<'v>>,
+    operation: &str,
+) -> anyhow::Result<Option<Value<'v>>> {
+    let Some(value) = value.filter(|value| !value.is_none()) else {
+        return Ok(None);
+    };
+    if value.unpack_str().is_some() || StarlarkLabel::from_value(value).is_some() {
+        return Ok(Some(value));
+    }
+    anyhow::bail!("ctx.actions.{operation} toolchain must be a Label, string, or None")
+}
+
+fn bind_shadowed_action<'v>(
+    value: Option<Value<'v>>,
+    operation: &str,
+) -> anyhow::Result<Option<Value<'v>>> {
+    let Some(_value) = value.filter(|value| !value.is_none()) else {
+        return Ok(None);
+    };
+    anyhow::bail!("ctx.actions.{operation} shadowed_action is not supported")
+}
+
+#[allow(clippy::too_many_arguments)]
+fn bind_run_request<'v>(
+    sink: &dyn AnalysisActionSink,
+    scope: AnalysisActionCallScope,
+    outputs: Value<'v>,
+    inputs: Option<Value<'v>>,
+    unused_inputs_list: Option<Value<'v>>,
+    executable: Value<'v>,
+    tools: Option<Value<'v>>,
+    arguments: Option<Value<'v>>,
+    mnemonic: Option<Value<'v>>,
+    progress_message: Option<Value<'v>>,
+    use_default_shell_env: Option<Value<'v>>,
+    env: Option<Value<'v>>,
+    execution_requirements: Option<Value<'v>>,
+    input_manifests: Option<Value<'v>>,
+    exec_group: Option<Value<'v>>,
+    shadowed_action: Option<Value<'v>>,
+    resource_set: Option<Value<'v>>,
+    toolchain: Option<Value<'v>>,
+) -> anyhow::Result<AnalysisSpawnRequest<'v>> {
+    bind_action_outputs(outputs, "run")?;
+    let inputs = bind_action_inputs(inputs, "run")?;
+    let unused_inputs_list =
+        bind_optional_file(unused_inputs_list, "ctx.actions.run unused_inputs_list")?;
+    bind_executable(executable, sink)?;
+    let tools = bind_action_tools(tools, "run")?;
+    let arguments = bind_action_arguments(arguments, "run")?;
+    let mnemonic = bind_optional_string(mnemonic, "ctx.actions.run mnemonic")?;
+    let progress_message =
+        bind_optional_string(progress_message, "ctx.actions.run progress_message")?;
+    let use_default_shell_env = bind_optional_bool(
+        use_default_shell_env,
+        "ctx.actions.run use_default_shell_env",
+    )?;
+    let env = bind_optional_dict(env, "ctx.actions.run env")?;
+    let execution_requirements = bind_optional_dict(
+        execution_requirements,
+        "ctx.actions.run execution_requirements",
+    )?;
+    bind_input_manifests(input_manifests, "run")?;
+    let exec_group = bind_optional_string(exec_group, "ctx.actions.run exec_group")?;
+    let shadowed_action = bind_shadowed_action(shadowed_action, "run")?;
+    let has_resource_set = bind_resource_set(resource_set, "run")?;
+    let toolchain = bind_toolchain(toolchain, "run")?;
+    Ok(AnalysisSpawnRequest {
+        scope,
+        invocation: AnalysisSpawnInvocation::Executable(executable),
+        outputs,
+        inputs,
+        unused_inputs_list,
+        tools,
+        arguments,
+        mnemonic,
+        progress_message,
+        use_default_shell_env,
+        env,
+        execution_requirements,
+        exec_group,
+        shadowed_action,
+        has_resource_set,
+        toolchain,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn bind_run_shell_request<'v>(
+    scope: AnalysisActionCallScope,
+    outputs: Value<'v>,
+    inputs: Option<Value<'v>>,
+    tools: Option<Value<'v>>,
+    arguments: Option<Value<'v>>,
+    mnemonic: Option<Value<'v>>,
+    command: Value<'v>,
+    progress_message: Option<Value<'v>>,
+    use_default_shell_env: Option<Value<'v>>,
+    env: Option<Value<'v>>,
+    execution_requirements: Option<Value<'v>>,
+    input_manifests: Option<Value<'v>>,
+    exec_group: Option<Value<'v>>,
+    shadowed_action: Option<Value<'v>>,
+    resource_set: Option<Value<'v>>,
+    toolchain: Option<Value<'v>>,
+) -> anyhow::Result<AnalysisSpawnRequest<'v>> {
+    bind_action_outputs(outputs, "run_shell")?;
+    let inputs = bind_action_inputs(inputs, "run_shell")?;
+    let tools = bind_action_tools(tools, "run_shell")?;
+    let arguments = bind_action_arguments(arguments, "run_shell")?;
+    let mnemonic = bind_optional_string(mnemonic, "ctx.actions.run_shell mnemonic")?;
+    bind_shell_command(command)?;
+    let progress_message =
+        bind_optional_string(progress_message, "ctx.actions.run_shell progress_message")?;
+    let use_default_shell_env = bind_optional_bool(
+        use_default_shell_env,
+        "ctx.actions.run_shell use_default_shell_env",
+    )?;
+    let env = bind_optional_dict(env, "ctx.actions.run_shell env")?;
+    let execution_requirements = bind_optional_dict(
+        execution_requirements,
+        "ctx.actions.run_shell execution_requirements",
+    )?;
+    bind_input_manifests(input_manifests, "run_shell")?;
+    let exec_group = bind_optional_string(exec_group, "ctx.actions.run_shell exec_group")?;
+    let shadowed_action = bind_shadowed_action(shadowed_action, "run_shell")?;
+    let has_resource_set = bind_resource_set(resource_set, "run_shell")?;
+    let toolchain = bind_toolchain(toolchain, "run_shell")?;
+    Ok(AnalysisSpawnRequest {
+        scope,
+        invocation: AnalysisSpawnInvocation::Shell(command),
+        outputs,
+        inputs,
+        unused_inputs_list: None,
+        tools,
+        arguments,
+        mnemonic,
+        progress_message,
+        use_default_shell_env,
+        env,
+        execution_requirements,
+        exec_group,
+        shadowed_action,
+        has_resource_set,
+        toolchain,
+    })
+}
 
 #[starlark_module]
 fn analysis_actions_methods(builder: &mut MethodsBuilder) {
@@ -922,16 +1273,46 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
 
     fn run_shell<'v>(
         this: Value<'v>,
-        outputs: Value<'v>,
-        command: &str,
-        arguments: Value<'v>,
+        #[starlark(require = named)] outputs: Value<'v>,
+        #[starlark(require = named)] inputs: Option<Value<'v>>,
+        #[starlark(require = named)] tools: Option<Value<'v>>,
+        #[starlark(require = named)] arguments: Option<Value<'v>>,
+        #[starlark(require = named)] mnemonic: Option<Value<'v>>,
+        #[starlark(require = named)] command: Value<'v>,
+        #[starlark(require = named)] progress_message: Option<Value<'v>>,
+        #[starlark(require = named)] use_default_shell_env: Option<Value<'v>>,
+        #[starlark(require = named)] env: Option<Value<'v>>,
+        #[starlark(require = named)] execution_requirements: Option<Value<'v>>,
+        #[starlark(require = named)] input_manifests: Option<Value<'v>>,
+        #[starlark(require = named)] exec_group: Option<Value<'v>>,
+        #[starlark(require = named)] shadowed_action: Option<Value<'v>>,
+        #[starlark(require = named)] resource_set: Option<Value<'v>>,
+        #[starlark(require = named)] toolchain: Option<Value<'v>>,
     ) -> anyhow::Result<NoneType> {
         let actions = AnalysisActions::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
+        let request = bind_run_shell_request(
+            actions.scope.clone(),
+            outputs,
+            inputs,
+            tools,
+            arguments,
+            mnemonic,
+            command,
+            progress_message,
+            use_default_shell_env,
+            env,
+            execution_requirements,
+            input_manifests,
+            exec_group,
+            shadowed_action,
+            resource_set,
+            toolchain,
+        )?;
         actions
             .token
             .require_active("run_shell", actions.context_name)?;
-        actions.action_sink.run_shell(outputs, command, arguments)?;
+        actions.action_sink.spawn(request)?;
         Ok(NoneType)
     }
 
@@ -951,29 +1332,46 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
     fn run<'v>(
         this: Value<'v>,
         #[starlark(require = named)] outputs: Value<'v>,
-        #[starlark(require = named)] executable: Value<'v>,
-        #[starlark(require = named)] arguments: Option<Value<'v>>,
         #[starlark(require = named)] inputs: Option<Value<'v>>,
+        #[starlark(require = named)] unused_inputs_list: Option<Value<'v>>,
+        #[starlark(require = named)] executable: Value<'v>,
         #[starlark(require = named)] tools: Option<Value<'v>>,
+        #[starlark(require = named)] arguments: Option<Value<'v>>,
+        #[starlark(require = named)] mnemonic: Option<Value<'v>>,
+        #[starlark(require = named)] progress_message: Option<Value<'v>>,
+        #[starlark(require = named)] use_default_shell_env: Option<Value<'v>>,
         #[starlark(require = named)] env: Option<Value<'v>>,
-        #[starlark(require = named)] mnemonic: Option<&'v str>,
-        #[starlark(require = named)] progress_message: Option<&'v str>,
-        #[starlark(require = named, default = false)] use_default_shell_env: bool,
+        #[starlark(require = named)] execution_requirements: Option<Value<'v>>,
+        #[starlark(require = named)] input_manifests: Option<Value<'v>>,
+        #[starlark(require = named)] exec_group: Option<Value<'v>>,
+        #[starlark(require = named)] shadowed_action: Option<Value<'v>>,
+        #[starlark(require = named)] resource_set: Option<Value<'v>>,
+        #[starlark(require = named)] toolchain: Option<Value<'v>>,
     ) -> anyhow::Result<NoneType> {
         let actions = AnalysisActions::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
-        actions.token.require_active("run", actions.context_name)?;
-        actions.action_sink.run(AnalysisRunRequest {
+        let request = bind_run_request(
+            actions.action_sink.as_ref(),
+            actions.scope.clone(),
             outputs,
-            executable,
-            arguments,
             inputs,
+            unused_inputs_list,
+            executable,
             tools,
-            env,
+            arguments,
             mnemonic,
             progress_message,
             use_default_shell_env,
-        })?;
+            env,
+            execution_requirements,
+            input_manifests,
+            exec_group,
+            shadowed_action,
+            resource_set,
+            toolchain,
+        )?;
+        actions.token.require_active("run", actions.context_name)?;
+        actions.action_sink.spawn(request)?;
         Ok(NoneType)
     }
 

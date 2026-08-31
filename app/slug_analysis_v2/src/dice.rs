@@ -1808,24 +1808,34 @@ fn configured_dependency_artifact(
     }
 }
 
+fn configured_executable_artifact(
+    result: &ConfiguredNodeResult,
+) -> Result<AnalysisArtifact, AnalysisError> {
+    if matches!(
+        result.kind(),
+        ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
+    ) {
+        return configured_dependency_artifact(result, None);
+    }
+    let path = result
+        .providers()
+        .default_info()
+        .and_then(|info| info.files_to_run.executable.as_deref())
+        .ok_or_else(|| {
+            AnalysisError::message(format!(
+                "configured dependency {} did not retain an executable File",
+                result.key().label()
+            ))
+        })?;
+    configured_dependency_artifact(result, Some(path))
+}
+
 fn configured_attribute_item(
     row: &crate::subrule::ConfiguredDependencyRow,
     result: &ConfiguredNodeResult,
 ) -> Result<AnalysisValue, AnalysisError> {
     if row.executable() {
-        let executable = if matches!(
-            result.kind(),
-            ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
-        ) {
-            configured_dependency_artifact(result, None)?
-        } else {
-            let path = result
-                .providers()
-                .default_info()
-                .and_then(|info| info.files_to_run.executable.as_deref())
-                .expect("configured executable validation ran before projection");
-            configured_dependency_artifact(result, Some(path))?
-        };
+        let executable = configured_executable_artifact(result)?;
         return Ok(AnalysisValue::provider(ProviderOccurrence::new(
             ProviderIdentity::builtin("FilesToRunProvider"),
             [
@@ -1918,6 +1928,11 @@ where
         .iter()
         .find(|target| target.name == configured_target.label().target().as_str())
         .expect("configured Starlark rule remains present in its loaded package");
+    let PackageTargetKind::StarlarkRule(implementation) = &target.kind else {
+        return Err(AnalysisError::message(
+            "configured target stopped being a Starlark rule",
+        ));
+    };
     let visibility = package.effective_visibility(target);
     let visibility_labels = visibility
         .as_ref()
@@ -1994,6 +2009,13 @@ where
             }
         };
         if !dependency.hidden {
+            let executable = implementation
+                .schema()
+                .iter()
+                .find(|schema| schema.declaration_name() == dependency.attribute)
+                .filter(|schema| schema.executable())
+                .map(|_| configured_executable_artifact(result.result()))
+                .transpose()?;
             dependencies.push(PreparedDependency {
                 key: result
                     .result()
@@ -2004,6 +2026,7 @@ where
                 providers: result.result().providers().clone(),
                 attribute: dependency.attribute.clone(),
                 target_shape: dependency.configured_row.is_some(),
+                executable,
             });
         }
         edges.push(crate::configured_target::ConfiguredEdge::new(

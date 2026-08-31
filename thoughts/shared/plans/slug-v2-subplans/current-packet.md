@@ -4,7 +4,16 @@ Packet: `WP-6-7A-complete-noncallback-spawn-envelope-implementation-r3`
 
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 action declaration.
 
-Status: Corrected design `ACCEPT`; Rust implementation authorized. R1 returned
+Status: Terminal implementation `ACCEPT`. The first terminal implementation
+review returned `REPLAN` because the
+evaluator method declarations did not follow Bazel's public parameter order and
+raw outer shapes allowed a later typed binding error to preempt an earlier
+invalid argument. The correction uses the exact Bazel signature order and one
+pre-method outer-shape binding pass, with dual-invalid precedence proof for
+both `run` and `run_shell`; the focused correction rereview returned `ACCEPT`.
+The same review otherwise accepted the common
+Spawn representation, publication equality, scoped provenance, and tool-depset
+branching. R1 returned
 `REPLAN`: it mistook the execution-time result of `resource_set` for an
 analysis-time dictionary parameter and claimed exact File executable/tool
 behavior without detecting Bazel's executable-attribute-to-FilesToRun
@@ -297,7 +306,9 @@ Production files:
 Proof files:
 
 - `app/slug_build_api_v2/tests/actions.rs`;
-- `app/slug_analysis_v2/tests/starlark_rule.rs` and `tests/subrule.rs`;
+- `app/slug_analysis_v2/tests/starlark_rule.rs`, `tests/subrule.rs`, and the
+  exact mechanical `SpawnSpec` constructor adapter in
+  `tests/configured_target.rs`;
 - focused loading tests colocated in `subrule_invocation.rs` only when binding
   behavior cannot be proved through analysis;
 - `app/slug_reapi_v2/tests/reapi.rs` only for the existing typed rejection.
@@ -365,6 +376,11 @@ deferred fields fail closed, and caps are credible before Rust edits. The R3
 focused correction review returned `ACCEPT`. Independent terminal review
 is mandatory for the retained public action representation. A material miss is
 `REPLAN`; one focused correction may be reviewed before implementation resumes.
+
+The first terminal implementation review returned `REPLAN` only for public
+binding order/outer-shape precedence and the omitted mechanical
+`configured_target.rs` proof allowlist row. The focused correction/rereview
+returned `ACCEPT` under the unchanged production boundary and caps.
 
 Terminal `ACCEPT` updates canonical M7 and Stage 6/9, commits the packet without
 the parked proof, and selects the next bounded bootstrap-critical consumer or

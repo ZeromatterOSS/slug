@@ -606,6 +606,33 @@ pub enum SpawnExecutable {
     Artifact(AnalysisArtifact),
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub enum RetainedSpawnInvocation {
+    Executable(SpawnExecutable),
+    Shell {
+        command: CompactString,
+        pad_dollar_zero: bool,
+    },
+}
+
+impl RetainedSpawnInvocation {
+    pub fn render_prefix(&self) -> Vec<String> {
+        match self {
+            Self::Executable(executable) => vec![executable.render()],
+            Self::Shell {
+                command,
+                pad_dollar_zero,
+            } => {
+                let mut prefix = vec![command.to_string()];
+                if *pad_dollar_zero {
+                    prefix.push(String::new());
+                }
+                prefix
+            }
+        }
+    }
+}
+
 impl SpawnExecutable {
     pub fn render(&self) -> String {
         match self {
@@ -668,11 +695,12 @@ impl ArtifactInputs {
 
 #[derive(Debug, Clone, Allocative)]
 pub struct SpawnSpec {
-    executable: SpawnExecutable,
+    invocation: RetainedSpawnInvocation,
     command_line: RetainedCommandLine,
     inputs: ArtifactInputs,
     tools: ArtifactInputs,
     outputs: Arc<[ActionOutput]>,
+    unused_inputs_list: Option<AnalysisArtifact>,
     environment: RetainedActionEnvironment,
     execution_requirements: CanonicalStringMap,
     mnemonic: CompactString,
@@ -682,22 +710,24 @@ pub struct SpawnSpec {
 impl SpawnSpec {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        executable: SpawnExecutable,
+        invocation: RetainedSpawnInvocation,
         command_line: RetainedCommandLine,
         inputs: ArtifactInputs,
         tools: ArtifactInputs,
         outputs: impl Into<Arc<[ActionOutput]>>,
+        unused_inputs_list: Option<AnalysisArtifact>,
         environment: RetainedActionEnvironment,
         execution_requirements: CanonicalStringMap,
         mnemonic: impl Into<CompactString>,
         progress_message: Option<impl Into<CompactString>>,
     ) -> Self {
         Self {
-            executable,
+            invocation,
             command_line,
             inputs,
             tools,
             outputs: outputs.into(),
+            unused_inputs_list,
             environment,
             execution_requirements,
             mnemonic: mnemonic.into(),
@@ -705,8 +735,8 @@ impl SpawnSpec {
         }
     }
 
-    pub fn executable(&self) -> &SpawnExecutable {
-        &self.executable
+    pub fn invocation(&self) -> &RetainedSpawnInvocation {
+        &self.invocation
     }
     pub fn command_line(&self) -> &RetainedCommandLine {
         &self.command_line
@@ -719,6 +749,9 @@ impl SpawnSpec {
     }
     pub fn outputs(&self) -> &[ActionOutput] {
         &self.outputs
+    }
+    pub fn unused_inputs_list(&self) -> Option<&AnalysisArtifact> {
+        self.unused_inputs_list.as_ref()
     }
     pub fn environment(&self) -> &RetainedActionEnvironment {
         &self.environment
@@ -733,15 +766,16 @@ impl SpawnSpec {
         self.progress_message.as_deref()
     }
     pub fn render_argv(&self) -> Vec<String> {
-        let mut argv = vec![self.executable.render()];
+        let mut argv = self.invocation.render_prefix();
         argv.extend(self.command_line.render());
         argv
     }
 
     fn publication_eq(&self, other: &Self) -> bool {
         let mut state = PublicationEqState::default();
-        self.executable == other.executable
+        self.invocation == other.invocation
             && self.outputs == other.outputs
+            && self.unused_inputs_list == other.unused_inputs_list
             && self.environment == other.environment
             && self.execution_requirements == other.execution_requirements
             && self.mnemonic == other.mnemonic

@@ -37,6 +37,7 @@ use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::RetainedArgsRecipe;
 use slug_build_api_v2::RetainedCommandLine;
 use slug_build_api_v2::RetainedParamFileFormat;
+use slug_build_api_v2::RetainedSpawnInvocation;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SpawnSpec;
 use slug_configuration_v2::CanonicalStringMap;
@@ -60,13 +61,14 @@ use slug_reapi_v2::RemoteMode;
 
 fn typed_spawn_action() -> ActionSpec {
     ActionSpec::spawn(SpawnSpec::new(
-        SpawnExecutable::Path(
+        RetainedSpawnInvocation::Executable(SpawnExecutable::Path(
             NormalizedBazelPath::new(HostPathFlavor::Unix, "tools/runner").unwrap(),
-        ),
+        )),
         RetainedCommandLine::new(Vec::new()),
         ArtifactInputs::new(Vec::new()),
         ArtifactInputs::new(Vec::new()),
         vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+        None,
         RetainedActionEnvironment::default(),
         CanonicalStringMap::default(),
         "Action",

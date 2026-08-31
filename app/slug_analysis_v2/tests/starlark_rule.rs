@@ -74,6 +74,7 @@ use slug_build_api_v2::ArtifactInputSource;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::ProviderId;
 use slug_build_api_v2::RetainedCommandLineSegment;
+use slug_build_api_v2::RetainedSpawnInvocation;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SymlinkTarget;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
@@ -7336,9 +7337,7 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     assert_eq!(leaf.actions()[0].outputs()[0].path(), "leaf/second.txt");
 }
 
-#[tokio::test]
-async fn args_run_and_symlink_snapshot_through_the_generic_action_sink() {
-    let workspace = scratch();
+fn write_spawn_envelope_fixture(workspace: &PathBuf) -> PathBuf {
     let package = workspace.join("pkg");
     fs::create_dir_all(&package).unwrap();
     fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
@@ -7355,6 +7354,8 @@ def _impl(ctx):
     first = ctx.actions.declare_file("first.out")
     second = ctx.actions.declare_file("second.out")
     later = ctx.actions.declare_file("later.out")
+    shell = ctx.actions.declare_file("shell.out")
+    shell_empty = ctx.actions.declare_file("shell-empty.out")
     link = ctx.actions.declare_file("linked.out")
     ctx.actions.write(source, "tool", is_executable = True)
     args = ctx.actions.args()
@@ -7367,17 +7368,30 @@ def _impl(ctx):
     args.add(source.path)
     args.add(source.short_path)
     mutate(args)
+    requirements = {"requires-network": "explicit", "ordinary-key": "discarded"}
+    environment = {"K": "V"}
+    arguments = ["head", args, "literal/looks/like/a/path"]
     ctx.actions.run(
         outputs = [first, second],
         executable = source,
-        arguments = ["head", args, "literal/looks/like/a/path"],
+        arguments = arguments,
         inputs = [source],
         tools = [depset([source])],
-        env = {"K": "V"},
+        env = environment,
         mnemonic = "Compile",
         progress_message = "first snapshot",
         use_default_shell_env = True,
+        unused_inputs_list = source,
+        execution_requirements = requirements,
+        input_manifests = ["ignored", struct(value = "also ignored")],
+        exec_group = None,
+        shadowed_action = None,
+        resource_set = None,
+        toolchain = None,
     )
+    requirements["requires-network"] = "late"
+    environment["K"] = "late"
+    arguments.append("late-list")
     args.add("late")
     ctx.actions.run(
         outputs = [later],
@@ -7385,13 +7399,28 @@ def _impl(ctx):
         arguments = [args],
         env = {"ONLY": "action"},
     )
+    empty = ctx.actions.args()
+    ctx.actions.run_shell(
+        outputs = [shell],
+        command = "echo shell",
+        arguments = [empty],
+        inputs = [source],
+        env = None,
+        execution_requirements = None,
+        input_manifests = None,
+        exec_group = None,
+        shadowed_action = None,
+        resource_set = None,
+        toolchain = None,
+    )
+    ctx.actions.run_shell(outputs = [shell_empty], command = "echo empty")
     ctx.actions.symlink(
         output = link,
         target_file = source,
         is_executable = True,
         progress_message = "link source",
     )
-    return [DefaultInfo(files = depset([first, second, later, link]))]
+    return [DefaultInfo(files = depset([first, second, later, shell, shell_empty, link]))]
 
 subject = rule(implementation = _impl, subrules = [mutate])
 "#,
@@ -7399,9 +7428,17 @@ subject = rule(implementation = _impl, subrules = [mutate])
     .unwrap();
     fs::write(
         package.join("BUILD.bazel"),
-        "load(':defs.bzl', 'subject')\nsubject(name = 'subject')\n",
+        "load(':defs.bzl', 'subject')\nsubject(name = 'subject', tags = ['no-cache', 'requires-network', 'no-cache', 'ordinary-tag'])\n",
     )
     .unwrap();
+
+    package
+}
+
+#[tokio::test]
+async fn args_run_and_symlink_snapshot_through_the_generic_action_sink() {
+    let workspace = scratch();
+    let package = write_spawn_envelope_fixture(&workspace);
 
     let result = analyze_request(
         &Dice::builder().build(DetectCycles::Enabled),
@@ -7416,13 +7453,16 @@ subject = rule(implementation = _impl, subrules = [mutate])
     .await
     .unwrap();
 
-    assert_eq!(result.actions().len(), 4);
+    assert_eq!(result.actions().len(), 6);
     assert!(matches!(
         result.actions()[0].kind(),
         ActionKind::Write { .. }
     ));
     let first = result.actions()[1].spawn_spec().unwrap();
-    assert!(matches!(first.executable(), SpawnExecutable::Artifact(_)));
+    assert!(matches!(
+        first.invocation(),
+        RetainedSpawnInvocation::Executable(SpawnExecutable::Artifact(_))
+    ));
     assert_eq!(
         first.render_argv(),
         [
@@ -7461,17 +7501,48 @@ subject = rule(implementation = _impl, subrules = [mutate])
     assert_eq!(first.environment().fixed().get("K"), Some("V"));
     assert_eq!(first.mnemonic(), "Compile");
     assert_eq!(first.progress_message(), Some("first snapshot"));
+    assert_eq!(
+        first
+            .unused_inputs_list()
+            .map(|artifact| artifact.path().into_owned()),
+        Some("pkg/source.tool".to_owned())
+    );
+    assert_eq!(
+        first.execution_requirements().iter().collect::<Vec<_>>(),
+        [("no-cache", ""), ("requires-network", "explicit")]
+    );
 
     let later = result.actions()[2].spawn_spec().unwrap();
-    assert!(
-        matches!(later.executable(), SpawnExecutable::Path(path) if path.as_str() == "tools/runner")
-    );
+    assert!(matches!(
+        later.invocation(),
+        RetainedSpawnInvocation::Executable(SpawnExecutable::Path(path))
+            if path.as_str() == "tools/runner"
+    ));
     assert_eq!(later.render_argv().last().map(String::as_str), Some("late"));
-    assert!(!first.render_argv().iter().any(|value| value == "late"));
     assert_eq!(later.environment().fixed().get("ONLY"), Some("action"));
     assert_eq!(later.environment().fixed().iter().len(), 1);
 
-    let link = result.actions()[3].symlink_spec().unwrap();
+    let shell = result.actions()[3].spawn_spec().unwrap();
+    assert!(matches!(
+        shell.invocation(),
+        RetainedSpawnInvocation::Shell {
+            command,
+            pad_dollar_zero: true,
+        } if command == "echo shell"
+    ));
+    assert_eq!(shell.render_argv(), ["echo shell", ""]);
+
+    let shell_empty = result.actions()[4].spawn_spec().unwrap();
+    assert!(matches!(
+        shell_empty.invocation(),
+        RetainedSpawnInvocation::Shell {
+            command,
+            pad_dollar_zero: false,
+        } if command == "echo empty"
+    ));
+    assert_eq!(shell_empty.render_argv(), ["echo empty"]);
+
+    let link = result.actions()[5].symlink_spec().unwrap();
     assert_eq!(link.progress_message(), Some("link source"));
     assert!(matches!(
         link.target(),
@@ -7512,6 +7583,326 @@ subject = rule(implementation = _impl, subrules = [mutate])
         .await
         .unwrap();
     assert_eq!(result.actions()[1], restored.actions()[1]);
+}
+
+#[tokio::test]
+async fn spawn_executable_provenance_is_scope_local_and_container_sensitive() {
+    let workspace = scratch();
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"def _tool(ctx):
+    out = ctx.actions.declare_file(ctx.label.name)
+    ctx.actions.write(out, "tool", is_executable = True)
+    return [DefaultInfo(executable = out)]
+
+tool = rule(implementation = _tool, executable = True)
+
+def _source(ctx, **kwargs):
+    return kwargs["_exec"].executable
+
+source = subrule(
+    implementation = _source,
+    attrs = {"_exec": attr.label(default = "//pkg:tool_b", cfg = "exec", executable = True)},
+)
+
+def _nested(ctx, foreign, **kwargs):
+    out = ctx.actions.declare_file("nested.out")
+    ctx.actions.run(
+        outputs = [out],
+        executable = foreign,
+        tools = [depset([kwargs["_exec"].executable])],
+    )
+    return out
+
+nested = subrule(
+    implementation = _nested,
+    attrs = {"_exec": attr.label(default = "//pkg:tool_a", cfg = "exec", executable = True)},
+)
+
+def _positive(ctx):
+    foreign = source()
+    nested_out = nested(foreign)
+    root_out = ctx.actions.declare_file("root.out")
+    ctx.actions.run(outputs = [root_out], executable = foreign)
+    return [DefaultInfo(files = depset([nested_out, root_out]))]
+
+positive = rule(implementation = _positive, subrules = [source, nested])
+
+def _top(ctx, **kwargs):
+    out = ctx.actions.declare_file("top.out")
+    ctx.actions.run(outputs = [out], executable = "runner", tools = depset([kwargs["_exec"].executable]))
+
+def _direct(ctx, **kwargs):
+    out = ctx.actions.declare_file("direct.out")
+    ctx.actions.run(outputs = [out], executable = kwargs["_exec"].executable)
+
+def _list(ctx, **kwargs):
+    out = ctx.actions.declare_file("list.out")
+    ctx.actions.run(outputs = [out], executable = "runner", tools = [kwargs["_exec"].executable])
+
+def _provider(ctx, **kwargs):
+    out = ctx.actions.declare_file("provider.out")
+    ctx.actions.run(outputs = [out], executable = "runner", tools = [kwargs["_exec"]])
+
+def _provider_exec(ctx, **kwargs):
+    out = ctx.actions.declare_file("provider-exec.out")
+    ctx.actions.run(outputs = [out], executable = kwargs["_exec"], tools = None)
+
+top = subrule(implementation = _top, attrs = {"_exec": attr.label(default = "//pkg:tool_a", cfg = "exec", executable = True)})
+direct = subrule(implementation = _direct, attrs = {"_exec": attr.label(default = "//pkg:tool_a", cfg = "exec", executable = True)})
+listed = subrule(implementation = _list, attrs = {"_exec": attr.label(default = "//pkg:tool_a", cfg = "exec", executable = True)})
+provider = subrule(implementation = _provider, attrs = {"_exec": attr.label(default = "//pkg:tool_a", cfg = "exec", executable = True)})
+provider_exec = subrule(implementation = _provider_exec, attrs = {"_exec": attr.label(default = "//pkg:tool_a", cfg = "exec", executable = True)})
+
+def _top_subject(ctx): top(); return []
+def _direct_subject(ctx): direct(); return []
+def _list_subject(ctx): listed(); return []
+def _provider_subject(ctx): provider(); return []
+def _provider_exec_subject(ctx): provider_exec(); return []
+top_subject = rule(implementation = _top_subject, subrules = [top])
+direct_subject = rule(implementation = _direct_subject, subrules = [direct])
+list_subject = rule(implementation = _list_subject, subrules = [listed])
+provider_subject = rule(implementation = _provider_subject, subrules = [provider])
+provider_exec_subject = rule(implementation = _provider_exec_subject, subrules = [provider_exec])
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("BUILD.bazel"),
+        r#"load(':defs.bzl', 'direct_subject', 'list_subject', 'positive', 'provider_exec_subject', 'provider_subject', 'tool', 'top_subject')
+tool(name = 'tool_a')
+tool(name = 'tool_b')
+positive(name = 'positive')
+top_subject(name = 'top')
+direct_subject(name = 'direct')
+list_subject(name = 'list')
+provider_subject(name = 'provider')
+provider_exec_subject(name = 'provider_exec')
+"#,
+    )
+    .unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = |target: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//pkg:{target}")).unwrap(),
+            typed_action_test_configuration(),
+        )
+    };
+    let positive = analyze_request(&dice, &workspace, &key("positive"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(positive.actions().len(), 2);
+    assert!(matches!(
+        positive.actions()[0]
+            .spawn_spec()
+            .unwrap()
+            .tools()
+            .sources()[0],
+        ArtifactInputSource::Depset(_)
+    ));
+    for target in ["top", "direct", "list"] {
+        let error = analyze_request(&dice, &workspace, &key(target), None, false)
+            .await
+            .unwrap_err();
+        assert!(
+            error.contains("associated with FilesToRunProvider"),
+            "{target}: {error}"
+        );
+    }
+    let provider = analyze_request(&dice, &workspace, &key("provider"), None, false)
+        .await
+        .unwrap_err();
+    assert!(provider.contains("FilesToRun is deferred"), "{provider}");
+    let provider_exec = analyze_request(&dice, &workspace, &key("provider_exec"), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        provider_exec.contains("tools must be a sequence or depset"),
+        "{provider_exec}"
+    );
+}
+
+#[tokio::test]
+async fn spawn_deferred_and_invalid_fields_fail_closed() {
+    let workspace = scratch();
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"Info = provider()
+
+def _resource(os_name, input_count): return {}
+
+def _impl(ctx):
+    out = ctx.actions.declare_file("out")
+    mode = ctx.attr.mode
+    if mode == "arguments_none":
+        ctx.actions.run(outputs = [out], executable = "tool", arguments = None)
+    elif mode == "inputs_none":
+        ctx.actions.run(outputs = [out], executable = "tool", inputs = None)
+    elif mode == "tools_none":
+        ctx.actions.run(outputs = [out], executable = "tool", tools = None)
+    elif mode == "shell_list":
+        ctx.actions.run_shell(outputs = [out], command = ["echo", "bad"])
+    elif mode == "resource_dict":
+        ctx.actions.run(outputs = [out], executable = "tool", resource_set = {})
+    elif mode == "resource_callable":
+        ctx.actions.run(outputs = [out], executable = "tool", resource_set = _resource)
+    elif mode == "exec_group":
+        ctx.actions.run(outputs = [out], executable = "tool", exec_group = "named")
+    elif mode == "toolchain":
+        ctx.actions.run(outputs = [out], executable = "tool", toolchain = "//pkg:type")
+    elif mode == "shadow":
+        ctx.actions.run(outputs = [out], executable = "tool", shadowed_action = "action")
+    elif mode == "manifests":
+        ctx.actions.run(outputs = [out], executable = "tool", input_manifests = "not-a-sequence")
+    elif mode == "unused":
+        ctx.actions.run(outputs = [out], executable = "tool", unused_inputs_list = "not-a-file")
+    elif mode == "run_precedence":
+        ctx.actions.run(outputs = "not-a-sequence", inputs = None, executable = 1)
+    elif mode == "shell_precedence":
+        ctx.actions.run_shell(outputs = [out], inputs = None, command = 1)
+    elif mode == "executable_provider_precedence":
+        ctx.actions.run(outputs = [out], executable = Info(), tools = None)
+    return []
+
+probe = rule(implementation = _impl, attrs = {"mode": attr.string()})
+"#,
+    )
+    .unwrap();
+    let modes = [
+        "arguments_none",
+        "inputs_none",
+        "tools_none",
+        "shell_list",
+        "resource_dict",
+        "resource_callable",
+        "exec_group",
+        "toolchain",
+        "shadow",
+        "manifests",
+        "unused",
+        "run_precedence",
+        "shell_precedence",
+        "executable_provider_precedence",
+    ];
+    fs::write(
+        package.join("BUILD.bazel"),
+        format!(
+            "load(':defs.bzl', 'probe')\n{}",
+            modes
+                .iter()
+                .map(|mode| format!("probe(name = '{mode}', mode = '{mode}')"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ),
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for (mode, expected) in [
+        ("arguments_none", "arguments must be a sequence"),
+        ("inputs_none", "inputs must be a sequence or depset"),
+        ("tools_none", "tools must be a sequence or depset"),
+        ("shell_list", "command must be a string"),
+        ("resource_dict", "resource_set"),
+        (
+            "resource_callable",
+            "callable resource_set is not supported",
+        ),
+        ("exec_group", "named exec_group is not supported"),
+        (
+            "toolchain",
+            "nondefault toolchain selection is not supported",
+        ),
+        ("shadow", "shadowed_action is not supported"),
+        ("manifests", "input_manifests must be a sequence"),
+        ("unused", "unused_inputs_list must be a File or None"),
+        ("run_precedence", "outputs must be a sequence"),
+        ("shell_precedence", "inputs must be a sequence or depset"),
+        (
+            "executable_provider_precedence",
+            "executable must be a File, string, or FilesToRunProvider",
+        ),
+    ] {
+        let error = analyze_request(
+            &dice,
+            &workspace,
+            &ConfiguredTargetKey::new(
+                CanonicalLabel::parse(&format!("@@//pkg:{mode}")).unwrap(),
+                typed_action_test_configuration(),
+            ),
+            None,
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(error.contains(expected), "{mode}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn spawn_omitted_and_explicit_none_defaults_publish_equally() {
+    let workspace = scratch();
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"def _impl(ctx):
+    out = ctx.actions.declare_file("out")
+    if ctx.attr.explicit:
+        ctx.actions.run(
+            outputs = [out],
+            executable = "",
+            unused_inputs_list = None,
+            mnemonic = None,
+            progress_message = None,
+            env = None,
+            execution_requirements = None,
+            input_manifests = None,
+            exec_group = None,
+            shadowed_action = None,
+            resource_set = None,
+            toolchain = None,
+        )
+    else:
+        ctx.actions.run(outputs = [out], executable = "")
+    return [DefaultInfo(files = depset([out]))]
+
+probe = rule(implementation = _impl, attrs = {"explicit": attr.bool()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("BUILD.bazel"),
+        "load(':defs.bzl', 'probe')\nprobe(name = 'omitted', explicit = False)\nprobe(name = 'explicit', explicit = True)\n",
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = |target: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//pkg:{target}")).unwrap(),
+            typed_action_test_configuration(),
+        )
+    };
+    let omitted = analyze_request(&dice, &workspace, &key("omitted"), None, false)
+        .await
+        .unwrap();
+    let explicit = analyze_request(&dice, &workspace, &key("explicit"), None, false)
+        .await
+        .unwrap();
+    let omitted_spec: &ActionSpec = &omitted.actions()[0];
+    let explicit_spec: &ActionSpec = &explicit.actions()[0];
+    assert_eq!(omitted_spec, explicit_spec);
+    assert!(matches!(
+        omitted_spec.spawn_spec().unwrap().invocation(),
+        RetainedSpawnInvocation::Executable(SpawnExecutable::Path(path)) if path.as_str().is_empty()
+    ));
 }
 
 #[tokio::test]

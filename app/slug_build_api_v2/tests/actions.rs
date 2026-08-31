@@ -42,6 +42,7 @@ use slug_build_api_v2::RetainedParamFileFormat;
 use slug_build_api_v2::RetainedScalarArg;
 use slug_build_api_v2::RetainedScalarValue;
 use slug_build_api_v2::RetainedSpawnArgsSnapshot;
+use slug_build_api_v2::RetainedSpawnInvocation;
 use slug_build_api_v2::RetainedSpawnParamFilePolicy;
 use slug_build_api_v2::RetainedVectorArg;
 use slug_build_api_v2::RetainedVectorOptions;
@@ -107,9 +108,9 @@ fn spawn_action(inputs: AnalysisDepset, tools: AnalysisDepset) -> ActionSpec {
         RetainedCommandLineSegment::ArgsSnapshot(RetainedSpawnArgsSnapshot::new(recipe, None)),
     ]);
     ActionSpec::spawn(SpawnSpec::new(
-        SpawnExecutable::Path(
+        RetainedSpawnInvocation::Executable(SpawnExecutable::Path(
             NormalizedBazelPath::new(HostPathFlavor::Unix, "tools/runner").unwrap(),
-        ),
+        )),
         command_line,
         ArtifactInputs::new(vec![ArtifactInputSource::Depset(
             RetainedArtifactInputs::new(inputs).unwrap(),
@@ -118,6 +119,7 @@ fn spawn_action(inputs: AnalysisDepset, tools: AnalysisDepset) -> ActionSpec {
             RetainedArtifactInputs::new(tools).unwrap(),
         )]),
         vec![ActionOutput::new("pkg/out", ActionOutputKind::File)],
+        None,
         RetainedActionEnvironment::default().for_action(false, [("K", "V")]),
         CanonicalStringMap::default(),
         "Compile",
@@ -305,15 +307,16 @@ fn spawn_publication_equality_covers_every_ordinary_field() {
                 mnemonic: &str,
                 progress: &str| {
         ActionSpec::spawn(SpawnSpec::new(
-            SpawnExecutable::Path(
+            RetainedSpawnInvocation::Executable(SpawnExecutable::Path(
                 NormalizedBazelPath::new(HostPathFlavor::Unix, executable).unwrap(),
-            ),
+            )),
             RetainedCommandLine::new(vec![RetainedCommandLineSegment::LiteralRun(Arc::from([
                 argument.into(),
             ]))]),
             ArtifactInputs::new(Vec::new()),
             ArtifactInputs::new(Vec::new()),
             vec![ActionOutput::new(output, ActionOutputKind::File)],
+            None,
             RetainedActionEnvironment::default().for_action(false, [("K", environment)]),
             CanonicalStringMap::from_pairs([("requirement", requirement)]),
             mnemonic,
@@ -332,6 +335,56 @@ fn spawn_publication_equality_covers_every_ordinary_field() {
     ] {
         assert_ne!(base, changed);
     }
+
+    let envelope = |invocation, unused_inputs_list| {
+        ActionSpec::spawn(SpawnSpec::new(
+            invocation,
+            RetainedCommandLine::new(Vec::new()),
+            ArtifactInputs::new(Vec::new()),
+            ArtifactInputs::new(Vec::new()),
+            vec![ActionOutput::new("out", ActionOutputKind::File)],
+            unused_inputs_list,
+            RetainedActionEnvironment::default(),
+            CanonicalStringMap::default(),
+            "Action",
+            None::<&str>,
+        ))
+    };
+    let executable = || {
+        RetainedSpawnInvocation::Executable(SpawnExecutable::Path(
+            NormalizedBazelPath::new(HostPathFlavor::Unix, "tool").unwrap(),
+        ))
+    };
+    assert_ne!(
+        envelope(executable(), None),
+        envelope(
+            RetainedSpawnInvocation::Shell {
+                command: "tool".into(),
+                pad_dollar_zero: false,
+            },
+            None,
+        )
+    );
+    assert_ne!(
+        envelope(executable(), None),
+        envelope(executable(), Some(source_artifact("unused.txt")))
+    );
+    assert_ne!(
+        envelope(
+            RetainedSpawnInvocation::Shell {
+                command: "command".into(),
+                pad_dollar_zero: false,
+            },
+            None,
+        ),
+        envelope(
+            RetainedSpawnInvocation::Shell {
+                command: "command".into(),
+                pad_dollar_zero: true,
+            },
+            None,
+        )
+    );
 }
 
 #[test]
@@ -507,7 +560,9 @@ fn vector_depsets_share_publication_alias_state_with_spawn_inputs() {
                 policy: Option<RetainedSpawnParamFilePolicy>| {
         let vector = RetainedVectorArg::new(source, default_vector_options());
         ActionSpec::spawn(SpawnSpec::new(
-            SpawnExecutable::Path(NormalizedBazelPath::new(HostPathFlavor::Unix, "tool").unwrap()),
+            RetainedSpawnInvocation::Executable(SpawnExecutable::Path(
+                NormalizedBazelPath::new(HostPathFlavor::Unix, "tool").unwrap(),
+            )),
             RetainedCommandLine::new(vec![RetainedCommandLineSegment::ArgsSnapshot(
                 RetainedSpawnArgsSnapshot::new(
                     RetainedArgsRecipe::new(
@@ -522,6 +577,7 @@ fn vector_depsets_share_publication_alias_state_with_spawn_inputs() {
             )]),
             ArtifactInputs::new(Vec::new()),
             vec![ActionOutput::new("pkg/out", ActionOutputKind::File)],
+            None,
             RetainedActionEnvironment::default(),
             CanonicalStringMap::default(),
             "Action",

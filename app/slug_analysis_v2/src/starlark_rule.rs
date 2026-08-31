@@ -34,6 +34,7 @@ use slug_build_api_v2::RetainedArtifactInputs;
 use slug_build_api_v2::RetainedCommandLine;
 use slug_build_api_v2::RetainedCommandLineSegment;
 use slug_build_api_v2::RetainedSpawnArgsSnapshot;
+use slug_build_api_v2::RetainedSpawnInvocation;
 use slug_build_api_v2::RetainedSpawnParamFilePolicy;
 use slug_build_api_v2::RetainedVectorArg;
 use slug_build_api_v2::RetainedVectorSource;
@@ -58,12 +59,15 @@ use slug_loading_v2::analysis_fragments::RuleFragmentCollection;
 use slug_loading_v2::package::resolve_rule_definition_label;
 use slug_loading_v2::provider::StarlarkDefaultInfo;
 use slug_loading_v2::provider::starlark_label;
+use slug_loading_v2::subrule_invocation::AnalysisActionCallScope;
 use slug_loading_v2::subrule_invocation::AnalysisActionSink;
 use slug_loading_v2::subrule_invocation::AnalysisActions;
 use slug_loading_v2::subrule_invocation::AnalysisArtifactValue;
 use slug_loading_v2::subrule_invocation::AnalysisCallToken;
 use slug_loading_v2::subrule_invocation::AnalysisEvaluationContext;
 use slug_loading_v2::subrule_invocation::AnalysisRunRequest;
+use slug_loading_v2::subrule_invocation::AnalysisSpawnInvocation;
+use slug_loading_v2::subrule_invocation::AnalysisSpawnRequest;
 use slug_loading_v2::subrule_invocation::EvaluatorArgCallGen;
 use slug_loading_v2::subrule_invocation::EvaluatorArgsSnapshot;
 use slug_loading_v2::subrule_invocation::EvaluatorVectorArgGen;
@@ -198,6 +202,7 @@ where
                 self.action_sink.clone(),
                 self.token.clone(),
                 "rule context",
+                AnalysisActionCallScope::Root,
             ))),
             "attr" => Some(heap.alloc_simple(AnalysisAttributes {
                 token: self.token.clone(),
@@ -229,6 +234,7 @@ pub(crate) struct PreparedDependency {
     pub(crate) providers: ProviderCollection,
     pub(crate) attribute: CompactString,
     pub(crate) target_shape: bool,
+    pub(crate) executable: Option<AnalysisArtifact>,
 }
 
 #[derive(Debug, Clone)]
@@ -628,6 +634,70 @@ struct SynchronousAnalysisActionSink {
     package_path: String,
     owner: AnalysisConfiguredTargetKey,
     typed_configuration: Result<Option<(HostPathFlavor, RetainedActionEnvironment)>, String>,
+    executable_provenance: Arc<ExecutableArtifactProvenance>,
+    execution_tags: CanonicalStringMap,
+}
+
+#[derive(Debug, Default)]
+struct ExecutableArtifactProvenance {
+    root: SmallSet<AnalysisArtifact>,
+    subrules: SmallMap<Arc<SubruleIdentity>, SmallSet<AnalysisArtifact>>,
+}
+
+impl ExecutableArtifactProvenance {
+    fn contains(&self, scope: &AnalysisActionCallScope, artifact: &AnalysisArtifact) -> bool {
+        match scope {
+            AnalysisActionCallScope::Root => self.root.contains(artifact),
+            AnalysisActionCallScope::Subrule(identity) => self
+                .subrules
+                .get(identity)
+                .is_some_and(|artifacts| artifacts.contains(artifact)),
+        }
+    }
+}
+
+fn files_to_run_executable(value: &AnalysisValue) -> Option<AnalysisArtifact> {
+    let AnalysisValueKind::Provider(provider) = value.kind() else {
+        return None;
+    };
+    if !provider.identity().is_builtin("FilesToRunProvider") {
+        return None;
+    }
+    provider
+        .fields()
+        .iter()
+        .find(|(name, _)| name.as_str() == "executable")
+        .and_then(|(_, value)| match value.kind() {
+            AnalysisValueKind::Artifact(artifact) => Some(artifact.clone()),
+            _ => None,
+        })
+}
+
+fn executable_artifact_provenance(
+    dependencies: &[PreparedDependency],
+    configured_attributes: &[PreparedConfiguredAttribute],
+) -> ExecutableArtifactProvenance {
+    let mut provenance = ExecutableArtifactProvenance::default();
+    provenance.root.extend(
+        dependencies
+            .iter()
+            .filter_map(|dependency| dependency.executable.clone()),
+    );
+    for attribute in configured_attributes {
+        let (Some(owner), Some(executable)) =
+            (&attribute.owner, files_to_run_executable(&attribute.value))
+        else {
+            continue;
+        };
+        if let Some(artifacts) = provenance.subrules.get_mut(owner) {
+            artifacts.insert(executable);
+        } else {
+            provenance
+                .subrules
+                .insert(owner.clone(), SmallSet::from_iter([executable]));
+        }
+    }
+    provenance
 }
 
 impl SynchronousAnalysisActionSink {
@@ -674,6 +744,50 @@ impl SynchronousAnalysisActionSink {
         register(&mut actions)
             .map(|_| ())
             .map_err(|error| anyhow::anyhow!(error.to_string()))
+    }
+
+    fn retained_invocation(
+        &self,
+        invocation: AnalysisSpawnInvocation<'_>,
+        scope: &AnalysisActionCallScope,
+        path_flavor: HostPathFlavor,
+        pad_dollar_zero: bool,
+    ) -> anyhow::Result<RetainedSpawnInvocation> {
+        match invocation {
+            AnalysisSpawnInvocation::Executable(value) => {
+                let executable = if let Some(file) = AnalysisArtifactValue::from_starlark(value) {
+                    reject_directory_file(file, "ctx.actions.run executable")?;
+                    reject_associated_executable(
+                        &self.executable_provenance,
+                        scope,
+                        file.artifact(),
+                        "ctx.actions.run executable",
+                    )?;
+                    SpawnExecutable::Artifact(file.artifact().clone())
+                } else if let Some(path) = value.unpack_str() {
+                    SpawnExecutable::Path(
+                        NormalizedBazelPath::new(path_flavor, path)
+                            .map_err(|error| anyhow::anyhow!(error.to_string()))?,
+                    )
+                } else {
+                    anyhow::bail!(
+                        "ctx.actions.run executable must be an unassociated File or string path"
+                    )
+                };
+                Ok(RetainedSpawnInvocation::Executable(executable))
+            }
+            AnalysisSpawnInvocation::Shell(value) => value
+                .unpack_str()
+                .map(|command| RetainedSpawnInvocation::Shell {
+                    command: CompactString::new(command),
+                    pad_dollar_zero,
+                })
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "ctx.actions.run_shell command must be a string under Bazel 9 defaults"
+                    )
+                }),
+        }
     }
 }
 
@@ -745,9 +859,6 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
                 reject_directory_file(file, "ctx.actions.run executable")?;
                 SpawnExecutable::Artifact(file.artifact().clone())
             } else if let Some(path) = request.executable.unpack_str() {
-                if path.is_empty() {
-                    anyhow::bail!("ctx.actions.run executable path must not be empty");
-                }
                 SpawnExecutable::Path(
                     NormalizedBazelPath::new(path_flavor, path)
                         .map_err(|error| anyhow::anyhow!(error.to_string()))?,
@@ -756,7 +867,7 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
                 anyhow::bail!("ctx.actions.run executable must be a File or string path")
             };
         let mut lowerer = AnalysisValueLowerer::default();
-        let command_line = retained_command_line(request.arguments, &mut lowerer)?;
+        let (command_line, _) = retained_command_line(request.arguments, &mut lowerer)?;
         let inputs = retained_artifact_inputs(request.inputs, false, "inputs", &mut lowerer)?;
         let tools = retained_artifact_inputs(request.tools, true, "tools", &mut lowerer)?;
         let action_environment = configured_environment.for_action(
@@ -764,25 +875,87 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             string_dict(request.env, "ctx.actions.run env")?,
         );
         let mnemonic = request.mnemonic.unwrap_or("Action");
-        if mnemonic.is_empty()
-            || !mnemonic
-                .chars()
-                .all(|character| character.is_ascii_alphanumeric())
-        {
+        if mnemonic.is_empty() || !mnemonic.chars().all(char::is_alphanumeric) {
             anyhow::bail!("ctx.actions.run mnemonic must be nonempty and alphanumeric");
         }
         let spec = SpawnSpec::new(
-            executable,
+            RetainedSpawnInvocation::Executable(executable),
             command_line,
             inputs,
             tools,
             outputs,
+            None,
             action_environment,
             CanonicalStringMap::default(),
             mnemonic,
             request.progress_message,
         );
         self.register(|actions| actions.register_spawn(spec))
+    }
+
+    fn spawn(&self, request: AnalysisSpawnRequest<'_>) -> anyhow::Result<()> {
+        let operation = match request.invocation {
+            AnalysisSpawnInvocation::Executable(_) => "run",
+            AnalysisSpawnInvocation::Shell(_) => "run_shell",
+        };
+        let mut lowerer = AnalysisValueLowerer::default();
+        let (command_line, has_arguments) = retained_command_line(request.arguments, &mut lowerer)?;
+        let (path_flavor, configured_environment) = self.typed_configuration()?;
+        let invocation = self.retained_invocation(
+            request.invocation,
+            &request.scope,
+            path_flavor,
+            has_arguments,
+        )?;
+        let inputs = retained_artifact_inputs(request.inputs, false, "inputs", &mut lowerer)?;
+        let outputs = self.outputs(request.outputs, operation)?;
+        let unused_inputs_list = optional_regular_file(
+            request.unused_inputs_list,
+            "ctx.actions.run unused_inputs_list",
+        )?;
+        let tools = retained_tools(
+            request.tools,
+            &request.scope,
+            &self.executable_provenance,
+            &mut lowerer,
+        )?;
+        let mnemonic = validated_mnemonic(request.mnemonic, operation)?;
+        let action_environment = configured_environment.for_action(
+            request.use_default_shell_env,
+            string_dict(request.env, &format!("ctx.actions.{operation} env"))?,
+        );
+        let execution_requirements = retained_execution_requirements(
+            request.execution_requirements,
+            &self.execution_tags,
+            operation,
+        )?;
+        validate_default_spawn_context(&request, operation)?;
+        let spec = SpawnSpec::new(
+            invocation,
+            command_line,
+            inputs,
+            tools,
+            outputs,
+            unused_inputs_list,
+            action_environment,
+            execution_requirements,
+            mnemonic,
+            request.progress_message,
+        );
+        self.register(|actions| actions.register_spawn(spec))
+    }
+
+    fn is_files_to_run_provider(&self, value: Value<'_>) -> bool {
+        let mut lowerer = AnalysisValueLowerer::default();
+        lowerer
+            .lower(value, "ctx.actions.run executable")
+            .is_ok_and(|value| {
+                matches!(
+                    value.kind(),
+                    AnalysisValueKind::Provider(provider)
+                        if provider.identity().is_builtin("FilesToRunProvider")
+                )
+            })
     }
 
     fn artifact_symlink(
@@ -854,12 +1027,16 @@ fn reject_directory_file(file: &AnalysisArtifactValue, name: &str) -> anyhow::Re
 fn retained_command_line<'v>(
     arguments: Option<Value<'v>>,
     lowerer: &mut AnalysisValueLowerer<'v>,
-) -> anyhow::Result<RetainedCommandLine> {
-    let Some(arguments) = arguments.filter(|value| !value.is_none()) else {
-        return Ok(RetainedCommandLine::new(Vec::new()));
+) -> anyhow::Result<(RetainedCommandLine, bool)> {
+    let Some(arguments) = arguments else {
+        return Ok((RetainedCommandLine::new(Vec::new()), false));
     };
+    if arguments.is_none() {
+        anyhow::bail!("ctx.actions.run arguments must be a sequence");
+    }
     let arguments = sequence_values(arguments)
         .ok_or_else(|| anyhow::anyhow!("ctx.actions.run arguments must be a sequence"))?;
+    let has_arguments = !arguments.is_empty();
     let mut segments = Vec::new();
     let mut literals = Vec::new();
     for argument in arguments {
@@ -882,7 +1059,7 @@ fn retained_command_line<'v>(
     if !literals.is_empty() {
         segments.push(RetainedCommandLineSegment::LiteralRun(literals.into()));
     }
-    Ok(RetainedCommandLine::new(segments))
+    Ok((RetainedCommandLine::new(segments), has_arguments))
 }
 
 fn lower_args_snapshot<'v>(
@@ -963,17 +1140,22 @@ fn retained_artifact_inputs<'v>(
     name: &str,
     lowerer: &mut AnalysisValueLowerer<'v>,
 ) -> anyhow::Result<ArtifactInputs> {
-    let Some(value) = value.filter(|value| !value.is_none()) else {
+    let Some(value) = value else {
         return Ok(ArtifactInputs::new(Vec::new()));
     };
+    if value.is_none() {
+        anyhow::bail!("ctx.actions.run {name} must be a sequence or depset of Files");
+    }
     let lowered = lowerer
         .lower(value, &format!("ctx.actions.run {name}"))
         .map_err(anyhow::Error::msg)?;
     let values = match lowered.kind() {
         AnalysisValueKind::Depset(depset) => {
+            let retained = RetainedArtifactInputs::new(depset.clone())
+                .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+            validate_regular_inputs(&retained, name)?;
             return Ok(ArtifactInputs::new(vec![ArtifactInputSource::Depset(
-                RetainedArtifactInputs::new(depset.clone())
-                    .map_err(|error| anyhow::anyhow!(error.to_string()))?,
+                retained,
             )]));
         }
         AnalysisValueKind::List(values) | AnalysisValueKind::Tuple(values) => values,
@@ -983,12 +1165,14 @@ fn retained_artifact_inputs<'v>(
         .iter()
         .map(|value| match value.kind() {
             AnalysisValueKind::Artifact(artifact) => {
+                reject_directory_artifact(artifact, &format!("ctx.actions.run {name}"))?;
                 Ok(ArtifactInputSource::Direct(artifact.clone()))
             }
             AnalysisValueKind::Depset(depset) if allow_nested_depsets => {
-                RetainedArtifactInputs::new(depset.clone())
-                    .map(ArtifactInputSource::Depset)
-                    .map_err(|error| anyhow::anyhow!(error.to_string()))
+                let retained = RetainedArtifactInputs::new(depset.clone())
+                    .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+                validate_regular_inputs(&retained, name)?;
+                Ok(ArtifactInputSource::Depset(retained))
             }
             _ => Err(anyhow::anyhow!(
                 "ctx.actions.run {name} entries must be Files{}",
@@ -1001,6 +1185,216 @@ fn retained_artifact_inputs<'v>(
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
     Ok(ArtifactInputs::new(sources))
+}
+
+fn reject_directory_artifact(artifact: &AnalysisArtifact, name: &str) -> anyhow::Result<()> {
+    if matches!(
+        artifact,
+        AnalysisArtifact::Derived { output, .. } if output.kind() == ActionOutputKind::Directory
+    ) {
+        anyhow::bail!("{name} must contain only regular Files")
+    }
+    Ok(())
+}
+
+fn validate_regular_inputs(inputs: &RetainedArtifactInputs, name: &str) -> anyhow::Result<()> {
+    let mut error = None;
+    inputs
+        .visit(|artifact| {
+            if error.is_none() {
+                error =
+                    reject_directory_artifact(artifact, &format!("ctx.actions.run {name}")).err();
+            }
+        })
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    error.map_or(Ok(()), Err)
+}
+
+fn reject_associated_executable(
+    provenance: &ExecutableArtifactProvenance,
+    scope: &AnalysisActionCallScope,
+    artifact: &AnalysisArtifact,
+    name: &str,
+) -> anyhow::Result<()> {
+    if provenance.contains(scope, artifact) {
+        anyhow::bail!(
+            "{name} is associated with FilesToRunProvider; FilesToRun/runfiles expansion is not supported"
+        )
+    }
+    Ok(())
+}
+
+fn retained_tools<'v>(
+    value: Option<Value<'v>>,
+    scope: &AnalysisActionCallScope,
+    provenance: &ExecutableArtifactProvenance,
+    lowerer: &mut AnalysisValueLowerer<'v>,
+) -> anyhow::Result<ArtifactInputs> {
+    let Some(value) = value else {
+        return Ok(ArtifactInputs::new(Vec::new()));
+    };
+    if value.is_none() {
+        anyhow::bail!("ctx.actions.run tools must be a sequence or depset");
+    }
+    let lowered = lowerer
+        .lower(value, "ctx.actions.run tools")
+        .map_err(anyhow::Error::msg)?;
+    // Bazel 9.2 StarlarkActionFactory.registerAction expands a top-level
+    // tools depset before its Artifact-to-FilesToRun lookup.
+    if let AnalysisValueKind::Depset(depset) = lowered.kind() {
+        let retained = RetainedArtifactInputs::new(depset.clone())
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        validate_tool_depset(&retained, scope, provenance, true)?;
+        return Ok(ArtifactInputs::new(vec![ArtifactInputSource::Depset(
+            retained,
+        )]));
+    }
+    let (AnalysisValueKind::List(values) | AnalysisValueKind::Tuple(values)) = lowered.kind()
+    else {
+        anyhow::bail!("ctx.actions.run tools must contain Files or depsets; FilesToRun is deferred")
+    };
+    let sources = values
+        .iter()
+        .map(|value| match value.kind() {
+            AnalysisValueKind::Artifact(artifact) => {
+                reject_directory_artifact(artifact, "ctx.actions.run tools")?;
+                reject_associated_executable(
+                    provenance,
+                    scope,
+                    artifact,
+                    "ctx.actions.run direct tool",
+                )?;
+                Ok(ArtifactInputSource::Direct(artifact.clone()))
+            }
+            AnalysisValueKind::Depset(depset) => {
+                let retained = RetainedArtifactInputs::new(depset.clone())
+                    .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+                // The Sequence branch adds nested depsets transitively and
+                // deliberately performs no per-leaf FilesToRun lookup.
+                validate_tool_depset(&retained, scope, provenance, false)?;
+                Ok(ArtifactInputSource::Depset(retained))
+            }
+            _ => Err(anyhow::anyhow!(
+                "ctx.actions.run tools entries must be Files or depsets; FilesToRun is deferred"
+            )),
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    Ok(ArtifactInputs::new(sources))
+}
+
+fn validate_tool_depset(
+    tools: &RetainedArtifactInputs,
+    scope: &AnalysisActionCallScope,
+    provenance: &ExecutableArtifactProvenance,
+    check_association: bool,
+) -> anyhow::Result<()> {
+    let mut error = None;
+    tools
+        .visit(|artifact| {
+            if error.is_some() {
+                return;
+            }
+            error = reject_directory_artifact(artifact, "ctx.actions.run tools").err();
+            if error.is_none() && check_association {
+                error = reject_associated_executable(
+                    provenance,
+                    scope,
+                    artifact,
+                    "ctx.actions.run top-level depset tool",
+                )
+                .err();
+            }
+        })
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    error.map_or(Ok(()), Err)
+}
+
+fn optional_regular_file(
+    value: Option<Value<'_>>,
+    name: &str,
+) -> anyhow::Result<Option<AnalysisArtifact>> {
+    let Some(value) = value.filter(|value| !value.is_none()) else {
+        return Ok(None);
+    };
+    let file = AnalysisArtifactValue::from_starlark(value)
+        .ok_or_else(|| anyhow::anyhow!("{name} must be a File or None"))?;
+    reject_directory_file(file, name)?;
+    Ok(Some(file.artifact().clone()))
+}
+
+fn validated_mnemonic<'a>(mnemonic: Option<&'a str>, operation: &str) -> anyhow::Result<&'a str> {
+    let mnemonic = mnemonic.unwrap_or("Action");
+    if mnemonic.is_empty() || !mnemonic.chars().all(char::is_alphanumeric) {
+        anyhow::bail!("ctx.actions.{operation} mnemonic must be nonempty and alphanumeric");
+    }
+    Ok(mnemonic)
+}
+
+fn is_legal_execution_info_key(key: &str) -> bool {
+    // TargetUtils.getExecutionInfo is the Bazel 9.2 owner of this allowlist.
+    ["block-", "requires-", "no-", "supports-", "disable-"]
+        .iter()
+        .any(|prefix| key.starts_with(prefix))
+        || key.starts_with("cpu:")
+        || key.starts_with("resources:")
+        || matches!(key, "local" | "worker-key-mnemonic")
+}
+
+fn retained_execution_requirements(
+    value: Option<Value<'_>>,
+    tags: &CanonicalStringMap,
+    operation: &str,
+) -> anyhow::Result<CanonicalStringMap> {
+    let mut pairs = tags
+        .iter()
+        .map(|(key, value)| (CompactString::new(key), CompactString::new(value)))
+        .collect::<Vec<_>>();
+    pairs.extend(
+        string_dict(
+            value,
+            &format!("ctx.actions.{operation} execution_requirements"),
+        )?
+        .into_iter()
+        .filter(|(key, _)| is_legal_execution_info_key(key)),
+    );
+    Ok(CanonicalStringMap::from_pairs(pairs))
+}
+
+fn validate_default_spawn_context(
+    request: &AnalysisSpawnRequest<'_>,
+    operation: &str,
+) -> anyhow::Result<()> {
+    if request.exec_group.is_some() {
+        anyhow::bail!("ctx.actions.{operation} named exec_group is not supported");
+    }
+    if request.toolchain.is_some_and(|value| !value.is_none()) {
+        anyhow::bail!("ctx.actions.{operation} nondefault toolchain selection is not supported");
+    }
+    if request
+        .shadowed_action
+        .is_some_and(|value| !value.is_none())
+    {
+        anyhow::bail!("ctx.actions.{operation} shadowed_action is not supported");
+    }
+    if request.has_resource_set {
+        anyhow::bail!("ctx.actions.{operation} callable resource_set is not supported");
+    }
+    Ok(())
+}
+
+fn target_execution_tags(attributes: &[ResolvedRuleAttribute]) -> CanonicalStringMap {
+    let Some(CoercedAttributeValue::StringList(tags)) = attributes
+        .iter()
+        .find(|attribute| attribute.declaration_name == "tags")
+        .map(|attribute| &attribute.value)
+    else {
+        return CanonicalStringMap::default();
+    };
+    CanonicalStringMap::from_pairs(
+        tags.iter()
+            .filter(|tag| is_legal_execution_info_key(tag))
+            .map(|tag| (tag.clone(), CompactString::default())),
+    )
 }
 
 fn string_dict(
@@ -1103,11 +1497,18 @@ pub(crate) fn evaluate_loaded_rule(
             ))
         })
         .transpose();
+    let executable_provenance = Arc::new(executable_artifact_provenance(
+        &dependencies,
+        &configured_attributes,
+    ));
+    let execution_tags = target_execution_tags(&resolved_attributes);
     let action_sink: Arc<dyn AnalysisActionSink> = Arc::new(SynchronousAnalysisActionSink {
         actions: actions.clone(),
         package_path: package_path.to_owned(),
         owner: retained_owner.clone(),
         typed_configuration,
+        executable_provenance,
+        execution_tags,
     });
     let (dependencies, toolchain) = {
         let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());

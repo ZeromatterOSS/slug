@@ -42,6 +42,7 @@ pub use actions::RetainedParamFileFormat;
 pub use actions::RetainedScalarArg;
 pub use actions::RetainedScalarValue;
 pub use actions::RetainedSpawnArgsSnapshot;
+pub use actions::RetainedSpawnInvocation;
 pub use actions::RetainedSpawnParamFilePolicy;
 pub use actions::RetainedVectorArg;
 pub use actions::RetainedVectorOptions;

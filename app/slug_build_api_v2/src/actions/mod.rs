@@ -39,6 +39,7 @@ pub use spec::RetainedParamFileFormat;
 pub use spec::RetainedScalarArg;
 pub use spec::RetainedScalarValue;
 pub use spec::RetainedSpawnArgsSnapshot;
+pub use spec::RetainedSpawnInvocation;
 pub use spec::RetainedSpawnParamFilePolicy;
 pub use spec::RetainedVectorArg;
 pub use spec::RetainedVectorOptions;

@@ -68,6 +68,7 @@ use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::RetainedArtifactInputs;
 use slug_build_api_v2::RetainedCommandLine;
+use slug_build_api_v2::RetainedSpawnInvocation;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SpawnSpec;
 use slug_configuration_v2::CanonicalStringMap;
@@ -462,15 +463,16 @@ fn publication_result(marker: &str, nested: bool) -> Arc<ConfiguredNodeResult> {
     );
     let (context, _) = default_action_context(&owner, "@@//:publication_platform");
     let action = ActionSpec::spawn(SpawnSpec::new(
-        SpawnExecutable::Path(
+        RetainedSpawnInvocation::Executable(SpawnExecutable::Path(
             NormalizedBazelPath::new(HostPathFlavor::Unix, "tools/runner").unwrap(),
-        ),
+        )),
         RetainedCommandLine::new(Vec::new()),
         ArtifactInputs::new(vec![ArtifactInputSource::Depset(
             RetainedArtifactInputs::new(files).unwrap(),
         )]),
         ArtifactInputs::new(Vec::new()),
         vec![ActionOutput::new("publication.out", ActionOutputKind::File)],
+        None,
         RetainedActionEnvironment::default().for_action(false, Vec::<(String, String)>::new()),
         CanonicalStringMap::default(),
         "PublicationProof",
