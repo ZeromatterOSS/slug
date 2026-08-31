@@ -744,6 +744,42 @@ Residual risk: Starlark value identity/equality, cross-owner topology lifetime,
 cache bounds, exact topological alias behavior, action/Aquery topology, and
 Bazel ActionKey projections remain part of the gate
 
+### Stage 6 generic Args/spawn/artifact-symlink category
+
+Status: Architecture accepted in
+`WP-6-7A-generic-args-spawn-symlink-category-architecture-r2`; independent R1
+`REPLAN`, focused R2 `ACCEPT`, and narrowed-command-surface confirmation
+`ACCEPT`
+Primary design reference: Bazel 9.2 `Args`, `StarlarkCustomCommandLine`,
+`StarlarkActionFactory`, public Args/action APIs and symlink implementations;
+Zabel `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer architecture and
+optimization guidance only
+Authenticated consumer: rules_cc 0.2.17
+`cc/private/rules_impl/fdo/fdo_context.bzl` SHA-256
+`91b7b46c515b4773d5a241e699027212f679ab93160cc79218bd687eac51d5b7`
+and `cc/private/cc_common.bzl` SHA-256
+`5e6ab737945b487759c9f039c77a066dc65bbe15cf590b566fe86029cc610762`
+Implementation summary: planned one evaluator-local Args recipe finalized at
+action registration into typed immutable segments; one dense-topology-aware
+input/tool owner; one common run/run_shell SpawnSpec; canonical compact
+environment/execution-requirement maps; Host-flavored normalized executable
+paths; and tagged artifact, unresolved and normalized authenticated absolute
+symlink targets. A bounded prerequisite derives the configured fixed-map/
+inherited-name action environment from the sole structural option vector and
+retained Host facts before the scalar FDO successor. `cc_common` and
+`cc_internal` remain ordinary Starlark consumers/bridges, not Rust rule or
+parser owners.
+Decision: review the whole non-callback category architecture before the
+bounded environment and scalar/FDO implementation successors; generated
+artifact path bytes are Slug-native until M9, map equality ignores insertion
+order, and callbacks, directory expansion, runtime paramfile decisions,
+inherited client-value resolution and new execution/REAPI behavior remain
+deferred
+Residual risk: exact snapshot/freeze timing, repository-mapped label rendering,
+FilesToRun/runfiles topology, action-owner execution context, client-
+environment execution invalidation, unresolved symlink configuration and
+migration from raw action vectors require the frozen successor proofs
+
 ### Stage 6 recursive configured custom-rule analysis
 
 Status: Partially landed

@@ -402,6 +402,50 @@ schedules FileWrite and later family projections just in time with their owning
 Stage 6/8 packets; only residual, not-yet-admitted action families may remain
 under M9.
 
+### 6.4C Generic Args/spawn/artifact-symlink category
+
+Selected architecture packet:
+`WP-6-7A-generic-args-spawn-symlink-category-architecture-r2` at base
+`7b0db03e1`, now independently `ACCEPT`. R1 review returned `REPLAN` for an exact generated-File path
+claim, missing effective default action-environment ownership, insertion-
+ordered map identity and raw executable/absolute-symlink strings. The corrected
+candidate freezes one evaluator-local Args recipe and one action-time
+finalization seam into typed retained command-line segments, dense depset-
+backed input/tool sources, a common run/run_shell SpawnSpec, canonical
+environment/execution-requirement maps and distinct artifact, unresolved-path
+and normalized private absolute-path symlink variants.
+
+Before action construction, implement one bounded configured-action-
+environment prerequisite from the sole structural native option vector plus a
+retained Rust Host observation. It owns exact `action_env`/`host_action_env`
+set/inherit/unset and Exec rewrite semantics, strict/default shell policy,
+runfiles/shell-path inputs, key-sorted fixed bindings and inherited names, and
+per-action env composition. Client inherited values remain command/execution
+state, never configured identity; until their resolver lands, such actions fail
+closed before execution. Map insertion order is not semantic identity.
+
+Authentic rules_cc 0.2.17 FDO is the first discriminator only. Its chained
+Args.add, File path fields, File executable, list/depset inputs, nested depset
+tool, artifact symlink and cc_internal absolute-symlink route must use generic
+Starlark/action owners with no C++ or parser branch. Plan the complete
+non-callback category now, then land bounded environment, scalar/FDO,
+vector/paramfile, complete spawn-envelope and unresolved-symlink successors.
+String executables reproduce Host-flavored Bazel `PathFragment` normalization;
+private absolute symlink targets additionally require absolute classification.
+Generated File path/dirname/basename and rendered argv bytes remain Slug-native
+until exact Bazel output paths land in M9, while typed relationships and path
+operations are exact. Callback mappers, directory expansion, resource callbacks
+and new execution/REAPI behavior stay explicitly deferred and fail closed.
+Focused R2 rereview and the post-preflight command-surface narrowing rereview
+both returned `ACCEPT`; implement only the configured-action-environment
+prerequisite before selecting the scalar FDO action successor.
+
+Bazel 9.2 remains the sole semantic authority. Zabel
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` supplies peer phase-ownership,
+typed-segment and input-topology lessons only; copy no Zig behavior or layout.
+Keep evaluator objects out of retained values and keep semantic action/artifact
+identity distinct from rendered paths, Bazel ActionKey and REAPI digests.
+
 ### 6.5 Toolchains and Platforms
 
 - Implement constraint values/settings, platform target analysis, registered
