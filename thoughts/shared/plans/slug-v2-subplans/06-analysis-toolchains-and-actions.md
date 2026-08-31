@@ -21723,3 +21723,26 @@ Independent R2 correction review returns `ACCEPT`. Implement only
 `WP-4-5-7A-external-bzl-source-observation-cutover-implementation` under the
 four-file 260/320/580 contract. Root-request direct/downstream key rows are an
 exact gate; do not reinterpret their activation graph as Slug-native.
+
+#### Typed runfiles and complete DefaultInfo accepted (2026-08-31)
+
+The second implementation successor of the generic
+DefaultInfo/runfiles/FilesToRun category is terminally `ACCEPTED`. Slug now
+retains typed File and SymlinkEntry depset topology, exposes exact admitted
+`ctx.runfiles` fields plus `merge`/`merge_all`, and normalizes all five
+DefaultInfo parameters, legacy/stateful modes, executable insertion and
+predeclared-output fallback into one immutable provider model. Iterative import
+and materialization pass a genuine depth-3,500 shared-diamond proof;
+publication equality preserves internal and cross-field alias partitions.
+
+Bazel 9.2 is the sole semantic authority. Rust Unicode/layout/DICE identity
+remain explicitly Slug-native. Collection flags, unsupported paths, physical
+trees/manifests, repository mapping bytes, support actions, Spawn expansion
+and execution remain deferred. Zabel supplied peer phase/layout guidance only;
+no behavior, code or compatibility claim was adopted.
+
+Activate next only the bounded runfiles support-action design successor. It
+must construct typed support/tree/manifest Artifacts and register their actions
+atomically before an executable FilesToRunProvider becomes complete. Spawn
+expansion remains the following successor; no parser, `set`, `cc_common`,
+`cc_internal`, rule-family, DICE-key or execution special case is admitted.

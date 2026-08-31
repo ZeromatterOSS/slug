@@ -73,6 +73,18 @@ fn default_paths(info: &DefaultInfo) -> Vec<String> {
         .collect()
 }
 
+fn runfiles_paths(runfiles: &RetainedRunfiles) -> Vec<String> {
+    runfiles
+        .files
+        .to_list()
+        .into_iter()
+        .map(|value| match value.kind() {
+            slug_build_api_v2::AnalysisValueKind::Artifact(value) => value.path().into_owned(),
+            _ => unreachable!(),
+        })
+        .collect()
+}
+
 fn user_provider(
     id: ProviderId,
     fields: impl IntoIterator<Item = (impl Into<compact_str::CompactString>, AnalysisValue)>,
@@ -167,8 +179,8 @@ fn executable_default_info_uses_the_executable_for_implicit_files_and_runfiles()
     );
     assert_eq!(info.files_to_run.executable, info.executable);
     assert!(!info.files_to_run.is_complete());
-    assert_eq!(info.default_runfiles.files.to_list(), ["pkg/tool"]);
-    assert_eq!(info.data_runfiles.files.to_list(), ["pkg/tool"]);
+    assert_eq!(runfiles_paths(&info.default_runfiles), ["pkg/tool"]);
+    assert_eq!(runfiles_paths(&info.data_runfiles), ["pkg/tool"]);
     assert!(info.files_to_run.runfiles_manifest().is_none());
     assert!(info.files_to_run.repo_mapping_manifest().is_none());
     assert!(info.default_runfiles.symlinks.is_empty());
@@ -197,10 +209,7 @@ fn runfiles_support_reserves_the_complete_typed_category_shape() {
         files: artifact_files(&["pkg/data.txt"]),
         symlinks: Depset::from_direct(
             DepsetOrder::Default,
-            vec![RunfilesSymlink {
-                path: CompactString::new("logical/data.txt"),
-                artifact: runfile.clone(),
-            }],
+            vec![RunfilesSymlink::new("logical/data.txt", runfile.clone())],
         )
         .unwrap(),
         root_symlinks: Depset::empty(),
@@ -219,6 +228,100 @@ fn runfiles_support_reserves_the_complete_typed_category_shape() {
     assert_eq!(support.runfiles.symlinks.to_list().len(), 1);
     assert_eq!(support.runfiles.repository_prefix, "repo");
     assert!(support.manifest.is_none());
+}
+
+#[test]
+fn runfiles_merge_preserves_order_conflicts_and_distinct_symlink_occurrences() {
+    let artifact = source_artifact("pkg/data.txt");
+    let make = |path: &str, policy| {
+        RetainedRunfiles::from_parts(
+            vec![source_artifact(path)],
+            Vec::new(),
+            vec![RunfilesSymlink::new("logical/data.txt", artifact.clone())],
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            policy,
+        )
+        .unwrap()
+    };
+    let left = make("pkg/left.txt", RunfilesConflictPolicy::Warn);
+    let right = make("pkg/right.txt", RunfilesConflictPolicy::Error);
+    let merged = left.merge(&right).unwrap();
+
+    assert_eq!(runfiles_paths(&merged), ["pkg/left.txt", "pkg/right.txt"]);
+    assert_eq!(merged.conflict_policy, RunfilesConflictPolicy::Error);
+    assert_eq!(merged.symlinks.to_list().len(), 2);
+    assert_eq!(left.merge(&RetainedRunfiles::empty()).unwrap(), left);
+}
+
+#[test]
+fn runfiles_publication_ignores_temporary_symlink_occurrence_tokens() {
+    let graph = |shared_grandchild: bool| {
+        let leaf = || {
+            Depset::from_direct(
+                DepsetOrder::Default,
+                vec![
+                    RunfilesSymlink::new("logical/data.txt", source_artifact("pkg/data.txt")),
+                    RunfilesSymlink::new("logical/config.txt", source_artifact("pkg/config.txt")),
+                ],
+            )
+            .unwrap()
+        };
+        let grandchild = leaf();
+        let other_grandchild = if shared_grandchild {
+            grandchild.clone()
+        } else {
+            leaf()
+        };
+        let branch = |grandchild| {
+            Depset::new(
+                DepsetOrder::Default,
+                vec![RunfilesSymlink::new(
+                    "logical/branch.txt",
+                    source_artifact("pkg/branch.txt"),
+                )],
+                vec![grandchild],
+            )
+            .unwrap()
+        };
+        Depset::new(
+            DepsetOrder::Default,
+            Vec::new(),
+            vec![branch(grandchild), branch(other_grandchild)],
+        )
+        .unwrap()
+    };
+    let collection = |shared_grandchild: bool, shared_fields: bool| {
+        let symlinks = graph(shared_grandchild);
+        let root_symlinks = if shared_fields {
+            symlinks.clone()
+        } else {
+            graph(shared_grandchild)
+        };
+        let runfiles = RetainedRunfiles {
+            files: AnalysisDepset::empty(DepsetOrder::Default),
+            symlinks,
+            root_symlinks,
+            empty_filenames: Depset::empty(),
+            conflict_policy: RunfilesConflictPolicy::Error,
+            repository_prefix: "_main".into(),
+        };
+        ProviderCollection::new(vec![ProviderValue::DefaultInfo(
+            DefaultInfo::from_effective(
+                AnalysisDepset::empty(DepsetOrder::Default),
+                runfiles,
+                RetainedRunfiles::empty(),
+                None,
+            )
+            .unwrap(),
+        )])
+        .unwrap()
+    };
+
+    assert_eq!(collection(true, true), collection(true, true));
+    assert_ne!(collection(true, true), collection(false, true));
+    assert_ne!(collection(true, true), collection(true, false));
 }
 
 #[test]
@@ -257,8 +360,8 @@ fn executable_default_info_preserves_an_explicit_files_override() {
         .collect::<Vec<_>>();
     files_to_run.sort();
     assert_eq!(files_to_run, ["pkg/explicit.txt", "pkg/tool"]);
-    assert_eq!(info.default_runfiles.files.to_list(), ["pkg/tool"]);
-    assert_eq!(info.data_runfiles.files.to_list(), ["pkg/tool"]);
+    assert_eq!(runfiles_paths(&info.default_runfiles), ["pkg/tool"]);
+    assert_eq!(runfiles_paths(&info.data_runfiles), ["pkg/tool"]);
 }
 
 #[test]

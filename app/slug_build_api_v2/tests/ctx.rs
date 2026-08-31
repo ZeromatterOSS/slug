@@ -8,11 +8,14 @@
  * above-listed licenses.
  */
 
+use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AttributeMap;
 use slug_build_api_v2::AttributeValue;
 use slug_build_api_v2::CtxActions;
+use slug_build_api_v2::RetainedRunfiles;
 use slug_build_api_v2::RuleContext;
-use slug_build_api_v2::RunfilesBuilder;
+use slug_build_api_v2::RunfilesConflictPolicy;
+use slug_build_api_v2::RunfilesSymlink;
 use slug_identity_v2::CanonicalLabel;
 
 fn label(value: &str) -> CanonicalLabel {
@@ -86,21 +89,21 @@ fn expand_location_and_resolve_command_use_prepared_location_map() {
 }
 
 #[test]
-fn runfiles_builder_creates_default_order_depsets() {
-    let runfiles = RunfilesBuilder::new()
-        .add_file("pkg/app")
-        .add_file("pkg/data.txt")
-        .add_symlink("repo/data.txt", "pkg/data.txt")
-        .add_empty_filename("repo/empty")
-        .build();
+fn retained_runfiles_keeps_typed_files_and_symlinks() {
+    let app = AnalysisArtifact::Source(label("@@//pkg:app"));
+    let data = AnalysisArtifact::Source(label("@@//pkg:data.txt"));
+    let runfiles = RetainedRunfiles::from_parts(
+        vec![app, data.clone()],
+        Vec::new(),
+        vec![RunfilesSymlink::new("repo/data.txt", data)],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        RunfilesConflictPolicy::Error,
+    )
+    .unwrap();
 
-    assert_eq!(
-        runfiles.files.to_list(),
-        vec!["pkg/app".to_owned(), "pkg/data.txt".to_owned()]
-    );
-    assert_eq!(runfiles.symlinks["repo/data.txt"], "pkg/data.txt");
-    assert_eq!(
-        runfiles.empty_filenames.to_list(),
-        vec!["repo/empty".to_owned()]
-    );
+    assert_eq!(runfiles.files.to_list().len(), 2);
+    assert_eq!(runfiles.symlinks.to_list()[0].path, "repo/data.txt");
+    assert!(runfiles.empty_filenames.is_empty());
 }

@@ -2020,3 +2020,26 @@ Implementation status: complete and terminally accepted at 665 production and
 648 proof additions. The retained utility use remains bounded to the reviewed
 compact/shared ownership shapes; no V1 or peer-implementation semantics entered
 the production path.
+
+### Stage 6 typed runfiles/DefaultInfo utility decision (2026-08-31)
+
+Source inspected: the accepted V2 Artifact, dense depset, provider and action
+owners; pinned Bazel 9.2 Runfiles, SymlinkEntry, DefaultInfo and configured-
+target construction sources; Buck2-derived retained compact utilities; and
+clean Zabel `0795445f…` runfiles phase ownership as peer guidance only.
+
+Decision: reuse V2 `AnalysisArtifact`, dense `Depset`/`AnalysisDepset`, `Arc`,
+`CompactString`, `Dupe`, `Allocative`, and phase-scratch Fx maps for a typed
+immutable runfiles category. Import no V1/Buck2/Zabel semantic owner, parser,
+rule implementation, scheduler, cache, interner, layout or compatibility
+claim. The private SymlinkEntry occurrence token preserves Bazel identity-
+sensitive leaf behavior; iterative topology conversion and bidirectional alias
+maps preserve structural publication identity without a parallel retained
+graph. Exact behavior remains pinned to Bazel 9.2, while Rust Unicode/layout
+and DICE identity stay Slug-native.
+
+Implementation status: terminally accepted at 837 net / 1,001 gross production
+and 255 net / 286 gross proof lines. No V1 extraction was required. The next
+support-action successor must continue to reuse the accepted typed owners and
+must not add a parser, global cache, rule-family branch or second runfiles
+representation.

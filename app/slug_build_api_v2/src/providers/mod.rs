@@ -11,6 +11,8 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -142,33 +144,45 @@ impl fmt::Display for ProviderId {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-pub struct Runfiles {
-    pub files: FileDepset,
-    pub symlinks: BTreeMap<String, String>,
-    pub empty_filenames: FileDepset,
-}
-
-impl Runfiles {
-    pub fn empty() -> Self {
-        Self {
-            files: Depset::empty(),
-            symlinks: BTreeMap::new(),
-            empty_filenames: Depset::empty(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
 pub enum RunfilesConflictPolicy {
     Warn,
     Error,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+#[derive(Debug, Clone, Allocative)]
 pub struct RunfilesSymlink {
     pub path: CompactString,
     pub artifact: AnalysisArtifact,
+    occurrence: Arc<()>,
+}
+
+impl RunfilesSymlink {
+    pub fn new(path: impl Into<CompactString>, artifact: AnalysisArtifact) -> Self {
+        Self {
+            path: path.into(),
+            artifact,
+            occurrence: Arc::new(()),
+        }
+    }
+
+    pub(crate) fn publication_eq(&self, other: &Self) -> bool {
+        self.path == other.path && self.artifact == other.artifact
+    }
+}
+
+impl PartialEq for RunfilesSymlink {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.occurrence, &other.occurrence)
+    }
+}
+
+impl Eq for RunfilesSymlink {}
+
+impl Hash for RunfilesSymlink {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (Arc::as_ptr(&self.occurrence) as usize).hash(state);
+    }
 }
 
 pub type RunfilesSymlinkDepset = Depset<RunfilesSymlink>;
@@ -181,17 +195,6 @@ pub struct RetainedRunfiles {
     pub empty_filenames: FileDepset,
     pub conflict_policy: RunfilesConflictPolicy,
     pub repository_prefix: CompactString,
-}
-
-impl RetainedRunfiles {
-    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
-        self.files.publication_eq_with(&other.files, state)
-            && self.symlinks == other.symlinks
-            && self.root_symlinks == other.root_symlinks
-            && self.empty_filenames == other.empty_filenames
-            && self.conflict_policy == other.conflict_policy
-            && self.repository_prefix == other.repository_prefix
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -367,8 +370,8 @@ impl FilesToRunProvider {
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct DefaultInfo {
     files: AnalysisDepset,
-    pub default_runfiles: Runfiles,
-    pub data_runfiles: Runfiles,
+    pub default_runfiles: RetainedRunfiles,
+    pub data_runfiles: RetainedRunfiles,
     pub executable: Option<AnalysisArtifact>,
     pub files_to_run: FilesToRunProvider,
 }
@@ -377,8 +380,8 @@ impl DefaultInfo {
     pub fn empty() -> Self {
         Self {
             files: AnalysisDepset::empty(DepsetOrder::Default),
-            default_runfiles: Runfiles::empty(),
-            data_runfiles: Runfiles::empty(),
+            default_runfiles: RetainedRunfiles::empty(),
+            data_runfiles: RetainedRunfiles::empty(),
             executable: None,
             files_to_run: FilesToRunProvider::empty(),
         }
@@ -445,14 +448,9 @@ impl DefaultInfo {
             )
             .expect("typed DefaultInfo files compose with its executable")
         };
-        let executable = executable_artifact.path().into_owned();
-        let executable_runfiles =
-            Depset::from_direct(DepsetOrder::Default, vec![executable.clone()])
-                .expect("a singleton executable runfiles depset is valid");
-        let runfiles = Runfiles {
-            files: executable_runfiles,
-            ..Runfiles::empty()
-        };
+        let runfiles = RetainedRunfiles::empty()
+            .with_artifact(executable_artifact.clone())
+            .expect("an executable is a valid runfiles Artifact");
         Ok(Self {
             files: effective_files,
             default_runfiles: runfiles.clone(),
@@ -462,6 +460,34 @@ impl DefaultInfo {
                 files_to_run,
                 executable_artifact,
             ),
+        })
+    }
+
+    pub fn from_effective(
+        files: AnalysisDepset,
+        default_runfiles: RetainedRunfiles,
+        data_runfiles: RetainedRunfiles,
+        executable: Option<AnalysisArtifact>,
+    ) -> Result<Self, ProviderError> {
+        Self::ensure_artifact_files(&files)?;
+        let files_to_run = match &executable {
+            Some(executable) => {
+                let files_to_run = AnalysisDepset::new(
+                    DepsetOrder::Default,
+                    vec![AnalysisValue::artifact(executable.clone())],
+                    vec![files.clone()],
+                )
+                .expect("typed DefaultInfo files compose with its executable");
+                FilesToRunProvider::incomplete_executable(files_to_run, executable.clone())
+            }
+            None => FilesToRunProvider::from_files(files.clone()),
+        };
+        Ok(Self {
+            files,
+            default_runfiles,
+            data_runfiles,
+            executable,
+            files_to_run,
         })
     }
 
@@ -490,8 +516,12 @@ impl DefaultInfo {
 
     fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         self.files.publication_eq_with(&other.files, state)
-            && self.default_runfiles == other.default_runfiles
-            && self.data_runfiles == other.data_runfiles
+            && self
+                .default_runfiles
+                .publication_eq_with(&other.default_runfiles, state)
+            && self
+                .data_runfiles
+                .publication_eq_with(&other.data_runfiles, state)
             && self.executable == other.executable
             && self
                 .files_to_run

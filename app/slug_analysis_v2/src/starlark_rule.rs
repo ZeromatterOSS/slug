@@ -18,12 +18,15 @@ use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
+use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::AnalysisValueKind;
 use slug_build_api_v2::ArgsWriteSpec;
 use slug_build_api_v2::ArtifactInputSource;
 use slug_build_api_v2::ArtifactInputs;
 use slug_build_api_v2::CtxActions;
+use slug_build_api_v2::DefaultInfo;
+use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
@@ -33,11 +36,15 @@ use slug_build_api_v2::RetainedArgsRecipe;
 use slug_build_api_v2::RetainedArtifactInputs;
 use slug_build_api_v2::RetainedCommandLine;
 use slug_build_api_v2::RetainedCommandLineSegment;
+use slug_build_api_v2::RetainedRunfiles;
 use slug_build_api_v2::RetainedSpawnArgsSnapshot;
 use slug_build_api_v2::RetainedSpawnInvocation;
 use slug_build_api_v2::RetainedSpawnParamFilePolicy;
 use slug_build_api_v2::RetainedVectorArg;
 use slug_build_api_v2::RetainedVectorSource;
+use slug_build_api_v2::RunfilesConflictPolicy;
+use slug_build_api_v2::RunfilesSymlink;
+use slug_build_api_v2::RunfilesSymlinkDepset;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SpawnSpec;
 use slug_build_api_v2::SymlinkSpec;
@@ -58,6 +65,7 @@ use slug_loading_v2::analysis_fragments::CppFragmentValue;
 use slug_loading_v2::analysis_fragments::RuleFragmentCollection;
 use slug_loading_v2::package::resolve_rule_definition_label;
 use slug_loading_v2::provider::StarlarkDefaultInfo;
+use slug_loading_v2::provider::StarlarkDefaultInfoFields;
 use slug_loading_v2::provider::starlark_label;
 use slug_loading_v2::subrule_invocation::AnalysisActionCallScope;
 use slug_loading_v2::subrule_invocation::AnalysisActionSink;
@@ -76,9 +84,13 @@ use slug_loading_v2::subrule_invocation::PreparedSubruleInvocation;
 use slug_loading_v2::subrule_invocation::StarlarkArgs;
 use starlark::PrintHandler;
 use starlark::any::ProvidesStaticType;
+use starlark::environment::Methods;
+use starlark::environment::MethodsBuilder;
+use starlark::environment::MethodsStatic;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::starlark_complex_value;
+use starlark::starlark_module;
 use starlark::values::Coerce;
 use starlark::values::Freeze;
 use starlark::values::FreezeResult;
@@ -93,6 +105,7 @@ use starlark::values::ValueLike;
 use starlark::values::dict::AllocDict;
 use starlark::values::dict::DictRef;
 use starlark::values::list::ListRef;
+use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::starlark_value;
 use starlark::values::tuple::TupleRef;
 use starlark_map::small_map::SmallMap;
@@ -100,6 +113,9 @@ use starlark_map::small_set::SmallSet;
 
 use crate::analysis_value::AnalysisValueLowerer;
 use crate::analysis_value::AnalysisValueMaterializer;
+use crate::analysis_value::lower_runfiles_symlink_depset;
+use crate::analysis_value::materialize_runfiles;
+use crate::analysis_value::retained_runfiles;
 use crate::build_setting;
 use crate::configured_attribute::ResolvedRuleAttribute;
 use crate::key::ConfiguredNodeKey;
@@ -225,6 +241,128 @@ where
             "fragments" => Some(self.fragments.to_value()),
             _ => None,
         }
+    }
+
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(analysis_context_methods)
+    }
+}
+
+fn normalized_runfiles_path(path: &str) -> bool {
+    !path.is_empty()
+        && !path.starts_with('/')
+        && path
+            .split('/')
+            .all(|component| !matches!(component, "" | "." | ".."))
+}
+
+fn runfiles_symlinks(
+    value: Option<Value<'_>>,
+    name: &str,
+) -> Result<(Vec<RunfilesSymlink>, Vec<RunfilesSymlinkDepset>), String> {
+    let Some(value) = value else {
+        return Ok((Vec::new(), Vec::new()));
+    };
+    if let Some(values) = DictRef::from_value(value) {
+        let direct = values
+            .iter()
+            .map(|(path, artifact)| {
+                let path = path
+                    .unpack_str()
+                    .ok_or_else(|| format!("ctx.runfiles {name} keys must be strings"))?;
+                if !normalized_runfiles_path(path) {
+                    return Err(format!(
+                        "ctx.runfiles {name} path `{path}` must be normalized and relative"
+                    ));
+                }
+                let artifact = AnalysisArtifactValue::from_starlark(artifact)
+                    .ok_or_else(|| format!("ctx.runfiles {name} values must be Files"))?;
+                Ok(RunfilesSymlink::new(path, artifact.artifact().clone()))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        return Ok((direct, Vec::new()));
+    }
+    let depset = lower_runfiles_symlink_depset(value, &format!("ctx.runfiles.{name}"))?;
+    Ok((Vec::new(), vec![depset]))
+}
+
+#[starlark_module]
+fn analysis_context_methods(builder: &mut MethodsBuilder) {
+    fn runfiles<'v>(
+        this: &AnalysisContext<'v>,
+        #[starlark(default = UnpackListOrTuple::default())] files: UnpackListOrTuple<Value<'v>>,
+        transitive_files: Option<Value<'v>>,
+        #[starlark(default = false)] collect_data: bool,
+        #[starlark(default = false)] collect_default: bool,
+        symlinks: Option<Value<'v>>,
+        root_symlinks: Option<Value<'v>>,
+        #[starlark(require = named, default = false)] skip_conflict_checking: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        this.token.require_active("runfiles", "rule context")?;
+        if collect_data || collect_default {
+            anyhow::bail!("ctx.runfiles collect_data and collect_default are unsupported/deferred");
+        }
+        if skip_conflict_checking {
+            anyhow::bail!("ctx.runfiles skip_conflict_checking is unsupported/deferred");
+        }
+        let direct_files = files
+            .items
+            .into_iter()
+            .map(|value| {
+                AnalysisArtifactValue::from_starlark(value)
+                    .map(|value| value.artifact().clone())
+                    .ok_or_else(|| anyhow::anyhow!("ctx.runfiles files must contain Files"))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let transitive_files = transitive_files
+            .filter(|value| !value.is_none())
+            .map(|value| {
+                let mut lowerer = AnalysisValueLowerer::default();
+                let lowered = lowerer.lower(value, "ctx.runfiles.transitive_files")?;
+                let AnalysisValueKind::Depset(files) = lowered.kind() else {
+                    return Err(
+                        "ctx.runfiles transitive_files must be a depset of Files".to_owned()
+                    );
+                };
+                if !matches!(files.order(), DepsetOrder::Default | DepsetOrder::Postorder) {
+                    return Err(format!(
+                        "order '{}' is invalid for transitive_files",
+                        files.order()
+                    ));
+                }
+                Ok(files.clone())
+            })
+            .transpose()
+            .map_err(anyhow::Error::msg)?
+            .into_iter()
+            .collect();
+        let (direct_symlinks, transitive_symlinks) =
+            runfiles_symlinks(symlinks, "symlinks").map_err(anyhow::Error::msg)?;
+        let (direct_root_symlinks, transitive_root_symlinks) =
+            runfiles_symlinks(root_symlinks, "root_symlinks").map_err(anyhow::Error::msg)?;
+        let conflict_policy = if direct_symlinks.is_empty()
+            && transitive_symlinks.is_empty()
+            && direct_root_symlinks.is_empty()
+            && transitive_root_symlinks.is_empty()
+        {
+            RunfilesConflictPolicy::Warn
+        } else {
+            RunfilesConflictPolicy::Error
+        };
+        let retained = RetainedRunfiles::from_parts(
+            direct_files,
+            transitive_files,
+            direct_symlinks,
+            transitive_symlinks,
+            direct_root_symlinks,
+            transitive_root_symlinks,
+            conflict_policy,
+        )?;
+        Ok(materialize_runfiles(&retained, eval.frozen_heap())
+            .map_err(anyhow::Error::msg)?
+            .to_value())
     }
 }
 
@@ -1410,6 +1548,145 @@ fn string_dict(
         .collect()
 }
 
+fn default_info_files<'v>(
+    value: Value<'v>,
+    path: &str,
+    lowerer: &mut AnalysisValueLowerer<'v>,
+) -> Result<AnalysisDepset, String> {
+    let value = lowerer.lower(value, path)?;
+    let AnalysisValueKind::Depset(files) = value.kind() else {
+        return Err("DefaultInfo.files must be the result of depset([...])".to_owned());
+    };
+    for value in files.to_list() {
+        match value.kind() {
+            AnalysisValueKind::Artifact(AnalysisArtifact::Source(_)) => {}
+            AnalysisValueKind::Artifact(AnalysisArtifact::Derived { output, .. })
+                if output.kind() == ActionOutputKind::File => {}
+            AnalysisValueKind::Artifact(AnalysisArtifact::Derived { .. }) => {
+                return Err("DefaultInfo.files depset must contain regular files".to_owned());
+            }
+            _ => return Err("DefaultInfo.files must be a depset of Files".to_owned()),
+        }
+    }
+    Ok(files.clone())
+}
+
+fn default_info_executable(
+    value: Value<'_>,
+    owner: &AnalysisConfiguredTargetKey,
+) -> Result<AnalysisArtifact, String> {
+    AnalysisArtifactValue::from_starlark(value)
+        .filter(|value| {
+            value
+                .output_for_owner(owner)
+                .is_some_and(|output| output.kind() == ActionOutputKind::File)
+        })
+        .map(|value| value.artifact().clone())
+        .ok_or_else(|| "DefaultInfo.executable must be a declared file".to_owned())
+}
+
+fn predeclared_output_artifacts(
+    attributes: &[ResolvedRuleAttribute],
+    package_path: &str,
+    owner: &AnalysisConfiguredTargetKey,
+) -> Vec<AnalysisArtifact> {
+    attributes
+        .iter()
+        .flat_map(|attribute| match (&attribute.kind, &attribute.value) {
+            (AttributeKind::Output, CoercedAttributeValue::Output(label)) => vec![label],
+            (AttributeKind::OutputList, CoercedAttributeValue::OutputList(labels)) => {
+                labels.iter().collect()
+            }
+            _ => Vec::new(),
+        })
+        .map(|label| {
+            predeclared_file(label, package_path, owner)
+                .artifact()
+                .clone()
+        })
+        .collect()
+}
+
+fn lower_default_info<'v>(
+    fields: StarlarkDefaultInfoFields<'v>,
+    index: usize,
+    attributes: &[ResolvedRuleAttribute],
+    package_path: &str,
+    owner: &AnalysisConfiguredTargetKey,
+    test_rule: bool,
+    lowerer: &mut AnalysisValueLowerer<'v>,
+) -> Result<DefaultInfo, String> {
+    if fields.runfiles.is_some()
+        && (fields.default_runfiles.is_some() || fields.data_runfiles.is_some())
+    {
+        return Err(
+            "DefaultInfo.runfiles cannot be combined with default_runfiles or data_runfiles"
+                .to_owned(),
+        );
+    }
+    let executable = fields
+        .executable
+        .map(|value| default_info_executable(value, owner))
+        .transpose()?;
+    let files = fields
+        .files
+        .map(|value| default_info_files(value, &format!("$[{index}].files"), lowerer))
+        .transpose()?
+        .map(Ok)
+        .unwrap_or_else(|| {
+            let mut artifacts = predeclared_output_artifacts(attributes, package_path, owner);
+            artifacts.extend(executable.iter().cloned());
+            AnalysisDepset::new(
+                DepsetOrder::Default,
+                artifacts.into_iter().map(AnalysisValue::artifact).collect(),
+                Vec::new(),
+            )
+        })
+        .map_err(|error| error.to_string())?;
+
+    let as_runfiles = |value: Value<'_>, name: &str| {
+        retained_runfiles(value)
+            .cloned()
+            .ok_or_else(|| format!("DefaultInfo.{name} must be a runfiles value"))
+    };
+    let legacy_runfiles = fields.runfiles.is_some()
+        || (fields.default_runfiles.is_none() && fields.data_runfiles.is_none());
+    let (default_runfiles, data_runfiles) = if legacy_runfiles {
+        let mut runfiles = fields
+            .runfiles
+            .map(|value| as_runfiles(value, "runfiles"))
+            .transpose()?
+            .unwrap_or_else(RetainedRunfiles::empty);
+        if let Some(executable) = &executable {
+            runfiles = runfiles
+                .with_artifact(executable.clone())
+                .map_err(|error| error.to_string())?;
+        }
+        (runfiles.clone(), runfiles)
+    } else {
+        let mut default_runfiles = fields
+            .default_runfiles
+            .map(|value| as_runfiles(value, "default_runfiles"))
+            .transpose()?
+            .unwrap_or_else(RetainedRunfiles::empty);
+        let data_runfiles = fields
+            .data_runfiles
+            .map(|value| as_runfiles(value, "data_runfiles"))
+            .transpose()?
+            .unwrap_or_else(RetainedRunfiles::empty);
+        if (executable.is_some() || test_rule)
+            && let Some(executable) = &executable
+        {
+            default_runfiles = default_runfiles
+                .with_artifact(executable.clone())
+                .map_err(|error| error.to_string())?;
+        }
+        (default_runfiles, data_runfiles)
+    };
+    DefaultInfo::from_effective(files, default_runfiles, data_runfiles, executable)
+        .map_err(|error| error.to_string())
+}
+
 pub(crate) fn evaluate_loaded_rule(
     package: &LoadedPackage,
     target_name: &str,
@@ -1492,6 +1769,7 @@ pub(crate) fn evaluate_loaded_rule(
         &configured_attributes,
     ));
     let execution_tags = target_execution_tags(&resolved_attributes);
+    let resolved_attributes: Arc<[ResolvedRuleAttribute]> = resolved_attributes.into();
     let action_sink: Arc<dyn AnalysisActionSink> = Arc::new(SynchronousAnalysisActionSink {
         actions: actions.clone(),
         package_path: package_path.to_owned(),
@@ -1588,7 +1866,7 @@ pub(crate) fn evaluate_loaded_rule(
             target_label: key.label().clone(),
             package_path: package_path.to_owned(),
             dependencies,
-            resolved_attributes: resolved_attributes.into(),
+            resolved_attributes: resolved_attributes.clone(),
             build_setting_value,
             fragments,
             toolchain,
@@ -1605,61 +1883,19 @@ pub(crate) fn evaluate_loaded_rule(
     let mut lowerer = AnalysisValueLowerer::default();
     let mut provider_values = Vec::with_capacity(returned.len());
     for (index, value) in returned.iter().enumerate() {
-        if let Some((files, executable)) = StarlarkDefaultInfo::fields_from_value(value) {
-            let files = files
-                .map(|files| {
-                    let files = lowerer.lower(files, &format!("$[{index}].files"))?;
-                    let AnalysisValueKind::Depset(files) = files.kind() else {
-                        return Err(
-                            "DefaultInfo.files must be the result of depset([...])".to_owned()
-                        );
-                    };
-                    for value in files.to_list() {
-                        match value.kind() {
-                            AnalysisValueKind::Artifact(AnalysisArtifact::Source(_)) => {}
-                            AnalysisValueKind::Artifact(AnalysisArtifact::Derived {
-                                output,
-                                ..
-                            }) if output.kind() == ActionOutputKind::File => {}
-                            AnalysisValueKind::Artifact(AnalysisArtifact::Derived { .. }) => {
-                                return Err("DefaultInfo.files depset must contain regular files"
-                                    .to_owned());
-                            }
-                            _ => {
-                                return Err(
-                                    "DefaultInfo.files must be a depset of Files".to_owned()
-                                );
-                            }
-                        }
-                    }
-                    Ok(files.clone())
-                })
-                .transpose()?;
-            let executable = executable
-                .map(|executable| -> Result<AnalysisArtifact, String> {
-                    let value = AnalysisArtifactValue::from_starlark(executable)
-                        .filter(|value| {
-                            value
-                                .output_for_owner(&retained_owner)
-                                .is_some_and(|output| output.kind() == ActionOutputKind::File)
-                        })
-                        .ok_or_else(|| {
-                            "DefaultInfo.executable must be a declared file".to_owned()
-                        })?;
-                    Ok(value.artifact().clone())
-                })
-                .transpose()?;
-            let default_info = match executable {
-                Some(artifact) => slug_build_api_v2::DefaultInfo::from_executable(artifact, files)
-                    .map_err(|error| error.to_string())?,
-                None => slug_build_api_v2::DefaultInfo::from_files(files.unwrap_or_else(|| {
-                    slug_build_api_v2::AnalysisDepset::empty(
-                        slug_build_api_v2::DepsetOrder::Default,
-                    )
-                }))
-                .map_err(|error| error.to_string())?,
-            };
-            provider_values.push(ProviderValue::DefaultInfo(default_info));
+        if let Some(fields) = StarlarkDefaultInfo::fields_from_value(value) {
+            let test_rule = rule_capability.as_ref().is_some_and(|capability| {
+                capability.test_kind == Some(slug_loading_v2::package::TestRuleKind::Test)
+            });
+            provider_values.push(ProviderValue::DefaultInfo(lower_default_info(
+                fields,
+                index,
+                &resolved_attributes,
+                package_path,
+                &retained_owner,
+                test_rule,
+                &mut lowerer,
+            )?));
         } else {
             let lowered = lowerer.lower(value, &format!("$[{index}]"))?;
             let AnalysisValueKind::Provider(provider) = lowered.kind() else {

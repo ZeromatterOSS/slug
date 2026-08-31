@@ -1422,6 +1422,26 @@ fn hash_unordered_entries<H: Hasher>(entries: &[(AnalysisValue, AnalysisValue)],
 pub(crate) struct PublicationEqState {
     left_depsets: FxHashMap<(usize, u32), (usize, u32)>,
     right_depsets: FxHashMap<(usize, u32), (usize, u32)>,
+    left_runfiles_depsets: FxHashMap<(usize, u32), (usize, u32)>,
+    right_runfiles_depsets: FxHashMap<(usize, u32), (usize, u32)>,
+}
+
+impl PublicationEqState {
+    pub(crate) fn enter_runfiles_depset_pair(
+        &mut self,
+        left: (usize, u32),
+        right: (usize, u32),
+    ) -> Result<bool, ()> {
+        if let Some(previous) = self.left_runfiles_depsets.get(&left) {
+            return (*previous == right).then_some(false).ok_or(());
+        }
+        if let Some(previous) = self.right_runfiles_depsets.get(&right) {
+            return (*previous == left).then_some(false).ok_or(());
+        }
+        self.left_runfiles_depsets.insert(left, right);
+        self.right_runfiles_depsets.insert(right, left);
+        Ok(true)
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

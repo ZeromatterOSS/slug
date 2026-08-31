@@ -3331,7 +3331,17 @@ impl BuildCommandEvaluation {
         let default_files = default_info.file_artifacts();
         let default_singleton =
             matches!(default_files.as_slice(), [only] if only.path().as_ref() == executable);
-        let runfiles_singleton = |files: &slug_build_api_v2::Depset<String>| matches!(files.to_list().as_slice(), [only] if only == executable);
+        let runfiles_singleton = |files: &slug_build_api_v2::AnalysisDepset| {
+            matches!(
+                files.to_list().as_slice(),
+                [only]
+                    if matches!(
+                        only.kind(),
+                        slug_build_api_v2::AnalysisValueKind::Artifact(artifact)
+                            if artifact.path().as_ref() == executable
+                    )
+            )
+        };
         if !default_singleton
             || !runfiles_singleton(&default_info.default_runfiles.files)
             || !runfiles_singleton(&default_info.data_runfiles.files)
@@ -3339,7 +3349,10 @@ impl BuildCommandEvaluation {
             return Err("run files and runfiles must contain only the executable");
         }
         for runfiles in [&default_info.default_runfiles, &default_info.data_runfiles] {
-            if !runfiles.symlinks.is_empty() || !runfiles.empty_filenames.to_list().is_empty() {
+            if !runfiles.symlinks.is_empty()
+                || !runfiles.root_symlinks.is_empty()
+                || !runfiles.empty_filenames.is_empty()
+            {
                 return Err("run symlinks and empty files are unsupported");
             }
         }

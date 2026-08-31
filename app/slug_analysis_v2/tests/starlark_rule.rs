@@ -74,6 +74,7 @@ use slug_build_api_v2::ArtifactInputSource;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::ProviderId;
 use slug_build_api_v2::RetainedCommandLineSegment;
+use slug_build_api_v2::RetainedRunfiles;
 use slug_build_api_v2::RetainedSpawnInvocation;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SymlinkTarget;
@@ -374,6 +375,18 @@ fn default_file_paths(info: &DefaultInfo) -> Vec<String> {
     info.file_artifacts()
         .into_iter()
         .map(|artifact| artifact.path().into_owned())
+        .collect()
+}
+
+fn runfiles_paths(runfiles: &RetainedRunfiles) -> Vec<String> {
+    runfiles
+        .files
+        .to_list()
+        .into_iter()
+        .map(|value| match value.kind() {
+            AnalysisValueKind::Artifact(artifact) => artifact.path().into_owned(),
+            _ => unreachable!(),
+        })
         .collect()
 }
 
@@ -6981,6 +6994,127 @@ parent = rule(implementation = _parent, attrs = {"dep": attr.label()})
 }
 
 #[tokio::test]
+async fn ctx_runfiles_preserves_typed_fields_merge_identity_and_default_info_modes() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _impl(ctx):
+    out = ctx.actions.declare_file("data.txt")
+    ctx.actions.write(out, "data\n")
+    empty = ctx.runfiles()
+    value = ctx.runfiles(
+        files = [out],
+        symlinks = {"logical/data.txt": out},
+        root_symlinks = {"root-data.txt": out},
+    )
+    if type(value) != "runfiles":
+        fail("expected dedicated runfiles value")
+    if empty.merge(value) != value or value.merge(empty) != value:
+        fail("empty merge must retain the nonempty runfiles identity")
+    if empty.merge_all([value, empty]) != value:
+        fail("unique merge_all must retain the nonempty runfiles identity")
+    entries = value.symlinks.to_list()
+    if len(entries) != 1 or type(entries[0]) != "SymlinkEntry":
+        fail("expected typed SymlinkEntry depset")
+    if entries[0].path != "logical/data.txt" or entries[0].target_file != out:
+        fail("unexpected SymlinkEntry fields")
+    duplicate = ctx.runfiles(symlinks = {"logical/data.txt": out})
+    duplicate_entries = value.merge(duplicate).symlinks
+    if len(duplicate_entries.to_list()) != 2:
+        fail("distinct SymlinkEntry occurrences must survive depset deduplication")
+    if len(ctx.runfiles(symlinks = duplicate_entries).symlinks.to_list()) != 2:
+        fail("SymlinkEntry depset topology must round trip through ctx.runfiles")
+    deep = depset([ctx.runfiles(symlinks = {"logical/data.txt": out}).symlinks.to_list()[0]])
+    for _ in range(3497):
+        fresh = ctx.runfiles(symlinks = {"logical/data.txt": out}).symlinks.to_list()[0]
+        deep = depset([fresh], transitive = [deep])
+    left_entry = ctx.runfiles(symlinks = {"logical/data.txt": out}).symlinks.to_list()[0]
+    right_entry = ctx.runfiles(symlinks = {"logical/data.txt": out}).symlinks.to_list()[0]
+    left_branch = depset([left_entry], transitive = [deep])
+    right_branch = depset([right_entry], transitive = [deep])
+    diamond = depset(transitive = [left_branch, right_branch])
+    if len(ctx.runfiles(symlinks = diamond).symlinks.to_list()) != 3500:
+        fail("depth-3500 shared SymlinkEntry diamond must round trip")
+    return [DefaultInfo(default_runfiles = value, data_runfiles = empty)]
+
+def _bad_collect_data(ctx):
+    ctx.runfiles(collect_data = True)
+
+def _bad_collect_default(ctx):
+    ctx.runfiles(collect_default = True)
+
+def _bad_skip(ctx):
+    ctx.runfiles(skip_conflict_checking = True)
+
+def _bad_files(ctx):
+    ctx.runfiles(files = None)
+
+def _bad_path(ctx):
+    out = ctx.actions.declare_file("bad.txt")
+    ctx.runfiles(symlinks = {"../bad.txt": out})
+
+def _bad_default_info(ctx):
+    value = ctx.runfiles()
+    return [DefaultInfo(runfiles = value, default_runfiles = value)]
+
+sample = rule(implementation = _impl)
+bad_collect_data = rule(implementation = _bad_collect_data)
+bad_collect_default = rule(implementation = _bad_collect_default)
+bad_skip = rule(implementation = _bad_skip)
+bad_files = rule(implementation = _bad_files)
+bad_path = rule(implementation = _bad_path)
+bad_default_info = rule(implementation = _bad_default_info)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"bad_collect_data\", \"bad_collect_default\", \"bad_default_info\", \"bad_files\", \"bad_path\", \"bad_skip\", \"sample\")\nsample(name = \"sample\")\nbad_collect_data(name = \"bad_collect_data\")\nbad_collect_default(name = \"bad_collect_default\")\nbad_skip(name = \"bad_skip\")\nbad_files(name = \"bad_files\")\nbad_path(name = \"bad_path\")\nbad_default_info(name = \"bad_default_info\")\n",
+    )
+    .unwrap();
+
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:sample").unwrap(),
+        test_configuration(),
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let result = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    let info = result.providers().default_info().unwrap();
+    assert!(info.files().is_empty());
+    assert_eq!(runfiles_paths(&info.default_runfiles), ["data.txt"]);
+    let symlinks = info.default_runfiles.symlinks.to_list();
+    assert_eq!(symlinks.len(), 1);
+    assert_eq!(symlinks[0].path, "logical/data.txt");
+    assert_eq!(symlinks[0].artifact.path().as_ref(), "data.txt");
+    assert_eq!(
+        info.default_runfiles.root_symlinks.to_list()[0].path,
+        "root-data.txt"
+    );
+    assert!(info.data_runfiles.is_empty());
+
+    for (target, expected) in [
+        ("bad_collect_data", "collect_data and collect_default"),
+        ("bad_collect_default", "collect_data and collect_default"),
+        ("bad_skip", "skip_conflict_checking is unsupported/deferred"),
+        ("bad_files", "expected `list | tuple`"),
+        ("bad_path", "must be normalized and relative"),
+        ("bad_default_info", "cannot be combined"),
+    ] {
+        let key = ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+            test_configuration(),
+        );
+        let error = analyze_request(&dice, &workspace, &key, None, false)
+            .await
+            .unwrap_err();
+        assert!(error.contains(expected), "{target}: {error}");
+    }
+}
+
+#[tokio::test]
 async fn default_info_executable_is_narrow_and_requires_an_executable_for_executable_rules() {
     let workspace = scratch();
     fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
@@ -7024,6 +7158,9 @@ def _consumer(ctx):
         fail("incomplete support must not fabricate manifests")
     return [DefaultInfo()]
 
+def _predeclared(ctx):
+    return [DefaultInfo()]
+
 implicit = rule(implementation = _implicit, executable = True)
 explicit = rule(implementation = _explicit, executable = True)
 omitted = rule(implementation = _omitted)
@@ -7032,12 +7169,13 @@ wrong_files = rule(implementation = _wrong_files)
 wrong_executable = rule(implementation = _wrong_executable)
 missing = rule(implementation = _missing, executable = True)
 consumer = rule(implementation = _consumer, attrs = {"dep": attr.label()})
+predeclared = rule(implementation = _predeclared, attrs = {"out": attr.output()})
 "#,
     )
     .unwrap();
     fs::write(
         workspace.join("BUILD.bazel"),
-        "load(\":defs.bzl\", \"consumer\", \"explicit\", \"implicit\", \"missing\", \"none\", \"omitted\", \"wrong_executable\", \"wrong_files\")\nimplicit(name = \"implicit\")\nexplicit(name = \"explicit\")\nconsumer(name = \"consumer\", dep = \":implicit\")\nomitted(name = \"omitted\")\nnone(name = \"none\")\nwrong_files(name = \"wrong_files\")\nwrong_executable(name = \"wrong_executable\")\nmissing(name = \"missing\")\n",
+        "load(\":defs.bzl\", \"consumer\", \"explicit\", \"implicit\", \"missing\", \"none\", \"omitted\", \"predeclared\", \"wrong_executable\", \"wrong_files\")\nimplicit(name = \"implicit\")\nexplicit(name = \"explicit\")\nconsumer(name = \"consumer\", dep = \":implicit\")\nomitted(name = \"omitted\")\nnone(name = \"none\")\npredeclared(name = \"predeclared\", out = \"fallback.txt\")\nwrong_files(name = \"wrong_files\")\nwrong_executable(name = \"wrong_executable\")\nmissing(name = \"missing\")\n",
     )
     .unwrap();
 
@@ -7060,8 +7198,8 @@ consumer = rule(implementation = _consumer, attrs = {"dep": attr.label()})
     );
     assert_eq!(implicit.files_to_run.executable, implicit.executable);
     assert!(!implicit.files_to_run.is_complete());
-    assert_eq!(implicit.default_runfiles.files.to_list(), ["implicit"]);
-    assert_eq!(implicit.data_runfiles.files.to_list(), ["implicit"]);
+    assert_eq!(runfiles_paths(&implicit.default_runfiles), ["implicit"]);
+    assert_eq!(runfiles_paths(&implicit.data_runfiles), ["implicit"]);
 
     analyze_request(&dice, &workspace, &key("consumer"), None, false)
         .await
@@ -7076,8 +7214,8 @@ consumer = rule(implementation = _consumer, attrs = {"dep": attr.label()})
         explicit.executable.as_ref().map(|value| value.path()),
         Some("explicit".into())
     );
-    assert_eq!(explicit.default_runfiles.files.to_list(), ["explicit"]);
-    assert_eq!(explicit.data_runfiles.files.to_list(), ["explicit"]);
+    assert_eq!(runfiles_paths(&explicit.default_runfiles), ["explicit"]);
+    assert_eq!(runfiles_paths(&explicit.data_runfiles), ["explicit"]);
 
     let omitted = analyze_request(&dice, &workspace, &key("omitted"), None, false)
         .await
@@ -7088,6 +7226,13 @@ consumer = rule(implementation = _consumer, attrs = {"dep": attr.label()})
     assert_eq!(
         omitted.providers().default_info(),
         none.providers().default_info()
+    );
+    let predeclared = analyze_request(&dice, &workspace, &key("predeclared"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        default_file_paths(predeclared.providers().default_info().unwrap()),
+        ["fallback.txt"]
     );
 
     for (target, expected) in [
@@ -7127,7 +7272,7 @@ async fn executable_default_info_recomputes_and_restores_structural_results() {
     let definitions = |explicit_files: bool| {
         let files = explicit_files
             .then_some(
-                "    extra = ctx.actions.declare_file(ctx.label.name + \".txt\")\n    ctx.actions.write(extra, \"extra\\n\")\n    return [DefaultInfo(files = depset([extra]), executable = out)]",
+                "    extra = ctx.actions.declare_file(ctx.label.name + \".txt\")\n    ctx.actions.write(extra, \"extra\\n\")\n    runfiles = ctx.runfiles(files = [extra])\n    return [DefaultInfo(files = depset([extra]), default_runfiles = runfiles, executable = out)]",
             )
             .unwrap_or("    return [DefaultInfo(executable = out)]");
         format!(
@@ -7166,6 +7311,10 @@ async fn executable_default_info_recomputes_and_restores_structural_results() {
     assert_eq!(
         default_file_paths(changed.providers().default_info().unwrap()),
         ["probe.txt"]
+    );
+    assert_eq!(
+        runfiles_paths(&changed.providers().default_info().unwrap().default_runfiles),
+        ["probe.txt", "probe"]
     );
     assert_ne!(initial, changed);
     assert_eq!(initial, restored);

@@ -36,7 +36,9 @@ use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
-use slug_build_api_v2::Runfiles;
+use slug_build_api_v2::RetainedRunfiles;
+use slug_build_api_v2::RunfilesSymlink;
+use slug_build_api_v2::RunfilesSymlinkDepset;
 use slug_loading_v2::provider::StarlarkDepset;
 use slug_loading_v2::provider::StarlarkDepsetSuccessorGen;
 use slug_loading_v2::provider::StarlarkToolchainInfo;
@@ -50,6 +52,11 @@ use slug_loading_v2::provider::starlark_user_provider_fields;
 use slug_loading_v2::subrule_invocation::AnalysisArtifactValue;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::StarlarkHasher;
+use starlark::environment::Methods;
+use starlark::environment::MethodsBuilder;
+use starlark::environment::MethodsStatic;
+use starlark::eval::Evaluator;
+use starlark::starlark_module;
 use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
 use starlark::values::Heap;
@@ -63,6 +70,7 @@ use starlark::values::dict::AllocDict;
 use starlark::values::dict::DictRef;
 use starlark::values::float::StarlarkFloat;
 use starlark::values::list::ListRef;
+use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::starlark_value;
 use starlark::values::structs::AllocStruct;
 use starlark::values::structs::StructRef;
@@ -179,6 +187,213 @@ pub(crate) fn is_files_to_run_provider(value: Value<'_>) -> bool {
 }
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub(crate) struct StarlarkRunfilesSymlink {
+    retained: RunfilesSymlink,
+    path: FrozenValue,
+    target_file: FrozenValue,
+}
+
+impl fmt::Display for StarlarkRunfilesSymlink {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SymlinkEntry(path = {:?})", self.retained.path)
+    }
+}
+
+starlark::starlark_simple_value!(StarlarkRunfilesSymlink);
+#[starlark_value(type = "SymlinkEntry")]
+impl<'v> StarlarkValue<'v> for StarlarkRunfilesSymlink {
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.retained.hash(hasher);
+        Ok(())
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(Self::from_value(other).is_some_and(|other| self.retained == other.retained))
+    }
+
+    fn get_attr(&self, name: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        match name {
+            "path" => Some(self.path.to_value()),
+            "target_file" => Some(self.target_file.to_value()),
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec!["path".to_owned(), "target_file".to_owned()]
+    }
+}
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub(crate) struct StarlarkRunfiles {
+    retained: RetainedRunfiles,
+    files: FrozenValue,
+    symlinks: FrozenValue,
+    root_symlinks: FrozenValue,
+    empty_filenames: FrozenValue,
+}
+
+impl fmt::Display for StarlarkRunfiles {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("runfiles(...)")
+    }
+}
+
+starlark::starlark_simple_value!(StarlarkRunfiles);
+#[starlark_value(type = "runfiles")]
+impl<'v> StarlarkValue<'v> for StarlarkRunfiles {
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(Self::from_value(other)
+            .is_some_and(|other| self.retained.is_empty() && other.retained.is_empty()))
+    }
+
+    fn get_attr(&self, name: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        match name {
+            "files" => Some(self.files.to_value()),
+            "symlinks" => Some(self.symlinks.to_value()),
+            "root_symlinks" => Some(self.root_symlinks.to_value()),
+            "empty_filenames" => Some(self.empty_filenames.to_value()),
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec![
+            "empty_filenames".to_owned(),
+            "files".to_owned(),
+            "root_symlinks".to_owned(),
+            "symlinks".to_owned(),
+        ]
+    }
+
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(starlark_runfiles_methods)
+    }
+}
+
+#[starlark_module]
+fn starlark_runfiles_methods(builder: &mut MethodsBuilder) {
+    fn merge<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] other: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        let this_runfiles = StarlarkRunfiles::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("runfiles.merge receiver is not runfiles"))?;
+        let other_runfiles = StarlarkRunfiles::from_value(other)
+            .ok_or_else(|| anyhow::anyhow!("runfiles.merge requires a runfiles value"))?;
+        if this_runfiles.retained.is_empty() {
+            return Ok(other);
+        }
+        if other_runfiles.retained.is_empty() {
+            return Ok(this);
+        }
+        let retained = this_runfiles.retained.merge(&other_runfiles.retained)?;
+        materialize_runfiles(&retained, eval.frozen_heap())
+            .map(|value| value.to_value())
+            .map_err(anyhow::Error::msg)
+    }
+
+    fn merge_all<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] other: UnpackListOrTuple<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        let mut values = Vec::with_capacity(other.items.len() + 1);
+        values.push(this);
+        values.extend(other.items.iter().copied());
+        let mut nonempty = Vec::new();
+        for value in values {
+            let runfiles = StarlarkRunfiles::from_value(value)
+                .ok_or_else(|| anyhow::anyhow!("runfiles.merge_all requires runfiles values"))?;
+            if !runfiles.retained.is_empty() {
+                nonempty.push((value, &runfiles.retained));
+            }
+        }
+        match nonempty.as_slice() {
+            [] => Ok(this),
+            [(value, _)] => Ok(*value),
+            _ => {
+                let retained =
+                    RetainedRunfiles::merge_all(nonempty.iter().map(|(_, retained)| *retained))?;
+                materialize_runfiles(&retained, eval.frozen_heap())
+                    .map(|value| value.to_value())
+                    .map_err(anyhow::Error::msg)
+            }
+        }
+    }
+}
+
+pub(crate) fn retained_runfiles(value: Value<'_>) -> Option<&RetainedRunfiles> {
+    StarlarkRunfiles::from_value(value).map(|value| &value.retained)
+}
+
+pub(crate) fn lower_runfiles_symlink_depset(
+    root: Value<'_>,
+    path: &str,
+) -> Result<RunfilesSymlinkDepset, String> {
+    let mut memo = HashMap::new();
+    let mut visiting = HashSet::new();
+    let mut stack = vec![(root, path.to_owned(), false)];
+    while let Some((value, path, exiting)) = stack.pop() {
+        let identity = value.identity();
+        if memo.contains_key(&identity) {
+            continue;
+        }
+        if !exiting {
+            if !visiting.insert(identity) {
+                return Err(format!("{path}: cyclic SymlinkEntry depset"));
+            }
+            let (_, _, _, _, _, successors) = StarlarkDepset::parts_from_value(value)
+                .ok_or_else(|| format!("{path} must be a depset of SymlinkEntry values"))?;
+            stack.push((value, path.clone(), true));
+            for (index, successor) in successors.into_iter().enumerate().rev() {
+                if let StarlarkDepsetSuccessorGen::Transitive(child) = successor {
+                    stack.push((child, format!("{path}.successor[{index}]"), false));
+                }
+            }
+            continue;
+        }
+        let (order, _, _, _, _, successors) = StarlarkDepset::parts_from_value(value)
+            .ok_or_else(|| format!("{path} must be a depset of SymlinkEntry values"))?;
+        let mut direct = Vec::new();
+        let mut transitive = Vec::new();
+        for (index, successor) in successors.into_iter().enumerate() {
+            match successor {
+                StarlarkDepsetSuccessorGen::Direct(value) => {
+                    direct.push(
+                        StarlarkRunfilesSymlink::from_value(value)
+                            .map(|value| value.retained.clone())
+                            .ok_or_else(|| {
+                                format!("{path}.successor[{index}] must be a SymlinkEntry value")
+                            })?,
+                    );
+                }
+                StarlarkDepsetSuccessorGen::Transitive(value) => transitive.push(
+                    memo.get(&value.identity())
+                        .cloned()
+                        .ok_or_else(|| format!("{path}.successor[{index}] was not materialized"))?,
+                ),
+            }
+        }
+        visiting.remove(&identity);
+        let result =
+            Depset::new(order, direct, transitive).map_err(|error| format!("{path}: {error}"))?;
+        memo.insert(identity, result.clone());
+    }
+    memo.remove(&root.identity())
+        .ok_or_else(|| format!("{path} was not materialized"))
+}
+
+pub(crate) fn materialize_runfiles(
+    value: &RetainedRunfiles,
+    heap: &FrozenHeap,
+) -> Result<FrozenValue, String> {
+    AnalysisValueMaterializer::new(heap).runfiles(value)
+}
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct AnalysisConfiguredTargetValue {
     retained: ConfiguredTargetValue,
     providers: SmallMap<ProviderIdentity, FrozenValue>,
@@ -243,6 +458,7 @@ pub(crate) struct AnalysisValueMaterializer<'a> {
     heap: &'a FrozenHeap,
     depsets: HashMap<AnalysisDepset, FrozenValue>,
     file_depsets: HashMap<(usize, u32), FrozenValue>,
+    symlink_depsets: HashMap<(usize, u32), FrozenValue>,
 }
 
 impl<'a> AnalysisValueMaterializer<'a> {
@@ -251,6 +467,7 @@ impl<'a> AnalysisValueMaterializer<'a> {
             heap,
             depsets: HashMap::default(),
             file_depsets: HashMap::default(),
+            symlink_depsets: HashMap::default(),
         }
     }
 
@@ -325,18 +542,71 @@ impl<'a> AnalysisValueMaterializer<'a> {
         result
     }
 
-    fn runfiles(&mut self, value: &Runfiles) -> FrozenValue {
-        let mut fields = SmallMap::new();
-        fields.insert("files".into(), self.file_depset(&value.files));
-        fields.insert("symlinks".into(), self.string_map(value.symlinks.clone()));
-        fields.insert(
-            "empty_filenames".into(),
-            self.file_depset(&value.empty_filenames),
-        );
-        self.heap.alloc(BuiltinProviderView {
-            identity: ProviderIdentity::builtin("runfiles"),
-            fields,
-        })
+    fn symlink_depset(&mut self, value: &RunfilesSymlinkDepset) -> FrozenValue {
+        let mut stack = vec![(value.clone(), false)];
+        while let Some((current, exiting)) = stack.pop() {
+            if self.symlink_depsets.contains_key(&current.node_key()) {
+                continue;
+            }
+            if !exiting {
+                stack.push((current.clone(), true));
+                for successor in current.successors() {
+                    if let slug_build_api_v2::DepsetSuccessor::Transitive(child) = successor
+                        && !self.symlink_depsets.contains_key(&child.node_key())
+                    {
+                        stack.push((child, false));
+                    }
+                }
+                continue;
+            }
+            let successors = current
+                .successors()
+                .map(|successor| match successor {
+                    slug_build_api_v2::DepsetSuccessor::Direct(value) => {
+                        let entry = self.heap.alloc(StarlarkRunfilesSymlink {
+                            retained: value.clone(),
+                            path: self.heap.alloc_str(&value.path).to_frozen_value(),
+                            target_file: self
+                                .heap
+                                .alloc(AnalysisArtifactValue::new(value.artifact.clone())),
+                        });
+                        StarlarkDepsetSuccessorGen::Direct(entry)
+                    }
+                    slug_build_api_v2::DepsetSuccessor::Transitive(child) => {
+                        StarlarkDepsetSuccessorGen::Transitive(
+                            *self
+                                .symlink_depsets
+                                .get(&child.node_key())
+                                .expect("child materialized first"),
+                        )
+                    }
+                })
+                .collect();
+            let result = alloc_starlark_depset_parts(
+                self.heap,
+                current.order(),
+                (!current.is_empty()).then(|| CompactString::new("SymlinkEntry")),
+                Default::default(),
+                None,
+                current.depth(),
+                successors,
+            );
+            self.symlink_depsets.insert(current.node_key(), result);
+        }
+        *self
+            .symlink_depsets
+            .get(&value.node_key())
+            .expect("root materialized")
+    }
+
+    fn runfiles(&mut self, value: &RetainedRunfiles) -> Result<FrozenValue, String> {
+        Ok(self.heap.alloc(StarlarkRunfiles {
+            retained: value.clone(),
+            files: self.depset(&value.files)?,
+            symlinks: self.symlink_depset(&value.symlinks),
+            root_symlinks: self.symlink_depset(&value.root_symlinks),
+            empty_filenames: self.file_depset(&value.empty_filenames),
+        }))
     }
 
     fn files_to_run(&self, value: &FilesToRunProvider) -> FrozenValue {
@@ -359,9 +629,9 @@ impl<'a> AnalysisValueMaterializer<'a> {
                 fields.insert("files".into(), self.depset(info.files())?);
                 fields.insert(
                     "default_runfiles".into(),
-                    self.runfiles(&info.default_runfiles),
+                    self.runfiles(&info.default_runfiles)?,
                 );
-                fields.insert("data_runfiles".into(), self.runfiles(&info.data_runfiles));
+                fields.insert("data_runfiles".into(), self.runfiles(&info.data_runfiles)?);
                 fields.insert("files_to_run".into(), self.files_to_run(&info.files_to_run));
             }
             ProviderValue::OutputGroupInfo(info) => {
