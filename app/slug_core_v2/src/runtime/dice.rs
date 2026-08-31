@@ -3308,17 +3308,23 @@ impl BuildCommandEvaluation {
             .providers()
             .default_info()
             .ok_or("run target has no built-in DefaultInfo")?;
-        let executable = default_info
+        let executable_artifact = default_info
             .executable
-            .as_deref()
+            .as_ref()
             .ok_or("run DefaultInfo has no executable")?;
+        let executable = match executable_artifact {
+            slug_build_api_v2::AnalysisArtifact::Derived { output, .. } => output.path(),
+            slug_build_api_v2::AnalysisArtifact::Source(_) => {
+                return Err("run DefaultInfo executable must be a generated File");
+            }
+        };
         if executable.is_empty()
-            || default_info.files_to_run.executable.as_deref() != Some(executable)
+            || default_info.files_to_run.executable.as_ref() != Some(executable_artifact)
         {
             return Err("run DefaultInfo executable relation is inconsistent");
         }
-        if default_info.files_to_run.runfiles_manifest.is_some()
-            || default_info.files_to_run.repo_mapping_manifest.is_some()
+        if default_info.files_to_run.runfiles_manifest().is_some()
+            || default_info.files_to_run.repo_mapping_manifest().is_some()
         {
             return Err("run manifests are unsupported");
         }

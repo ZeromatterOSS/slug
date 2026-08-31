@@ -525,6 +525,18 @@ artifacts and scoped Spawn expansion, split into four bounded successors. The
 first successor may migrate only the provider core and must retain an explicit
 incomplete-support guard until runfiles-tree production is admitted.
 
+The first successor,
+`WP-6-7A-typed-files-to-run-provider-core-implementation-r1`, is terminally
+accepted. It replaces executable path strings with typed Artifacts, retains a
+stable files-to-run depset, materializes one dedicated FilesToRun Starlark
+value, carries complete providers in root/subrule scope-local provenance, and
+fails incomplete associated actions before publication. A bounded terminal
+correction also reserves the exact typed RetainedRunfiles/RunfilesSupport
+schema from the architecture, without constructing support or opening
+runfiles behavior. Select successor 2 for typed runfiles values, merge
+operations, and all five DefaultInfo parameters; support actions and Spawn
+expansion remain successors 3 and 4.
+
 Bazel 9.2 remains the sole semantic authority. Zabel
 `0795445f3ab60f4e49070bdd0b94425c5610f73a` supplies peer phase-ownership,
 typed-segment and input-topology lessons only; copy no Zig behavior or layout.

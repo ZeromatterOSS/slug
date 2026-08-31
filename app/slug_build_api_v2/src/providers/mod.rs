@@ -159,20 +159,208 @@ impl Runfiles {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
+pub enum RunfilesConflictPolicy {
+    Warn,
+    Error,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+pub struct RunfilesSymlink {
+    pub path: CompactString,
+    pub artifact: AnalysisArtifact,
+}
+
+pub type RunfilesSymlinkDepset = Depset<RunfilesSymlink>;
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct RetainedRunfiles {
+    pub files: AnalysisDepset,
+    pub symlinks: RunfilesSymlinkDepset,
+    pub root_symlinks: RunfilesSymlinkDepset,
+    pub empty_filenames: FileDepset,
+    pub conflict_policy: RunfilesConflictPolicy,
+    pub repository_prefix: CompactString,
+}
+
+impl RetainedRunfiles {
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        self.files.publication_eq_with(&other.files, state)
+            && self.symlinks == other.symlinks
+            && self.root_symlinks == other.root_symlinks
+            && self.empty_filenames == other.empty_filenames
+            && self.conflict_policy == other.conflict_policy
+            && self.repository_prefix == other.repository_prefix
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct RunfilesSupport {
+    pub runfiles: RetainedRunfiles,
+    pub tree: AnalysisArtifact,
+    pub manifest: Option<AnalysisArtifact>,
+    pub repo_mapping_manifest: Option<AnalysisArtifact>,
+}
+
+impl RunfilesSupport {
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        self.runfiles.publication_eq_with(&other.runfiles, state)
+            && self.tree == other.tree
+            && self.manifest == other.manifest
+            && self.repo_mapping_manifest == other.repo_mapping_manifest
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct FilesToRunProvider {
-    pub executable: Option<String>,
-    pub runfiles_manifest: Option<String>,
-    pub repo_mapping_manifest: Option<String>,
+    files: AnalysisDepset,
+    pub executable: Option<AnalysisArtifact>,
+    pub support: Option<Arc<RunfilesSupport>>,
+    complete: bool,
 }
 
 impl FilesToRunProvider {
     pub fn empty() -> Self {
         Self {
+            files: AnalysisDepset::empty(DepsetOrder::Default),
             executable: None,
-            runfiles_manifest: None,
-            repo_mapping_manifest: None,
+            support: None,
+            complete: true,
         }
+    }
+
+    pub fn files(&self) -> &AnalysisDepset {
+        &self.files
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.complete
+    }
+
+    pub fn runfiles_manifest(&self) -> Option<&AnalysisArtifact> {
+        self.support
+            .as_ref()
+            .and_then(|support| support.manifest.as_ref())
+    }
+
+    pub fn repo_mapping_manifest(&self) -> Option<&AnalysisArtifact> {
+        self.support
+            .as_ref()
+            .and_then(|support| support.repo_mapping_manifest.as_ref())
+    }
+
+    pub fn to_occurrence(&self) -> ProviderOccurrence {
+        ProviderOccurrence::new(
+            ProviderIdentity::builtin("FilesToRunProvider"),
+            [
+                (
+                    "executable",
+                    self.executable
+                        .clone()
+                        .map(AnalysisValue::artifact)
+                        .unwrap_or_else(AnalysisValue::none),
+                ),
+                ("_files_to_run", AnalysisValue::depset(self.files.clone())),
+                ("_complete", AnalysisValue::boolean(self.complete)),
+                (
+                    "runfiles_manifest",
+                    self.runfiles_manifest()
+                        .cloned()
+                        .map(AnalysisValue::artifact)
+                        .unwrap_or_else(AnalysisValue::none),
+                ),
+                (
+                    "repo_mapping_manifest",
+                    self.repo_mapping_manifest()
+                        .cloned()
+                        .map(AnalysisValue::artifact)
+                        .unwrap_or_else(AnalysisValue::none),
+                ),
+            ],
+        )
+    }
+
+    pub fn from_occurrence(value: &ProviderOccurrence) -> Option<Self> {
+        if !value.identity().is_builtin("FilesToRunProvider") {
+            return None;
+        }
+        let field = |name: &str| {
+            value
+                .fields()
+                .iter()
+                .find(|(candidate, _)| candidate.as_str() == name)
+                .map(|(_, value)| value)
+        };
+        let executable = match field("executable")?.kind() {
+            crate::analysis_value::AnalysisValueKind::None => None,
+            crate::analysis_value::AnalysisValueKind::Artifact(value) => Some(value.clone()),
+            _ => return None,
+        };
+        let files = match field("_files_to_run")?.kind() {
+            crate::analysis_value::AnalysisValueKind::Depset(value) => value.clone(),
+            _ => return None,
+        };
+        let complete = match field("_complete")?.kind() {
+            crate::analysis_value::AnalysisValueKind::Boolean(value) => value,
+            _ => return None,
+        };
+        if !matches!(
+            field("runfiles_manifest")?.kind(),
+            crate::analysis_value::AnalysisValueKind::None
+        ) || !matches!(
+            field("repo_mapping_manifest")?.kind(),
+            crate::analysis_value::AnalysisValueKind::None
+        ) {
+            return None;
+        }
+        Some(Self {
+            files,
+            executable,
+            support: None,
+            complete,
+        })
+    }
+
+    fn from_files(files: AnalysisDepset) -> Self {
+        Self {
+            files,
+            ..Self::empty()
+        }
+    }
+
+    fn incomplete_executable(files: AnalysisDepset, executable: AnalysisArtifact) -> Self {
+        Self {
+            files,
+            executable: Some(executable),
+            support: None,
+            complete: false,
+        }
+    }
+
+    pub fn single_executable_without_support(executable: AnalysisArtifact) -> Self {
+        let files = AnalysisDepset::new(
+            DepsetOrder::Default,
+            vec![AnalysisValue::artifact(executable.clone())],
+            Vec::new(),
+        )
+        .expect("a singleton executable artifact depset is valid");
+        Self {
+            files,
+            executable: Some(executable),
+            support: None,
+            complete: true,
+        }
+    }
+
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        self.files.publication_eq_with(&other.files, state)
+            && self.executable == other.executable
+            && match (&self.support, &other.support) {
+                (Some(left), Some(right)) => left.publication_eq_with(right, state),
+                (None, None) => true,
+                _ => false,
+            }
+            && self.complete == other.complete
     }
 }
 
@@ -181,7 +369,7 @@ pub struct DefaultInfo {
     files: AnalysisDepset,
     pub default_runfiles: Runfiles,
     pub data_runfiles: Runfiles,
-    pub executable: Option<String>,
+    pub executable: Option<AnalysisArtifact>,
     pub files_to_run: FilesToRunProvider,
 }
 
@@ -199,9 +387,20 @@ impl DefaultInfo {
     pub fn from_files(files: AnalysisDepset) -> Result<Self, ProviderError> {
         Self::ensure_artifact_files(&files)?;
         Ok(Self {
-            files,
+            files: files.clone(),
+            files_to_run: FilesToRunProvider::from_files(files),
             ..Self::empty()
         })
+    }
+
+    pub fn from_file_target(artifact: AnalysisArtifact) -> Self {
+        let files_to_run = FilesToRunProvider::single_executable_without_support(artifact.clone());
+        Self {
+            files: files_to_run.files.clone(),
+            executable: Some(artifact),
+            files_to_run,
+            ..Self::empty()
+        }
     }
 
     pub fn files(&self) -> &AnalysisDepset {
@@ -223,7 +422,6 @@ impl DefaultInfo {
     /// `DefaultInfo`. Explicit files retain the rule's declared file set;
     /// otherwise the executable is its sole default file and runfile.
     pub fn from_executable(
-        executable: String,
         executable_artifact: AnalysisArtifact,
         files: Option<AnalysisDepset>,
     ) -> Result<Self, ProviderError> {
@@ -232,10 +430,22 @@ impl DefaultInfo {
         }
         let executable_files = AnalysisDepset::new(
             DepsetOrder::Default,
-            vec![AnalysisValue::artifact(executable_artifact)],
+            vec![AnalysisValue::artifact(executable_artifact.clone())],
             Vec::new(),
         )
         .expect("a singleton executable artifact depset is valid");
+        let effective_files = files.unwrap_or_else(|| executable_files.clone());
+        let files_to_run = if effective_files == executable_files {
+            executable_files
+        } else {
+            AnalysisDepset::new(
+                DepsetOrder::Default,
+                vec![AnalysisValue::artifact(executable_artifact.clone())],
+                vec![effective_files.clone()],
+            )
+            .expect("typed DefaultInfo files compose with its executable")
+        };
+        let executable = executable_artifact.path().into_owned();
         let executable_runfiles =
             Depset::from_direct(DepsetOrder::Default, vec![executable.clone()])
                 .expect("a singleton executable runfiles depset is valid");
@@ -244,14 +454,14 @@ impl DefaultInfo {
             ..Runfiles::empty()
         };
         Ok(Self {
-            files: files.unwrap_or(executable_files),
+            files: effective_files,
             default_runfiles: runfiles.clone(),
             data_runfiles: runfiles,
-            executable: Some(executable.clone()),
-            files_to_run: FilesToRunProvider {
-                executable: Some(executable),
-                ..FilesToRunProvider::empty()
-            },
+            executable: Some(executable_artifact.clone()),
+            files_to_run: FilesToRunProvider::incomplete_executable(
+                files_to_run,
+                executable_artifact,
+            ),
         })
     }
 
@@ -283,7 +493,9 @@ impl DefaultInfo {
             && self.default_runfiles == other.default_runfiles
             && self.data_runfiles == other.data_runfiles
             && self.executable == other.executable
-            && self.files_to_run == other.files_to_run
+            && self
+                .files_to_run
+                .publication_eq_with(&other.files_to_run, state)
     }
 }
 
@@ -370,7 +582,9 @@ impl ProviderValue {
             }
             (Self::OutputGroupInfo(left), Self::OutputGroupInfo(right)) => left == right,
             (Self::RunEnvironmentInfo(left), Self::RunEnvironmentInfo(right)) => left == right,
-            (Self::FilesToRunProvider(left), Self::FilesToRunProvider(right)) => left == right,
+            (Self::FilesToRunProvider(left), Self::FilesToRunProvider(right)) => {
+                left.publication_eq_with(right, state)
+            }
             (Self::PlatformInfo(left), Self::PlatformInfo(right)) => left == right,
             (Self::Occurrence(left), Self::Occurrence(right)) => {
                 left.publication_eq_with(right, state)

@@ -25,15 +25,12 @@ use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
-use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::AnalysisTargetIdentity;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::ConfiguredTargetValue;
 use slug_build_api_v2::DefaultInfo;
-use slug_build_api_v2::DepsetOrder;
+use slug_build_api_v2::FilesToRunProvider;
 use slug_build_api_v2::ProviderCollection;
-use slug_build_api_v2::ProviderIdentity;
-use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
@@ -1724,15 +1721,8 @@ fn materialized_target_providers(
         return Ok(result.providers().clone());
     }
     let artifact = configured_dependency_artifact(result, None)?;
-    let files = AnalysisDepset::new(
-        DepsetOrder::Default,
-        vec![AnalysisValue::artifact(artifact)],
-        Vec::new(),
-    )
-    .map_err(|error| AnalysisError::message(error.to_string()))?;
     ProviderCollection::new(vec![ProviderValue::DefaultInfo(
-        DefaultInfo::from_files(files)
-            .map_err(|error| AnalysisError::message(error.to_string()))?,
+        DefaultInfo::from_file_target(artifact),
     )])
     .map_err(|error| AnalysisError::message(error.to_string()))
 }
@@ -1808,26 +1798,33 @@ fn configured_dependency_artifact(
     }
 }
 
-fn configured_executable_artifact(
+fn configured_executable_provider(
     result: &ConfiguredNodeResult,
-) -> Result<AnalysisArtifact, AnalysisError> {
+) -> Result<FilesToRunProvider, AnalysisError> {
     if matches!(
         result.kind(),
         ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
     ) {
-        return configured_dependency_artifact(result, None);
+        return configured_dependency_artifact(result, None)
+            .map(FilesToRunProvider::single_executable_without_support);
     }
-    let path = result
+    let provider = result
         .providers()
         .default_info()
-        .and_then(|info| info.files_to_run.executable.as_deref())
+        .map(|info| info.files_to_run.clone())
         .ok_or_else(|| {
             AnalysisError::message(format!(
-                "configured dependency {} did not retain an executable File",
+                "configured dependency {} did not retain FilesToRunProvider",
                 result.key().label()
             ))
         })?;
-    configured_dependency_artifact(result, Some(path))
+    if provider.executable.is_none() {
+        return Err(AnalysisError::message(format!(
+            "configured dependency {} did not retain an executable File",
+            result.key().label()
+        )));
+    }
+    Ok(provider)
 }
 
 fn configured_attribute_item(
@@ -1835,15 +1832,9 @@ fn configured_attribute_item(
     result: &ConfiguredNodeResult,
 ) -> Result<AnalysisValue, AnalysisError> {
     if row.executable() {
-        let executable = configured_executable_artifact(result)?;
-        return Ok(AnalysisValue::provider(ProviderOccurrence::new(
-            ProviderIdentity::builtin("FilesToRunProvider"),
-            [
-                ("executable", AnalysisValue::artifact(executable)),
-                ("runfiles_manifest", AnalysisValue::none()),
-                ("repo_mapping_manifest", AnalysisValue::none()),
-            ],
-        )));
+        return Ok(AnalysisValue::provider(
+            configured_executable_provider(result)?.to_occurrence(),
+        ));
     }
     if row.allow_single_file() {
         let artifact = if matches!(
@@ -2014,7 +2005,7 @@ where
                 .iter()
                 .find(|schema| schema.declaration_name() == dependency.attribute)
                 .filter(|schema| schema.executable())
-                .map(|_| configured_executable_artifact(result.result()))
+                .map(|_| configured_executable_provider(result.result()))
                 .transpose()?;
             dependencies.push(PreparedDependency {
                 key: result

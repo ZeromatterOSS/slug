@@ -866,6 +866,13 @@ Buck2, or Zabel representation is extracted. Four bounded successors cover
 typed provider core, runfiles values/DefaultInfo, support actions, and Spawn
 expansion without future schema replacement.
 
+The typed provider-core successor is terminally `ACCEPT`. It uses existing
+Rust-native Artifact, dense depset, compact map, Arc, and publication-equality
+owners; no V1, Buck2, or Zabel representation is extracted. The terminal
+schema correction reserves the final typed RetainedRunfiles and
+RunfilesSupport fields now, so the runfiles-value successor adds behavior
+rather than replacing the provider or support layout.
+
 ### Stage 6 recursive configured custom-rule analysis
 
 Status: Partially landed

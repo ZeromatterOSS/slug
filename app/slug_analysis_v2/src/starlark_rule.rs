@@ -234,7 +234,7 @@ pub(crate) struct PreparedDependency {
     pub(crate) providers: ProviderCollection,
     pub(crate) attribute: CompactString,
     pub(crate) target_shape: bool,
-    pub(crate) executable: Option<AnalysisArtifact>,
+    pub(crate) executable: Option<slug_build_api_v2::FilesToRunProvider>,
 }
 
 #[derive(Debug, Clone)]
@@ -640,37 +640,30 @@ struct SynchronousAnalysisActionSink {
 
 #[derive(Debug, Default)]
 struct ExecutableArtifactProvenance {
-    root: SmallSet<AnalysisArtifact>,
-    subrules: SmallMap<Arc<SubruleIdentity>, SmallSet<AnalysisArtifact>>,
+    root: SmallMap<AnalysisArtifact, slug_build_api_v2::FilesToRunProvider>,
+    subrules: SmallMap<
+        Arc<SubruleIdentity>,
+        SmallMap<AnalysisArtifact, slug_build_api_v2::FilesToRunProvider>,
+    >,
 }
 
 impl ExecutableArtifactProvenance {
     fn contains(&self, scope: &AnalysisActionCallScope, artifact: &AnalysisArtifact) -> bool {
         match scope {
-            AnalysisActionCallScope::Root => self.root.contains(artifact),
+            AnalysisActionCallScope::Root => self.root.contains_key(artifact),
             AnalysisActionCallScope::Subrule(identity) => self
                 .subrules
                 .get(identity)
-                .is_some_and(|artifacts| artifacts.contains(artifact)),
+                .is_some_and(|artifacts| artifacts.contains_key(artifact)),
         }
     }
 }
 
-fn files_to_run_executable(value: &AnalysisValue) -> Option<AnalysisArtifact> {
+fn files_to_run_provider(value: &AnalysisValue) -> Option<slug_build_api_v2::FilesToRunProvider> {
     let AnalysisValueKind::Provider(provider) = value.kind() else {
         return None;
     };
-    if !provider.identity().is_builtin("FilesToRunProvider") {
-        return None;
-    }
-    provider
-        .fields()
-        .iter()
-        .find(|(name, _)| name.as_str() == "executable")
-        .and_then(|(_, value)| match value.kind() {
-            AnalysisValueKind::Artifact(artifact) => Some(artifact.clone()),
-            _ => None,
-        })
+    slug_build_api_v2::FilesToRunProvider::from_occurrence(provider)
 }
 
 fn executable_artifact_provenance(
@@ -678,23 +671,29 @@ fn executable_artifact_provenance(
     configured_attributes: &[PreparedConfiguredAttribute],
 ) -> ExecutableArtifactProvenance {
     let mut provenance = ExecutableArtifactProvenance::default();
-    provenance.root.extend(
-        dependencies
-            .iter()
-            .filter_map(|dependency| dependency.executable.clone()),
-    );
+    for provider in dependencies
+        .iter()
+        .filter_map(|dependency| dependency.executable.clone())
+    {
+        if let Some(executable) = provider.executable.clone() {
+            provenance.root.insert(executable, provider);
+        }
+    }
     for attribute in configured_attributes {
-        let (Some(owner), Some(executable)) =
-            (&attribute.owner, files_to_run_executable(&attribute.value))
+        let (Some(owner), Some(provider)) =
+            (&attribute.owner, files_to_run_provider(&attribute.value))
         else {
             continue;
         };
+        let Some(executable) = provider.executable.clone() else {
+            continue;
+        };
         if let Some(artifacts) = provenance.subrules.get_mut(owner) {
-            artifacts.insert(executable);
+            artifacts.insert(executable, provider);
         } else {
             provenance
                 .subrules
-                .insert(owner.clone(), SmallSet::from_iter([executable]));
+                .insert(owner.clone(), SmallMap::from_iter([(executable, provider)]));
         }
     }
     provenance
@@ -946,16 +945,7 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
     }
 
     fn is_files_to_run_provider(&self, value: Value<'_>) -> bool {
-        let mut lowerer = AnalysisValueLowerer::default();
-        lowerer
-            .lower(value, "ctx.actions.run executable")
-            .is_ok_and(|value| {
-                matches!(
-                    value.kind(),
-                    AnalysisValueKind::Provider(provider)
-                        if provider.identity().is_builtin("FilesToRunProvider")
-                )
-            })
+        crate::analysis_value::is_files_to_run_provider(value)
     }
 
     fn artifact_symlink(
@@ -1646,7 +1636,7 @@ pub(crate) fn evaluate_loaded_rule(
                 })
                 .transpose()?;
             let executable = executable
-                .map(|executable| -> Result<(String, AnalysisArtifact), String> {
+                .map(|executable| -> Result<AnalysisArtifact, String> {
                     let value = AnalysisArtifactValue::from_starlark(executable)
                         .filter(|value| {
                             value
@@ -1656,17 +1646,12 @@ pub(crate) fn evaluate_loaded_rule(
                         .ok_or_else(|| {
                             "DefaultInfo.executable must be a declared file".to_owned()
                         })?;
-                    Ok((
-                        value.artifact().path().into_owned(),
-                        value.artifact().clone(),
-                    ))
+                    Ok(value.artifact().clone())
                 })
                 .transpose()?;
             let default_info = match executable {
-                Some((executable, artifact)) => {
-                    slug_build_api_v2::DefaultInfo::from_executable(executable, artifact, files)
-                        .map_err(|error| error.to_string())?
-                }
+                Some(artifact) => slug_build_api_v2::DefaultInfo::from_executable(artifact, files)
+                    .map_err(|error| error.to_string())?,
                 None => slug_build_api_v2::DefaultInfo::from_files(files.unwrap_or_else(|| {
                     slug_build_api_v2::AnalysisDepset::empty(
                         slug_build_api_v2::DepsetOrder::Default,

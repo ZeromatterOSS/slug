@@ -31,6 +31,7 @@ use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::AnalysisValueKind;
 use slug_build_api_v2::ConfiguredTargetValue;
 use slug_build_api_v2::Depset;
+use slug_build_api_v2::FilesToRunProvider;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::ProviderOccurrence;
@@ -135,6 +136,49 @@ impl<'v> StarlarkValue<'v> for BuiltinProviderView {
 }
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct StarlarkFilesToRunProvider {
+    retained: FilesToRunProvider,
+    executable: FrozenValue,
+    runfiles_manifest: FrozenValue,
+    repo_mapping_manifest: FrozenValue,
+}
+
+impl fmt::Display for StarlarkFilesToRunProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("FilesToRunProvider(...)")
+    }
+}
+
+starlark::starlark_simple_value!(StarlarkFilesToRunProvider);
+#[starlark_value(type = "FilesToRunProvider")]
+impl<'v> StarlarkValue<'v> for StarlarkFilesToRunProvider {
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(Self::from_value(other).is_some_and(|other| self.retained == other.retained))
+    }
+
+    fn get_attr(&self, name: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        match name {
+            "executable" => Some(self.executable.to_value()),
+            "runfiles_manifest" => Some(self.runfiles_manifest.to_value()),
+            "repo_mapping_manifest" => Some(self.repo_mapping_manifest.to_value()),
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec![
+            "executable".to_owned(),
+            "repo_mapping_manifest".to_owned(),
+            "runfiles_manifest".to_owned(),
+        ]
+    }
+}
+
+pub(crate) fn is_files_to_run_provider(value: Value<'_>) -> bool {
+    StarlarkFilesToRunProvider::from_value(value).is_some()
+}
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct AnalysisConfiguredTargetValue {
     retained: ConfiguredTargetValue,
     providers: SmallMap<ProviderIdentity, FrozenValue>,
@@ -211,6 +255,9 @@ impl<'a> AnalysisValueMaterializer<'a> {
     }
 
     fn provider(&mut self, occurrence: &ProviderOccurrence) -> Result<FrozenValue, String> {
+        if let Some(value) = FilesToRunProvider::from_occurrence(occurrence) {
+            return Ok(self.files_to_run(&value));
+        }
         let fields = occurrence
             .fields()
             .iter()
@@ -228,9 +275,9 @@ impl<'a> AnalysisValueMaterializer<'a> {
         })
     }
 
-    fn string_option(&self, value: Option<&String>) -> FrozenValue {
+    fn artifact_option(&self, value: Option<&AnalysisArtifact>) -> FrozenValue {
         value
-            .map(|value| self.heap.alloc_str(value).to_frozen_value())
+            .map(|value| self.heap.alloc(AnalysisArtifactValue::new(value.clone())))
             .unwrap_or_else(FrozenValue::new_none)
     }
 
@@ -292,25 +339,12 @@ impl<'a> AnalysisValueMaterializer<'a> {
         })
     }
 
-    fn files_to_run(&self, value: &slug_build_api_v2::FilesToRunProvider) -> FrozenValue {
-        self.heap.alloc(BuiltinProviderView {
-            identity: ProviderIdentity::builtin("FilesToRunProvider"),
-            fields: [
-                (
-                    CompactString::new("executable"),
-                    self.string_option(value.executable.as_ref()),
-                ),
-                (
-                    CompactString::new("runfiles_manifest"),
-                    self.string_option(value.runfiles_manifest.as_ref()),
-                ),
-                (
-                    CompactString::new("repo_mapping_manifest"),
-                    self.string_option(value.repo_mapping_manifest.as_ref()),
-                ),
-            ]
-            .into_iter()
-            .collect(),
+    fn files_to_run(&self, value: &FilesToRunProvider) -> FrozenValue {
+        self.heap.alloc(StarlarkFilesToRunProvider {
+            retained: value.clone(),
+            executable: self.artifact_option(value.executable.as_ref()),
+            runfiles_manifest: self.artifact_option(value.runfiles_manifest()),
+            repo_mapping_manifest: self.artifact_option(value.repo_mapping_manifest()),
         })
     }
 
@@ -566,6 +600,9 @@ impl<'v> AnalysisValueLowerer<'v> {
         }
         if let Some(value) = AnalysisArtifactValue::from_starlark(value) {
             return Ok(AnalysisValue::artifact(value.artifact().clone()));
+        }
+        if let Some(value) = StarlarkFilesToRunProvider::from_value(value) {
+            return Ok(AnalysisValue::provider(value.retained.to_occurrence()));
         }
         if let Some(value) = AnalysisConfiguredTargetValue::from_value(value) {
             return Ok(AnalysisValue::configured_target(value.retained.clone()));
@@ -844,8 +881,7 @@ mod tests {
         );
         let providers = ProviderCollection::new(vec![
             ProviderValue::DefaultInfo(
-                DefaultInfo::from_executable("bin/tool".to_owned(), executable_artifact, None)
-                    .unwrap(),
+                DefaultInfo::from_executable(executable_artifact.clone(), None).unwrap(),
             ),
             ProviderValue::OutputGroupInfo(OutputGroupInfo::new(BTreeMap::from([(
                 "validation".to_owned(),
@@ -859,11 +895,9 @@ mod tests {
                 environment: BTreeMap::from([("KEY".to_owned(), "value".to_owned())]),
                 inherited_environment: vec!["PATH".to_owned()],
             }),
-            ProviderValue::FilesToRunProvider(FilesToRunProvider {
-                executable: Some("bin/tool".to_owned()),
-                runfiles_manifest: Some("bin/tool.runfiles_manifest".to_owned()),
-                repo_mapping_manifest: None,
-            }),
+            ProviderValue::FilesToRunProvider(
+                FilesToRunProvider::single_executable_without_support(executable_artifact),
+            ),
             ProviderValue::PlatformInfo(PlatformInfo {
                 label: "@@platforms//:host".to_owned(),
                 constraints: BTreeMap::from([("cpu".to_owned(), "x86_64".to_owned())]),
@@ -925,11 +959,17 @@ mod tests {
             "bin/tool"
         );
         let files_to_run =
-            BuiltinProviderView::from_value(field(default, "files_to_run").to_value()).unwrap();
+            StarlarkFilesToRunProvider::from_value(field(default, "files_to_run").to_value())
+                .unwrap();
         assert_eq!(
-            field(files_to_run, "executable").to_value().unpack_str(),
-            Some("bin/tool")
+            AnalysisArtifactValue::from_value(files_to_run.executable.to_value())
+                .unwrap()
+                .artifact()
+                .path()
+                .as_ref(),
+            "bin/tool"
         );
+        assert!(files_to_run.runfiles_manifest.to_value().is_none());
         let output_groups = builtin(target, "OutputGroupInfo");
         assert_eq!(output_groups.dir_attr(), ["validation"]);
         assert_eq!(
@@ -947,12 +987,23 @@ mod tests {
                 .unwrap();
         assert_eq!(inherited[0].unpack_str(), Some("PATH"));
 
-        let files_to_run = builtin(target, "FilesToRunProvider");
+        let files_to_run = StarlarkFilesToRunProvider::from_value(
+            target
+                .providers
+                .get(&ProviderIdentity::builtin("FilesToRunProvider"))
+                .unwrap()
+                .to_value(),
+        )
+        .unwrap();
         assert_eq!(
-            field(files_to_run, "executable").to_value().unpack_str(),
-            Some("bin/tool")
+            AnalysisArtifactValue::from_value(files_to_run.executable.to_value())
+                .unwrap()
+                .artifact()
+                .path()
+                .as_ref(),
+            "bin/tool"
         );
-        assert!(field(files_to_run, "repo_mapping_manifest").is_none());
+        assert!(files_to_run.repo_mapping_manifest.to_value().is_none());
         let platform = builtin(target, "PlatformInfo");
         assert_eq!(
             field(platform, "label").to_value().unpack_str(),
@@ -1008,17 +1059,10 @@ mod tests {
                 ),
             }),
         ));
-        let executable = AnalysisValue::provider(ProviderOccurrence::new(
-            ProviderIdentity::builtin("FilesToRunProvider"),
-            [
-                (
-                    "executable",
-                    AnalysisValue::artifact(AnalysisArtifact::Source(label)),
-                ),
-                ("runfiles_manifest", AnalysisValue::none()),
-                ("repo_mapping_manifest", AnalysisValue::none()),
-            ],
-        ));
+        let executable = AnalysisValue::provider(
+            FilesToRunProvider::single_executable_without_support(AnalysisArtifact::Source(label))
+                .to_occurrence(),
+        );
         let nested = AnalysisValue::provider(ProviderOccurrence::new(
             ProviderIdentity::user(ProviderId::new("//rules:defs.bzl", "Info").unwrap()),
             [

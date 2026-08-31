@@ -10,15 +10,18 @@
 
 use std::collections::BTreeMap;
 
+use compact_str::CompactString;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
 use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::AnalysisValue;
+use slug_build_api_v2::AnalysisValueType;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetOrder;
+use slug_build_api_v2::FilesToRunProvider;
 use slug_build_api_v2::OutputGroupInfo;
 use slug_build_api_v2::PlatformInfo;
 use slug_build_api_v2::ProviderCollection;
@@ -28,7 +31,11 @@ use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::ProviderName;
 use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
+use slug_build_api_v2::RetainedRunfiles;
 use slug_build_api_v2::RunEnvironmentInfo;
+use slug_build_api_v2::RunfilesConflictPolicy;
+use slug_build_api_v2::RunfilesSupport;
+use slug_build_api_v2::RunfilesSymlink;
 use slug_identity_v2::CanonicalLabel;
 
 fn files(items: &[&str]) -> Depset<String> {
@@ -151,31 +158,105 @@ fn provider_collection_exposes_bazel_native_and_user_providers() {
 
 #[test]
 fn executable_default_info_uses_the_executable_for_implicit_files_and_runfiles() {
-    let info =
-        DefaultInfo::from_executable("pkg/tool".to_owned(), source_artifact("pkg/tool"), None)
-            .unwrap();
+    let info = DefaultInfo::from_executable(source_artifact("pkg/tool"), None).unwrap();
 
     assert_eq!(default_paths(&info), ["pkg/tool"]);
-    assert_eq!(info.executable.as_deref(), Some("pkg/tool"));
-    assert_eq!(info.files_to_run.executable.as_deref(), Some("pkg/tool"));
+    assert_eq!(
+        info.executable.as_ref().map(|value| value.path()),
+        Some("pkg/tool".into())
+    );
+    assert_eq!(info.files_to_run.executable, info.executable);
+    assert!(!info.files_to_run.is_complete());
     assert_eq!(info.default_runfiles.files.to_list(), ["pkg/tool"]);
     assert_eq!(info.data_runfiles.files.to_list(), ["pkg/tool"]);
-    assert!(info.files_to_run.runfiles_manifest.is_none());
-    assert!(info.files_to_run.repo_mapping_manifest.is_none());
+    assert!(info.files_to_run.runfiles_manifest().is_none());
+    assert!(info.files_to_run.repo_mapping_manifest().is_none());
     assert!(info.default_runfiles.symlinks.is_empty());
     assert!(info.data_runfiles.symlinks.is_empty());
 }
 
 #[test]
+fn file_target_files_to_run_is_complete_and_typed() {
+    let artifact = source_artifact("pkg/input.txt");
+    let info = DefaultInfo::from_file_target(artifact.clone());
+
+    assert_eq!(info.executable, Some(artifact.clone()));
+    assert_eq!(info.files_to_run.executable, Some(artifact));
+    assert!(info.files_to_run.is_complete());
+    assert_eq!(
+        info.files_to_run.files().element_type(),
+        AnalysisValueType::Artifact
+    );
+    assert!(info.default_runfiles.files.is_empty());
+}
+
+#[test]
+fn runfiles_support_reserves_the_complete_typed_category_shape() {
+    let runfile = source_artifact("pkg/data.txt");
+    let runfiles = RetainedRunfiles {
+        files: artifact_files(&["pkg/data.txt"]),
+        symlinks: Depset::from_direct(
+            DepsetOrder::Default,
+            vec![RunfilesSymlink {
+                path: CompactString::new("logical/data.txt"),
+                artifact: runfile.clone(),
+            }],
+        )
+        .unwrap(),
+        root_symlinks: Depset::empty(),
+        empty_filenames: Depset::empty(),
+        conflict_policy: RunfilesConflictPolicy::Warn,
+        repository_prefix: CompactString::new("repo"),
+    };
+    let support = RunfilesSupport {
+        runfiles,
+        tree: source_artifact("pkg/tool.runfiles"),
+        manifest: None,
+        repo_mapping_manifest: None,
+    };
+
+    assert_eq!(support.runfiles.files.to_list().len(), 1);
+    assert_eq!(support.runfiles.symlinks.to_list().len(), 1);
+    assert_eq!(support.runfiles.repository_prefix, "repo");
+    assert!(support.manifest.is_none());
+}
+
+#[test]
+fn files_to_run_occurrence_round_trip_preserves_private_typed_state() {
+    let provider =
+        FilesToRunProvider::single_executable_without_support(source_artifact("pkg/input.txt"));
+    assert_eq!(
+        FilesToRunProvider::from_occurrence(&provider.to_occurrence()),
+        Some(provider)
+    );
+    let fabricated = ProviderOccurrence::new(
+        ProviderIdentity::builtin("FilesToRunProvider"),
+        [("executable", AnalysisValue::none())],
+    );
+    assert!(FilesToRunProvider::from_occurrence(&fabricated).is_none());
+}
+
+#[test]
 fn executable_default_info_preserves_an_explicit_files_override() {
     let info = DefaultInfo::from_executable(
-        "pkg/tool".to_owned(),
         source_artifact("pkg/tool"),
         Some(artifact_files(&["pkg/explicit.txt"])),
     )
     .unwrap();
 
     assert_eq!(default_paths(&info), ["pkg/explicit.txt"]);
+    let mut files_to_run = info
+        .files_to_run
+        .files()
+        .to_list()
+        .into_iter()
+        .map(|value| match value.kind() {
+            slug_build_api_v2::AnalysisValueKind::Artifact(value) => value.path().into_owned(),
+            _ => unreachable!(),
+        })
+        .collect::<Vec<_>>();
+    files_to_run.sort();
+    assert_eq!(files_to_run, ["pkg/explicit.txt", "pkg/tool"]);
     assert_eq!(info.default_runfiles.files.to_list(), ["pkg/tool"]);
     assert_eq!(info.data_runfiles.files.to_list(), ["pkg/tool"]);
 }

@@ -7014,6 +7014,16 @@ def _wrong_executable(ctx):
 def _missing(ctx):
     return [DefaultInfo()]
 
+def _consumer(ctx):
+    files_to_run = ctx.attr.dep[DefaultInfo].files_to_run
+    if type(files_to_run) != "FilesToRunProvider":
+        fail("expected dedicated FilesToRunProvider")
+    if files_to_run.executable.path != "implicit":
+        fail("expected typed executable File")
+    if files_to_run.runfiles_manifest != None or files_to_run.repo_mapping_manifest != None:
+        fail("incomplete support must not fabricate manifests")
+    return [DefaultInfo()]
+
 implicit = rule(implementation = _implicit, executable = True)
 explicit = rule(implementation = _explicit, executable = True)
 omitted = rule(implementation = _omitted)
@@ -7021,12 +7031,13 @@ none = rule(implementation = _none)
 wrong_files = rule(implementation = _wrong_files)
 wrong_executable = rule(implementation = _wrong_executable)
 missing = rule(implementation = _missing, executable = True)
+consumer = rule(implementation = _consumer, attrs = {"dep": attr.label()})
 "#,
     )
     .unwrap();
     fs::write(
         workspace.join("BUILD.bazel"),
-        "load(\":defs.bzl\", \"explicit\", \"implicit\", \"missing\", \"none\", \"omitted\", \"wrong_executable\", \"wrong_files\")\nimplicit(name = \"implicit\")\nexplicit(name = \"explicit\")\nomitted(name = \"omitted\")\nnone(name = \"none\")\nwrong_files(name = \"wrong_files\")\nwrong_executable(name = \"wrong_executable\")\nmissing(name = \"missing\")\n",
+        "load(\":defs.bzl\", \"consumer\", \"explicit\", \"implicit\", \"missing\", \"none\", \"omitted\", \"wrong_executable\", \"wrong_files\")\nimplicit(name = \"implicit\")\nexplicit(name = \"explicit\")\nconsumer(name = \"consumer\", dep = \":implicit\")\nomitted(name = \"omitted\")\nnone(name = \"none\")\nwrong_files(name = \"wrong_files\")\nwrong_executable(name = \"wrong_executable\")\nmissing(name = \"missing\")\n",
     )
     .unwrap();
 
@@ -7043,20 +7054,28 @@ missing = rule(implementation = _missing, executable = True)
         .unwrap();
     let implicit = implicit.providers().default_info().unwrap();
     assert_eq!(default_file_paths(implicit), ["implicit"]);
-    assert_eq!(implicit.executable.as_deref(), Some("implicit"));
     assert_eq!(
-        implicit.files_to_run.executable.as_deref(),
-        Some("implicit")
+        implicit.executable.as_ref().map(|value| value.path()),
+        Some("implicit".into())
     );
+    assert_eq!(implicit.files_to_run.executable, implicit.executable);
+    assert!(!implicit.files_to_run.is_complete());
     assert_eq!(implicit.default_runfiles.files.to_list(), ["implicit"]);
     assert_eq!(implicit.data_runfiles.files.to_list(), ["implicit"]);
+
+    analyze_request(&dice, &workspace, &key("consumer"), None, false)
+        .await
+        .unwrap();
 
     let explicit = analyze_request(&dice, &workspace, &key("explicit"), None, false)
         .await
         .unwrap();
     let explicit = explicit.providers().default_info().unwrap();
     assert_eq!(default_file_paths(explicit), ["explicit.txt"]);
-    assert_eq!(explicit.executable.as_deref(), Some("explicit"));
+    assert_eq!(
+        explicit.executable.as_ref().map(|value| value.path()),
+        Some("explicit".into())
+    );
     assert_eq!(explicit.default_runfiles.files.to_list(), ["explicit"]);
     assert_eq!(explicit.data_runfiles.files.to_list(), ["explicit"]);
 
