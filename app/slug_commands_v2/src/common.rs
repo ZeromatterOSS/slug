@@ -523,7 +523,11 @@ pub(crate) fn command_configuration_occurrence(
         "extra_execution_platforms" => CommandConfigurationOccurrence::extra_execution_platforms(
             required_joined_value(flag, "--extra_execution_platforms=<patterns>")?,
         ),
-        "nocollect_code_coverage" => {
+        name if name
+            .strip_prefix("no")
+            .and_then(NativeCommandOption::from_name)
+            .is_some_and(NativeCommandOption::is_boolean) =>
+        {
             if flag.value.is_some() {
                 return Err(CommandParseError::InvalidFlagValue {
                     flag: flag.raw.clone(),
@@ -531,7 +535,11 @@ pub(crate) fn command_configuration_occurrence(
                 });
             }
             CommandConfigurationOccurrence::native(
-                NativeCommandOption::CollectCodeCoverage,
+                NativeCommandOption::from_name(
+                    name.strip_prefix("no")
+                        .expect("guarded boolean no-form has a prefix"),
+                )
+                .expect("guarded boolean no-form remains admitted"),
                 None::<&str>,
                 true,
             )
@@ -669,4 +677,68 @@ fn json_escape(value: &str) -> String {
         }
     }
     escaped
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn occurrence(raw: &str) -> Result<Option<CommandConfigurationOccurrence>, CommandParseError> {
+        command_configuration_occurrence(&parse_flag(raw))
+    }
+
+    #[test]
+    fn action_environment_flags_use_closed_typed_command_options() {
+        assert_eq!(
+            occurrence("--action_env=NAME=value").unwrap(),
+            Some(CommandConfigurationOccurrence::native(
+                NativeCommandOption::ActionEnv,
+                Some("NAME=value"),
+                false,
+            ))
+        );
+        assert_eq!(
+            occurrence("--host_action_env=NAME").unwrap(),
+            Some(CommandConfigurationOccurrence::native(
+                NativeCommandOption::HostActionEnv,
+                Some("NAME"),
+                false,
+            ))
+        );
+        for raw in [
+            "--incompatible_strict_action_env",
+            "--experimental_strict_action_env",
+        ] {
+            assert_eq!(
+                occurrence(raw).unwrap(),
+                Some(CommandConfigurationOccurrence::native(
+                    NativeCommandOption::IncompatibleStrictActionEnv,
+                    None::<&str>,
+                    false,
+                ))
+            );
+        }
+        for raw in [
+            "--noincompatible_strict_action_env",
+            "--noexperimental_strict_action_env",
+        ] {
+            assert_eq!(
+                occurrence(raw).unwrap(),
+                Some(CommandConfigurationOccurrence::native(
+                    NativeCommandOption::IncompatibleStrictActionEnv,
+                    None::<&str>,
+                    true,
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn environment_flags_reject_missing_values_and_joined_boolean_no_forms() {
+        assert!(occurrence("--action_env").is_err());
+        assert!(occurrence("--host_action_env").is_err());
+        assert!(occurrence("--noexperimental_strict_action_env=true").is_err());
+        assert_eq!(occurrence("--enable_runfiles=true").unwrap(), None);
+        assert_eq!(occurrence("--shell_executable=/bin/sh").unwrap(), None);
+    }
 }

@@ -36,6 +36,9 @@ enum Property {
     OsName,
     OsArch,
     UserHome,
+    BazelSh,
+    Path,
+    SystemRoot,
 }
 
 trait ProcessHostSource: Send + Sync {
@@ -93,6 +96,9 @@ impl ProcessHostSource for NativeSource {
                 .as_deref()
                 .map(utf16_property)
                 .unwrap_or(PropertyRead::Absent),
+            Property::BazelSh => native_environment("BAZEL_SH"),
+            Property::Path => native_environment("PATH"),
+            Property::SystemRoot => native_environment("SYSTEMROOT"),
         }
     }
 
@@ -147,6 +153,14 @@ fn native_home() -> Option<String> {
     {
         std::env::var("HOME").ok()
     }
+}
+
+fn native_environment(name: &str) -> PropertyRead {
+    std::env::var(name)
+        .ok()
+        .as_deref()
+        .map(utf16_property)
+        .unwrap_or(PropertyRead::Absent)
 }
 
 fn native_processors() -> Result<i32, SourceError> {
@@ -756,6 +770,7 @@ pub struct ProcessHostOwner {
     os: ClassCell<HostOs>,
     cpu: ClassCell<HostCpu>,
     resources: ClassCell<ResourceSample>,
+    action_environment: ClassCell<slug_configuration_v2::native::host::ActionEnvironmentHost>,
     capacity: CapacityCell<ResourceSample>,
 }
 
@@ -780,6 +795,7 @@ impl ProcessHostOwner {
             os: ClassCell::new(),
             cpu: ClassCell::new(),
             resources: ClassCell::new(),
+            action_environment: ClassCell::new(),
             capacity: CapacityCell::new(),
         })
     }
@@ -876,6 +892,45 @@ impl ProcessHostOwner {
         })
     }
 
+    fn action_environment_host(
+        &self,
+    ) -> Result<slug_configuration_v2::native::host::ActionEnvironmentHost, ProcessHostError> {
+        use slug_configuration_v2::native::host::ActionEnvironmentHost;
+        use slug_configuration_v2::native::host::ActionEnvironmentHostOs;
+
+        let os = self.os()?;
+        self.action_environment
+            .get_or_init(|| {
+                let configuration_os = match os {
+                    HostOs::Linux => ActionEnvironmentHostOs::Linux,
+                    HostOs::Windows => ActionEnvironmentHostOs::Windows,
+                    HostOs::Macos => ActionEnvironmentHostOs::Macos,
+                    HostOs::Freebsd => ActionEnvironmentHostOs::Freebsd,
+                    HostOs::Openbsd => ActionEnvironmentHostOs::Openbsd,
+                    HostOs::Unknown => ActionEnvironmentHostOs::Unknown,
+                };
+                if os != HostOs::Windows {
+                    return Ok(ActionEnvironmentHost::without_environment(configuration_os));
+                }
+                let read = |property| match self.source.property(property) {
+                    PropertyRead::Present(value) => String::from_utf16(&value)
+                        .map(Some)
+                        .map_err(|_| ClassInitFailure::Source(SourceError::ReadError)),
+                    PropertyRead::Absent => Ok(None),
+                    PropertyRead::ReadError(error) => Err(ClassInitFailure::Source(error)),
+                };
+                let bazel_sh = read(Property::BazelSh)?;
+                let path = read(Property::Path)?;
+                let system_root = read(Property::SystemRoot)?;
+                Ok(ActionEnvironmentHost::windows(
+                    bazel_sh.as_deref(),
+                    path.as_deref(),
+                    system_root.as_deref(),
+                ))
+            })
+            .map_err(ProcessHostError::Class)
+    }
+
     /// Supplies precisely the Host facts needed for the admitted default
     /// configuration. This deliberately does not observe capacity or home:
     /// neither default conversion requests them.
@@ -944,14 +999,15 @@ impl ProcessHostOwner {
             HostPathFlavor::Unix => ConfigurationPathFlavor::Unix,
             HostPathFlavor::Windows => ConfigurationPathFlavor::Windows,
         };
-        Ok(HostConversionInputs::new(
+        let inputs = HostConversionInputs::new(
             Some(auto_cpu),
             Some(path_flavor),
             None,
             Arc::from([]),
             Arc::from([]),
         )
-        .expect("empty default configuration Host facts are ordered"))
+        .expect("empty default configuration Host facts are ordered");
+        Ok(inputs.with_action_environment_host(self.action_environment_host()?))
     }
 }
 
@@ -1473,10 +1529,58 @@ mod tests {
         assert!(inputs.home_facts().is_empty());
         assert!(inputs.windows_option_path_facts().is_empty());
         assert_eq!(
+            inputs.action_environment_host().unwrap().os(),
+            slug_configuration_v2::native::host::ActionEnvironmentHostOs::Linux
+        );
+        assert_eq!(
             source.calls(),
             vec![Property::BlazeOs, Property::OsName, Property::OsArch]
         );
         assert!(source.0.lock().unwrap().resource_calls.is_empty());
+    }
+
+    #[test]
+    fn windows_action_environment_properties_latch_once_across_concurrent_requests() {
+        let (source, owner) = FakeSource::owner(FakeState {
+            properties: VecDeque::from([
+                PropertyRead::Absent,
+                property("Windows"),
+                property("x86_64"),
+                property("D:/tools/bin/bash.exe"),
+                property("C:/client/bin"),
+                property("D:\\Windows"),
+            ]),
+            ..Default::default()
+        });
+        let gate = Arc::new(Barrier::new(3));
+        let mut workers = Vec::new();
+        for _ in 0..2 {
+            let owner = owner.clone();
+            let gate = gate.clone();
+            workers.push(std::thread::spawn(move || {
+                gate.wait();
+                owner.default_configuration_inputs().unwrap()
+            }));
+        }
+        gate.wait();
+        for worker in workers {
+            let inputs = worker.join().unwrap();
+            let host = inputs.action_environment_host().unwrap();
+            assert_eq!(host.bazel_sh(), Some("D:/tools/bin/bash.exe"));
+            assert_eq!(host.path(), Some("C:/client/bin"));
+            assert_eq!(host.system_root(), Some("D:\\Windows"));
+        }
+        assert_eq!(
+            source.calls(),
+            vec![
+                Property::BlazeOs,
+                Property::OsName,
+                Property::OsArch,
+                Property::BazelSh,
+                Property::Path,
+                Property::SystemRoot,
+            ]
+        );
     }
 
     #[cfg(target_os = "linux")]

@@ -971,7 +971,7 @@ async fn filewrite_aquery_text_matches_frozen_baseline() {
             "  Target: //:write\n",
             "  Configuration: slugcfg-v2:3a50fb29d36af6da954342aa166fc2b92c736ec3fc625f6f34bab5272cec7975\n",
             "  Execution platform: //:platform\n",
-            "  SlugActionToken: slugact-display-v1:59d5ce196c9729d238bd790bd9c01436f9adbdf178b7c80619e7e8102baa0606\n",
+            "  SlugActionToken: slugact-display-v1:cba388ad89797e0c8b0c8db2dc49cdb04fed142c96a1cdd5ff5e591529599b67\n",
             "  Inputs: []\n",
             "  Outputs: [bazel-out/slugcfg-v2-3a50fb29d36af6da954342aa166fc2b92c736ec3fc625f6f34bab5272cec7975/bin/write.txt]\n",
             "  IsExecutable: false\n\n",

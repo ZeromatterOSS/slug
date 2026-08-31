@@ -747,9 +747,9 @@ Bazel ActionKey projections remain part of the gate
 ### Stage 6 generic Args/spawn/artifact-symlink category
 
 Status: Architecture accepted in
-`WP-6-7A-generic-args-spawn-symlink-category-architecture-r2`; independent R1
-`REPLAN`, focused R2 `ACCEPT`, and narrowed-command-surface confirmation
-`ACCEPT`
+`WP-6-7A-generic-args-spawn-symlink-category-architecture-r2`; configured-
+action-environment prerequisite implementation terminally accepted in
+`WP-6-7A-configured-action-environment-owner-implementation-r1`
 Primary design reference: Bazel 9.2 `Args`, `StarlarkCustomCommandLine`,
 `StarlarkActionFactory`, public Args/action APIs and symlink implementations;
 Zabel `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer architecture and
@@ -759,16 +759,19 @@ Authenticated consumer: rules_cc 0.2.17
 `91b7b46c515b4773d5a241e699027212f679ab93160cc79218bd687eac51d5b7`
 and `cc/private/cc_common.bzl` SHA-256
 `5e6ab737945b487759c9f039c77a066dc65bbe15cf590b566fe86029cc610762`
-Implementation summary: planned one evaluator-local Args recipe finalized at
-action registration into typed immutable segments; one dense-topology-aware
-input/tool owner; one common run/run_shell SpawnSpec; canonical compact
-environment/execution-requirement maps; Host-flavored normalized executable
-paths; and tagged artifact, unresolved and normalized authenticated absolute
-symlink targets. A bounded prerequisite derives the configured fixed-map/
-inherited-name action environment from the sole structural option vector and
-retained Host facts before the scalar FDO successor. `cc_common` and
-`cc_internal` remain ordinary Starlark consumers/bridges, not Rust rule or
-parser owners.
+Implementation summary: the bounded prerequisite now derives the canonical
+fixed-map/inherited-name environment from the sole structural option vector
+and one process-latched Host fact, preserves it through structural
+configuration and Exec conversion, and composes it with action-fixed values.
+It retains sorted compact `Arc` slices with `CompactString`, `Dupe`, and
+`Allocative`; it imports no V1/Buck2/Zabel semantic owner, retained mutable map,
+interner, cache, DICE key, parser, action, or ruleset branch. Planned successors
+remain one evaluator-local Args recipe finalized into typed immutable segments,
+one dense-topology-aware input/tool owner, one common run/run_shell SpawnSpec,
+canonical execution-requirement maps, Host-flavored normalized executable
+paths, and tagged artifact/unresolved/authenticated-absolute symlink targets.
+`cc_common` and `cc_internal` remain ordinary Starlark consumers/bridges, not
+Rust rule or parser owners.
 Decision: review the whole non-callback category architecture before the
 bounded environment and scalar/FDO implementation successors; generated
 artifact path bytes are Slug-native until M9, map equality ignores insertion
@@ -779,6 +782,12 @@ Residual risk: exact snapshot/freeze timing, repository-mapped label rendering,
 FilesToRun/runfiles topology, action-owner execution context, client-
 environment execution invalidation, unresolved symlink configuration and
 migration from raw action vectors require the frozen successor proofs
+
+Validation: exact pinned Bazel option/default/Exec/composition regressions;
+all modeled Host OS classes; Windows path and 8.3 rejection; configuration and
+environment A/B/A; concurrent one-read Host latching; public dependent tests;
+and 597 production / 489 proof / 1,086 total Rust-line caps. Independent
+terminal review returned `ACCEPT`.
 
 ### Stage 6 recursive configured custom-rule analysis
 

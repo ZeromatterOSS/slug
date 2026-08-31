@@ -40,6 +40,9 @@ pub enum NativeCommandOption {
     CsFdoInstrument,
     CollectCodeCoverage,
     Copt,
+    ActionEnv,
+    HostActionEnv,
+    IncompatibleStrictActionEnv,
 }
 
 impl NativeCommandOption {
@@ -60,6 +63,11 @@ impl NativeCommandOption {
             "cs_fdo_instrument" => Self::CsFdoInstrument,
             "collect_code_coverage" => Self::CollectCodeCoverage,
             "copt" => Self::Copt,
+            "action_env" => Self::ActionEnv,
+            "host_action_env" => Self::HostActionEnv,
+            "incompatible_strict_action_env" | "experimental_strict_action_env" => {
+                Self::IncompatibleStrictActionEnv
+            }
             _ => return None,
         })
     }
@@ -81,11 +89,17 @@ impl NativeCommandOption {
             Self::CsFdoInstrument => "cs_fdo_instrument",
             Self::CollectCodeCoverage => "collect_code_coverage",
             Self::Copt => "copt",
+            Self::ActionEnv => "action_env",
+            Self::HostActionEnv => "host_action_env",
+            Self::IncompatibleStrictActionEnv => "incompatible_strict_action_env",
         }
     }
 
     pub const fn is_boolean(self) -> bool {
-        matches!(self, Self::CollectCodeCoverage)
+        matches!(
+            self,
+            Self::CollectCodeCoverage | Self::IncompatibleStrictActionEnv
+        )
     }
 
     pub const fn requires_repository_mapping(self) -> bool {

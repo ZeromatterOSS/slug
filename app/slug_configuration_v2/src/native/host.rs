@@ -5,6 +5,65 @@ use compact_str::CompactString;
 use dupe::Dupe;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+#[repr(u16)]
+pub enum ActionEnvironmentHostOs {
+    Linux = 0x0710,
+    Windows = 0x0711,
+    Macos = 0x0712,
+    Freebsd = 0x0713,
+    Openbsd = 0x0714,
+    Unknown = 0x0715,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+struct ActionEnvironmentHostData {
+    os: ActionEnvironmentHostOs,
+    bazel_sh: Option<CompactString>,
+    path: Option<CompactString>,
+    system_root: Option<CompactString>,
+}
+
+/// Process-latched Host facts consumed by Bazel's configured shell environment.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative, Dupe)]
+pub struct ActionEnvironmentHost(Arc<ActionEnvironmentHostData>);
+
+impl ActionEnvironmentHost {
+    pub fn without_environment(os: ActionEnvironmentHostOs) -> Self {
+        Self(Arc::new(ActionEnvironmentHostData {
+            os,
+            bazel_sh: None,
+            path: None,
+            system_root: None,
+        }))
+    }
+
+    pub fn windows(bazel_sh: Option<&str>, path: Option<&str>, system_root: Option<&str>) -> Self {
+        Self(Arc::new(ActionEnvironmentHostData {
+            os: ActionEnvironmentHostOs::Windows,
+            bazel_sh: bazel_sh.map(CompactString::new),
+            path: path.map(CompactString::new),
+            system_root: system_root.map(CompactString::new),
+        }))
+    }
+
+    pub fn os(&self) -> ActionEnvironmentHostOs {
+        self.0.os
+    }
+
+    pub fn bazel_sh(&self) -> Option<&str> {
+        self.0.bazel_sh.as_deref()
+    }
+
+    pub fn path(&self) -> Option<&str> {
+        self.0.path.as_deref()
+    }
+
+    pub fn system_root(&self) -> Option<&str> {
+        self.0.system_root.as_deref()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub enum AutoCpuToken {
     DarwinX86_64,
     DarwinArm64,
@@ -190,6 +249,7 @@ struct HostConversionInputsData {
     capacity: Option<HostCapacity>,
     home_facts: Arc<[HomeFact]>,
     windows_option_path_facts: Arc<[WindowsOptionPathFact]>,
+    action_environment_host: Option<ActionEnvironmentHost>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative, Dupe)]
@@ -211,6 +271,7 @@ impl HostConversionInputs {
             capacity,
             home_facts,
             windows_option_path_facts,
+            action_environment_host: None,
         })))
     }
 
@@ -232,6 +293,16 @@ impl HostConversionInputs {
 
     pub fn windows_option_path_facts(&self) -> &[WindowsOptionPathFact] {
         &self.0.windows_option_path_facts
+    }
+
+    pub fn with_action_environment_host(&self, host: ActionEnvironmentHost) -> Self {
+        let mut data = self.0.as_ref().clone();
+        data.action_environment_host = Some(host);
+        Self(Arc::new(data))
+    }
+
+    pub fn action_environment_host(&self) -> Option<&ActionEnvironmentHost> {
+        self.0.action_environment_host.as_ref()
     }
 }
 
@@ -426,12 +497,15 @@ mod tests {
         allocative::<AutoCpuToken>();
         allocative::<HostPathFlavor>();
         allocative::<HostCapacity>();
+        allocative::<ActionEnvironmentHostOs>();
+        allocative::<ActionEnvironmentHost>();
         allocative::<ConverterCallId>();
         allocative::<HomeFact>();
         allocative::<WindowsOptionPathOutcome>();
         allocative::<WindowsOptionPathFact>();
         allocative::<HostConversionInputsError>();
         allocative::<HostConversionInputs>();
+        dupe::<ActionEnvironmentHost>();
         dupe::<HostConversionInputs>();
 
         let empty =
@@ -439,6 +513,17 @@ mod tests {
         assert_eq!(empty.auto_cpu(), None);
         assert_eq!(empty.path_flavor(), None);
         assert_eq!(empty.capacity(), None);
+        assert_eq!(empty.action_environment_host(), None);
+
+        let windows = ActionEnvironmentHost::windows(
+            Some("D:/bash.exe"),
+            Some("C:/bin"),
+            Some("D:\\Windows"),
+        );
+        let with_environment = empty.with_action_environment_host(windows.dupe());
+        assert_eq!(with_environment.action_environment_host(), Some(&windows));
+        assert_eq!(windows.os(), ActionEnvironmentHostOs::Windows);
+        assert_eq!(windows.bazel_sh(), Some("D:/bash.exe"));
 
         let make = |home_call, windows_call, outcome| {
             HostConversionInputs::new(
@@ -489,6 +574,13 @@ mod tests {
                     raw(&[3]),
                     WindowsOptionPathOutcome::Resolved(raw(&[2])),
                 )]);
+                data
+            }),
+            with_changed({
+                let mut data = original.0.as_ref().clone();
+                data.action_environment_host = Some(ActionEnvironmentHost::without_environment(
+                    ActionEnvironmentHostOs::Linux,
+                ));
                 data
             }),
             make(2, 1, WindowsOptionPathOutcome::Resolved(raw(&[2]))),

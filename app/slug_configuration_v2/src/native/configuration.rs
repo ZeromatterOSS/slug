@@ -25,6 +25,7 @@ use super::configuration_field::ConfigurationFieldIdentity;
 use super::configuration_field::CppConfigurationField;
 use super::convert::ConvertError;
 use super::defaults::materialize_default;
+use super::host::ActionEnvironmentHost;
 use super::host::AutoCpuToken;
 use super::host::HostConversionInputs;
 use super::host::HostPathFlavor;
@@ -46,6 +47,8 @@ const PROJECTION_VERSION: u16 = 2;
 const PLATFORM_OPTIONS: &str = "com.google.devtools.build.lib.analysis.PlatformOptions";
 const CPP_OPTIONS: &str = "com.google.devtools.build.lib.rules.cpp.CppOptions";
 const CORE_OPTIONS: &str = "com.google.devtools.build.lib.analysis.config.CoreOptions";
+const STRICT_ACTION_ENV_OPTIONS: &str =
+    "com.google.devtools.build.lib.bazel.rules.BazelRuleClassProvider.StrictActionEnvOptions";
 const HOST_PLATFORM: &str = "host_platform";
 const TARGET_PLATFORMS: &str = "platforms";
 
@@ -317,6 +320,7 @@ pub enum SlugConfigurationError {
     UnexpectedNativeLabel { option: &'static str },
     NonVisibleNativeLabel { option: &'static str },
     InvalidCppConfiguration { reason: &'static str },
+    ActionEnvironment { reason: &'static str },
 }
 
 impl fmt::Display for SlugConfigurationError {
@@ -387,6 +391,9 @@ impl fmt::Display for SlugConfigurationError {
             Self::InvalidCppConfiguration { reason } => {
                 write!(formatter, "invalid C++ configuration: {reason}")
             }
+            Self::ActionEnvironment { reason } => {
+                write!(formatter, "invalid action environment: {reason}")
+            }
         }
     }
 }
@@ -413,6 +420,7 @@ struct SlugConfigurationData {
     kind: SlugConfigurationKind,
     options: Arc<[OptionRecord]>,
     starlark_options: StarlarkOptions,
+    action_environment_host: Option<ActionEnvironmentHost>,
     canonical_bytes: Arc<[u8]>,
     projection: SlugConfigurationProjection,
 }
@@ -489,6 +497,7 @@ impl SlugConfiguration {
             kind,
             Arc::from(options),
             StarlarkOptions::default(),
+            host.action_environment_host().cloned(),
         ))
     }
 
@@ -518,6 +527,7 @@ impl SlugConfiguration {
             SlugConfigurationKind::Exec,
             self.0.options.dupe(),
             self.0.starlark_options.to_exec()?,
+            self.0.action_environment_host.dupe(),
         ))
     }
 
@@ -567,7 +577,12 @@ impl SlugConfiguration {
         record.value = OptionValue::Label(Some(LabelValue::Label(
             ResolvedOptionLabel::from_canonical(platform),
         )));
-        finish_configuration(self.0.kind, options.into(), self.0.starlark_options.dupe())
+        finish_configuration(
+            self.0.kind,
+            options.into(),
+            self.0.starlark_options.dupe(),
+            self.0.action_environment_host.dupe(),
+        )
     }
 
     pub fn to_exec_for_platform(
@@ -583,8 +598,10 @@ impl SlugConfiguration {
         let host_compilation_mode = self
             .option_value(CORE_OPTIONS, "host_compilation_mode")?
             .clone();
+        let host_action_environment = self.option_value(CORE_OPTIONS, "host_action_env")?.clone();
         let mut found_platform = false;
         let mut found_compilation_mode = false;
+        let mut found_action_environment = false;
         for record in &mut options {
             if record.class_name == PLATFORM_OPTIONS && record.canonical_name == TARGET_PLATFORMS {
                 found_platform = true;
@@ -597,15 +614,19 @@ impl SlugConfiguration {
             {
                 found_compilation_mode = true;
                 record.value = host_compilation_mode.clone();
+            } else if record.class_name == CORE_OPTIONS && record.canonical_name == "action_env" {
+                found_action_environment = true;
+                record.value = host_action_environment.clone();
             }
         }
-        if !found_platform || !found_compilation_mode {
+        if !found_platform || !found_compilation_mode || !found_action_environment {
             return Err(SlugConfigurationError::UnknownNativeOption);
         }
         Ok(finish_configuration(
             SlugConfigurationKind::Exec,
             options.into(),
             starlark_options,
+            self.0.action_environment_host.dupe(),
         ))
     }
 
@@ -641,6 +662,7 @@ impl SlugConfiguration {
             self.0.kind,
             self.0.options.dupe(),
             self.0.starlark_options.with(value),
+            self.0.action_environment_host.dupe(),
         )
     }
 
@@ -652,6 +674,7 @@ impl SlugConfiguration {
             self.0.kind,
             self.0.options.dupe(),
             self.0.starlark_options.without(label),
+            self.0.action_environment_host.dupe(),
         )
     }
 
@@ -800,7 +823,12 @@ impl SlugConfiguration {
         {
             return base;
         }
-        finish_configuration(base.0.kind, Arc::from(options), starlark_options)
+        finish_configuration(
+            base.0.kind,
+            Arc::from(options),
+            starlark_options,
+            base.0.action_environment_host.dupe(),
+        )
     }
 
     /// Apply the contextual command rows and complete Starlark map in one
@@ -923,6 +951,10 @@ impl SlugConfiguration {
 
     pub fn option_count(&self) -> usize {
         self.0.options.len()
+    }
+
+    pub(super) fn action_environment_host(&self) -> Option<&ActionEnvironmentHost> {
+        self.0.action_environment_host.as_ref()
     }
 
     #[cfg(test)]
@@ -1053,15 +1085,14 @@ fn command_native_descriptor(
 fn typed_native_command_descriptor(
     option: NativeCommandOption,
 ) -> Result<(usize, &'static NativeOptionDescriptor), SlugConfigurationError> {
-    let class_name = if matches!(
-        option,
+    let class_name = match option {
         NativeCommandOption::CollectCodeCoverage
-            | NativeCommandOption::CompilationMode
-            | NativeCommandOption::HostCompilationMode
-    ) {
-        CORE_OPTIONS
-    } else {
-        CPP_OPTIONS
+        | NativeCommandOption::CompilationMode
+        | NativeCommandOption::HostCompilationMode
+        | NativeCommandOption::ActionEnv
+        | NativeCommandOption::HostActionEnv => CORE_OPTIONS,
+        NativeCommandOption::IncompatibleStrictActionEnv => STRICT_ACTION_ENV_OPTIONS,
+        _ => CPP_OPTIONS,
     };
     NATIVE_OPTION_DESCRIPTORS
         .iter()
@@ -1333,11 +1364,13 @@ fn finish_configuration(
     kind: SlugConfigurationKind,
     options: Arc<[OptionRecord]>,
     starlark_options: StarlarkOptions,
+    action_environment_host: Option<ActionEnvironmentHost>,
 ) -> SlugConfiguration {
     let provisional = SlugConfigurationData {
         kind,
         options: options.dupe(),
         starlark_options: starlark_options.clone(),
+        action_environment_host: action_environment_host.dupe(),
         canonical_bytes: Arc::from([]),
         projection: SlugConfigurationProjection([0; 32]),
     };
@@ -1349,6 +1382,7 @@ fn finish_configuration(
         kind,
         options,
         starlark_options,
+        action_environment_host,
         canonical_bytes,
         projection,
     }))
@@ -1386,6 +1420,9 @@ fn canonical_bytes(data: &SlugConfigurationData) -> Vec<u8> {
                 });
             }
         });
+        if let Some(host) = &data.action_environment_host {
+            root.field(0x0013, |field| field.action_environment_host(host));
+        }
     });
     encoder.into_bytes()
 }
@@ -1463,6 +1500,19 @@ impl Encoder {
             StarlarkOptionValue::StringSet(values) => self.field(0x0624, |field| {
                 field.sequence(values, 0x0640, |item, value| item.raw_text(value));
             }),
+        }
+    }
+
+    fn action_environment_host(&mut self, host: &ActionEnvironmentHost) {
+        self.field(0x0700, |field| field.field(host.os() as u16, |_| {}));
+        if let Some(value) = host.bazel_sh() {
+            self.field(0x0701, |field| field.raw_text(value));
+        }
+        if let Some(value) = host.path() {
+            self.field(0x0702, |field| field.raw_text(value));
+        }
+        if let Some(value) = host.system_root() {
+            self.field(0x0703, |field| field.raw_text(value));
         }
     }
 
@@ -2015,7 +2065,12 @@ mod tests {
                 RegexFilterDefaultSeed::new("different spelling", seed.semantic),
             )));
         data.options = Arc::from(options);
-        let changed = finish_configuration(data.kind, data.options, data.starlark_options);
+        let changed = finish_configuration(
+            data.kind,
+            data.options,
+            data.starlark_options,
+            data.action_environment_host,
+        );
         assert_eq!(base, changed);
         assert_eq!(base.projection(), changed.projection());
         let mut first = RecordingHasher::default();
@@ -2033,6 +2088,56 @@ mod tests {
         assert_eq!(
             SlugConfiguration::default_target(&missing),
             Err(SlugConfigurationError::MissingAutoCpu)
+        );
+    }
+
+    #[test]
+    fn configured_action_environment_rejects_deferred_option_mutation() {
+        let host = host(AutoCpuToken::K8, HostPathFlavor::Unix).with_action_environment_host(
+            super::super::host::ActionEnvironmentHost::without_environment(
+                super::super::host::ActionEnvironmentHostOs::Linux,
+            ),
+        );
+        let base = SlugConfiguration::default_target(&host).unwrap();
+        let mutate = |class_name, canonical_name, value| {
+            let mut data = base.0.as_ref().clone();
+            let mut options = data.options.as_ref().to_vec();
+            options
+                .iter_mut()
+                .find(|record| {
+                    record.class_name == class_name && record.canonical_name == canonical_name
+                })
+                .unwrap()
+                .value = OptionValue::Native(NativeOccurrence::Scalar(value));
+            data.options = Arc::from(options);
+            finish_configuration(
+                data.kind,
+                data.options,
+                data.starlark_options,
+                data.action_environment_host,
+            )
+        };
+        let runfiles = mutate(
+            CORE_OPTIONS,
+            "enable_runfiles",
+            NativeValue::Tri(TriState::Yes),
+        );
+        assert_eq!(
+            runfiles.configured_action_environment(),
+            Err(SlugConfigurationError::ActionEnvironment {
+                reason: "explicit enable_runfiles is deferred",
+            })
+        );
+        let shell = mutate(
+            "com.google.devtools.build.lib.analysis.ShellConfiguration.Options",
+            "shell_executable",
+            NativeValue::Text("/bin/sh".into()),
+        );
+        assert_eq!(
+            shell.configured_action_environment(),
+            Err(SlugConfigurationError::ActionEnvironment {
+                reason: "explicit shell_executable is deferred",
+            })
         );
     }
 }
