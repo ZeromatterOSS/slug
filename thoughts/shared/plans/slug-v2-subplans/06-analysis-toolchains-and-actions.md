@@ -22783,7 +22783,7 @@ case.
 ### WP-6-7A module-extension tag attribute-schema category (2026-09-01)
 
 The authentic replay-selected successor is
-`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r3`.
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r4`.
 This is the complete default-enabled ordinary tag-schema kind category, not a
 literal `auth: StringDict` repair. Pinned Bazel 9.2 source plus a disposable
 fourteen-kind oracle establish `bool`, `int`, `int_list`, every ordinary
@@ -22822,3 +22822,12 @@ compatibility, architecture and caps are unchanged, and independent review was
 required before terminal validation continued. Independent R3 review returns
 `ACCEPT`: the named assertion is necessarily stale and the bounded update
 exposes the newly admitted behavior without masking an implementation error.
+
+Dependent analysis compilation then failed at the two exhaustive shared-value
+projections for rule `ctx.attr` and transition attributes. R4 permits those
+consumers to allocate `IntegerList` as a Starlark integer list. It also permits
+`dice.rs` to enforce the already-retained `allow_empty` bit for ordinary
+configured rules after selector resolution, matching pinned Bazel 9.2
+`RuleContext.checkAttributesNonEmpty`. Tag conversion still ignores the bit;
+macro and repository paths are unchanged. No representation, DICE ownership,
+lifetime or cap changes. Independent R4 review is required before editing.

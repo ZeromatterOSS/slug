@@ -1,13 +1,15 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r3`
+Packet: `WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r4`
 
 Milestone: M7A generic Starlark/ruleset closure; module-extension tag schema
 conversion and invocation values.
 
 Status: R1 architecture review returned `REPLAN`; independent R2 architecture
 review returned `ACCEPT`; implementation validation selected a proof-only R3
-allowlist correction; independent R3 review returned `ACCEPT`.
+allowlist correction; independent R3 review returned `ACCEPT`; dependent
+compilation selected an R4 shared-analysis projection correction for
+independent review.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -160,6 +162,13 @@ Production allowlist:
 - `app/slug_loading_v2/src/repository_rule_context.rs`; and
 - `app/slug_loading_v2/src/rule_outputs.rs`.
 
+R4 additionally permits only the shared `IntegerList` projection and ordinary
+configured-rule `allow_empty` validation in:
+
+- `app/slug_analysis_v2/src/starlark_rule.rs`;
+- `app/slug_analysis_v2/src/starlark_transition.rs`; and
+- `app/slug_analysis_v2/src/dice.rs`.
+
 Focused proof may use tests colocated in those files and the selected-graph
 module-extension corridor in
 `app/slug_loading_v2/src/host_package_load_tests.rs`. R3 additionally permits
@@ -242,6 +251,33 @@ stale once `string_list` joins the exact ordinary tag category, the named hunk
 exposes rather than masks that behavior, and all four routing documents keep
 production ownership, semantics, representation and caps unchanged. Terminal
 validation may resume.
+
+## R4 shared-analysis projection correction
+
+The first dependent `slug_analysis_v2` check failed exhaustiveness in exactly
+two generic `CoercedAttributeValue` consumers: `ctx.attr` materialization and
+transition-attribute materialization. Both must project the already-retained
+`IntegerList(Arc<[i32]>)` as an invocation-local Starlark list of integers.
+This is not a new semantic owner or a tag special case; it completes the shared
+value path required by R2.
+
+The same audit found that the retained `allow_empty` bit now reaches ordinary
+rule schemas but is not yet consulted. Bazel 9.2
+`RuleContext.checkAttributesNonEmpty`, pinned SHA-256
+`0f6dcffac7286a9056d050624bd29e73cefc4138dd9dc24708dec63e147b41e2`,
+rejects empty lists/maps for configured rule attributes carrying `NON_EMPTY`.
+R4 therefore adds one shared collection-emptiness projection and performs that
+check after selector resolution, before dependency or rule implementation
+evaluation. Module-extension tags continue to ignore `allow_empty`; macro and
+repository-rule behavior is unchanged because Bazel's cited configured-rule
+consumer does not own those paths.
+
+Add colocated proofs for integer-list `ctx.attr`, transition projection and
+the complete collection/noncollection emptiness discriminator. No new value,
+key, cache, evaluator retention, collection implementation or representation
+is allowed. The original 900 production/1,100 proof/2,000 total gross caps
+remain sufficient. Independent review must accept R4 before those three
+analysis files are edited.
 
 ## Immediate predecessor
 

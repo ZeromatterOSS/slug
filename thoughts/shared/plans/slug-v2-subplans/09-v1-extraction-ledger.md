@@ -2309,7 +2309,7 @@ scratch. No service-retained cache or asynchronous transfer memory is added.
 Status: R1 architecture review returned `REPLAN` before Rust; independent R2
 architecture review accepted the semantic architecture; proof-only R3 is
 independently accepted for
-`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r3`.
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r4`.
 
 Decision: no V1 extraction and no second tag-only value family. Extend the
 existing V2 `AttributeKind`/`CoercedAttributeValue` once with compact
@@ -2337,6 +2337,14 @@ surface, representation, lifetime or cap changes; independent review was
 required before terminal validation resumed. Independent R3 review returns
 `ACCEPT`; the named expectation is necessarily stale and the update does not
 mask an implementation error.
+
+The dependent analysis check selected R4 without changing the no-extraction
+decision: project the shared `IntegerList` through existing rule and transition
+Starlark allocators, and consult the already-retained `allow_empty` bit for
+ordinary configured rules after selector resolution. Only the three named
+analysis source files join ownership; tags still ignore the bit, other
+consumers remain unchanged, and no representation, graph, lifetime or cap is
+added. Independent R4 review is pending.
 
 Zabel `0795445f...` schema-ordered tag slots, compact typed tag values and
 invocation freezing are peer optimization guidance only. Copy no Zig type,
