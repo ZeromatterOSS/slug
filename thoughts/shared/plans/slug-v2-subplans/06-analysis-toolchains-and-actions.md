@@ -22368,8 +22368,9 @@ corrected `starlark_rule.rs` allowlist and 600/760/1,360 gross caps.
 
 #### Default-exec configured dependencies terminally accepted (2026-09-01)
 
-`WP-6-7A-default-exec-configured-label-dependency-implementation-r2` is
-terminally `ACCEPTED`. One typed attribute edge now retains target, default-exec
+Commit `20bbe8661` terminally accepts
+`WP-6-7A-default-exec-configured-label-dependency-implementation-r2`. One typed
+attribute edge now retains target, default-exec
 or complete Starlark-transition identity across all five label-bearing
 constructors; one shared `ConfiguredExecGroup` owns default/named group identity
 for dependencies and actions. Default-exec children are configured only after
@@ -22387,3 +22388,15 @@ returned `ACCEPT`. The replay clears `proc_macro_deps(cfg = "exec")` and next
 stops at `repository_rule(doc = ...)` declaration metadata. That frontier is a
 generic declaration-documentation category, not a platforms, rules_rust,
 `cc_common` or `cc_internal` branch.
+
+#### Repository declaration documentation design accepted (2026-09-01)
+
+Independent review accepts
+`WP-6-7A-repository-declaration-documentation-category-design-r1`. The exact
+already-exposed inventory is thirteen attr constructors plus `rule`, `aspect`,
+`provider`, symbolic `macro`, `module_extension`, `tag_class` and
+`repository_rule`; Bazel's separate `materializer_rule` builtin is pinned and
+deferred. Implement only typed acceptance and nonsemantic discard of
+`repository_rule(doc = ...)` in `package.rs`, with one closed proof owner.
+Stardoc extraction, retained doc output and experimental remote repository
+execution remain deferred; Zabel supplies peer separation guidance only.

@@ -2227,9 +2227,8 @@ cancellation, eviction and shutdown lifetimes remain unchanged.
 
 ### Stage 6 configured exec dependency utility decision (2026-09-01)
 
-Status: implementation terminally `ACCEPTED` in
-`WP-6-7A-default-exec-configured-label-dependency-implementation-r2`; commit
-pending.
+Status: implementation terminally `ACCEPTED` in commit `20bbe8661` for
+`WP-6-7A-default-exec-configured-label-dependency-implementation-r2`.
 
 Decision: reuse existing Buck2-derived `CompactString`, `Arc` slices,
 `Allocative`, structural configuration values and provider owners. Add one
