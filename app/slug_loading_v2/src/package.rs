@@ -7287,7 +7287,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     }
 
     fn tag_class<'v>(
-        #[starlark(require = named)] attrs: Option<SmallMap<String, Value<'v>>>,
+        attrs: Option<SmallMap<String, Value<'v>>>,
         #[starlark(require = named)] doc: Option<&str>,
     ) -> anyhow::Result<TagClassDefinition> {
         let _ = doc;
@@ -7341,7 +7341,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     }
 
     fn module_extension<'v>(
-        #[starlark(require = named)] implementation: Value<'v>,
+        implementation: Value<'v>,
         #[starlark(require = named)] tag_classes: Option<SmallMap<String, Value<'v>>>,
         #[starlark(require = named)] doc: Option<&str>,
         #[starlark(require = named)] environ: Option<UnpackListOrTuple<&str>>,
@@ -8310,6 +8310,69 @@ mod module_extension_definition_tests {
                 .is_ok()
         );
         evaluate("captured = Label\n").unwrap();
+    }
+
+    #[test]
+    fn bzlmod_declaration_builtins_share_bazel_first_parameter_binding() {
+        let source = |positional: bool| {
+            let repository = if positional {
+                "repository_rule(_impl)"
+            } else {
+                "repository_rule(implementation = _impl)"
+            };
+            let tag = if positional {
+                "tag_class({'value': attr.string(default = 'same')})"
+            } else {
+                "tag_class(attrs = {'value': attr.string(default = 'same')})"
+            };
+            let extension = if positional {
+                "module_extension(_impl, tag_classes = {'tag': tag, 'empty': empty})"
+            } else {
+                "module_extension(implementation = _impl, tag_classes = {'tag': tag, 'empty': empty})"
+            };
+            format!(
+                "def _impl(ctx):\n    pass\nrepo = {repository}\ntag = {tag}\nempty = tag_class()\next = {extension}\n"
+            )
+        };
+        let named = evaluate(&source(false)).unwrap();
+        let positional = evaluate(&source(true)).unwrap();
+        let repository_projection = |module: &starlark::environment::FrozenModule| {
+            module
+                .get("repo")
+                .unwrap()
+                .downcast::<crate::module_extension_repository_rule::FrozenRepositoryRuleDefinition>()
+                .unwrap()
+                .projection()
+                .unwrap()
+        };
+        assert_eq!(
+            repository_projection(&named),
+            repository_projection(&positional)
+        );
+        let extension_projection = |module: &starlark::environment::FrozenModule| {
+            module
+                .get("ext")
+                .unwrap()
+                .downcast::<FrozenModuleExtensionDefinition>()
+                .unwrap()
+                .projection()
+        };
+        assert_eq!(
+            extension_projection(&named),
+            extension_projection(&positional)
+        );
+
+        for rejected in [
+            "module_extension(_impl, implementation = _impl)",
+            "module_extension(_impl, {})",
+            "module_extension()",
+            "tag_class({}, attrs = {})",
+            "tag_class({}, 'doc')",
+            "repository_rule(_impl, implementation = _impl)",
+            "repository_rule(_impl, {})",
+        ] {
+            assert!(evaluate(&format!("def _impl(ctx):\n    pass\nbad = {rejected}\n")).is_err());
+        }
     }
 
     #[test]
