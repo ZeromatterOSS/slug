@@ -30849,7 +30849,7 @@ T = transition(
     )
     .unwrap();
     let consumer = eval_bzl_with_loaded_children(
-        "load('@bridge//bridge:defs.bzl', 'REEXPORTED')\nIMPORTED = REEXPORTED\n",
+        "load('@bridge//bridge:defs.bzl', 'REEXPORTED')\nIMPORTED = REEXPORTED\ndef rule_impl(ctx): return []\nRULE = rule(implementation = rule_impl, cfg = REEXPORTED)\n",
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@consumer+//consumer:defs.bzl").unwrap(),
             workspace_path: PathBuf::from("/consumer/consumer/defs.bzl"),
@@ -30894,6 +30894,20 @@ T = transition(
             ("@@mapped+//cfg:out".to_owned(), "@mapped//cfg:out"),
         ]
     );
+    let rule = consumer
+        .get("RULE")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    let incoming = rule.incoming_transition().unwrap();
+    assert!(
+        incoming
+            .implementation()
+            .to_value()
+            .ptr_eq(transition.implementation().to_value())
+    );
+    assert_eq!(incoming.inputs(), transition.inputs());
+    assert_eq!(incoming.outputs(), transition.outputs());
 }
 
 #[test]

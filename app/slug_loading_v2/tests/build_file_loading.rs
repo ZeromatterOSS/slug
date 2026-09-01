@@ -2674,7 +2674,7 @@ fn transition_declarations_retain_complete_sorted_identity_and_spelling() {
     fs::create_dir_all(&package).unwrap();
     fs::write(
         package.join(BUILD_FILE_PRIMARY),
-        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"subject\")\n",
+        "load(\":defs.bzl\", \"incoming\", \"probe\")\nprobe(name = \"subject\")\nincoming(name = \"incoming\")\n",
     )
     .unwrap();
     let definitions = r#"def _impl(ctx): return []
@@ -2693,6 +2693,7 @@ complete = transition(
     ],
 )
 empty = transition(implementation = _transition, inputs = [], outputs = [])
+incoming = rule(implementation = _impl, cfg = complete)
 probe = rule(implementation = _impl, attrs = {
     "complete": attr.label(cfg = complete),
     "empty": attr.label(cfg = empty),
@@ -2701,7 +2702,13 @@ probe = rule(implementation = _impl, attrs = {
     fs::write(package.join("defs.bzl"), definitions).unwrap();
 
     let loaded = load_package(&workspace, &package);
-    let PackageTargetKind::StarlarkRule(rule) = &loaded.targets[0].kind else {
+    let PackageTargetKind::StarlarkRule(rule) = &loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "subject")
+        .unwrap()
+        .kind
+    else {
         panic!("expected Starlark rule")
     };
     let transition = |name: &str| {
@@ -2752,6 +2759,16 @@ probe = rule(implementation = _impl, attrs = {
     assert_eq!(complete.inputs()[1], complete.outputs()[4]);
     assert!(transition("empty").inputs().is_empty());
     assert!(transition("empty").outputs().is_empty());
+    let PackageTargetKind::StarlarkRule(incoming) = &loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "incoming")
+        .unwrap()
+        .kind
+    else {
+        panic!("expected incoming-transition rule")
+    };
+    assert_eq!(incoming.incoming_transition(), Some(complete));
 
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let runtime = tokio::runtime::Runtime::new().unwrap();
@@ -2786,6 +2803,155 @@ probe = rule(implementation = _impl, attrs = {
             .unwrap();
         assert_eq!(first, restored);
     });
+}
+
+#[test]
+fn rule_level_transition_binding_identity_and_allowlist_are_generic() {
+    let workspace = scratch("rule-level-transition-attachment");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"def _impl(ctx): return []
+def _transition(settings, attr): return {}
+T = transition(implementation = _transition, inputs = ["//pkg:z", "//pkg:a"], outputs = ["//pkg:out"])
+plain = rule(implementation = _impl, build_setting = None, cfg = None)
+incoming = rule(implementation = _impl, build_setting = None, cfg = T)
+attribute = rule(implementation = _impl, attrs = {"dep": attr.label(cfg = T)})
+both = rule(implementation = _impl, cfg = T, attrs = {"dep": attr.label(cfg = T)})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        r#"load(":defs.bzl", "attribute", "both", "incoming", "plain")
+plain(name = "plain")
+incoming(name = "incoming")
+attribute(name = "attribute")
+both(name = "both")
+"#,
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let rule = |name: &str| {
+        let PackageTargetKind::StarlarkRule(rule) = &loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap()
+            .kind
+        else {
+            panic!("expected Starlark rule {name}")
+        };
+        rule
+    };
+    let allowlist_count = |name: &str| {
+        rule(name)
+            .schema()
+            .iter()
+            .filter(|schema| schema.declaration_name() == "$allowlist_function_transition")
+            .count()
+    };
+    assert!(rule("plain").incoming_transition().is_none());
+    assert_eq!(allowlist_count("plain"), 0);
+    assert!(rule("incoming").incoming_transition().is_some());
+    assert_eq!(allowlist_count("incoming"), 1);
+    assert!(rule("attribute").incoming_transition().is_none());
+    assert_eq!(allowlist_count("attribute"), 1);
+    assert_eq!(allowlist_count("both"), 1);
+
+    let incoming = rule("both").incoming_transition().unwrap();
+    let attribute = rule("both")
+        .schema()
+        .iter()
+        .find(|schema| schema.declaration_name() == "dep")
+        .unwrap()
+        .transition()
+        .unwrap();
+    assert!(
+        incoming
+            .implementation()
+            .to_value()
+            .ptr_eq(attribute.implementation().to_value())
+    );
+    assert_eq!(incoming, attribute);
+    assert_eq!(
+        incoming
+            .inputs()
+            .iter()
+            .map(|setting| setting.declared())
+            .collect::<Vec<_>>(),
+        ["//pkg:a", "//pkg:z"]
+    );
+    let allowlist = CanonicalLabel::parse(
+        "@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist",
+    )
+    .unwrap();
+    for name in ["incoming", "attribute", "both"] {
+        assert!(rule(name).dependencies().contains(&allowlist), "{name}");
+    }
+
+    let invalid = [
+        (
+            "invalid-cfg",
+            "probe = rule(implementation = _impl, cfg = 'bad')",
+            "`cfg` must be set to a transition object initialized by the transition() function.",
+        ),
+        (
+            "conflict-precedes-cfg-conversion",
+            "probe = rule(implementation = _impl, build_setting = config.string(), cfg = 'bad')",
+            "Build setting rules cannot use the `cfg` param to apply transitions to themselves.",
+        ),
+        (
+            "invalid-build-setting-precedes-conflict",
+            "probe = rule(implementation = _impl, build_setting = 'bad', cfg = 'bad')",
+            "rule build_setting must use config.int(), config.string(), config.bool(), config.string_list(), or config.string_set()",
+        ),
+    ];
+    for (name, declaration, expected) in invalid {
+        let workspace = scratch(name);
+        let package = workspace.join("pkg");
+        fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+        fs::create_dir_all(&package).unwrap();
+        fs::write(
+            package.join(BUILD_FILE_PRIMARY),
+            "load(':defs.bzl', 'probe')\nprobe(name = 'subject')\n",
+        )
+        .unwrap();
+        fs::write(
+            package.join("defs.bzl"),
+            format!("def _impl(ctx): return []\n{declaration}\n"),
+        )
+        .unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(expected), "{name}: {error}");
+    }
+
+    let workspace = scratch("rule-cfg-named-only");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(':defs.bzl', 'probe')\nexports_files([])\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "def _impl(ctx): return []\ndef _t(settings, attr): return {}\nT = transition(implementation = _t, inputs = [], outputs = [])\nprobe = rule(_impl, None, None, None, None, T)\n",
+    )
+    .unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("Found 1 extra positional argument(s) for call to rule"),
+        "{error}"
+    );
 }
 
 #[test]

@@ -5,15 +5,17 @@ Packet: `WP-6-7A-rule-level-transition-attachment-r1`
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 transition consumer
 breadth.
 
-Status: design accepted and frozen. R1 independent pre-review returned
-`REVISE` for one binding-normalization gap. This R2 contract normalizes omitted
-and explicit `None` for both `build_setting` and `cfg`, and adds the required
-conflict-precedence discriminator; focused correction rereview returned
-`ACCEPT`. Base commit `37f5959c1` terminally accepts complete regular-transition
-declaration-setting identity.
-Authentic rebuilt rules_rust 0.73.0 replay clears `transition()` construction
-and stops at generic `rule(cfg = transition)` binding in
-`rust/private/rust.bzl:1120-1124`.
+Status: terminal implementation rereview `ACCEPT`. R1 independent design
+pre-review returned `REVISE` for one binding-normalization gap. The accepted R2
+contract normalizes omitted and explicit `None` for both `build_setting` and
+`cfg`. Initial terminal implementation review found one diagnostic-ordering
+miss; the focused correction validates `build_setting` before applying the
+valid-build-setting/`cfg` conflict, adds the dual-invalid discriminator, and
+passed focused rereview. Base commit `37f5959c1` terminally accepts complete
+regular-transition declaration-setting identity. Authentic rebuilt rules_rust
+0.73.0 replay clears `transition()` construction and generic
+`rule(cfg = transition)` attachment, then stops at `rule(outputs = ...)` in
+`rust/private/rustdoc.bzl:319-436`.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -40,10 +42,11 @@ Exact admitted behavior:
   other non-`None` value fails with
   `` `cfg` must be set to a transition object initialized by the transition()
   function. ``;
-- a non-`None` `build_setting` and non-`None` `cfg` fail before `cfg` type
-  conversion with
+- a valid non-`None` `build_setting` and non-`None` `cfg` fail before `cfg`
+  type conversion with
   `Build setting rules cannot use the \`cfg\` param to apply transitions to
-  themselves.`;
+  themselves.`. The API's typed build-setting binding rejects an invalid
+  non-`None` descriptor before that conflict;
 - live/frozen rule definitions, direct and transitive imports/re-exports,
   target invocation, final `StarlarkRuleImplementation` equality, package
   equality, and same-DICE restoration preserve the transition callable plus
@@ -126,8 +129,9 @@ untyped `build_setting: Option<Value>` path incorrectly treats explicit `None`
 as a supplied invalid descriptor; Bazel's API makes omitted and explicit
 `None` equivalent before the rule-body conflict.
 
-Normalize both optional raw arguments by removing explicit `None`, then apply
-the build-setting/`cfg` conflict before converting `cfg`. Add one reusable
+Normalize both optional raw arguments by removing explicit `None`, validate
+the build-setting descriptor, then apply the build-setting/`cfg` conflict
+before converting `cfg`. Add one reusable
 live-or-frozen transition projection helper and use it for both attribute and
 rule consumers. Retain `Option<TransitionDefinitionGen<V>>`
 in live/frozen rule definitions and lower it once at target invocation to
@@ -203,7 +207,8 @@ Focused proofs must cover:
    `build_setting = None` plus a named regular transition reaching ordinary
    attachment, positional rejection, invalid scalar/object diagnostics, and a
    real build-setting descriptor plus even an invalid non-`None` `cfg`
-   producing the build-setting conflict before cfg conversion;
+   producing the build-setting conflict before cfg conversion, while invalid
+   build-setting plus invalid cfg fails at build-setting binding first;
 2. live and imported frozen transitions through direct import, transitive
    re-export and dictionary-independent rule export, retaining callable pointer,
    canonical labels, original spellings and sorted complete slices;
@@ -244,6 +249,23 @@ evidence.
 Residual risk is explicit: complete attachment identity prevents loading-side
 representation churn, but configured rule-transition execution remains a
 later category selected only when replay reaches an instantiated consumer.
+
+The accepted candidate is 55 net / 77 gross production Rust lines and 251 net / 257
+gross proof Rust lines. Focused binding/identity/import/ordering/A-B-A and
+pre-configured-work tests pass. Complete `slug_loading_v2` passes 560 tests
+with one ignored; complete `slug_analysis_v2` passes 122. Formatting, Cargo
+metadata, diff hygiene, pinned-source hashes, clean Bazel/Buck2/Zabel, parked-
+file hash, rebuilt `slug_cli_v2`, and no-stale-`slugd` gates pass. The archive
+checker retains only its three documented thought-path failures. Initial
+terminal implementation review returned `REVISE` for the dual-invalid
+diagnostic ordering; the focused correction test, complete loading suite and
+independent terminal rereview pass.
+
+Authentic rules_rust 0.73.0 cquery clears `rule(cfg = transition)` and advances
+through the rest of `rust/private/rust.bzl`. It stops at the next independent
+generic declaration frontier, `rule(outputs = {"rust_doc_zip":
+"%{name}.zip"})` in `rust/private/rustdoc.bzl:319-436`, before any rule body,
+transition execution, `cc_common`, `cc_internal`, or C++ special handling.
 
 ## Immediate predecessor
 

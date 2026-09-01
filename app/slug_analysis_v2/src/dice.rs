@@ -5364,6 +5364,12 @@ impl ConfiguredNodeAnalysisKey {
             Ok(implementation) => implementation,
             Err(error) => return root_analysis_driver_complete(Err(error)),
         };
+        if implementation.incoming_transition().is_some() {
+            return root_analysis_driver_complete(Err(AnalysisError::message(format!(
+                "rule-level Starlark transition execution is not supported for {}",
+                configured_target.label()
+            ))));
+        }
         let configured_dependency_names = implementation
             .configured_dependency_attributes()
             .filter(|attribute| !attribute.is_hidden())

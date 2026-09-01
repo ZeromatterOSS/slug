@@ -5476,6 +5476,77 @@ parent = rule(implementation = _empty, attrs = {{"dep": attr.label(cfg = t)}})
 }
 
 #[tokio::test]
+async fn rule_level_transition_attachment_fails_before_all_configured_work() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _transition(settings, attr): fail("TRANSITION_IMPLEMENTATION_WAS_INVOKED")
+T = transition(implementation = _transition, inputs = ["//:missing_input"], outputs = ["//:missing_output"])
+def _incoming(ctx): fail("RULE_IMPLEMENTATION_WAS_INVOKED")
+incoming = rule(
+    implementation = _incoming,
+    cfg = T,
+    attrs = {"dep": attr.label()},
+    toolchains = ["//missing:toolchain_type"],
+)
+def _plain(ctx): return []
+plain = rule(implementation = _plain, cfg = None)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "incoming", "plain")
+incoming(
+    name = "incoming",
+    dep = select({
+        "//missing:condition": "//missing:dependency",
+        "//conditions:default": "//missing:fallback",
+    }),
+)
+plain(name = "plain")
+"#,
+    )
+    .unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let incoming = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:incoming").unwrap(),
+        test_configuration(),
+    );
+    let error = analyze_request(&dice, &workspace, &incoming, None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        error.contains(
+            "rule-level Starlark transition execution is not supported for @@//:incoming"
+        ),
+        "{error}"
+    );
+    for forbidden in [
+        "TRANSITION_IMPLEMENTATION_WAS_INVOKED",
+        "RULE_IMPLEMENTATION_WAS_INVOKED",
+        "missing_input",
+        "missing_output",
+        "missing:condition",
+        "missing:dependency",
+        "missing:fallback",
+        "missing:toolchain_type",
+    ] {
+        assert!(!error.contains(forbidden), "{forbidden}: {error}");
+    }
+
+    let plain = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:plain").unwrap(),
+        test_configuration(),
+    );
+    analyze_request(&dice, &workspace, &plain, None, false)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn mixed_root_and_external_overlay_demands_root_package_before_mapping_need() {
     let workspace = scratch();
     fs::write(

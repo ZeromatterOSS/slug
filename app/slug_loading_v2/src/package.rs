@@ -811,6 +811,7 @@ pub struct StarlarkRuleImplementation {
     values: Arc<[AttributeValue]>,
     capability: Arc<RuleCapability>,
     build_setting_definition: Option<BuildSettingDefinition>,
+    incoming_transition: Option<LoadingTransitionDefinition>,
 }
 
 impl PartialEq for StarlarkRuleImplementation {
@@ -829,6 +830,7 @@ impl PartialEq for StarlarkRuleImplementation {
             && self.values == other.values
             && self.capability == other.capability
             && self.build_setting_definition == other.build_setting_definition
+            && self.incoming_transition == other.incoming_transition
     }
 }
 
@@ -997,6 +999,10 @@ impl StarlarkRuleImplementation {
 
     pub fn build_setting_definition(&self) -> Option<BuildSettingDefinition> {
         self.build_setting_definition
+    }
+
+    pub fn incoming_transition(&self) -> Option<&LoadingTransitionDefinition> {
+        self.incoming_transition.as_ref()
     }
 
     pub fn build_setting_declaration(&self) -> anyhow::Result<Option<BuildSettingDeclaration>> {
@@ -1648,6 +1654,7 @@ impl PackageRecorder {
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
         build_setting_definition: Option<BuildSettingDefinition>,
+        incoming_transition: Option<LoadingTransitionDefinition>,
         visibility: Option<RuleVisibility>,
     ) -> anyhow::Result<()> {
         let mut dependencies = Vec::new();
@@ -1685,6 +1692,7 @@ impl PackageRecorder {
                 values,
                 capability,
                 build_setting_definition,
+                incoming_transition,
             }),
             visibility.map_or(VisibilitySource::PackageDefault, VisibilitySource::Declared),
         )
@@ -3621,6 +3629,7 @@ struct RuleDefinitionGen<V> {
     executable: bool,
     test: bool,
     build_setting_definition: Option<BuildSettingDefinition>,
+    incoming_transition: Option<TransitionDefinitionGen<V>>,
     #[trace(unsafe_ignore)]
     rule_class: OnceCell<CompactString>,
 }
@@ -3642,6 +3651,7 @@ pub(crate) struct FrozenRuleDefinition {
     pub(crate) schema: Arc<[FrozenRuleAttributeSchema]>,
     capability: Arc<RuleCapability>,
     pub(crate) build_setting_definition: Option<BuildSettingDefinition>,
+    incoming_transition: Option<FrozenTransitionDefinition>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -3888,6 +3898,11 @@ impl FrozenRuleDefinition {
         &self.capability
     }
 
+    #[cfg(test)]
+    pub(crate) fn incoming_transition(&self) -> Option<&FrozenTransitionDefinition> {
+        self.incoming_transition.as_ref()
+    }
+
     fn reject_deferred_attribute_invocation(&self) -> anyhow::Result<()> {
         if let Some(attribute) = self.schema.iter().find(|attribute| {
             !attribute.required_providers.is_empty() || attribute.attached_aspect.is_some()
@@ -3952,6 +3967,10 @@ impl<'v> Freeze for RuleDefinition<'v> {
                 test_kind: self.test.then_some(TestRuleKind::Test),
             }),
             build_setting_definition: self.build_setting_definition,
+            incoming_transition: self
+                .incoming_transition
+                .map(|transition| transition.freeze(freezer))
+                .transpose()?,
         })
     }
 }
@@ -4962,6 +4981,18 @@ pub(crate) struct TransitionDefinitionGen<V> {
 type TransitionDefinition<'v> = TransitionDefinitionGen<Value<'v>>;
 pub(crate) type FrozenTransitionDefinition = TransitionDefinitionGen<FrozenValue>;
 starlark::starlark_complex_values!(TransitionDefinition);
+
+fn transition_definition_from_value<'v>(value: Value<'v>) -> Option<TransitionDefinition<'v>> {
+    match TransitionDefinition::from_value(value)? {
+        starlark::__macro_refs::Either::Left(value) => Some(value.clone()),
+        starlark::__macro_refs::Either::Right(value) => Some(TransitionDefinitionGen {
+            implementation: value.implementation.to_value(),
+            inputs: value.inputs.clone(),
+            outputs: value.outputs.clone(),
+        }),
+    }
+}
+
 impl FrozenTransitionDefinition {
     #[cfg(test)]
     pub(crate) fn implementation(&self) -> FrozenValue {
@@ -5688,16 +5719,7 @@ fn attribute_definition<'v>(
                 exec_configuration = true;
                 return Ok(None);
             }
-            TransitionDefinition::from_value(value)
-                .into_iter()
-                .find_map(|value| match value {
-                    starlark::__macro_refs::Either::Left(value) => Some(value.clone()),
-                    starlark::__macro_refs::Either::Right(value) => Some(TransitionDefinitionGen {
-                        implementation: value.implementation.to_value(),
-                        inputs: value.inputs.clone(),
-                        outputs: value.outputs.clone(),
-                    }),
-                })
+            transition_definition_from_value(value)
                 .map(Some)
                 .ok_or_else(|| anyhow::anyhow!("attr.label cfg must be 'exec' or a transition"))
         })
@@ -6459,6 +6481,13 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         let subrule_callables = self.subrule_callables.clone();
         let late_bound_attributes = self.late_bound_attributes.clone();
         let capability = self.capability.clone();
+        let incoming_transition = self.incoming_transition.as_ref().map(|transition| {
+            LoadingTransitionDefinition::new(
+                transition.implementation,
+                transition.inputs.clone(),
+                transition.outputs.clone(),
+            )
+        });
         let heap = eval.heap();
         PackageRecorder::from_evaluator(eval)
             .and_then(|recorder| {
@@ -6681,6 +6710,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     schema,
                     values,
                     self.build_setting_definition,
+                    incoming_transition,
                     visibility,
                 )?;
                 for output in generated {
@@ -7703,6 +7733,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         build_setting: Option<Value<'v>>,
         toolchains: Option<Value<'v>>,
         fragments: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] subrules: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] provides: Option<Value<'v>>,
@@ -7713,6 +7744,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         if doc.is_some_and(|value| !value.is_none() && value.unpack_str().is_none()) {
             anyhow::bail!("rule doc must be a string or None");
         }
+        let build_setting = build_setting.filter(|value| !value.is_none());
+        let cfg = cfg.filter(|value| !value.is_none());
         let build_setting_definition = build_setting.and_then(|value| {
             if let Some(setting) = RootIntBuildSetting::from_value(value) {
                 Some(BuildSettingDefinition::Integer { flag: setting.flag })
@@ -7742,6 +7775,20 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 "rule build_setting must use config.int(), config.string(), config.bool(), config.string_list(), or config.string_set()"
             )
         }
+        if build_setting_definition.is_some() && cfg.is_some() {
+            anyhow::bail!(
+                "Build setting rules cannot use the `cfg` param to apply transitions to themselves."
+            );
+        }
+        let incoming_transition = cfg
+            .map(|value| {
+                transition_definition_from_value(value).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "`cfg` must be set to a transition object initialized by the transition() function."
+                    )
+                })
+            })
+            .transpose()?;
         let declared_builtin_names =
             starlark_builtin_schema::<Value<'v>>(executable, test, build_setting_definition, true);
         let mut user_schema = Vec::new();
@@ -7781,7 +7828,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 user_schema.push(declared_attribute_schema(name, &definition));
             }
         }
-        let has_transition = user_schema.iter().any(|schema| schema.transition.is_some());
+        let has_transition = incoming_transition.is_some()
+            || user_schema.iter().any(|schema| schema.transition.is_some());
         let mut schema =
             starlark_builtin_schema(executable, test, build_setting_definition, has_transition);
         let builtin_count = u32::try_from(schema.len()).expect("built-in attribute count fits u32");
@@ -7814,6 +7862,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             executable,
             test,
             build_setting_definition,
+            incoming_transition,
             rule_class: OnceCell::new(),
         })
     }
