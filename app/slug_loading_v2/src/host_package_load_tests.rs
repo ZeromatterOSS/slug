@@ -444,6 +444,7 @@ impl ActivationTracker for EventTracker {
             || name.starts_with("observed-repository-package-load:")
             || name.starts_with("repository-package-inventory:")
             || name.starts_with("observed-repository-package-inventory:")
+            || name.starts_with("observed-host-glob-traversal:")
         {
             self.loading_dependencies
                 .lock()
@@ -1509,7 +1510,7 @@ async fn observed_root_package_preserves_semantics_arcs_order_events_and_familie
             .filter(|dep| dep.starts_with("observed-host-glob-traversal:"))
             .map(|dep| dep.rsplit(':').next().unwrap())
             .collect::<Vec<_>>(),
-        ["2a2e747874", "7375622f2a2e747874", "7375622f6e6f2e747874"]
+        ["2a2e747874", "7375622f2a2e747874"]
     );
     assert!(RootPackageLoadObservationKey::validity(&observed));
     assert!(RootPackageLoadObservationKey::equality(
@@ -36035,6 +36036,169 @@ async fn observed_repository_package_load_retains_source_child_arcs_and_local_ba
         .collect::<Vec<_>>();
     assert!(families.contains(&false) && families.contains(&true));
 }
+
+fn external_recursive_glob_epoch(include_root: bool, variant: i64) -> PathObservationEpoch {
+    const BUILD: &[u8] =
+        b"print(\"GLOB_BUILD\")\nfilegroup(name = \"files\", srcs = glob([\"**/*.txt\"]))\n";
+    let mut files = vec![
+        ("pkg/BUILD.bazel", BUILD),
+        ("pkg/nested/leaf.txt", b"leaf\n" as &[u8]),
+        (
+            "pkg/subpkg/BUILD.bazel",
+            b"exports_files([\"hidden.txt\"])\n" as &[u8],
+        ),
+        ("pkg/subpkg/hidden.txt", b"hidden\n" as &[u8]),
+    ];
+    if include_root {
+        files.push(("pkg/root.txt", b"root\n"));
+    }
+    let mut epoch = EpochBuilder::external_sources(&files, variant);
+    epoch.directory("/workspace/dep/pkg", variant);
+    epoch.directory("/workspace/dep/pkg/nested", variant);
+    epoch.directory("/workspace/dep/pkg/subpkg", variant);
+    epoch.listing(
+        "/workspace/dep/pkg",
+        &[
+            (b"BUILD.bazel", PathDirectoryEntryKind::File),
+            (b"nested", PathDirectoryEntryKind::Directory),
+            (b"subpkg", PathDirectoryEntryKind::Directory),
+        ],
+    );
+    if include_root {
+        epoch.listing(
+            "/workspace/dep/pkg",
+            &[
+                (b"BUILD.bazel", PathDirectoryEntryKind::File),
+                (b"nested", PathDirectoryEntryKind::Directory),
+                (b"root.txt", PathDirectoryEntryKind::File),
+                (b"subpkg", PathDirectoryEntryKind::Directory),
+            ],
+        );
+    } else {
+        epoch.missing("/workspace/dep/pkg/root.txt");
+    }
+    epoch.listing(
+        "/workspace/dep/pkg/nested",
+        &[(b"leaf.txt", PathDirectoryEntryKind::File)],
+    );
+    epoch.missing("/workspace/dep/pkg/nested/BUILD.bazel");
+    epoch.missing("/workspace/dep/pkg/nested/BUILD");
+    epoch.build()
+}
+
+#[test]
+fn external_repository_glob_root_derivation_checks_build_and_package_suffixes() {
+    let address = slug_bzlmod_v2::RepositoryPackageSourceAddress::Host(
+        NormalizedAbsolutePath::new("/materialized/dep/pkg/BUILD.bazel").unwrap(),
+    );
+    assert_eq!(
+        super::repository_package_host_root(
+            &address,
+            "BUILD.bazel",
+            &PackagePath::parse("pkg").unwrap(),
+        )
+        .unwrap(),
+        Some(NormalizedAbsolutePath::new("/materialized/dep").unwrap())
+    );
+    assert!(
+        super::repository_package_host_root(
+            &address,
+            "BUILD",
+            &PackagePath::parse("pkg").unwrap(),
+        )
+        .is_err()
+    );
+    assert!(
+        super::repository_package_host_root(
+            &address,
+            "BUILD.bazel",
+            &PackagePath::parse("other").unwrap(),
+        )
+        .is_err()
+    );
+}
+
+#[tokio::test]
+async fn observed_external_repository_glob_uses_materialized_root_boundaries_and_replays_a_b_a() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(EventTracker::default());
+    let epoch_a = external_recursive_glob_epoch(true, 811);
+    let mut cold = transaction(&dice, epoch_a.dupe(), true, Some(tracker.dupe())).await;
+    let route = external_route(&mut cold).await;
+    tracker.take();
+    let key =
+        RepositoryPackageLoadObservationKey::new(route.clone(), PackagePath::parse("pkg").unwrap());
+    let cold_value = cold.compute(&key).await.unwrap();
+    let cold_loaded = observed_repository_package(&cold_value)
+        .result()
+        .as_ref()
+        .as_ref()
+        .unwrap();
+    let PackageTargetKind::Filegroup { srcs, .. } = &cold_loaded.targets[0].kind else {
+        panic!("external glob must produce a filegroup")
+    };
+    assert_eq!(
+        srcs.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        ["@@dep+//pkg:nested/leaf.txt", "@@dep+//pkg:root.txt"]
+    );
+    let inventory_key = RepositoryPackageInventoryObservationKey::new(
+        HostRepositorySourceRoute::root(route),
+        PackagePath::parse("pkg").unwrap(),
+    );
+    let inventory_dependencies = tracker.dependencies(&inventory_key.to_string());
+    let traversal = inventory_dependencies
+        .iter()
+        .find(|key| key.starts_with("observed-host-glob-traversal:"))
+        .expect("repository inventory must depend on observed Host traversal");
+    assert!(
+        tracker
+            .dependencies(traversal)
+            .iter()
+            .any(|key| { key.starts_with("observed-host-external-package-boundary:") })
+    );
+    tracker.take();
+    let mut changed = transaction(
+        &dice,
+        external_recursive_glob_epoch(false, 812),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut changed).await;
+    let changed_value = changed
+        .compute(&RepositoryPackageLoadObservationKey::new(
+            route,
+            PackagePath::parse("pkg").unwrap(),
+        ))
+        .await
+        .unwrap();
+    let changed_loaded = observed_repository_package(&changed_value)
+        .result()
+        .as_ref()
+        .as_ref()
+        .unwrap();
+    let PackageTargetKind::Filegroup { srcs, .. } = &changed_loaded.targets[0].kind else {
+        panic!("changed external glob must produce a filegroup")
+    };
+    assert_eq!(
+        srcs.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        ["@@dep+//pkg:nested/leaf.txt"]
+    );
+    let mut restored = transaction(&dice, epoch_a, false, None).await;
+    let route = external_route(&mut restored).await;
+    let restored_value = restored
+        .compute(&RepositoryPackageLoadObservationKey::new(
+            route,
+            PackagePath::parse("pkg").unwrap(),
+        ))
+        .await
+        .unwrap();
+    assert!(RepositoryPackageLoadObservationKey::equality(
+        &cold_value,
+        &restored_value
+    ));
+}
+
 #[tokio::test]
 async fn observed_repository_package_load_source_terminals_keep_prefixes() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
@@ -36224,7 +36388,7 @@ async fn observed_repository_package_load_keeps_terminal_prefixes_and_error_batc
         ("load-label", b"load(\"@other//:bad.bzl\", \"X\")\n"),
         ("evaluation", b"print(\"BEFORE\")\nfail(\"boom\")\n"),
         (
-            "glob",
+            "glob-empty",
             b"filegroup(name = \"x\", srcs = glob([\"*.txt\"]))\n",
         ),
         (
@@ -36242,13 +36406,18 @@ async fn observed_repository_package_load_keeps_terminal_prefixes_and_error_batc
         }
         let dice = Dice::builder().build(DetectCycles::Enabled);
         let tracker = Arc::new(EventTracker::default());
-        let mut tx = transaction(
-            &dice,
-            EpochBuilder::external_sources(&files, 170 + variant as i64).build(),
-            true,
-            Some(tracker.dupe()),
-        )
-        .await;
+        let mut epoch = EpochBuilder::external_sources(&files, 170 + variant as i64);
+        if *name == "glob-empty" {
+            epoch.listing(
+                "/workspace/dep",
+                &[
+                    (b"BUILD.bazel", PathDirectoryEntryKind::File),
+                    (b"MODULE.bazel", PathDirectoryEntryKind::File),
+                ],
+            );
+        }
+        let epoch = epoch.build();
+        let mut tx = transaction(&dice, epoch.dupe(), true, Some(tracker.dupe())).await;
         let route = external_route(&mut tx).await;
         tracker.take();
         let package = PackagePath::parse("").unwrap();
@@ -36265,7 +36434,7 @@ async fn observed_repository_package_load_keeps_terminal_prefixes_and_error_batc
             | ("parse", RepositoryPackageLoadErrorInner::Parse { .. })
             | ("load-label", RepositoryPackageLoadErrorInner::LoadLabel { .. })
             | ("evaluation", RepositoryPackageLoadErrorInner::Attempt(_))
-            | ("glob", RepositoryPackageLoadErrorInner::GlobUnsupported { .. })
+            | ("glob-empty", RepositoryPackageLoadErrorInner::Attempt(_))
             | ("postvalidation", RepositoryPackageLoadErrorInner::LoadedTargetKind { .. }) => true,
             _ => false,
         });
@@ -36292,6 +36461,15 @@ async fn observed_repository_package_load_keeps_terminal_prefixes_and_error_batc
                 observed_external(&child).observations(),
             )
             .unwrap()
+        } else if *name == "glob-empty" {
+            let demand =
+                EpochBuilder::demand("/workspace/dep", PathObservationOperation::DirectoryEntries);
+            let traversal = PathObservationEpoch::from_shared([(
+                demand.dupe(),
+                epoch.get(&demand).expect("scripted glob listing").dupe(),
+            )])
+            .unwrap();
+            super::union_host_observations(source.observations(), &traversal).unwrap()
         } else {
             source.observations().dupe()
         };

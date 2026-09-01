@@ -18,6 +18,16 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 #[cfg(unix)]
+use slug_bzlmod_v2::HostExternalPackageBoundary;
+use slug_bzlmod_v2::HostExternalPackageBoundaryError;
+#[cfg(unix)]
+use slug_bzlmod_v2::HostExternalPackageBoundaryKey;
+#[cfg(unix)]
+use slug_bzlmod_v2::HostExternalPackageBoundaryKind;
+#[cfg(unix)]
+use slug_bzlmod_v2::HostExternalPackageBoundaryObservationKey;
+use slug_bzlmod_v2::HostRepositorySourceRoute;
+#[cfg(unix)]
 use slug_bzlmod_v2::HostRootPackageBoundary;
 use slug_bzlmod_v2::HostRootPackageBoundaryError;
 #[cfg(unix)]
@@ -37,8 +47,6 @@ use slug_workspace_v2::PathOutcome;
 use starlark_map::small_set::SmallSet;
 
 use super::HexBytes;
-use super::HostGlobDeferredPattern;
-use super::HostGlobInvalidPattern;
 #[cfg(unix)]
 use super::HostGlobSegmentCandidateKind;
 #[cfg(unix)]
@@ -49,117 +57,24 @@ use super::HostGlobSegmentCandidatesKey;
 use super::HostGlobSegmentCandidatesObservationKey;
 use super::HostGlobSegmentError;
 use super::HostGlobSegmentPattern;
-use super::HostGlobSegmentPatternError;
 #[cfg(unix)]
 use super::dice_invariant;
 #[cfg(unix)]
 use super::logical_child;
 #[cfg(unix)]
 use super::union_observation_epochs;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
-enum HostGlobPatternFragment {
-    Segment(HostGlobSegmentPattern),
-    RecursiveWildcard,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-pub(super) enum HostGlobPatternError {
-    Invalid {
-        pattern: Arc<[u8]>,
-        fragment_index: Option<usize>,
-        reason: HostGlobInvalidPattern,
-    },
-    Deferred {
-        pattern: Arc<[u8]>,
-        fragment_index: usize,
-        reason: HostGlobDeferredPattern,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
-pub(super) struct HostGlobPattern {
-    bytes: Arc<[u8]>,
-    fragments: Arc<[HostGlobPatternFragment]>,
-}
-
-impl HostGlobPattern {
-    pub(super) fn new(bytes: impl Into<Arc<[u8]>>) -> Result<Self, HostGlobPatternError> {
-        let bytes = bytes.into();
-        let invalid = |fragment_index, reason| HostGlobPatternError::Invalid {
-            pattern: bytes.dupe(),
-            fragment_index,
-            reason,
-        };
-        if bytes.contains(&b'?') {
-            return Err(invalid(None, HostGlobInvalidPattern::QuestionMarkForbidden));
-        }
-        if bytes.is_empty() {
-            return Err(invalid(None, HostGlobInvalidPattern::Empty));
-        }
-        if bytes[0] == b'/' {
-            return Err(invalid(None, HostGlobInvalidPattern::Absolute));
-        }
-
-        let mut fragments = Vec::new();
-        for (fragment_index, fragment) in bytes.split(|byte| *byte == b'/').enumerate() {
-            if fragment.is_empty() {
-                return Err(invalid(
-                    Some(fragment_index),
-                    HostGlobInvalidPattern::EmptySegment,
-                ));
-            }
-            if fragment == b"." {
-                return Err(invalid(
-                    Some(fragment_index),
-                    HostGlobInvalidPattern::DotSegment,
-                ));
-            }
-            if fragment == b".." {
-                return Err(invalid(
-                    Some(fragment_index),
-                    HostGlobInvalidPattern::UpLevelSegment,
-                ));
-            }
-            if super::contains_adjacent_stars(fragment) && fragment != b"**" {
-                return Err(invalid(
-                    Some(fragment_index),
-                    HostGlobInvalidPattern::EmbeddedRecursiveWildcard,
-                ));
-            }
-            if fragment == b"**" {
-                fragments.push(HostGlobPatternFragment::RecursiveWildcard);
-                continue;
-            }
-            match HostGlobSegmentPattern::new(Arc::<[u8]>::from(fragment)) {
-                Ok(pattern) => fragments.push(HostGlobPatternFragment::Segment(pattern)),
-                Err(HostGlobSegmentPatternError::Invalid { reason, .. }) => {
-                    return Err(invalid(Some(fragment_index), reason));
-                }
-                Err(HostGlobSegmentPatternError::Deferred { reason, .. }) => {
-                    return Err(HostGlobPatternError::Deferred {
-                        pattern: bytes.dupe(),
-                        fragment_index,
-                        reason,
-                    });
-                }
-            }
-        }
-        Ok(Self {
-            bytes,
-            fragments: fragments.into(),
-        })
-    }
-
-    fn fragments(&self) -> &[HostGlobPatternFragment] {
-        &self.fragments
-    }
-}
+use crate::glob::GlobPattern;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
 pub(super) enum HostGlobTraversalOperation {
     Files,
     FilesAndDirs,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) enum HostGlobBoundaryScope {
+    Root,
+    External(HostRepositorySourceRoute),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
@@ -173,19 +88,21 @@ pub(super) enum HostGlobTraversalKeyError {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(super) struct HostGlobTraversalKey {
     workspace: NormalizedAbsolutePath,
+    boundary_scope: HostGlobBoundaryScope,
     logical_package_root: NormalizedAbsolutePath,
     package: PackagePath,
     package_bytes: Arc<[u8]>,
-    pattern: HostGlobPattern,
+    pattern: GlobPattern,
     operation: HostGlobTraversalOperation,
 }
 
 impl HostGlobTraversalKey {
     pub(super) fn new(
         workspace: NormalizedAbsolutePath,
+        boundary_scope: HostGlobBoundaryScope,
         logical_package_root: NormalizedAbsolutePath,
         package: PackagePath,
-        pattern: HostGlobPattern,
+        pattern: GlobPattern,
         operation: HostGlobTraversalOperation,
     ) -> Result<Self, HostGlobTraversalKeyError> {
         let mut package_bytes = Vec::with_capacity(package.as_str().len());
@@ -200,6 +117,7 @@ impl HostGlobTraversalKey {
         }
         Ok(Self {
             workspace,
+            boundary_scope,
             logical_package_root,
             package,
             package_bytes: package_bytes.into(),
@@ -216,7 +134,7 @@ impl fmt::Display for HostGlobTraversalKey {
             "host-glob-traversal:{}//{}:{}",
             self.workspace,
             self.package,
-            HexBytes(&self.pattern.bytes)
+            HexBytes(self.pattern.raw().as_bytes())
         )
     }
 }
@@ -259,8 +177,14 @@ pub(super) enum HostGlobTraversalError {
     },
     Boundary {
         candidate_package: PackagePath,
-        error: HostRootPackageBoundaryError,
+        error: HostGlobBoundaryError,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(super) enum HostGlobBoundaryError {
+    Root(HostRootPackageBoundaryError),
+    External(HostExternalPackageBoundaryError),
 }
 
 pub(super) type HostGlobTraversalOutcome =
@@ -272,13 +196,21 @@ pub(super) struct HostGlobTraversalObservationKey(HostGlobTraversalKey);
 impl HostGlobTraversalObservationKey {
     pub(super) fn new(
         workspace: NormalizedAbsolutePath,
+        boundary_scope: HostGlobBoundaryScope,
         logical_package_root: NormalizedAbsolutePath,
         package: PackagePath,
-        pattern: HostGlobPattern,
+        pattern: GlobPattern,
         operation: HostGlobTraversalOperation,
     ) -> Result<Self, HostGlobTraversalKeyError> {
-        HostGlobTraversalKey::new(workspace, logical_package_root, package, pattern, operation)
-            .map(Self)
+        HostGlobTraversalKey::new(
+            workspace,
+            boundary_scope,
+            logical_package_root,
+            package,
+            pattern,
+            operation,
+        )
+        .map(Self)
     }
 }
 
@@ -326,6 +258,13 @@ enum HostGlobTraversalMode {
 struct TraversalChild<T, E> {
     result: Arc<Result<T, E>>,
     observations: PathObservationEpoch,
+}
+
+#[cfg(unix)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
+enum HostGlobBoundary {
+    Continue,
+    Stop,
 }
 
 #[cfg(unix)]
@@ -458,9 +397,24 @@ impl HostGlobTraversalMode {
     async fn boundary(
         self,
         ctx: &mut DiceComputations<'_>,
+        scope: &HostGlobBoundaryScope,
         workspace: NormalizedAbsolutePath,
         package: PackagePath,
-    ) -> TraversalChildOutcome<HostRootPackageBoundary, HostRootPackageBoundaryError> {
+    ) -> TraversalChildOutcome<HostGlobBoundary, HostGlobBoundaryError> {
+        match scope {
+            HostGlobBoundaryScope::Root => self.root_boundary(ctx, workspace, package).await,
+            HostGlobBoundaryScope::External(route) => {
+                self.external_boundary(ctx, route, package).await
+            }
+        }
+    }
+
+    async fn root_boundary(
+        self,
+        ctx: &mut DiceComputations<'_>,
+        workspace: NormalizedAbsolutePath,
+        package: PackagePath,
+    ) -> TraversalChildOutcome<HostGlobBoundary, HostGlobBoundaryError> {
         let outcome = match self {
             Self::Legacy => dice_invariant(
                 ctx.compute(&HostRootPackageBoundaryKey::new(workspace, package))
@@ -468,7 +422,7 @@ impl HostGlobTraversalMode {
             )
             .map(|result| {
                 Ok(TraversalChild {
-                    result,
+                    result: Arc::new(project_root_boundary(result.as_ref())),
                     observations: PathObservationEpoch::empty(),
                 })
             }),
@@ -480,7 +434,7 @@ impl HostGlobTraversalMode {
             )
             .map(|observed| {
                 observed.map(|observed| TraversalChild {
-                    result: Arc::new(observed.result().clone()),
+                    result: Arc::new(project_root_boundary(observed.result())),
                     observations: observed.observations().dupe(),
                 })
             }),
@@ -492,6 +446,84 @@ impl HostGlobTraversalMode {
             PathOutcome::Complete(value) => SourcePreparationOutcome::Complete(value),
         }
     }
+
+    async fn external_boundary(
+        self,
+        ctx: &mut DiceComputations<'_>,
+        route: &HostRepositorySourceRoute,
+        package: PackagePath,
+    ) -> TraversalChildOutcome<HostGlobBoundary, HostGlobBoundaryError> {
+        let key = match route {
+            HostRepositorySourceRoute::Root(route) => {
+                HostExternalPackageBoundaryKey::new(route.clone(), package.clone())
+            }
+            HostRepositorySourceRoute::Canonical(input) => {
+                HostExternalPackageBoundaryKey::new_canonical(input.clone(), package.clone())
+            }
+        };
+        let observed_key = match route {
+            HostRepositorySourceRoute::Root(route) => {
+                HostExternalPackageBoundaryObservationKey::new(route.clone(), package)
+            }
+            HostRepositorySourceRoute::Canonical(input) => {
+                HostExternalPackageBoundaryObservationKey::new_canonical(input.clone(), package)
+            }
+        };
+        match self {
+            Self::Legacy => match dice_invariant(ctx.compute(&key).await) {
+                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(result) => {
+                    SourcePreparationOutcome::Complete(Ok(TraversalChild {
+                        result: Arc::new(project_external_boundary(result.as_ref())),
+                        observations: PathObservationEpoch::empty(),
+                    }))
+                }
+            },
+            Self::Observed => match dice_invariant(ctx.compute(&observed_key).await) {
+                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    SourcePreparationOutcome::Complete(Err(error))
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => {
+                    SourcePreparationOutcome::Complete(Ok(TraversalChild {
+                        result: Arc::new(project_external_boundary(observed.result())),
+                        observations: observed.observations().dupe(),
+                    }))
+                }
+            },
+        }
+    }
+}
+
+#[cfg(unix)]
+fn project_root_boundary(
+    result: &Result<HostRootPackageBoundary, HostRootPackageBoundaryError>,
+) -> Result<HostGlobBoundary, HostGlobBoundaryError> {
+    result
+        .as_ref()
+        .map(|boundary| match boundary.kind() {
+            HostRootPackageBoundaryKind::IgnoredDirectory
+            | HostRootPackageBoundaryKind::Package => HostGlobBoundary::Stop,
+            HostRootPackageBoundaryKind::NoPackage
+            | HostRootPackageBoundaryKind::DeletedPackage => HostGlobBoundary::Continue,
+        })
+        .map_err(|error| HostGlobBoundaryError::Root(error.clone()))
+}
+
+#[cfg(unix)]
+fn project_external_boundary(
+    result: &Result<HostExternalPackageBoundary, HostExternalPackageBoundaryError>,
+) -> Result<HostGlobBoundary, HostGlobBoundaryError> {
+    result
+        .as_ref()
+        .map(|boundary| match boundary.kind() {
+            HostExternalPackageBoundaryKind::IgnoredDirectory
+            | HostExternalPackageBoundaryKind::Package => HostGlobBoundary::Stop,
+            HostExternalPackageBoundaryKind::InvalidPackageName
+            | HostExternalPackageBoundaryKind::DeletedPackage
+            | HostExternalPackageBoundaryKind::NoPackage => HostGlobBoundary::Continue,
+        })
+        .map_err(|error| HostGlobBoundaryError::External(*error))
 }
 
 fn raw_child(parent: &[u8], child: &[u8]) -> Arc<[u8]> {
@@ -537,13 +569,11 @@ impl HostGlobTraversalKey {
         ctx: &mut DiceComputations<'_>,
         mode: HostGlobTraversalMode,
     ) -> HostGlobTraversalDriverOutcome {
-        let has_multiple_recursive = self
-            .pattern
-            .fragments()
-            .iter()
-            .filter(|fragment| matches!(fragment, HostGlobPatternFragment::RecursiveWildcard))
-            .nth(1)
-            .is_some();
+        let has_multiple_recursive = self.pattern.recursive_count() > 1;
+        let recursive_candidate_pattern = GlobPattern::include("*")
+            .expect("a fixed simple wildcard is valid")
+            .segment(0)
+            .expect("a fixed simple wildcard has one segment");
         let logical_directory = logical_child(&self.logical_package_root, &self.package_bytes);
         let mut visited = has_multiple_recursive.then(SmallSet::new);
         let mut frontier = VecDeque::from([TraversalState {
@@ -561,37 +591,34 @@ impl HostGlobTraversalKey {
         let mut terminals = TraversalTerminals::new();
 
         while let Some(state) = frontier.pop_front() {
-            let fragment = &self.pattern.fragments()[state.fragment_index];
-            let (candidate_pattern, recursive) = match fragment {
-                HostGlobPatternFragment::Segment(pattern) => (pattern.dupe(), false),
-                HostGlobPatternFragment::RecursiveWildcard => {
-                    let last = state.fragment_index + 1 == self.pattern.fragments().len();
-                    if last {
-                        if self.operation == HostGlobTraversalOperation::FilesAndDirs
-                            && !state.relative_path.is_empty()
-                        {
-                            paths.push(state.relative_path.dupe());
-                        }
-                    } else {
-                        enqueue(
-                            &mut frontier,
-                            &mut visited,
-                            &mut next_ordinal,
-                            TraversalState {
-                                logical_directory: state.logical_directory.dupe(),
-                                package: state.package.clone(),
-                                relative_path: state.relative_path.dupe(),
-                                fragment_index: state.fragment_index + 1,
-                                ordinal: 0,
-                            },
-                        );
+            let recursive = self.pattern.is_recursive(state.fragment_index);
+            let candidate_pattern = if recursive {
+                let last = state.fragment_index + 1 == self.pattern.len();
+                if last {
+                    if self.operation == HostGlobTraversalOperation::FilesAndDirs
+                        && !state.relative_path.is_empty()
+                    {
+                        paths.push(state.relative_path.dupe());
                     }
-                    (
-                        HostGlobSegmentPattern::new(Arc::<[u8]>::from(&b"*"[..]))
-                            .expect("a fixed simple wildcard is valid"),
-                        true,
-                    )
+                } else {
+                    enqueue(
+                        &mut frontier,
+                        &mut visited,
+                        &mut next_ordinal,
+                        TraversalState {
+                            logical_directory: state.logical_directory.dupe(),
+                            package: state.package.clone(),
+                            relative_path: state.relative_path.dupe(),
+                            fragment_index: state.fragment_index + 1,
+                            ordinal: 0,
+                        },
+                    );
                 }
+                recursive_candidate_pattern.dupe()
+            } else {
+                self.pattern
+                    .segment(state.fragment_index)
+                    .expect("a non-recursive fragment is a segment")
             };
             let candidates = match mode
                 .segment(ctx, state.logical_directory.dupe(), candidate_pattern)
@@ -622,7 +649,7 @@ impl HostGlobTraversalKey {
                     continue;
                 }
             };
-            let last = state.fragment_index + 1 == self.pattern.fragments().len();
+            let last = state.fragment_index + 1 == self.pattern.len();
             for (slot, candidate) in candidates.candidates().iter().enumerate() {
                 let relative_path = raw_child(&state.relative_path, &candidate.component);
                 if candidate.kind == HostGlobSegmentCandidateKind::NonDirectory {
@@ -633,7 +660,12 @@ impl HostGlobTraversalKey {
                 }
                 let candidate_package = package_child(&state.package, &candidate.component);
                 let boundary = match mode
-                    .boundary(ctx, self.workspace.dupe(), candidate_package.clone())
+                    .boundary(
+                        ctx,
+                        &self.boundary_scope,
+                        self.workspace.dupe(),
+                        candidate_package.clone(),
+                    )
                     .await
                 {
                     SourcePreparationOutcome::Need(need) => {
@@ -660,11 +692,7 @@ impl HostGlobTraversalKey {
                         continue;
                     }
                 };
-                if matches!(
-                    boundary.kind(),
-                    HostRootPackageBoundaryKind::IgnoredDirectory
-                        | HostRootPackageBoundaryKind::Package
-                ) {
+                if boundary == HostGlobBoundary::Stop {
                     continue;
                 }
                 if last && self.operation == HostGlobTraversalOperation::FilesAndDirs && !recursive

@@ -22765,3 +22765,17 @@ identity, acyclic inventory-to-traversal-to-external-boundary dependencies,
 evaluator release before DICE work, ordered observed-epoch merging, unchanged
 segment-key identity and honest built-in catalog deferral. Resume only the
 bounded R4 implementation.
+
+R4 implementation is terminally `ACCEPTED` at 1,272 production/833 proof/2,105
+total gross lines. One checked Root/materialized-External scope reuses the
+existing traversal and external boundary owners; non-root root derivation,
+subpackage stops, observed dependency order and A/B/A restoration are proven.
+The complete loading suite passes 579 tests with one documented ignore;
+analysis/query/core/server checks, formatting, source hashes, clean reference
+trees, parked-proof hash, expected archive exceptions and rebuilt CLI pass.
+The authentic rules_rust replay clears `@@platforms//host` glob loading and
+reaches the next generic gap: module-extension attribute schema `auth:
+StringDict` for `rules_rust++rust+rust_toolchains`. Independent terminal review
+returns `ACCEPT`. Schedule only a docs-first complete module-extension
+attribute-schema category audit; add no rules_rust, toolchain or C++ special
+case.

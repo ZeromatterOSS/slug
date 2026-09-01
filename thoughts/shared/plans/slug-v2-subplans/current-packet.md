@@ -4,9 +4,9 @@ Packet: `WP-6-7A-recursive-build-glob-category-implementation-r4`
 
 Milestone: M7A generic Starlark/ruleset closure; BUILD glob loading semantics.
 
-Status: implementation active after independent `ACCEPT` of the R4 route-aware
-external Host adapter. The accepted matcher/callable architecture and
-compatibility classes remain unchanged.
+Status: implementation terminally `ACCEPTED`. The recursive BUILD glob category
+is closed at R4; the authentic replay selects a separate module-extension
+attribute-schema successor.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -214,6 +214,24 @@ Independent review confirms the route plus selected Host BUILD address is
 complete source identity, the inventory-to-traversal-to-external-boundary edge
 is acyclic, evaluator state is released before DICE work, observed epoch order
 is preserved, and built-in catalog deferral is honest. It returns `ACCEPT`.
+
+## Terminal result
+
+The implementation measures 1,272 production/833 proof/2,105 total gross
+lines. It proves checked non-root source-root derivation, recursive external
+membership, subpackage stopping, observed external-boundary dependencies,
+semantic empty-glob failure and same-DICE A/B/A restoration. The full
+`slug_loading_v2` suite passes 579 tests with one documented ignore; direct
+analysis/query/core/server checks, formatting, diff, exact Bazel/Zabel hashes,
+clean reference trees, parked-proof hash, expected archive exceptions and the
+rebuilt V2 CLI pass.
+
+The authentic rules_rust replay clears the former
+`external repository BUILD globs are deferred: @@platforms//host` terminal and
+advances to `unsupported module-extension attribute schema 'auth': StringDict`
+while resolving `rules_rust++rust+rust_toolchains`. Independent terminal review
+returns `ACCEPT`. This is the next generic schema category, not glob,
+rules_rust, toolchain, `cc_common`, `cc_internal` or C++ behavior.
 
 ## Required proof and validation
 

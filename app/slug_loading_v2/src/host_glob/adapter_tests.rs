@@ -46,7 +46,6 @@ use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 
 use super::*;
-use crate::host_glob::HostGlobInvalidPattern;
 use crate::host_glob::traversal::HostGlobTraversal;
 use crate::host_glob::traversal::HostGlobTraversalKey;
 use crate::host_glob::traversal::HostGlobTraversalObservationKey;
@@ -56,7 +55,7 @@ type ScriptEntry = (PathObservationDemand, PathObservationResult);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 struct AdapterConsumerKey {
     package: PackagePath,
-    pattern: Arc<[u8]>,
+    pattern: Arc<str>,
     operation: HostGlobTraversalOperation,
 }
 
@@ -105,7 +104,7 @@ impl Key for AdapterConsumerKey {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 struct RequestAdapterConsumerKey {
     observed: bool,
-    pattern: Arc<[u8]>,
+    pattern: Arc<str>,
 }
 
 impl std::fmt::Display for RequestAdapterConsumerKey {
@@ -127,12 +126,16 @@ impl Key for RequestAdapterConsumerKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        let pattern = GlobPattern::include(&self.pattern).map_err(|error| {
+            HostGlobRequestInputError(HostGlobLoadingInputError::Pattern(error))
+        })?;
         compute_host_glob_request(
             ctx,
             path("/workspace"),
+            HostGlobBoundaryScope::Root,
             path("/workspace"),
             PackagePath::parse("pkg").unwrap(),
-            HostGlobLoadingRequest::new(self.pattern.clone(), HostGlobLoadingOperation::Files),
+            HostGlobLoadingRequest::new(pattern, HostGlobLoadingOperation::Files),
             self.observed,
         )
         .await
@@ -247,7 +250,7 @@ fn consumer(
 ) -> AdapterConsumerKey {
     AdapterConsumerKey {
         package: PackagePath::parse(package).unwrap(),
-        pattern: Arc::from(pattern),
+        pattern: Arc::from(std::str::from_utf8(pattern).unwrap()),
         operation,
     }
 }
@@ -290,12 +293,7 @@ async fn rejects_pattern_and_key_before_traversal_activation() {
         .unwrap();
     assert!(matches!(
         invalid,
-        Err(HostGlobLoadingInputError::Pattern(
-            HostGlobPatternError::Invalid {
-                reason: HostGlobInvalidPattern::QuestionMarkForbidden,
-                ..
-            }
-        ))
+        Err(HostGlobLoadingInputError::Pattern(_))
     ));
 
     let non_latin1 = transaction
@@ -501,7 +499,7 @@ async fn request_adapter_preserves_semantics_exact_epoch_arcs_and_family_isolati
 
     let key = |observed| RequestAdapterConsumerKey {
         observed,
-        pattern: Arc::from(&b"*"[..]),
+        pattern: Arc::from("*"),
     };
     let legacy = transaction.compute(&key(false)).await.unwrap();
     let observed = transaction.compute(&key(true)).await.unwrap();
@@ -551,7 +549,7 @@ async fn observed_request_adapter_preserves_all_terminal_polarities() {
     let invalid = transaction
         .compute(&RequestAdapterConsumerKey {
             observed: true,
-            pattern: Arc::from(&b"?"[..]),
+            pattern: Arc::from("?"),
         })
         .await
         .unwrap();
@@ -564,7 +562,7 @@ async fn observed_request_adapter_preserves_all_terminal_polarities() {
     let need = transaction
         .compute(&RequestAdapterConsumerKey {
             observed: true,
-            pattern: Arc::from(&b"entry"[..]),
+            pattern: Arc::from("entry"),
         })
         .await
         .unwrap()
@@ -592,7 +590,7 @@ async fn observed_request_adapter_preserves_all_terminal_polarities() {
     let semantic = transaction
         .compute(&RequestAdapterConsumerKey {
             observed: true,
-            pattern: Arc::from(&b"entry"[..]),
+            pattern: Arc::from("entry"),
         })
         .await
         .unwrap();
@@ -625,7 +623,7 @@ async fn observed_request_adapter_preserves_all_terminal_polarities() {
         outer
             .compute(&RequestAdapterConsumerKey {
                 observed: true,
-                pattern: Arc::from(&b"entry"[..]),
+                pattern: Arc::from("entry"),
             })
             .await
             .unwrap(),

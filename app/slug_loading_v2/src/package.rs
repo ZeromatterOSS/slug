@@ -96,7 +96,7 @@ use crate::bzl_module::FrozenBzlLifetimeEntry;
 use crate::bzl_module::LoadingPrintCapture;
 use crate::bzl_visibility::bzl_visibility_globals;
 use crate::cc_common::cc_common_globals;
-use crate::glob::GlobError;
+use crate::glob::GlobPattern;
 use crate::glob::GlobSpec;
 use crate::glob::PackageListing;
 use crate::glob::expand_glob;
@@ -1957,47 +1957,51 @@ impl PackageRecorder {
         } else {
             HostGlobLoadingOperation::FilesAndDirs
         };
-        let mut include_matched = Vec::with_capacity(spec.includes.len());
+        let mut include_matched = Vec::with_capacity(spec.includes().len());
         let mut matches = Vec::new();
-        for pattern in spec.includes.iter() {
-            let paths = self.host_glob_request(host, pattern.as_bytes(), operation)?;
+        for pattern in spec.includes() {
+            let paths = self.host_glob_request(host, pattern.dupe(), operation)?;
             include_matched.push(!paths.is_empty());
             matches.extend(paths);
         }
-        let mut excluded = SmallSet::new();
-        for pattern in spec.excludes.iter() {
-            excluded.extend(self.host_glob_request(host, pattern.as_bytes(), operation)?);
-        }
+        spec.check_include_matches(&include_matched)?;
+        spec.validate_excludes()?;
+        matches.retain(|path| !spec.is_excluded(path));
+        spec.check_final_matches(matches.is_empty())?;
 
-        if !spec.allow_empty {
-            if let Some((index, _)) = include_matched
-                .iter()
-                .enumerate()
-                .find(|(_, matched)| !**matched)
-            {
-                return Err(GlobError::EmptyPattern {
-                    pattern: spec.includes[index].to_string(),
-                }
-                .into());
-            }
-        }
-
-        matches.retain(|path| !excluded.contains(path));
-        matches.sort_unstable();
-        matches.dedup();
-        if !spec.allow_empty && matches.is_empty() {
-            return Err(GlobError::AllExcluded.into());
-        }
-        Ok(matches)
+        let mut projected = matches
+            .iter()
+            .map(|path| {
+                let value = match std::str::from_utf8(path) {
+                    Ok(value) => value,
+                    Err(_) => {
+                        return self.transfer_host_glob(
+                            host,
+                            HostGlobAttemptControl::Terminal(
+                                HostGlobAttemptError::UnsupportedPath { path: path.dupe() },
+                            ),
+                        );
+                    }
+                };
+                Ok(if value.starts_with('@') {
+                    format!(":{value}")
+                } else {
+                    value.to_owned()
+                })
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        projected.sort_by(|left, right| left.encode_utf16().cmp(right.encode_utf16()));
+        projected.dedup();
+        Ok(projected)
     }
 
     fn host_glob_request(
         &self,
         host: &HostGlobAttemptState,
-        pattern: &[u8],
+        pattern: GlobPattern,
         operation: HostGlobLoadingOperation,
-    ) -> anyhow::Result<Vec<String>> {
-        let request = HostGlobLoadingRequest::new(Arc::<[u8]>::from(pattern), operation);
+    ) -> anyhow::Result<Vec<Arc<[u8]>>> {
+        let request = HostGlobLoadingRequest::new(pattern, operation);
         let Some(prepared) = host.prepared.get(&request) else {
             return self.transfer_host_glob(host, HostGlobAttemptControl::Pending(request));
         };
@@ -2012,28 +2016,7 @@ impl PackageRecorder {
                 );
             }
         };
-        matches
-            .paths()
-            .iter()
-            .map(|path| {
-                let value = match std::str::from_utf8(path) {
-                    Ok(value) => value,
-                    Err(_) => {
-                        return self.transfer_host_glob(
-                            host,
-                            HostGlobAttemptControl::Terminal(
-                                HostGlobAttemptError::UnsupportedPath { path: path.clone() },
-                            ),
-                        );
-                    }
-                };
-                Ok(if value.starts_with('@') {
-                    format!(":{value}")
-                } else {
-                    value.to_owned()
-                })
-            })
-            .collect()
+        Ok(matches.paths().iter().map(Dupe::dupe).collect())
     }
 
     fn transfer_host_glob<T>(
@@ -3093,10 +3076,35 @@ fn alias_global(
     Ok(NoneType)
 }
 
+#[derive(Debug, Clone, Copy)]
+struct UnpackGlobExcludeDirectories(bool);
+
+impl Default for UnpackGlobExcludeDirectories {
+    fn default() -> Self {
+        Self(true)
+    }
+}
+
+impl starlark::values::type_repr::StarlarkTypeRepr for UnpackGlobExcludeDirectories {
+    type Canonical = <i32 as starlark::values::type_repr::StarlarkTypeRepr>::Canonical;
+
+    fn starlark_type_repr() -> starlark::typing::Ty {
+        starlark::typing::Ty::int()
+    }
+}
+
+impl<'v> UnpackValue<'v> for UnpackGlobExcludeDirectories {
+    type Error = starlark::Error;
+
+    fn unpack_value_impl(value: Value<'v>) -> starlark::Result<Option<Self>> {
+        Ok((value.get_type() == "int").then(|| Self(value.to_bool())))
+    }
+}
+
 fn glob_global<'v>(
     include: UnpackListOrTuple<&str>,
     exclude: UnpackListOrTuple<&str>,
-    exclude_directories: i32,
+    exclude_directories: UnpackGlobExcludeDirectories,
     allow_empty: Option<Value<'v>>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<Vec<String>> {
@@ -3112,7 +3120,7 @@ fn glob_global<'v>(
     let spec = GlobSpec::new(
         include.items,
         exclude.items,
-        exclude_directories != 0,
+        exclude_directories.0,
         allow_empty,
     )?;
     PackageRecorder::for_glob(eval)?.glob(spec)
@@ -8108,7 +8116,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn glob<'v>(
         #[starlark(default=UnpackListOrTuple::default())] include: UnpackListOrTuple<&str>,
         #[starlark(default=UnpackListOrTuple::default())] exclude: UnpackListOrTuple<&str>,
-        #[starlark(default = 1)] exclude_directories: i32,
+        #[starlark(default = UnpackGlobExcludeDirectories::default())]
+        exclude_directories: UnpackGlobExcludeDirectories,
         allow_empty: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Vec<String>> {
@@ -8666,7 +8675,8 @@ fn native_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] _native: Value<'v>,
         #[starlark(default=UnpackListOrTuple::default())] include: UnpackListOrTuple<&str>,
         #[starlark(default=UnpackListOrTuple::default())] exclude: UnpackListOrTuple<&str>,
-        #[starlark(default = 1)] exclude_directories: i32,
+        #[starlark(default = UnpackGlobExcludeDirectories::default())]
+        exclude_directories: UnpackGlobExcludeDirectories,
         allow_empty: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Vec<String>> {

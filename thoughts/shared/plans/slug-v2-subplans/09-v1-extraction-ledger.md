@@ -2272,8 +2272,11 @@ reuse the package-attempt retry driver. Zabel's analogous source-root split is
 peer guidance only. New DICE keys, copied listings/trees, caches, locks and
 built-in catalog glob claims remain forbidden; independent review is pending.
 Independent R4 review returned `ACCEPT` on complete source identity, acyclic
-existing-key ownership and unchanged segment-key equality; implementation and
-terminal acceptance remain pending.
+existing-key ownership and unchanged segment-key equality. The bounded
+1,272/833/2,105 implementation then passed the full loading suite, dependent
+checks and authentic replay through `@@platforms//host`; independent terminal
+review returned `ACCEPT`. The replay now stops at the separate generic
+module-extension `StringDict` schema category. No V1 extraction occurred.
 
 Decision: replace the split raw flat-pattern validator and separately retained
 Host pattern with one V2-owned immutable `GlobPattern`: one `Arc<str>` raw

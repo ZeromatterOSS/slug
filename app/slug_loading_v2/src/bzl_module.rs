@@ -115,6 +115,7 @@ use crate::cycle_detector::ExternalBzlLoadCycleGuard;
 use crate::cycle_detector::HostBzlLoadCycle;
 use crate::cycle_detector::HostBzlLoadCycleGuard;
 use crate::glob::PackageListing;
+use crate::host_glob::HostGlobBoundaryScope;
 use crate::host_glob::HostGlobLoadingRequest;
 use crate::host_glob::HostGlobPrepared;
 use crate::host_glob::HostGlobRequestInputError;
@@ -842,6 +843,7 @@ async fn evaluate_host_package_attempts_driver(
     input: HostPackageAttemptInput<'_>,
     mode: HostPackageLoadMode,
     repository_mapping: Arc<RunfilesRepositoryMapping>,
+    boundary_scope: HostGlobBoundaryScope,
 ) -> HostPackageAttemptDriverOutcome {
     let mut prepared = Arc::new(SmallMap::new());
     let mut observations = PathObservationEpoch::empty();
@@ -859,6 +861,7 @@ async fn evaluate_host_package_attempts_driver(
                 let outcome = compute_host_glob_request(
                     ctx,
                     input.workspace.dupe(),
+                    boundary_scope.clone(),
                     input.logical_package_root.dupe(),
                     input.package.clone(),
                     request.dupe(),
@@ -911,6 +914,7 @@ async fn evaluate_host_package_attempts(
         input,
         HostPackageLoadMode::Legacy,
         Arc::new(RunfilesRepositoryMapping::empty()),
+        HostGlobBoundaryScope::Root,
     )
     .await
     {
@@ -2166,6 +2170,11 @@ enum RepositoryPackageLoadErrorInner {
         canonical_repo: CompactString,
         package: PackagePath,
     },
+    GlobSourceRoot {
+        canonical_repo: CompactString,
+        package: PackagePath,
+        build_file: PathBuf,
+    },
     Attempt(HostPackageAttemptError),
 }
 
@@ -2298,6 +2307,15 @@ impl fmt::Display for RepositoryPackageLoadError {
             } => write!(
                 f,
                 "external repository BUILD globs are deferred: @@{canonical_repo}//{package}"
+            ),
+            RepositoryPackageLoadErrorInner::GlobSourceRoot {
+                canonical_repo,
+                package,
+                build_file,
+            } => write!(
+                f,
+                "external repository BUILD source does not identify the materialized root for @@{canonical_repo}//{package}: {}",
+                build_file.display()
             ),
             RepositoryPackageLoadErrorInner::Attempt(error) => write!(f, "{error:?}"),
         }
@@ -5671,6 +5689,7 @@ async fn compute_root_package(
         },
         mode,
         repository_mapping,
+        HostGlobBoundaryScope::Root,
     )
     .await;
     let (terminal, incoming) = match attempts {
@@ -6206,6 +6225,7 @@ fn project_repository_load_resolution_error(
 struct PreparedRepositoryPackageEvaluation {
     source_text: Arc<String>,
     canonical_repo: CompactString,
+    host_repository_root: Option<NormalizedAbsolutePath>,
     logical_package_dir: PathBuf,
     logical_build_file: PathBuf,
     build_label: CanonicalLabel,
@@ -6214,12 +6234,56 @@ struct PreparedRepositoryPackageEvaluation {
     observations: PathObservationEpoch,
 }
 
+fn repository_package_host_root(
+    address: &RepositoryPackageSourceAddress,
+    build_file_name: &str,
+    package: &PackagePath,
+) -> Result<Option<NormalizedAbsolutePath>, PathBuf> {
+    let RepositoryPackageSourceAddress::Host(build_file) = address else {
+        return Ok(None);
+    };
+    let fail = || build_file.as_path().to_path_buf();
+    if build_file.as_path().file_name() != Some(std::ffi::OsStr::new(build_file_name)) {
+        return Err(fail());
+    }
+    let mut directory = build_file.as_path().parent().ok_or_else(&fail)?;
+    for component in package
+        .as_str()
+        .split('/')
+        .rev()
+        .filter(|component| !component.is_empty())
+    {
+        if directory.file_name() != Some(std::ffi::OsStr::new(component)) {
+            return Err(fail());
+        }
+        directory = directory.parent().ok_or_else(&fail)?;
+    }
+    NormalizedAbsolutePath::new(directory.to_path_buf())
+        .map(Some)
+        .map_err(|_| fail())
+}
+
 fn prepare_repository_package_evaluation(
     key: &RepositoryPackageInventoryKey,
     source: RepositoryPackageSource,
     observations: PathObservationEpoch,
 ) -> Result<PreparedRepositoryPackageEvaluation, RepositoryPackageInventoryDriverOutcome> {
     let relative_build_file = PathBuf::from(key.package.as_str()).join(source.build_file_name());
+    let canonical_repo = CompactString::new(key.route.canonical_repo().as_str());
+    let host_repository_root =
+        repository_package_host_root(source.address(), source.build_file_name(), &key.package)
+            .map_err(|build_file| {
+                repository_package_driver_complete(
+                    Err(RepositoryPackageLoadError::new(
+                        RepositoryPackageLoadErrorInner::GlobSourceRoot {
+                            canonical_repo: canonical_repo.clone(),
+                            package: key.package.clone(),
+                            build_file,
+                        },
+                    )),
+                    observations.dupe(),
+                )
+            })?;
     let source_text = match std::str::from_utf8(source.bytes().as_ref()) {
         Ok(source) => Arc::new(source.to_owned()),
         Err(_) => {
@@ -6237,7 +6301,6 @@ fn prepare_repository_package_evaluation(
             ));
         }
     };
-    let canonical_repo = CompactString::new(key.route.canonical_repo().as_str());
     let logical_package_dir = PathBuf::from("<output_base>")
         .join("external")
         .join(canonical_repo.as_str())
@@ -6298,6 +6361,7 @@ fn prepare_repository_package_evaluation(
     Ok(PreparedRepositoryPackageEvaluation {
         source_text,
         canonical_repo,
+        host_repository_root,
         logical_package_dir,
         logical_build_file,
         build_label,
@@ -6349,18 +6413,23 @@ fn prepare_repository_package_child_loads(
         .collect()
 }
 
-fn evaluate_repository_package(
+async fn evaluate_repository_package(
+    ctx: &mut DiceComputations<'_>,
     key: &RepositoryPackageInventoryKey,
     prepared: PreparedRepositoryPackageEvaluation,
     loaded_modules: &[(String, FrozenBzlModule)],
+    mode: RepositoryPackageInventoryMode,
     observations: PathObservationEpoch,
     capture_events: bool,
     event_batch: &mut Option<EventBatch>,
 ) -> RepositoryPackageInventoryDriverOutcome {
     let canonical_repo = prepared.canonical_repo.clone();
+    let host_repository_root = prepared.host_repository_root.clone();
     let input = HostPackageAttemptInput {
         workspace: key.route.workspace().dupe(),
-        logical_package_root: key.route.workspace().dupe(),
+        logical_package_root: host_repository_root
+            .clone()
+            .unwrap_or_else(|| key.route.workspace().dupe()),
         package: key.package.clone(),
         package_identifier: PackageIdentifier::new(
             key.route.canonical_repo().clone(),
@@ -6373,6 +6442,36 @@ fn evaluate_repository_package(
         loaded_modules,
         capture_events,
     };
+    if host_repository_root.is_some() {
+        let host_mode = match mode {
+            RepositoryPackageInventoryMode::Legacy => HostPackageLoadMode::Legacy,
+            RepositoryPackageInventoryMode::Observed => HostPackageLoadMode::Observed,
+        };
+        let attempts = evaluate_host_package_attempts_driver(
+            ctx,
+            input,
+            host_mode,
+            external_runfiles_repository_mapping(&key.route),
+            HostGlobBoundaryScope::External(key.route.clone()),
+        )
+        .await;
+        let (terminal, incoming) = match attempts {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Err(error));
+            }
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+        };
+        let observations = match merge_repository_package_observations(&observations, &incoming) {
+            Ok(observations) => observations,
+            Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        };
+        *event_batch = Some(terminal.event_batch.clone());
+        let result = terminal.result.clone().map_err(|error| {
+            RepositoryPackageLoadError::new(RepositoryPackageLoadErrorInner::Attempt(error))
+        });
+        return repository_package_driver_complete(result, observations);
+    }
     match evaluate_host_package_attempt(
         &input,
         Arc::new(SmallMap::new()),
@@ -6478,13 +6577,16 @@ impl RepositoryPackageInventoryKey {
             ControlFlow::Break(value) => return value,
         };
         evaluate_repository_package(
+            ctx,
             self,
             prepared,
             &loaded_modules,
+            mode,
             observations,
             capture_events,
             event_batch,
         )
+        .await
     }
 }
 

@@ -35,88 +35,53 @@ use slug_bzlmod_v2::inject_root_package_policy_inputs;
 use slug_identity_v2::PackagePath;
 use slug_workspace_v2::*;
 
-use super::traversal::HostGlobPattern;
 use super::traversal::HostGlobTraversalKey;
 use super::traversal::HostGlobTraversalOperation;
 use super::*;
+use crate::glob::GlobPattern;
 
 fn path(value: &str) -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new(value).unwrap()
 }
 
-fn pattern(value: &[u8]) -> HostGlobSegmentPattern {
-    HostGlobSegmentPattern::new(Arc::<[u8]>::from(value)).unwrap()
-}
-
-fn invalid(value: &[u8]) -> HostGlobInvalidPattern {
-    let HostGlobSegmentPatternError::Invalid { reason, .. } =
-        HostGlobSegmentPattern::new(Arc::<[u8]>::from(value)).unwrap_err()
-    else {
-        panic!("expected invalid pattern")
-    };
-    reason
-}
-
-fn deferred(value: &[u8]) -> HostGlobDeferredPattern {
-    let HostGlobSegmentPatternError::Deferred { reason, .. } =
-        HostGlobSegmentPattern::new(Arc::<[u8]>::from(value)).unwrap_err()
-    else {
-        panic!("expected deferred pattern")
-    };
-    reason
+fn pattern(value: &str) -> HostGlobSegmentPattern {
+    GlobPattern::include(value)
+        .unwrap()
+        .segment(0)
+        .expect("test segment pattern must contain one ordinary segment")
 }
 
 #[test]
-fn pattern_constructor_preserves_invalid_deferred_and_supported_identity() {
-    assert_eq!(
-        invalid(b"what?"),
-        HostGlobInvalidPattern::QuestionMarkForbidden
-    );
-    assert_eq!(invalid(b""), HostGlobInvalidPattern::Empty);
-    assert_eq!(invalid(b"/a"), HostGlobInvalidPattern::Absolute);
-    assert_eq!(invalid(b"a//b"), HostGlobInvalidPattern::EmptySegment);
-    assert_eq!(invalid(b"."), HostGlobInvalidPattern::DotSegment);
-    assert_eq!(invalid(b"a/../b"), HostGlobInvalidPattern::UpLevelSegment);
-    assert_eq!(
-        invalid(b"a/**x"),
-        HostGlobInvalidPattern::EmbeddedRecursiveWildcard
-    );
-
-    assert_eq!(deferred(b"**"), HostGlobDeferredPattern::RecursiveWildcard);
-    assert_eq!(deferred(b"a/b"), HostGlobDeferredPattern::MultiSegment);
-    assert_eq!(deferred(b"a\0b"), HostGlobDeferredPattern::NulPathByte);
-    assert_eq!(deferred(b"a(b)*"), HostGlobDeferredPattern::Parenthesis);
-    assert_eq!(deferred(b"a[b]*"), HostGlobDeferredPattern::Bracket);
-    assert_eq!(deferred(b"a{b}*"), HostGlobDeferredPattern::Brace);
-    assert_eq!(deferred(br"a\b*"), HostGlobDeferredPattern::Backslash);
-
-    let literal = pattern(b"\xe9.txt");
-    assert_eq!(literal.kind, HostGlobSegmentPatternKind::Literal);
-    assert_eq!(literal.bytes(), b"\xe9.txt");
-    let wildcard = pattern(b"a*b*c.txt");
-    assert_eq!(wildcard.kind, HostGlobSegmentPatternKind::SimpleWildcard);
+fn shared_segment_view_preserves_kind_bytes_and_cross_pattern_identity() {
+    let literal = pattern("é.txt");
+    assert_eq!(literal.kind(), HostGlobSegmentPatternKind::Literal);
+    assert_eq!(literal.bytes(), "é.txt".as_bytes());
+    let wildcard = pattern("a*b*c.txt");
+    assert_eq!(wildcard.kind(), HostGlobSegmentPatternKind::Wildcard);
     assert_eq!(wildcard.bytes(), b"a*b*c.txt");
 
-    let same = pattern(b"a*b*c.txt");
-    let different = pattern(b"a*b*d.txt");
+    let same = GlobPattern::include("other/a*b*c.txt")
+        .unwrap()
+        .segment(1)
+        .unwrap();
+    let different = pattern("a*b*d.txt");
     assert_eq!(wildcard, same);
     assert_ne!(wildcard, different);
 }
 
 #[test]
 fn simple_matcher_preserves_raw_dot_and_nonadjacent_star_semantics() {
-    assert!(simple_segment_matches(b"*", b".hidden.txt"));
-    assert!(!simple_segment_matches(b"*.txt", b".hidden.txt"));
-    assert!(simple_segment_matches(b".h*.txt", b".hidden.txt"));
-    assert!(simple_segment_matches(
-        b"m*id*end.txt",
+    assert!(glob_segment_matches(&pattern("*"), b".hidden.txt"));
+    assert!(!glob_segment_matches(&pattern("*.txt"), b".hidden.txt"));
+    assert!(glob_segment_matches(&pattern(".h*.txt"), b".hidden.txt"));
+    assert!(glob_segment_matches(
+        &pattern("m*id*end.txt"),
         b"m-left-id-right-end.txt"
     ));
-    assert!(simple_segment_matches(b"\xe9*.txt", b"\xe9.txt"));
-    assert!(!simple_segment_matches(b"\xc3\xa9*.txt", b"\xe9.txt"));
-    assert!(simple_segment_matches(b"\xc3\xa9*.txt", b"\xc3\xa9.txt"));
-    assert!(!simple_segment_matches(b"a*b*c", b"a-x-X-c"));
-    assert!(!simple_segment_matches(b"*", b""));
+    assert!(!glob_segment_matches(&pattern("é*.txt"), b"\xe9.txt"));
+    assert!(glob_segment_matches(&pattern("é*.txt"), "é.txt".as_bytes()));
+    assert!(!glob_segment_matches(&pattern("a*b*c"), b"a-x-X-c"));
+    assert!(!glob_segment_matches(&pattern("*"), b""));
 }
 
 #[test]
@@ -320,7 +285,7 @@ async fn compute(
     transaction
         .compute(&HostGlobSegmentCandidatesKey::new(
             path("/pkg"),
-            pattern(pattern_bytes),
+            pattern(std::str::from_utf8(pattern_bytes).unwrap()),
         ))
         .await
         .unwrap()
@@ -340,7 +305,7 @@ async fn compute_observed(
     let outcome = transaction
         .compute(&HostGlobSegmentCandidatesObservationKey::new(
             path("/pkg"),
-            pattern(pattern_bytes),
+            pattern(std::str::from_utf8(pattern_bytes).unwrap()),
         ))
         .await
         .unwrap();
@@ -497,7 +462,7 @@ fn pending_prefix_ignores_later_outer_and_full_batch_outer_wins_need() {
         component: Arc::from(name),
         logical_path: path(&format!("/pkg/{}", String::from_utf8_lossy(name))),
     };
-    let key = HostGlobSegmentCandidatesKey::new(path("/pkg"), pattern(b"*"));
+    let key = HostGlobSegmentCandidatesKey::new(path("/pkg"), pattern("*"));
     let outcomes = vec![
         (
             pending(0, b"a-link"),
@@ -686,7 +651,7 @@ async fn observed_family_isolated_and_traversal_remains_legacy() {
         )])
         .unwrap();
     let mut transaction = updater.commit().await;
-    let observed_key = HostGlobSegmentCandidatesObservationKey::new(path("/pkg"), pattern(b"*"));
+    let observed_key = HostGlobSegmentCandidatesObservationKey::new(path("/pkg"), pattern("*"));
     let mut cancelled = Box::pin(transaction.compute(&observed_key));
     std::future::poll_fn(|context| {
         assert!(std::future::Future::poll(cancelled.as_mut(), context).is_pending());
@@ -718,7 +683,7 @@ async fn observed_family_isolated_and_traversal_remains_legacy() {
     transaction
         .compute(&HostGlobSegmentCandidatesKey::new(
             path("/pkg"),
-            pattern(b"*"),
+            pattern("*"),
         ))
         .await
         .unwrap();
@@ -753,9 +718,10 @@ async fn observed_family_isolated_and_traversal_remains_legacy() {
     let mut transaction = updater.commit().await;
     let traversal = HostGlobTraversalKey::new(
         path("/workspace"),
+        super::traversal::HostGlobBoundaryScope::Root,
         path("/workspace"),
         PackagePath::parse("pkg").unwrap(),
-        HostGlobPattern::new(&b"entry"[..]).unwrap(),
+        GlobPattern::include("entry").unwrap(),
         HostGlobTraversalOperation::Files,
     )
     .unwrap();
@@ -1099,7 +1065,7 @@ async fn listing_symlink_resolution_disagreement_is_a_semantic_error() {
 #[tokio::test]
 async fn same_dice_create_delete_recreate_and_kind_changes_restore_values() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
-    let key = HostGlobSegmentCandidatesObservationKey::new(path("/pkg"), pattern(b"*"));
+    let key = HostGlobSegmentCandidatesObservationKey::new(path("/pkg"), pattern("*"));
     let scripts = [
         (
             base_listing(vec![(
@@ -1162,7 +1128,7 @@ async fn same_dice_create_delete_recreate_and_kind_changes_restore_values() {
 #[tokio::test]
 async fn same_dice_symlink_retarget_error_recovery_and_restoration() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
-    let key = HostGlobSegmentCandidatesKey::new(path("/pkg"), pattern(b"*"));
+    let key = HostGlobSegmentCandidatesKey::new(path("/pkg"), pattern("*"));
     let listing = || {
         base_listing(vec![(
             OsString::from("entry"),
@@ -1251,7 +1217,7 @@ async fn equal_complete_prunes_consumer_and_host_key_stores_no_evaluation_data()
     let tracker = Arc::new(HostGlobTracker::default());
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let consumer = HostGlobConsumerKey {
-        host: HostGlobSegmentCandidatesKey::new(path("/pkg"), pattern(b"*")),
+        host: HostGlobSegmentCandidatesKey::new(path("/pkg"), pattern("*")),
     };
     let mut updater = dice.updater_with_data(UserComputationData {
         activation_tracker: Some(tracker.dupe() as Arc<dyn ActivationTracker>),

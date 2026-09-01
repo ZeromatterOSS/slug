@@ -57,6 +57,10 @@ use slug_workspace_v2::ResolvedPathObservationKey;
 #[cfg(unix)]
 use slug_workspace_v2::ResolvedPathState;
 
+use crate::glob::GlobSegmentPattern as HostGlobSegmentPattern;
+use crate::glob::GlobSegmentPatternKind as HostGlobSegmentPatternKind;
+use crate::glob::glob_segment_matches;
+
 mod adapter;
 pub(crate) use adapter::HostGlobLoadingOperation;
 pub(crate) use adapter::HostGlobLoadingRequest;
@@ -64,172 +68,10 @@ pub(crate) use adapter::HostGlobPrepared;
 pub(crate) use adapter::HostGlobRequestInputError;
 pub(crate) use adapter::HostGlobRequestTraversalError;
 pub(crate) use adapter::compute_host_glob_request;
+pub(crate) use traversal::HostGlobBoundaryScope;
 #[cfg(all(test, unix))]
 mod tests;
 mod traversal;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
-enum HostGlobSegmentPatternKind {
-    Literal,
-    SimpleWildcard,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
-struct HostGlobSegmentPattern {
-    bytes: Arc<[u8]>,
-    kind: HostGlobSegmentPatternKind,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
-enum HostGlobInvalidPattern {
-    QuestionMarkForbidden,
-    Empty,
-    Absolute,
-    EmptySegment,
-    DotSegment,
-    UpLevelSegment,
-    EmbeddedRecursiveWildcard,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
-enum HostGlobDeferredPattern {
-    RecursiveWildcard,
-    MultiSegment,
-    NulPathByte,
-    Parenthesis,
-    Bracket,
-    Brace,
-    Backslash,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-enum HostGlobSegmentPatternError {
-    Invalid {
-        pattern: Arc<[u8]>,
-        reason: HostGlobInvalidPattern,
-    },
-    Deferred {
-        pattern: Arc<[u8]>,
-        reason: HostGlobDeferredPattern,
-    },
-}
-
-impl HostGlobSegmentPattern {
-    fn new(bytes: impl Into<Arc<[u8]>>) -> Result<Self, HostGlobSegmentPatternError> {
-        let bytes = bytes.into();
-        let invalid = |reason| HostGlobSegmentPatternError::Invalid {
-            pattern: bytes.dupe(),
-            reason,
-        };
-        let deferred = |reason| HostGlobSegmentPatternError::Deferred {
-            pattern: bytes.dupe(),
-            reason,
-        };
-
-        // GlobValue checks this before UnixGlob validation.
-        if bytes.contains(&b'?') {
-            return Err(invalid(HostGlobInvalidPattern::QuestionMarkForbidden));
-        }
-        if bytes.is_empty() {
-            return Err(invalid(HostGlobInvalidPattern::Empty));
-        }
-        if bytes[0] == b'/' {
-            return Err(invalid(HostGlobInvalidPattern::Absolute));
-        }
-
-        let segments = bytes.split(|byte| *byte == b'/').collect::<Vec<_>>();
-        for segment in &segments {
-            if segment.is_empty() {
-                return Err(invalid(HostGlobInvalidPattern::EmptySegment));
-            }
-            if *segment == b"." {
-                return Err(invalid(HostGlobInvalidPattern::DotSegment));
-            }
-            if *segment == b".." {
-                return Err(invalid(HostGlobInvalidPattern::UpLevelSegment));
-            }
-            if contains_adjacent_stars(segment) && *segment != b"**" {
-                return Err(invalid(HostGlobInvalidPattern::EmbeddedRecursiveWildcard));
-            }
-        }
-        if segments.len() != 1 {
-            return Err(deferred(HostGlobDeferredPattern::MultiSegment));
-        }
-
-        let segment = segments[0];
-        if segment == b"**" {
-            return Err(deferred(HostGlobDeferredPattern::RecursiveWildcard));
-        }
-        if segment.contains(&0) {
-            return Err(deferred(HostGlobDeferredPattern::NulPathByte));
-        }
-        for (needle, reason) in [
-            (b'(', HostGlobDeferredPattern::Parenthesis),
-            (b')', HostGlobDeferredPattern::Parenthesis),
-            (b'[', HostGlobDeferredPattern::Bracket),
-            (b']', HostGlobDeferredPattern::Bracket),
-            (b'{', HostGlobDeferredPattern::Brace),
-            (b'}', HostGlobDeferredPattern::Brace),
-            (b'\\', HostGlobDeferredPattern::Backslash),
-        ] {
-            if segment.contains(&needle) {
-                return Err(deferred(reason));
-            }
-        }
-
-        let kind = if segment.contains(&b'*') {
-            HostGlobSegmentPatternKind::SimpleWildcard
-        } else {
-            HostGlobSegmentPatternKind::Literal
-        };
-        Ok(Self { bytes, kind })
-    }
-
-    fn bytes(&self) -> &[u8] {
-        &self.bytes
-    }
-}
-
-fn contains_adjacent_stars(bytes: &[u8]) -> bool {
-    bytes.windows(2).any(|pair| pair == b"**")
-}
-
-fn simple_segment_matches(pattern: &[u8], candidate: &[u8]) -> bool {
-    if pattern.is_empty() || candidate.is_empty() {
-        return false;
-    }
-    if pattern == b"*" {
-        return true;
-    }
-    if candidate[0] == b'.' && pattern[0] != b'.' {
-        return false;
-    }
-
-    let mut pattern_index = 0;
-    let mut candidate_index = 0;
-    let mut last_star = None;
-    let mut star_candidate_index = 0;
-    while candidate_index < candidate.len() {
-        if pattern_index < pattern.len() && pattern[pattern_index] == candidate[candidate_index] {
-            pattern_index += 1;
-            candidate_index += 1;
-        } else if pattern_index < pattern.len() && pattern[pattern_index] == b'*' {
-            last_star = Some(pattern_index);
-            pattern_index += 1;
-            star_candidate_index = candidate_index;
-        } else if let Some(star) = last_star {
-            star_candidate_index += 1;
-            candidate_index = star_candidate_index;
-            pattern_index = star + 1;
-        } else {
-            return false;
-        }
-    }
-    while pattern_index < pattern.len() && pattern[pattern_index] == b'*' {
-        pattern_index += 1;
-    }
-    pattern_index == pattern.len()
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
 enum HostGlobSegmentCandidateKind {
@@ -595,11 +437,9 @@ impl HostGlobSegmentCandidatesKey {
         ctx: &mut DiceComputations<'_>,
         mode: HostGlobSegmentMode,
     ) -> HostGlobSegmentDriverOutcome {
-        match self.pattern.kind {
+        match self.pattern.kind() {
             HostGlobSegmentPatternKind::Literal => self.compute_literal_unix(ctx, mode).await,
-            HostGlobSegmentPatternKind::SimpleWildcard => {
-                self.compute_wildcard_unix(ctx, mode).await
-            }
+            HostGlobSegmentPatternKind::Wildcard => self.compute_wildcard_unix(ctx, mode).await,
         }
     }
 
@@ -608,7 +448,7 @@ impl HostGlobSegmentCandidatesKey {
         ctx: &mut DiceComputations<'_>,
         mode: HostGlobSegmentMode,
     ) -> HostGlobSegmentDriverOutcome {
-        let component = self.pattern.bytes.dupe();
+        let component: Arc<[u8]> = Arc::from(self.pattern.bytes());
         let logical_path = logical_child(&self.logical_directory, &component);
         let resolved = match mode.resolve(ctx, logical_path).await {
             PathOutcome::Need(need) => return segment_need(need),
@@ -667,7 +507,7 @@ impl HostGlobSegmentCandidatesKey {
         let mut pending = Vec::new();
         for entry in entries.entries() {
             let component: Arc<[u8]> = Arc::from(entry.name().as_os_str().as_bytes());
-            if !simple_segment_matches(self.pattern.bytes(), &component) {
+            if !glob_segment_matches(&self.pattern, &component) {
                 continue;
             }
             let slot = slots.len();

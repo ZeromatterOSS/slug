@@ -160,6 +160,15 @@ fn lstat_error(value: &str) -> ScriptEntry {
     )
 }
 
+fn read_link(value: &str, target: &str) -> ScriptEntry {
+    (
+        demand(path(value), PathObservationOperation::ReadLink),
+        PathObservationResult::ReadLink(PathOperationResult::Present(Arc::new(PathBuf::from(
+            target,
+        )))),
+    )
+}
+
 fn listing(value: &str, entries: Vec<(&[u8], PathDirectoryEntryKind)>) -> ScriptEntry {
     let entries = PathDirectoryEntries::new(entries.into_iter().map(|(name, kind)| {
         PathDirectoryEntry::new(
@@ -363,6 +372,212 @@ print("done")
 }
 
 #[tokio::test]
+async fn callable_recursive_patterns_and_in_memory_excludes_share_host_traversal() {
+    let mut script = prelude();
+    script.extend([
+        present("/workspace/pkg", PathNodeKind::Directory),
+        listing(
+            "/workspace/pkg",
+            vec![
+                (b"root.txt", PathDirectoryEntryKind::File),
+                (b"nested", PathDirectoryEntryKind::Directory),
+            ],
+        ),
+        present("/workspace/pkg/root.txt", PathNodeKind::RegularFile),
+        missing("/workspace/pkg/deep"),
+        present("/workspace/pkg/nested", PathNodeKind::Directory),
+        missing("/workspace/pkg/nested/BUILD.bazel"),
+        missing("/workspace/pkg/nested/BUILD"),
+        missing("/workspace/pkg/nested/nested"),
+        missing("/workspace/pkg/nested/last.txt"),
+        listing(
+            "/workspace/pkg/nested",
+            vec![
+                (b"leaf.txt", PathDirectoryEntryKind::File),
+                (b"deep", PathDirectoryEntryKind::Directory),
+            ],
+        ),
+        present("/workspace/pkg/nested/leaf.txt", PathNodeKind::RegularFile),
+        present("/workspace/pkg/nested/deep", PathNodeKind::Directory),
+        missing("/workspace/pkg/nested/deep/deep"),
+        missing("/workspace/pkg/nested/deep/BUILD.bazel"),
+        missing("/workspace/pkg/nested/deep/BUILD"),
+        missing("/workspace/pkg/nested/deep/nested"),
+        listing(
+            "/workspace/pkg/nested/deep",
+            vec![(b"last.txt", PathDirectoryEntryKind::File)],
+        ),
+        present(
+            "/workspace/pkg/nested/deep/last.txt",
+            PathNodeKind::RegularFile,
+        ),
+    ]);
+    let source = r#"
+filegroup(name = "all_txt", srcs = glob(["**/*.txt"], exclude = ["absent/**"]))
+filegroup(name = "middle", srcs = glob(["**/deep/**"], exclude_directories = 0))
+filegroup(name = "multiple", srcs = glob(["**/nested/**/last.txt"]))
+"#;
+    let mut transaction = new_transaction(script).await;
+    let outcome = transaction.compute(&key("pkg", source)).await.unwrap();
+    let terminal = complete(&outcome);
+    let package = terminal.result.as_ref().unwrap();
+    assert_eq!(
+        filegroup_srcs(package, "all_txt"),
+        [
+            "@@//pkg:nested/deep/last.txt",
+            "@@//pkg:nested/leaf.txt",
+            "@@//pkg:root.txt",
+        ]
+    );
+    assert_eq!(
+        filegroup_srcs(package, "middle"),
+        ["@@//pkg:nested/deep", "@@//pkg:nested/deep/last.txt"]
+    );
+    assert_eq!(
+        filegroup_srcs(package, "multiple"),
+        ["@@//pkg:nested/deep/last.txt"]
+    );
+}
+
+#[tokio::test]
+async fn both_bindings_accept_arbitrary_integer_exclude_directories_and_reject_other_types() {
+    let mut script = prelude();
+    script.extend([
+        present("/workspace/pkg", PathNodeKind::Directory),
+        listing(
+            "/workspace/pkg",
+            vec![
+                (b"entry", PathDirectoryEntryKind::File),
+                (b"dir", PathDirectoryEntryKind::Directory),
+            ],
+        ),
+        present("/workspace/pkg/entry", PathNodeKind::RegularFile),
+        present("/workspace/pkg/dir", PathNodeKind::Directory),
+        missing("/workspace/pkg/dir/BUILD.bazel"),
+        missing("/workspace/pkg/dir/BUILD"),
+    ]);
+    let source = r#"
+filegroup(name = "global_zero", srcs = glob(["*"], exclude_directories = 0))
+filegroup(name = "native_zero", srcs = native.glob(["*"], exclude_directories = 0))
+filegroup(name = "global_default", srcs = glob(["*"]))
+filegroup(name = "native_default", srcs = native.glob(["*"]))
+filegroup(name = "global_big", srcs = glob(["*"], exclude_directories = 999999999999999999999999))
+filegroup(name = "global_negative", srcs = glob(["*"], exclude_directories = -999999999999999999999999))
+filegroup(name = "native_big", srcs = native.glob(["*"], exclude_directories = 999999999999999999999999))
+filegroup(name = "native_negative", srcs = native.glob(["*"], exclude_directories = -999999999999999999999999))
+"#;
+    let mut transaction = new_transaction(script).await;
+    let outcome = transaction.compute(&key("pkg", source)).await.unwrap();
+    let package = complete(&outcome).result.as_ref().unwrap();
+    for name in ["global_zero", "native_zero"] {
+        assert_eq!(
+            filegroup_srcs(package, name),
+            ["@@//pkg:dir", "@@//pkg:entry"]
+        );
+    }
+    for name in [
+        "global_default",
+        "native_default",
+        "global_big",
+        "global_negative",
+        "native_big",
+        "native_negative",
+    ] {
+        assert_eq!(filegroup_srcs(package, name), ["@@//pkg:entry"]);
+    }
+
+    let mut invalid_transaction = new_transaction(prelude()).await;
+    for callable in ["glob", "native.glob"] {
+        for value in ["True", "\"1\"", "None"] {
+            let source = format!("{callable}([], exclude_directories = {value})\n");
+            let outcome = invalid_transaction
+                .compute(&key("pkg", &source))
+                .await
+                .unwrap();
+            let Err(HostPackageAttemptError::Loading(error)) = &complete(&outcome).result else {
+                panic!("expected typed binding rejection for {callable}({value})")
+            };
+            assert!(error.message.contains("int"), "{}", error.message);
+        }
+    }
+}
+
+#[tokio::test]
+async fn callable_cycles_fail_only_when_matched_and_recursive_expansion_stays_typed() {
+    for (pattern, include_listing) in [("self", false), ("*", true), ("**/self", true)] {
+        let mut script = prelude();
+        script.push(present("/workspace/pkg", PathNodeKind::Directory));
+        if include_listing {
+            script.push(listing(
+                "/workspace/pkg",
+                vec![(b"self", PathDirectoryEntryKind::Symlink)],
+            ));
+        }
+        script.extend([
+            present("/workspace/pkg/self", PathNodeKind::Symlink),
+            read_link("/workspace/pkg/self", "self"),
+        ]);
+        let mut transaction = new_transaction(script).await;
+        let source = format!("glob([\"{pattern}\"])\n");
+        let outcome = transaction.compute(&key("pkg", &source)).await.unwrap();
+        assert!(matches!(
+            &complete(&outcome).result,
+            Err(HostPackageAttemptError::Glob(
+                HostGlobAttemptError::Traversal(_)
+            ))
+        ));
+    }
+
+    let mut unmatched = prelude();
+    unmatched.extend([
+        present("/workspace/pkg", PathNodeKind::Directory),
+        listing(
+            "/workspace/pkg",
+            vec![
+                (b"self", PathDirectoryEntryKind::Symlink),
+                (b"entry.txt", PathDirectoryEntryKind::File),
+            ],
+        ),
+        present("/workspace/pkg/entry.txt", PathNodeKind::RegularFile),
+    ]);
+    let mut transaction = new_transaction(unmatched).await;
+    let outcome = transaction
+        .compute(&key(
+            "pkg",
+            "filegroup(name = \"result\", srcs = glob([\"*.txt\"]))\n",
+        ))
+        .await
+        .unwrap();
+    let package = complete(&outcome).result.as_ref().unwrap();
+    assert_eq!(filegroup_srcs(package, "result"), ["@@//pkg:entry.txt"]);
+
+    let mut expansion = prelude();
+    expansion.extend([
+        present("/workspace/pkg", PathNodeKind::Directory),
+        listing(
+            "/workspace/pkg",
+            vec![(b"match", PathDirectoryEntryKind::Symlink)],
+        ),
+        present("/workspace/pkg/match", PathNodeKind::Symlink),
+        read_link("/workspace/pkg/match", "/a/a"),
+        present("/a", PathNodeKind::Directory),
+        present("/a/a", PathNodeKind::Symlink),
+        read_link("/a/a", "../a"),
+    ]);
+    let mut transaction = new_transaction(expansion).await;
+    let outcome = transaction
+        .compute(&key("pkg", "glob([\"**\"])\n"))
+        .await
+        .unwrap();
+    assert!(matches!(
+        &complete(&outcome).result,
+        Err(HostPackageAttemptError::Glob(
+            HostGlobAttemptError::Traversal(_)
+        ))
+    ));
+}
+
+#[tokio::test]
 async fn forwards_need_and_restores_outputs_in_one_dice_graph() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut updater = dice.updater();
@@ -463,6 +678,36 @@ async fn distinguishes_per_include_and_all_excluded_diagnostics() {
         error
             .message
             .contains("all files in the glob have been excluded, but allow_empty is set to False")
+    );
+
+    let include_before_exclude = transaction
+        .compute(&key(
+            "pkg",
+            "glob([\"entry\", \"missing\"], exclude = [\"bad/**x*\"])\n",
+        ))
+        .await
+        .unwrap();
+    let Err(HostPackageAttemptError::Loading(error)) = &complete(&include_before_exclude).result
+    else {
+        panic!("expected per-include error before deferred exclude validation")
+    };
+    assert!(
+        error
+            .message
+            .contains("glob pattern 'missing' didn't match")
+    );
+
+    let invalid_exclude = transaction
+        .compute(&key("pkg", "glob([\"entry\"], exclude = [\"bad/**x*\"])\n"))
+        .await
+        .unwrap();
+    let Err(HostPackageAttemptError::Loading(error)) = &complete(&invalid_exclude).result else {
+        panic!("expected deferred complex-exclude validation error")
+    };
+    assert!(
+        error
+            .message
+            .contains("recursive wildcard must be its own segment")
     );
 }
 
@@ -568,4 +813,21 @@ async fn terminal_failures_retain_typed_payload_and_only_the_print_prefix() {
             HostGlobAttemptError::UnsupportedPath { path }
         )) if path.as_ref() == raw
     ));
+
+    let mut excluded_non_utf8 = prelude();
+    excluded_non_utf8.extend([
+        present("/workspace/pkg", PathNodeKind::Directory),
+        listing("/workspace/pkg", vec![(raw, PathDirectoryEntryKind::File)]),
+        present_path(raw_child("/workspace/pkg", raw), PathNodeKind::RegularFile),
+    ]);
+    let mut excluded_transaction = new_transaction(excluded_non_utf8).await;
+    let outcome = excluded_transaction
+        .compute(&key(
+            "pkg",
+            "filegroup(name = \"empty\", srcs = glob([\"*\"], exclude = [\"*\"], allow_empty = True))\n",
+        ))
+        .await
+        .unwrap();
+    let package = complete(&outcome).result.as_ref().unwrap();
+    assert!(filegroup_srcs(package, "empty").is_empty());
 }

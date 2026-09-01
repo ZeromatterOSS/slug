@@ -19,14 +19,15 @@ use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathObservationEpoch;
 
 use super::dice_invariant;
-use super::traversal::HostGlobPattern;
-use super::traversal::HostGlobPatternError;
+use super::traversal::HostGlobBoundaryScope;
 use super::traversal::HostGlobTraversalError;
 use super::traversal::HostGlobTraversalKey;
 use super::traversal::HostGlobTraversalKeyError;
 use super::traversal::HostGlobTraversalObservationKey;
 use super::traversal::HostGlobTraversalOperation;
 use super::traversal::HostGlobTraversalOutcome;
+use crate::glob::GlobPattern;
+use crate::glob::GlobPatternError;
 
 /// Callable-facing operation retained in one prepared-request identity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
@@ -38,23 +39,20 @@ pub(crate) enum HostGlobLoadingOperation {
 /// Exact raw pattern and operation requested by one BUILD `glob()` attempt.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
 pub(crate) struct HostGlobLoadingRequest {
-    pattern: Arc<[u8]>,
+    pattern: GlobPattern,
     operation: HostGlobLoadingOperation,
 }
 
 impl HostGlobLoadingRequest {
-    pub(crate) fn new(pattern: impl Into<Arc<[u8]>>, operation: HostGlobLoadingOperation) -> Self {
-        Self {
-            pattern: pattern.into(),
-            operation,
-        }
+    pub(crate) fn new(pattern: GlobPattern, operation: HostGlobLoadingOperation) -> Self {
+        Self { pattern, operation }
     }
 }
 
 /// Input rejected before the adapter creates or computes a traversal key.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub(super) enum HostGlobLoadingInputError {
-    Pattern(HostGlobPatternError),
+    Pattern(GlobPatternError),
     Key(HostGlobTraversalKeyError),
 }
 
@@ -137,13 +135,19 @@ pub(super) async fn compute_host_glob_for_loading(
     workspace: NormalizedAbsolutePath,
     logical_package_root: NormalizedAbsolutePath,
     package: PackagePath,
-    pattern: Arc<[u8]>,
+    pattern: Arc<str>,
     operation: HostGlobTraversalOperation,
 ) -> Result<HostGlobLoadingOutcome, HostGlobLoadingInputError> {
-    let pattern = HostGlobPattern::new(pattern).map_err(HostGlobLoadingInputError::Pattern)?;
-    let key =
-        HostGlobTraversalKey::new(workspace, logical_package_root, package, pattern, operation)
-            .map_err(HostGlobLoadingInputError::Key)?;
+    let pattern = GlobPattern::include(&pattern).map_err(HostGlobLoadingInputError::Pattern)?;
+    let key = HostGlobTraversalKey::new(
+        workspace,
+        HostGlobBoundaryScope::Root,
+        logical_package_root,
+        package,
+        pattern,
+        operation,
+    )
+    .map_err(HostGlobLoadingInputError::Key)?;
     Ok(project_traversal_outcome(dice_invariant(
         ctx.compute(&key).await,
     )))
@@ -153,6 +157,7 @@ pub(super) async fn compute_host_glob_for_loading(
 pub(crate) async fn compute_host_glob_request(
     ctx: &mut DiceComputations<'_>,
     workspace: NormalizedAbsolutePath,
+    boundary_scope: HostGlobBoundaryScope,
     logical_package_root: NormalizedAbsolutePath,
     package: PackagePath,
     request: HostGlobLoadingRequest,
@@ -161,6 +166,7 @@ pub(crate) async fn compute_host_glob_request(
     compute_host_glob_request_driver(
         ctx,
         workspace,
+        boundary_scope,
         logical_package_root,
         package,
         request,
@@ -176,6 +182,7 @@ pub(crate) async fn compute_host_glob_request(
 async fn compute_host_glob_request_driver(
     ctx: &mut DiceComputations<'_>,
     workspace: NormalizedAbsolutePath,
+    boundary_scope: HostGlobBoundaryScope,
     logical_package_root: NormalizedAbsolutePath,
     package: PackagePath,
     request: HostGlobLoadingRequest,
@@ -185,13 +192,12 @@ async fn compute_host_glob_request_driver(
         HostGlobLoadingOperation::Files => HostGlobTraversalOperation::Files,
         HostGlobLoadingOperation::FilesAndDirs => HostGlobTraversalOperation::FilesAndDirs,
     };
-    let pattern = HostGlobPattern::new(request.pattern)
-        .map_err(HostGlobLoadingInputError::Pattern)
-        .map_err(HostGlobRequestInputError)?;
+    let pattern = request.pattern;
     let outcome = match mode {
         HostGlobRequestMode::Legacy => {
             let key = HostGlobTraversalKey::new(
                 workspace,
+                boundary_scope,
                 logical_package_root,
                 package,
                 pattern,
@@ -209,6 +215,7 @@ async fn compute_host_glob_request_driver(
         HostGlobRequestMode::Observed => {
             let key = HostGlobTraversalObservationKey::new(
                 workspace,
+                boundary_scope,
                 logical_package_root,
                 package,
                 pattern,

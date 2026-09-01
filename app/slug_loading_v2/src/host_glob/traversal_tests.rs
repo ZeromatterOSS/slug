@@ -118,8 +118,8 @@ fn path(value: &str) -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new(value).unwrap()
 }
 
-fn pattern(value: &[u8]) -> HostGlobPattern {
-    HostGlobPattern::new(Arc::<[u8]>::from(value)).unwrap()
+fn pattern(value: &[u8]) -> GlobPattern {
+    GlobPattern::include(std::str::from_utf8(value).unwrap()).unwrap()
 }
 
 fn demand(value: &str, operation: PathObservationOperation) -> PathObservationDemand {
@@ -195,6 +195,7 @@ fn prelude() -> Vec<ScriptEntry> {
 fn key(pattern: &[u8], operation: HostGlobTraversalOperation) -> HostGlobTraversalKey {
     HostGlobTraversalKey::new(
         path("/workspace"),
+        HostGlobBoundaryScope::Root,
         path("/workspace"),
         PackagePath::parse("pkg").unwrap(),
         self::pattern(pattern),
@@ -209,6 +210,7 @@ fn observed_key(
 ) -> HostGlobTraversalObservationKey {
     HostGlobTraversalObservationKey::new(
         path("/workspace"),
+        HostGlobBoundaryScope::Root,
         path("/workspace"),
         PackagePath::parse("pkg").unwrap(),
         self::pattern(pattern),
@@ -286,31 +288,18 @@ fn matches(outcome: HostGlobTraversalOutcome) -> Vec<Vec<u8>> {
 
 #[test]
 fn checked_pattern_and_key_construction_preserve_raw_identity() {
-    assert!(matches!(
-        HostGlobPattern::new(Arc::<[u8]>::from(&b"dir/**/leaf"[..])),
-        Ok(value) if value.fragments().len() == 3
-    ));
-    assert!(matches!(
-        HostGlobPattern::new(Arc::<[u8]>::from(&b"dir/**x"[..])),
-        Err(HostGlobPatternError::Invalid {
-            fragment_index: Some(1),
-            reason: HostGlobInvalidPattern::EmbeddedRecursiveWildcard,
-            ..
-        })
-    ));
-    assert!(matches!(
-        HostGlobPattern::new(Arc::<[u8]>::from(&b"dir/[x]"[..])),
-        Err(HostGlobPatternError::Deferred {
-            fragment_index: 1,
-            reason: HostGlobDeferredPattern::Bracket,
-            ..
-        })
-    ));
+    let recursive = GlobPattern::include("dir/**/leaf").unwrap();
+    assert_eq!(recursive.len(), 3);
+    assert!(recursive.is_recursive(1));
+    assert!(GlobPattern::include("dir/**x").is_err());
+    let punctuation = GlobPattern::include("dir/[x]").unwrap();
+    assert_eq!(punctuation.segment(1).unwrap().bytes(), b"[x]");
     let latin = PackagePath::parse("\u{e9}").unwrap();
     let non_latin = PackagePath::parse("\u{100}").unwrap();
     assert!(
         HostGlobTraversalKey::new(
             path("/workspace"),
+            HostGlobBoundaryScope::Root,
             path("/workspace"),
             latin,
             pattern(b"*"),
@@ -321,6 +310,7 @@ fn checked_pattern_and_key_construction_preserve_raw_identity() {
     assert!(matches!(
         HostGlobTraversalKey::new(
             path("/workspace"),
+            HostGlobBoundaryScope::Root,
             path("/workspace"),
             non_latin,
             pattern(b"*"),
@@ -336,6 +326,7 @@ fn traversal_key_identity_includes_only_semantic_fields() {
     let same = key(b"a/*", HostGlobTraversalOperation::Files);
     let workspace = HostGlobTraversalKey::new(
         path("/other-workspace"),
+        HostGlobBoundaryScope::Root,
         path("/workspace"),
         PackagePath::parse("pkg").unwrap(),
         pattern(b"a/*"),
@@ -344,6 +335,7 @@ fn traversal_key_identity_includes_only_semantic_fields() {
     .unwrap();
     let logical_package_root = HostGlobTraversalKey::new(
         path("/workspace"),
+        HostGlobBoundaryScope::Root,
         path("/other-root"),
         PackagePath::parse("pkg").unwrap(),
         pattern(b"a/*"),
@@ -352,6 +344,7 @@ fn traversal_key_identity_includes_only_semantic_fields() {
     .unwrap();
     let package = HostGlobTraversalKey::new(
         path("/workspace"),
+        HostGlobBoundaryScope::Root,
         path("/workspace"),
         PackagePath::parse("other").unwrap(),
         pattern(b"a/*"),
@@ -372,6 +365,7 @@ fn traversal_key_identity_includes_only_semantic_fields() {
 fn package_path_latin1_lifting_keeps_distinct_raw_byte_names_distinct() {
     let one_byte = HostGlobTraversalKey::new(
         path("/workspace"),
+        HostGlobBoundaryScope::Root,
         path("/workspace"),
         PackagePath::parse("\u{e9}").unwrap(),
         pattern(b"*"),
@@ -380,6 +374,7 @@ fn package_path_latin1_lifting_keeps_distinct_raw_byte_names_distinct() {
     .unwrap();
     let utf8_bytes_as_scalars = HostGlobTraversalKey::new(
         path("/workspace"),
+        HostGlobBoundaryScope::Root,
         path("/workspace"),
         PackagePath::parse("\u{c3}\u{a9}").unwrap(),
         pattern(b"*"),
@@ -1111,7 +1106,7 @@ async fn boundary_error_beats_sibling_need_and_uses_fifo_candidate_rank() {
 async fn same_graph_marker_deleted_and_ignore_transitions_restore_equal_value() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let tracker = Arc::new(TraversalTracker::default());
-    let traversal = key(b"*", HostGlobTraversalOperation::FilesAndDirs);
+    let traversal = key(b"**", HostGlobTraversalOperation::FilesAndDirs);
     let script = |marker, ignored| {
         let mut entries = prelude();
         entries.pop();
@@ -1139,6 +1134,7 @@ async fn same_graph_marker_deleted_and_ignore_transitions_restore_equal_value() 
                 missing("/workspace/pkg/entry/BUILD.bazel")
             },
             missing("/workspace/pkg/entry/BUILD"),
+            listing("/workspace/pkg/entry", Vec::new()),
         ]);
         entries
     };
@@ -1186,14 +1182,32 @@ async fn same_graph_marker_deleted_and_ignore_transitions_restore_equal_value() 
 async fn observed_warm_and_create_delete_restore_reactivate_and_restore_value() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let tracker = Arc::new(TraversalTracker::default());
-    let key = observed_key(b"entry", HostGlobTraversalOperation::Files);
+    let key = observed_key(b"**/entry", HostGlobTraversalOperation::Files);
     let script = |present_entry| {
         let mut entries = prelude();
-        entries.push(present("/workspace/pkg", PathNodeKind::Directory));
+        entries.extend([
+            present("/workspace/pkg", PathNodeKind::Directory),
+            listing(
+                "/workspace/pkg",
+                vec![(b"nested", PathDirectoryEntryKind::Directory)],
+            ),
+            missing("/workspace/pkg/entry"),
+            present("/workspace/pkg/nested", PathNodeKind::Directory),
+            missing("/workspace/pkg/nested/BUILD.bazel"),
+            missing("/workspace/pkg/nested/BUILD"),
+            listing(
+                "/workspace/pkg/nested",
+                if present_entry {
+                    vec![(b"entry", PathDirectoryEntryKind::File)]
+                } else {
+                    Vec::new()
+                },
+            ),
+        ]);
         entries.push(if present_entry {
-            present("/workspace/pkg/entry", PathNodeKind::RegularFile)
+            present("/workspace/pkg/nested/entry", PathNodeKind::RegularFile)
         } else {
-            missing("/workspace/pkg/entry")
+            missing("/workspace/pkg/nested/entry")
         });
         entries
     };
@@ -1211,15 +1225,15 @@ async fn observed_warm_and_create_delete_restore_reactivate_and_restore_value() 
     let mut transaction = updater.commit().await;
     assert_eq!(
         observed_matches(&transaction.compute(&key).await.unwrap()),
-        vec![b"entry".to_vec()]
+        vec![b"nested/entry".to_vec()]
     );
     assert_eq!(
         observed_matches(&transaction.compute(&key).await.unwrap()),
-        vec![b"entry".to_vec()]
+        vec![b"nested/entry".to_vec()]
     );
     assert_eq!(tracker.observed_evaluated.load(Ordering::SeqCst), 1);
 
-    for (present_entry, expected) in [(false, Vec::new()), (true, vec![b"entry".to_vec()])] {
+    for (present_entry, expected) in [(false, Vec::new()), (true, vec![b"nested/entry".to_vec()])] {
         let mut updater = transaction.into_updater();
         updater
             .changed_to(vec![(

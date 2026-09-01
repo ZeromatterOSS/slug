@@ -79,7 +79,12 @@ external package-boundary keys, derive the materialized root from the selected
 Host BUILD address, and drive the existing package-attempt retry loop. Add no
 platforms/rules_rust/C++ special case, new DICE key, cache, lock or eager walk;
 built-in catalog globs remain deferred. Independent review returned `ACCEPT`;
-activate only R4.
+activate only R4. R4 is terminally `ACCEPTED`: the 1,272 production/833
+proof/2,105 total gross candidate passes the full loading suite and dependent
+checks, and the rebuilt authentic replay clears `@@platforms//host` glob
+loading before stopping at the unrelated generic module-extension attribute
+schema `auth: StringDict`. Schedule only the docs-first complete
+module-extension attribute-schema category audit next.
 Structured `starlark_doc_extract` output and experimental remote repository
 execution remain separate deferred categories. Bazel 9.2 is sole behavior
 authority; Zabel remains peer architecture and optimization guidance only.
