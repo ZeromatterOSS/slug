@@ -1,17 +1,12 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r5`
+Packet: `WP-6-7B-module-extension-metadata-construction-and-capture-design-r1`
 
-Milestone: M7A generic Starlark/ruleset closure; module-extension tag schema
-conversion and invocation values.
+Milestone: M7A generic Starlark/ruleset closure; module-extension metadata
+construction, return capture and generated-repository validation.
 
-Status: R1 architecture review returned `REPLAN`; independent R2 architecture
-review returned `ACCEPT`; implementation validation selected a proof-only R3
-allowlist correction; independent R3 review returned `ACCEPT`; dependent
-compilation selected an R4 shared-analysis projection correction for
-independent review; R4 review returned `REPLAN`; independent corrected R5
-review returned `ACCEPT`; implementation and independent terminal review
-returned `ACCEPT`.
+Status: docs-first architecture awaiting independent review. Rust is not yet
+authorized.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -19,327 +14,196 @@ at SHA-256
 `36c937d49369ac57e51defe2b17d4a53636a815ec0b2d407f7bd1a664c4d816a`;
 do not edit or stage it.
 
-## Objective and compatibility boundary
+## Replay-selected objective
 
-Implement the complete ordinary Bazel 9.2 module-extension tag attribute-kind
-category, rather than the replay's literal `auth: StringDict` row. The admitted
-kind matrix is `bool`, `int`, `int_list`, `string`, `string_list`,
-`string_dict`, `string_list_dict`, `label`, `label_list`,
-`string_keyed_label_dict`, `label_keyed_string_dict`, `label_list_dict`,
-`output`, and `output_list`. This packet also adds the missing general
-`attr.int_list` descriptor and carries that kind through the already-shared
-rule, macro and repository-rule attribute model so the public constructor does
-not create a tag-only special case.
+Commit `3c5603a3c` terminally accepted the complete ordinary module-extension
+tag-schema category. The authentic rules_rust 0.73 configured-query replay now
+passes that category and stops when `rust/extensions.bzl` returns
+`module_ctx.extension_metadata(reproducible = True)`.
 
-Admit as **exact** for Bazel 9.2's default-enabled ordinary descriptor surface
-when every supplied/default label is visible:
+Implement the complete Bazel 9.2 metadata construction and capture category,
+not that literal call. Add the named-only `root_module_direct_deps`,
+`root_module_direct_dev_deps`, `reproducible`, and `facts` constructor surface;
+the opaque `extension_metadata` return value; `None`-or-metadata implementation
+return validation; generated-repository membership validation; and the
+`module_ctx.root_module_has_non_dev_dependency` field that real extensions use
+to choose metadata. Carry one heap-independent metadata value in the existing
+module-extension invocation receipt and DICE equality.
 
-- supplied non-`None` values are converted in MODULE call order; explicit
-  `None` is skipped; then mandatory/default/visibility checks run in schema
-  order and every runtime tag exposes one value per schema entry;
-- signed i32 scalar and integer-list members, list or tuple input for list
-  kinds, ordered Starlark dictionary conversion, all scalar/list/dictionary
-  type failures, intrinsic defaults, declared defaults, `mandatory`, scalar
-  `values`, unknown attributes, and failure order outside the deferred
-  non-visible-label case;
-- empty tag collections even when their descriptor carries
-  `allow_empty = False`, because Bazel's tag conversion does not consult that
-  rule-attribute policy;
-- apparent label conversion in the consuming module's repository mapping,
-  definition-owned visible canonical label defaults, recursive visibility
-  acceptance, same-package output conversion, and duplicate canonical
-  `label_keyed_string_dict` key rejection;
-- public Starlark tag field spelling, including leading-underscore private
-  names, schema-order field lookup and `dir`, Starlark insertion order within
-  collections, immutable invocation-local list/dictionary values, Label ABI,
-  and no retained evaluator borrow; and
-- the same `IntegerList` kind/value in rules, symbolic macros, repository-rule
-  declaration/instantiation/context projection, query candidates and explicit
-  unsupported output-template diagnostics.
+`ctx.facts` hydration, facts-version/lockfile lifecycle, reproducible lockfile
+reuse, incorrect-`use_repo` warning/fixup generation and `mod tidy` mutation are
+separate lifecycle categories. This packet must leave typed inputs for them and
+must not silently claim those effects.
 
-Keep as **Slug-native** Rust valid-Unicode strings and diagnostics, compact
-retained Rust values, starlark-rust exception decoration, and DICE scheduling,
-cancellation, memory accounting and eviction. Exact Java exception text,
-HotSpot identity and Java UTF-16-only invalid strings are not claimed.
+## Compatibility boundary
 
-Keep **unsupported/deferred** experimental dormant-label descriptors,
-the disabled legacy `attr.license`, computed/late-bound defaults, selectors in
-MODULE values, dormant dependencies, descriptor policies not consumed by
-`AttributeUtils.typeCheckAttrValues`, exact diagnostic/failure precedence for
-non-visible supplied or definition-default labels, and exact documentation-only
-descriptor metadata. Non-visible labels still fail closed and are never
-accepted. This packet changes no MODULE parser, BCR rule body, rules_rust,
-toolchain, C++, `cc_common`, `cc_internal`, provider, configured-analysis or
-action semantics. Those names remain downstream discriminators only.
+Admit as **exact** for Bazel 9.2:
 
-## Bazel 9.2 authority and oracle evidence
+- named-only binding, defaults, types and failure order for all four
+  `extension_metadata` parameters;
+- paired unspecified direct-dependency fields; paired list/tuple string
+  sequences; the single `"all"` plus explicit-empty-companion forms; valid
+  user-provided repository names; duplicate and regular/dev overlap rejection;
+- boolean `reproducible`, including retention when direct dependencies are
+  unspecified and facts are empty;
+- finite JSON-like facts construction: string-keyed dictionaries, strings,
+  arbitrary Starlark integers, finite floats, booleans, `None`, lists, tuple to
+  list normalization, recursively sorted dictionary keys and the seven-level
+  nesting bound;
+- opaque metadata type identity; module-extension implementations may return
+  only `None` or metadata produced by this host; returned metadata is detached
+  before evaluator release and participates structurally in DICE equality;
+- validation that explicit direct dependencies were generated, `"all"`
+  expansion over generated names, and rejection of nonempty regular/dev sets
+  when the root has no matching non-dev/dev extension usage; and
+- exact `root_module_has_non_dev_dependency` from matching root proxies.
+
+Keep as **Slug-native** Rust valid-Unicode strings and error decoration,
+compact Rust retention, DICE scheduling/cancellation/accounting, and the fact
+that Slug currently evaluates selected extensions instead of reusing Bazel
+lockfile extension results.
+
+Keep **unsupported/deferred** non-finite fact floats, `ctx.facts` hydration,
+nonempty returned facts until their lockfile/facts-version owner is connected,
+reproducible lockfile omission/reuse, hidden/workspace facts merging,
+`--lockfile_mode=error` facts comparison, incorrect-`use_repo` warnings and
+fixup commands, `mod tidy`, isolated usages and exact Java diagnostic
+decoration. Non-finite or nonempty returned facts fail closed; no unmodeled
+metadata input may be discarded. Direct-dependency success/error semantics are
+implemented now, but warning-only import classification remains deferred.
+
+The stock fixture runner's unsupported query flags, expressions and Starlark
+output mode are unrelated CLI surfaces. They remain deferred; the supported
+direct configured-query replay is the packet discriminator.
+
+## Bazel 9.2 authority and peer guidance
 
 Bazel tag `9.2.0` commit
 `8220c6198837d5c13d53fea211cf3282aa12408a` is the sole semantic authority.
 Pinned sources are:
 
-- `StarlarkAttrModuleApi.java`
-  `af70c851882fa049034184dbb6f6580731cfa738d79dfb8abcf61af176257670`;
-- `StarlarkAttrModule.java`
-  `388421c44c623c1c6625fd9f2b059d2a7d1e13b8d45e7c96173f24866a917967`;
-- `StarlarkRepositoryModule.java`
-  `c6adf0f521e56419ec22e7980def6b27778bab4d5c5294b3556c2286f5b6bcea`;
-- `TagClass.java`
-  `8b6359f485d473482162bceabf0375c69b770ab1d14ab712d7cfd98e2d620571`;
-- `TypeCheckedTag.java`
-  `402ed1072a6364191cee513e4669d2f676f27a19168e629186e512b0f1b0c642`;
-- `AttributeUtils.java`
-  `d1db963ecf54b3c921112d1bfd15876c525921187ba4b6fc6cee16426b5f2c3f`;
-- `Attribute.java`
-  `fbe208c37ad4ed88030f874fa6cd8bd5cf2f4aac63f9a01a4ff24ca499c9a6a4`;
+- `ModuleExtensionContext.java`
+  `36460dcfafadce9581c146e06d1394b6d5bf47224840d0debeb7c96993898711`;
+- `ModuleExtensionMetadata.java`
+  `b5b3d4e6486c1f48ae55667ce442b014ed3344ef4011e1f57cdd3580f67cb38c`;
+- `Facts.java`
+  `820c305b23c92f5780d33a3fc24e90bdb91d1aaf02de81659f4ace4dc49cb160`;
+- `RepositoryName.java`
+  `29697296225f187fc10281bf068aca2752a78e986e1cdfdb5c2bb34a8498e8e2`;
+- `RegularRunnableExtension.java`
+  `1c91439270aef8dcd1d4615dd40369e51431cebaee36f8dc085a51a9d0aead20`;
+- `LockfileModuleExtensionMetadata.java`
+  `42c1195c6693b8d0780582a9dc82690d4708787c8f545e3bb334a55b61b132ea`;
+- `SingleExtensionEvalFunction.java`
+  `e97d01acd89834147bef7825e25563a1af8787edd59ae4307fbe97d3f23000a2`;
   and
 - `ModuleExtensionResolutionTest.java`
   `d8602fd385d34ab5387cb0ef3891ef9acc0ca62cd8f67324e09fd33ea7a3e769`.
 
-A disposable pinned-Bazel oracle exercised one tag containing all fourteen
-kinds. Bazel exposed
-`True`, `7`, `[1, -2, 3]`, scalar/list/nested-dictionary `Label` values,
-same-package output labels, strings and ordered dictionaries. A second omitted
-tag exposed intrinsic defaults
-`False`, `0`, `[]`, `None`, empty label collections, `None`, `[]`, `""`, and
-empty string collections/dictionaries in the same schema order. The fixture,
-output base and Bazel server were removed after capture; no Java helper,
-checked-in oracle or probe artifact enters Slug.
+Reuse the pinned `extensionMetadata_*`, `facts_*`, return-type and root-usage
+tests as discriminating evidence; add no redundant Java oracle artifact.
+
+Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance only.
+`module_extension_metadata_value.zig`
+`2aa1e18a1042a10f5c102813b298665f387f88c0d67b81ac9fece069d4509d6a`
+and `module_extension_execution_capture.zig`
+`8f03505b2302f79443d3ab95f12cbca2b65eec8a417ff94e739fb9fafcd06fc0`
+support a typed transient callable, evaluator-release detachment and one
+capability record. Copy no Zig allocator, evaluator, representation,
+diagnostic, lifecycle, scheduler, cache or behavior.
 
 ## Frozen architecture
 
-Extend the existing shared `AttributeKind` with `IntegerList` and
-`CoercedAttributeValue` with `IntegerList(Arc<[i32]>)`. Reuse that value through
-ordinary rule/macro/repository projections. Do not add a parallel
-module-extension-only type graph. The existing heap-independent
-`NonrootAttributeValue` already owns raw list/tuple/dictionary and arbitrary
-integer syntax; conversion validates i32 only at the typed schema boundary.
+Create one public Bzlmod-owned metadata family and reuse the existing lockfile
+facts representation rather than adding a loading-only graph:
 
-Retain existing allowed scalar values in the shared definition/schema
-projection. `allow_empty` remains available to the shared rule-attribute
-consumers that actually enforce it, but module-extension tag conversion must
-ignore it. `prepare_module_extension_tag_attributes` owns the Bazel
-`AttributeUtils` two-phase order: initialize schema slots, convert every
-supplied non-`None` value in source order, then fill/check slots in schema
-order. It recursively converts visible labels and checks visibility; an
-invisible label fails closed without claiming Bazel's precise diagnostic
-precedence. Collection conversion returns existing immutable `Arc` slices;
-dictionary equality stays structural while source order remains available for
-Starlark iteration.
+- `ModuleExtensionRepositorySelection`: unspecified, all, or explicit compact
+  set;
+- `ModuleExtensionMetadata`: both selections, `reproducible`, and normalized
+  facts; and
+- the existing sorted `Facts`/`FactValue`/`FactNumber` family, promoted behind
+  a narrow constructor/query API and still used by lockfile v28.
 
-Store each tag schema entry under its public Starlark name. In particular,
-`_private` remains `_private` for supplied lookup, defaults, runtime
-`get_attr`, and `dir`; Slug does not expose Bazel's internal `$private`
-spelling because it has no separate native/public tag-field representation.
+Retain `CompactString`, starlark-rust `SmallSet`/`SortedMap`, immutable `Arc`
+slices and `Allocative`. Explicit dependency equality is set-like while source
+order remains available for stable future rendering. Facts dictionaries are
+sorted; lists remain ordered; arbitrary integers retain canonical decimal
+spelling; finite-float equality follows the existing lockfile facts owner.
+Add no second fact graph, serde value tree, global table, interner or cache.
 
-At extension invocation, materialize the already-prepared values into the
-invocation module's existing starlark-rust `FrozenHeap`. Lists and dictionaries
-are therefore immutable without a custom collection implementation or a
-DICE-retained evaluator value. The invocation module owns and releases those
-frozen values with the existing evaluator lifetime. Add no evaluator borrow to
-a DICE value, new key, graph, cache, interner, global table, lock, task or
-semantic side store.
+Both the selected-owner input and legacy root-aggregate input retain the
+already-parsed matching root proxies, preserving dev classification, imports,
+locations and include-file ownership for future warning/fixup work. They expose
+only narrow accessors; no new DICE key or reverse edge is added. The two
+invocation paths must produce identical context fields, metadata capture and
+validation behavior.
 
-Buck2/starlark-rust supplies the already-retained `Arc`, compact collection,
-`Allocative`, `FrozenHeap`, `AllocList` and `AllocDict` utilities. Zabel commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance only:
-`module_extension_tag_value.zig`
-`4e2dfc4148b7ef12d02e48d5d59d0067832d27cac61957a313cc2270822e2741`,
-`module_extension_declaration_host.zig`
-`7474d1ddb37d2ffaa0006b4ce3b19df3917bb6dce055c4db87363fcf50067600`,
-and `module_extension_execution_capture.zig`
-`8f03505b2302f79443d3ab95f12cbca2b65eec8a417ff94e739fb9fafcd06fc0`
-motivate one typed value family, schema-ordered slots and invocation-local
-freezing. Copy no Zig representation, allocator, evaluator, diagnostic,
-scheduler, cache, policy or behavior.
+`InvocationContext` constructs an invocation-local opaque Starlark wrapper.
+After evaluation, downcast and clone its shared metadata before the `Module`
+and evaluator are released. Add `Option<ModuleExtensionMetadata>` to the
+existing receipt. Repository instantiation stays unchanged. Certificate
+validation compares metadata selections to instantiated generated names and
+root proxy kinds. `None` retains default metadata behavior without allocating
+a parallel result path.
 
-## Closed ownership, caps and stop conditions
+Nonempty facts are fully type-checked and normalized at construction, but a
+returned nonempty facts value fails closed before certificate publication until
+the existing lockfile/facts-version inputs are connected. This preserves the
+future representation without pretending persistence is implemented.
+
+## Ownership, caps and stop conditions
 
 Production allowlist:
 
-- `app/slug_loading_v2/src/attrs.rs`;
-- `app/slug_loading_v2/src/package.rs`;
-- `app/slug_loading_v2/src/module_extension.rs`;
-- `app/slug_loading_v2/src/module_extension_repository_instantiation.rs`;
-- `app/slug_loading_v2/src/repository_rule_context.rs`; and
-- `app/slug_loading_v2/src/rule_outputs.rs`.
+- one new shared metadata module plus `app/slug_bzlmod_v2/src/lib.rs`,
+  `app/slug_bzlmod_v2/src/lockfile_v28.rs` and
+  `app/slug_bzlmod_v2/src/selected_repo_spec.rs` and
+  `app/slug_bzlmod_v2/src/selected_repo_spec/selected_extension_demand.rs`;
+- `app/slug_loading_v2/src/module_extension.rs`; and
+- `app/slug_loading_v2/src/module_extension_repository_validation.rs`.
 
-R4 additionally permits only the shared `IntegerList` projection and ordinary
-configured-rule `allow_empty` validation in:
+Focused proof may use colocated tests, the existing lockfile-v28 facts tests,
+the selected-owner input corridor and the selected module-extension invocation
+tests. The authentic rules_rust fixture remains external replay evidence; do
+not edit it. Gross caps are 900 production Rust lines, 1,000 proof Rust lines
+and 1,900 total.
 
-- `app/slug_analysis_v2/src/starlark_rule.rs`;
-- `app/slug_analysis_v2/src/starlark_transition.rs`; and
-- `app/slug_analysis_v2/src/dice.rs`.
-
-R5 focused proof may additionally use only the ordinary file-admissibility
-fixture/test corridor in `app/slug_analysis_v2/tests/starlark_rule.rs` for the
-required dependency-versus-empty precedence discriminator and positive
-integer-list `ctx.attr` projection.
-
-Focused proof may use tests colocated in those files and the selected-graph
-module-extension corridor in
-`app/slug_loading_v2/src/host_package_load_tests.rs`. R3 additionally permits
-only the existing
-`module_extension_definition_loading_tests::real_prepared_inputs_preserve_raw_first_and_contextual_errors`
-proof in `app/slug_loading_v2/src/bzl_module.rs` to replace its stale
-string-list-schema rejection with successful preparation. No production line
-or other test in that file is authorized. Do not touch the parked proof,
-fixtures, generated files, another crate, parser code, C++ modules or a
-consumer-specific file. Gross caps are 900 production Rust lines, 1,100 proof
-Rust lines and 2,000 total; deletions and moves count. Stop with `REPLAN` if
-another file, DICE key, retained evaluator value, custom Starlark collection,
-second attribute value graph, cache, interner or broader parser change is
-required.
+Do not touch the parked proof, parser, rules_rust, toolchain, C++, `cc_common`,
+`cc_internal`, query/CLI parsing, another lockfile version, materializer or
+remote execution. Add no key, lock, cache, retained evaluator value, custom
+Starlark collection or ruleset-specific branch. Stop with `REPLAN` if facts
+cannot reuse the lockfile semantic owner, metadata cannot detach before heap
+release, root proxy identity is unavailable without another graph key, or a
+required exact effect crosses the deferred lifecycle boundary.
 
 ## Required proof and validation
 
-Add one table-driven fourteen-kind conversion/default/runtime projection proof
-covering list and tuple inputs, ordered nested dictionaries, local and mapped
-labels, outputs and immutable collection mutation failures. Add discriminating
-rows for every wrong shape, i32 scalar/member overflow, unknown attributes,
-explicit `None`, mandatory/default order, scalar `values`, acceptance of empty
-tag collections with `allow_empty = False`, fail-closed invisible
-nested/default labels without an exact-order claim, same-package outputs,
-canonicalized duplicate label keys, and supplied/default/runtime/`dir`
-behavior for a leading-underscore field. Prove the shared `IntegerList` value
-through ordinary rule, macro, repository-rule and query/output-template
-boundaries.
+Prove the four-keyword matrix, list/tuple forms, both `"all"` directions,
+omitted/explicit `None`, repository grammar, duplicates/overlap, facts scalar
+and nested forms, tuple normalization, key sorting, arbitrary integers,
+finite floats, depth and unsupported types. Prove opaque return acceptance,
+wrong return rejection, metadata survival after evaluator drop, DICE equality
+differences for each retained field, default `None`, empty/nonempty facts
+boundary and root non-dev classification.
 
-Run formatting and diff checks, focused package/module-extension/repository
-tests, the full `slug_loading_v2` suite, direct analysis/query/core/server
-checks, pinned source hashes, clean Bazel/Buck2/Zabel trees, parked-proof hash
-and `scripts/v2_archive_status.sh`. Rebuild `slug_cli_v2`, clean `slugd` before
-and after, then replay the authentic rules_rust fixture. It must clear
-`auth: StringDict` without a rules_rust/toolchain/C++ special case; the next
-genuine generic failure selects the following packet. Independent architecture
-review is required before Rust and independent terminal review before
-acceptance.
+Prove generated-name membership, all expansion and root dev/non-dev failure
+order after repository instantiation. Reuse existing repository-call proofs;
+do not copy a nondiscriminating ruleset fixture.
 
-## R1 review and R2 correction
+Run formatting/diff checks, focused Bzlmod/loading tests, full
+`slug_bzlmod_v2` and `slug_loading_v2` suites, direct analysis/query/core/server
+checks, pinned hashes, clean Bazel/Buck2/Zabel trees, parked hash and the known
+archive baseline. Rebuild `slug_cli_v2`, clean `slugd` before and after, and
+replay the authentic rules_rust fixture. It must clear
+`extension_metadata(reproducible=True)` without a consumer special case; the
+next genuine generic failure selects the successor.
 
-Independent R1 architecture review returned `REPLAN` before Rust. First,
-Slug's shared `CanonicalLabel` value cannot retain a non-visible label long
-enough to reproduce Bazel's later schema-ordered visibility failure, so R1's
-exact nested/default visibility-order claim required a forbidden second value
-graph. R2 keeps complete exact visible-label conversion and explicitly defers
-only the precise non-visible diagnostic precedence while preserving fail-closed
-behavior. Second, R1 incorrectly treated `allow_empty` as tag conversion
-policy; pinned `AttributeUtils.typeCheckAttrValues` never consults it, so R2
-requires empty tag collections to succeed. Third, Bazel indexes tag fields by
-`Attribute.getPublicName()`; R2 therefore preserves `_private` rather than the
-internal `$private` spelling. The fourteen-kind inventory, shared
-`IntegerList`, invocation `FrozenHeap`, allowlist and caps are otherwise
-unchanged.
-
-Independent R2 architecture review returns `ACCEPT`. It confirms that exact
-valid/visible conversion, fail-closed invisible labels with deferred diagnostic
-precedence, tag-specific `allow_empty` behavior, public private-field names,
-the shared compact `IntegerList`, invocation-local `FrozenHeap`, allowlist,
-caps and proof matrix are coherent and implementation-ready. The only residual
-risk is the explicitly deferred precise ordering/diagnostics for non-visible
-labels.
-
-## R3 proof-only allowlist correction
-
-The first full `slug_loading_v2` run passed the new implementation proofs but
-correctly invalidated two historical rejection assertions. The selected
-`host_package_load_tests.rs` corridor already owns the scalar allowed-values
-expectation. The second assertion is colocated in `bzl_module.rs` and expected
-an unused `attr.string_list()` tag schema to fail during prepared-input
-validation. That behavior is exactly what this packet removes, so leaving the
-assertion unchanged cannot produce a green full suite without contradicting
-the admitted category.
-
-R3 changes only the proof allowlist to permit that one assertion to require a
-successful prepared input. It changes no production file, compatibility
-claim, value representation, lifetime, cap, test fixture or downstream
-consumer. Independent R3 review returns `ACCEPT`: the assertion is necessarily
-stale once `string_list` joins the exact ordinary tag category, the named hunk
-exposes rather than masks that behavior, and all four routing documents keep
-production ownership, semantics, representation and caps unchanged. Terminal
-validation may resume.
-
-## R4 shared-analysis projection correction
-
-The first dependent `slug_analysis_v2` check failed exhaustiveness in exactly
-two generic `CoercedAttributeValue` consumers: `ctx.attr` materialization and
-transition-attribute materialization. Both must project the already-retained
-`IntegerList(Arc<[i32]>)` as an invocation-local Starlark list of integers.
-This is not a new semantic owner or a tag special case; it completes the shared
-value path required by R2.
-
-The same audit found that the retained `allow_empty` bit now reaches ordinary
-rule schemas but is not yet consulted. Bazel 9.2
-`RuleContext.checkAttributesNonEmpty`, pinned SHA-256
-`0f6dcffac7286a9056d050624bd29e73cefc4138dd9dc24708dec63e147b41e2`,
-rejects empty lists/maps for configured rule attributes carrying `NON_EMPTY`.
-R4 therefore adds one shared collection-emptiness projection and performs that
-check after selector resolution, before dependency or rule implementation
-evaluation. Module-extension tags continue to ignore `allow_empty`; macro and
-repository-rule behavior is unchanged because Bazel's cited configured-rule
-consumer does not own those paths.
-
-Add colocated proofs for integer-list `ctx.attr`, transition projection and
-the complete collection/noncollection emptiness discriminator. No new value,
-key, cache, evaluator retention, collection implementation or representation
-is allowed. The original 900 production/1,100 proof/2,000 total gross caps
-remain sufficient. Independent review must accept R4 before those three
-analysis files are edited.
-
-Independent R4 review returns `REPLAN` only for phase order. Bazel creates and
-validates the prerequisite target map before
-`validateExtraPrerequisites` invokes `checkAttributesNonEmpty`; R4 instead
-placed the empty check before dependency evaluation. That would change
-dual-invalid error precedence and DICE work. The reviewer accepts the two
-integer-list allocations, complete list/map emptiness projection, allowlist,
-lifecycle and caps.
-
-## R5 corrected configured-rule validation phase
-
-Keep selector resolution where it is, but do not reject an empty configured
-value there. In `finish_analysis`, first complete and validate every declared
-dependency through the existing `validate_configured_dependency` loop. Then,
-before `evaluate_loaded_rule`, align the fully resolved attributes with the
-retained schema and reject the first schema-order empty list/map whose
-`allow_empty` bit is false. This preserves dependency error precedence and
-keeps the rule implementation uninvoked on a nonempty-policy failure.
-
-The integration proof must combine `attr.int_list(allow_empty=False)` with a
-file-admissibility dependency: a valid dependency plus empty list reports the
-nonempty policy, while an invalid dependency plus empty list reports the
-dependency failure first. A nonempty integer list must reach `ctx.attr` with
-order/sign intact. Transition allocation remains a colocated unit proof.
-Independent review must accept R5 before implementation resumes.
-
-Independent R5 review returns `ACCEPT`. Selector resolution remains early;
-every declared dependency completes and passes the existing validation loop;
-schema-order `NON_EMPTY` validation then runs before `evaluate_loaded_rule`.
-The dual-invalid file-admissibility/empty-list proof discriminates dependency
-precedence, while the valid signed integer-list row covers `ctx.attr` shape.
-The transition projection, complete list/map emptiness model, DICE ownership,
-lifecycle, allowlist and caps remain sound. Implementation may resume.
-
-## Terminal acceptance
-
-R5 is terminally `ACCEPTED` at 592 production, 777 proof and 1,369 total gross
-Rust lines. The complete `slug_loading_v2` and `slug_analysis_v2` suites pass;
-the named analysis/query/core/server checks, formatting, source hashes, clean
-reference trees, parked-proof hash, expected archive exceptions and rebuilt
-CLI pass. Independent terminal review confirms the shared compact
-`IntegerList`, invocation-local `FrozenHeap`, fourteen-kind conversion,
-tag-specific `allow_empty` behavior and ordinary dependency-before-nonempty
-phase.
-
-The authentic rules_rust configured-query replay clears the prior `auth:
-StringDict` failure without a ruleset, toolchain or C++ special case and now
-stops at the next generic boundary: `module_ctx.extension_metadata(...)`.
-Schedule only a docs-first complete Bazel 9.2 module-extension metadata
-category audit next. The stock fixture runner additionally encounters already
-unsupported query flags and expression/output forms; those CLI surfaces are
-not the semantic replay corridor and are not widened by this packet.
+Independent architecture review is required before Rust and independent
+terminal review before acceptance.
 
 ## Immediate predecessor
 
-Commit `cfe83834d` terminally accepts the complete recursive BUILD glob
-category and advances authentic replay from external `@@platforms//host` glob
-loading to this generic module-extension schema frontier.
+Commit `3c5603a3c` terminally accepts
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r5` at
+592 production/777 proof/1,369 total gross Rust lines and advances authentic
+replay from `auth: StringDict` to this metadata boundary.

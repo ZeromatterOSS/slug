@@ -22847,3 +22847,24 @@ configured-query replay advances to the next generic failure:
 `module_ctx.extension_metadata(...)`. Schedule only a docs-first complete
 Bazel 9.2 metadata category audit, with no rules_rust, toolchain, C++ or query
 special case.
+
+### WP-6-7B module-extension metadata construction and capture (2026-09-01)
+
+The authentic replay-selected successor is
+`WP-6-7B-module-extension-metadata-construction-and-capture-design-r1`.
+Implement the full four-keyword metadata constructor, opaque return contract,
+heap-independent receipt capture, root non-dev usage field and generated-name
+validation as one category. Do not special-case rules_rust's
+`reproducible=True` call.
+
+The Bzlmod semantic owner must hold one compact metadata/facts family and reuse
+the existing lockfile-v28 sorted facts representation. Selected-owner and
+legacy aggregate inputs retain matching root proxies for current dev/non-dev
+validation and future warning/fixup work; the current receipt gains the
+detached metadata identically on both invocation paths.
+No evaluator value, new DICE key, cache, lock or duplicate JSON/facts graph is
+allowed. Facts hydration/version persistence, lockfile result reuse,
+warning/fixup diagnostics and `mod tidy` remain explicit lifecycle successors;
+nonempty returned facts fail closed meanwhile. Bazel 9.2 owns semantics and
+Zabel supplies peer shape/lifetime guidance only. Independent architecture
+review is required before Rust.

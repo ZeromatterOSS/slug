@@ -2358,6 +2358,23 @@ need no V1 extraction or second tag representation. The authentic rules_rust
 configured-query replay clears the schema category and selects
 `module_ctx.extension_metadata(...)` as the next generic docs-first audit.
 
+### Stage 6 module-extension metadata utility decision (2026-09-01)
+
+Candidate packet
+`WP-6-7B-module-extension-metadata-construction-and-capture-design-r1` requires
+no V1 extraction. Promote the existing V2 lockfile-v28 sorted facts model
+behind a narrow public Bzlmod API and add one compact metadata selection value
+beside it. Reuse `CompactString`, `SmallSet`, `SortedMap`, immutable `Arc`
+slices and `Allocative`; do not create a loading-only facts tree, serde value
+graph, evaluator-retained value, cache or interner.
+
+The selected-owner and legacy aggregate inputs retain already-owned matching
+root proxies, and the existing invocation receipt owns detached metadata on
+both paths. This prepares later facts hydration, lockfile persistence and
+warning/fixup consumers without claiming them now. Bazel 9.2 remains semantic
+authority; Zabel's typed transient value and evaluator-release capture are
+peer guidance only. Independent architecture review is required before Rust.
+
 Zabel `0795445f...` schema-ordered tag slots, compact typed tag values and
 invocation freezing are peer optimization guidance only. Copy no Zig type,
 allocator, evaluator, scheduler, cache, diagnostic or behavior. Bazel 9.2 is
