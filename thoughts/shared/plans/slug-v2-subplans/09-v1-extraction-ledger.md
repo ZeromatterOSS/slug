@@ -2309,7 +2309,7 @@ scratch. No service-retained cache or asynchronous transfer memory is added.
 Status: R1 architecture review returned `REPLAN` before Rust; independent R2
 architecture review accepted the semantic architecture; proof-only R3 is
 independently accepted for
-`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r4`.
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r5`.
 
 Decision: no V1 extraction and no second tag-only value family. Extend the
 existing V2 `AttributeKind`/`CoercedAttributeValue` once with compact
@@ -2340,11 +2340,14 @@ mask an implementation error.
 
 The dependent analysis check selected R4 without changing the no-extraction
 decision: project the shared `IntegerList` through existing rule and transition
-Starlark allocators, and consult the already-retained `allow_empty` bit for
-ordinary configured rules after selector resolution. Only the three named
-analysis source files join ownership; tags still ignore the bit, other
-consumers remain unchanged, and no representation, graph, lifetime or cap is
-added. Independent R4 review is pending.
+Starlark allocators, and consult the retained `allow_empty` bit for ordinary
+configured rules. Independent review returns `REPLAN` only on phase order:
+Bazel validates completed prerequisites before the nonempty check. R5 moves
+the check after existing dependency validation and before rule implementation,
+with a dual-invalid precedence proof. Only the three named analysis source
+files join ownership; tags still ignore the bit, other consumers remain
+unchanged, and no representation, graph, lifetime or cap is added. Independent
+R5 review is pending.
 
 Zabel `0795445f...` schema-ordered tag slots, compact typed tag values and
 invocation freezing are peer optimization guidance only. Copy no Zig type,

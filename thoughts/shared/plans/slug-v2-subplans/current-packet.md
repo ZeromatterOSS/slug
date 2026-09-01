@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r4`
+Packet: `WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r5`
 
 Milestone: M7A generic Starlark/ruleset closure; module-extension tag schema
 conversion and invocation values.
@@ -9,6 +9,7 @@ Status: R1 architecture review returned `REPLAN`; independent R2 architecture
 review returned `ACCEPT`; implementation validation selected a proof-only R3
 allowlist correction; independent R3 review returned `ACCEPT`; dependent
 compilation selected an R4 shared-analysis projection correction for
+independent review; R4 review returned `REPLAN`; corrected R5 is pending
 independent review.
 
 The unrelated dirty
@@ -169,6 +170,11 @@ configured-rule `allow_empty` validation in:
 - `app/slug_analysis_v2/src/starlark_transition.rs`; and
 - `app/slug_analysis_v2/src/dice.rs`.
 
+R5 focused proof may additionally use only the ordinary file-admissibility
+fixture/test corridor in `app/slug_analysis_v2/tests/starlark_rule.rs` for the
+required dependency-versus-empty precedence discriminator and positive
+integer-list `ctx.attr` projection.
+
 Focused proof may use tests colocated in those files and the selected-graph
 module-extension corridor in
 `app/slug_loading_v2/src/host_package_load_tests.rs`. R3 additionally permits
@@ -278,6 +284,31 @@ key, cache, evaluator retention, collection implementation or representation
 is allowed. The original 900 production/1,100 proof/2,000 total gross caps
 remain sufficient. Independent review must accept R4 before those three
 analysis files are edited.
+
+Independent R4 review returns `REPLAN` only for phase order. Bazel creates and
+validates the prerequisite target map before
+`validateExtraPrerequisites` invokes `checkAttributesNonEmpty`; R4 instead
+placed the empty check before dependency evaluation. That would change
+dual-invalid error precedence and DICE work. The reviewer accepts the two
+integer-list allocations, complete list/map emptiness projection, allowlist,
+lifecycle and caps.
+
+## R5 corrected configured-rule validation phase
+
+Keep selector resolution where it is, but do not reject an empty configured
+value there. In `finish_analysis`, first complete and validate every declared
+dependency through the existing `validate_configured_dependency` loop. Then,
+before `evaluate_loaded_rule`, align the fully resolved attributes with the
+retained schema and reject the first schema-order empty list/map whose
+`allow_empty` bit is false. This preserves dependency error precedence and
+keeps the rule implementation uninvoked on a nonempty-policy failure.
+
+The integration proof must combine `attr.int_list(allow_empty=False)` with a
+file-admissibility dependency: a valid dependency plus empty list reports the
+nonempty policy, while an invalid dependency plus empty list reports the
+dependency failure first. A nonempty integer list must reach `ctx.attr` with
+order/sign intact. Transition allocation remains a colocated unit proof.
+Independent review must accept R5 before implementation resumes.
 
 ## Immediate predecessor
 

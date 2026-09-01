@@ -22783,7 +22783,7 @@ case.
 ### WP-6-7A module-extension tag attribute-schema category (2026-09-01)
 
 The authentic replay-selected successor is
-`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r4`.
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r5`.
 This is the complete default-enabled ordinary tag-schema kind category, not a
 literal `auth: StringDict` repair. Pinned Bazel 9.2 source plus a disposable
 fourteen-kind oracle establish `bool`, `int`, `int_list`, every ordinary
@@ -22824,10 +22824,12 @@ required before terminal validation continued. Independent R3 review returns
 exposes the newly admitted behavior without masking an implementation error.
 
 Dependent analysis compilation then failed at the two exhaustive shared-value
-projections for rule `ctx.attr` and transition attributes. R4 permits those
-consumers to allocate `IntegerList` as a Starlark integer list. It also permits
-`dice.rs` to enforce the already-retained `allow_empty` bit for ordinary
-configured rules after selector resolution, matching pinned Bazel 9.2
-`RuleContext.checkAttributesNonEmpty`. Tag conversion still ignores the bit;
-macro and repository paths are unchanged. No representation, DICE ownership,
-lifetime or cap changes. Independent R4 review is required before editing.
+projections for rule `ctx.attr` and transition attributes. R4 proposed those
+integer-list allocations plus configured-rule enforcement of the retained
+`allow_empty` bit. Independent review returns `REPLAN` only because R4 checked
+before dependency evaluation; Bazel 9.2 validates completed prerequisites
+first. R5 performs the check after existing dependency validation and before
+rule implementation, and requires a dual-invalid dependency/empty precedence
+proof. Tag conversion still ignores the bit; macro and repository paths are
+unchanged. No representation, DICE ownership, lifetime or cap changes.
+Independent R5 review is required before editing.

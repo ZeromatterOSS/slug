@@ -91,7 +91,7 @@ before Rust: its exact non-visible-label ordering claim cannot be represented
 without a forbidden second graph, it incorrectly applies `allow_empty` to tag
 conversion, and it uses Bazel's internal `$private` spelling instead of the
 public `_private` tag field. Activate only corrected
-`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r4`.
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r5`.
 R2 preserves exact conversion for all valid/visible values, makes invisible
 labels fail closed while deferring their precise diagnostic precedence,
 accepts empty tag collections regardless of `allow_empty`, and preserves
@@ -104,12 +104,16 @@ that expected `attr.string_list()` tag schemas to remain unsupported. It
 permits that named assertion to require successful preparation; production,
 semantics, caps and every other boundary are unchanged. Independent R3 review
 returns `ACCEPT`; terminal validation may resume.
-Dependent analysis compilation then selects R4: complete the shared
+Dependent analysis compilation then selected R4: complete the shared
 `IntegerList` projection through ordinary `ctx.attr` and transition inputs,
 and enforce the retained `allow_empty` bit for configured rules after selector
-resolution. Only `starlark_rule.rs`, `starlark_transition.rs` and `dice.rs`
-join production ownership. Tag, macro and repository behavior, representation,
-lifetime and caps remain unchanged; independent R4 review is pending.
+resolution. Independent review `REPLAN`s only the proposed validation phase:
+Bazel validates completed prerequisites before `NON_EMPTY`. Corrected R5 runs
+the check after existing dependency completion/validation and before rule
+implementation, and adds a dual-invalid precedence proof. Only
+`starlark_rule.rs`, `starlark_transition.rs` and `dice.rs` join production
+ownership. Tag, macro and repository behavior, representation, lifetime and
+caps remain unchanged; independent R5 review is pending.
 Structured `starlark_doc_extract` output and experimental remote repository
 execution remain separate deferred categories. Bazel 9.2 is sole behavior
 authority; Zabel remains peer architecture and optimization guidance only.
@@ -7170,7 +7174,7 @@ historical Host read, watcher, oracle, or JVM.
 Commit `cfe83834d` closes recursive BUILD glob loading and authentic rules_rust
 replay now stops at generic `auth: StringDict` tag-schema conversion. The
 docs-first successor is
-`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r4`.
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r5`.
 It covers all fourteen default-enabled ordinary Bazel 9.2 tag attribute kinds,
 including the missing shared `attr.int_list`, rather than special-casing
 rules_rust, toolchains, C++, `cc_common` or `cc_internal`.
@@ -7194,8 +7198,10 @@ Production ownership, semantics, caps and every other boundary remain
 unchanged; independent R3 review returns `ACCEPT` and terminal validation may
 resume.
 The dependent analysis check then exposed the shared `IntegerList` variant in
-the existing `ctx.attr` and transition projections. R4 permits only those two
-list allocations plus configured-rule enforcement of the already-retained
-`allow_empty` bit after selector resolution. Bazel 9.2 `RuleContext` owns that
-ordinary-rule check; tag, macro and repository behavior is unchanged.
-Independent R4 review is pending.
+the existing `ctx.attr` and transition projections. R4 proposed those two list
+allocations plus configured-rule enforcement of the already-retained
+`allow_empty` bit after selector resolution. Independent review `REPLAN`s only
+the phase: Bazel 9.2 validates completed prerequisites before `NON_EMPTY`.
+Corrected R5 checks after existing dependency validation and before rule
+implementation, with a dual-invalid precedence discriminator. Tag, macro and
+repository behavior is unchanged; independent R5 review is pending.
