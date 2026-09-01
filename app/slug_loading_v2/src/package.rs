@@ -4314,11 +4314,7 @@ fn aspect_attributes<'v>(
     let repo = defining_label.package().repo().as_str();
     let mut schemas = Vec::with_capacity(attribute_count);
     for (name, value) in attrs {
-        let definition = AttributeDefinition::from_value(value)
-            .and_then(|value| match value {
-                starlark::__macro_refs::Either::Left(value) => Some(value),
-                starlark::__macro_refs::Either::Right(_) => None,
-            })
+        let definition = attribute_definition_from_value(value)
             .ok_or_else(|| anyhow::anyhow!("aspect attribute `{name}` must use attr.label()"))?;
         let (label, file_admissibility, executable, exec_configuration) = match name.as_str() {
             "_capture_output" => (
@@ -4415,7 +4411,7 @@ fn aspect_attributes<'v>(
         {
             anyhow::bail!("aspect attribute `{name}` does not match the admitted fixed schema");
         }
-        schemas.push(declared_attribute_schema(name, definition));
+        schemas.push(declared_attribute_schema(name, &definition));
     }
     Ok(schemas.into())
 }
@@ -5018,33 +5014,32 @@ type AttributeDefinition<'v> = AttributeDefinitionGen<Value<'v>>;
 type FrozenAttributeDefinition = AttributeDefinitionGen<FrozenValue>;
 starlark::starlark_complex_values!(AttributeDefinition);
 
-fn rule_attribute_definition_from_value<'v>(value: Value<'v>) -> Option<AttributeDefinition<'v>> {
+fn attribute_definition_from_value<'v>(value: Value<'v>) -> Option<AttributeDefinition<'v>> {
     match AttributeDefinition::from_value(value)? {
         starlark::__macro_refs::Either::Left(value) => Some(value.clone()),
-        starlark::__macro_refs::Either::Right(value)
-            if value.required_providers.is_empty()
-                && value.attached_aspect.is_none()
-                && value.transition.is_none() =>
-        {
-            Some(AttributeDefinitionGen {
-                kind: value.kind,
-                mandatory: value.mandatory,
-                configurable: value.configurable,
-                configurable_set: value.configurable_set,
-                file_admissibility: value.file_admissibility.clone(),
-                flags: value.flags,
-                allowed_values: value.allowed_values.clone(),
-                default: value.default.clone(),
-                late_bound_default: value.late_bound_default.clone(),
-                computed_default: value.computed_default,
-                executable: value.executable,
-                exec_configuration: value.exec_configuration,
-                required_providers: value.required_providers.clone(),
-                attached_aspect: None,
-                transition: None,
-            })
-        }
-        starlark::__macro_refs::Either::Right(_) => None,
+        starlark::__macro_refs::Either::Right(value) => Some(AttributeDefinitionGen {
+            kind: value.kind,
+            mandatory: value.mandatory,
+            configurable: value.configurable,
+            configurable_set: value.configurable_set,
+            file_admissibility: value.file_admissibility.clone(),
+            flags: value.flags,
+            allowed_values: value.allowed_values.clone(),
+            default: value.default.clone(),
+            late_bound_default: value.late_bound_default.clone(),
+            computed_default: value.computed_default,
+            executable: value.executable,
+            exec_configuration: value.exec_configuration,
+            required_providers: value.required_providers.clone(),
+            attached_aspect: value.attached_aspect.as_ref().map(|value| value.to_value()),
+            transition: value
+                .transition
+                .as_ref()
+                .map(|transition| TransitionDefinitionGen {
+                    implementation: transition.implementation.to_value(),
+                    output: transition.output.clone(),
+                }),
+        }),
     }
 }
 
@@ -5118,12 +5113,9 @@ pub(crate) fn subrule_attribute_from_value<'v>(
         })
     }
 
-    match AttributeDefinition::from_value(value)
-        .ok_or_else(|| anyhow::anyhow!("subrule attribute '{name}' must use attr.*()"))?
-    {
-        starlark::__macro_refs::Either::Left(definition) => convert(name, definition),
-        starlark::__macro_refs::Either::Right(definition) => convert(name, definition),
-    }
+    let definition = attribute_definition_from_value(value)
+        .ok_or_else(|| anyhow::anyhow!("subrule attribute '{name}' must use attr.*()"))?;
+    convert(name, &definition)
 }
 
 impl<V> fmt::Display for AttributeDefinitionGen<V> {
@@ -7167,7 +7159,7 @@ fn symbolic_macro_global<'v>(
         if value.is_none() {
             continue;
         }
-        let definition = rule_attribute_definition_from_value(*value)
+        let definition = attribute_definition_from_value(*value)
             .ok_or_else(|| anyhow::anyhow!("macro attribute '{name}' must use attr.*()"))?;
         attributes.push(MacroAttributeSchema::from_definition(name, &definition)?);
     }
@@ -7321,14 +7313,9 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             if !is_repository_rule_attribute_name(&name) {
                 anyhow::bail!("unsupported repository_rule attribute name '{name}'");
             }
-            let definition = AttributeDefinition::from_value(value)
-                .and_then(|value| match value {
-                    starlark::__macro_refs::Either::Left(value) => Some(value),
-                    starlark::__macro_refs::Either::Right(_) => None,
-                })
-                .ok_or_else(|| {
-                    anyhow::anyhow!("repository attribute '{name}' must use attr.*()")
-                })?;
+            let definition = attribute_definition_from_value(value).ok_or_else(|| {
+                anyhow::anyhow!("repository attribute '{name}' must use attr.*()")
+            })?;
             if definition.configurable_set
                 || definition.late_bound_default.is_some()
                 || definition.computed_default
@@ -7371,11 +7358,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         let _ = doc;
         let mut attributes = Vec::new();
         for (name, value) in attrs.unwrap_or_default() {
-            let definition = AttributeDefinition::from_value(value)
-                .and_then(|value| match value {
-                    starlark::__macro_refs::Either::Left(value) => Some(value),
-                    starlark::__macro_refs::Either::Right(_) => None,
-                })
+            let definition = attribute_definition_from_value(value)
                 .ok_or_else(|| anyhow::anyhow!("tag attribute `{name}` must use attr.*()"))?;
             if definition.transition.is_some()
                 || definition.executable
@@ -7756,7 +7739,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 {
                     anyhow::bail!("rule attribute `{name}` is built in and cannot be redeclared");
                 }
-                let definition = rule_attribute_definition_from_value(value)
+                let definition = attribute_definition_from_value(value)
                     .ok_or_else(|| anyhow::anyhow!("rule attribute `{name}` must use attr.*()"))?;
                 if definition.configurable_set {
                     anyhow::bail!(

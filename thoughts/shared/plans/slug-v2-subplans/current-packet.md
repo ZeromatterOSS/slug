@@ -5,8 +5,8 @@ Packet: `WP-6-7A-cross-module-attribute-descriptor-identity-r1`
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 declaration and
 configured-attribute breadth.
 
-Status: independent design pre-review returned `ACCEPT`; implement only the
-frozen allowlists, caps, proofs, and stops below.
+Status: terminal implementation review returned `ACCEPT`. The bounded
+implementation, proof, replay, and hygiene gates below are complete.
 Base commit `300b724e7` terminally accepts the complete eleven-member C++
 configuration-field catalog. The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -252,6 +252,24 @@ two-hop oracle contract, complete field projection, vendored starlark-rust and
 Slug transitive heap ownership, unchanged consumer restrictions, scratch and
 retained memory classification, A/B/A proof, allowlists, caps, peer-guidance
 classification, and replay stop.
+
+Implementation replaced the partial frozen conversion with the one shared
+projection and routed rule, macro, fixed-aspect, repository-rule, tag-class,
+and subrule declarations through it. Focused proof covers local/frozen field
+equivalence, two-hop dictionary union, producer-owned labels, provider/aspect/
+transition pointer identity, late-bound/computed/configurability preservation,
+consumer-specific rejection, invalid values, and same-DICE source A/B/A. The
+complete loading suite passes 556 tests with one ignored; the complete analysis
+suite passes 120 tests. Rebuilt authentic rules_rust 0.73.0 cquery clears
+`RUSTC_ALLOCATOR_LIBRARIES_ATTRS["allocator_libraries"]` and advances to
+`rust/private/rust.bzl:1110`, where the already-typed transition declaration
+rejects nonempty `inputs` before any rule body, provider invocation,
+`cc_common`, or `cc_internal` execution. Production growth is 35 additions and
+52 deletions; proof growth is 293 additions and 7 deletions, for 387 total
+gross lines. Formatting, metadata, archive baseline, diff, cap, pinned-source,
+clean-peer, parked-SHA, rebuilt-CLI, and daemon-clean gates pass. Independent
+terminal implementation review returned `ACCEPT` and selected generic
+transition declaration-input breadth as the next frontier.
 
 ## Immediate predecessor
 

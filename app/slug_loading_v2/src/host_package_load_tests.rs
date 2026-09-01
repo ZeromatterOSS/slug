@@ -30806,15 +30806,301 @@ load("//rust/private:providers.bzl", "CaptureClippyOutputInfo", "ClippyInfo", "C
         let setting = module.get(name).unwrap().downcast::<FrozenRuleDefinition>().unwrap();
         assert_eq!(setting.build_setting_definition, Some(BuildSettingDefinition::Boolean { flag: true }));
     }
-    for rich in [
-        "P=provider()\nX=attr.label(providers=[P])",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl)\nX=attr.label_list(aspects=[A])",
-        "def impl(settings, attr): return {}\nT=transition(implementation=impl, inputs=[], outputs=['//:setting'])\nX=attr.label(cfg=T)",
-    ] {
-        let rich_owner = child_owner("rich");
-        let rich = eval_bzl_with_identity(rich, rich_owner.clone()).unwrap();
-        assert!(eval_bzl_with_loaded_children("load(':rich.bzl','X')\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'x':X})", clippy_owner(), &[(":rich.bzl", rich_owner, rich)]).is_err());
+}
+
+#[test]
+fn imported_rule_attribute_descriptors_preserve_complete_frozen_identity() {
+    let owner = |package: &str, file: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(&format!("@@rules_rust+//{package}:{file}")).unwrap(),
+        workspace_path: PathBuf::from(format!("/rules_rust/{package}/{file}")),
+        repository_mapping: Arc::from([]),
+    };
+    let producer_owner = owner("producer", "attrs.bzl");
+    let producer = eval_bzl_with_identity(
+        r#"P = provider(fields = {})
+def aspect_impl(target, ctx): return []
+A = aspect(implementation = aspect_impl)
+def transition_impl(settings, attr): return {}
+TRANSITION_IMPL = transition_impl
+T = transition(implementation = transition_impl, inputs = [], outputs = ["//command_line_option:platforms"])
+DESCRIPTORS = {
+    "owned": attr.label(default = Label(":owned")),
+    "deps": attr.label_list(default = [Label(":owned")], allow_files = [".rs", ".src", ".rs"], providers = [[P]], aspects = [A], cfg = T, flags = ["DIRECT_COMPILE_TIME_INPUT"]),
+    "tool": attr.label(default = Label(":tool"), allow_single_file = [".bin"], providers = [P], executable = True, cfg = "exec"),
+    "mode": attr.string(default = "two", values = ["two", "one", "two"]),
+    "required": attr.int(mandatory = True, values = [2, 1, 2]),
+}
+def rule_impl(ctx): return []
+LOCAL = rule(implementation = rule_impl, attrs = DESCRIPTORS)
+"#,
+        producer_owner.clone(),
+    )
+    .unwrap();
+    let bridge_owner = owner("bridge", "attrs.bzl");
+    let bridge = eval_bzl_with_loaded_children(
+        "load('//producer:attrs.bzl', 'DESCRIPTORS')\nREEXPORTED = {} | DESCRIPTORS\n",
+        bridge_owner.clone(),
+        &[(
+            "//producer:attrs.bzl",
+            producer_owner.clone(),
+            producer.dupe(),
+        )],
+    )
+    .unwrap();
+    let consumer = eval_bzl_with_loaded_children(
+        "load('//bridge:attrs.bzl', 'REEXPORTED')\ndef impl(ctx): return []\nIMPORTED = rule(implementation = impl, attrs = {'local': attr.bool()} | REEXPORTED)\n",
+        owner("consumer", "defs.bzl"),
+        &[("//bridge:attrs.bzl", bridge_owner, bridge)],
+    )
+    .unwrap();
+    let local = producer
+        .get("LOCAL")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    let imported = consumer
+        .get("IMPORTED")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    let schema_index = |rule: &FrozenRuleDefinition, name: &str| {
+        rule.schema
+            .iter()
+            .position(|schema| schema.name == name)
+            .unwrap()
+    };
+
+    for name in ["owned", "deps", "tool", "mode", "required"] {
+        let local = &local.schema[schema_index(&local, name)];
+        let imported = &imported.schema[schema_index(&imported, name)];
+        assert_eq!(imported.kind, local.kind, "{name}");
+        assert_eq!(imported.mandatory, local.mandatory, "{name}");
+        assert_eq!(imported.configurable, local.configurable, "{name}");
+        assert_eq!(
+            imported.file_admissibility, local.file_admissibility,
+            "{name}"
+        );
+        assert_eq!(imported.flags, local.flags, "{name}");
+        assert_eq!(imported.allowed_values, local.allowed_values, "{name}");
+        assert_eq!(imported.default, local.default, "{name}");
+        assert_eq!(imported.executable, local.executable, "{name}");
+        assert_eq!(
+            imported.exec_configuration, local.exec_configuration,
+            "{name}"
+        );
+        assert_eq!(
+            imported.required_providers, local.required_providers,
+            "{name}"
+        );
+        assert_eq!(
+            imported.attached_aspect.is_some(),
+            local.attached_aspect.is_some(),
+            "{name}"
+        );
+        assert_eq!(
+            imported.transition.is_some(),
+            local.transition.is_some(),
+            "{name}"
+        );
     }
+    assert!(
+        imported.schema[schema_index(&imported, "local")]
+            .default
+            .is_none()
+    );
+    assert!(matches!(
+        imported.schema[schema_index(&imported, "owned")].default.as_ref(),
+        Some(CoercedAttributeValue::Label(label))
+            if label.to_string() == "@@rules_rust+//producer:owned"
+    ));
+    let deps = &imported.schema[schema_index(&imported, "deps")];
+    assert_eq!(
+        provider_identity_text(&deps.required_providers[0][0]),
+        "@@rules_rust+//producer:attrs.bzl%P"
+    );
+    assert_eq!(
+        deps.file_admissibility.suffixes().unwrap(),
+        [".rs", ".src", ".rs"]
+    );
+    assert!(deps.flags.direct_compile_time_input());
+    assert!(
+        deps.attached_aspect
+            .unwrap()
+            .to_value()
+            .ptr_eq(producer.get("A").unwrap().value())
+    );
+    let transition = deps.transition.as_ref().unwrap();
+    assert!(
+        transition
+            .implementation()
+            .to_value()
+            .ptr_eq(producer.get("TRANSITION_IMPL").unwrap().value())
+    );
+    assert_eq!(transition.output(), "//command_line_option:platforms");
+    let tool = &imported.schema[schema_index(&imported, "tool")];
+    assert!(tool.executable && tool.exec_configuration);
+    assert!(tool.file_admissibility.single_artifact());
+    assert_eq!(tool.file_admissibility.suffixes().unwrap(), [".bin"]);
+    assert!(imported.schema[schema_index(&imported, "required")].mandatory);
+    assert_eq!(
+        imported.schema[schema_index(&imported, "mode")].allowed_values,
+        AllowedAttributeValues::String(Arc::from(["one".into(), "two".into()]))
+    );
+}
+
+#[test]
+fn imported_descriptors_share_one_seam_without_widening_consumer_policies() {
+    let producer_owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_rust+//rust/private:consumer_attrs.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_rust/rust/private/consumer_attrs.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let producer = eval_bzl_with_identity(
+        r#"P = provider()
+def aspect_impl(target, ctx): return []
+DEP_ASPECT = aspect(implementation = aspect_impl)
+def transition_impl(settings, attr): return {}
+USER_TRANSITION = transition(implementation = transition_impl, inputs = [], outputs = ["//:setting"])
+def computed(name, tags): return Label("//owned:computed")
+SIMPLE = attr.string(default = "value")
+PRIVATE = attr.label(default = Label("//owned:dep"))
+PROVIDER = attr.label(providers = [P])
+ASPECTED = attr.label_list(default = [], aspects = [DEP_ASPECT])
+TRANSITIONED = attr.label(default = Label("//owned:dep"), cfg = USER_TRANSITION)
+COMPUTED = attr.label(default = computed)
+LATE = attr.label(default = configuration_field(fragment = "coverage", name = "output_generator"))
+CONFIGURABLE = attr.string(configurable = False)
+BAD = 1
+RUSTFMT = {
+    "_config": attr.label(allow_single_file = True, default = Label("//rust/settings:rustfmt.toml")),
+    "_process_wrapper": attr.label(cfg = "exec", executable = True, default = Label("//util/process_wrapper")),
+}
+RUSTFMT_BAD = {
+    "_config": attr.label(default = Label("//rust/settings:rustfmt.toml")),
+    "_process_wrapper": attr.label(cfg = "exec", executable = True, default = Label("//util/process_wrapper")),
+}
+"#,
+        producer_owner.clone(),
+    )
+    .unwrap();
+    let evaluate = |source: &str| {
+        eval_bzl_with_loaded_children(
+            source,
+            clippy_owner(),
+            &[(
+                ":consumer_attrs.bzl",
+                producer_owner.clone(),
+                producer.dupe(),
+            )],
+        )
+    };
+    let accepted = evaluate(
+        r#"load(":consumer_attrs.bzl", "SIMPLE", "PRIVATE", "RUSTFMT")
+def macro_impl(name, visibility, value): pass
+M = macro(implementation = macro_impl, attrs = {"value": SIMPLE})
+def repository_impl(ctx): pass
+RR = repository_rule(implementation = repository_impl, attrs = {"value": SIMPLE})
+TC = tag_class(attrs = {"value": SIMPLE})
+def subrule_impl(ctx): pass
+S = subrule(implementation = subrule_impl, attrs = {"_dep": PRIVATE})
+def imported_aspect_impl(target, ctx): return []
+FIXED = aspect(implementation = imported_aspect_impl, attrs = RUSTFMT)
+"#,
+    )
+    .unwrap();
+    for name in ["M", "RR", "TC", "S", "FIXED"] {
+        assert!(accepted.get(name).is_ok(), "{name}");
+    }
+
+    for (source, expected) in [
+        (
+            "load(':consumer_attrs.bzl','PROVIDER')\ndef impl(name, visibility, value): pass\nX=macro(implementation=impl, attrs={'value':PROVIDER})",
+            "macro attribute 'value' uses an unsupported dependency constraint",
+        ),
+        (
+            "load(':consumer_attrs.bzl','PROVIDER')\ndef impl(ctx): pass\nX=repository_rule(implementation=impl, attrs={'value':PROVIDER})",
+            "unsupported repository_rule attribute schema 'value'",
+        ),
+        (
+            "load(':consumer_attrs.bzl','PROVIDER')\nX=tag_class(attrs={'value':PROVIDER})",
+            "tag attribute `value` does not support providers",
+        ),
+        (
+            "load(':consumer_attrs.bzl','ASPECTED')\ndef impl(ctx): pass\nX=subrule(implementation=impl, attrs={'_dep':ASPECTED})",
+            "subrule attribute '_dep' uses a deferred attached aspect",
+        ),
+        (
+            "load(':consumer_attrs.bzl','TRANSITIONED')\ndef impl(ctx): pass\nX=subrule(implementation=impl, attrs={'_dep':TRANSITIONED})",
+            "bad cfg for attribute '_dep'",
+        ),
+        (
+            "load(':consumer_attrs.bzl','RUSTFMT_BAD')\ndef impl(target, ctx): return []\nX=aspect(implementation=impl, attrs=RUSTFMT_BAD)",
+            "aspect attribute `_config` does not match the admitted fixed schema",
+        ),
+        (
+            "load(':consumer_attrs.bzl','COMPUTED')\ndef impl(ctx): return []\nX=rule(implementation=impl, attrs={'_dep':COMPUTED})",
+            "rule attribute `_dep` uses a default form deferred outside this packet",
+        ),
+        (
+            "load(':consumer_attrs.bzl','LATE')\ndef impl(ctx): return []\nX=rule(implementation=impl, attrs={'late':LATE})",
+            "the attribute must be private (i.e. start with '_'). Found 'late'",
+        ),
+        (
+            "load(':consumer_attrs.bzl','CONFIGURABLE')\ndef impl(ctx): return []\nX=rule(implementation=impl, attrs={'value':CONFIGURABLE})",
+            "attribute 'value' has the 'configurable' argument set",
+        ),
+        (
+            "load(':consumer_attrs.bzl','BAD')\ndef impl(ctx): return []\nX=rule(implementation=impl, attrs={'value':BAD})",
+            "rule attribute `value` must use attr.*()",
+        ),
+    ] {
+        let error = evaluate(source).unwrap_err().to_string();
+        assert!(error.contains(expected), "{source}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn imported_descriptor_source_changes_and_restores_through_loaded_module_a_b_a() {
+    const BUILD: &[u8] =
+        b"load(':consumer.bzl','R')\nR(name='subject', visibility=['//visibility:public'])\n";
+    const BRIDGE: &[u8] =
+        b"load(':producer.bzl','DESCRIPTOR')\nATTRS = {} | {'mode': DESCRIPTOR}\n";
+    const CONSUMER: &[u8] = b"load(':bridge.bzl','ATTRS')\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={} | ATTRS)\n";
+    const PRODUCER_A: &[u8] = b"DESCRIPTOR=attr.string(default='a')\n";
+    const PRODUCER_B: &[u8] = b"DESCRIPTOR=attr.string(default='b')\n";
+    let files = |producer| {
+        [
+            ("BUILD.bazel", BUILD),
+            ("producer.bzl", producer),
+            ("bridge.bzl", BRIDGE),
+            ("consumer.bzl", CONSUMER),
+        ]
+    };
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let a = load_repository_package_fixture_on(&dice, &files(PRODUCER_A), 434).await;
+    let b = load_repository_package_fixture_on(&dice, &files(PRODUCER_B), 435).await;
+    let restored = load_repository_package_fixture_on(&dice, &files(PRODUCER_A), 436).await;
+    let mode = |outcome: &RepositoryPackageOutcome| {
+        let target = &repository_package_terminal(outcome).targets[0];
+        let PackageTargetKind::StarlarkRule(rule) = &target.kind else {
+            panic!("subject did not retain its imported Starlark schema")
+        };
+        let value = rule
+            .values()
+            .iter()
+            .find(|value| value.declaration_name == "mode")
+            .unwrap();
+        let CoercedAttributeValue::String(value) = value.value.as_ref() else {
+            panic!("mode did not retain its string default")
+        };
+        value.clone()
+    };
+
+    assert_eq!(mode(&a), "a");
+    assert_eq!(mode(&b), "b");
+    assert_eq!(mode(&restored), "a");
+    assert!(!RepositoryPackageLoadKey::equality(&a, &b));
+    assert!(RepositoryPackageLoadKey::equality(&a, &restored));
 }
 
 #[test]
