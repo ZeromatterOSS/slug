@@ -2179,3 +2179,40 @@ net / 304 gross proof Rust lines. Full serial owner/downstream and terminal
 review pass. The next Bzlmod declaration-signature packet changes only generated
 call binding and has no retained utility, hashing, collection, interning, clone,
 memory-accounting or V1 extraction decision.
+
+### Stage 6 assigned-global Starlark module utility decision (2026-08-31)
+
+Status: design independently `ACCEPTED` after a focused correction requiring
+assigned origin and public visibility together for `use_repo_rule`, in
+`WP-6-7A-bzlmod-declaration-selection-identity-parity-r1`.
+
+Source inspected: Buck2 `088c75c7e36805df99c3de29062baa95db700b8b`
+starlark-rust `environment/{names,modules}.rs`, evaluator module stores, and
+load evaluation; pinned Bazel 9.2 net.starlark `Module.getGlobals`,
+`BzlLoadFunction.execAndExport`, `RegularRunnableExtension`,
+`InnateRunnableExtension`, `StarlarkRepoRule`, and the named runfiles/Bzlmod
+tests. V1 supplies no applicable owner.
+
+Decision: retain Buck2's `SmallMap` name/slot table and slot-indexed assignment
+stores. Add one evaluation-scratch packed assignment bit per slot and fold it
+into the existing frozen name entry, with a layout assertion that the retained
+tuple does not grow. Public/private visibility remains unchanged and distinct
+from assigned/load origin. One hidden `FrozenModule::get_assigned` returns an
+assigned binding together with its unchanged visibility. Module-extension
+selectors accept either visibility; `use_repo_rule` requires `Public` from the
+same origin-aware lookup so public-named raw loads remain excluded. No
+parser/source scan, second map/set, interner, cache, global state, DICE key, or
+producer-side table is admitted.
+
+Zabel `0795445f3ab60f4e49070bdd0b94425c5610f73a`
+`module_extension_declaration_host.zig` and
+`module_extension_execution_capture.zig` are concept/test-only guidance for
+first producer label/name retention through repository-rule aliases. Copy no
+Zig code, layout, allocator, evaluator, scheduler, cache, error, or behavior.
+Bazel 9.2 alone fixes assigned-global selection and alias semantics.
+
+Memory class: the packed mutable bits are evaluator scratch and die at freeze;
+the folded bit is DICE-retained frozen-module semantic metadata with no new
+allocation and no evaluator borrow. Existing source/manifests own invalidation,
+existing frozen heaps own values, and existing DICE publication/cutoff,
+cancellation, eviction and shutdown lifetimes remain unchanged.

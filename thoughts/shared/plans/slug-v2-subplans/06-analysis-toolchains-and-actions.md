@@ -21906,3 +21906,41 @@ have Bazel's positional-or-named shape, later admitted parameters remain
 named-only, `tag_class.attrs` belongs in the category because
 `Param.positional()` defaults true, and no retained owner changes. Implement
 only the frozen two-annotation correction and its category proof.
+
+#### Bzlmod signature parity accepted; declaration selection identity active (2026-08-31)
+
+Commit `817d017b6` terminally accepts the complete `repository_rule`,
+`module_extension`, and `tag_class` first-parameter binding category. Full
+owner/downstream validation and the real rules_cc replay pass the old
+named-only failure; independent terminal review returned `ACCEPT`.
+
+The replay now stops at rules_cc's private
+`_compatibility_proxy_repo_rule`. A complete Bazel 9.2 selector audit proves
+this is not an underscore exception: `use_extension` selects any global
+actually assigned by its target module, including private assignments and
+assignment-based aliases/reexports, but excludes raw load bindings.
+Repository rules invoked inside extensions retain their first-assignment
+producer identity at either visibility. `use_repo_rule` selects only a public
+assigned global, yet a public alias/reexport retains the underlying first
+producer label/name rather than the alias spelling.
+
+Activate only
+`WP-6-7A-bzlmod-declaration-selection-identity-parity-r1` at `817d017b6`.
+Add one compact starlark-rust assigned-global lookup backed by a packed
+evaluation-scratch slot bit folded into the existing frozen-name entry; use it
+at every module-extension selection/reacquisition site. Return the binding's
+unchanged visibility with that lookup; require both assigned origin and public
+visibility for `use_repo_rule`, then remove its false alias-equals-producer
+check. Public visibility alone is insufficient because a public-named raw
+`load` binding is visible through starlark-rust's current `FrozenModule::get`.
+Private
+repository-effect reacquisition may use any visibility only because the
+complete defining label/name/schema projection is already authenticated.
+No parser, set, builtin binder, DICE key, rule body, action, `cc_common`,
+`cc_internal`, rules_cc or C++ special case is admitted. Bazel 9.2 remains sole
+semantic authority; Zabel supplies producer-identity guidance only.
+
+Initial retained-representation/public-ABI review returned `REVISE`: public
+visibility alone does not exclude public-named raw `load` bindings in
+starlark-rust. The focused correction makes assigned origin and public
+visibility conjunctive for `use_repo_rule`; rereview returned `ACCEPT`.

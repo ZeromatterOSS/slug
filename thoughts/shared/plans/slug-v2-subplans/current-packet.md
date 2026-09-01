@@ -1,158 +1,234 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-bzlmod-declaration-signature-parity-r1`
+Packet: `WP-6-7A-bzlmod-declaration-selection-identity-parity-r1`
 
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 Bzlmod declaration
-builtin call binding.
+selection and repository-rule producer identity.
 
-Status: independent public-ABI review returned `ACCEPT`; implementation is
-active. Commit `21db5d7b8` terminally accepts the complete FilesToRun Spawn
-expansion and is this packet's base. The unrelated dirty
+Status: design is frozen and independently `ACCEPTED`. The first retained-
+representation/public-ABI review returned `REVISE` because public visibility
+alone does not exclude a public-named raw `load` binding in starlark-rust. The
+focused correction requires assigned origin and public visibility together for
+`use_repo_rule`; rereview returned `ACCEPT`. Commit `817d017b6` terminally
+accepts the complete Bzlmod declaration-call signature category and is this
+packet's Rust base. The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked;
 do not edit or stage it.
 
-## Observable result and stop boundary
+## Observable result and complete category boundary
 
-Make the admitted call signatures of the complete Bzlmod `.bzl` declaration
-builtin category match Bazel 9.2:
+Match Bazel 9.2's complete admitted Bzlmod declaration-selection category:
 
-1. `repository_rule(implementation, ...)` keeps its already-correct mandatory
-   positional-or-named first parameter;
-2. `module_extension(implementation, ...)` admits its mandatory first
-   parameter positionally or by name; and
-3. `tag_class(attrs, ...)` admits its optional first parameter positionally or
-   by name, with omission retaining the empty-dictionary default.
+1. a `module_extension` selected by `use_extension` is found among globals
+   actually assigned by the selected `.bzl` module, independent of underscore
+   visibility. Direct private definitions, private/public aliases, and
+   assignment-based reexports work; raw `load` bindings that were never
+   assigned by that module remain absent;
+2. a `repository_rule` called from a module-extension implementation may have
+   a public or private first assignment. Later file-effect execution reacquires
+   that exact defining-module binding at any visibility and still compares the
+   complete retained producer projection before invoking its implementation;
+3. `use_repo_rule` continues to select only a public assigned global, so a
+   directly requested underscore/private name and a raw loaded binding fail.
+   Public aliases and assignment-based reexports succeed while retaining the
+   underlying repository rule's first-export defining label/name as the
+   `RepoRuleId`; and
+4. `tag_class` has no independent module selector. Its accepted call binding
+   and embedding in the selected module-extension projection remain unchanged.
 
-Every later parameter remains named-only. Duplicate positional-plus-named
-binding, missing mandatory implementation, excess positional arguments and
-existing type/semantic validation continue to fail before publication. Named
-forms remain byte-for-byte behaviorally unchanged.
-
-After focused proof, rebuild the V2 CLI and run two daemon-clean
+Every module-extension load, drift-reacquisition, and selected-owner invocation
+path must use the same assigned-global capability. Missing/wrong-kind values,
+load-only bindings, changed manifests/projections, unsupported extension
+factors, and repository projection drift continue to fail closed. After
+focused proof, rebuild the V2 CLI and run two daemon-clean
 `cquery //app/slug_cli_v2:slug` replays. Both must pass the authentic rules_cc
-0.2.17 `compatibility_proxy = module_extension(_compat_proxy_impl)` declaration
-and stop identically at the next unsupported boundary, or succeed. The observed
-next boundary selects the successor; do not expand this packet to consume it.
+0.2.17 private `_compatibility_proxy_repo_rule` boundary and stop identically
+at the next unsupported boundary, or succeed. Do not consume that next
+boundary in this packet.
 
-This is generic Starlark Host-ABI binding. It adds no parser or evaluator
-language construct, rule implementation, repository/module-extension effect,
-provider, DICE key, configured analysis, action, execution, `cc_common`,
-`cc_internal`, rules_cc or C++ special case. Bazel 9 BCR Starlark continues to
-own rule bodies; `cc_common` is only a downstream consumer.
+This is generic Starlark module-binding and Bzlmod Host-selection architecture.
+It adds no parser grammar, evaluator language value, set behavior, manual
+builtin binder, rule body, repository operation, DICE key, configured-analysis
+owner, action, execution, `cc_common`, `cc_internal`, rules_cc, or C++ branch.
+Bazel 9 BCR Starlark remains the rule-body owner.
 
 ## Learned facts and authenticated evidence
 
 Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is the sole
 semantic authority. Pinned sources and SHA-256 values are:
 
-- `RepositoryModuleApi.java`
-  `1bb286ec5fe4667c4328081b3ca002e22fbcfb1af8f4ba5d06581a20151ddd8f`;
-- `Param.java`
-  `3014de7bc7fb2bb40b8f1e8f0ec648bd923eb5777963c9d21111e0dfcae28104`;
+- `StarlarkRepositoryModule.java`
+  `c6adf0f521e56419ec22e7980def6b27778bab4d5c5294b3556c2286f5b6bcea`;
+- `BzlLoadFunction.java`
+  `bc3efe6f47de9c0a4f8a5a865972575ace4594564c4851d64edea37184fdf2cc`;
+- `RegularRunnableExtension.java`
+  `1c91439270aef8dcd1d4615dd40369e51431cebaee36f8dc085a51a9d0aead20`;
+- `InnateRunnableExtension.java`
+  `1d2d87a071281f20b9be4253cd92ed007c6c3915ca117214e7ce3d720861698e`;
+- net.starlark `Module.java`
+  `d8893ba4f6beea6c12a997122873591a5cb917b31bd3b18a33f2eddb6a9d3e49`;
 - `RunfilesRepoMappingManifestTest.java`
   `8df1c7f6cc4558fe35405f43e7130ffc4f0588f41e75f18709adf520146545df`;
   and
-- selected rules_cc 0.2.17 `cc/extensions.bzl`
-  `a190a467ac48329a76e1a9ccab1fea53519af4bb2202e22346b23fc24dcf9872`.
+- `ModuleExtensionResolutionTest.java`
+  `d8602fd385d34ab5387cb0ef3891ef9acc0ca62cd8f67324e09fd33ea7a3e769`.
 
-`RepositoryModuleApi` marks the first parameter of `repository_rule` and
-`module_extension` as `named = true` without disabling positional binding;
-`tag_class.attrs` has the same declaration. `Param.positional()` defaults to
-true. All following parameters explicitly set `positional = false`.
-`RunfilesRepoMappingManifestTest` and rules_cc independently exercise the
-single positional `module_extension` spelling.
+`BzlLoadFunction.execAndExport` attaches first-assignment identity to every
+`StarlarkExportable`, including underscore bindings. `StarlarkRepoRule` stores
+that first rule name. `RegularRunnableExtension` selects a
+`Module.getGlobal(extensionName)` with no underscore/public-visibility gate.
+`InnateRunnableExtension` instead rejects requested names beginning `_`, then
+selects `Module.getGlobal(ruleName)` and uses the selected rule's own
+`RepoRule`; it does not require the requested alias to equal the rule's first
+export label/name. net.starlark `Module.getGlobals` contains globals assigned
+by that module and excludes unassigned load bindings.
 
-A disposable Bazel 9.2 oracle composed all three positional first-parameter
-forms in one extension: `repository_rule(_repo_impl)`,
-`tag_class({"value": attr.string()})`, and
-`module_extension(_extension_impl, tag_classes = {...})`. Querying the
-generated repository returned `@generated//:ok`. The current rebuilt Slug
-binary instead reaches rules_cc and returns the discriminating error
-`Missing named-only parameter implementation` at `cc/extensions.bzl:190`.
+The pinned runfiles test executes an underscore-bound `_deps_repo` inside a
+module extension. The pinned module-extension resolution test separately proves
+that `use_repo_rule(..., "_data_repo")` is rejected. These are complementary,
+not contradictory, visibility surfaces.
 
-Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance,
-not a source of truth. Its
-`src/starlark_host/engine/module_extension_execution_capture.zig`
-(`8f03505b2302f79443d3ab95f12cbca2b65eec8a417ff94e739fb9fafcd06fc0`)
-keeps call binding at the declaration Host boundary and already proves the
-rules_cc positional `module_extension` spelling. Its `tag_class` binder rejects
-all positional arguments, contrary to pinned Bazel's API declaration, so that
-behavior is explicitly not adopted. Copy no Zig code, binding tables, errors,
-representation, scheduler, cache or compatibility claim.
+A disposable Bazel 9.2 oracle additionally proved all discriminating rows:
+
+- private and public repository rules invoked inside one extension both
+  generated queryable repositories;
+- direct private `use_repo_rule` failed with the expected does-not-export
+  message shape;
+- public `use_repo_rule` aliases to both first-private and first-public rules
+  succeeded;
+- direct private, private/public alias, and assignment-reexported
+  `module_extension` selections succeeded;
+- raw public/private load bindings failed for both Bzlmod selectors; and
+- private/public extension reexports and a public repository-rule reexport
+  from another `.bzl` succeeded.
+
+Authentic rules_cc 0.2.17 `cc/extensions.bzl`
+`a190a467ac48329a76e1a9ccab1fea53519af4bb2202e22346b23fc24dcf9872`
+declares and invokes `_compatibility_proxy_repo_rule` privately. Current Slug
+passes its positional `module_extension` declaration after `817d017b6`, then
+fails only because `authenticate_rule` calls public-only `FrozenModule::get`.
 
 ## Compatibility classification
 
-**Exact:** first-parameter positional-or-named acceptance for
-`repository_rule`, `module_extension`, and `tag_class`; omission/default rules;
-named-only status for later parameters; duplicate, missing and excess argument
-rejection; and unchanged existing semantic validation after binding.
+**Exact:** assigned-global versus raw-load selection for `module_extension`;
+private/public/alias/reexport shapes above; internal repository-rule
+reacquisition; public-only `use_repo_rule` selection; first-export repository
+producer identity; missing/wrong-kind/load-only/projection-drift rejection; and
+unchanged declaration-call signatures.
 
-**Slug-native:** Rust/starlark-rust diagnostic wording where the accepted tests
-do not claim exact Bazel text, Rust Unicode, compact frozen declaration layout
+**Slug-native:** Rust/starlark-rust diagnostic wording where no exact text is
+claimed, Rust Unicode, the compact frozen-name representation, DICE key bytes,
 and existing structural publication identity.
 
-**Unsupported/deferred:** `repository_rule.remotable` behind Bazel's
-experimental flag; unadmitted repository/module-context operations; physical
-repository effects beyond accepted capabilities; later BCR loading/configured
-analysis failures; exact Java exception text; and all action/execution breadth.
-The packet may not silently widen any of these surfaces.
+**Unsupported/deferred:** `repository_rule.remotable`, unadmitted
+repository/module-context operations, exact Java exception text, module
+extension environment/OS/architecture/facts execution, later BCR loading and
+configured-analysis failures, and action/execution breadth. No classification
+is widened by this packet.
 
-## Frozen architecture
+## Frozen architecture and natural owners
 
-Keep `package_globals` as the sole declaration-builtin registration owner and
-starlark-rust's generated parameter schema as the sole binder. Correct only the
-two mismatched first-parameter annotations: remove the named-only requirement
-from `module_extension.implementation` and `tag_class.attrs`. Do not add a
-manual `*args/**kwargs` adapter, signature table, wrapper builtin, call-site
-rewrite, source inspection or rules_cc branch. The existing Rust function
-arguments continue to feed the same validation and frozen declaration owners.
+The adopted starlark-rust parser and evaluator remain the sole language
+implementation. Add one general, hidden `FrozenModule::get_assigned(name)`
+capability; do not parse source, scan AST text, add a Slug side table, infer
+underscores, or use `get_any_visibility` for Bzlmod selectors.
 
-Category proof must cover all three builtins together so later consumers do not
-reopen this signature decision. Assert positional, named and omitted-where-
-optional forms; reject positional-plus-named duplicates and a second
-positional argument; and prove positional/named results retain the same
-declaration content. No retained representation, hashing, compact collection,
-interning, clone, memory-accounting or DICE ownership changes.
+`MutableNames` owns an evaluation-scratch packed assignment bit per module slot.
+Ordinary top-level assignment stores, including modify/reassignment, mark the
+slot; `load` stores and `import_public_symbols` do not. Freeze folds that bit
+into each existing compact `FrozenNames` entry. The retained tuple must not
+grow in `size_of`; add a layout assertion. `Module::set` is assigned, while the
+existing private import helper stays unassigned. `get_assigned` returns the
+assigned value together with its unchanged `Visibility`, and treats load-only
+bindings as absent. It is a hidden origin-aware lookup, not a change to public
+module exports.
+
+All four module-extension selection/reacquisition call sites in `bzl_module.rs`
+and `module_extension.rs` consume `get_assigned` and accept either returned
+visibility. Repository file-effect authentication alone uses existing
+`get_any_visibility` because its retained projection already names the exact
+defining module and first-export binding; complete projection equality prevents
+imported/alias substitution. `use_repo_rule` also selects through
+`get_assigned`, then requires the returned visibility to be `Public`; this
+public-and-assigned conjunction rejects both underscore/private definitions and
+public-named raw load bindings. Its selected value is the authentication
+boundary: remove only the false requirement that the selected alias's request
+label/name equal the underlying first-export producer identity. The two-load
+stable-projection comparison and all type checks remain.
+
+No new DICE key, cache, interner, registry, global state, hash, collection
+graph, task, lock, or fallback is admitted. Existing source/manifests own
+invalidation; existing frozen-module heaps own values; existing selected
+definition/owner keys own request-local selection and structural cutoffs. The
+mutable packed bit vector is evaluator scratch released at freeze. The folded
+bit is DICE-retained semantic module metadata and borrows no evaluator heap.
+Cancellation, publication, eviction, and shutdown remain the existing module
+load/key lifecycles.
+
+## Buck2 and Zabel guidance
+
+Buck2 commit `088c75c7e36805df99c3de29062baa95db700b8b` remains the
+starlark-rust donor. Its compact `SmallMap` name/slot table and generated
+assignment stores are retained. Its current `FrozenModule` exposes public
+lookup while private/imported bindings share one visibility state, so it has no
+assigned-only selector to reuse verbatim. The bounded V2 addition is a leaf
+module-environment capability; do not fork parser grammar, bytecode evaluation,
+hashing, slot identity, or module storage. No V1 extraction applies.
+
+Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance,
+not truth. `module_extension_declaration_host.zig`
+`7474d1ddb37d2ffaa0006b4ce3b19df3917bb6dce055c4db87363fcf50067600`
+binds one producer `.bzl` label/name to a repository-rule declaration and
+preserves it through aliases; `module_extension_execution_capture.zig`
+`8f03505b2302f79443d3ab95f12cbca2b65eec8a417ff94e739fb9fafcd06fc0`
+retains that pair in invocation rows. Adopt only the producer-identity and
+module-owner concepts. Copy no Zig code, allocator, row layout, evaluator,
+selector behavior, scheduler, cache, errors, or compatibility claim.
 
 ## Allowlist, caps, validation and stops
 
 Production allowlist:
 
-- `app/slug_loading_v2/src/package.rs`.
+- `starlark-rust/starlark/src/environment/names.rs`;
+- `starlark-rust/starlark/src/environment/modules.rs`;
+- `starlark-rust/starlark/src/eval/runtime/evaluator.rs`;
+- `starlark-rust/starlark/src/eval/compiler/module.rs`;
+- `app/slug_loading_v2/src/bzl_module.rs`;
+- `app/slug_loading_v2/src/module_extension.rs`;
+- `app/slug_loading_v2/src/module_extension_innate_repository.rs`; and
+- `app/slug_loading_v2/src/module_extension_repository_file_effect.rs`.
 
-Proof allowlist:
+Proof stays inline in those files. Scheduling/status edits may touch this
+manifest, canonical Live Status, Stage 6, and Stage 9. No fixture is committed;
+the disposable Bazel oracle is already recorded. No routing-log row is needed
+unless review changes the route.
 
-- the inline `module_extension_definition_tests` module in
-  `app/slug_loading_v2/src/package.rs`;
-- `app/slug_loading_v2/src/host_package_load_tests.rs`; or
-- one existing focused `app/slug_loading_v2` test module if it already owns
-  declaration-builtin call signatures.
+Caps are 90 net / 120 gross starlark-rust production lines, 30 net / 45 gross
+Slug production lines, 260 net / 330 gross proof lines, and 420 gross total
+Rust lines. The large Slug files remain cohesive because only their existing
+selector/reacquisition call sites and owning tests change; do not add another
+central module or refactor unrelated history.
 
-Scheduling/status edits may touch this manifest, canonical Live Status,
-Stage 6 and Stage 9. No routing-log row is needed unless review changes the
-route.
+Validate serially with the focused starlark assigned-global test; focused
+module-extension selection, innate alias, and private file-effect tests; full
+`starlark` and `slug_loading_v2`; direct `slug_query_v2` and
+`slug_analysis_v2` dependents; rebuilt `slug_cli_v2`; two daemon-clean real
+bootstrap replays; `cargo fmt --all -- --check`; Cargo metadata;
+`scripts/v2_archive_status.sh`; `git diff --check`; cap/layout accounting; and
+parked-file SHA-256 verification. Clean stale `slugd` before and after replays.
 
-Caps are 10 net / 10 gross production Rust lines, 120 net / 150 gross proof
-Rust lines, and 130 net / 160 gross total Rust lines. Validate serially with
-the focused signature tests, full `slug_loading_v2`, direct `slug_query_v2` and
-`slug_analysis_v2` dependents, rebuilt `slug_cli_v2`, two daemon-clean real
-bootstrap replays, `cargo fmt --all -- --check`, Cargo metadata,
-`scripts/v2_archive_status.sh`, `git diff --check`, cap accounting and parked
-file SHA-256 verification. Clean stale `slugd` processes before and after the
-replays.
-
-`REPLAN` before changing parser/evaluator language semantics, starlark-rust,
-manual argument binding, a retained declaration representation, DICE/loading
-ownership, repository effects, a rule/provider/action owner, exact diagnostic
-claims, an unsupported parameter, any ruleset/C++ branch, or a cap. Independent
-public-ABI review is required before Rust; independent terminal review is
-required before acceptance and commit.
+`REPLAN` before changing parser grammar, Starlark visibility/load behavior,
+bytecode value semantics beyond the assignment-origin bit, public
+`FrozenModule::get`, a DICE key, module-load ownership, retained producer
+identity fields, repository effects, an unsupported declaration parameter, an
+action/rule/provider owner, any ruleset/C++ branch, or a cap. Independent
+retained-representation/public-ABI review is required before Rust and
+independent terminal review before acceptance and commit.
 
 ## Immediate predecessor
 
-Commit `21db5d7b8` implements the independently accepted complete FilesToRun
-Spawn expansion at `+378/-226` production and `+279/-25` proof Rust lines. It
-passes full owner/downstream, alias, root/subrule, warm A/B/A, format, metadata,
-archive and hygiene gates. Its later execution/REAPI importer remains deferred
-and must consume FilesToRun roots from both invocation and tool domains without
-flattening or losing alias topology.
+Commit `817d017b6` terminally accepts exact first-parameter binding across
+`repository_rule`, `module_extension`, and `tag_class`. It changes only the two
+mismatched generated-binder annotations plus category proof, passes full owner
+and downstream validation, and advances the real BCR replay from the old
+named-only error to the private repository-rule selection boundary.
