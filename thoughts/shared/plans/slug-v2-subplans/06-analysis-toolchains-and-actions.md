@@ -21953,3 +21953,30 @@ remains protected by complete producer-projection equality. Full owner and
 downstream validation passes, the complete starlark result adds one passing
 test over an identical 30-failure detached baseline, and two real replays
 advance to rules_rust `attr.label_keyed_string_dict(doc=...)` breadth.
+
+#### Bzlmod selection identity accepted; attribute constructor categories active (2026-08-31)
+
+Commit `18b2549bd` terminally accepts the complete assigned-global/private/
+alias/reexport selector category and first-producer repository identity. The
+next real failure is declaration-time `doc` binding on
+`attr.label_keyed_string_dict`, before configured analysis or `cc_common`.
+
+Activate `WP-6-7A-attribute-doc-parameter-category-parity-r1` at
+`18b2549bd`. Close the validation-only documentation parameter across all
+thirteen attribute representations Slug already owns through the existing
+generated binder and shared discard helper. Retain no documentation or new
+schema state. Sequence later constructor breadth by semantic family:
+collection/`int_list` plus `allow_empty`, label-dependency controls, then
+experimental/disabled surfaces. `attr.license` remains absent under Bazel
+9.2's default incompatible flag so BCR `hasattr` fallbacks stay correct.
+Zabel guides only that category partition and future retained-policy placement;
+Bazel 9.2 remains the sole behavior authority.
+
+The documentation-parameter implementation is terminally `ACCEPTED`. Five
+missing named-only parameters feed the existing discard validator, and one
+matrix proves all thirteen owned representations preserve identical retained
+definitions for omitted, `None`, and distinct string docs while rejecting
+invalid types and positional docs. Full owner/direct-dependent validation and
+the CLI rebuild pass. The real replay advances to the separate
+`attr.label_list(flags=["DIRECT_COMPILE_TIME_INPUT"])` label-dependency-control
+family. No parser, schema, DICE, ruleset, `cc_common`, or C++ owner changed.

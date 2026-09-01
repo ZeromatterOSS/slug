@@ -5877,8 +5877,10 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] mandatory: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
+        discard_attribute_doc(doc)?;
         attribute_definition(
             AttributeKind::StringKeyedLabelDict,
             mandatory.unwrap_or(false),
@@ -5895,8 +5897,10 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] mandatory: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
+        discard_attribute_doc(doc)?;
         attribute_definition(
             AttributeKind::LabelKeyedStringDict,
             mandatory.unwrap_or(false),
@@ -5961,8 +5965,10 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] mandatory: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
+        discard_attribute_doc(doc)?;
         attribute_definition(
             AttributeKind::LabelListDict,
             mandatory.unwrap_or(false),
@@ -5976,9 +5982,11 @@ fn attr_methods(builder: &mut MethodsBuilder) {
     }
     fn output<'v>(
         #[starlark(this)] _attr: Value<'v>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] mandatory: Option<bool>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
+        discard_attribute_doc(doc)?;
         attribute_definition(
             AttributeKind::Output,
             mandatory.unwrap_or(false),
@@ -5992,9 +6000,11 @@ fn attr_methods(builder: &mut MethodsBuilder) {
     }
     fn output_list<'v>(
         #[starlark(this)] _attr: Value<'v>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] mandatory: Option<bool>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
+        discard_attribute_doc(doc)?;
         attribute_definition(
             AttributeKind::OutputList,
             mandatory.unwrap_or(false),
@@ -8372,6 +8382,95 @@ mod module_extension_definition_tests {
             "repository_rule(_impl, {})",
         ] {
             assert!(evaluate(&format!("def _impl(ctx):\n    pass\nbad = {rejected}\n")).is_err());
+        }
+    }
+
+    #[test]
+    fn attribute_documentation_category_is_named_typed_and_nonsemantic() {
+        #[derive(Debug, PartialEq, Eq)]
+        struct DefinitionSnapshot {
+            kind: AttributeKind,
+            mandatory: bool,
+            configurable: bool,
+            configurable_set: bool,
+            allow_files: bool,
+            allow_single_file: Option<AllowSingleFile>,
+            allowed_values: AllowedAttributeValues,
+            default: Option<CoercedAttributeValue>,
+            late_bound_default: bool,
+            computed_default: bool,
+            executable: bool,
+            exec_configuration: bool,
+            required_providers: Arc<[Arc<[ProviderIdentity]>]>,
+            attached_aspect: bool,
+            transition: bool,
+        }
+        let snapshot = |constructor: &str, arguments: &str| {
+            let module = evaluate(&format!("X = attr.{constructor}({arguments})\n")).unwrap();
+            let definition = module
+                .get("X")
+                .unwrap()
+                .downcast::<FrozenAttributeDefinition>()
+                .unwrap();
+            DefinitionSnapshot {
+                kind: definition.kind,
+                mandatory: definition.mandatory,
+                configurable: definition.configurable,
+                configurable_set: definition.configurable_set,
+                allow_files: definition.allow_files,
+                allow_single_file: definition.allow_single_file.clone(),
+                allowed_values: definition.allowed_values.clone(),
+                default: definition.default.clone(),
+                late_bound_default: definition.late_bound_default.is_some(),
+                computed_default: definition.computed_default,
+                executable: definition.executable,
+                exec_configuration: definition.exec_configuration,
+                required_providers: definition.required_providers.clone(),
+                attached_aspect: definition.attached_aspect.is_some(),
+                transition: definition.transition.is_some(),
+            }
+        };
+        for constructor in [
+            "bool",
+            "int",
+            "string",
+            "label",
+            "string_list",
+            "label_list",
+            "string_keyed_label_dict",
+            "label_keyed_string_dict",
+            "label_list_dict",
+            "output",
+            "output_list",
+            "string_dict",
+            "string_list_dict",
+        ] {
+            let omitted = snapshot(constructor, "");
+            assert_eq!(
+                omitted,
+                snapshot(constructor, "doc = None"),
+                "{constructor}"
+            );
+            assert_eq!(
+                omitted,
+                snapshot(constructor, "doc = 'first documentation'"),
+                "{constructor}"
+            );
+            assert_eq!(
+                omitted,
+                snapshot(constructor, "doc = 'different documentation'"),
+                "{constructor}"
+            );
+            for invalid in ["1", "[]"] {
+                assert!(
+                    evaluate(&format!("X = attr.{constructor}(doc = {invalid})\n")).is_err(),
+                    "{constructor} accepted doc={invalid}"
+                );
+            }
+            assert!(
+                evaluate(&format!("X = attr.{constructor}('documentation')\n")).is_err(),
+                "{constructor} accepted positional documentation"
+            );
         }
     }
 
