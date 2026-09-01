@@ -22693,3 +22693,21 @@ walk. Resume Rust acceptance only after that cap correction returns `ACCEPT`.
 Independent cap-correction review recomputes exactly 987 production, 624 proof
 and 1,611 total gross lines and returns `ACCEPT`. R2 implementation acceptance
 may resume under the corrected caps and otherwise unchanged contract.
+
+R2 ends `REPLAN` at the mandatory full `slug_loading_v2` suite. The sole
+failure is protected test
+`observed_root_package_preserves_semantics_arcs_order_events_and_families`:
+its dependency assertion expects include patterns `*.txt`, `sub/*.txt` and
+exclude pattern `sub/no.txt`, while the accepted implementation correctly
+retains only the two include traversal keys. Reintroducing a fake or real
+exclude request would violate the accepted in-memory exclusion architecture.
+
+Independently review only
+`WP-6-7A-recursive-build-glob-category-implementation-r3`. Add
+`app/slug_loading_v2/src/host_package_load_tests.rs` to the proof allowlist for
+the sole purpose of replacing that one three-key expectation with the two
+include keys in the named test. No other line in the 37,117-line file is
+authorized. The measured result becomes 987 production/626 proof/1,613 total
+gross under unchanged 1,000/1,000/1,720 caps. Every semantic, production,
+DICE, cache, lock, traversal, compatibility and remaining proof boundary is
+unchanged. Resume editing only after independent `ACCEPT`.

@@ -65,6 +65,11 @@ semantics, allowlists, proof obligations and 1,720 total cap: one shared
 immutable pattern representation serves the flat-listing and observed Host
 owners while preserving existing DICE observation keys. The platforms file is
 a discriminator only.
+R2 then ended `REPLAN` when the mandatory full suite exposed one protected
+legacy assertion that requires the now-forbidden exclude traversal. Review
+only R3's proof-allowlist correction: it permits replacing that single
+three-key dependency expectation with the two include keys, under unchanged
+production, semantics, caps and all other proof boundaries.
 Structured `starlark_doc_extract` output and experimental remote repository
 execution remain separate deferred categories. Bazel 9.2 is sole behavior
 authority; Zabel remains peer architecture and optimization guidance only.

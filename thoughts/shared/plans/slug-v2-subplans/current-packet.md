@@ -1,12 +1,12 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-recursive-build-glob-category-implementation-r2`
+Packet: `WP-6-7A-recursive-build-glob-category-implementation-r3`
 
 Milestone: M7A generic Starlark/ruleset closure; BUILD glob loading semantics.
 
-Status: implementation active after independent `ACCEPT` of the R2 cap
-correction. The accepted architecture, compatibility classes, allowlists and
-proof obligations are unchanged.
+Status: proof-allowlist correction review active after R2 ended `REPLAN` at a
+stale protected assertion. The accepted architecture, compatibility classes,
+production allowlist, caps and proof obligations are unchanged.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -149,10 +149,13 @@ Proof allowlist:
 - `app/slug_loading_v2/src/host_glob/tests.rs`;
 - `app/slug_loading_v2/src/host_glob/adapter_tests.rs`;
 - `app/slug_loading_v2/src/host_glob/traversal_tests.rs`; and
-- `app/slug_loading_v2/src/host_package_attempt_tests.rs`.
+- `app/slug_loading_v2/src/host_package_attempt_tests.rs`; and
+- `app/slug_loading_v2/src/host_package_load_tests.rs`, limited to replacing
+  the one stale exclude-traversal dependency expectation in
+  `observed_root_package_preserves_semantics_arcs_order_events_and_families`.
 
-Do not touch the parked proof, `host_package_load_tests.rs`, fixtures,
-generated files or another crate. Gross caps are 1,000 production, 1,000 proof
+Do not touch the parked proof, any other `host_package_load_tests.rs` line,
+fixtures, generated files or another crate. Gross caps are 1,000 production, 1,000 proof
 and 1,720 total Rust lines; deletions and moves count. In `package.rs`, change
 only the existing glob/binding corridor; `glob.rs` remains the shared semantic
 owner.
@@ -165,6 +168,14 @@ production cap to 1,000; it adds no file, semantic row, proof exception, DICE
 owner, cache, lock or eager walk. The unchanged 1,720 total cap still bounds
 the complete packet. Independent review recomputed exactly 987 production, 624
 proof and 1,611 total gross lines and returned `ACCEPT`.
+
+R2 ended `REPLAN` when the required full loading suite proved that the named
+protected test still required an observed Host traversal dependency for the
+exclude `sub/no.txt`. The accepted architecture intentionally filters excludes
+after the include union and forbids that dependency. R3 adds only the exact
+proof assertion above; changing its three expected traversal keys to the two
+include keys adds two gross proof lines, for 987 production/626 proof/1,613
+total. It does not authorize another change in the 37,117-line file.
 
 Stop with `REPLAN` if another production file is required, segment-key equality
 cannot remain byte/discriminator based, or the implementation needs a new DICE
