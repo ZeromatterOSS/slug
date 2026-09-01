@@ -7220,7 +7220,7 @@ docs-first complete Bazel 9.2 module-extension metadata category audit; add no
 rules_rust, toolchain, C++ or CLI special case.
 
 Activate docs-first
-`WP-6-7B-module-extension-metadata-construction-and-capture-design-r1` only
+`WP-6-7B-module-extension-metadata-construction-and-capture-design-r2` only
 after independent architecture review. It places one compact metadata/facts
 family in the Bzlmod semantic owner, reusing lockfile facts; captures detached
 metadata in the existing invocation receipt; validates generated repository
@@ -7229,3 +7229,11 @@ membership and root usage kinds; and exposes the general
 reproducible lockfile reuse, warning/fixup generation and `mod tidy` remain
 explicit lifecycle successors. Zabel is peer guidance only; rules_rust is a
 replay discriminator only.
+
+R1 independent architecture review returned `REPLAN`: Bazel accepts `"all"`
+only with an empty list companion, normalizes a `None` implementation return to
+the same default metadata value as explicit `extension_metadata()`, and runs
+metadata fixup/validation only when a root usage exists. R2 corrects exactly
+those points, including a nonroot-only selected-owner proof, without changing
+owners, caps or lifecycle deferrals. Focused R2 rereview is required before
+Rust.

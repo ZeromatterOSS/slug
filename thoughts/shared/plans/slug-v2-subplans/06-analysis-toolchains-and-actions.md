@@ -22851,7 +22851,7 @@ special case.
 ### WP-6-7B module-extension metadata construction and capture (2026-09-01)
 
 The authentic replay-selected successor is
-`WP-6-7B-module-extension-metadata-construction-and-capture-design-r1`.
+`WP-6-7B-module-extension-metadata-construction-and-capture-design-r2`.
 Implement the full four-keyword metadata constructor, opaque return contract,
 heap-independent receipt capture, root non-dev usage field and generated-name
 validation as one category. Do not special-case rules_rust's
@@ -22861,10 +22861,21 @@ The Bzlmod semantic owner must hold one compact metadata/facts family and reuse
 the existing lockfile-v28 sorted facts representation. Selected-owner and
 legacy aggregate inputs retain matching root proxies for current dev/non-dev
 validation and future warning/fixup work; the current receipt gains the
-detached metadata identically on both invocation paths.
+detached, non-optional default-normalized metadata identically on both
+invocation paths. `None` and explicit `extension_metadata()` are one semantic
+value. A selected-owner input distinguishes absent root usage from a present
+root usage and validation runs only for the latter; the legacy root aggregate
+is root-present by construction.
 No evaluator value, new DICE key, cache, lock or duplicate JSON/facts graph is
 allowed. Facts hydration/version persistence, lockfile result reuse,
 warning/fixup diagnostics and `mod tidy` remain explicit lifecycle successors;
 nonempty returned facts fail closed meanwhile. Bazel 9.2 owns semantics and
 Zabel supplies peer shape/lifetime guidance only. Independent architecture
 review is required before Rust.
+
+R1 independent review returned `REPLAN` on three bounded exactness points. R2
+requires the companion of `"all"` to be exactly an empty Starlark list (empty
+tuple and `None` reject), normalizes `None` to explicit default metadata for
+DICE equality, and skips metadata fixup/validation for nonroot-only selected
+invocations. The frozen owners, allowlist, caps and deferred effects do not
+change. Focused R2 rereview is required before Rust.

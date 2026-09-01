@@ -1,12 +1,13 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7B-module-extension-metadata-construction-and-capture-design-r1`
+Packet: `WP-6-7B-module-extension-metadata-construction-and-capture-design-r2`
 
 Milestone: M7A generic Starlark/ruleset closure; module-extension metadata
 construction, return capture and generated-repository validation.
 
-Status: docs-first architecture awaiting independent review. Rust is not yet
-authorized.
+Status: R1 independent architecture review returned `REPLAN`. R2 corrects the
+three bounded semantic mismatches and awaits focused independent rereview.
+Rust is not yet authorized.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -42,7 +43,8 @@ Admit as **exact** for Bazel 9.2:
 - named-only binding, defaults, types and failure order for all four
   `extension_metadata` parameters;
 - paired unspecified direct-dependency fields; paired list/tuple string
-  sequences; the single `"all"` plus explicit-empty-companion forms; valid
+  sequences; the single `"all"` plus exactly an empty Starlark-list companion;
+  valid
   user-provided repository names; duplicate and regular/dev overlap rejection;
 - boolean `reproducible`, including retention when direct dependencies are
   unspecified and facts are empty;
@@ -51,11 +53,14 @@ Admit as **exact** for Bazel 9.2:
   list normalization, recursively sorted dictionary keys and the seven-level
   nesting bound;
 - opaque metadata type identity; module-extension implementations may return
-  only `None` or metadata produced by this host; returned metadata is detached
-  before evaluator release and participates structurally in DICE equality;
-- validation that explicit direct dependencies were generated, `"all"`
-  expansion over generated names, and rejection of nonempty regular/dev sets
-  when the root has no matching non-dev/dev extension usage; and
+  only `None` or metadata produced by this host; `None` normalizes to the same
+  default semantic value as explicit `extension_metadata()`; returned metadata
+  is detached before evaluator release and participates structurally in DICE
+  equality;
+- when a root usage exists, validation that explicit direct dependencies were
+  generated, `"all"` expansion over generated names, and rejection of nonempty
+  regular/dev sets without matching non-dev/dev root proxies; when no root
+  usage exists, skip this fixup/validation exactly as Bazel does; and
 - exact `root_module_has_non_dev_dependency` from matching root proxies.
 
 Keep as **Slug-native** Rust valid-Unicode strings and error decoration,
@@ -133,18 +138,25 @@ Add no second fact graph, serde value tree, global table, interner or cache.
 
 Both the selected-owner input and legacy root-aggregate input retain the
 already-parsed matching root proxies, preserving dev classification, imports,
-locations and include-file ownership for future warning/fixup work. They expose
-only narrow accessors; no new DICE key or reverse edge is added. The two
-invocation paths must produce identical context fields, metadata capture and
-validation behavior.
+locations and include-file ownership for future warning/fixup work. The
+selected-owner projection distinguishes an absent root usage from a present
+root usage whose retained proxy slice describes its dev/non-dev occurrences;
+the legacy root aggregate is root-present by construction. They expose only
+narrow accessors; no new DICE key or reverse edge is added. The two invocation
+paths must produce identical context fields, metadata capture and validation
+behavior for equivalent inputs.
 
 `InvocationContext` constructs an invocation-local opaque Starlark wrapper.
 After evaluation, downcast and clone its shared metadata before the `Module`
-and evaluator are released. Add `Option<ModuleExtensionMetadata>` to the
-existing receipt. Repository instantiation stays unchanged. Certificate
-validation compares metadata selections to instantiated generated names and
-root proxy kinds. `None` retains default metadata behavior without allocating
-a parallel result path.
+and evaluator are released. Add one non-optional, default-normalized
+`ModuleExtensionMetadata` to the existing receipt: `None` and explicit
+`extension_metadata()` publish the same value and are equal in DICE. Do not
+retain an explicit-return bit in semantic equality or create a parallel result
+path. Repository instantiation stays unchanged. Only when the invocation has a
+root usage does certificate validation compare metadata selections to
+instantiated generated names and retained root proxy kinds. A selected-owner
+nonroot-only invocation skips that validation and reports
+`root_module_has_non_dev_dependency = False`.
 
 Nonempty facts are fully type-checked and normalized at construction, but a
 returned nonempty facts value fails closed before certificate publication until
@@ -178,17 +190,21 @@ required exact effect crosses the deferred lifecycle boundary.
 
 ## Required proof and validation
 
-Prove the four-keyword matrix, list/tuple forms, both `"all"` directions,
-omitted/explicit `None`, repository grammar, duplicates/overlap, facts scalar
-and nested forms, tuple normalization, key sorting, arbitrary integers,
-finite floats, depth and unsupported types. Prove opaque return acceptance,
-wrong return rejection, metadata survival after evaluator drop, DICE equality
-differences for each retained field, default `None`, empty/nonempty facts
-boundary and root non-dev classification.
+Prove the four-keyword matrix, ordinary explicit list/tuple forms, both `"all"`
+directions with exactly an empty list companion, and rejection of empty tuple
+or `None` companions; omitted/explicit `None`, repository grammar,
+duplicates/overlap, facts scalar and nested forms, tuple normalization, key
+sorting, arbitrary integers, finite floats, depth and unsupported types. Prove
+opaque return acceptance, wrong return rejection, metadata survival after
+evaluator drop, DICE equality differences for each retained field, semantic
+equality of a `None` return and explicit `extension_metadata()`, empty/nonempty
+facts boundary and root non-dev classification.
 
 Prove generated-name membership, all expansion and root dev/non-dev failure
-order after repository instantiation. Reuse existing repository-call proofs;
-do not copy a nondiscriminating ruleset fixture.
+order after repository instantiation when root usage is present. Prove a
+selected-owner nonroot-only invocation skips those checks even for metadata
+that would fail them if a root usage existed. Reuse existing repository-call
+proofs; do not copy a nondiscriminating ruleset fixture.
 
 Run formatting/diff checks, focused Bzlmod/loading tests, full
 `slug_bzlmod_v2` and `slug_loading_v2` suites, direct analysis/query/core/server
@@ -207,3 +223,11 @@ Commit `3c5603a3c` terminally accepts
 `WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r5` at
 592 production/777 proof/1,369 total gross Rust lines and advances authentic
 replay from `auth: StringDict` to this metadata boundary.
+
+R1 independent architecture review returned `REPLAN` on three bounded Bazel
+9.2 mismatches. R2 freezes the `"all"` companion as an empty list rather than
+an arbitrary empty sequence, normalizes `None` and explicit default metadata
+to one receipt value, and conditions generated-name/root-polarity validation
+on root-usage presence. All ownership, allowlists, caps and deferred lifecycle
+boundaries remain unchanged. Focused independent R2 rereview is required
+before Rust.
