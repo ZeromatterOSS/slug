@@ -20,7 +20,6 @@ use std::sync::Arc;
 use allocative::Allocative;
 use compact_str::CompactString;
 use dupe::Dupe;
-use slug_build_api_v2::ProviderId;
 use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::RunfilesPackageMetadata;
 use slug_build_api_v2::RunfilesRepositoryMapping;
@@ -56,6 +55,7 @@ use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
+use starlark::values::Tracer;
 use starlark::values::UnpackValue;
 use starlark::values::Value;
 use starlark::values::ValueLike;
@@ -2964,6 +2964,49 @@ pub(crate) fn subrule_toolchain_requirements(
     Ok(requirements.into())
 }
 
+fn aspect_toolchain_requirements(
+    value: Option<Value>,
+    subrules: &AttachedSubrules,
+    eval: &Evaluator<'_, '_, '_>,
+) -> anyhow::Result<Arc<[ToolchainTypeRequirement]>> {
+    let mut requirements = subrule_toolchain_requirements(value, eval)?.to_vec();
+    for requirement in subrules
+        .definitions
+        .iter()
+        .flat_map(|definition| definition.toolchains.iter())
+    {
+        if let Some(existing) = requirements
+            .iter_mut()
+            .find(|existing| existing.label() == requirement.label())
+        {
+            if requirement.mandatory() && !existing.mandatory() {
+                *existing = requirement.clone();
+            }
+        } else {
+            requirements.push(requirement.clone());
+        }
+    }
+    Ok(requirements.into())
+}
+
+fn aspect_exec_compatible_with(
+    values: Option<UnpackListOrTuple<&str>>,
+    source: &BzlModuleIdentity,
+) -> anyhow::Result<Arc<[CanonicalLabel]>> {
+    let mut seen = SmallSet::new();
+    values
+        .unwrap_or_default()
+        .items
+        .into_iter()
+        .filter_map(|value| match direct_toolchain_label(value, source) {
+            Ok(label) if seen.insert(label.clone()) => Some(Ok(label)),
+            Ok(_) => None,
+            Err(error) => Some(Err(error)),
+        })
+        .collect::<anyhow::Result<Vec<_>>>()
+        .map(Arc::from)
+}
+
 fn package_global(
     default_visibility: Option<UnpackVisibility>,
     default_deprecation: Option<&str>,
@@ -4029,22 +4072,88 @@ impl<'v> StarlarkValue<'v> for RuleDefinition<'v> {
 /// The declaration returned by Bazel's `aspect()` global while its defining
 /// `.bzl` module is still evaluating. Aspect implementations are retained for
 /// later analysis, but loading never executes them.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) enum AspectAttributePropagationEdge {
+    All,
+    Public(CompactString),
+    Private(CompactString),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) enum AspectToolchainPropagationEdge {
+    All,
+    Type(CanonicalLabel),
+}
+
+#[derive(Debug, Clone, Allocative)]
+pub(crate) enum AspectPropagationEdgesGen<V, T> {
+    Fixed(Arc<[T]>),
+    Callback(V),
+}
+
+impl<V: PartialEq, T: PartialEq> PartialEq for AspectPropagationEdgesGen<V, T> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Fixed(left), Self::Fixed(right)) => {
+                left.iter().all(|edge| right.contains(edge))
+                    && right.iter().all(|edge| left.contains(edge))
+            }
+            (Self::Callback(left), Self::Callback(right)) => left == right,
+            _ => false,
+        }
+    }
+}
+
+impl<V: Eq, T: Eq> Eq for AspectPropagationEdgesGen<V, T> {}
+
+unsafe impl<'v, V: Trace<'v>, T> Trace<'v> for AspectPropagationEdgesGen<V, T> {
+    fn trace(&mut self, tracer: &Tracer<'v>) {
+        if let Self::Callback(callback) = self {
+            callback.trace(tracer);
+        }
+    }
+}
+
+impl<'v, T> AspectPropagationEdgesGen<Value<'v>, T> {
+    fn freeze(self, freezer: &Freezer) -> FreezeResult<AspectPropagationEdgesGen<FrozenValue, T>> {
+        Ok(match self {
+            Self::Fixed(edges) => AspectPropagationEdgesGen::Fixed(edges),
+            Self::Callback(callback) => {
+                AspectPropagationEdgesGen::Callback(callback.freeze(freezer)?)
+            }
+        })
+    }
+}
+
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 struct AspectDefinitionGen<V> {
     implementation: V,
-    #[trace(unsafe_ignore)]
-    attr_aspects: Arc<[CompactString]>,
+    attr_aspects: AspectPropagationEdgesGen<V, AspectAttributePropagationEdge>,
+    toolchains_aspects: AspectPropagationEdgesGen<V, AspectToolchainPropagationEdge>,
     #[trace(unsafe_ignore)]
     attributes: Arc<[RuleAttributeSchemaGen<V>]>,
-    required_aspect: Option<V>,
+    #[trace(unsafe_ignore)]
+    late_bound_attributes: Arc<[LateBoundRuleAttribute]>,
+    #[trace(unsafe_ignore)]
+    required_parameters: Arc<[CompactString]>,
+    required_aspects: Vec<V>,
+    propagation_predicate: Option<V>,
     #[trace(unsafe_ignore)]
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     #[trace(unsafe_ignore)]
-    required_providers: Arc<[Arc<[ProviderId]>]>,
+    required_providers: Arc<[Arc<[ProviderIdentity]>]>,
+    #[trace(unsafe_ignore)]
+    required_aspect_providers: Arc<[Arc<[ProviderIdentity]>]>,
     #[trace(unsafe_ignore)]
     advertised_providers: Arc<[ProviderIdentity]>,
     #[trace(unsafe_ignore)]
     required_fragments: Arc<[CompactString]>,
+    apply_to_generating_rules: bool,
+    #[trace(unsafe_ignore)]
+    exec_compatible_with: Arc<[CanonicalLabel]>,
+    #[trace(unsafe_ignore)]
+    attached_subrules: AttachedSubrules,
+    subrule_callables: Vec<V>,
     #[trace(unsafe_ignore)]
     defining_label: CanonicalLabel,
     #[trace(unsafe_ignore)]
@@ -4057,18 +4166,46 @@ struct AspectDefinitionGen<V> {
 #[allow(dead_code)] // Retained now; configured-aspect consumers are deliberately deferred.
 pub(crate) struct FrozenAspectDefinition {
     implementation: FrozenValue,
-    pub(crate) attr_aspects: Arc<[CompactString]>,
+    pub(crate) attr_aspects: AspectPropagationEdgesGen<FrozenValue, AspectAttributePropagationEdge>,
+    pub(crate) toolchains_aspects:
+        AspectPropagationEdgesGen<FrozenValue, AspectToolchainPropagationEdge>,
     pub(crate) attributes: Arc<[FrozenRuleAttributeSchema]>,
-    pub(crate) required_aspect: Option<FrozenValue>,
+    pub(crate) late_bound_attributes: Arc<[LateBoundRuleAttribute]>,
+    pub(crate) required_parameters: Arc<[CompactString]>,
+    pub(crate) required_aspects: Vec<FrozenValue>,
+    pub(crate) propagation_predicate: Option<FrozenValue>,
     pub(crate) required_toolchains: Arc<[ToolchainTypeRequirement]>,
-    pub(crate) required_providers: Arc<[Arc<[ProviderId]>]>,
+    pub(crate) required_providers: Arc<[Arc<[ProviderIdentity]>]>,
+    pub(crate) required_aspect_providers: Arc<[Arc<[ProviderIdentity]>]>,
     pub(crate) advertised_providers: Arc<[ProviderIdentity]>,
     pub(crate) required_fragments: Arc<[CompactString]>,
+    pub(crate) apply_to_generating_rules: bool,
+    pub(crate) exec_compatible_with: Arc<[CanonicalLabel]>,
+    pub(crate) attached_subrules: AttachedSubrules,
+    #[allocative(skip)]
+    subrule_callables: Vec<FrozenValue>,
     pub(crate) defining_label: CanonicalLabel,
     pub(crate) exported_name: Option<CompactString>,
 }
 
 type AspectDefinition<'v> = AspectDefinitionGen<Value<'v>>;
+
+#[cfg(test)]
+impl FrozenAspectDefinition {
+    pub(crate) fn fixed_attr_aspect_names(&self) -> Vec<&str> {
+        let AspectPropagationEdgesGen::Fixed(edges) = &self.attr_aspects else {
+            panic!("expected fixed attribute propagation");
+        };
+        edges
+            .iter()
+            .map(|edge| match edge {
+                AspectAttributePropagationEdge::All => "*",
+                AspectAttributePropagationEdge::Public(name)
+                | AspectAttributePropagationEdge::Private(name) => name.as_str(),
+            })
+            .collect()
+    }
+}
 
 impl<V> fmt::Display for AspectDefinitionGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -4090,7 +4227,8 @@ impl<'v> Freeze for AspectDefinition<'v> {
     fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
         Ok(FrozenAspectDefinition {
             implementation: self.implementation.freeze(freezer)?,
-            attr_aspects: self.attr_aspects,
+            attr_aspects: self.attr_aspects.freeze(freezer)?,
+            toolchains_aspects: self.toolchains_aspects.freeze(freezer)?,
             attributes: self
                 .attributes
                 .iter()
@@ -4098,14 +4236,30 @@ impl<'v> Freeze for AspectDefinition<'v> {
                 .map(|schema| schema.freeze(freezer))
                 .collect::<FreezeResult<Vec<_>>>()?
                 .into(),
-            required_aspect: self
-                .required_aspect
+            late_bound_attributes: self.late_bound_attributes,
+            required_parameters: self.required_parameters,
+            required_aspects: self
+                .required_aspects
+                .into_iter()
                 .map(|aspect| aspect.freeze(freezer))
+                .collect::<FreezeResult<_>>()?,
+            propagation_predicate: self
+                .propagation_predicate
+                .map(|predicate| predicate.freeze(freezer))
                 .transpose()?,
             required_toolchains: self.required_toolchains,
             required_providers: self.required_providers,
+            required_aspect_providers: self.required_aspect_providers,
             advertised_providers: self.advertised_providers,
             required_fragments: self.required_fragments,
+            apply_to_generating_rules: self.apply_to_generating_rules,
+            exec_compatible_with: self.exec_compatible_with,
+            attached_subrules: self.attached_subrules,
+            subrule_callables: self
+                .subrule_callables
+                .into_iter()
+                .map(|subrule| subrule.freeze(freezer))
+                .collect::<FreezeResult<_>>()?,
             defining_label: self.defining_label,
             exported_name: self.exported_name.into_inner(),
         })
@@ -4123,13 +4277,6 @@ fn declaration_provider_identity(value: Value, argument: &str) -> anyhow::Result
         return Ok(identity);
     }
     anyhow::bail!("{argument} must contain exported provider constructors")
-}
-
-fn declaration_user_provider_id(value: Value, argument: &str) -> anyhow::Result<ProviderId> {
-    declaration_provider_identity(value, argument)?
-        .user_id()
-        .map(Dupe::dupe)
-        .ok_or_else(|| anyhow::anyhow!("{argument} must contain user provider constructors"))
 }
 
 fn advertised_provider_ids(
@@ -4155,33 +4302,6 @@ fn advertised_provider_ids(
         }
     }
     Ok(result.into())
-}
-
-fn aspect_required_providers(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[ProviderId]>]>> {
-    let Some(value) = value else {
-        return Ok(Arc::from([]));
-    };
-    let alternatives = ListRef::from_value(value)
-        .ok_or_else(|| anyhow::anyhow!("aspect required_providers must be a nested list"))?;
-    if alternatives.len() != 2 {
-        anyhow::bail!("only two singleton aspect provider alternatives are supported");
-    }
-    alternatives
-        .iter()
-        .map(|alternative| {
-            let providers = ListRef::from_value(alternative).ok_or_else(|| {
-                anyhow::anyhow!("aspect required_providers must be a nested list")
-            })?;
-            if providers.len() != 1 {
-                anyhow::bail!("aspect required_providers alternatives must be singletons");
-            }
-            Ok(Arc::from([declaration_user_provider_id(
-                providers[0],
-                "aspect required_providers",
-            )?]))
-        })
-        .collect::<anyhow::Result<Vec<_>>>()
-        .map(Arc::from)
 }
 
 fn aspect_advertised_providers(value: Option<Value>) -> anyhow::Result<Arc<[ProviderIdentity]>> {
@@ -4286,10 +4406,117 @@ fn aspect_required_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>>
     Ok(Some(*required))
 }
 
+fn aspect_required_aspects(value: Option<Value>) -> anyhow::Result<Vec<Value>> {
+    let values = match value {
+        None => Vec::new(),
+        Some(value) if ListRef::from_value(value).is_some() => {
+            ListRef::from_value(value).unwrap().iter().collect()
+        }
+        Some(value) if TupleRef::from_value(value).is_some() => {
+            TupleRef::from_value(value).unwrap().iter().collect()
+        }
+        Some(_) => anyhow::bail!("aspect requires must be a sequence"),
+    };
+    let mut result = Vec::new();
+    for value in values {
+        if value.downcast_ref::<AspectDefinition>().is_none()
+            && value.downcast_ref::<FrozenAspectDefinition>().is_none()
+        {
+            anyhow::bail!("aspect requires must contain aspect values");
+        }
+        if !result.iter().any(|existing: &Value| existing.ptr_eq(value)) {
+            result.push(value);
+        }
+    }
+    Ok(result)
+}
+
+fn aspect_attribute_propagation<'v>(
+    value: Option<Value<'v>>,
+) -> anyhow::Result<AspectPropagationEdgesGen<Value<'v>, AspectAttributePropagationEdge>> {
+    let Some(value) = value else {
+        return Ok(AspectPropagationEdgesGen::Fixed(Arc::from([])));
+    };
+    if value.parameters_spec().is_some() {
+        return Ok(AspectPropagationEdgesGen::Callback(value));
+    }
+    let values = starlark_string_sequence(value, "attr_aspects")?;
+    if values.len() != 1 && values.iter().any(|value| *value == "*") {
+        anyhow::bail!("'*' must be the only string in 'attr_aspects' list");
+    }
+    let mut seen = SmallSet::new();
+    let edges = values
+        .into_iter()
+        .filter_map(|value| {
+            let edge = if value == "*" {
+                AspectAttributePropagationEdge::All
+            } else if value.starts_with('_') {
+                AspectAttributePropagationEdge::Private(value.into())
+            } else {
+                AspectAttributePropagationEdge::Public(value.into())
+            };
+            seen.insert(edge.clone()).then_some(edge)
+        })
+        .collect::<Vec<_>>();
+    Ok(AspectPropagationEdgesGen::Fixed(edges.into()))
+}
+
+fn aspect_toolchain_propagation<'v>(
+    value: Option<Value<'v>>,
+    source: &BzlModuleIdentity,
+) -> anyhow::Result<AspectPropagationEdgesGen<Value<'v>, AspectToolchainPropagationEdge>> {
+    let Some(value) = value else {
+        return Ok(AspectPropagationEdgesGen::Fixed(Arc::from([])));
+    };
+    if value.parameters_spec().is_some() {
+        return Ok(AspectPropagationEdgesGen::Callback(value));
+    }
+    let values = starlark_string_sequence(value, "toolchains_aspects")?;
+    if values.len() != 1 && values.iter().any(|value| *value == "*") {
+        anyhow::bail!("'*' must be the only item in 'toolchains_aspects' list");
+    }
+    let mut seen = SmallSet::new();
+    let edges = values
+        .into_iter()
+        .map(|value| {
+            if value == "*" {
+                Ok(AspectToolchainPropagationEdge::All)
+            } else {
+                direct_toolchain_label(value, source).map(AspectToolchainPropagationEdge::Type)
+            }
+        })
+        .filter_map(|edge| match edge {
+            Ok(edge) if seen.insert(edge.clone()) => Some(Ok(edge)),
+            Ok(_) => None,
+            Err(error) => Some(Err(error)),
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    Ok(AspectPropagationEdgesGen::Fixed(edges.into()))
+}
+
+fn starlark_string_sequence<'v>(value: Value<'v>, argument: &str) -> anyhow::Result<Vec<&'v str>> {
+    let values = if let Some(values) = ListRef::from_value(value) {
+        values.iter().collect::<Vec<_>>()
+    } else if let Some(values) = TupleRef::from_value(value) {
+        values.iter().collect::<Vec<_>>()
+    } else {
+        anyhow::bail!("{argument} must be a sequence of strings")
+    };
+    values
+        .into_iter()
+        .map(|value| {
+            value
+                .unpack_str()
+                .ok_or_else(|| anyhow::anyhow!("{argument} must contain only strings"))
+        })
+        .collect()
+}
+
 /// Canonical disjunction of conjunctions over the shared provider identity.
 /// Both levels are set-semantic; one empty conjunction means no restriction.
-fn attribute_required_providers(
+fn declaration_required_providers(
     value: Option<Value>,
+    argument: &str,
 ) -> anyhow::Result<Arc<[Arc<[ProviderIdentity]>]>> {
     fn sequence(value: Value) -> Option<Vec<Value>> {
         if let Some(values) = ListRef::from_value(value) {
@@ -4307,7 +4534,7 @@ fn attribute_required_providers(
     let Some(value) = value else {
         return Ok(Arc::from([]));
     };
-    let outer = sequence(value).ok_or_else(|| anyhow::anyhow!("label providers must be a list"))?;
+    let outer = sequence(value).ok_or_else(|| anyhow::anyhow!("{argument} must be a sequence"))?;
     if outer.is_empty() {
         return Ok(Arc::from([]));
     }
@@ -4320,7 +4547,7 @@ fn attribute_required_providers(
             .map(|alternative| {
                 sequence(alternative).ok_or_else(|| {
                         anyhow::anyhow!(
-                            "attribute providers must contain either providers or lists of providers, but not both"
+                            "{argument} must contain either providers or lists of providers, but not both"
                         )
                     })
             })
@@ -4332,7 +4559,7 @@ fn attribute_required_providers(
         .map(|providers| {
             let mut result = providers
                 .into_iter()
-                .map(|provider| declaration_provider_identity(provider, "attribute providers"))
+                .map(|provider| declaration_provider_identity(provider, argument))
                 .collect::<anyhow::Result<Vec<_>>>()?;
             result.sort_by(provider_identity_cmp);
             result.dedup();
@@ -4376,11 +4603,11 @@ fn provider_identity_slice_cmp(
 fn label_list_required_providers(
     value: Option<Value>,
 ) -> anyhow::Result<Arc<[Arc<[ProviderIdentity]>]>> {
-    attribute_required_providers(value)
+    declaration_required_providers(value, "attribute providers")
 }
 
 fn label_required_provider(value: Option<Value>) -> anyhow::Result<Arc<[Arc<[ProviderIdentity]>]>> {
-    attribute_required_providers(value)
+    declaration_required_providers(value, "attribute providers")
 }
 
 fn label_list_attached_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>> {
@@ -4389,135 +4616,84 @@ fn label_list_attached_aspect(value: Option<Value>) -> anyhow::Result<Option<Val
 
 fn aspect_attributes<'v>(
     attrs: Option<SmallMap<String, Value<'v>>>,
-    defining_label: &CanonicalLabel,
-) -> anyhow::Result<Arc<[RuleAttributeSchema<'v>]>> {
-    let Some(attrs) = attrs else {
-        return Ok(Arc::from([]));
-    };
-    let names = attrs.keys().map(String::as_str).collect::<Vec<_>>();
-    let rustfmt = ["_config", "_process_wrapper"];
-    let clippy = [
-        "_capture_output",
-        "_clippy_error_format",
-        "_clippy_flag",
-        "_clippy_flags",
-        "_clippy_output_diagnostics",
-        "_config",
-        "_error_format",
-        "_extra_rustc_flag",
-        "_incompatible_change_clippy_error_format",
-        "_per_crate_rustc_flag",
-        "_process_wrapper",
-    ];
-    let is_rustfmt = names == rustfmt;
-    if !is_rustfmt && names != clippy {
-        anyhow::bail!("only the fixed rustfmt and clippy aspect attributes are supported");
-    }
-    let attribute_count = names.len();
-    drop(names);
-    let repo = defining_label.package().repo().as_str();
-    let mut schemas = Vec::with_capacity(attribute_count);
-    for (name, value) in attrs {
+) -> anyhow::Result<(
+    Arc<[RuleAttributeSchema<'v>]>,
+    Arc<[LateBoundRuleAttribute]>,
+    Arc<[CompactString]>,
+)> {
+    let mut schemas = Vec::new();
+    let mut late_bound_attributes = Vec::new();
+    let mut required_parameters = Vec::new();
+    for (name, value) in attrs.unwrap_or_default() {
+        if !is_starlark_identifier(&name) {
+            anyhow::bail!("attribute name `{name}` is not a valid identifier.");
+        }
         let definition = attribute_definition_from_value(value)
-            .ok_or_else(|| anyhow::anyhow!("aspect attribute `{name}` must use attr.label()"))?;
-        let (label, file_admissibility, executable, exec_configuration) = match name.as_str() {
-            "_capture_output" => (
-                format!("@@{repo}//rust/settings:capture_clippy_output"),
-                FileAdmissibility::default(),
-                false,
-                false,
-            ),
-            "_clippy_error_format" => (
-                format!("@@{repo}//rust/settings:clippy_error_format"),
-                FileAdmissibility::default(),
-                false,
-                false,
-            ),
-            "_clippy_flag" => (
-                format!("@@{repo}//rust/settings:clippy_flag"),
-                FileAdmissibility::default(),
-                false,
-                false,
-            ),
-            "_clippy_flags" => (
-                format!("@@{repo}//rust/settings:clippy_flags"),
-                FileAdmissibility::default(),
-                false,
-                false,
-            ),
-            "_clippy_output_diagnostics" => (
-                format!("@@{repo}//rust/settings:clippy_output_diagnostics"),
-                FileAdmissibility::default(),
-                false,
-                false,
-            ),
-            "_config" => (
-                format!(
-                    "@@{repo}//rust/settings:{}",
-                    if is_rustfmt {
-                        "rustfmt.toml"
-                    } else {
-                        "clippy.toml"
-                    }
-                ),
-                FileAdmissibility::any_file().with_single_artifact(),
-                false,
-                false,
-            ),
-            "_error_format" => (
-                format!("@@{repo}//rust/settings:error_format"),
-                FileAdmissibility::default(),
-                false,
-                false,
-            ),
-            "_extra_rustc_flag" => (
-                format!("@@{repo}//rust/settings:extra_rustc_flag"),
-                FileAdmissibility::default(),
-                false,
-                false,
-            ),
-            "_incompatible_change_clippy_error_format" => (
-                format!("@@{repo}//rust/settings:incompatible_change_clippy_error_format"),
-                FileAdmissibility::default(),
-                false,
-                false,
-            ),
-            "_per_crate_rustc_flag" => (
-                format!("@@{repo}//rust/settings:per_crate_rustc_flag"),
-                FileAdmissibility::default(),
-                false,
-                false,
-            ),
-            "_process_wrapper" => (
-                format!("@@{repo}//util/process_wrapper:process_wrapper"),
-                FileAdmissibility::default(),
-                true,
-                true,
-            ),
-            _ => unreachable!(),
-        };
-        let expected_default = CoercedAttributeValue::Label(
-            CanonicalLabel::parse(&label).map_err(anyhow::Error::msg)?,
-        );
-        if definition.kind != AttributeKind::Label
-            || definition.mandatory
-            || !definition.configurable
-            || definition.configurable_set
-            || definition.file_admissibility != file_admissibility
-            || !matches!(definition.allowed_values, AllowedAttributeValues::None)
-            || definition.default.as_ref() != Some(&expected_default)
-            || definition.executable != executable
-            || definition.exec_configuration != exec_configuration
-            || !definition.required_providers.is_empty()
-            || definition.attached_aspect.is_some()
-            || definition.transition.is_some()
-            || !definition.flags.is_empty()
-        {
-            anyhow::bail!("aspect attribute `{name}` does not match the admitted fixed schema");
+            .ok_or_else(|| anyhow::anyhow!("aspect attribute `{name}` must use attr.*()"))?;
+        if definition.configurable_set {
+            anyhow::bail!(
+                "attribute '{name}' has the 'configurable' argument set, which is not allowed in aspect definitions"
+            );
+        }
+        if definition.computed_default {
+            anyhow::bail!("Aspect attribute '{name}' with computed default value is unsupported.");
+        }
+        if name.starts_with('_') {
+            if definition.default.is_none() && definition.late_bound_default.is_none() {
+                anyhow::bail!("Aspect attribute '{name}' has no default value.");
+            }
+        } else {
+            if !matches!(
+                definition.kind,
+                AttributeKind::Boolean | AttributeKind::Integer | AttributeKind::String
+            ) {
+                anyhow::bail!(
+                    "Aspect parameter attribute '{name}' must have type 'bool', 'int' or 'string'."
+                );
+            }
+            let has_default = definition
+                .default
+                .as_ref()
+                .is_some_and(|default| default != &intrinsic_default(definition.kind));
+            if has_default {
+                validate_allowed_value(
+                    &name,
+                    definition.default.as_ref().expect("checked above"),
+                    &definition.allowed_values,
+                )
+                .map_err(|error| {
+                    anyhow::anyhow!(
+                        "Aspect parameter attribute '{name}' has a bad default value: {error}"
+                    )
+                })?;
+            }
+            if !has_default || definition.mandatory {
+                required_parameters.push(CompactString::new(&name));
+            }
+        }
+        if let Some(identity) = &definition.late_bound_default {
+            late_bound_attributes.push(LateBoundRuleAttribute {
+                schema_index: u32::try_from(schemas.len())
+                    .expect("aspect attribute count fits in u32"),
+                identity: identity.clone(),
+                required_providers: definition.required_providers.clone(),
+            });
         }
         schemas.push(declared_attribute_schema(name, &definition));
     }
-    Ok(schemas.into())
+    Ok((
+        schemas.into(),
+        late_bound_attributes.into(),
+        required_parameters.into(),
+    ))
+}
+
+fn is_starlark_identifier(name: &str) -> bool {
+    let mut chars = name.chars();
+    chars
+        .next()
+        .is_some_and(|first| first == '_' || first.is_ascii_alphabetic())
+        && chars.all(|character| character == '_' || character.is_ascii_alphanumeric())
 }
 
 #[starlark_value(type = "aspect")]
@@ -8052,14 +8228,22 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
 fn aspect_globals(builder: &mut GlobalsBuilder) {
     fn aspect<'v>(
         implementation: Value<'v>,
-        #[starlark(require = named)] attr_aspects: Option<UnpackList<&str>>,
+        #[starlark(require = named)] attr_aspects: Option<Value<'v>>,
+        #[starlark(require = named)] toolchains_aspects: Option<Value<'v>>,
         #[starlark(require = named)] attrs: Option<SmallMap<String, Value<'v>>>,
-        #[starlark(require = named)] toolchains: Option<Value<'v>>,
         #[starlark(require = named)] required_providers: Option<Value<'v>>,
-        #[starlark(require = named)] requires: Option<Value<'v>>,
+        #[starlark(require = named)] required_aspect_providers: Option<Value<'v>>,
         #[starlark(require = named)] provides: Option<Value<'v>>,
+        #[starlark(require = named)] requires: Option<Value<'v>>,
+        #[starlark(require = named)] propagation_predicate: Option<Value<'v>>,
         #[starlark(require = named)] fragments: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] host_fragments: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] toolchains: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named, default = false)] apply_to_generating_rules: bool,
+        #[starlark(require = named)] exec_compatible_with: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] exec_groups: Option<Value<'v>>,
+        #[starlark(require = named)] subrules: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AspectDefinition<'v>> {
         if implementation.parameters_spec().is_none() {
@@ -8068,17 +8252,10 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
         if doc.is_some_and(|value| !value.is_none() && value.unpack_str().is_none()) {
             anyhow::bail!("aspect doc must be a string or None");
         }
-        let attr_aspects: Arc<[CompactString]> = attr_aspects
-            .map_or_else(Vec::new, |values| values.items)
-            .into_iter()
-            .map(CompactString::new)
-            .collect::<Vec<_>>()
-            .into();
-        if attr_aspects.len() != 1 && attr_aspects.iter().any(|name| name == "*") {
-            anyhow::bail!("'*' must be the only string in 'attr_aspects' list");
-        }
+        let _ = host_fragments;
         let context = BzlEvaluationContext::from_evaluator(eval)
             .map_err(|_| anyhow::anyhow!("aspect may only be called in a .bzl module"))?;
+        let source = context.source_identity_for_call(eval)?;
         let source_label = context.source_label();
         let canonical_source = if source_label.starts_with("@@") {
             source_label.to_owned()
@@ -8087,21 +8264,68 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
         };
         let defining_label =
             CanonicalLabel::parse(&canonical_source).map_err(anyhow::Error::msg)?;
-        let attributes = aspect_attributes(attrs, &defining_label)?;
-        let required_aspect = aspect_required_aspect(requires)?;
-        let required_toolchains = toolchain_requirements(toolchains, eval)?;
-        let required_providers = aspect_required_providers(required_providers)?;
+        let (attributes, late_bound_attributes, required_parameters) = aspect_attributes(attrs)?;
+        let required_provider_entries = required_providers.map_or(Ok(0), |value| {
+            if let Some(values) = ListRef::from_value(value) {
+                Ok(values.len())
+            } else if let Some(values) = TupleRef::from_value(value) {
+                Ok(values.len())
+            } else {
+                anyhow::bail!("required_providers must be a sequence")
+            }
+        })?;
+        let propagation_predicate = propagation_predicate
+            .filter(|value| !value.is_none())
+            .map(|value| {
+                value.parameters_spec().map(|_| value).ok_or_else(|| {
+                    anyhow::anyhow!("propagation_predicate must be a function or None")
+                })
+            })
+            .transpose()?;
+        if apply_to_generating_rules && required_provider_entries != 0 {
+            anyhow::bail!(
+                "An aspect cannot simultaneously have required providers and apply to generating rules."
+            );
+        }
+        if apply_to_generating_rules && propagation_predicate.is_some() {
+            anyhow::bail!(
+                "An aspect cannot simultaneously have a propagation predicate and apply to generating rules."
+            );
+        }
+        if let Some(value) = exec_groups.filter(|value| !value.is_none()) {
+            let groups = DictRef::from_value(value)
+                .ok_or_else(|| anyhow::anyhow!("aspect exec_groups must be a dict or None"))?;
+            if !groups.is_empty() {
+                anyhow::bail!("nonempty aspect exec_groups are unsupported");
+            }
+        }
+        let (attached_subrules, subrule_callables) = attached_subrules(subrules)?;
+        let required_toolchains =
+            aspect_toolchain_requirements(toolchains, &attached_subrules, eval)?;
+        let required_providers =
+            declaration_required_providers(required_providers, "required_providers")?;
+        let required_aspect_providers =
+            declaration_required_providers(required_aspect_providers, "required_aspect_providers")?;
         let advertised_providers = aspect_advertised_providers(provides)?;
         let required_fragments = required_configuration_fragments(fragments);
         Ok(AspectDefinitionGen {
             implementation,
-            attr_aspects,
+            attr_aspects: aspect_attribute_propagation(attr_aspects)?,
+            toolchains_aspects: aspect_toolchain_propagation(toolchains_aspects, source)?,
             attributes,
-            required_aspect,
+            late_bound_attributes,
+            required_parameters,
+            required_aspects: aspect_required_aspects(requires)?,
+            propagation_predicate,
             required_toolchains,
             required_providers,
+            required_aspect_providers,
             advertised_providers,
             required_fragments,
+            apply_to_generating_rules,
+            exec_compatible_with: aspect_exec_compatible_with(exec_compatible_with, source)?,
+            attached_subrules,
+            subrule_callables,
             defining_label,
             exported_name: OnceCell::new(),
         })
@@ -8852,13 +9076,17 @@ mod module_extension_definition_tests {
 
         let control_aspect = "def impl(target, ctx): return []\nA = aspect(implementation = impl, attrs = {'_config': attr.label(allow_single_file = True, default = Label('//rust/settings:rustfmt.toml')), '_process_wrapper': attr.label(cfg = 'exec', executable = True, default = Label('//util/process_wrapper'))})\n";
         evaluate(control_aspect).unwrap();
-        assert!(
-            evaluate(&control_aspect.replace(
-                "allow_single_file = True",
-                "flags = ['DIRECT_COMPILE_TIME_INPUT'], allow_single_file = True"
-            ))
-            .is_err()
-        );
+        let flagged = evaluate(&control_aspect.replace(
+            "allow_single_file = True",
+            "flags = ['DIRECT_COMPILE_TIME_INPUT'], allow_single_file = True",
+        ))
+        .unwrap();
+        let aspect = flagged
+            .get("A")
+            .unwrap()
+            .downcast::<FrozenAspectDefinition>()
+            .unwrap();
+        assert!(aspect.attributes[0].flags.direct_compile_time_input());
 
         for (control, flagged) in [
             (

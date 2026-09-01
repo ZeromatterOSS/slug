@@ -22197,3 +22197,25 @@ the aspect toolchain owner. Corrected R2 makes only those changes. Multi-aspect
 attachment remains fail-closed for its complete future traversal packet.
 Focused R2 rereview returns `ACCEPT`; commit this architecture before
 materializing its implementation successor.
+
+#### Generic aspect declaration architecture accepted; implementation active (2026-09-01)
+
+Commit `2c6ab4a0c` accepts corrected R2. Activate only
+`WP-6-7A-generic-aspect-declaration-implementation-r1` with its frozen
+representation, exact/Slug-native/deferred classes, allowlists, caps, proof
+matrix and stops.
+
+#### Generic aspect declarations terminally accepted (2026-09-01)
+
+The implementation retains the complete default-enabled declaration family in
+one typed live/frozen/importable owner and removes the fixed rustfmt/clippy
+schema gate. Terminal review required one correction: fixed attribute and
+toolchain propagation edges now compare as semantic sets while retaining
+source order. The reversed-order proof, complete loading and serial analysis
+suites, source/hash/archive gates, rebuilt CLI and fresh authentic replay all
+pass within caps. The replay clears rules_rust `rust_unpretty_aspect` and next
+stops at target invocation for the provider-constrained `link_deps` attribute.
+The next packet must cover Bazel 9.2's complete provider-policy family across
+all five label-bearing constructors; it must not become a rules_rust,
+`cc_common`, `cc_internal`, parser or configured-aspect special case. Zabel
+remains peer ownership/optimization guidance only.

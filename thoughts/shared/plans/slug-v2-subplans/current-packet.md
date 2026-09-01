@@ -1,23 +1,20 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-generic-aspect-declaration-architecture-r2`
+Packet: `WP-6-7A-generic-aspect-declaration-implementation-r1`
 
 Milestone: M7A generic Starlark/ruleset closure; Stage 4 frozen module
 declarations and the future Stage 6 configured-aspect owner.
 
-Status: R1 independent architecture pre-review returned `REVISE`: the proof
-matrix was narrower than the generic private descriptor decision, `requires`
-dedup was conflated with Bazel's separate attribute-attached-aspect traversal,
-and the exact strictest-duplicate/subrule-union toolchain owner was unnamed.
-Corrected R2 expands only those proofs and makes multi-aspect attachment
-explicitly fail closed; the retained representation and other boundaries are
-unchanged. Focused R2 rereview returns `ACCEPT`; commit this design before
-materializing its implementation successor. Commit
-`2799030dc` terminally accepts the complete generic rule predeclared-output
-category. A rebuilt authentic replay clears it and stops while freezing
-rules_rust `rust/private/unpretty.bzl:237`: Slug rejects the aspect's generic
-implicit attribute dictionary because loading still admits only the old fixed
-rustfmt and clippy schemas.
+Status: terminal implementation review returns `ACCEPT` after one bounded
+correction added explicit set-semantic equality for fixed propagation edges
+while preserving source order, plus a reversed-order discriminating proof.
+The complete loading suite passes 477 unit tests plus every integration group;
+the serial complete analysis suite passes 123 tests. Formatting, metadata,
+diff, archive, pinned-source, donor-cleanliness and parked-file gates pass
+within all caps. A rebuilt fresh rules_rust 0.73 replay clears generic
+`rust_unpretty_aspect` declaration and stops at target invocation for its
+provider-constrained `link_deps` attribute. Commit `2c6ab4a0c` accepts the
+architecture and `2799030dc` accepts the immediate rule-output predecessor.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -27,12 +24,11 @@ do not edit or stage it.
 
 ## Observable result and compatibility classification
 
-Freeze the architecture for Bazel 9.2's complete default-enabled Starlark
-`aspect()` declaration family before implementation. This is one generic
-loading abstraction, not the rules_rust dictionary that exposed it. The
-implementation successor will replace the fixed rustfmt/clippy capture with a
-typed, live/frozen/importable aspect declaration that preserves every admitted
-declaration input needed by future configured-aspect evaluation.
+Implement Bazel 9.2's complete default-enabled Starlark `aspect()` declaration
+family. This is one generic loading abstraction, not the rules_rust dictionary
+that exposed it. Replace the fixed rustfmt/clippy capture with a typed,
+live/frozen/importable aspect declaration that preserves every admitted input
+needed by future configured-aspect evaluation.
 
 Exact declaration-time behavior:
 
@@ -112,8 +108,8 @@ Unsupported/deferred behavior:
   implementation execution, provider publication, toolchain application,
   generating-rule redirection, aspect action ownership, query/cquery/aquery
   aspect projection and REAPI execution remain the Stage 6 configured-aspect
-  category. The successor retains their complete declaration inputs but makes
-  no execution-parity claim;
+  category. This packet retains their complete declaration inputs but makes no
+  execution-parity claim;
 - attribute `aspects=[...]` attachment remains limited to the already admitted
   singleton form. Bazel's `AspectsList` recursively inserts required aspects
   before their parent, deduplicates shared transitive diamonds, and rejects
@@ -234,9 +230,7 @@ provider classes typed. Slug adopts those ownership lessons, not Zabel's Zig
 rows, allocator, dense IDs, configured-aspect implementation, scheduler,
 limits, tests or behavior. Bazel 9.2 remains the oracle.
 
-## Successor implementation boundary, caps, proofs, and stops
-
-After architecture `ACCEPT`, materialize one implementation successor with:
+## Implementation boundary, caps, proofs, and stops
 
 Production allowlist:
 

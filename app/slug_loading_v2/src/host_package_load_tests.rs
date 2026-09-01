@@ -55,6 +55,7 @@ use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
 use slug_bzlmod_v2::install_registry_io;
+use slug_configuration_v2::ConfigurationField;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
@@ -143,6 +144,9 @@ use crate::TestRuleKind;
 use crate::attrs::AllowedAttributeValues;
 use crate::bzl_visibility::BzlLoadVisibility;
 use crate::cycle_detector::bzl_load_cycle_detector;
+use crate::package::AspectAttributePropagationEdge;
+use crate::package::AspectPropagationEdgesGen;
+use crate::package::AspectToolchainPropagationEdge;
 use crate::package::BuildSettingDefinition;
 use crate::package::FrozenAspectDefinition;
 use crate::package::FrozenRuleDefinition;
@@ -3244,11 +3248,11 @@ async fn external_bzl_module_freezes_and_imports_fixed_aspect_definition() {
     let imported = module.get("IMPORTED").unwrap();
     let aspect = imported.downcast::<FrozenAspectDefinition>().unwrap();
     assert_eq!(
-        aspect.attr_aspects.join(","),
+        aspect.fixed_attr_aspect_names().join(","),
         "srcs,deps,proc_macro_deps,crate,actual,proto"
     );
     assert!(aspect.attributes.is_empty());
-    assert!(aspect.required_aspect.is_none());
+    assert!(aspect.required_aspects.is_empty());
     assert!(aspect.advertised_providers.is_empty());
     assert_mandatory_aspect_toolchain(&aspect, "@@dep+//rust:toolchain_type");
     assert_eq!(
@@ -3405,11 +3409,11 @@ fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
     assert!(process_wrapper.executable && process_wrapper.exec_configuration);
     assert_eq!(aspect.required_providers.len(), 2);
     assert_eq!(
-        aspect.required_providers[0][0].to_string(),
+        provider_identity_text(&aspect.required_providers[0][0]),
         "@@dep+//rust/private:providers.bzl%CrateInfo"
     );
     assert_eq!(
-        aspect.required_providers[1][0].to_string(),
+        provider_identity_text(&aspect.required_providers[1][0]),
         "@@dep+//rust/private:providers.bzl%TestCrateInfo"
     );
     assert!(aspect.advertised_providers.is_empty());
@@ -3420,11 +3424,10 @@ fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
     );
     assert_eq!(aspect.exported_name.as_deref(), Some("rustfmt_aspect"));
     assert_mandatory_aspect_toolchain(aspect, "@@dep+//rust/rustfmt:toolchain_type");
-    let required = aspect
-        .required_aspect
-        .unwrap()
-        .downcast_ref::<FrozenAspectDefinition>()
-        .unwrap();
+    let [required] = aspect.required_aspects.as_slice() else {
+        panic!("expected one directly required aspect");
+    };
+    let required = required.downcast_ref::<FrozenAspectDefinition>().unwrap();
     assert_eq!(
         required.defining_label,
         CanonicalLabel::parse("@@dep+//rust/private:rustfmt.bzl").unwrap()
@@ -3434,7 +3437,7 @@ fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
         Some("rustfmt_srcs_aspect")
     );
     assert_eq!(
-        required.required_providers[0][0].to_string(),
+        provider_identity_text(&required.required_providers[0][0]),
         "@@dep+//rust/private:providers.bzl%CrateInfo"
     );
 }
@@ -30781,8 +30784,16 @@ load("//rust/private:providers.bzl", "CaptureClippyOutputInfo", "ClippyInfo", "C
     assert_eq!(groups.iter().map(|v| v.to_value().unpack_str().unwrap()).collect::<Vec<_>>(), ["clippy_checks", "clippy_output"]);
     let aspect_value = module.get("TEST_ASPECT").unwrap();
     let aspect = aspect_value.clone().downcast::<FrozenAspectDefinition>().unwrap();
-    assert_eq!(aspect.attr_aspects.as_ref(), ["deps", "proc_macro_deps", "crate"]);
-    assert!(aspect.required_aspect.unwrap().to_value().ptr_eq(module.get("rust_clippy_aspect").unwrap().value()));
+    assert_eq!(
+        aspect.fixed_attr_aspect_names(),
+        ["deps", "proc_macro_deps", "crate"]
+    );
+    let [required] = aspect.required_aspects.as_slice() else {
+        panic!("expected one directly required aspect");
+    };
+    assert!(required
+        .to_value()
+        .ptr_eq(module.get("rust_clippy_aspect").unwrap().value()));
     assert_eq!(
         aspect.advertised_providers[0]
             .user_id()
@@ -31100,7 +31111,7 @@ RUSTFMT_BAD = {
         )
     };
     let accepted = evaluate(
-        r#"load(":consumer_attrs.bzl", "SIMPLE", "PRIVATE", "RUSTFMT")
+        r#"load(":consumer_attrs.bzl", "SIMPLE", "PRIVATE", "RUSTFMT", "RUSTFMT_BAD")
 def macro_impl(name, visibility, value): pass
 M = macro(implementation = macro_impl, attrs = {"value": SIMPLE})
 def repository_impl(ctx): pass
@@ -31110,10 +31121,11 @@ def subrule_impl(ctx): pass
 S = subrule(implementation = subrule_impl, attrs = {"_dep": PRIVATE})
 def imported_aspect_impl(target, ctx): return []
 FIXED = aspect(implementation = imported_aspect_impl, attrs = RUSTFMT)
+GENERIC = aspect(implementation = imported_aspect_impl, attrs = RUSTFMT_BAD)
 "#,
     )
     .unwrap();
-    for name in ["M", "RR", "TC", "S", "FIXED"] {
+    for name in ["M", "RR", "TC", "S", "FIXED", "GENERIC"] {
         assert!(accepted.get(name).is_ok(), "{name}");
     }
 
@@ -31137,10 +31149,6 @@ FIXED = aspect(implementation = imported_aspect_impl, attrs = RUSTFMT)
         (
             "load(':consumer_attrs.bzl','TRANSITIONED')\ndef impl(ctx): pass\nX=subrule(implementation=impl, attrs={'_dep':TRANSITIONED})",
             "bad cfg for attribute '_dep'",
-        ),
-        (
-            "load(':consumer_attrs.bzl','RUSTFMT_BAD')\ndef impl(target, ctx): return []\nX=aspect(implementation=impl, attrs=RUSTFMT_BAD)",
-            "aspect attribute `_config` does not match the admitted fixed schema",
         ),
         (
             "load(':consumer_attrs.bzl','COMPUTED')\ndef impl(ctx): return []\nX=rule(implementation=impl, attrs={'_dep':COMPUTED})",
@@ -31206,6 +31214,70 @@ async fn imported_descriptor_source_changes_and_restores_through_loaded_module_a
     assert_eq!(mode(&restored), "a");
     assert!(!RepositoryPackageLoadKey::equality(&a, &b));
     assert!(RepositoryPackageLoadKey::equality(&a, &restored));
+}
+
+#[tokio::test]
+async fn generic_aspect_declaration_inputs_invalidate_and_restore_external_module_a_b_a() {
+    const A: &[u8] = b"def impl(target, ctx): return []\nA=aspect(implementation=impl, attr_aspects=['deps'], fragments=['cpp'])\n";
+    const B: &[u8] = b"def impl(target, ctx): return []\nA=aspect(implementation=impl, attr_aspects=['srcs'], fragments=['apple'])\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+
+    let mut first = transaction(
+        &dice,
+        EpochBuilder::external_sources(&[("root.bzl", A)], 437).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut first).await;
+    let first = first
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+
+    let mut changed = transaction(
+        &dice,
+        EpochBuilder::external_sources(&[("root.bzl", B)], 438).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut changed).await;
+    let changed = changed
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+
+    let mut restored = transaction(
+        &dice,
+        EpochBuilder::external_sources(&[("root.bzl", A)], 439).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut restored).await;
+    let restored = restored
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+
+    let aspect_names = |outcome: &ExternalBzlOutcome| {
+        external_terminal(outcome)
+            .module
+            .get("A")
+            .unwrap()
+            .downcast::<FrozenAspectDefinition>()
+            .unwrap()
+            .fixed_attr_aspect_names()
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(aspect_names(&first), ["deps"]);
+    assert_eq!(aspect_names(&changed), ["srcs"]);
+    assert_eq!(aspect_names(&restored), ["deps"]);
+    assert!(!ExternalBzlModuleEvalKey::equality(&first, &changed));
+    assert!(ExternalBzlModuleEvalKey::equality(&first, &restored));
 }
 
 #[test]
@@ -31403,65 +31475,111 @@ fn clippy_aspect_freezes_complete_source_declaration() {
 }
 
 #[test]
-fn clippy_aspect_rejects_source_mutations() {
-    let admitted = CLIPPY_ASPECT_SOURCE.replace("TOOLCHAINS", CLIPPY_TOOLCHAINS);
-    for (from, to) in [
-        (
-            "\"_capture_output\": attr.label",
-            "\"capture_output\": attr.label",
-        ),
-        (
-            "default = Label(\"//rust/settings:capture_clippy_output\")",
-            "configurable = False, default = Label(\"//rust/settings:capture_clippy_output\")",
-        ),
-        (
-            "default = \"//rust/settings:clippy_error_format\"",
-            "default = \"//rust/settings:wrong\"",
-        ),
-        (
-            "attr.label(doc = \"flag\", default = Label(\"//rust/settings:clippy_flag\"))",
-            "attr.label(doc = \"flag\")",
-        ),
-        ("attr.label(doc = \"flags\"", "attr.string(doc = \"flags\""),
-        (
-            "doc = \"diagnostics\", default",
-            "doc = \"diagnostics\", allow_files = True, default",
-        ),
-        (
-            "doc = \"rustc format\", default",
-            "doc = \"rustc format\", cfg = \"exec\", default",
-        ),
-        (
-            "doc = \"wrapper\", default",
-            "doc = \"wrapper\", providers = [1], default",
-        ),
-        (
-            "doc = \"wrapper\", default",
-            "doc = \"wrapper\", aspects = [1], default",
-        ),
-        (
-            "cfg = \"exec\"",
-            "cfg = transition(implementation = _clippy_aspect_impl, inputs = [], outputs = [\"//:setting\"] )",
-        ),
-        (
-            "executable = True, cfg = \"exec\"",
-            "executable = False, cfg = \"exec\"",
-        ),
+fn generic_aspect_attributes_retain_private_kinds_late_bound_and_parameters() {
+    let source = r#"
+P = provider()
+def dep_impl(target, ctx): return []
+DEP = aspect(implementation = dep_impl)
+def impl(target, ctx): return []
+GENERIC = aspect(implementation = impl, attrs = {
+    "_label": attr.label(default = Label("//:dep"), allow_single_file = True, providers = [P], executable = True, cfg = "exec"),
+    "_labels": attr.label_list(default = [Label("//:dep")], aspects = [DEP]),
+    "_bool": attr.bool(default = True),
+    "_int": attr.int(default = 7),
+    "_string": attr.string(default = "x"),
+    "_strings": attr.string_list(default = ["x"]),
+    "_string_dict": attr.string_dict(default = {"k": "v"}),
+    "_string_list_dict": attr.string_list_dict(default = {"k": ["v"]}),
+    "_string_keyed_labels": attr.string_keyed_label_dict(default = {"k": Label("//:dep")}),
+    "_label_keyed_strings": attr.label_keyed_string_dict(default = {Label("//:dep"): "v"}),
+    "_label_list_dict": attr.label_list_dict(default = {"k": [Label("//:dep")]}),
+    "_late": attr.label(default = configuration_field(fragment = "coverage", name = "output_generator"), providers = [P]),
+    "required_bool": attr.bool(),
+    "default_bool": attr.bool(default = True),
+    "required_int": attr.int(default = 0),
+    "default_int": attr.int(default = 2, values = [1, 2]),
+    "required_string": attr.string(default = ""),
+    "default_string": attr.string(default = "on", values = ["off", "on"]),
+    "mandatory": attr.string(default = "on", mandatory = True),
+})
+"#;
+    let module = eval_bzl_with_identity(source, clippy_owner()).unwrap();
+    let aspect = module
+        .get("GENERIC")
+        .unwrap()
+        .downcast::<FrozenAspectDefinition>()
+        .unwrap();
+    assert_eq!(
+        aspect
+            .attributes
+            .iter()
+            .take(11)
+            .map(|attribute| attribute.kind)
+            .collect::<Vec<_>>(),
+        [
+            AttributeKind::Label,
+            AttributeKind::LabelList,
+            AttributeKind::Boolean,
+            AttributeKind::Integer,
+            AttributeKind::String,
+            AttributeKind::StringList,
+            AttributeKind::StringDict,
+            AttributeKind::StringListDict,
+            AttributeKind::StringKeyedLabelDict,
+            AttributeKind::LabelKeyedStringDict,
+            AttributeKind::LabelListDict,
+        ]
+    );
+    let label = &aspect.attributes[0];
+    assert!(label.executable && label.exec_configuration);
+    assert!(label.file_admissibility.single_artifact());
+    assert_eq!(label.required_providers.len(), 1);
+    assert!(
+        aspect.attributes[1]
+            .attached_aspect
+            .unwrap()
+            .to_value()
+            .ptr_eq(module.get("DEP").unwrap().value())
+    );
+    let [late] = aspect.late_bound_attributes.as_ref() else {
+        panic!("expected one late-bound aspect attribute");
+    };
+    assert_eq!(late.schema_index, 11);
+    assert_eq!(
+        late.identity.field(),
+        ConfigurationField::CoverageOutputGenerator
+    );
+    assert_eq!(late.identity.tools_repository().as_str(), "bazel_tools+");
+    assert_eq!(late.required_providers.len(), 1);
+    assert_eq!(
+        aspect.required_parameters.as_ref(),
+        [
+            "required_bool",
+            "required_int",
+            "required_string",
+            "mandatory"
+        ]
+    );
+}
+
+#[test]
+fn generic_aspect_attribute_validation_rejects_unadmitted_shapes() {
+    for declaration in [
+        "attrs={'_x': attr.label()}",
+        "attrs={'_x': attr.output()}",
+        "attrs={'x': attr.label(default=Label('//:x'))}",
+        "attrs={'_x': attr.string(default='x', configurable=False)}",
+        "attrs={'bad-name': attr.string(default='x')}",
+        "attrs={'mode': attr.string(default='bad', values=['good'])}",
+        "attrs={'_x': attr.label(default=computed)}",
     ] {
-        let source = admitted.replacen(from, to, 1);
-        assert_ne!(source, admitted, "mutation anchor must remain live: {from}");
+        let source = format!(
+            "def computed(name, tags): return Label('//:x')\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, {declaration})"
+        );
         assert!(
             eval_bzl_with_identity(&source, clippy_owner()).is_err(),
-            "{from}"
+            "{declaration}"
         );
-    }
-
-    for source in [
-        admitted.replacen("        \"_capture_output\": attr.label(doc = \"capture\", default = Label(\"//rust/settings:capture_clippy_output\")),\n", "", 1),
-        admitted.replacen("        \"_process_wrapper\":", "        \"_extra\": attr.label(default = Label(\"//:extra\")),\n        \"_process_wrapper\":", 1),
-        admitted.replace("\"_capture_output\"", "\"_temporary\"").replace("\"_clippy_error_format\"", "\"_capture_output\"").replace("\"_temporary\"", "\"_clippy_error_format\""),
-    ] {
-        assert!(eval_bzl_with_identity(&source, clippy_owner()).is_err());
     }
 }
 
@@ -31472,6 +31590,7 @@ def impl(target, ctx): return []
 MIXED = aspect(implementation = impl, toolchains = [":local", Label("@bazel_tools//tools:label"), config_common.toolchain_type("//tools:optional", mandatory = False)])
 TRUE = aspect(implementation = impl, toolchains = [config_common.toolchain_type("//tools:same", mandatory = True)])
 FALSE = aspect(implementation = impl, toolchains = [config_common.toolchain_type("//tools:same", mandatory = False)])
+MERGED = aspect(implementation = impl, toolchains = [config_common.toolchain_type("//tools:same", mandatory = False), "//tools:same", Label("//tools:same")])
 "#;
     let module = eval_bzl_with_identity(source, clippy_owner()).unwrap();
     let mixed = module
@@ -31500,11 +31619,15 @@ FALSE = aspect(implementation = impl, toolchains = [config_common.toolchain_type
         get("TRUE").required_toolchains,
         get("FALSE").required_toolchains
     );
+    let merged = get("MERGED");
+    let [merged] = merged.required_toolchains.as_ref() else {
+        panic!("duplicate toolchain labels must converge");
+    };
+    assert!(merged.mandatory());
 
     for source in [
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, toolchains=1)",
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, toolchains=[None])",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, toolchains=['//:same', Label('//:same')])",
     ] {
         assert!(
             eval_bzl_with_identity(source, clippy_owner()).is_err(),
@@ -31513,9 +31636,184 @@ FALSE = aspect(implementation = impl, toolchains = [config_common.toolchain_type
     }
 }
 
+#[test]
+fn generic_aspect_propagation_retains_typed_fixed_and_callback_edges() {
+    let source = r#"
+def impl(target, ctx): return []
+def attr_edges(ctx): return ["deps"]
+def toolchain_edges(ctx): return [Label("//:dynamic")]
+FIXED = aspect(implementation = impl, attr_aspects = ["deps", "_hidden", "deps"], toolchains_aspects = ["@bazel_tools//tools:toolchain_type", "@bazel_tools//tools:toolchain_type"])
+ALL = aspect(implementation = impl, attr_aspects = ["*"], toolchains_aspects = ["*"])
+DYNAMIC = aspect(implementation = impl, attr_aspects = attr_edges, toolchains_aspects = toolchain_edges)
+FORWARD = aspect(implementation = impl, attr_aspects = ["deps", "srcs"], toolchains_aspects = ["//tools:first", "//tools:second"])
+REVERSED = aspect(implementation = impl, attr_aspects = ["srcs", "deps"], toolchains_aspects = ["//tools:second", "//tools:first"])
+DIFFERENT = aspect(implementation = impl, attr_aspects = ["deps", "data"], toolchains_aspects = ["//tools:first", "//tools:other"])
+"#;
+    let module = eval_bzl_with_identity(source, clippy_owner()).unwrap();
+    let get = |name| {
+        module
+            .get(name)
+            .unwrap()
+            .downcast::<FrozenAspectDefinition>()
+            .unwrap()
+    };
+    let fixed = get("FIXED");
+    let AspectPropagationEdgesGen::Fixed(attributes) = &fixed.attr_aspects else {
+        panic!("expected fixed attribute edges");
+    };
+    assert_eq!(
+        attributes.as_ref(),
+        [
+            AspectAttributePropagationEdge::Public("deps".into()),
+            AspectAttributePropagationEdge::Private("_hidden".into()),
+        ]
+    );
+    let AspectPropagationEdgesGen::Fixed(toolchains) = &fixed.toolchains_aspects else {
+        panic!("expected fixed toolchain edges");
+    };
+    assert_eq!(
+        toolchains.as_ref(),
+        [AspectToolchainPropagationEdge::Type(
+            CanonicalLabel::parse("@@bazel_tools+//tools:toolchain_type").unwrap()
+        )]
+    );
+    let all = get("ALL");
+    assert!(matches!(
+        &all.attr_aspects,
+        AspectPropagationEdgesGen::Fixed(edges)
+            if edges.as_ref() == [AspectAttributePropagationEdge::All]
+    ));
+    assert!(matches!(
+        &all.toolchains_aspects,
+        AspectPropagationEdgesGen::Fixed(edges)
+            if edges.as_ref() == [AspectToolchainPropagationEdge::All]
+    ));
+    let dynamic = get("DYNAMIC");
+    assert!(matches!(
+        &dynamic.attr_aspects,
+        AspectPropagationEdgesGen::Callback(callback)
+            if callback.to_value().ptr_eq(module.get("attr_edges").unwrap().value())
+    ));
+    assert!(matches!(
+        &dynamic.toolchains_aspects,
+        AspectPropagationEdgesGen::Callback(callback)
+            if callback.to_value().ptr_eq(module.get("toolchain_edges").unwrap().value())
+    ));
+    let forward = get("FORWARD");
+    let reversed = get("REVERSED");
+    let different = get("DIFFERENT");
+    assert_eq!(forward.attr_aspects, reversed.attr_aspects);
+    assert_eq!(forward.toolchains_aspects, reversed.toolchains_aspects);
+    assert_ne!(forward.attr_aspects, different.attr_aspects);
+    assert_ne!(forward.toolchains_aspects, different.toolchains_aspects);
+    let AspectPropagationEdgesGen::Fixed(reversed_attributes) = &reversed.attr_aspects else {
+        panic!("expected fixed reversed attribute edges");
+    };
+    assert_eq!(
+        reversed_attributes.as_ref(),
+        [
+            AspectAttributePropagationEdge::Public("srcs".into()),
+            AspectAttributePropagationEdge::Public("deps".into()),
+        ]
+    );
+
+    for parameters in [
+        "attr_aspects=['*','deps']",
+        "toolchains_aspects=['*','//:type']",
+        "attr_aspects=[1]",
+        "toolchains_aspects=1",
+    ] {
+        let source = format!(
+            "def impl(target, ctx): return []\nA=aspect(implementation=impl, {parameters})"
+        );
+        assert!(eval_bzl_with_identity(&source, clippy_owner()).is_err());
+    }
+}
+
+#[test]
+fn generic_aspect_adjacent_fields_and_subrule_toolchains_survive_freezing() {
+    let source = r#"
+def predicate(target): return True
+def sub_impl(ctx): return None
+S = subrule(
+    implementation = sub_impl,
+    attrs = {"_dep": attr.label(default = Label("//:dep"))},
+    toolchains = ["//tools:shared"],
+)
+T = subrule(implementation = sub_impl, toolchains = ["//tools:sub"])
+def impl(target, ctx): return []
+A = aspect(
+    implementation = impl,
+    propagation_predicate = predicate,
+    fragments = ["cpp", "cpp"],
+    host_fragments = ("cpp",),
+    toolchains = (config_common.toolchain_type("//tools:shared", mandatory = False), "//tools:direct"),
+    exec_compatible_with = ("@bazel_tools//platforms:host", "@bazel_tools//platforms:host"),
+    exec_groups = {},
+    subrules = (S, T),
+)
+GENERATING = aspect(implementation = impl, apply_to_generating_rules = True, required_providers = [])
+"#;
+    let module = eval_bzl_with_identity(source, clippy_owner()).unwrap();
+    let aspect = module
+        .get("A")
+        .unwrap()
+        .downcast::<FrozenAspectDefinition>()
+        .unwrap();
+    assert!(
+        aspect
+            .propagation_predicate
+            .unwrap()
+            .to_value()
+            .ptr_eq(module.get("predicate").unwrap().value())
+    );
+    assert_eq!(aspect.required_fragments.as_ref(), ["cpp"]);
+    assert!(!aspect.apply_to_generating_rules);
+    assert_eq!(
+        aspect.exec_compatible_with.as_ref(),
+        [CanonicalLabel::parse("@@bazel_tools+//platforms:host").unwrap()]
+    );
+    assert_eq!(aspect.attached_subrules.definition_count(), 2);
+    assert_eq!(aspect.required_toolchains.len(), 3);
+    assert_eq!(
+        aspect
+            .required_toolchains
+            .iter()
+            .map(|requirement| (requirement.label().to_string(), requirement.mandatory()))
+            .collect::<Vec<_>>(),
+        [
+            ("@@rules_rust+//tools:shared".to_owned(), true),
+            ("@@rules_rust+//tools:direct".to_owned(), true),
+            ("@@rules_rust+//tools:sub".to_owned(), true),
+        ]
+    );
+    assert!(
+        module
+            .get("GENERATING")
+            .unwrap()
+            .downcast::<FrozenAspectDefinition>()
+            .unwrap()
+            .apply_to_generating_rules
+    );
+
+    for parameters in [
+        "propagation_predicate=1",
+        "apply_to_generating_rules=True, propagation_predicate=predicate",
+        "apply_to_generating_rules=True, required_providers=[[]]",
+        "exec_groups={'named': 1}",
+        "exec_groups=1",
+        "subrules=[1]",
+    ] {
+        let source = format!(
+            "def predicate(target): return True\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, {parameters})"
+        );
+        assert!(eval_bzl_with_identity(&source, clippy_owner()).is_err());
+    }
+}
+
 fn assert_frozen_rustfmt_test_aspect(aspect: &FrozenAspectDefinition) {
     assert_eq!(
-        aspect.attr_aspects.as_ref(),
+        aspect.fixed_attr_aspect_names(),
         ["deps", "proc_macro_deps", "crate"]
     );
     assert!(aspect.attributes.is_empty());
@@ -31536,11 +31834,10 @@ fn assert_frozen_rustfmt_test_aspect(aspect: &FrozenAspectDefinition) {
         aspect.exported_name.as_deref(),
         Some("_rustfmt_test_aspect")
     );
-    let required = aspect
-        .required_aspect
-        .unwrap()
-        .downcast_ref::<FrozenAspectDefinition>()
-        .unwrap();
+    let [required] = aspect.required_aspects.as_slice() else {
+        panic!("expected one directly required aspect");
+    };
+    let required = required.downcast_ref::<FrozenAspectDefinition>().unwrap();
     assert_frozen_rustfmt_aspect(required);
 }
 
@@ -31730,43 +32027,107 @@ rustfmt_test = rule(
 }
 
 #[test]
-fn rustfmt_first_aspect_rejects_unadmitted_requirement_shapes() {
-    eval_global(
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl)",
-        &loading_globals(),
-    )
-    .unwrap();
-    for source in [
-        "P=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[P])",
-        "P=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[P], P])",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[]])",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[1]])",
-        "P=provider()\nQ=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[P, Q], [P]])",
-        "P=provider()\nQ=provider()\nR=provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[P], [Q], [R]])",
-        "def make_provider(): return provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, required_providers=[[make_provider()]])",
+fn generic_aspect_provider_predicates_are_canonical_and_field_distinct() {
+    let source = r#"
+P = provider()
+Q = provider()
+def impl(target, ctx): return []
+DIRECT = aspect(implementation = impl, required_providers = [P, testing.ExecutionInfo, P], required_aspect_providers = [Q])
+NESTED_A = aspect(implementation = impl, required_providers = [[P, Q], [testing.ExecutionInfo]])
+NESTED_B = aspect(implementation = impl, required_providers = [[testing.ExecutionInfo], [Q, P], [P, Q]])
+EMPTY = aspect(implementation = impl, required_providers = [], required_aspect_providers = [])
+EMPTY_INNER = aspect(implementation = impl, required_providers = [[]], required_aspect_providers = [[]])
+"#;
+    let module = eval_bzl_with_identity(source, clippy_owner()).unwrap();
+    let get = |name| {
+        module
+            .get(name)
+            .unwrap()
+            .downcast::<FrozenAspectDefinition>()
+            .unwrap()
+    };
+    let direct = get("DIRECT");
+    assert_eq!(direct.required_providers.len(), 1);
+    assert_eq!(
+        direct.required_providers[0]
+            .iter()
+            .map(provider_identity_text)
+            .collect::<Vec<_>>(),
+        [
+            "ExecutionInfo".to_owned(),
+            "@@rules_rust+//rust/private:clippy.bzl%P".to_owned(),
+        ]
+    );
+    assert_eq!(
+        provider_identity_text(&direct.required_aspect_providers[0][0]),
+        "@@rules_rust+//rust/private:clippy.bzl%Q"
+    );
+    assert_eq!(
+        get("NESTED_A").required_providers,
+        get("NESTED_B").required_providers
+    );
+    for name in ["EMPTY", "EMPTY_INNER"] {
+        let aspect = get(name);
+        assert!(aspect.required_providers.is_empty());
+        assert!(aspect.required_aspect_providers.is_empty());
+    }
+
+    for requirement in [
+        "required_providers=[[P], P]",
+        "required_providers=[[1]]",
+        "required_aspect_providers=1",
+        "required_aspect_providers=[[make_provider()]]",
     ] {
-        assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
+        let source = format!(
+            "P=provider()\ndef make_provider(): return provider()\ndef impl(target, ctx): return []\nA=aspect(implementation=impl, {requirement})"
+        );
+        assert!(eval_bzl_with_identity(&source, clippy_owner()).is_err());
     }
 }
 
 #[test]
-fn rustfmt_second_aspect_rejects_unadmitted_declaration_shapes() {
-    for source in [
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, attrs={})",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, attrs={'_config': attr.label()})",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, attrs={'_process_wrapper': attr.label(), '_config': attr.label()})",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, attrs={'_config': attr.label(), '_wrapper': attr.label()})",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, attrs={'_config': attr.string(), '_process_wrapper': attr.label()})",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, attrs={'_config': attr.label(allow_single_file=True, default=Label('//rust/settings:rustfmt.toml')), '_process_wrapper': attr.label(cfg='exec', executable=True, default=Label('//util/process_wrapper')), '_extra': attr.label()})",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, attrs={'_config': attr.label(allow_single_file=True, default=Label('//rust/settings:other.toml')), '_process_wrapper': attr.label(cfg='exec', executable=True, default=Label('//util/process_wrapper'))})",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, attrs={'_config': attr.label(default=Label('//rust/settings:rustfmt.toml')), '_process_wrapper': attr.label(cfg='exec', executable=True, default=Label('//util/process_wrapper'))})",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, attrs={'_config': attr.label(allow_single_file=True, default=Label('//rust/settings:rustfmt.toml')), '_process_wrapper': attr.label(cfg='exec', default=Label('//util/process_wrapper'))})",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, requires=[])",
-        "def impl(target, ctx): return []\nA=aspect(implementation=impl, requires=[1])",
-        "def impl(target, ctx): return []\nB=aspect(implementation=impl)\nC=aspect(implementation=impl)\nA=aspect(implementation=impl, requires=[B, C])",
-        "def impl(target, ctx): return []\nNESTED=[aspect(implementation=impl)]\nA=aspect(implementation=impl, requires=[NESTED[0]])",
-    ] {
-        assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
+fn generic_aspect_requires_retain_multiple_imported_values_and_deduplicate() {
+    let producer_owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@dep+//producer:aspects.bzl").unwrap(),
+        workspace_path: PathBuf::from("/dep/producer/aspects.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let producer = eval_bzl_with_identity(
+        "def impl(target, ctx): return []\nFIRST=aspect(implementation=impl)\nSECOND=aspect(implementation=impl)",
+        producer_owner.clone(),
+    )
+    .unwrap();
+    let consumer = eval_bzl_with_loaded_children(
+        "load('//producer:aspects.bzl','FIRST','SECOND')\ndef impl(target, ctx): return []\nCOMBINED=aspect(implementation=impl, requires=(FIRST,SECOND,FIRST))\nNESTED=[aspect(implementation=impl)]\nLOCAL=aspect(implementation=impl, requires=[NESTED[0],NESTED[0]])",
+        clippy_owner(),
+        &[("//producer:aspects.bzl", producer_owner, producer.dupe())],
+    )
+    .unwrap();
+    let combined = consumer
+        .get("COMBINED")
+        .unwrap()
+        .downcast::<FrozenAspectDefinition>()
+        .unwrap();
+    assert_eq!(combined.required_aspects.len(), 2);
+    for (required, name) in combined.required_aspects.iter().zip(["FIRST", "SECOND"]) {
+        assert!(
+            required
+                .to_value()
+                .ptr_eq(producer.get(name).unwrap().value())
+        );
+    }
+    let local = consumer
+        .get("LOCAL")
+        .unwrap()
+        .downcast::<FrozenAspectDefinition>()
+        .unwrap();
+    assert_eq!(local.required_aspects.len(), 1);
+
+    for requirement in ["requires=1", "requires=[1]"] {
+        let source = format!(
+            "def impl(target, ctx): return []\nA=aspect(implementation=impl, {requirement})"
+        );
+        assert!(eval_bzl_with_identity(&source, clippy_owner()).is_err());
     }
 }
 
@@ -31804,6 +32165,8 @@ fn rustfmt_test_rule_validates_admitted_dependency_schemas() {
         "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[])})",
         "def aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\nB=aspect(implementation=aspect_impl)\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[A, B])})",
         "def aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[A, A])})",
+        "def aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\nB=aspect(implementation=aspect_impl, requires=[A])\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[B, A])})",
+        "def aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\nB=aspect(implementation=aspect_impl, requires=[A])\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[A, B])})",
         "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[1])})",
         "def aspect_impl(target, ctx): return []\nNESTED=[aspect(implementation=aspect_impl)]\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=NESTED)})",
         "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(cfg=1)})",
@@ -33431,16 +33794,26 @@ fn label_attribute_default_rejects_unadmitted_apparent_mapping() {
 }
 
 #[test]
-fn bazel_aspect_definition_validates_admitted_fixed_abi_and_build_absence() {
+fn bazel_aspect_definition_validates_complete_abi_and_build_absence() {
     eval_global(
-        "def impl(target, ctx): return []\nNAMED=aspect(implementation=impl)\nPOSITIONAL=aspect(impl, attr_aspects=[])\nNESTED=[aspect(implementation=impl)]",
+        "def impl(target, ctx): return []\nNAMED=aspect(implementation=impl)\nPOSITIONAL=aspect(impl, attr_aspects=[])\nNESTED=[aspect(implementation=impl)]\nFULL=aspect(impl, attr_aspects=(), toolchains_aspects=(), attrs={}, required_providers=(), required_aspect_providers=(), provides=(), requires=(), propagation_predicate=None, fragments=(), host_fragments=('cpp',), toolchains=(), doc='docs', apply_to_generating_rules=False, exec_compatible_with=(), exec_groups=None, subrules=())\nEMPTY_GROUPS=aspect(impl, exec_groups={})",
         &loading_globals(),
     )
     .unwrap();
     for source in [
+        "A=aspect()",
         "A=aspect(implementation=print)",
+        "def impl(target, ctx): return []\nA=aspect(impl, ['deps'])",
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, attr_aspects=['*', 'deps'])",
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, doc=1)",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, host_fragments='cpp')",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, exec_compatible_with=[1])",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, attrs=[])",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, attrs=None)",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, fragments=None)",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, host_fragments=None)",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, exec_compatible_with=None)",
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, unknown=1)",
     ] {
         assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
     }
