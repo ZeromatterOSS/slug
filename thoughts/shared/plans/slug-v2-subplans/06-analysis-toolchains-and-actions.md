@@ -21848,3 +21848,27 @@ admitted. Focused independent R4 review returned `ACCEPT`; the corrected
 candidate passes the full serial owner/downstream, cap, format, archive-status,
 and hygiene gates. Terminal implementation review returned `ACCEPT`; Spawn
 expansion is the next packet.
+
+#### FilesToRun Spawn expansion design active (2026-08-31)
+
+Activate `WP-6-7A-files-to-run-spawn-expansion-design-r1` at `f46a009a0`.
+Pinned Bazel 9.2 `RuleConfiguredTargetBuilder`, `FilesToRunProvider`,
+`StarlarkActionFactory`, `SpawnAction`, root attribute, and subrule sources fix
+the full category: stable provider Files include the runfiles tree; direct and
+root-associated providers contribute one transitive Spawn tool root; root
+Artifacts retain scoped association; top-level tool depsets perform per-File
+association; sequence-nested depsets do not; and subrule Files are rejected in
+favor of the typed provider.
+
+The design adds only `FilesToRun` variants to the existing Spawn executable and
+tool-source enums and threads them through the existing shared
+`PublicationEqState`. The provider's temporary completeness bit is deleted
+because support action finalization now precedes every configured-result
+publication. Existing dense depsets, `SmallMap`, Artifact identity, `Arc`
+support, and `Allocative` remain the owners. Zabel `0795445f…` guides retaining
+the authenticated provider until lowering and using one action-scoped graph
+import context; its Zig representation, code, IDs, scheduler, cache, and
+behavior remain excluded. No DICE, loading, parser, execution, REAPI,
+`cc_common`, ruleset, or C++ production owner changes. Independent retained-
+representation review returned `REPLAN` only for a mistyped pinned
+`SpawnAction.java` digest; focused correction rereview returned `ACCEPT`.

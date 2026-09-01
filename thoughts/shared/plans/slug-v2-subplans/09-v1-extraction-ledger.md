@@ -2147,3 +2147,28 @@ collection, clone, cache, interner, task, lock, key, graph, or memory owner is
 added. Focused R4 review returned `ACCEPT`; the corrected candidate passes the
 full serial gates within the unchanged caps. Terminal implementation review
 also returned `ACCEPT`; no V1, Buck2, or Zabel semantic owner was introduced.
+
+### Stage 6 FilesToRun Spawn expansion utility decision (2026-08-31)
+
+Status: design `ACCEPT` in
+`WP-6-7A-files-to-run-spawn-expansion-design-r1` at base `f46a009a0`; the
+initial review's sole `REPLAN` was a mistyped pinned `SpawnAction.java` digest,
+which focused correction rereview accepted.
+
+Decision: reuse the existing Rust-native `FilesToRunProvider`,
+`AnalysisArtifact`, dense `AnalysisDepset`/`RetainedArtifactInputs`,
+`SmallMap`, `Arc<RunfilesSupport>`, `Allocative`, and one shared
+`PublicationEqState`. Add no V1 extraction, Buck2 import, second graph,
+flattened File vector, interner, cache, task, lock, DICE key, or deep clone.
+The provider clone retained by one action is a bounded shallow clone of dense
+handles, Artifacts, and an `Arc`; changing provider occurrence identity to add
+another `Arc` is deferred until a measured need exists.
+
+Zabel `0795445f3ab60f4e49070bdd0b94425c5610f73a`
+`ARCHITECTURE.md`, `providers.zig`, `starlark_action_registration.zig`, and
+`logical_actions.zig` are reference-only peer guidance for keeping provider
+authentication through action lowering and sharing one invocation-scoped
+depset import context. Copy no Zig code, row layout, IDs, errors, action
+representation, scheduler, cache, digest, or compatibility claim. Bazel 9.2
+`FilesToRunProvider`, `RuleConfiguredTargetBuilder`, `SpawnAction`, and
+`StarlarkActionFactory` remain the sole exact behavior authority.
