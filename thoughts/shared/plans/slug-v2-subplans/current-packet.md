@@ -9,8 +9,8 @@ Status: R1 architecture review returned `REPLAN`; independent R2 architecture
 review returned `ACCEPT`; implementation validation selected a proof-only R3
 allowlist correction; independent R3 review returned `ACCEPT`; dependent
 compilation selected an R4 shared-analysis projection correction for
-independent review; R4 review returned `REPLAN`; corrected R5 is pending
-independent review.
+independent review; R4 review returned `REPLAN`; independent corrected R5
+review returned `ACCEPT`.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -309,6 +309,14 @@ nonempty policy, while an invalid dependency plus empty list reports the
 dependency failure first. A nonempty integer list must reach `ctx.attr` with
 order/sign intact. Transition allocation remains a colocated unit proof.
 Independent review must accept R5 before implementation resumes.
+
+Independent R5 review returns `ACCEPT`. Selector resolution remains early;
+every declared dependency completes and passes the existing validation loop;
+schema-order `NON_EMPTY` validation then runs before `evaluate_loaded_rule`.
+The dual-invalid file-admissibility/empty-list proof discriminates dependency
+precedence, while the valid signed integer-list row covers `ctx.attr` shape.
+The transition projection, complete list/map emptiness model, DICE ownership,
+lifecycle, allowlist and caps remain sound. Implementation may resume.
 
 ## Immediate predecessor
 

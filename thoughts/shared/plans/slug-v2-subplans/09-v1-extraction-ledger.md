@@ -2348,6 +2348,8 @@ with a dual-invalid precedence proof. Only the three named analysis source
 files join ownership; tags still ignore the bit, other consumers remain
 unchanged, and no representation, graph, lifetime or cap is added. Independent
 R5 review is pending.
+Independent R5 review returns `ACCEPT`; the corrected phase, proof boundary,
+shared representation and no-extraction decision are coherent.
 
 Zabel `0795445f...` schema-ordered tag slots, compact typed tag values and
 invocation freezing are peer optimization guidance only. Copy no Zig type,

@@ -22833,3 +22833,6 @@ rule implementation, and requires a dual-invalid dependency/empty precedence
 proof. Tag conversion still ignores the bit; macro and repository paths are
 unchanged. No representation, DICE ownership, lifetime or cap changes.
 Independent R5 review is required before editing.
+Independent R5 review returns `ACCEPT`: the corrected order preserves
+dependency-error precedence and DICE work, and the required dual-invalid proof
+discriminates that boundary. Implement only R5.

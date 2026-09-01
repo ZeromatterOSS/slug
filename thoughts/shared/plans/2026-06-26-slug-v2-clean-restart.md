@@ -114,6 +114,8 @@ implementation, and adds a dual-invalid precedence proof. Only
 `starlark_rule.rs`, `starlark_transition.rs` and `dice.rs` join production
 ownership. Tag, macro and repository behavior, representation, lifetime and
 caps remain unchanged; independent R5 review is pending.
+Independent R5 review returns `ACCEPT`; implement only the corrected phase and
+proof boundary.
 Structured `starlark_doc_extract` output and experimental remote repository
 execution remain separate deferred categories. Bazel 9.2 is sole behavior
 authority; Zabel remains peer architecture and optimization guidance only.
@@ -7205,3 +7207,5 @@ the phase: Bazel 9.2 validates completed prerequisites before `NON_EMPTY`.
 Corrected R5 checks after existing dependency validation and before rule
 implementation, with a dual-invalid precedence discriminator. Tag, macro and
 repository behavior is unchanged; independent R5 review is pending.
+Independent R5 review returns `ACCEPT`; implementation may resume only within
+the corrected boundary.
