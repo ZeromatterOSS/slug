@@ -7248,3 +7248,14 @@ Bzlmod owner, reused lockfile facts, detached normalized receipt and root-only
 validation remain intact. Authentic rules_rust 0.73 replay clears the metadata
 category and selects generic attribute flag `SKIP_CONSTRAINTS_OVERRIDE` as the
 next docs-first complete-category audit; no consumer special case is allowed.
+
+The docs-first audit activates
+`WP-6-7C-attribute-property-flag-category-implementation-r3` after independent
+R1/R2/R3 review. One compact 25-bit final property set follows Bazel's ordered
+raw/sibling-keyword mutations and survives rule, aspect, macro and subrule
+projection. Existing optimized schema effects reconcile from that owner;
+generated/rule file-type skipping is exact while source-file admissibility is
+preserved. Missing constraint, license, validation, instrumentation and
+dependency-resolution consumers remain explicit deferred surfaces, not parity
+claims. Implement under the frozen five-file 650/900/1,550 gross envelope with
+no ruleset, C++, `cc_common` or `cc_internal` branch.

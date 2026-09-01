@@ -22892,3 +22892,28 @@ rules_rust 0.73 replay clears `extension_metadata(reproducible=True)` and now
 stops at rules_shell's generic attribute flag `SKIP_CONSTRAINTS_OVERRIDE`.
 Audit the complete Bazel 9.2 attribute-flag category next; do not add a
 rules_shell, C++, `cc_common`, `cc_internal` or rules_rust special case.
+
+### WP-6-7C dependency-attribute property flags (2026-09-01)
+
+Activate
+`WP-6-7C-attribute-property-flag-category-implementation-r3`. Bazel 9.2 exposes
+`flags` on the five label-bearing dependency constructors and recognizes one
+25-property set. Replace Slug's one-bit carrier with one complete compact set,
+apply raw flags and sibling-keyword mutations in Bazel source order, and retain
+the final set through rules, aspects, symbolic macros and lifted subrules.
+
+R1 architecture review `REPLAN`s a direct/generated file-check collapse,
+commutative-union mutation model, fabricated raw allowed-values predicate,
+unresolved subrules and missing caps. R2 corrects these, freezes exact five-file
+production and four-file proof allowlists at 650/900/1,550 gross, and admits
+`for_dependency_resolution` plus the exact four-constructor
+`skip_validations` sibling surface. Focused rereview `REPLAN`s only the claim
+that tag/repository schemas exclude dependency descriptors. R3 records Bazel's
+acceptance while preserving Slug's existing unflagged acceptance and explicit
+flagged fail-closed boundary. Focused correction rereview returns `ACCEPT`.
+
+Implement only R3. Exact effects are limited to existing schema behaviors and
+generated/rule file-type-check bypass; every other bit remains structural and
+its absent owner is classified unsupported/deferred. `SKIP_CONSTRAINTS_OVERRIDE`
+does not claim a dependency constraint checker. Bazel 9.2 is authority; Zabel's
+complete-name table and compact derived properties are peer guidance only.

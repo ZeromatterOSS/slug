@@ -2391,6 +2391,16 @@ sets/maps; no V1 utility extraction, second facts graph, cache or interner was
 introduced. The next generic attribute-flag category remains a fresh
 docs-first audit rather than an extraction continuation.
 
+### Stage 6 attribute-property flag utility decision (2026-09-01)
+
+`WP-6-7C-attribute-property-flag-category-implementation-r3` requires no V1
+extraction. Generalize the existing V2 `AttributeFlags(u32)` owner in place to
+the complete Bazel 9.2 property set and retain it through existing immutable
+schema/macro/subrule projections. Add no strings in frozen schemas, per-flag
+booleans, cache, interner or DICE key. Zabel's parallel complete-name table is
+peer optimization guidance only. Independent corrected architecture review
+returns `ACCEPT`.
+
 Zabel `0795445f...` schema-ordered tag slots, compact typed tag values and
 invocation freezing are peer optimization guidance only. Copy no Zig type,
 allocator, evaluator, scheduler, cache, diagnostic or behavior. Bazel 9.2 is
