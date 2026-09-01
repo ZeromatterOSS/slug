@@ -1,0 +1,63 @@
+[fixture]
+name = "rule-level-starlark-transition-execution"
+description = "Bazel 9.2 rule-transition ordering, idempotency, typed outputs, return shapes, attr composition, and target-platform conversion."
+comparison = "message_shape"
+oracle_notes = "This exact admitted slice covers direct build settings, //command_line_option:platforms with default-policy platforms, raw transition attrs, output-reading selector omission, identity/idempotent/non-idempotent rule application, rule-before-attribute composition, and patch/split-shaped returns. Other native options, platform flags/mappings, aliases, configured aspects, and split attribute topology remain deferred."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/analysis/producers/RuleTransitionApplier.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/producers/TargetAndConfigurationProducer.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleTransitionProvider.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkAttributeTransitionProvider.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/config/StarlarkDefinedConfigTransition.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/FunctionTransitionUtil.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/config/CoreOptionConverters.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/ConfiguredTargetKey.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/PlatformOptions.java",
+]
+translation_notes = "Slug uses the retained Starlark callable and its Bzl source context, DICE-prepared typed declarations/selectors/platform facts, one shared synchronous rule/attribute evaluator, structural configuration equality, and an apply/skip configured-target bit. Bazel remains the behavior authority; Slug does not claim Java object, checksum, or output-path identity."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture rule-level-starlark-transition-execution --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture rule-level-starlark-transition-execution --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "identity_idempotent_nonidempotent_typed_platform_and_composition"
+argv = ["build", "//:identity", "//:idempotent", "//:non_idempotent", "//:patch", "//:dict", "//:sequence", "//:platform", "//:comma_platform", "//:comma_sequence_platform", "//:composed"]
+expected_exit = 0
+
+[[commands]]
+name = "ambiguous_selector_omitted_then_final_error"
+argv = ["build", "//:ambiguous"]
+expected_exit = 1
+
+[[commands]]
+name = "missing_declared_output"
+argv = ["build", "//:missing"]
+expected_exit = 1
+
+[[commands]]
+name = "undeclared_extra_output"
+argv = ["build", "//:extra"]
+expected_exit = 1
+
+[[commands]]
+name = "wrong_typed_output"
+argv = ["build", "//:wrong"]
+expected_exit = 1
+
+[[commands]]
+name = "split_rule_result_rejected"
+argv = ["build", "//:split"]
+expected_exit = 1
+
+[[commands]]
+name = "scalar_platform_label_rejected"
+argv = ["build", "//:scalar_platform_label"]
+expected_exit = 1
+
+[[commands]]
+name = "missing_platform_target_rejected"
+argv = ["build", "//:missing_platform"]
+expected_exit = 1

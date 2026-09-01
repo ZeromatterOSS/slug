@@ -181,6 +181,24 @@ pub(crate) struct BzlEvaluationContext {
     bzl_load_visibility: RefCell<Option<BzlLoadVisibility>>,
 }
 
+/// Runtime-only source context for invoking a retained transition callable.
+/// It lets loading-owned `Label()` resolve against the defining Bzl manifest
+/// without exposing loading's broader mutable evaluation state.
+#[derive(Debug, ProvidesStaticType)]
+pub struct TransitionEvaluationContext(BzlEvaluationContext);
+
+impl TransitionEvaluationContext {
+    pub fn new(
+        source_identity: BzlModuleIdentity,
+        source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    ) -> Self {
+        Self(BzlEvaluationContext::macro_runtime_context(
+            source_identity,
+            source_identities_by_filename,
+        ))
+    }
+}
+
 impl BzlEvaluationContext {
     #[cfg(test)]
     pub(crate) fn new(source_label: impl Into<CompactString>) -> Self {
@@ -237,8 +255,13 @@ impl BzlEvaluationContext {
             .and_then(|extra| {
                 extra.downcast_ref::<Self>().or_else(|| {
                     extra
-                        .downcast_ref::<crate::package::MacroEvaluationContext<'_>>()
-                        .map(crate::package::MacroEvaluationContext::bzl)
+                        .downcast_ref::<TransitionEvaluationContext>()
+                        .map(|context| &context.0)
+                        .or_else(|| {
+                            extra
+                                .downcast_ref::<crate::package::MacroEvaluationContext<'_>>()
+                                .map(crate::package::MacroEvaluationContext::bzl)
+                        })
                 })
             })
             .ok_or_else(|| anyhow::anyhow!("operation may only be called in a .bzl module"))

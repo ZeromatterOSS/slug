@@ -72,16 +72,10 @@ use slug_workspace_v2::ResolvedPathObservationKey;
 use slug_workspace_v2::ResolvedPathState;
 use starlark::PrintHandler;
 use starlark::PrintLocation;
-use starlark::environment::Module;
-use starlark::eval::Evaluator;
-use starlark::values::Value;
-use starlark::values::dict::DictRef;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
 use crate::build_setting::matches_expected_text;
-use crate::build_setting::resolve_candidate;
-use crate::build_setting::unpack_transition_value;
 use crate::configured_analysis_cycle_detector::ConfiguredAnalysisCycleGuard;
 use crate::configured_attribute::ConfiguredAttributeCondition;
 use crate::configured_attribute::ResolvedRuleAttribute;
@@ -113,37 +107,13 @@ use crate::starlark_rule::PreparedConfiguredAttribute;
 use crate::starlark_rule::PreparedDependency;
 use crate::starlark_rule::PreparedToolchain;
 use crate::starlark_rule::evaluate_loaded_rule;
+use crate::starlark_transition::PreparedTransitionSetting;
+use crate::starlark_transition::evaluate as evaluate_starlark_transition;
+use crate::starlark_transition::is_platforms;
 use crate::subrule::ConfiguredDependencyValidation;
 use crate::subrule::DeclaredDependencyKey;
 use crate::subrule::configured_dependency_rows;
 use crate::subrule::validate_configured_dependency;
-
-fn without_starlark_option(
-    configuration: &ConfigurationKey,
-    label: &CanonicalLabel,
-) -> ConfigurationKey {
-    if configuration.starlark_option(label).is_none() {
-        return configuration.clone();
-    }
-    if let Some(configuration) = configuration.slug_configuration() {
-        return ConfigurationKey::from_slug(configuration.without_starlark_option(label));
-    }
-    let mut result = ConfigurationKey::new(
-        configuration.kind(),
-        configuration
-            .checksum()
-            .expect("legacy configuration carries a checksum")
-            .clone(),
-    );
-    for option in configuration
-        .starlark_options()
-        .iter()
-        .filter(|option| option.label() != label)
-    {
-        result = result.with_starlark_option(option.clone());
-    }
-    result
-}
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum AnalysisErrorKind {
@@ -1143,6 +1113,21 @@ macro_rules! root_value {
     };
 }
 
+macro_rules! semantic_value {
+    ($outcome:expr) => {
+        match $outcome {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error))
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return analysis_semantic_complete(Err(error))
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
+        }
+    };
+}
+
 #[derive(Default)]
 struct AnalysisPrintCapture {
     events: RefCell<Vec<EvaluationEvent>>,
@@ -1405,6 +1390,8 @@ async fn prepare_configured_rule_attributes(
     workspace: &NormalizedAbsolutePath,
     package: &LoadedPackage,
     configured_target: &ConfiguredTargetKey,
+    omitted_transition_outputs: &[slug_loading_v2::attrs::TransitionSetting],
+    omit_unresolved_attributes: bool,
 ) -> AnalysisSemanticOutcome<(Vec<ResolvedRuleAttribute>, Arc<[ConfiguredNodeKey]>)> {
     let implementation = match starlark_rule_implementation(package, configured_target) {
         Ok(implementation) => implementation,
@@ -1446,21 +1433,46 @@ async fn prepare_configured_rule_attributes(
         .values()
         .iter()
         .zip(implementation.schema())
-        .map(|(attribute, schema)| {
-            resolve_configured_attribute(attribute.value.as_ref(), &conditions.values)
-                .map(|value| ResolvedRuleAttribute {
+        .filter(|(attribute, _)| {
+            !attribute.value.selector_key_labels().iter().any(|label| {
+                conditions.values.iter().any(|condition| {
+                    &condition.label == label
+                        && omitted_transition_outputs.iter().any(|output| {
+                            if output.is_native_option() {
+                                output.canonical().target().as_str() == "platforms"
+                                    && condition
+                                        .declaration
+                                        .values()
+                                        .value()
+                                        .iter()
+                                        .any(|(name, _)| name == "platforms")
+                            } else {
+                                condition
+                                    .declaration
+                                    .flag_values()
+                                    .value()
+                                    .iter()
+                                    .any(|(setting, _)| setting == output.canonical())
+                            }
+                        })
+                })
+            })
+        })
+        .filter_map(|(attribute, schema)| {
+            match resolve_configured_attribute(attribute.value.as_ref(), &conditions.values) {
+                Ok(value) => Some(Ok(ResolvedRuleAttribute {
                     declaration_name: attribute.declaration_name.clone(),
                     kind: schema.kind(),
                     sequence: schema.transition().is_some()
                         || matches!(schema.kind(), AttributeKind::LabelList),
                     value,
-                })
-                .map_err(|error| {
-                    AnalysisError::message(format!(
-                        "resolving configured attribute `{}`: {error}",
-                        attribute.declaration_name
-                    ))
-                })
+                })),
+                Err(_) if omit_unresolved_attributes => None,
+                Err(error) => Some(Err(AnalysisError::message(format!(
+                    "resolving configured attribute `{}`: {error}",
+                    attribute.declaration_name
+                )))),
+            }
         })
         .collect::<Result<Vec<_>, _>>();
     analysis_semantic_complete(resolved.map(|values| (values, conditions.packages)))
@@ -1507,6 +1519,7 @@ async fn root_declared_dependency_keys(
             workspace,
             configured_target.configuration(),
             schema.transition(),
+            resolved_attributes,
         )
         .await
         {
@@ -1593,69 +1606,226 @@ async fn configured_dependency_configuration(
     workspace: &NormalizedAbsolutePath,
     configuration: &ConfigurationKey,
     transition: Option<&TransitionDefinition>,
+    attributes: &[ResolvedRuleAttribute],
 ) -> AnalysisSemanticOutcome<(ConfigurationKey, Option<CanonicalLabel>)> {
     let Some(transition) = transition else {
         return analysis_semantic_complete(Ok((configuration.clone(), None)));
     };
-    let [declared_output] = transition.outputs() else {
-        return analysis_semantic_complete(Err(AnalysisError::new(
-            "transition execution currently supports only input-free transitions with one root-repository build-setting output",
+    let rows = semantic_value!(
+        prepare_starlark_transition_settings(ctx, mode, workspace, transition).await
+    );
+    let configurations =
+        match evaluate_starlark_transition(transition, &rows, attributes, configuration) {
+            Ok(configurations) => configurations,
+            Err(error) => return analysis_semantic_complete(Err(AnalysisError::message(error))),
+        };
+    let [candidate] = configurations.as_slice() else {
+        return analysis_semantic_complete(Err(AnalysisError::message(
+            "attribute transition must return exactly one configuration",
         )));
     };
-    if !transition.inputs().is_empty()
-        || declared_output.is_native_option()
-        || !declared_output.canonical().package().repo().is_root()
-    {
-        return analysis_semantic_complete(Err(AnalysisError::new(
-            "transition execution currently supports only input-free transitions with one root-repository build-setting output",
-        )));
+    semantic_value!(validate_transition_platform(ctx, workspace, configuration, candidate).await);
+    analysis_semantic_complete(Ok((
+        candidate.clone(),
+        transition
+            .outputs()
+            .first()
+            .map(|setting| setting.canonical().clone()),
+    )))
+}
+
+async fn prepare_starlark_transition_settings(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    transition: &TransitionDefinition,
+) -> AnalysisSemanticOutcome<Vec<PreparedTransitionSetting>> {
+    let mut canonical = SmallSet::new();
+    let mut rows = Vec::new();
+    for setting in transition.inputs().iter().chain(transition.outputs()) {
+        if !canonical.insert(setting.canonical().clone()) {
+            continue;
+        }
+        if setting.is_native_option() {
+            if !is_platforms(setting) {
+                return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                    "unsupported native transition setting {}",
+                    setting.declared()
+                ))));
+            }
+            rows.push(PreparedTransitionSetting::Platforms(setting.clone()));
+            continue;
+        }
+        let declaration = semantic_value!(
+            build_setting_declaration(ctx, mode, workspace, setting.canonical()).await
+        );
+        rows.push(PreparedTransitionSetting::BuildSetting {
+            setting: setting.clone(),
+            declaration,
+        });
     }
-    let output_label = declared_output.canonical().clone();
-    let declaration = match build_setting_declaration(ctx, mode, workspace, &output_label).await {
-        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+    analysis_semantic_complete(Ok(rows))
+}
+
+async fn validate_transition_platform(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    previous: &ConfigurationKey,
+    candidate: &ConfigurationKey,
+) -> AnalysisSemanticOutcome<()> {
+    let Some(previous) = previous.slug_configuration() else {
+        return analysis_semantic_complete(Ok(()));
+    };
+    let Some(candidate_structural) = candidate.slug_configuration() else {
+        return analysis_semantic_complete(Err(AnalysisError::message(
+            "transition changed structural configuration into a legacy configuration",
+        )));
+    };
+    let previous = match previous.target_platform_label() {
+        Ok(label) => label,
+        Err(error) => {
+            return analysis_semantic_complete(Err(AnalysisError::message(error.to_string())));
+        }
+    };
+    let candidate_label = match candidate_structural.target_platform_label() {
+        Ok(label) => label,
+        Err(error) => {
+            return analysis_semantic_complete(Err(AnalysisError::message(error.to_string())));
+        }
+    };
+    if previous == candidate_label {
+        return analysis_semantic_complete(Ok(()));
+    }
+    let key = match ConfiguredPlatformKey::new(
+        workspace.dupe(),
+        ConfiguredTargetKey::new(candidate_label, candidate.clone()),
+    ) {
+        Ok(key) => key,
+        Err(error) => return analysis_semantic_complete(Err(error)),
+    };
+    match ctx.compute(&key).await {
+        Ok(LoadingPreparationOutcome::Need(need)) => LoadingPreparationOutcome::Need(need),
+        Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
+            LoadingPreparationOutcome::Complete(Err(error))
+        }
+        Ok(LoadingPreparationOutcome::Complete(Ok(result))) => match result.as_ref() {
+            Ok(_) => analysis_semantic_complete(Ok(())),
+            Err(error) => analysis_semantic_complete(Err(error.clone())),
+        },
+        Err(error) => analysis_semantic_complete(Err(AnalysisError::message(format!(
+            "validating transition target platform through DICE: {error}"
+        )))),
+    }
+}
+
+async fn rule_transition_delegate(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    package: &LoadedPackage,
+    configured_target: &ConfiguredTargetKey,
+    transition: &TransitionDefinition,
+) -> AnalysisSemanticOutcome<Option<ConfiguredTargetKey>> {
+    let (attributes, _) = semantic_value!(
+        prepare_configured_rule_attributes(
+            ctx,
+            mode,
+            workspace,
+            package,
+            configured_target,
+            transition.outputs(),
+            true,
+        )
+        .await
+    );
+    let rows = semantic_value!(
+        prepare_starlark_transition_settings(ctx, mode, workspace, transition).await
+    );
+    let first = match evaluate_starlark_transition(
+        transition,
+        &rows,
+        &attributes,
+        configured_target.configuration(),
+    ) {
+        Ok(configurations) => configurations,
+        Err(error) => return analysis_semantic_complete(Err(AnalysisError::message(error))),
+    };
+    let [first] = first.as_slice() else {
+        return analysis_semantic_complete(Err(AnalysisError::message(
+            "rule transition must return exactly one configuration",
+        )));
+    };
+    if first == configured_target.configuration() {
+        return analysis_semantic_complete(Ok(None));
+    }
+    semantic_value!(
+        validate_transition_platform(ctx, workspace, configured_target.configuration(), first)
+            .await
+    );
+    let second = match evaluate_starlark_transition(transition, &rows, &attributes, first) {
+        Ok(configurations) => configurations,
+        Err(error) => return analysis_semantic_complete(Err(AnalysisError::message(error))),
+    };
+    let [second] = second.as_slice() else {
+        return analysis_semantic_complete(Err(AnalysisError::message(
+            "rule transition must return exactly one configuration on its idempotency check",
+        )));
+    };
+    semantic_value!(validate_transition_platform(ctx, workspace, first, second).await);
+    let delegated = if first == second {
+        ConfiguredTargetKey::new(configured_target.label().clone(), first.clone())
+    } else {
+        ConfiguredTargetKey::without_rule_transition(
+            configured_target.label().clone(),
+            first.clone(),
+        )
+    };
+    analysis_semantic_complete(Ok(Some(delegated)))
+}
+
+async fn maybe_compute_rule_transition_delegate(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    package: &LoadedPackage,
+    configured_target: &ConfiguredTargetKey,
+    transition: Option<&TransitionDefinition>,
+) -> Option<RootAnalysisDriverValue> {
+    if !configured_target.should_apply_rule_transition() {
+        return None;
+    }
+    let transition = transition?;
+    let delegated = match rule_transition_delegate(
+        ctx,
+        mode,
+        workspace,
+        package,
+        configured_target,
+        transition,
+    )
+    .await
+    {
+        LoadingPreparationOutcome::Need(need) => {
+            return Some(LoadingPreparationOutcome::Need(need));
+        }
         LoadingPreparationOutcome::Complete(Err(error)) => {
-            return LoadingPreparationOutcome::Complete(Err(error));
+            return Some(LoadingPreparationOutcome::Complete(Err(error)));
         }
         LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-            return analysis_semantic_complete(Err(error));
+            return Some(root_analysis_driver_complete(Err(error)));
         }
-        LoadingPreparationOutcome::Complete(Ok(Ok(declaration))) => declaration,
+        LoadingPreparationOutcome::Complete(Ok(Ok(None))) => return None,
+        LoadingPreparationOutcome::Complete(Ok(Ok(Some(delegated)))) => delegated,
     };
-    let resolved = (|| -> Result<_, AnalysisError> {
-        let module = Module::new();
-        let returned = Evaluator::new(&module)
-            .eval_function(
-                transition.implementation().to_value(),
-                &[Value::new_none(), Value::new_none()],
-                &[],
-            )
-            .map_err(|error| AnalysisError::new(error.to_string()))?;
-        let entries = DictRef::from_value(returned)
-            .ok_or_else(|| AnalysisError::new("transition must return a dictionary"))?
-            .iter()
-            .collect::<Vec<_>>();
-        let [(returned_output, setting)] = entries.as_slice() else {
-            return Err(AnalysisError::new(
-                "transition must return exactly one declared output",
-            ));
-        };
-        if returned_output.unpack_str() != Some(declared_output.declared()) {
-            return Err(AnalysisError::new(format!(
-                "transition output must be exactly {}",
-                declared_output.declared()
-            )));
-        }
-        let candidate =
-            unpack_transition_value(&output_label, &declaration, *setting, module.heap())
-                .map_err(AnalysisError::new)?;
-        let resolved = resolve_candidate(output_label.clone(), &declaration, candidate)
-            .map_err(AnalysisError::new)?;
-        Ok(match resolved {
-            Some(resolved) => configuration.with_starlark_option(resolved),
-            None => without_starlark_option(configuration, &output_label),
-        })
-    })();
-    analysis_semantic_complete(resolved.map(|configuration| (configuration, Some(output_label))))
+    Some(
+        compute_configured_node_child(
+            ctx,
+            mode,
+            workspace.dupe(),
+            ConfiguredNodeKey::configured(delegated),
+        )
+        .await,
+    )
 }
 
 async fn prepare_declared_dependency_keys(
@@ -2458,6 +2628,40 @@ async fn compute_configured_child(
                 Ok(value) => value,
                 Err(error) => root_analysis_driver_complete(Err(AnalysisError::new(format!(
                     "computing configured child through DICE: {error}"
+                )))),
+            }
+        }
+    }
+}
+
+async fn compute_configured_node_child(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: NormalizedAbsolutePath,
+    node: ConfiguredNodeKey,
+) -> RootAnalysisDriverValue {
+    let key = match ConfiguredNodeAnalysisKey::new(workspace, node) {
+        Ok(key) => key,
+        Err(error) => return root_analysis_driver_complete(Err(error)),
+    };
+    match mode {
+        ConfiguredAnalysisMode::Legacy => match ctx.compute(&key).await {
+            Ok(LoadingPreparationOutcome::Need(need)) => LoadingPreparationOutcome::Need(need),
+            Ok(LoadingPreparationOutcome::Complete(value)) => {
+                LoadingPreparationOutcome::Complete(Ok(value))
+            }
+            Err(error) => root_analysis_driver_complete(Err(AnalysisError::message(format!(
+                "computing configured transition delegate through DICE: {error}"
+            )))),
+        },
+        ConfiguredAnalysisMode::Observed => {
+            match ctx
+                .compute(&ConfiguredNodeAnalysisObservationKey(key))
+                .await
+            {
+                Ok(value) => value,
+                Err(error) => root_analysis_driver_complete(Err(AnalysisError::message(format!(
+                    "computing observed transition delegate through DICE: {error}"
                 )))),
             }
         }
@@ -4482,7 +4686,7 @@ mod tests {
             .expect("fixture carries one retained option")
             as *const StarlarkOption;
 
-        let unchanged = without_starlark_option(&configuration, &missing);
+        let unchanged = configuration.without_starlark_option(&missing);
 
         assert_eq!(unchanged, configuration);
         assert!(unchanged.starlark_option(&missing).is_none());
@@ -5364,11 +5568,17 @@ impl ConfiguredNodeAnalysisKey {
             Ok(implementation) => implementation,
             Err(error) => return root_analysis_driver_complete(Err(error)),
         };
-        if implementation.incoming_transition().is_some() {
-            return root_analysis_driver_complete(Err(AnalysisError::message(format!(
-                "rule-level Starlark transition execution is not supported for {}",
-                configured_target.label()
-            ))));
+        if let Some(delegated) = maybe_compute_rule_transition_delegate(
+            ctx,
+            mode,
+            &self.workspace,
+            package,
+            configured_target,
+            implementation.incoming_transition(),
+        )
+        .await
+        {
+            return delegated;
         }
         let configured_dependency_names = implementation
             .configured_dependency_attributes()
@@ -5401,6 +5611,8 @@ impl ConfiguredNodeAnalysisKey {
             &self.workspace,
             package,
             configured_target,
+            &[],
+            false,
         )
         .await
         {

@@ -25,6 +25,8 @@ use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use starlark::values::FrozenValue;
 
+use crate::bzl_module::BzlModuleIdentity;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
 pub enum AttributeKind {
     Label,
@@ -386,17 +388,23 @@ pub struct TransitionDefinition {
     implementation: FrozenValue,
     inputs: Arc<[TransitionSetting]>,
     outputs: Arc<[TransitionSetting]>,
+    definition_source: Arc<BzlModuleIdentity>,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
 }
 impl TransitionDefinition {
     pub fn new(
         implementation: FrozenValue,
         inputs: Arc<[TransitionSetting]>,
         outputs: Arc<[TransitionSetting]>,
+        definition_source: Arc<BzlModuleIdentity>,
+        source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
     ) -> Self {
         Self {
             implementation,
             inputs,
             outputs,
+            definition_source,
+            source_identities_by_filename,
         }
     }
     pub fn implementation(&self) -> FrozenValue {
@@ -408,10 +416,19 @@ impl TransitionDefinition {
     pub fn outputs(&self) -> &[TransitionSetting] {
         &self.outputs
     }
+    pub fn definition_source(&self) -> &Arc<BzlModuleIdentity> {
+        &self.definition_source
+    }
+    pub fn source_identities_by_filename(&self) -> &Arc<[(CompactString, BzlModuleIdentity)]> {
+        &self.source_identities_by_filename
+    }
 }
 impl PartialEq for TransitionDefinition {
     fn eq(&self, other: &Self) -> bool {
-        self.inputs == other.inputs && self.outputs == other.outputs
+        self.inputs == other.inputs
+            && self.outputs == other.outputs
+            && self.definition_source == other.definition_source
+            && self.source_identities_by_filename == other.source_identities_by_filename
     }
 }
 impl Eq for TransitionDefinition {}

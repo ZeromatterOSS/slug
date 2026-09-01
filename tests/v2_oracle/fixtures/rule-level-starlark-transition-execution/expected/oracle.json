@@ -1,0 +1,238 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//:identity",
+        "//:idempotent",
+        "//:non_idempotent",
+        "//:patch",
+        "//:dict",
+        "//:sequence",
+        "//:platform",
+        "//:comma_platform",
+        "//:comma_sequence_platform",
+        "//:composed"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:identity",
+        "//:idempotent",
+        "//:non_idempotent",
+        "//:patch",
+        "//:dict",
+        "//:sequence",
+        "//:platform",
+        "//:comma_platform",
+        "//:comma_sequence_platform",
+        "//:composed"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "identity_idempotent_nonidempotent_typed_platform_and_composition",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 10 targets (5 packages loaded, 6 targets configured)\nAnalyzing: 10 targets (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed 10 targets (6 packages loaded, 35 targets configured).\nINFO: Found 10 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 10 targets (5 packages loaded, 6 targets configured)\nAnalyzing: 10 targets (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed 10 targets (6 packages loaded, 35 targets configured).\nINFO: Found 10 targets...\nINFO: Elapsed time: 4.881s, Critical Path: 0.02s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:ambiguous"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:ambiguous"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "ambiguous_selector_omitted_then_final_error",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:ambiguous (0 packages loaded, 0 targets configured)\nAnalyzing: target //:ambiguous (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:79:15: Illegal ambiguous match on configurable attribute \"selected\" in //:ambiguous:\n//:fastbuild\n//:nostamp\nMultiple matches are not allowed unless one is unambiguously more specialized or they resolve to the same value. See https://bazel.build/reference/be/functions#select.\nERROR: Analysis of target '//:ambiguous' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:ambiguous (0 packages loaded, 0 targets configured)\nAnalyzing: target //:ambiguous (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/rule-level-starlark-transition-execution/20260901-101110-1293553-bazel/workspace/BUILD.bazel:79:15: Illegal ambiguous match on configurable attribute \"selected\" in //:ambiguous:\n//:fastbuild\n//:nostamp\nMultiple matches are not allowed unless one is unambiguously more specialized or they resolve to the same value. See https://bazel.build/reference/be/functions#select.\nERROR: Analysis of target '//:ambiguous' failed; build aborted\nINFO: Elapsed time: 0.089s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:missing"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:missing"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "missing_declared_output",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:missing (0 packages loaded, 0 targets configured)\nAnalyzing: target //:missing (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/defs.bzl:68:5: invalid result from transition function: transition outputs [//:enabled] were not defined by transition function\nERROR: <workspace>/BUILD.bazel:60:13: Errors encountered while applying Starlark transition\nERROR: Analysis of target '//:missing' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:missing (0 packages loaded, 0 targets configured)\nAnalyzing: target //:missing (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/rule-level-starlark-transition-execution/20260901-101110-1293553-bazel/workspace/defs.bzl:68:5: invalid result from transition function: transition outputs [//:enabled] were not defined by transition function\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/rule-level-starlark-transition-execution/20260901-101110-1293553-bazel/workspace/BUILD.bazel:60:13: Errors encountered while applying Starlark transition\nERROR: Analysis of target '//:missing' failed; build aborted\nINFO: Elapsed time: 0.030s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:extra"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:extra"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "undeclared_extra_output",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:extra (0 packages loaded, 0 targets configured)\nAnalyzing: target //:extra (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/defs.bzl:71:5: invalid result from transition function: transition function returned undeclared output '//:other'\nERROR: <workspace>/BUILD.bazel:61:11: Errors encountered while applying Starlark transition\nERROR: Analysis of target '//:extra' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:extra (0 packages loaded, 0 targets configured)\nAnalyzing: target //:extra (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/rule-level-starlark-transition-execution/20260901-101110-1293553-bazel/workspace/defs.bzl:71:5: invalid result from transition function: transition function returned undeclared output '//:other'\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/rule-level-starlark-transition-execution/20260901-101110-1293553-bazel/workspace/BUILD.bazel:61:11: Errors encountered while applying Starlark transition\nERROR: Analysis of target '//:extra' failed; build aborted\nINFO: Elapsed time: 0.025s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:wrong"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:wrong"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "wrong_typed_output",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:wrong (0 packages loaded, 0 targets configured)\nAnalyzing: target //:wrong (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:62:11: expected value of type 'string' for //:text, but got 7 (int)\nERROR: Analysis of target '//:wrong' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:wrong (0 packages loaded, 0 targets configured)\nAnalyzing: target //:wrong (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/rule-level-starlark-transition-execution/20260901-101110-1293553-bazel/workspace/BUILD.bazel:62:11: expected value of type 'string' for //:text, but got 7 (int)\nERROR: Analysis of target '//:wrong' failed; build aborted\nINFO: Elapsed time: 0.023s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:split"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:split"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "split_rule_result_rejected",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:split (0 packages loaded, 0 targets configured)\nAnalyzing: target //:split (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/defs.bzl:86:25: Rule transition only allowed to return a single transitioned configuration.\nERROR: <workspace>/BUILD.bazel:63:11: Errors encountered while applying Starlark transition\nERROR: Analysis of target '//:split' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:split (0 packages loaded, 0 targets configured)\nAnalyzing: target //:split (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/rule-level-starlark-transition-execution/20260901-101110-1293553-bazel/workspace/defs.bzl:86:25: Rule transition only allowed to return a single transitioned configuration.\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/rule-level-starlark-transition-execution/20260901-101110-1293553-bazel/workspace/BUILD.bazel:63:11: Errors encountered while applying Starlark transition\nERROR: Analysis of target '//:split' failed; build aborted\nINFO: Elapsed time: 0.024s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:scalar_platform_label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:scalar_platform_label"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "scalar_platform_label_rejected",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:scalar_platform_label (0 packages loaded, 0 targets configured)\nAnalyzing: target //:scalar_platform_label (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/defs.bzl:121:21: Invalid value type for option 'platforms'\nERROR: <workspace>/BUILD.bazel:77:27: Errors encountered while applying Starlark transition\nERROR: Analysis of target '//:scalar_platform_label' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:scalar_platform_label (0 packages loaded, 0 targets configured)\nAnalyzing: target //:scalar_platform_label (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/rule-level-starlark-transition-execution/20260901-101110-1293553-bazel/workspace/defs.bzl:121:21: Invalid value type for option 'platforms'\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/rule-level-starlark-transition-execution/20260901-101110-1293553-bazel/workspace/BUILD.bazel:77:27: Errors encountered while applying Starlark transition\nERROR: Analysis of target '//:scalar_platform_label' failed; build aborted\nINFO: Elapsed time: 0.025s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:missing_platform"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:missing_platform"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "missing_platform_target_rejected",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:missing_platform (0 packages loaded, 0 targets configured)\nAnalyzing: target //:missing_platform (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:78:22: com.google.devtools.build.lib.packages.NoSuchTargetException: no such target '//:does_not_exist': target 'does_not_exist' not declared in package '' defined by <workspace>/BUILD.bazel\nERROR: Analysis of target '//:missing_platform' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:missing_platform (0 packages loaded, 0 targets configured)\nAnalyzing: target //:missing_platform (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/rule-level-starlark-transition-execution/20260901-101110-1293553-bazel/workspace/BUILD.bazel:78:22: com.google.devtools.build.lib.packages.NoSuchTargetException: no such target '//:does_not_exist': target 'does_not_exist' not declared in package '' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/rule-level-starlark-transition-execution/20260901-101110-1293553-bazel/workspace/BUILD.bazel\nERROR: Analysis of target '//:missing_platform' failed; build aborted\nINFO: Elapsed time: 0.025s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "rule-level-starlark-transition-execution",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

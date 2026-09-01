@@ -566,6 +566,58 @@ impl SlugConfiguration {
             })
     }
 
+    /// Effective value exposed to the admitted Starlark transition native
+    /// option. Slug's empty retained list denotes the Host fallback, so the
+    /// evaluator always observes the effective one-member label list.
+    pub fn transition_target_platforms(
+        &self,
+    ) -> Result<Arc<[CanonicalLabel]>, SlugConfigurationError> {
+        Ok(Arc::from([self.target_platform_label()?]))
+    }
+
+    /// Functional update for `//command_line_option:platforms`. Bazel's list
+    /// option is normalized to its first member; `None` and explicit Host use
+    /// Slug's existing empty-list Host-fallback representation.
+    pub fn with_transition_target_platform(
+        &self,
+        platform: Option<&CanonicalLabel>,
+    ) -> Result<Self, SlugConfigurationError> {
+        let host =
+            self.host_platform_label()
+                .ok_or(SlugConfigurationError::UnexpectedNativeLabel {
+                    option: HOST_PLATFORM,
+                })?;
+        let platform = platform.filter(|platform| *platform != &host);
+        let wants_fallback = platform.is_none();
+        let current_fallback = matches!(
+            self.native_label_value(TARGET_PLATFORMS)?,
+            LabelValue::Labels(values) if values.0.is_empty()
+        );
+        let current = self.target_platform_label()?;
+        let selected = platform.unwrap_or(&host);
+        if current == *selected && current_fallback == wants_fallback {
+            return Ok(self.dupe());
+        }
+        let mut options = self.0.options.to_vec();
+        let record = options
+            .iter_mut()
+            .find(|record| {
+                record.class_name == PLATFORM_OPTIONS && record.canonical_name == TARGET_PLATFORMS
+            })
+            .ok_or(SlugConfigurationError::UnknownNativeOption)?;
+        record.value = OptionValue::Label(Some(LabelValue::Labels(LabelValues(
+            platform
+                .map(|platform| Arc::from([ResolvedOptionLabel::from_canonical(platform)]))
+                .unwrap_or_else(|| Arc::from([])),
+        ))));
+        Ok(finish_configuration(
+            self.0.kind,
+            options.into(),
+            self.0.starlark_options.dupe(),
+            self.0.action_environment_host.dupe(),
+        ))
+    }
+
     pub fn host_platform_label(&self) -> Option<CanonicalLabel> {
         let LabelValue::Label(label) = self.native_label_value(HOST_PLATFORM).ok()? else {
             return None;

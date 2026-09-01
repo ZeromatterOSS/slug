@@ -30951,6 +30951,12 @@ T = transition(
     );
     assert_eq!(incoming.inputs(), transition.inputs());
     assert_eq!(incoming.outputs(), transition.outputs());
+    assert_eq!(transition.definition_source().as_ref(), &producer_owner);
+    assert_eq!(incoming.definition_source(), transition.definition_source());
+    assert_eq!(
+        incoming.source_identities_by_filename(),
+        transition.source_identities_by_filename()
+    );
 }
 
 #[test]

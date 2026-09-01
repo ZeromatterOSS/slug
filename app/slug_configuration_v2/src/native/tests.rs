@@ -199,6 +199,40 @@ mod command_configuration_tests {
     }
 
     #[test]
+    fn transition_platform_projection_normalizes_first_member_and_host_fallback() {
+        let base = configuration();
+        let host = base.host_platform_label().unwrap();
+        assert_eq!(
+            base.transition_target_platforms().unwrap().as_ref(),
+            &[host.clone()]
+        );
+
+        let linux = CanonicalLabel::parse("@@platforms//host:host").unwrap();
+        let selected = base.with_transition_target_platform(Some(&linux)).unwrap();
+        assert_eq!(selected.target_platform_label().unwrap(), linux);
+        assert_eq!(
+            selected.transition_target_platforms().unwrap().as_ref(),
+            &[linux.clone()]
+        );
+        assert_eq!(
+            selected
+                .with_transition_target_platform(Some(&linux))
+                .unwrap(),
+            selected
+        );
+        assert_eq!(
+            selected
+                .with_transition_target_platform(Some(&host))
+                .unwrap(),
+            base
+        );
+        assert_eq!(
+            selected.with_transition_target_platform(None).unwrap(),
+            base
+        );
+    }
+
+    #[test]
     fn typed_fdo_command_closure_uses_descriptor_conversion_and_root_mapping() {
         let mapping = mapping();
         let overlay: CommandConfigurationOverlay = vec![

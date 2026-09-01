@@ -5414,27 +5414,28 @@ parent(
 }
 
 #[tokio::test]
-async fn unsupported_transition_shapes_fail_before_setting_lookup_or_invocation() {
+async fn transition_declarations_fail_before_invocation_when_unpreparable() {
     let cases = [
         (
-            "nonempty-input",
+            "missing-input",
             "[\"//:missing_input\"]",
+            "[]",
+            "build setting @@//:missing_input is missing",
+        ),
+        (
+            "missing-output",
+            "[]",
             "[\"//:missing_output\"]",
-        ),
-        ("zero-output", "[]", "[]"),
-        (
-            "multiple-output",
-            "[]",
-            "[\"//:missing_a\", \"//:missing_b\"]",
+            "build setting @@//:missing_output is missing",
         ),
         (
-            "native-output",
+            "unsupported-native-output",
             "[]",
-            "[\"//command_line_option:platforms\"]",
+            "[\"//command_line_option:cpu\"]",
+            "unsupported native transition setting //command_line_option:cpu",
         ),
-        ("external-output", "[]", "[\"@@dep+//:missing\"]"),
     ];
-    for (name, inputs, outputs) in cases {
+    for (name, inputs, outputs, expected) in cases {
         let workspace = scratch();
         fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
         fs::write(
@@ -5462,33 +5463,32 @@ parent = rule(implementation = _empty, attrs = {{"dep": attr.label(cfg = t)}})
         let error = analyze_request(&dice, &workspace, &key, None, false)
             .await
             .unwrap_err();
-        assert!(
-            error.contains(
-                "transition execution currently supports only input-free transitions with one root-repository build-setting output"
-            ),
-            "{name}: {error}"
-        );
+        assert!(error.contains(expected), "{name}: {error}");
         assert!(!error.contains("TRANSITION_IMPLEMENTATION_WAS_INVOKED"));
-        for missing in ["missing_input", "missing_output", "missing_a", "missing_b"] {
-            assert!(!error.contains(missing), "{name}: {error}");
-        }
     }
 }
 
 #[tokio::test]
-async fn rule_level_transition_attachment_fails_before_all_configured_work() {
+async fn rule_level_transition_runs_before_final_selector_and_is_idempotent() {
     let workspace = scratch();
     fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
     fs::write(
         workspace.join("defs.bzl"),
-        r#"def _transition(settings, attr): fail("TRANSITION_IMPLEMENTATION_WAS_INVOKED")
-T = transition(implementation = _transition, inputs = ["//:missing_input"], outputs = ["//:missing_output"])
-def _incoming(ctx): fail("RULE_IMPLEMENTATION_WAS_INVOKED")
+        r#"TransitionInfo = provider(fields = {"value": "value"})
+def _setting(ctx): return []
+setting = rule(implementation = _setting, build_setting = config.string(flag = True))
+def _transition(settings, attr):
+    if hasattr(attr, "selected"):
+        fail("output-reading selector leaked into transition attr")
+    if type(attr.dep) != "Label":
+        fail("transition label attr was not a Label")
+    return {"//:mode": attr.desired}
+T = transition(implementation = _transition, inputs = ["//:mode"], outputs = ["//:mode"])
+def _incoming(ctx): return [TransitionInfo(value = ctx.attr.selected)]
 incoming = rule(
     implementation = _incoming,
     cfg = T,
-    attrs = {"dep": attr.label()},
-    toolchains = ["//missing:toolchain_type"],
+    attrs = {"desired": attr.string(), "selected": attr.string(), "dep": attr.label()},
 )
 def _plain(ctx): return []
 plain = rule(implementation = _plain, cfg = None)
@@ -5497,12 +5497,16 @@ plain = rule(implementation = _plain, cfg = None)
     .unwrap();
     fs::write(
         workspace.join("BUILD.bazel"),
-        r#"load(":defs.bzl", "incoming", "plain")
+        r#"load(":defs.bzl", "incoming", "plain", "setting")
+setting(name = "mode", build_setting_default = "default")
+config_setting(name = "changed", flag_values = {":mode": "changed"})
 incoming(
     name = "incoming",
-    dep = select({
-        "//missing:condition": "//missing:dependency",
-        "//conditions:default": "//missing:fallback",
+    desired = "changed",
+    dep = ":plain",
+    selected = select({
+        ":changed": "after",
+        "//conditions:default": "before",
     }),
 )
 plain(name = "plain")
@@ -5515,27 +5519,27 @@ plain(name = "plain")
         CanonicalLabel::parse("@@//:incoming").unwrap(),
         test_configuration(),
     );
-    let error = analyze_request(&dice, &workspace, &incoming, None, false)
+    let result = analyze_request(&dice, &workspace, &incoming, None, false)
         .await
-        .unwrap_err();
-    assert!(
-        error.contains(
-            "rule-level Starlark transition execution is not supported for @@//:incoming"
+        .unwrap();
+    assert_eq!(
+        provider_value(
+            &result,
+            &ProviderId::new("//:defs.bzl", "TransitionInfo").unwrap()
         ),
-        "{error}"
+        "after"
     );
-    for forbidden in [
-        "TRANSITION_IMPLEMENTATION_WAS_INVOKED",
-        "RULE_IMPLEMENTATION_WAS_INVOKED",
-        "missing_input",
-        "missing_output",
-        "missing:condition",
-        "missing:dependency",
-        "missing:fallback",
-        "missing:toolchain_type",
-    ] {
-        assert!(!error.contains(forbidden), "{forbidden}: {error}");
-    }
+    assert_eq!(
+        result
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .starlark_option(&CanonicalLabel::parse("@@//:mode").unwrap())
+            .unwrap()
+            .value()
+            .as_str(),
+        Some("changed")
+    );
 
     let plain = ConfiguredTargetKey::new(
         CanonicalLabel::parse("@@//:plain").unwrap(),
@@ -5544,6 +5548,437 @@ plain(name = "plain")
     analyze_request(&dice, &workspace, &plain, None, false)
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn rule_transition_omits_ambiguous_attr_before_final_analysis_error() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _empty(ctx): return []
+setting = rule(implementation = _empty, build_setting = config.string(flag = True))
+def _transition(settings, attr):
+    if hasattr(attr, "selected"):
+        fail("AMBIGUOUS_ATTR_LEAKED_TO_TRANSITION")
+    return {"//:setting": "changed"}
+t = transition(implementation = _transition, inputs = [], outputs = ["//:setting"])
+probe = rule(implementation = _empty, cfg = t, attrs = {"selected": attr.string()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "probe", "setting")
+setting(name = "setting", build_setting_default = "default")
+config_setting(name = "mode", values = {"compilation_mode": "fastbuild"})
+config_setting(name = "stamp", values = {"stamp": "false"})
+probe(name = "probe", selected = select({":mode": "one", ":stamp": "two"}))
+"#,
+    )
+    .unwrap();
+    let error = analyze_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        &ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:probe").unwrap(),
+            test_configuration(),
+        ),
+        None,
+        false,
+    )
+    .await
+    .unwrap_err();
+    assert!(error.contains("ambiguous matching conditions"), "{error}");
+    assert!(!error.contains("AMBIGUOUS_ATTR_LEAKED_TO_TRANSITION"));
+}
+
+#[tokio::test]
+async fn non_idempotent_rule_transition_applies_once_and_terminates() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"TransitionInfo = provider(fields = {"value": "value"})
+def _setting(ctx): return []
+setting = rule(implementation = _setting, build_setting = config.string(flag = True))
+def _toggle(settings, attr):
+    return {"//:mode": "changed" if settings["//:mode"] == "default" else "default"}
+toggle = transition(implementation = _toggle, inputs = ["//:mode"], outputs = ["//:mode"])
+def _impl(ctx): return [TransitionInfo(value = ctx.attr.selected)]
+transitioned = rule(implementation = _impl, cfg = toggle, attrs = {"selected": attr.string()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "setting", "transitioned")
+setting(name = "mode", build_setting_default = "default")
+config_setting(name = "changed", flag_values = {":mode": "changed"})
+transitioned(name = "probe", selected = select({":changed": "once", "//conditions:default": "wrong"}))
+"#,
+    )
+    .unwrap();
+    let result = analyze_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        &ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:probe").unwrap(),
+            test_configuration(),
+        ),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        provider_value(
+            &result,
+            &ProviderId::new("//:defs.bzl", "TransitionInfo").unwrap()
+        ),
+        "once"
+    );
+    assert_eq!(
+        result
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .starlark_option(&CanonicalLabel::parse("@@//:mode").unwrap())
+            .unwrap()
+            .value()
+            .as_str(),
+        Some("changed")
+    );
+}
+
+#[tokio::test]
+async fn rule_transition_return_shapes_validate_complete_typed_outputs() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _empty(ctx): return []
+string_setting = rule(implementation = _empty, build_setting = config.string(flag = True))
+int_setting = rule(implementation = _empty, build_setting = config.int(flag = True))
+def _patch(settings, attr): return {"//:text": "patch", "//:count": 2}
+def _dict(settings, attr): return {"only": {"//:text": "dict", "//:count": 3}}
+def _sequence(settings, attr): return [{"//:text": "sequence", "//:count": 4}]
+def _none(settings, attr): return None
+def _empty_dict(settings, attr): return {}
+def _empty_sequence(settings, attr): return []
+def _missing(settings, attr): return {"//:text": "missing"}
+def _extra(settings, attr): return {"//:text": "extra", "//:count": 5, "//:other": "bad"}
+def _wrong(settings, attr): return {"//:text": 7, "//:count": 6}
+def _split(settings, attr): return [{"//:text": "a", "//:count": 1}, {"//:text": "b", "//:count": 2}]
+OUT = ["//:text", "//:count"]
+patch_t = transition(implementation = _patch, inputs = [], outputs = OUT)
+dict_t = transition(implementation = _dict, inputs = [], outputs = OUT)
+sequence_t = transition(implementation = _sequence, inputs = [], outputs = OUT)
+none_t = transition(implementation = _none, inputs = [], outputs = OUT)
+empty_dict_t = transition(implementation = _empty_dict, inputs = [], outputs = [])
+empty_sequence_t = transition(implementation = _empty_sequence, inputs = [], outputs = [])
+missing_t = transition(implementation = _missing, inputs = [], outputs = OUT)
+extra_t = transition(implementation = _extra, inputs = [], outputs = OUT)
+wrong_t = transition(implementation = _wrong, inputs = [], outputs = OUT)
+split_t = transition(implementation = _split, inputs = [], outputs = OUT)
+patch_rule = rule(implementation = _empty, cfg = patch_t)
+dict_rule = rule(implementation = _empty, cfg = dict_t)
+sequence_rule = rule(implementation = _empty, cfg = sequence_t)
+none_rule = rule(implementation = _empty, cfg = none_t)
+empty_dict_rule = rule(implementation = _empty, cfg = empty_dict_t)
+empty_sequence_rule = rule(implementation = _empty, cfg = empty_sequence_t)
+missing_rule = rule(implementation = _empty, cfg = missing_t)
+extra_rule = rule(implementation = _empty, cfg = extra_t)
+wrong_rule = rule(implementation = _empty, cfg = wrong_t)
+split_rule = rule(implementation = _empty, cfg = split_t)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "string_setting", "int_setting", "patch_rule", "dict_rule", "sequence_rule", "none_rule", "empty_dict_rule", "empty_sequence_rule", "missing_rule", "extra_rule", "wrong_rule", "split_rule")
+string_setting(name = "text", build_setting_default = "default")
+int_setting(name = "count", build_setting_default = 0)
+[r(name = n) for n, r in [("patch", patch_rule), ("dict", dict_rule), ("sequence", sequence_rule), ("none", none_rule), ("empty_dict", empty_dict_rule), ("empty_sequence", empty_sequence_rule), ("missing", missing_rule), ("extra", extra_rule), ("wrong", wrong_rule), ("split", split_rule)]]
+"#,
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let text = CanonicalLabel::parse("@@//:text").unwrap();
+    let count = CanonicalLabel::parse("@@//:count").unwrap();
+    for (target, expected_text, expected_count) in [
+        ("patch", "patch", 2),
+        ("dict", "dict", 3),
+        ("sequence", "sequence", 4),
+    ] {
+        let result = analyze_request(
+            &dice,
+            &workspace,
+            &ConfiguredTargetKey::new(
+                CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+                test_configuration(),
+            ),
+            None,
+            false,
+        )
+        .await
+        .unwrap();
+        let configuration = result.configured_target_key().unwrap().configuration();
+        assert_eq!(
+            configuration
+                .starlark_option(&text)
+                .unwrap()
+                .value()
+                .as_str(),
+            Some(expected_text)
+        );
+        assert_eq!(
+            configuration.starlark_option(&count).unwrap().value(),
+            &StarlarkOptionValue::Integer(BigInt::from(expected_count))
+        );
+    }
+    for target in ["none", "empty_dict", "empty_sequence"] {
+        let result = analyze_request(
+            &dice,
+            &workspace,
+            &ConfiguredTargetKey::new(
+                CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+                test_configuration(),
+            ),
+            None,
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            result
+                .configured_target_key()
+                .unwrap()
+                .configuration()
+                .starlark_options()
+                .iter()
+                .len(),
+            0
+        );
+    }
+    for (target, expected) in [
+        ("missing", "did not return declared outputs"),
+        ("extra", "undeclared output //:other"),
+        ("wrong", "transition output for @@//:text must be string"),
+        (
+            "split",
+            "rule transition must return exactly one configuration",
+        ),
+    ] {
+        let error = analyze_request(
+            &dice,
+            &workspace,
+            &ConfiguredTargetKey::new(
+                CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+                test_configuration(),
+            ),
+            None,
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(error.contains(expected), "{target}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn rule_transition_platforms_accepts_string_and_label_sequences_but_not_scalar_label() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _empty(ctx): return []
+def _string(settings, attr): return {"//command_line_option:platforms": str(Label("//:alt"))}
+def _sequence(settings, attr): return {"//command_line_option:platforms": [Label("//:alt"), "//:other"]}
+def _comma_scalar(settings, attr): return {"//command_line_option:platforms": "//:other,//:alt"}
+def _comma_sequence(settings, attr): return {"//command_line_option:platforms": ["//:other,//:alt", Label("//:alt")]}
+def _scalar_label(settings, attr): return {"//command_line_option:platforms": Label("//:alt")}
+def _fallback(settings, attr): return {"//command_line_option:platforms": []}
+P = ["//command_line_option:platforms"]
+string_rule = rule(implementation = _empty, cfg = transition(implementation = _string, inputs = P, outputs = P))
+sequence_rule = rule(implementation = _empty, cfg = transition(implementation = _sequence, inputs = P, outputs = P))
+comma_scalar_rule = rule(implementation = _empty, cfg = transition(implementation = _comma_scalar, inputs = P, outputs = P))
+comma_sequence_rule = rule(implementation = _empty, cfg = transition(implementation = _comma_sequence, inputs = P, outputs = P))
+scalar_label_rule = rule(implementation = _empty, cfg = transition(implementation = _scalar_label, inputs = P, outputs = P))
+fallback_rule = rule(implementation = _empty, cfg = transition(implementation = _fallback, inputs = P, outputs = P))
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "string_rule", "sequence_rule", "comma_scalar_rule", "comma_sequence_rule", "scalar_label_rule", "fallback_rule")
+platform(name = "alt")
+platform(name = "other")
+string_rule(name = "string")
+sequence_rule(name = "sequence")
+comma_scalar_rule(name = "comma_scalar")
+comma_sequence_rule(name = "comma_sequence")
+scalar_label_rule(name = "scalar_label")
+fallback_rule(name = "fallback")
+"#,
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for (target, platform) in [
+        ("string", "alt"),
+        ("sequence", "alt"),
+        ("comma_scalar", "other"),
+        ("comma_sequence", "other"),
+    ] {
+        let result = analyze_request(
+            &dice,
+            &workspace,
+            &ConfiguredTargetKey::new(
+                CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+                test_configuration(),
+            ),
+            None,
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            result
+                .configured_target_key()
+                .unwrap()
+                .configuration()
+                .slug_configuration()
+                .unwrap()
+                .target_platform_label()
+                .unwrap(),
+            CanonicalLabel::parse(&format!("@@//:{platform}")).unwrap()
+        );
+    }
+    let fallback = analyze_request(
+        &dice,
+        &workspace,
+        &ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:fallback").unwrap(),
+            test_configuration(),
+        ),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        fallback
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .slug_configuration()
+            .unwrap()
+            .target_platform_label()
+            .unwrap(),
+        test_configuration()
+            .slug_configuration()
+            .unwrap()
+            .host_platform_label()
+            .unwrap()
+    );
+    let error = analyze_request(
+        &dice,
+        &workspace,
+        &ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:scalar_label").unwrap(),
+            test_configuration(),
+        ),
+        None,
+        false,
+    )
+    .await
+    .unwrap_err();
+    assert!(error.contains("cannot be a scalar Label"), "{error}");
+}
+
+#[tokio::test]
+async fn rule_transition_implementation_and_attrs_invalidate_and_restore_a_b_a() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    let defs = |override_value: Option<&str>| {
+        format!(
+            r#"def _empty(ctx): return []
+setting = rule(implementation = _empty, build_setting = config.string(flag = True))
+def _transition(settings, attr): return {{"//:mode": {}}}
+t = transition(implementation = _transition, inputs = ["//:mode"], outputs = ["//:mode"])
+probe = rule(implementation = _empty, cfg = t, attrs = {{"desired": attr.string()}})
+"#,
+            override_value
+                .map(|value| format!("\"{value}\""))
+                .unwrap_or_else(|| "attr.desired".to_owned())
+        )
+    };
+    let build = |desired: &str| {
+        format!(
+            "load(':defs.bzl', 'setting', 'probe')\nsetting(name = 'mode', build_setting_default = 'default')\nprobe(name = 'probe', desired = '{desired}')\n"
+        )
+    };
+    fs::write(workspace.join("defs.bzl"), defs(None)).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), build("a")).unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:probe").unwrap(),
+        test_configuration(),
+    );
+    let initial = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    let mode = CanonicalLabel::parse("@@//:mode").unwrap();
+    assert_eq!(
+        initial
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .starlark_option(&mode)
+            .unwrap()
+            .value()
+            .as_str(),
+        Some("a")
+    );
+
+    fs::write(workspace.join("BUILD.bazel"), build("b")).unwrap();
+    let attr_changed = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        attr_changed
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .starlark_option(&mode)
+            .unwrap()
+            .value()
+            .as_str(),
+        Some("b")
+    );
+
+    fs::write(workspace.join("defs.bzl"), defs(Some("implementation"))).unwrap();
+    let implementation_changed = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        implementation_changed
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .starlark_option(&mode)
+            .unwrap()
+            .value()
+            .as_str(),
+        Some("implementation")
+    );
+
+    fs::write(workspace.join("defs.bzl"), defs(None)).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), build("a")).unwrap();
+    let restored = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_eq!(restored, initial);
 }
 
 #[tokio::test]

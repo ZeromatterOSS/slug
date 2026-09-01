@@ -20,6 +20,7 @@ pub mod key;
 pub mod result;
 mod runfiles_support;
 pub mod starlark_rule;
+mod starlark_transition;
 mod subrule;
 pub mod toolchains;
 

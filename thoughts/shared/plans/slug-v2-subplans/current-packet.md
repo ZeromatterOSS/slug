@@ -5,13 +5,16 @@ Packet: `WP-6-7A-rule-level-starlark-transition-execution-architecture-r1`
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 configured-target
 identity, transition application and delegation.
 
-Status: corrected R2 architecture accepted; implementation active. R1 review
+Status: implementation terminally accepted. R1 architecture review
 returned `REVISE` only because it incorrectly admitted a scalar `Label` as a
 `platforms` output; Bazel accepts scalar string or a sequence of strings/Labels
 and rejects scalar `Label`. Focused R2 rereview returned `ACCEPT` with no
-remaining findings. Commit `493be79b6` terminally accepted provider-constrained
-dependencies and the rebuilt authentic rules_rust 0.73 replay now stops at the
-independent rule-level Starlark transition-execution gate for `@@//pkg:probe`.
+remaining findings. Terminal implementation review returned `REVISE` for two
+bounded parity gaps: unresolved transition attrs and comma-delimited native
+label-list conversion. The correction adds discriminating Rust and permanent
+Bazel 9.2 oracle rows; focused terminal rereview returned `ACCEPT`. The rebuilt
+authentic rules_rust 0.73 replay clears rule-level transition execution and now
+stops at the independent `proc_macro_deps` attribute declared with `cfg="exec"`.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -44,7 +47,9 @@ Exact behavior within the admitted surface:
   effective target-platform label list, including the Host fallback when the
   retained option list is empty. Output accepts Bazel's scalar string or a
   sequence of strings/Labels; scalar `Label` is rejected as an invalid native
-  option value. Accepted spellings resolve in the transition definition's Bzl/
+  option value. Scalar strings and every string sequence member use Bazel's
+  comma-delimited label-list conversion, omitting empty pieces before resolving
+  each piece. Accepted spellings resolve in the transition definition's Bzl/
   repository context, normalize Bazel's list option to its first member, and
   treat empty or the effective Host platform as the existing Host-fallback
   semantic configuration. A changed effective selection is DICE-validated as
@@ -146,6 +151,8 @@ Pinned source SHA-256 values are:
   `427a16020eb158943b4073981b1f0701b75ebd85d28816f3a3b6415afcb9a22b`;
 - `FunctionTransitionUtil.java`:
   `f07a15da5366085a9ba9d8054628f0e244d7022611180c63299e79c2a5cb7447`;
+- `CoreOptionConverters.java`:
+  `c75421a52abf5a25de657ed3c2f5dd4f5b7d7993d3b0ccad5a6e08ef556e9786`;
 - `ConfiguredTargetKey.java`:
   `a679d99c0195fe16c247b9702e349a32c72f5710757b78f75f82ab54e035ae28`;
 - `PlatformOptions.java`:
@@ -164,7 +171,8 @@ selector-output omission and patch-only rule transitions.
 the owning rule's final configured raw attrs and are intrinsically split.
 `StarlarkDefinedConfigTransition` proves all accepted return shapes, declared-
 spelling output validation and canonicalization. `FunctionTransitionUtil`
-proves declared settings, typed application and native list conversion.
+proves declared settings and typed application; `CoreOptionConverters` proves
+comma-splitting and empty-piece omission for native label-list conversion.
 `RuleTransitionApplier` and
 `TargetAndConfigurationProducer` prove ordering, double application,
 identity/idempotent/non-idempotent classification and delegation.

@@ -1,0 +1,91 @@
+load(
+    ":defs.bzl",
+    "ambiguous_rule",
+    "bool_setting",
+    "child_rule",
+    "comma_platform_rule",
+    "comma_sequence_platform_rule",
+    "dict_rule",
+    "extra_rule",
+    "idempotent_rule",
+    "identity_rule",
+    "int_setting",
+    "missing_platform_rule",
+    "missing_rule",
+    "non_idempotent_rule",
+    "parent_rule",
+    "patch_rule",
+    "platform_rule",
+    "scalar_platform_label_rule",
+    "sequence_rule",
+    "split_rule",
+    "string_setting",
+    "wrong_rule",
+)
+
+string_setting(name = "mode", build_setting_default = "default")
+string_setting(name = "text", build_setting_default = "default")
+string_setting(name = "parent_mode", build_setting_default = "off")
+string_setting(name = "child_mode", build_setting_default = "child_off")
+int_setting(name = "count", build_setting_default = 0)
+bool_setting(name = "enabled", build_setting_default = False)
+
+config_setting(name = "mode_changed", flag_values = {":mode": "changed"})
+config_setting(name = "parent_on", flag_values = {":parent_mode": "on"})
+config_setting(name = "child_on", flag_values = {":child_mode": "child_on"})
+config_setting(name = "fastbuild", values = {"compilation_mode": "fastbuild"})
+config_setting(name = "nostamp", values = {"stamp": "false"})
+
+constraint_setting(name = "cpu")
+constraint_value(name = "alt_cpu", constraint_setting = ":cpu")
+platform(name = "alt", constraint_values = [":alt_cpu"])
+platform(name = "other_platform")
+config_setting(name = "alt_selected", constraint_values = [":alt_cpu"])
+
+identity_rule(name = "identity")
+identity_rule(name = "plain")
+idempotent_rule(
+    name = "idempotent",
+    desired = "changed",
+    dep = ":plain",
+    selected = select({":mode_changed": "selected", "//conditions:default": "wrong"}),
+)
+non_idempotent_rule(
+    name = "non_idempotent",
+    selected = select({":mode_changed": "selected", "//conditions:default": "wrong"}),
+)
+patch_rule(name = "patch")
+dict_rule(name = "dict")
+sequence_rule(name = "sequence")
+missing_rule(name = "missing")
+extra_rule(name = "extra")
+wrong_rule(name = "wrong")
+split_rule(name = "split")
+platform_rule(
+    name = "platform",
+    platform = ":alt",
+    selected = select({":alt_selected": "selected", "//conditions:default": "wrong"}),
+)
+comma_platform_rule(
+    name = "comma_platform",
+    selected = select({":alt_selected": "selected", "//conditions:default": "wrong"}),
+)
+comma_sequence_platform_rule(
+    name = "comma_sequence_platform",
+    selected = select({":alt_selected": "selected", "//conditions:default": "wrong"}),
+)
+scalar_platform_label_rule(name = "scalar_platform_label", platform = ":alt")
+missing_platform_rule(name = "missing_platform")
+ambiguous_rule(
+    name = "ambiguous",
+    selected = select({":fastbuild": "one", ":nostamp": "two"}),
+)
+child_rule(
+    name = "child",
+    selected = select({":child_on": "selected", "//conditions:default": "wrong"}),
+)
+parent_rule(
+    name = "composed",
+    dep = ":child",
+    desired = select({":parent_on": "child_on", "//conditions:default": "wrong"}),
+)

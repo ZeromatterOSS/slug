@@ -147,6 +147,25 @@ impl ConfigurationKey {
         }
     }
 
+    pub(crate) fn without_starlark_option(&self, label: &CanonicalLabel) -> Self {
+        match &self.identity {
+            ConfigurationIdentity::Slug(configuration) => {
+                Self::from_slug(configuration.without_starlark_option(label))
+            }
+            ConfigurationIdentity::Legacy {
+                kind,
+                checksum,
+                starlark_options,
+            } => Self {
+                identity: ConfigurationIdentity::Legacy {
+                    kind: *kind,
+                    checksum: checksum.clone(),
+                    starlark_options: starlark_options.without(label),
+                },
+            },
+        }
+    }
+
     pub fn starlark_option(&self, label: &CanonicalLabel) -> Option<&StarlarkOption> {
         match &self.identity {
             ConfigurationIdentity::Slug(configuration) => {
@@ -217,6 +236,7 @@ impl fmt::Display for ConfigurationKey {
 pub struct ConfiguredTargetKey {
     label: CanonicalLabel,
     configuration: ConfigurationKey,
+    should_apply_rule_transition: bool,
 }
 
 impl ConfiguredTargetKey {
@@ -224,6 +244,18 @@ impl ConfiguredTargetKey {
         Self {
             label,
             configuration,
+            should_apply_rule_transition: true,
+        }
+    }
+
+    pub(crate) fn without_rule_transition(
+        label: CanonicalLabel,
+        configuration: ConfigurationKey,
+    ) -> Self {
+        Self {
+            label,
+            configuration,
+            should_apply_rule_transition: false,
         }
     }
 
@@ -233,6 +265,10 @@ impl ConfiguredTargetKey {
 
     pub fn configuration(&self) -> &ConfigurationKey {
         &self.configuration
+    }
+
+    pub(crate) fn should_apply_rule_transition(&self) -> bool {
+        self.should_apply_rule_transition
     }
 
     pub fn stable_serialize(&self) -> String {
@@ -295,5 +331,38 @@ impl fmt::Display for ConfiguredNodeKey {
             Self::Configured(target) => target.fmt(f),
             Self::Null(label) => write!(f, "{label} [null]"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hash;
+    use std::hash::Hasher;
+
+    use super::*;
+
+    #[test]
+    fn rule_transition_control_is_identity_but_not_display() {
+        let label = CanonicalLabel::parse("@@//pkg:target").unwrap();
+        let configuration = ConfigurationKey::target("cfg").unwrap();
+        let applying = ConfiguredTargetKey::new(label.clone(), configuration.clone());
+        let skipped = ConfiguredTargetKey::without_rule_transition(label, configuration);
+        assert!(applying.should_apply_rule_transition());
+        assert!(!skipped.should_apply_rule_transition());
+        assert_ne!(applying, skipped);
+        assert_eq!(applying.stable_serialize(), skipped.stable_serialize());
+        let hash = |key: &ConfiguredTargetKey| {
+            let mut hasher = DefaultHasher::new();
+            key.hash(&mut hasher);
+            hasher.finish()
+        };
+        assert_ne!(hash(&applying), hash(&skipped));
+        let retained_size = std::mem::size_of::<ConfiguredTargetKey>();
+        let two_field_size = std::mem::size_of::<(CanonicalLabel, ConfigurationKey)>();
+        assert!(
+            retained_size <= two_field_size + std::mem::align_of::<ConfiguredTargetKey>(),
+            "transition bit inflated key unexpectedly: {two_field_size} -> {retained_size}"
+        );
     }
 }

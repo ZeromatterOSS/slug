@@ -5236,6 +5236,12 @@ pub(crate) struct TransitionDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     #[freeze(identity)]
     outputs: Arc<[TransitionSetting]>,
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    definition_source: Arc<BzlModuleIdentity>,
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
 }
 type TransitionDefinition<'v> = TransitionDefinitionGen<Value<'v>>;
 pub(crate) type FrozenTransitionDefinition = TransitionDefinitionGen<FrozenValue>;
@@ -5248,6 +5254,8 @@ fn transition_definition_from_value<'v>(value: Value<'v>) -> Option<TransitionDe
             implementation: value.implementation.to_value(),
             inputs: value.inputs.clone(),
             outputs: value.outputs.clone(),
+            definition_source: value.definition_source.clone(),
+            source_identities_by_filename: value.source_identities_by_filename.clone(),
         }),
     }
 }
@@ -5266,6 +5274,18 @@ impl FrozenTransitionDefinition {
     #[cfg(test)]
     pub(crate) fn outputs(&self) -> &[TransitionSetting] {
         &self.outputs
+    }
+
+    #[cfg(test)]
+    pub(crate) fn definition_source(&self) -> &Arc<BzlModuleIdentity> {
+        &self.definition_source
+    }
+
+    #[cfg(test)]
+    pub(crate) fn source_identities_by_filename(
+        &self,
+    ) -> &Arc<[(CompactString, BzlModuleIdentity)]> {
+        &self.source_identities_by_filename
     }
 }
 impl<V> fmt::Display for TransitionDefinitionGen<V> {
@@ -5341,6 +5361,8 @@ fn attribute_definition_from_value<'v>(value: Value<'v>) -> Option<AttributeDefi
                     implementation: transition.implementation.to_value(),
                     inputs: transition.inputs.clone(),
                     outputs: transition.outputs.clone(),
+                    definition_source: transition.definition_source.clone(),
+                    source_identities_by_filename: transition.source_identities_by_filename.clone(),
                 }),
         }),
     }
@@ -6754,6 +6776,8 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 transition.implementation,
                 transition.inputs.clone(),
                 transition.outputs.clone(),
+                transition.definition_source.clone(),
+                transition.source_identities_by_filename.clone(),
             )
         });
         let heap = eval.heap();
@@ -6808,6 +6832,8 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                                         transition.implementation,
                                         transition.inputs.clone(),
                                         transition.outputs.clone(),
+                                        transition.definition_source.clone(),
+                                        transition.source_identities_by_filename.clone(),
                                     ),
                                 )
                             }
@@ -8232,6 +8258,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             implementation: implementation.0,
             inputs,
             outputs,
+            definition_source: Arc::new(source.clone()),
+            source_identities_by_filename: context.source_identities_by_filename(),
         })
     }
 }
