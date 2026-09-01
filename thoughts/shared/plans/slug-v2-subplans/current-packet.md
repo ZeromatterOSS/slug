@@ -1,12 +1,13 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-recursive-build-glob-category-implementation-r3`
+Packet: `WP-6-7A-recursive-build-glob-category-implementation-r4`
 
 Milestone: M7A generic Starlark/ruleset closure; BUILD glob loading semantics.
 
-Status: implementation active after independent `ACCEPT` of the R3
-proof-allowlist correction. The accepted architecture, compatibility classes,
-production allowlist, caps and proof obligations are unchanged.
+Status: route-aware external-glob correction review active after R3 ended
+`REPLAN` at the authentic replay. The accepted matcher/callable architecture
+and compatibility classes remain unchanged; implementation acceptance is
+paused pending independent review of the bounded external Host adapter.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -140,7 +141,10 @@ Production allowlist:
 - `app/slug_loading_v2/src/package.rs`;
 - `app/slug_loading_v2/src/host_glob/mod.rs`;
 - `app/slug_loading_v2/src/host_glob/adapter.rs`; and
-- `app/slug_loading_v2/src/host_glob/traversal.rs`.
+- `app/slug_loading_v2/src/host_glob/traversal.rs`; and
+- `app/slug_loading_v2/src/bzl_module.rs`, limited to the repository-package
+  glob retry, selected Host source-root derivation and observation-union
+  corridor.
 
 Proof allowlist:
 
@@ -148,23 +152,23 @@ Proof allowlist:
 - `app/slug_loading_v2/tests/glob_invalidation.rs`;
 - `app/slug_loading_v2/src/host_glob/tests.rs`;
 - `app/slug_loading_v2/src/host_glob/adapter_tests.rs`;
-- `app/slug_loading_v2/src/host_glob/traversal_tests.rs`; and
+- `app/slug_loading_v2/src/host_glob/traversal_tests.rs`;
 - `app/slug_loading_v2/src/host_package_attempt_tests.rs`; and
-- `app/slug_loading_v2/src/host_package_load_tests.rs`, limited to replacing
-  the one stale exclude-traversal dependency expectation in
-  `observed_root_package_preserves_semantics_arcs_order_events_and_families`.
+- `app/slug_loading_v2/src/host_package_load_tests.rs`, limited to the accepted
+  no-exclude dependency correction and focused materialized external glob
+  driver/boundary/lifecycle proofs.
 
-Do not touch the parked proof, any other `host_package_load_tests.rs` line,
-fixtures, generated files or another crate. Gross caps are 1,000 production, 1,000 proof
-and 1,720 total Rust lines; deletions and moves count. In `package.rs`, change
-only the existing glob/binding corridor; `glob.rs` remains the shared semantic
-owner.
+Do not touch the parked proof, any unrelated `host_package_load_tests.rs` line,
+fixtures, generated files or another crate. Gross caps are 1,300 production,
+1,100 proof and 2,200 total Rust lines; deletions and moves count. In
+`package.rs`, change only the existing glob/binding corridor; `glob.rs` remains
+the shared semantic owner.
 
 R1 ended `REPLAN` at its measured 987 production/624 proof/1,611 total gross
 candidate. The 720 production estimate counted the replacement architecture
 but undercounted more than 300 gross deleted lines from removing two
-superseded Host pattern implementations and their adapter plumbing. R2 changes only the
-production cap to 1,000; it adds no file, semantic row, proof exception, DICE
+superseded Host pattern implementations and their adapter plumbing. R2 changes
+only the production cap to 1,000; it adds no file, semantic row, proof exception, DICE
 owner, cache, lock or eager walk. The unchanged 1,720 total cap still bounds
 the complete packet. Independent review recomputed exactly 987 production, 624
 proof and 1,611 total gross lines and returned `ACCEPT`.
@@ -179,9 +183,33 @@ total. It does not authorize another change in the 37,117-line file.
 Independent review confirmed this is the exact stale assertion, strengthens
 the no-exclude-traversal invariant and returned `ACCEPT`.
 
-Stop with `REPLAN` if another production file is required, segment-key equality
-cannot remain byte/discriminator based, or the implementation needs a new DICE
-key/cache/lock/eager walk.
+R3 then ended `REPLAN` at its authentic rebuilt rules_rust replay. Recursive
+pattern parsing clears, but `RepositoryPackageInventoryKey` converts the first
+pending Host glob request into `GlobUnsupported`, so `@@platforms//host` still
+cannot load. The stop is generic external-package routing, not platforms,
+rules_rust, `cc_common` or `cc_internal` behavior. Direct dependent compilation
+and the full 578-test loading suite are green. A wider core runtime test failure
+was reproduced unchanged at pre-implementation commit `aa3b00cb1` and is not a
+glob regression.
+
+R4 extends the existing traversal key with a Root/materialized-External
+boundary scope. Root identity and behavior stay unchanged. External scope
+retains the already-authenticated `HostRepositorySourceRoute`, uses
+`HostExternalPackageBoundaryKey` or its observed sibling for package/ignore/
+deleted decisions, and keeps ordinary segment-key equality byte/discriminator
+only. The selected Host BUILD address derives the materialized repository root
+by removing the BUILD basename and checked package components; malformed or
+non-Host sources fail closed. `RepositoryPackageInventoryKey` reuses the
+existing package-attempt retry driver, merges glob observations after source
+and loaded-module observations, and retains terminal events only. It adds no
+new DICE key, cache, lock, eager walk, parser or semantic side store. Excludes
+remain in-memory and create no traversal dependency. Built-in catalog globs,
+which have no Host source root, remain explicitly unsupported/deferred.
+
+R4's measured starting point is 987 production/626 proof/1,613 total gross.
+The 1,300/1,100/2,200 caps cover only this route-aware extension and its focused
+proof. Stop with `REPLAN` if another crate/file, a new DICE key, or a copied
+repository tree/listing owner is required.
 
 ## Required proof and validation
 

@@ -22716,3 +22716,46 @@ Independent R3 review confirms the assertion is exactly the stale
 include/include/exclude dependency list and that retaining only the two include
 keys strengthens the accepted no-exclude-traversal invariant. It returns
 `ACCEPT`; resume only the bounded R3 implementation.
+
+R3 ends `REPLAN` at the authentic rebuilt rules_rust replay. The shared parser
+now accepts recursive `**`, but the existing repository-package evaluator
+turns its first pending Host glob request into `GlobUnsupported`; the terminal
+is `external repository BUILD globs are deferred: @@platforms//host`. This is
+the next generic loading owner, not a platforms, rules_rust, `cc_common` or
+`cc_internal` special case. Full loading passes 578 tests with one documented
+ignore; direct analysis/query/core/server compilation, formatting, source
+hashes, clean Bazel/Buck2/Zabel trees, the parked proof hash and the expected
+three archive-status exceptions pass. A core event-order test with no glob was
+reproduced identically at pre-implementation commit `aa3b00cb1`, so it remains
+baseline evidence outside this packet.
+
+Independently review only
+`WP-6-7A-recursive-build-glob-category-implementation-r4`. Add production
+`app/slug_loading_v2/src/bzl_module.rs` only in the repository-package glob
+retry/source-root/observation-union corridor. The existing production files
+remain allowed. Extend proof access in `host_package_load_tests.rs` only for
+focused materialized external glob driver, boundary and lifecycle rows. Gross
+caps become 1,300 production, 1,100 proof and 2,200 total from the measured
+987/626/1,613 starting candidate.
+
+Retain one traversal-scope value distinguishing Root from materialized
+External. Root keys and behavior remain unchanged. External scope retains the
+existing authenticated `HostRepositorySourceRoute` and dispatches boundary
+classification through `HostExternalPackageBoundaryKey` or
+`HostExternalPackageBoundaryObservationKey`; it does not reuse the root policy
+under a synthetic workspace. Ordinary segment-candidate equality/hash remains
+only segment bytes plus discriminator. Derive the physical repository root
+from the selected Host BUILD address by removing its basename and the checked
+package components; malformed identity fails closed. Reuse
+`evaluate_host_package_attempts_driver`, merge its observed glob epoch after
+source and loaded-module epochs, preserve Need/error/event order, and keep
+excludes in memory. Add no DICE key, copied listing/tree, cache, lock, eager
+walk, parser or semantic side store. Built-in catalog globs lack a Host source
+root and remain unsupported/deferred.
+
+Pinned Bazel 9.2 glob/package sources remain sole semantic authority. Zabel
+`0795445f...` `session_package_glob_computation.zig` is peer guidance only for
+deriving a materialized external glob root from repository source identity;
+copy no Zig route, key, allocator, scheduler, policy, cache or behavior. Resume
+Rust only after independent `ACCEPT`; stop if the bounded existing-key adapter
+is insufficient.

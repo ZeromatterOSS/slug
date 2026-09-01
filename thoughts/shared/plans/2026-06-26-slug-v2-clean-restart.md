@@ -71,6 +71,14 @@ only R3's proof-allowlist correction: it permits replacing that single
 three-key dependency expectation with the two include keys, under unchanged
 production, semantics, caps and all other proof boundaries. Independent review
 returned `ACCEPT`; activate only R3.
+R3's authentic rebuilt replay clears recursive pattern parsing but reaches the
+pre-existing external-package `GlobUnsupported` adapter at
+`@@platforms//host`; therefore R3 ends `REPLAN`, not acceptance. Independently
+review only R4's route-aware correction: reuse the existing Host traversal and
+external package-boundary keys, derive the materialized root from the selected
+Host BUILD address, and drive the existing package-attempt retry loop. Add no
+platforms/rules_rust/C++ special case, new DICE key, cache, lock or eager walk;
+built-in catalog globs remain deferred.
 Structured `starlark_doc_extract` output and experimental remote repository
 execution remain separate deferred categories. Bazel 9.2 is sole behavior
 authority; Zabel remains peer architecture and optimization guidance only.

@@ -2263,6 +2263,15 @@ expectation to retain the two include keys instead of three include/exclude
 keys, producing 987/626/1,613 gross under unchanged caps. Independent R3 review
 returned `ACCEPT`; terminal implementation acceptance remains pending.
 
+The authentic replay then cleared recursive parsing and exposed the existing
+external-package `GlobUnsupported` adapter at `@@platforms//host`, so R3 ended
+`REPLAN`. R4 proposes no V1 extraction: retain a Root/materialized-External
+scope on the existing Host traversal, reuse authenticated external boundary
+keys, derive the materialized root from the selected Host BUILD source, and
+reuse the package-attempt retry driver. Zabel's analogous source-root split is
+peer guidance only. New DICE keys, copied listings/trees, caches, locks and
+built-in catalog glob claims remain forbidden; independent review is pending.
+
 Decision: replace the split raw flat-pattern validator and separately retained
 Host pattern with one V2-owned immutable `GlobPattern`: one `Arc<str>` raw
 spelling, one `Arc` fragment slice, range-based ordinary fragments and unit
