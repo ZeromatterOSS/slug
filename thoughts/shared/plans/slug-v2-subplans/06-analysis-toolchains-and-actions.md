@@ -22674,3 +22674,18 @@ literal/wildcard/recursive cycle plus recursive infinite-expansion proofs.
 Focused correction rereview returns `ACCEPT`; activate only
 `WP-6-7A-recursive-build-glob-category-implementation-r1` under the allowlists,
 caps, compatibility matrix and validation gates above.
+
+R1 ends `REPLAN` at its formatted 987 production/624 proof/1,611 total gross
+candidate. The implementation stayed inside every frozen file, semantic,
+segment-key, DICE, cache, lock and traversal boundary, but the 720 production
+estimate undercounted more than 300 gross deleted lines from removing both
+superseded Host pattern implementations and their adapter plumbing. Do not retain dead
+duplicate parsers to satisfy a churn estimate.
+
+Independently review only
+`WP-6-7A-recursive-build-glob-category-implementation-r2`. It changes the
+gross caps to 1,000 production, 1,000 proof and 1,720 total. Every other allowlist,
+compatibility classification, architecture decision, proof obligation,
+validation gate and stop condition above remains byte-for-byte authoritative;
+R2 adds no production file, semantic row, DICE owner, cache, lock or eager
+walk. Resume Rust acceptance only after that cap correction returns `ACCEPT`.

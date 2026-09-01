@@ -2251,8 +2251,12 @@ and `cc_common` are downstream consumers.
 
 Status: architecture independently `ACCEPTED` after the bounded
 `exclude_directories` and symlink-cycle correction in
-`WP-6-7A-recursive-build-glob-category-design-r1`; implementation and terminal
-acceptance remain pending.
+`WP-6-7A-recursive-build-glob-category-design-r1`. Implementation R1 ended
+`REPLAN` only because removing both superseded Host parsers produced 987 gross
+production lines against an underestimated 720-line production cap. R2 changes
+that cap to 1,000 while preserving the 1,720 total cap and every architecture,
+allowlist and proof boundary; its independent cap-correction review and
+terminal acceptance remain pending.
 
 Decision: replace the split raw flat-pattern validator and separately retained
 Host pattern with one V2-owned immutable `GlobPattern`: one `Arc<str>` raw

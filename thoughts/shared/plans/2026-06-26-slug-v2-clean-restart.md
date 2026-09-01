@@ -55,11 +55,15 @@ deferred. The rebuilt authentic replay clears documentation and stops at
 Independent architecture review accepts
 `WP-6-7A-recursive-build-glob-category-design-r1` after the bounded correction
 for arbitrary-size `exclude_directories` integers and matched symlink-cycle
-semantics. Activate only
-`WP-6-7A-recursive-build-glob-category-implementation-r1`: one shared immutable
-pattern representation serves the flat-listing and observed Host owners while
-preserving existing DICE observation keys. The platforms file is a
-discriminator only.
+semantics. R1 ended `REPLAN` because its 987 production gross lines include
+the required deletion of both duplicate Host pattern implementations, beyond
+the estimated 720 production cap while remaining inside the total cap.
+Independently review only the truthful cap correction, then activate
+`WP-6-7A-recursive-build-glob-category-implementation-r2` under unchanged
+semantics, allowlists, proof obligations and 1,720 total cap: one shared
+immutable pattern representation serves the flat-listing and observed Host
+owners while preserving existing DICE observation keys. The platforms file is
+a discriminator only.
 Structured `starlark_doc_extract` output and experimental remote repository
 execution remain separate deferred categories. Bazel 9.2 is sole behavior
 authority; Zabel remains peer architecture and optimization guidance only.

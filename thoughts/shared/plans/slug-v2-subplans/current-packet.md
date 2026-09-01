@@ -1,11 +1,13 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-recursive-build-glob-category-implementation-r1`
+Packet: `WP-6-7A-recursive-build-glob-category-implementation-r2`
 
 Milestone: M7A generic Starlark/ruleset closure; BUILD glob loading semantics.
 
-Status: implementation active after independent architecture `ACCEPT` of
-`WP-6-7A-recursive-build-glob-category-design-r1` and its bounded correction.
+Status: cap-correction review active after R1 ended `REPLAN`. The accepted
+architecture, compatibility classes, allowlists and proof obligations are
+unchanged; implementation acceptance remains paused pending independent review
+of the truthful R2 gross bounds.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -151,10 +153,18 @@ Proof allowlist:
 - `app/slug_loading_v2/src/host_package_attempt_tests.rs`.
 
 Do not touch the parked proof, `host_package_load_tests.rs`, fixtures,
-generated files or another crate. Gross caps are 720 production, 1,000 proof
+generated files or another crate. Gross caps are 1,000 production, 1,000 proof
 and 1,720 total Rust lines; deletions and moves count. In `package.rs`, change
 only the existing glob/binding corridor; `glob.rs` remains the shared semantic
 owner.
+
+R1 ended `REPLAN` at its measured 987 production/624 proof/1,611 total gross
+candidate. The 720 production estimate counted the replacement architecture
+but undercounted more than 300 gross deleted lines from removing two
+superseded Host pattern implementations and their adapter plumbing. R2 changes only the
+production cap to 1,000; it adds no file, semantic row, proof exception, DICE
+owner, cache, lock or eager walk. The unchanged 1,720 total cap still bounds
+the complete packet.
 
 Stop with `REPLAN` if another production file is required, segment-key equality
 cannot remain byte/discriminator based, or the implementation needs a new DICE
