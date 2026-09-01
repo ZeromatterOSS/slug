@@ -31,6 +31,7 @@ pub enum NativeCommandOption {
     XbinaryFdo,
     FdoProfile,
     CsFdoProfile,
+    CustomMalloc,
     FdoPrefetchHints,
     PropellerOptimize,
     MemprofProfile,
@@ -55,6 +56,7 @@ impl NativeCommandOption {
             "xbinary_fdo" => Self::XbinaryFdo,
             "fdo_profile" => Self::FdoProfile,
             "cs_fdo_profile" => Self::CsFdoProfile,
+            "custom_malloc" => Self::CustomMalloc,
             "fdo_prefetch_hints" => Self::FdoPrefetchHints,
             "propeller_optimize" => Self::PropellerOptimize,
             "memprof_profile" => Self::MemprofProfile,
@@ -82,6 +84,7 @@ impl NativeCommandOption {
             Self::XbinaryFdo => "xbinary_fdo",
             Self::FdoProfile => "fdo_profile",
             Self::CsFdoProfile => "cs_fdo_profile",
+            Self::CustomMalloc => "custom_malloc",
             Self::FdoPrefetchHints => "fdo_prefetch_hints",
             Self::PropellerOptimize => "propeller_optimize",
             Self::MemprofProfile => "memprof_profile",
@@ -111,6 +114,7 @@ impl NativeCommandOption {
             Self::XbinaryFdo
                 | Self::FdoProfile
                 | Self::CsFdoProfile
+                | Self::CustomMalloc
                 | Self::FdoPrefetchHints
                 | Self::PropellerOptimize
                 | Self::MemprofProfile

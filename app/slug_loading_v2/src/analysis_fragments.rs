@@ -75,6 +75,14 @@ starlark::starlark_simple_value!(CppFragmentValue);
 
 #[starlark_module]
 fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
+    #[starlark(attribute)]
+    fn custom_malloc<'v>(this: &CppFragmentValue, heap: Heap<'v>) -> anyhow::Result<Value<'v>> {
+        Ok(this
+            .projection
+            .custom_malloc()?
+            .map_or_else(Value::new_none, |label| alloc_starlark_label(heap, label)))
+    }
+
     fn compilation_mode(
         this: &CppFragmentValue,
         eval: &mut Evaluator<'_, '_, '_>,

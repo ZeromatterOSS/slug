@@ -544,6 +544,19 @@ pub(crate) fn command_configuration_occurrence(
                 true,
             )
         }
+        name if name
+            .strip_prefix("no")
+            .and_then(NativeCommandOption::from_name)
+            .is_some() =>
+        {
+            return Err(CommandParseError::InvalidFlagValue {
+                flag: flag.raw.clone(),
+                message: format!(
+                    "Illegal use of 'no' prefix on non-boolean option: {}",
+                    flag.raw
+                ),
+            });
+        }
         name if NativeCommandOption::from_name(name).is_some() => {
             let option = NativeCommandOption::from_name(name)
                 .expect("guarded native command option remains admitted");
@@ -744,7 +757,7 @@ mod tests {
             ))
         );
         assert!(occurrence("--coverage_output_generator").is_err());
-        assert_eq!(occurrence("--nocoverage_output_generator").unwrap(), None);
+        assert!(occurrence("--nocoverage_output_generator").is_err());
         assert_eq!(
             occurrence("--collect_code_coverage=true").unwrap(),
             Some(CommandConfigurationOccurrence::native(
@@ -761,6 +774,34 @@ mod tests {
                 true,
             ))
         );
+    }
+
+    #[test]
+    fn custom_malloc_is_typed_and_known_non_boolean_no_forms_fail_closed() {
+        assert_eq!(
+            occurrence("--custom_malloc=@tools//malloc:custom").unwrap(),
+            Some(CommandConfigurationOccurrence::native(
+                NativeCommandOption::CustomMalloc,
+                Some("@tools//malloc:custom"),
+                false,
+            ))
+        );
+        assert!(occurrence("--custom_malloc").is_err());
+        for raw in [
+            "--nocustom_malloc",
+            "--nocoverage_output_generator",
+            "--nofdo_profile",
+        ] {
+            let error = occurrence(raw).unwrap_err();
+            assert!(
+                error.to_string().contains(&format!(
+                    "Illegal use of 'no' prefix on non-boolean option: {raw}"
+                )),
+                "{error}"
+            );
+        }
+        assert!(occurrence("--nocollect_code_coverage").is_ok());
+        assert_eq!(occurrence("--nounknown_compatible").unwrap(), None);
     }
 
     #[test]

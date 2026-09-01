@@ -21,6 +21,8 @@ struct ExpectedDescriptor {
 }
 
 mod command_configuration_tests {
+    use std::hash::Hash;
+    use std::hash::Hasher;
     use std::mem::size_of;
     use std::sync::Arc;
 
@@ -397,7 +399,7 @@ mod command_configuration_tests {
     }
 
     #[test]
-    fn cpp_configuration_fields_project_the_ten_pinned_bazel_labels() {
+    fn cpp_configuration_fields_project_the_eleven_pinned_bazel_labels() {
         // Bazel 9.2 CppConfiguration's @StarlarkConfigurationField methods
         // borrow the converted CppOptions values; Slug does the same through
         // the sole structural option vector.
@@ -425,6 +427,12 @@ mod command_configuration_tests {
                 "//profiles:cs",
                 CppConfigurationField::CsFdoProfile,
                 "@@//profiles:cs",
+            ),
+            (
+                NativeCommandOption::CustomMalloc,
+                "//malloc:custom",
+                CppConfigurationField::CustomMalloc,
+                "@@//malloc:custom",
             ),
             (
                 NativeCommandOption::FdoPrefetchHints,
@@ -482,6 +490,7 @@ mod command_configuration_tests {
             "xbinary_fdo",
             "fdo_profile",
             "cs_fdo_profile",
+            "custom_malloc",
             "fdo_prefetch_hints",
             "propeller_optimize",
             "memprof_profile",
@@ -503,6 +512,83 @@ mod command_configuration_tests {
         }
         assert_eq!(size_of::<CppConfigurationField>(), 1);
         assert_eq!(size_of::<ConfigurationField>(), 1);
+
+        let identity = |tools: &str| {
+            ConfigurationFieldIdentity::new(
+                ConfigurationField::cpp(CppConfigurationField::CustomMalloc),
+                CanonicalRepoName::new(tools).unwrap(),
+            )
+        };
+        let hash = |value: &ConfigurationFieldIdentity| {
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        };
+        let first = identity("tools+9.2");
+        let changed = identity("tools+next");
+        let restored = identity("tools+9.2");
+        assert_eq!(first, restored);
+        assert_eq!(hash(&first), hash(&restored));
+        assert_ne!(first, changed);
+    }
+
+    #[test]
+    fn custom_malloc_command_observes_mapping_last_wins_and_default_restoration() {
+        let base = configuration();
+        assert_eq!(base.cpp_custom_malloc_label().unwrap(), None);
+
+        let mapping = mapping();
+        let overlay: CommandConfigurationOverlay = vec![
+            native(NativeCommandOption::CustomMalloc, "//malloc:first"),
+            native(NativeCommandOption::CustomMalloc, "@alias//malloc:mapped"),
+        ]
+        .into();
+        assert!(overlay.requires_repository_mapping());
+        let configured = base
+            .with_command_configuration_context(
+                StarlarkOptions::default(),
+                &overlay,
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap();
+        let expected = "@@mapped+1.0//malloc:mapped";
+        assert_eq!(
+            configured
+                .cpp_custom_malloc_label()
+                .unwrap()
+                .unwrap()
+                .to_string(),
+            expected
+        );
+        assert_eq!(
+            configured
+                .configuration_field_label(&cpp_field(CppConfigurationField::CustomMalloc))
+                .unwrap()
+                .unwrap()
+                .to_string(),
+            expected
+        );
+        assert_ne!(configured, base);
+        assert_eq!(configuration(), base);
+
+        let unresolved = base
+            .with_command_configuration_context(
+                StarlarkOptions::default(),
+                &vec![native(
+                    NativeCommandOption::CustomMalloc,
+                    "@missing//malloc:unresolved",
+                )]
+                .into(),
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap();
+        assert!(
+            unresolved
+                .cpp_custom_malloc_label()
+                .unwrap_err()
+                .to_string()
+                .contains("non-visible repository")
+        );
     }
 
     #[test]

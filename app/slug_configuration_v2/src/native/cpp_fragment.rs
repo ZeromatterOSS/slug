@@ -2,6 +2,7 @@
 
 use allocative::Allocative;
 use dupe::Dupe;
+use slug_identity_v2::CanonicalLabel;
 
 use super::configuration::OptionValue;
 use super::configuration::SlugConfiguration;
@@ -28,6 +29,7 @@ impl CppFragmentProjection {
         projection.optional_text("propeller_optimize_absolute_cc_profile")?;
         projection.optional_text("propeller_optimize_absolute_ld_profile")?;
         projection.proto_profile()?;
+        projection.custom_malloc()?;
         Ok(projection)
     }
 
@@ -79,6 +81,10 @@ impl CppFragmentProjection {
                 reason: "proto_profile has an invalid retained value",
             }),
         }
+    }
+
+    pub fn custom_malloc(&self) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
+        self.configuration.cpp_custom_malloc_label()
     }
 
     fn optional_text(&self, name: &'static str) -> Result<Option<&str>, SlugConfigurationError> {

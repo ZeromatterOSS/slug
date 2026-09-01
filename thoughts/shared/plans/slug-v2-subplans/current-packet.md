@@ -5,9 +5,10 @@ Packet: `WP-6-7A-cpp-configuration-field-catalog-completion-r1`
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 configured fragment,
 late-bound dependency, and command-configuration breadth.
 
-Status: R1 implementation discovered a separate ordinary provider-constrained
-target-invocation boundary and returned `REPLAN`. Focused R2 correction review
-returned `ACCEPT`; resume only the corrected frozen boundary.
+Status: corrected R2 implementation terminally accepted. R1 discovered a
+separate ordinary provider-
+constrained target-invocation boundary and returned `REPLAN`; focused R2
+correction review returned `ACCEPT`.
 Base commit `cb477b7ab` terminally accepts the complete coverage configuration-
 field category. The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -245,6 +246,39 @@ Focused independent R2 correction review returned `ACCEPT`. It confirms that
 provider-constrained ordinary invocation is an independent category and that
 unconstrained root/subrule proofs still discriminate every field, edge, facade,
 mapping, lifecycle, and restoration behavior owned here.
+
+## Corrected implementation candidate result
+
+The R2 candidate adds only the sole missing typed field/discriminant, existing
+CppOptions label and command projections, field-specific public facade access,
+and generic known-native non-Boolean no-prefix rejection. The R1 provider-
+constrained fixture was replaced by otherwise admitted ordinary/subrule label
+schemas; existing provider-validation regressions remain in the full suites.
+
+Serial validation passes all 64 configuration tests, all 29 command tests, all
+553 loading tests with one existing ignored test, and all 120 analysis tests.
+The V2 CLI rebuild, formatting, workspace metadata, diff hygiene, all pinned
+Bazel/rules_rust hashes, clean Zabel guidance commit, and parked-file hash pass.
+The archive checker reports only its three documented non-V2 thought-path
+failures. Growth is 45 net/gross production lines, 257 net / 267 gross proof
+lines, and 312 total gross, below every cap.
+
+A fresh rebuilt one-shot cquery over rules_rust 0.73.0 clears
+`cpp.custom_malloc` and reaches `rust/private/rust.bzl:1001`. The next failure
+is generic cross-module attribute-descriptor identity: the imported
+`RUSTC_ALLOCATOR_LIBRARIES_ATTRS["allocator_libraries"]` value from
+`rust/private/rust_allocator_libraries.bzl` (SHA-256
+`ae4acb50ac6a1b922254a07346d97b4649810d33836f2be4824fd0b7a81e536e`)
+is rejected after dictionary union
+with `rule attribute 'allocator_libraries' must use attr.*()`. This is earlier
+than provider-constrained target invocation and still precedes any rule body,
+`cc_common`, `cc_internal`, or C++ builtin semantics.
+
+Independent terminal implementation review returned `ACCEPT`. It verified the
+closed eleven-member catalog, one-byte identity, existing-owner reuse, mixed
+public/private facade, generic no-prefix correction, proof matrix, caps,
+authentic replay, parked-state isolation, and corrected deferred provider
+boundary.
 
 ## Immediate predecessor
 

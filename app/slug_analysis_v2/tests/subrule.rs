@@ -264,6 +264,22 @@ fn coverage_configuration(enabled: bool, generator: Option<&str>) -> Configurati
     )
 }
 
+fn custom_malloc_configuration(value: Option<&str>) -> ConfigurationKey {
+    let base = configuration(None).slug_configuration().unwrap().clone();
+    let occurrences = value.map_or_else(Vec::new, |value| {
+        vec![CommandConfigurationOccurrence::native(
+            NativeCommandOption::CustomMalloc,
+            Some(value),
+            false,
+        )]
+    });
+    let overlay: CommandConfigurationOverlay = occurrences.into();
+    ConfigurationKey::from_slug(
+        base.with_command_configuration(base.starlark_options().clone(), &overlay)
+            .unwrap(),
+    )
+}
+
 fn compilation_configuration(mode: &str, host_mode: &str) -> ConfigurationKey {
     let base = configuration(None).slug_configuration().unwrap().clone();
     let overlay: CommandConfigurationOverlay = vec![
@@ -694,6 +710,43 @@ coverage_rule = rule(
     subrules = [coverage_sub],
 )
 
+CUSTOM_MALLOC = configuration_field(fragment = "cpp", name = "custom_malloc")
+
+def _custom_malloc_sub(ctx, **kwargs):
+    projected = ctx.fragments.cpp.custom_malloc
+    dependency = kwargs["_malloc"]
+    if (dependency == None) != (projected == None): fail("subrule custom malloc presence diverged")
+    if dependency != None and dependency.label != projected: fail("subrule custom malloc label diverged")
+    return projected
+
+custom_malloc_sub = subrule(
+    implementation = _custom_malloc_sub,
+    attrs = {"_malloc": attr.label(default = CUSTOM_MALLOC)},
+    fragments = ["cpp"],
+)
+
+def _custom_malloc(ctx):
+    if "custom_malloc" not in dir(ctx.fragments.cpp): fail("custom malloc missing from cpp fragment dir")
+    projected = ctx.fragments.cpp.custom_malloc
+    dependency = ctx.attr._malloc
+    if (dependency == None) != (projected == None): fail("root custom malloc presence diverged")
+    if dependency != None and dependency.label != projected: fail("root custom malloc label diverged")
+    if custom_malloc_sub() != projected: fail("root and subrule custom malloc fragments diverged")
+    return [DefaultInfo()]
+
+custom_malloc_rule = rule(
+    implementation = _custom_malloc,
+    attrs = {"_malloc": attr.label(default = CUSTOM_MALLOC)},
+    fragments = ["cpp"],
+    subrules = [custom_malloc_sub],
+)
+
+def _private_cpp(ctx):
+    ctx.fragments.cpp.compilation_mode()
+    return [DefaultInfo()]
+
+private_cpp_rule = rule(implementation = _private_cpp, fragments = ["cpp"])
+
 def _bad_file(ctx): return [DefaultInfo()]
 bad_file = rule(implementation = _bad_file, attrs = {
     "_generator": attr.label(default = OUTPUT_GENERATOR, allow_files = [".prof"]),
@@ -820,7 +873,7 @@ fragment_exec_parent = rule(implementation = _exec_parent, subrules = [exec_prob
     );
     epoch.package(
         "subject",
-        "load('//rules:defs.bzl', 'allowed_helper_subject', 'bad_executable_subject', 'bad_extension_subject', 'bad_file_provider_subject', 'bad_file_subject', 'bad_nested_subject', 'bad_provider_subject', 'escaped_actions_subject', 'escaped_ctx_subject', 'exec_first_subject', 'fragment_subject', 'missing_action_subject', 'multi_single_subject', 'nested_subject', 'ordinary', 'outer_lock_subject', 'override_subject', 'parent_lock_subject', 'repeat_context_subject', 'subject', 'target_first_subject', 'toolchain_subject', 'undeclared_subject', 'zero_single_subject')\nload('//rules:coverage.bzl', 'bad_file', 'bad_provider', 'coverage_rule', 'escaped', 'sub_undeclared_rule', 'undeclared', 'unknown')\nload('//tools/build_defs/cc:fragments.bzl', 'denied_helper', 'fragment_arity', 'fragment_exec_parent', 'fragment_methods', 'fragment_opt_terminal', 'undeclared_fragment', 'undeclared_sub_fragment')\nsubject(name='subject')\nbad_provider_subject(name='bad_provider')\nzero_single_subject(name='zero_single')\nmulti_single_subject(name='multi_single')\nbad_extension_subject(name='bad_extension')\nbad_executable_subject(name='bad_executable')\nbad_file_subject(name='bad_file')\nbad_file_provider_subject(name='bad_file_provider')\nexec_first_subject(name='exec_first')\ntarget_first_subject(name='target_first')\nnested_subject(name='nested')\nundeclared_subject(name='undeclared')\nbad_nested_subject(name='bad_nested')\noverride_subject(name='override')\nouter_lock_subject(name='outer_lock')\nescaped_ctx_subject(name='escaped_ctx')\nescaped_actions_subject(name='escaped_actions')\nparent_lock_subject(name='parent_lock')\nrepeat_context_subject(name='repeat_context')\nfragment_subject(name='fragment')\nallowed_helper_subject(name='allowed_helper')\nfragment_methods(name='fragment_methods')\ndenied_helper(name='denied_helper')\nundeclared_fragment(name='undeclared_fragment')\nundeclared_sub_fragment(name='undeclared_sub_fragment')\nfragment_arity(name='fragment_arity')\nfragment_opt_terminal(name='fragment_opt_terminal')\nfragment_exec_parent(name='fragment_exec_parent')\ntoolchain_subject(name='toolchain_deferred')\nmissing_action_subject(name='missing_action')\nordinary(name='ordinary')\ncoverage_rule(name='coverage')\nbad_file(name='coverage_bad_file')\nbad_provider(name='coverage_bad_provider')\nundeclared(name='coverage_undeclared')\nsub_undeclared_rule(name='coverage_sub_undeclared')\nescaped(name='coverage_escaped')\nunknown(name='coverage_unknown')\n",
+        "load('//rules:defs.bzl', 'allowed_helper_subject', 'bad_executable_subject', 'bad_extension_subject', 'bad_file_provider_subject', 'bad_file_subject', 'bad_nested_subject', 'bad_provider_subject', 'escaped_actions_subject', 'escaped_ctx_subject', 'exec_first_subject', 'fragment_subject', 'missing_action_subject', 'multi_single_subject', 'nested_subject', 'ordinary', 'outer_lock_subject', 'override_subject', 'parent_lock_subject', 'repeat_context_subject', 'subject', 'target_first_subject', 'toolchain_subject', 'undeclared_subject', 'zero_single_subject')\nload('//rules:coverage.bzl', 'bad_file', 'bad_provider', 'coverage_rule', 'custom_malloc_rule', 'escaped', 'private_cpp_rule', 'sub_undeclared_rule', 'undeclared', 'unknown')\nload('//tools/build_defs/cc:fragments.bzl', 'denied_helper', 'fragment_arity', 'fragment_exec_parent', 'fragment_methods', 'fragment_opt_terminal', 'undeclared_fragment', 'undeclared_sub_fragment')\nsubject(name='subject')\nbad_provider_subject(name='bad_provider')\nzero_single_subject(name='zero_single')\nmulti_single_subject(name='multi_single')\nbad_extension_subject(name='bad_extension')\nbad_executable_subject(name='bad_executable')\nbad_file_subject(name='bad_file')\nbad_file_provider_subject(name='bad_file_provider')\nexec_first_subject(name='exec_first')\ntarget_first_subject(name='target_first')\nnested_subject(name='nested')\nundeclared_subject(name='undeclared')\nbad_nested_subject(name='bad_nested')\noverride_subject(name='override')\nouter_lock_subject(name='outer_lock')\nescaped_ctx_subject(name='escaped_ctx')\nescaped_actions_subject(name='escaped_actions')\nparent_lock_subject(name='parent_lock')\nrepeat_context_subject(name='repeat_context')\nfragment_subject(name='fragment')\nallowed_helper_subject(name='allowed_helper')\nfragment_methods(name='fragment_methods')\ndenied_helper(name='denied_helper')\nundeclared_fragment(name='undeclared_fragment')\nundeclared_sub_fragment(name='undeclared_sub_fragment')\nfragment_arity(name='fragment_arity')\nfragment_opt_terminal(name='fragment_opt_terminal')\nfragment_exec_parent(name='fragment_exec_parent')\ntoolchain_subject(name='toolchain_deferred')\nmissing_action_subject(name='missing_action')\nordinary(name='ordinary')\ncoverage_rule(name='coverage')\ncustom_malloc_rule(name='custom_malloc')\nprivate_cpp_rule(name='custom_malloc_private')\nbad_file(name='coverage_bad_file')\nbad_provider(name='coverage_bad_provider')\nundeclared(name='coverage_undeclared')\nsub_undeclared_rule(name='coverage_sub_undeclared')\nescaped(name='coverage_escaped')\nunknown(name='coverage_unknown')\n",
     );
     epoch
 }
@@ -1264,6 +1317,71 @@ async fn coverage_field_and_public_facades_restore_false_true_false_in_one_dice(
         assert_eq!(explicit_edges.len(), 2, "{route:?}");
         assert_eq!(explicit_edges.iter().filter(|edge| edge.tool()).count(), 1);
     }
+}
+
+#[tokio::test]
+async fn custom_malloc_field_and_public_cpp_facades_restore_none_label_none() {
+    for route in [AnalysisRoute::Legacy, AnalysisRoute::Observed] {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(Tracker::default());
+        let absent = analyze_result(
+            &dice,
+            semantic_epoch().build(),
+            "@@//subject:custom_malloc",
+            custom_malloc_configuration(None),
+            tracker.clone(),
+            route,
+        )
+        .await
+        .unwrap();
+        assert!(
+            absent
+                .edges()
+                .iter()
+                .all(|edge| edge.target().label().target().as_str() != "profile"),
+            "{route:?}: default custom malloc edge"
+        );
+
+        let configured = analyze_result(
+            &dice,
+            semantic_epoch().build(),
+            "@@//subject:custom_malloc",
+            custom_malloc_configuration(Some("//deps:profile")),
+            tracker.clone(),
+            route,
+        )
+        .await
+        .unwrap();
+        let edges = configured
+            .edges()
+            .iter()
+            .filter(|edge| edge.target().label().to_string() == "@@//deps:profile")
+            .count();
+        assert_eq!(edges, 2, "{route:?}");
+
+        let restored = analyze_result(
+            &dice,
+            semantic_epoch().build(),
+            "@@//subject:custom_malloc",
+            custom_malloc_configuration(None),
+            tracker,
+            route,
+        )
+        .await
+        .unwrap();
+        assert!(Arc::ptr_eq(&absent, &restored), "{route:?}");
+    }
+
+    let denied = analyze(
+        &Dice::builder().build(DetectCycles::Enabled),
+        semantic_epoch().build(),
+        "@@//subject:custom_malloc_private",
+        custom_malloc_configuration(Some("//deps:profile")),
+        Arc::new(Tracker::default()),
+        AnalysisRoute::Legacy,
+    )
+    .await;
+    assert!(denied.contains("cannot use private API"), "{denied}");
 }
 
 #[tokio::test]

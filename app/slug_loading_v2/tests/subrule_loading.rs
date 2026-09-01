@@ -291,7 +291,7 @@ my_rule = rule(implementation = _rule_impl, subrules = [my_subrule])
 }
 
 #[test]
-fn coverage_configuration_field_freezes_for_ordinary_and_subrule_private_labels() {
+fn coverage_and_custom_malloc_fields_freeze_for_ordinary_and_subrule_private_labels() {
     let workspace = scratch("coverage-field");
     let package = workspace.join("pkg");
     write(
@@ -316,11 +316,23 @@ coverage_rule = rule(
     attrs = {"_coverage": attr.label(default = COVERAGE)},
     subrules = [coverage_sub],
 )
+
+CUSTOM_MALLOC = configuration_field(fragment = "cpp", name = "custom_malloc")
+def _malloc_sub_impl(ctx, _malloc): return None
+malloc_sub = subrule(
+    implementation = _malloc_sub_impl,
+    attrs = {"_malloc": attr.label(default = CUSTOM_MALLOC)},
+)
+malloc_rule = rule(
+    implementation = _impl,
+    attrs = {"_malloc": attr.label(default = CUSTOM_MALLOC)},
+    subrules = [malloc_sub],
+)
 "#,
     );
     write(
         &package.join("BUILD.bazel"),
-        "load(':defs.bzl', 'coverage_rule')\ncoverage_rule(name = 'subject')\n",
+        "load(':defs.bzl', 'coverage_rule', 'malloc_rule')\ncoverage_rule(name = 'subject')\nmalloc_rule(name = 'malloc')\n",
     );
 
     let loaded = load_package(&workspace, &package);
@@ -340,6 +352,19 @@ coverage_rule = rule(
         .unwrap();
     assert!(lifted.exec_configuration());
     assert!(lifted.executable());
+
+    let malloc = starlark_rule(&loaded, "malloc");
+    let configured = malloc
+        .configured_dependency_attributes()
+        .collect::<Vec<_>>();
+    assert_eq!(configured.len(), 2);
+    for attribute in configured {
+        let ConfiguredDependencyDefault::ConfigurationField(identity) = attribute.default() else {
+            panic!("custom malloc dependency lost typed field identity")
+        };
+        assert_eq!(identity.field().fragment_name(), "cpp");
+        assert_eq!(identity.field().field_name(), "custom_malloc");
+    }
 
     for (name, source, expected) in [
         (

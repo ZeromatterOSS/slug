@@ -921,6 +921,7 @@ impl SlugConfiguration {
             CppConfigurationField::XbinaryFdo => self.effective_xbinary_label(),
             CppConfigurationField::FdoProfile => self.cpp_label("fdo_profile"),
             CppConfigurationField::CsFdoProfile => self.cpp_label("cs_fdo_profile"),
+            CppConfigurationField::CustomMalloc => self.cpp_label("custom_malloc"),
             CppConfigurationField::FdoPrefetchHints => self.cpp_label("fdo_prefetch_hints"),
             CppConfigurationField::PropellerOptimize => {
                 if self.cpp_text_present("fdo_instrument")?
@@ -962,6 +963,13 @@ impl SlugConfiguration {
             return Ok(None);
         }
         self.native_label(COVERAGE_OPTIONS, "coverage_output_generator")
+    }
+
+    pub fn cpp_custom_malloc_label(
+        &self,
+    ) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
+        self.validate_cpp_field_state()?;
+        self.native_label(CPP_OPTIONS, "custom_malloc")
     }
 
     pub fn projection(&self) -> SlugConfigurationProjection {
