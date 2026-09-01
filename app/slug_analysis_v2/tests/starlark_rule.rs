@@ -100,6 +100,7 @@ use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
 use slug_configuration_v2::CommandConfigurationOccurrence;
 use slug_configuration_v2::CommandConfigurationOverlay;
+use slug_configuration_v2::NativeCommandOption;
 use slug_configuration_v2::SlugConfiguration;
 use slug_configuration_v2::native::host::ActionEnvironmentHost;
 use slug_configuration_v2::native::host::ActionEnvironmentHostOs;
@@ -7381,7 +7382,7 @@ predeclared = rule(implementation = _predeclared, attrs = {"out": attr.output()}
         Some("implicit".into())
     );
     assert_eq!(implicit.files_to_run.executable, implicit.executable);
-    assert!(implicit.files_to_run.is_complete());
+    assert!(implicit.files_to_run.support.is_some());
     let support = implicit.files_to_run.support.as_ref().unwrap();
     assert_eq!(support.tree.path(), "implicit.runfiles");
     assert!(matches!(
@@ -7664,7 +7665,8 @@ probe(name = "clear", suffix = ".unrelated")
             .default_info()
             .unwrap()
             .files_to_run
-            .is_complete()
+            .support
+            .is_some()
     );
 }
 
@@ -8116,6 +8118,11 @@ async fn spawn_executable_provenance_is_scope_local_and_container_sensitive() {
 
 tool = rule(implementation = _tool, executable = True)
 
+def _empty(ctx):
+    return [DefaultInfo()]
+
+empty = rule(implementation = _empty)
+
 def _source(ctx, **kwargs):
     return kwargs["_exec"].executable
 
@@ -8162,10 +8169,12 @@ def _list(ctx, **kwargs):
 def _provider(ctx, **kwargs):
     out = ctx.actions.declare_file("provider.out")
     ctx.actions.run(outputs = [out], executable = "runner", tools = [kwargs["_exec"]])
+    return out
 
 def _provider_exec(ctx, **kwargs):
     out = ctx.actions.declare_file("provider-exec.out")
-    ctx.actions.run(outputs = [out], executable = kwargs["_exec"], tools = None)
+    ctx.actions.run(outputs = [out], executable = kwargs["_exec"])
+    return out
 
 top = subrule(implementation = _top, attrs = {"_exec": attr.label(default = "//pkg:tool_a", cfg = "exec", executable = True)})
 direct = subrule(implementation = _direct, attrs = {"_exec": attr.label(default = "//pkg:tool_a", cfg = "exec", executable = True)})
@@ -8176,36 +8185,80 @@ provider_exec = subrule(implementation = _provider_exec, attrs = {"_exec": attr.
 def _top_subject(ctx): top(); return []
 def _direct_subject(ctx): direct(); return []
 def _list_subject(ctx): listed(); return []
-def _provider_subject(ctx): provider(); return []
-def _provider_exec_subject(ctx): provider_exec(); return []
+def _provider_subject(ctx): return [DefaultInfo(files = depset([provider()]))]
+def _provider_exec_subject(ctx): return [DefaultInfo(files = depset([provider_exec()]))]
 top_subject = rule(implementation = _top_subject, subrules = [top])
 direct_subject = rule(implementation = _direct_subject, subrules = [direct])
 list_subject = rule(implementation = _list_subject, subrules = [listed])
 provider_subject = rule(implementation = _provider_subject, subrules = [provider])
 provider_exec_subject = rule(implementation = _provider_exec_subject, subrules = [provider_exec])
+
+def _root_subject(ctx):
+    provider = ctx.attr.exec[DefaultInfo].files_to_run
+    executable = provider.executable
+    outputs = [ctx.actions.declare_file("root-%d.out" % i) for i in range(6)]
+    ctx.actions.run(outputs = [outputs[0]], executable = executable)
+    ctx.actions.run(outputs = [outputs[1]], executable = provider)
+    ctx.actions.run(outputs = [outputs[2]], executable = "runner", tools = [executable])
+    ctx.actions.run(outputs = [outputs[3]], executable = "runner", tools = [provider])
+    ctx.actions.run(outputs = [outputs[4]], executable = "runner", tools = depset([executable]))
+    ctx.actions.run(outputs = [outputs[5]], executable = "runner", tools = [depset([executable])])
+    return [DefaultInfo(files = depset(outputs))]
+
+root_subject = rule(
+    implementation = _root_subject,
+    attrs = {"exec": attr.label(default = configuration_field(fragment = "cpp", name = "fdo_profile"), cfg = "exec", executable = True)},
+)
+
+def _missing_provider_exec(ctx):
+    out = ctx.actions.declare_file("missing-provider-exec.out")
+    ctx.actions.run(outputs = [out], executable = ctx.attr.dep[DefaultInfo].files_to_run)
+    return [DefaultInfo(files = depset([out]))]
+
+missing_provider_exec = rule(
+    implementation = _missing_provider_exec,
+    attrs = {"dep": attr.label()},
+)
 "#,
     )
     .unwrap();
     fs::write(
         package.join("BUILD.bazel"),
-        r#"load(':defs.bzl', 'direct_subject', 'list_subject', 'positive', 'provider_exec_subject', 'provider_subject', 'tool', 'top_subject')
+        r#"load(':defs.bzl', 'direct_subject', 'empty', 'list_subject', 'missing_provider_exec', 'positive', 'provider_exec_subject', 'provider_subject', 'root_subject', 'tool', 'top_subject')
 tool(name = 'tool_a')
 tool(name = 'tool_b')
+empty(name = 'empty')
 positive(name = 'positive')
 top_subject(name = 'top')
 direct_subject(name = 'direct')
 list_subject(name = 'list')
 provider_subject(name = 'provider')
 provider_exec_subject(name = 'provider_exec')
+root_subject(name = 'root')
+missing_provider_exec(name = 'missing_provider_exec', dep = ':empty')
 "#,
     )
     .unwrap();
 
     let dice = Dice::builder().build(DetectCycles::Enabled);
+    let base = typed_action_test_configuration()
+        .slug_configuration()
+        .unwrap()
+        .clone();
+    let overlay: CommandConfigurationOverlay = vec![CommandConfigurationOccurrence::native(
+        NativeCommandOption::FdoProfile,
+        Some("//pkg:tool_a"),
+        false,
+    )]
+    .into();
+    let configuration = ConfigurationKey::from_slug(
+        base.with_command_configuration(base.starlark_options().clone(), &overlay)
+            .unwrap(),
+    );
     let key = |target: &str| {
         ConfiguredTargetKey::new(
             CanonicalLabel::parse(&format!("@@//pkg:{target}")).unwrap(),
-            typed_action_test_configuration(),
+            configuration.clone(),
         )
     };
     let positive = analyze_request(&dice, &workspace, &key("positive"), None, false)
@@ -8225,21 +8278,106 @@ provider_exec_subject(name = 'provider_exec')
             .await
             .unwrap_err();
         assert!(
-            error.contains("associated with FilesToRunProvider"),
+            error.contains("expected FilesToRunProvider, got File"),
             "{target}: {error}"
         );
     }
     let provider = analyze_request(&dice, &workspace, &key("provider"), None, false)
         .await
-        .unwrap_err();
-    assert!(provider.contains("FilesToRun is deferred"), "{provider}");
+        .unwrap();
+    assert_eq!(provider.actions().len(), 1);
+    assert!(matches!(
+        provider.actions()[0]
+            .spawn_spec()
+            .unwrap()
+            .tools()
+            .sources(),
+        [ArtifactInputSource::FilesToRun(_)]
+    ));
     let provider_exec = analyze_request(&dice, &workspace, &key("provider_exec"), None, false)
         .await
-        .unwrap_err();
+        .unwrap();
+    assert_eq!(provider_exec.actions().len(), 1);
+    assert!(matches!(
+        provider_exec.actions()[0]
+            .spawn_spec()
+            .unwrap()
+            .invocation(),
+        RetainedSpawnInvocation::Executable(SpawnExecutable::FilesToRun(_))
+    ));
+    let missing_provider_exec = analyze_request(
+        &dice,
+        &workspace,
+        &key("missing_provider_exec"),
+        None,
+        false,
+    )
+    .await
+    .unwrap_err();
     assert!(
-        provider_exec.contains("tools must be a sequence or depset"),
-        "{provider_exec}"
+        missing_provider_exec.contains("FilesToRunProvider has no executable"),
+        "{missing_provider_exec}"
     );
+
+    let root = analyze_request(&dice, &workspace, &key("root"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(root.actions().len(), 6);
+    for index in [0, 1] {
+        assert!(matches!(
+            root.actions()[index].spawn_spec().unwrap().invocation(),
+            RetainedSpawnInvocation::Executable(SpawnExecutable::FilesToRun(_))
+        ));
+    }
+    assert!(matches!(
+        root.actions()[2].spawn_spec().unwrap().tools().sources(),
+        [
+            ArtifactInputSource::Direct(_),
+            ArtifactInputSource::FilesToRun(_)
+        ]
+    ));
+    assert!(matches!(
+        root.actions()[3].spawn_spec().unwrap().tools().sources(),
+        [ArtifactInputSource::FilesToRun(_)]
+    ));
+    assert!(matches!(
+        root.actions()[4].spawn_spec().unwrap().tools().sources(),
+        [
+            ArtifactInputSource::Depset(_),
+            ArtifactInputSource::FilesToRun(_)
+        ]
+    ));
+    assert!(matches!(
+        root.actions()[5].spawn_spec().unwrap().tools().sources(),
+        [ArtifactInputSource::Depset(_)]
+    ));
+    let mut provider_tool_paths = Vec::new();
+    root.actions()[3]
+        .spawn_spec()
+        .unwrap()
+        .tools()
+        .visit(|artifact| provider_tool_paths.push(artifact.path().into_owned()))
+        .unwrap();
+    assert_eq!(provider_tool_paths, ["pkg/tool_a", "pkg/tool_a.runfiles"]);
+
+    let warm = analyze_request(&dice, &workspace, &key("root"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(root, warm);
+    let definitions = package.join("defs.bzl");
+    let original = fs::read_to_string(&definitions).unwrap();
+    let changed = original.replace("tools = [provider])", "tools = [provider, provider])");
+    assert_ne!(original, changed);
+    fs::write(&definitions, changed).unwrap();
+    let topology_changed = analyze_request(&dice, &workspace, &key("root"), None, false)
+        .await
+        .unwrap();
+    assert_ne!(root.actions()[3], topology_changed.actions()[3]);
+    fs::write(&definitions, original).unwrap();
+    let restored = analyze_request(&dice, &workspace, &key("root"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(root, restored);
 }
 
 #[tokio::test]

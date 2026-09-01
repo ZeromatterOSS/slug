@@ -29,6 +29,7 @@ use crate::analysis_value::AnalysisDepset;
 use crate::analysis_value::AnalysisValueKind;
 use crate::analysis_value::AnalysisValueType;
 use crate::analysis_value::PublicationEqState;
+use crate::providers::FilesToRunProvider;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub enum ActionOutputKind {
@@ -602,13 +603,14 @@ impl PartialEq for RetainedCommandLine {
 
 impl Eq for RetainedCommandLine {}
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+#[derive(Debug, Clone, Allocative)]
 pub enum SpawnExecutable {
     Path(NormalizedBazelPath),
     Artifact(AnalysisArtifact),
+    FilesToRun(FilesToRunProvider),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+#[derive(Debug, Clone, Allocative)]
 pub enum RetainedSpawnInvocation {
     Executable(SpawnExecutable),
     Shell {
@@ -633,6 +635,25 @@ impl RetainedSpawnInvocation {
             }
         }
     }
+
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        match (self, other) {
+            (Self::Executable(left), Self::Executable(right)) => {
+                left.publication_eq_with(right, state)
+            }
+            (
+                Self::Shell {
+                    command: left_command,
+                    pad_dollar_zero: left_pad,
+                },
+                Self::Shell {
+                    command: right_command,
+                    pad_dollar_zero: right_pad,
+                },
+            ) => left_command == right_command && left_pad == right_pad,
+            _ => false,
+        }
+    }
 }
 
 impl SpawnExecutable {
@@ -640,14 +661,48 @@ impl SpawnExecutable {
         match self {
             Self::Path(path) => path.as_str().to_owned(),
             Self::Artifact(artifact) => artifact.path().into_owned(),
+            Self::FilesToRun(provider) => provider
+                .executable
+                .as_ref()
+                .expect("Spawn FilesToRun executable was validated before publication")
+                .path()
+                .into_owned(),
+        }
+    }
+
+    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        match (self, other) {
+            (Self::Path(left), Self::Path(right)) => left == right,
+            (Self::Artifact(left), Self::Artifact(right)) => left == right,
+            (Self::FilesToRun(left), Self::FilesToRun(right)) => {
+                left.publication_eq_with(right, state)
+            }
+            _ => false,
         }
     }
 }
+
+impl PartialEq for SpawnExecutable {
+    fn eq(&self, other: &Self) -> bool {
+        self.publication_eq_with(other, &mut PublicationEqState::default())
+    }
+}
+
+impl Eq for SpawnExecutable {}
+
+impl PartialEq for RetainedSpawnInvocation {
+    fn eq(&self, other: &Self) -> bool {
+        self.publication_eq_with(other, &mut PublicationEqState::default())
+    }
+}
+
+impl Eq for RetainedSpawnInvocation {}
 
 #[derive(Debug, Clone, Allocative)]
 pub enum ArtifactInputSource {
     Direct(AnalysisArtifact),
     Depset(RetainedArtifactInputs),
+    FilesToRun(FilesToRunProvider),
 }
 
 impl ArtifactInputSource {
@@ -655,6 +710,9 @@ impl ArtifactInputSource {
         match (self, other) {
             (Self::Direct(left), Self::Direct(right)) => left == right,
             (Self::Depset(left), Self::Depset(right)) => left.publication_eq_with(right, state),
+            (Self::FilesToRun(left), Self::FilesToRun(right)) => {
+                left.publication_eq_with(right, state)
+            }
             _ => false,
         }
     }
@@ -680,6 +738,9 @@ impl ArtifactInputs {
             match source {
                 ArtifactInputSource::Direct(artifact) => visitor(artifact),
                 ArtifactInputSource::Depset(inputs) => inputs.visit(&mut visitor)?,
+                ArtifactInputSource::FilesToRun(provider) => {
+                    RetainedArtifactInputs::new(provider.files().dupe())?.visit(&mut visitor)?;
+                }
             }
         }
         Ok(())
@@ -775,7 +836,8 @@ impl SpawnSpec {
 
     fn publication_eq(&self, other: &Self) -> bool {
         let mut state = PublicationEqState::default();
-        self.invocation == other.invocation
+        self.invocation
+            .publication_eq_with(&other.invocation, &mut state)
             && self.outputs == other.outputs
             && self.unused_inputs_list == other.unused_inputs_list
             && self.environment == other.environment

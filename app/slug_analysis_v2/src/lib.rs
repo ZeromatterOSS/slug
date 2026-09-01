@@ -15,6 +15,7 @@ mod configured_analysis_cycle_detector;
 mod configured_attribute;
 pub mod configured_target;
 pub mod dice;
+mod files_to_run_spawn;
 pub mod key;
 pub mod result;
 mod runfiles_support;

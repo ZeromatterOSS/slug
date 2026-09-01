@@ -186,6 +186,10 @@ pub(crate) fn is_files_to_run_provider(value: Value<'_>) -> bool {
     StarlarkFilesToRunProvider::from_value(value).is_some()
 }
 
+pub(crate) fn files_to_run_provider<'v>(value: Value<'v>) -> Option<&'v FilesToRunProvider> {
+    StarlarkFilesToRunProvider::from_value(value).map(|value| &value.retained)
+}
+
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct StarlarkRunfilesSymlink {
     retained: RunfilesSymlink,

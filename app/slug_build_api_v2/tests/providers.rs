@@ -20,6 +20,7 @@ use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
 use slug_build_api_v2::AnalysisDepset;
+use slug_build_api_v2::AnalysisDepsetSuccessor;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::AnalysisValueType;
 use slug_build_api_v2::DefaultInfo;
@@ -193,7 +194,7 @@ fn executable_default_info_uses_the_executable_for_implicit_files_and_runfiles()
         Some("pkg/tool".into())
     );
     assert_eq!(info.files_to_run.executable, info.executable);
-    assert!(!info.files_to_run.is_complete());
+    assert!(info.files_to_run.support.is_none());
     assert_eq!(runfiles_paths(&info.default_runfiles), ["pkg/tool"]);
     assert_eq!(runfiles_paths(&info.data_runfiles), ["pkg/tool"]);
     assert!(info.files_to_run.runfiles_manifest().is_none());
@@ -203,17 +204,21 @@ fn executable_default_info_uses_the_executable_for_implicit_files_and_runfiles()
 }
 
 #[test]
-fn file_target_files_to_run_is_complete_and_typed() {
+fn file_target_files_to_run_is_a_supportless_typed_singleton() {
     let artifact = source_artifact("pkg/input.txt");
     let info = DefaultInfo::from_file_target(artifact.clone());
 
     assert_eq!(info.executable, Some(artifact.clone()));
-    assert_eq!(info.files_to_run.executable, Some(artifact));
-    assert!(info.files_to_run.is_complete());
+    assert_eq!(info.files_to_run.executable, Some(artifact.clone()));
+    assert!(info.files_to_run.support.is_none());
     assert_eq!(
         info.files_to_run.files().element_type(),
         AnalysisValueType::Artifact
     );
+    assert!(matches!(
+        info.files_to_run.files().singleton_value().map(AnalysisValue::kind),
+        Some(slug_build_api_v2::AnalysisValueKind::Artifact(value)) if value == &artifact
+    ));
     assert!(info.default_runfiles.files.is_empty());
 }
 
@@ -247,14 +252,18 @@ fn runfiles_support_reserves_the_complete_typed_category_shape() {
 }
 
 #[test]
-fn files_to_run_private_carrier_preserves_complete_support_and_hash_law() {
+fn files_to_run_private_carrier_preserves_support_topology_and_hash_law() {
     let executable = derived_artifact("pkg/tool", ActionOutputKind::File);
-    let info = DefaultInfo::from_executable(executable.clone(), None).unwrap();
-    let incomplete = info.files_to_run.clone();
-    let incomplete_round_trip =
-        FilesToRunProvider::from_occurrence(&incomplete.to_occurrence()).unwrap();
-    assert_eq!(incomplete_round_trip, incomplete);
-    assert!(!incomplete_round_trip.is_complete());
+    let info = DefaultInfo::from_executable(
+        executable.clone(),
+        Some(artifact_files(&["pkg/default-a", "pkg/default-b"])),
+    )
+    .unwrap();
+    let pre_support = info.files_to_run.clone();
+    let pre_support_round_trip =
+        FilesToRunProvider::from_occurrence(&pre_support.to_occurrence()).unwrap();
+    assert_eq!(pre_support_round_trip, pre_support);
+    assert!(pre_support_round_trip.support.is_none());
     let support = Arc::new(RunfilesSupport {
         runfiles: info.default_runfiles.clone(),
         tree: derived_artifact("pkg/tool.runfiles", ActionOutputKind::RunfilesTree),
@@ -272,9 +281,51 @@ fn files_to_run_private_carrier_preserves_complete_support_and_hash_law() {
         .with_runfiles_support(support.clone())
         .unwrap()
         .files_to_run;
+    let provider_paths = provider
+        .files()
+        .to_list()
+        .into_iter()
+        .map(|value| match value.kind() {
+            slug_build_api_v2::AnalysisValueKind::Artifact(value) => value.path().into_owned(),
+            _ => unreachable!(),
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        provider_paths,
+        [
+            "pkg/default-a",
+            "pkg/default-b",
+            "pkg/tool.runfiles",
+            "pkg/tool",
+        ]
+    );
+    let successors = provider.files().successors().collect::<Vec<_>>();
+    assert_eq!(successors.len(), 3);
+    assert!(matches!(
+        &successors[0],
+        AnalysisDepsetSuccessor::Transitive(value)
+            if value.shares_successors_with(info.files())
+    ));
+    assert!(matches!(
+        &successors[1],
+        AnalysisDepsetSuccessor::Direct(value)
+            if matches!(
+                value.kind(),
+                slug_build_api_v2::AnalysisValueKind::Artifact(value)
+                    if value == &support.tree
+            )
+    ));
+    assert!(matches!(
+        &successors[2],
+        AnalysisDepsetSuccessor::Direct(value)
+            if matches!(
+                value.kind(),
+                slug_build_api_v2::AnalysisValueKind::Artifact(value)
+                    if value == &executable
+            )
+    ));
     let occurrence = provider.to_occurrence();
     let round_trip = FilesToRunProvider::from_occurrence(&occurrence).unwrap();
-    assert!(round_trip.is_complete());
     assert!(Arc::ptr_eq(round_trip.support.as_ref().unwrap(), &support));
 
     let fabricated = ProviderOccurrence::new(

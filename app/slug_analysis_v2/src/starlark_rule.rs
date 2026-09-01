@@ -119,6 +119,10 @@ use crate::analysis_value::materialize_runfiles;
 use crate::analysis_value::retained_runfiles;
 use crate::build_setting;
 use crate::configured_attribute::ResolvedRuleAttribute;
+use crate::files_to_run_spawn::ExecutableArtifactProvenance;
+use crate::files_to_run_spawn::executable_artifact_provenance;
+use crate::files_to_run_spawn::retained_invocation;
+use crate::files_to_run_spawn::retained_tools;
 use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
 use crate::result::ConfiguredActionOwnerContext;
@@ -779,67 +783,6 @@ struct SynchronousAnalysisActionSink {
     execution_tags: CanonicalStringMap,
 }
 
-#[derive(Debug, Default)]
-struct ExecutableArtifactProvenance {
-    root: SmallMap<AnalysisArtifact, slug_build_api_v2::FilesToRunProvider>,
-    subrules: SmallMap<
-        Arc<SubruleIdentity>,
-        SmallMap<AnalysisArtifact, slug_build_api_v2::FilesToRunProvider>,
-    >,
-}
-
-impl ExecutableArtifactProvenance {
-    fn contains(&self, scope: &AnalysisActionCallScope, artifact: &AnalysisArtifact) -> bool {
-        match scope {
-            AnalysisActionCallScope::Root => self.root.contains_key(artifact),
-            AnalysisActionCallScope::Subrule(identity) => self
-                .subrules
-                .get(identity)
-                .is_some_and(|artifacts| artifacts.contains_key(artifact)),
-        }
-    }
-}
-
-fn files_to_run_provider(value: &AnalysisValue) -> Option<slug_build_api_v2::FilesToRunProvider> {
-    let AnalysisValueKind::Provider(provider) = value.kind() else {
-        return None;
-    };
-    slug_build_api_v2::FilesToRunProvider::from_occurrence(provider)
-}
-
-fn executable_artifact_provenance(
-    dependencies: &[PreparedDependency],
-    configured_attributes: &[PreparedConfiguredAttribute],
-) -> ExecutableArtifactProvenance {
-    let mut provenance = ExecutableArtifactProvenance::default();
-    for provider in dependencies
-        .iter()
-        .filter_map(|dependency| dependency.executable.clone())
-    {
-        if let Some(executable) = provider.executable.clone() {
-            provenance.root.insert(executable, provider);
-        }
-    }
-    for attribute in configured_attributes {
-        let (Some(owner), Some(provider)) =
-            (&attribute.owner, files_to_run_provider(&attribute.value))
-        else {
-            continue;
-        };
-        let Some(executable) = provider.executable.clone() else {
-            continue;
-        };
-        if let Some(artifacts) = provenance.subrules.get_mut(owner) {
-            artifacts.insert(executable, provider);
-        } else {
-            provenance
-                .subrules
-                .insert(owner.clone(), SmallMap::from_iter([(executable, provider)]));
-        }
-    }
-    provenance
-}
-
 impl SynchronousAnalysisActionSink {
     fn owned_output(&self, value: Value<'_>, operation: &str) -> anyhow::Result<ActionOutput> {
         AnalysisArtifactValue::from_starlark(value)
@@ -884,50 +827,6 @@ impl SynchronousAnalysisActionSink {
         register(&mut actions)
             .map(|_| ())
             .map_err(|error| anyhow::anyhow!(error.to_string()))
-    }
-
-    fn retained_invocation(
-        &self,
-        invocation: AnalysisSpawnInvocation<'_>,
-        scope: &AnalysisActionCallScope,
-        path_flavor: HostPathFlavor,
-        pad_dollar_zero: bool,
-    ) -> anyhow::Result<RetainedSpawnInvocation> {
-        match invocation {
-            AnalysisSpawnInvocation::Executable(value) => {
-                let executable = if let Some(file) = AnalysisArtifactValue::from_starlark(value) {
-                    reject_directory_file(file, "ctx.actions.run executable")?;
-                    reject_associated_executable(
-                        &self.executable_provenance,
-                        scope,
-                        file.artifact(),
-                        "ctx.actions.run executable",
-                    )?;
-                    SpawnExecutable::Artifact(file.artifact().clone())
-                } else if let Some(path) = value.unpack_str() {
-                    SpawnExecutable::Path(
-                        NormalizedBazelPath::new(path_flavor, path)
-                            .map_err(|error| anyhow::anyhow!(error.to_string()))?,
-                    )
-                } else {
-                    anyhow::bail!(
-                        "ctx.actions.run executable must be an unassociated File or string path"
-                    )
-                };
-                Ok(RetainedSpawnInvocation::Executable(executable))
-            }
-            AnalysisSpawnInvocation::Shell(value) => value
-                .unpack_str()
-                .map(|command| RetainedSpawnInvocation::Shell {
-                    command: CompactString::new(command),
-                    pad_dollar_zero,
-                })
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "ctx.actions.run_shell command must be a string under Bazel 9 defaults"
-                    )
-                }),
-        }
     }
 }
 
@@ -1041,9 +940,10 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
         let mut lowerer = AnalysisValueLowerer::default();
         let (command_line, has_arguments) = retained_command_line(request.arguments, &mut lowerer)?;
         let (path_flavor, configured_environment) = self.typed_configuration()?;
-        let invocation = self.retained_invocation(
+        let invocation = retained_invocation(
             request.invocation,
             &request.scope,
+            &self.executable_provenance,
             path_flavor,
             has_arguments,
         )?;
@@ -1335,105 +1235,6 @@ fn validate_regular_inputs(inputs: &RetainedArtifactInputs, name: &str) -> anyho
             if error.is_none() {
                 error =
                     reject_directory_artifact(artifact, &format!("ctx.actions.run {name}")).err();
-            }
-        })
-        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-    error.map_or(Ok(()), Err)
-}
-
-fn reject_associated_executable(
-    provenance: &ExecutableArtifactProvenance,
-    scope: &AnalysisActionCallScope,
-    artifact: &AnalysisArtifact,
-    name: &str,
-) -> anyhow::Result<()> {
-    if provenance.contains(scope, artifact) {
-        anyhow::bail!(
-            "{name} is associated with FilesToRunProvider; FilesToRun/runfiles expansion is not supported"
-        )
-    }
-    Ok(())
-}
-
-fn retained_tools<'v>(
-    value: Option<Value<'v>>,
-    scope: &AnalysisActionCallScope,
-    provenance: &ExecutableArtifactProvenance,
-    lowerer: &mut AnalysisValueLowerer<'v>,
-) -> anyhow::Result<ArtifactInputs> {
-    let Some(value) = value else {
-        return Ok(ArtifactInputs::new(Vec::new()));
-    };
-    if value.is_none() {
-        anyhow::bail!("ctx.actions.run tools must be a sequence or depset");
-    }
-    let lowered = lowerer
-        .lower(value, "ctx.actions.run tools")
-        .map_err(anyhow::Error::msg)?;
-    // Bazel 9.2 StarlarkActionFactory.registerAction expands a top-level
-    // tools depset before its Artifact-to-FilesToRun lookup.
-    if let AnalysisValueKind::Depset(depset) = lowered.kind() {
-        let retained = RetainedArtifactInputs::new(depset.clone())
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-        validate_tool_depset(&retained, scope, provenance, true)?;
-        return Ok(ArtifactInputs::new(vec![ArtifactInputSource::Depset(
-            retained,
-        )]));
-    }
-    let (AnalysisValueKind::List(values) | AnalysisValueKind::Tuple(values)) = lowered.kind()
-    else {
-        anyhow::bail!("ctx.actions.run tools must contain Files or depsets; FilesToRun is deferred")
-    };
-    let sources = values
-        .iter()
-        .map(|value| match value.kind() {
-            AnalysisValueKind::Artifact(artifact) => {
-                reject_directory_artifact(artifact, "ctx.actions.run tools")?;
-                reject_associated_executable(
-                    provenance,
-                    scope,
-                    artifact,
-                    "ctx.actions.run direct tool",
-                )?;
-                Ok(ArtifactInputSource::Direct(artifact.clone()))
-            }
-            AnalysisValueKind::Depset(depset) => {
-                let retained = RetainedArtifactInputs::new(depset.clone())
-                    .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-                // The Sequence branch adds nested depsets transitively and
-                // deliberately performs no per-leaf FilesToRun lookup.
-                validate_tool_depset(&retained, scope, provenance, false)?;
-                Ok(ArtifactInputSource::Depset(retained))
-            }
-            _ => Err(anyhow::anyhow!(
-                "ctx.actions.run tools entries must be Files or depsets; FilesToRun is deferred"
-            )),
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-    Ok(ArtifactInputs::new(sources))
-}
-
-fn validate_tool_depset(
-    tools: &RetainedArtifactInputs,
-    scope: &AnalysisActionCallScope,
-    provenance: &ExecutableArtifactProvenance,
-    check_association: bool,
-) -> anyhow::Result<()> {
-    let mut error = None;
-    tools
-        .visit(|artifact| {
-            if error.is_some() {
-                return;
-            }
-            error = reject_directory_artifact(artifact, "ctx.actions.run tools").err();
-            if error.is_none() && check_association {
-                error = reject_associated_executable(
-                    provenance,
-                    scope,
-                    artifact,
-                    "ctx.actions.run top-level depset tool",
-                )
-                .err();
             }
         })
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;

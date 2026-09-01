@@ -31,8 +31,10 @@ use slug_build_api_v2::ArgsWriteSpec;
 use slug_build_api_v2::ArtifactInputSource;
 use slug_build_api_v2::ArtifactInputs;
 use slug_build_api_v2::CtxActions;
+use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetOrder;
+use slug_build_api_v2::FilesToRunProvider;
 use slug_build_api_v2::ReapiCommandProjection;
 use slug_build_api_v2::RetainedArgCall;
 use slug_build_api_v2::RetainedArgsDepset;
@@ -170,6 +172,19 @@ fn artifact_depset(name: &str) -> AnalysisDepset {
         Vec::new(),
     )
     .unwrap()
+}
+
+fn files_to_run_provider(executable: &str) -> FilesToRunProvider {
+    let executable = derived_artifact(executable, ActionOutputKind::File);
+    let info = DefaultInfo::from_executable(executable, None).unwrap();
+    let support = Arc::new(RunfilesSupport {
+        runfiles: info.default_runfiles.clone(),
+        tree: derived_artifact("pkg/tool.runfiles", ActionOutputKind::RunfilesTree),
+        input_manifest: derived_artifact("pkg/tool.runfiles_manifest", ActionOutputKind::File),
+        manifest: None,
+        repo_mapping_manifest: None,
+    });
+    info.with_runfiles_support(support).unwrap().files_to_run
 }
 
 fn default_vector_options() -> RetainedVectorOptions {
@@ -360,6 +375,24 @@ fn retained_artifact_inputs_stream_ordered_unique_topology_to_sink() {
 }
 
 #[test]
+fn files_to_run_inputs_visit_complete_provider_files_without_flattening_storage() {
+    let provider = files_to_run_provider("pkg/tool");
+    let retained = provider.files().clone();
+    let inputs = ArtifactInputs::new(vec![ArtifactInputSource::FilesToRun(provider)]);
+    let mut paths = Vec::new();
+    inputs
+        .visit(|artifact| paths.push(artifact.path().into_owned()))
+        .unwrap();
+
+    assert_eq!(paths, ["pkg/tool", "pkg/tool.runfiles"]);
+    assert!(matches!(
+        inputs.sources(),
+        [ArtifactInputSource::FilesToRun(provider)]
+            if provider.files().shares_successors_with(&retained)
+    ));
+}
+
+#[test]
 fn typed_spawn_retains_one_recipe_and_publication_equal_depsets() {
     let left = spawn_action(artifact_depset("input.h"), artifact_depset("tool.h"));
     let right = spawn_action(artifact_depset("input.h"), artifact_depset("tool.h"));
@@ -493,6 +526,38 @@ fn spawn_publication_equality_preserves_alias_partitions_across_domains() {
     let split = spawn_action(artifact_depset("shared.h"), artifact_depset("shared.h"));
 
     assert_ne!(aliased, split);
+}
+
+#[test]
+fn files_to_run_spawn_equality_shares_one_alias_state_across_invocation_and_tools() {
+    let make = |executable: FilesToRunProvider, tool: FilesToRunProvider| {
+        ActionSpec::spawn(SpawnSpec::new(
+            RetainedSpawnInvocation::Executable(SpawnExecutable::FilesToRun(executable)),
+            RetainedCommandLine::new(Vec::new()),
+            ArtifactInputs::new(Vec::new()),
+            ArtifactInputs::new(vec![ArtifactInputSource::FilesToRun(tool)]),
+            vec![ActionOutput::new("pkg/out", ActionOutputKind::File)],
+            None,
+            RetainedActionEnvironment::default(),
+            CanonicalStringMap::default(),
+            "Action",
+            None::<&str>,
+        ))
+    };
+    let shared = files_to_run_provider("pkg/tool");
+    let aliased = make(shared.clone(), shared);
+    let independently_aliased = {
+        let shared = files_to_run_provider("pkg/tool");
+        make(shared.clone(), shared)
+    };
+    let split = make(
+        files_to_run_provider("pkg/tool"),
+        files_to_run_provider("pkg/tool"),
+    );
+
+    assert_eq!(aliased, independently_aliased);
+    assert_ne!(aliased, split);
+    assert_eq!(aliased.render_argv(), ["pkg/tool"]);
 }
 
 #[test]

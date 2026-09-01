@@ -241,7 +241,6 @@ pub struct FilesToRunProvider {
     files: AnalysisDepset,
     pub executable: Option<AnalysisArtifact>,
     pub support: Option<Arc<RunfilesSupport>>,
-    complete: bool,
 }
 
 impl FilesToRunProvider {
@@ -250,16 +249,11 @@ impl FilesToRunProvider {
             files: AnalysisDepset::empty(DepsetOrder::Default),
             executable: None,
             support: None,
-            complete: true,
         }
     }
 
     pub fn files(&self) -> &AnalysisDepset {
         &self.files
-    }
-
-    pub fn is_complete(&self) -> bool {
-        self.complete
     }
 
     pub fn runfiles_manifest(&self) -> Option<&AnalysisArtifact> {
@@ -286,7 +280,6 @@ impl FilesToRunProvider {
                         .unwrap_or_else(AnalysisValue::none),
                 ),
                 ("_files_to_run", AnalysisValue::depset(self.files.clone())),
-                ("_complete", AnalysisValue::boolean(self.complete)),
                 (
                     "runfiles_manifest",
                     self.runfiles_manifest()
@@ -320,12 +313,11 @@ impl FilesToRunProvider {
         }
     }
 
-    fn incomplete_executable(files: AnalysisDepset, executable: AnalysisArtifact) -> Self {
+    fn executable_without_support(files: AnalysisDepset, executable: AnalysisArtifact) -> Self {
         Self {
             files,
             executable: Some(executable),
             support: None,
-            complete: false,
         }
     }
 
@@ -340,7 +332,6 @@ impl FilesToRunProvider {
             files,
             executable: Some(executable),
             support: None,
-            complete: true,
         }
     }
 
@@ -352,14 +343,17 @@ impl FilesToRunProvider {
                 (None, None) => true,
                 _ => false,
             }
-            && self.complete == other.complete
     }
 
-    pub fn with_support(&self, support: Arc<RunfilesSupport>) -> Result<Self, ProviderError> {
+    fn with_support(
+        &self,
+        files_to_build: AnalysisDepset,
+        support: Arc<RunfilesSupport>,
+    ) -> Result<Self, ProviderError> {
         let Some(executable) = &self.executable else {
             return Err(ProviderError::MissingExecutable);
         };
-        if self.complete || self.support.is_some() {
+        if self.support.is_some() {
             return Err(ProviderError::FilesToRunAlreadyComplete);
         }
         if !support.runfiles.files.to_list().iter().any(|value| {
@@ -371,11 +365,22 @@ impl FilesToRunProvider {
         }) {
             return Err(ProviderError::RunfilesMissingExecutable);
         }
+        let runfiles_trees = AnalysisDepset::new(
+            DepsetOrder::Default,
+            vec![AnalysisValue::artifact(support.tree.clone())],
+            Vec::new(),
+        )
+        .expect("a singleton runfiles-tree Artifact depset is valid");
+        let files = AnalysisDepset::new(
+            DepsetOrder::Default,
+            vec![AnalysisValue::artifact(executable.clone())],
+            vec![files_to_build, runfiles_trees],
+        )
+        .expect("typed files, runfiles tree, and executable compose in stable order");
         Ok(Self {
-            files: self.files.clone(),
+            files,
             executable: Some(executable.clone()),
             support: Some(support),
-            complete: true,
         })
     }
 }
@@ -432,7 +437,9 @@ impl DefaultInfo {
             default_runfiles: self.default_runfiles.clone(),
             data_runfiles: self.data_runfiles.clone(),
             executable: self.executable.clone(),
-            files_to_run: self.files_to_run.with_support(support)?,
+            files_to_run: self
+                .files_to_run
+                .with_support(self.files.clone(), support)?,
         })
     }
 
@@ -482,7 +489,7 @@ impl DefaultInfo {
             default_runfiles: runfiles.clone(),
             data_runfiles: runfiles,
             executable: Some(executable_artifact.clone()),
-            files_to_run: FilesToRunProvider::incomplete_executable(
+            files_to_run: FilesToRunProvider::executable_without_support(
                 files_to_run,
                 executable_artifact,
             ),
@@ -504,7 +511,7 @@ impl DefaultInfo {
                     vec![files.clone()],
                 )
                 .expect("typed DefaultInfo files compose with its executable");
-                FilesToRunProvider::incomplete_executable(files_to_run, executable.clone())
+                FilesToRunProvider::executable_without_support(files_to_run, executable.clone())
             }
             None => FilesToRunProvider::from_files(files.clone()),
         };
