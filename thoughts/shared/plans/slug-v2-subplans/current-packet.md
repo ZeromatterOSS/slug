@@ -1,11 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-recursive-build-glob-category-design-r1`
+Packet: `WP-6-7A-recursive-build-glob-category-implementation-r1`
 
 Milestone: M7A generic Starlark/ruleset closure; BUILD glob loading semantics.
 
-Status: docs-only source/owner audit active after terminal acceptance of
-`WP-6-7A-repository-declaration-documentation-category-implementation-r2`.
+Status: implementation active after independent architecture `ACCEPT` of
+`WP-6-7A-recursive-build-glob-category-design-r1` and its bounded correction.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -15,123 +15,177 @@ do not edit or stage it.
 
 ## Objective and compatibility boundary
 
-Design the complete Bazel 9.2 recursive BUILD-glob category, not a literal
-`"**"` workaround. The authentic `@platforms//host:BUILD` call is one consumer
-discriminator. No platforms, rules_rust, ruleset, `cc_common`, `cc_internal`,
-parser or rule-family special case is allowed.
+Implement the complete Bazel 9.2 recursive BUILD `glob()` category across the
+retained flat `PackageListing` and observed Host traversal paths. This is not a
+literal `"**"` workaround. `@platforms//host:BUILD`, rules_rust, `cc_common`
+and `cc_internal` are downstream discriminators only. Change no parser, BCR
+rule body, rule family, configured analysis, provider or action semantics.
+Bazel 9 BCR Starlark continues to own all rules.
 
-The design audit must classify exact, Slug-native, and unsupported/deferred
-behavior for:
+Admit as **exact** for valid Rust-Unicode patterns/results on the Unix Host:
 
-- recursive wildcard segments at the start, middle and end, including multiple
-  `**` segments and the zero-directory match;
-- ordinary `*`, mixed recursive/ordinary segments, include union, exclude
-  subtraction, duplicate elimination and deterministic result order;
-- source files, directories under `exclude_directories`, symlinks, dangling or
-  cyclic paths, hidden names, non-UTF-8 Host names and Host-path flavor;
-- subpackage boundaries, ignored directories, deleted-package policy, package
-  marker changes, repository roots and external repository mappings;
-- empty includes, per-pattern empty failures, all-excluded behavior,
-  `allow_empty`, invalid absolute/dot/up-level/empty/embedded-`**` patterns and
-  exact phase/error precedence;
-- the retained flat listing path used by injected/package tests and the observed
-  Host traversal path used by production requests; and
-- same-DICE create/edit/delete, directory-boundary invalidation, A/B/A
-  restoration, Need/error ordering, cancellation and warm reuse.
+- literal and ordinary `*` segments, standalone leading/middle/trailing,
+  consecutive and multiple `**`, zero-directory matches, hidden-name and
+  wildcard-parenthesis behavior, and literal regex punctuation;
+- include union, Bazel's literal/shortcut/validated exclude split, per-include
+  empty checks before exclude filtering, final all-excluded checking, explicit
+  `allow_empty` and the Bazel 9.2 default false;
+- arbitrary-size integer `exclude_directories`, where zero includes directories
+  and every positive or negative nonzero value excludes them;
+- file/directory selection, package-root omission, leading-`@` projection,
+  Java UTF-16 result order and duplicate removal;
+- package and ignored-directory stops, deleted-package continuation, dangling
+  symlink omission and source-spelled resolvable symlinks; and
+- semantic failure for matched literal/wildcard/recursive symlink cycles and
+  recursive unbounded symlink expansion, while unmatched cycles remain inert.
 
-Do not assume all of those rows are already admitted. Any behavior without a
-bounded Rust-native owner must be classified unsupported/deferred and fail
-closed rather than silently widened.
+Keep as **Slug-native** Rust Host observations and deterministic DICE
+Need/error scheduling, typed Rust filesystem/cycle diagnostics,
+starlark-rust argument diagnostic decoration, non-UTF-8 matched-output
+fail-closed behavior, and the injected flat path's eager immutable snapshot and
+symlink/special-entry failure boundary.
+
+Keep **unsupported/deferred** non-Unix traversal, NUL and Java unpaired-UTF-16
+edges, historical filesystem snapshots,
+`--incompatible_disallow_empty_glob=false`, `subpackages()`, exact Skyframe
+node/prefetch topology, and ignore/deleted-package policy on the legacy flat
+scaffold. No successful path may fall back to an unobserved scan.
 
 ## Bazel 9.2 authority
 
 Bazel tag `9.2.0` commit
 `8220c6198837d5c13d53fea211cf3282aa12408a` is the sole behavior authority.
-Pinned starting sources are:
+Pinned sources are:
 
-- `StarlarkNativeModuleApi.java`:
+- `StarlarkNativeModuleApi.java`
   `0451254c4e4f587a90d919c99a63bb469a49d80898deb1187dcf5ebd46866273`;
-- `StarlarkNativeModule.java`:
+- `StarlarkNativeModule.java`
   `600541da8362b71249e093552b84ee009da5e112d1c942a95eeb9c783fd16204`;
-- `UnixGlob.java`:
+- `UnixGlob.java`
   `f86ca1900a2d4668233771a85814bc8aaf5139808b7e27ef9d47714e125ea460`;
-- `GlobCache.java`:
+- `GlobCache.java`
   `cf79d5a4a64924990936dfa1ae186aec94ea4ea9b0b7d7192c4ac30329558236`;
-- `GlobDescriptor.java`:
-  `8b06f007ca5ded81d72f342cb509bdad3c2ff0be70e73d876f152da45c48e310`;
-- `GlobFunction.java`:
-  `77a19c81fa09e9fc84bf0bd86aadfd906194faa379e12aed394976aa90ed63a6`;
-- `GlobValue.java`:
+- `GlobValue.java`
   `b4ace32f5b31b2057a50d81bf0c47eec36c53aeb648acfb9cf068c9c14879c27`;
+- `GlobsValue.java`
+  `4dc7dc58d3c53fc81598f27cf9b2d5527c561489816371964e3a7dd52dd9af43`;
+- `PackageFunctionWithMultipleGlobDeps.java`
+  `6c1c6bfdf88fa008dce55ceaf31751ab9993266a537d04c3e327e2c644f84ddc`;
+- `GlobberUtils.java`
+  `0942ec734eca33c22df6d5576773458e48e6ae6408c952c5ffceedf482ec2adf`;
   and
-- `FragmentProducer.java`:
-  `410e8b8917247c774ddc4506859cc3efae5231c2d2f55507d8a5940d1b4f2dba`.
+- `BuildLanguageOptions.java`
+  `b01e106ef0ff7af458766248bce7799b49c0f54fc14d023a8297aeb7dbfb44e5`.
 
-The audit must locate and pin the smallest relevant Bazel regressions for
-recursive matching, subpackage pruning, excludes, files/directories and
-incremental invalidation. Add no Java helper or artifact to Slug.
+Pinned regression owners are `GlobTestBase.java`
+`4d6769e18428e2540fcf2b022fd1dc52748fcbabd5abd3ae3c9c02bb95cc57e2`,
+`GlobCacheTest.java`
+`874d8e4c7c09d257270a4da238de06c4afeed22ff18d19380bfc3aab67486d0a`,
+`GlobTest.java`
+`d37947c41d912ece50bb4b3980b974befc0d8997a79145de6de88248935135b2`
+and `PackageFunctionTest.java`
+`62c104416003600ec390b795c07f7b3e62d46aaf61b707f746eb94623c014d06`.
+Reuse them; add no Java helper, checked-in oracle or copied fixture.
 
-## Learned Slug facts to verify
+## Frozen architecture
 
-Slug currently has two related owners:
+One V2-owned immutable `GlobPattern` serves `GlobSpec`, flat matching,
+`HostGlobLoadingRequest`, Host traversal and segment candidate keys. Retain one
+`Arc<str>` raw spelling and one compact immutable fragment slice. Ordinary
+fragments retain checked byte ranges plus a literal/wildcard discriminator;
+recursive fragments are a unit enum. `GlobSegmentPattern` is a cheap
+pattern-Arc/index view whose manual equality/hash uses only the segment bytes
+and discriminator, preserving cross-pattern segment-key sharing.
 
-- `glob.rs` owns public `GlobSpec` validation and expansion over an already
-  retained flat `WorkspaceDirectorySnapshot`; it currently rejects recursive
-  patterns before expansion; and
-- `host_glob/traversal.rs` already parses a standalone `**` segment and performs
-  observed recursive traversal with package-boundary checks. `package.rs`
-  nevertheless constructs `GlobSpec` before dispatch, so the public validator
-  blocks this owner from receiving the authentic pattern.
+Derive or preserve `Allocative` and `Dupe`. Add no owned `String`/`Vec` graph
+field, interner, regex cache, second parser, semantic side store, DICE key,
+cache, task or lock. Use phase-local linear-space dynamic matching for multiple
+`**`; never add exponential backtracking or an eager repository walk.
 
-The audit must determine whether one shared immutable parsed pattern can serve
-both flat-listing and Host traversal without replacing the existing observed
-keys, and whether the flat path can implement identical matching from its
-retained snapshot. Preserve DICE observation ownership: do not move Host I/O
-into the Starlark evaluator or hold a lock across a compute.
+`GlobSpec::new` parses includes in source order. Excludes retain one of exact
+literal removal, Bazel's raw prefix/suffix `**/*` shortcut, a validated shared
+pattern, or a deferred parse error. Complete all includes and per-include empty
+checks before surfacing an exclude error or filtering. Excludes never activate
+Host traversal.
 
-Read `docs/developers/dice.md` before proposing key/ownership changes. Inspect
-the full current glob/host-glob caller and proof graph, not only the replay
-failure.
+Host segment matching remains byte-wise. Callable-facing matching uses valid
+Rust Unicode; only validated complex excludes admit `?`, consuming one Unicode
+scalar. Parentheses are literal for literal segments and ignored only in a
+wildcard segment. `PackageRecorder::glob` owns final raw-path exclusion,
+non-UTF-8 rejection, leading-`@` projection, UTF-16 sorting and deduplication.
 
-## Reuse and peer guidance
+Both global and `native.glob` bindings use one private typed unpacker in
+`package.rs` for `exclude_directories`. It admits only runtime type `int`, uses
+`Value::to_bool()` transiently, and retains only the boolean in `GlobSpec`; add
+no bigint dependency or graph state.
 
-Reuse existing Buck2-derived `Arc`, `CompactString`, compact maps/sets,
-`Allocative`, DICE keys and path-observation carriers. The design must account
-for parsed-pattern retained size, clone cost and memory accounting before adding
-another representation.
+Preserve existing ownership: `PackageListingKey` owns flat candidate/boundary
+facts; Host traversal, segment and package-boundary observation keys own Host
+discovery; `PackageLoadKey` retains the successful package and glob identity.
+No evaluator borrow enters DICE and no lock crosses a compute.
 
 Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance only.
-Inspect `src/load/build_glob_pattern.zig`,
-`session_package_glob_computation.zig`, and the recursive package-source tests
-for route pruning, recursive-segment representation and proof ideas. Copy no
-Zig code, allocator/layout, IDs, limits, scheduler, cache, error, ordering or
-behavior. Bazel 9.2 alone fixes semantics.
+Its explicit recursive states, route pruning and proof themes may guide shape;
+copy no Zig representation, behavior, allocator, key, scheduler, cache,
+ordering, diagnostic or limit. Bazel 9.2 alone fixes semantics. Buck2/
+starlark-rust supplies only already-retained `Arc`, `Dupe`, compact collection
+and `Allocative` utilities.
 
-## Design deliverable and stops
+## Closed ownership and caps
 
-This packet is documentation-only. It may edit only this manifest, the Stage 6
-owner plan, Stage 9 utility ledger if a retained representation decision is
-made, and canonical status. No Rust, fixture or generated file may change.
+Production allowlist:
 
-Produce an execution-ready successor with:
+- `app/slug_loading_v2/src/glob.rs`;
+- `app/slug_loading_v2/src/package.rs`;
+- `app/slug_loading_v2/src/host_glob/mod.rs`;
+- `app/slug_loading_v2/src/host_glob/adapter.rs`; and
+- `app/slug_loading_v2/src/host_glob/traversal.rs`.
 
-- exact/Slug-native/deferred rows for the complete matrix above;
-- one representation and owner flow across `GlobSpec`, flat expansion and Host
-  traversal, or a justified `REPLAN` if unification is unsound;
-- closed production/proof/fixture allowlists, per-file complexity decisions and
-  gross-line caps;
-- pinned Bazel source/test hashes and one permanent oracle only if existing
-  evidence cannot discriminate the gap;
-- same-DICE, cancellation, error-order, package-boundary and replay gates; and
-- independent architecture review before Rust.
+Proof allowlist:
 
-Return `REPLAN` rather than designing an unbounded filesystem walk, duplicate
-graph, eager full-repository snapshot, second cache/interner, platform-specific
-special case, or semantics borrowed from Zabel.
+- `app/slug_loading_v2/tests/glob_boundaries.rs`;
+- `app/slug_loading_v2/tests/glob_invalidation.rs`;
+- `app/slug_loading_v2/src/host_glob/tests.rs`;
+- `app/slug_loading_v2/src/host_glob/adapter_tests.rs`;
+- `app/slug_loading_v2/src/host_glob/traversal_tests.rs`; and
+- `app/slug_loading_v2/src/host_package_attempt_tests.rs`.
+
+Do not touch the parked proof, `host_package_load_tests.rs`, fixtures,
+generated files or another crate. Gross caps are 720 production, 1,000 proof
+and 1,720 total Rust lines; deletions and moves count. In `package.rs`, change
+only the existing glob/binding corridor; `glob.rs` remains the shared semantic
+owner.
+
+Stop with `REPLAN` if another production file is required, segment-key equality
+cannot remain byte/discriminator based, or the implementation needs a new DICE
+key/cache/lock/eager walk.
+
+## Required proof and validation
+
+Cover the complete validation/matcher/order table: multiple and zero-directory
+`**`, literal/special/wildcard/hidden/parenthesis cases, include-`?` rejection,
+complex exclude-`?`, literal/shortcut exclude quirks, deferred complex-exclude
+error precedence, package-root omission, directories, leading `@`, UTF-16 order
+and flat/Host agreement.
+
+Both bindings must prove default, zero, small and arbitrarily large positive
+and negative `exclude_directories`, plus boolean/string/`None` rejection before
+glob evaluation. Host proofs must show no exclude traversal, dangling and
+resolvable symlinks, literal and wildcard matched cycles, recursive cycle/
+unbounded expansion, an unmatched inert cycle, boundary behavior, non-UTF-8
+failure, Need/error precedence, cancellation and complete-only equality.
+
+Same-DICE proof covers recursive create/delete/recreate, nested membership,
+BUILD/BUILD.bazel markers, ignore and deleted-package A/B/A, warm reuse and
+equal restoration. Run formatting, `git diff --check`, focused glob/Host tests,
+the full `slug_loading_v2` suite, named direct loading/query dependents, source
+hashes and `scripts/v2_archive_status.sh`. Rebuild `slug_cli_v2`, clean `slugd`
+before and after, and rerun the authentic BCR replay. It must clear
+`@platforms//host:BUILD` without a special case; the next genuine generic
+failure selects the next packet.
 
 ## Immediate predecessor
 
-The terminally accepted documentation-binding packet uses typed
-`Option<NoneOr<&str>>` for the complete three-sibling gap, retains no metadata,
-and passes complete loading validation. Its rebuilt replay clears
-`repository_rule(doc = ...)` and exposes this recursive glob frontier.
+Commit `6b1a27c29` terminally accepts repository declaration documentation
+binding. The accepted glob design was independently reviewed, corrected once
+for arbitrary integer and cycle coverage, and accepted before this Rust packet.

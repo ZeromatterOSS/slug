@@ -2246,3 +2246,36 @@ ownership only. No Zig representation, IDs, selection semantics, scheduler,
 cache, limits or behavior is imported. Bazel 9.2 remains sole authority, and
 BCR Starlark continues to own rule bodies including `cc_internal`; rules_rust
 and `cc_common` are downstream consumers.
+
+### Stage 4/6 recursive BUILD-glob utility decision (2026-09-01)
+
+Status: architecture independently `ACCEPTED` after the bounded
+`exclude_directories` and symlink-cycle correction in
+`WP-6-7A-recursive-build-glob-category-design-r1`; implementation and terminal
+acceptance remain pending.
+
+Decision: replace the split raw flat-pattern validator and separately retained
+Host pattern with one V2-owned immutable `GlobPattern`: one `Arc<str>` raw
+spelling, one `Arc` fragment slice, range-based ordinary fragments and unit
+recursive fragments. A cheap pattern-plus-index segment view preserves the
+current segment key's byte/discriminator equality and sharing. Retain
+`Allocative` and `Dupe`; use phase-local linear-space matching scratch. Add no
+V1 extraction, owned `String`/`Vec` graph field, interner, regex cache, second
+parser, DICE key, lock, evaluator borrow or semantic side store. Bazel 9.2
+`UnixGlob`, globber and package-loading sources/tests remain the exact semantic
+authority.
+
+Buck2/starlark-rust contributes only the already-retained `Arc`, `Dupe`,
+compact immutable slice and `Allocative` utilities. No new utility is imported.
+Zabel `0795445f3ab60f4e49070bdd0b94425c5610f73a`
+`build_glob_pattern.zig`, `session_package_glob_computation.zig` and recursive
+package-source tests are concept/test-only guidance for explicit recursive
+states and route pruning. Copy no Zig representation, key, policy, allocator,
+scheduler, cache, error, order or limit.
+
+Memory class: parsed include and successful exclude patterns replace existing
+retained raw `GlobSpec` rows and the Host traversal's separately parsed pattern;
+their immutable arcs live only with the existing package/Host DICE values and
+release on ordinary invalidation/eviction/shutdown. Deferred invalid-exclude
+diagnostics exist only in a failing evaluation. Match state is evaluator/phase
+scratch. No service-retained cache or asynchronous transfer memory is added.
