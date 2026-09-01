@@ -22851,7 +22851,7 @@ special case.
 ### WP-6-7B module-extension metadata construction and capture (2026-09-01)
 
 The authentic replay-selected successor is
-`WP-6-7B-module-extension-metadata-construction-and-capture-design-r2`.
+`WP-6-7B-module-extension-metadata-construction-and-capture-implementation-r2`.
 Implement the full four-keyword metadata constructor, opaque return contract,
 heap-independent receipt capture, root non-dev usage field and generated-name
 validation as one category. Do not special-case rules_rust's
@@ -22879,3 +22879,5 @@ tuple and `None` reject), normalizes `None` to explicit default metadata for
 DICE equality, and skips metadata fixup/validation for nonroot-only selected
 invocations. The frozen owners, allowlist, caps and deferred effects do not
 change. Focused R2 rereview is required before Rust.
+
+Focused R2 rereview returns `ACCEPT`; implement only this corrected boundary.

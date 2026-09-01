@@ -2361,7 +2361,7 @@ configured-query replay clears the schema category and selects
 ### Stage 6 module-extension metadata utility decision (2026-09-01)
 
 Candidate packet
-`WP-6-7B-module-extension-metadata-construction-and-capture-design-r2` requires
+`WP-6-7B-module-extension-metadata-construction-and-capture-implementation-r2` requires
 no V1 extraction. Promote the existing V2 lockfile-v28 sorted facts model
 behind a narrow public Bzlmod API and add one compact metadata selection value
 beside it. Reuse `CompactString`, `SmallSet`, `SortedMap`, immutable `Arc`
@@ -2380,6 +2380,9 @@ on ownership or extraction. R2 requires an empty list beside `"all"`, one
 default-normalized receipt value for `None` and explicit default metadata, and
 root-presence-conditioned fixup/validation. The no-extraction decision and
 shared compact owner remain unchanged; focused R2 rereview is required.
+
+Focused R2 rereview returns `ACCEPT`; the no-extraction decision is final for
+this implementation packet.
 
 Zabel `0795445f...` schema-ordered tag slots, compact typed tag values and
 invocation freezing are peer optimization guidance only. Copy no Zig type,

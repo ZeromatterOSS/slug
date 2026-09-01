@@ -7220,7 +7220,7 @@ docs-first complete Bazel 9.2 module-extension metadata category audit; add no
 rules_rust, toolchain, C++ or CLI special case.
 
 Activate docs-first
-`WP-6-7B-module-extension-metadata-construction-and-capture-design-r2` only
+`WP-6-7B-module-extension-metadata-construction-and-capture-implementation-r2` only
 after independent architecture review. It places one compact metadata/facts
 family in the Bzlmod semantic owner, reusing lockfile facts; captures detached
 metadata in the existing invocation receipt; validates generated repository
@@ -7237,3 +7237,6 @@ metadata fixup/validation only when a root usage exists. R2 corrects exactly
 those points, including a nonroot-only selected-owner proof, without changing
 owners, caps or lifecycle deferrals. Focused R2 rereview is required before
 Rust.
+
+Focused R2 rereview returns `ACCEPT`; implementation is authorized only within
+the corrected packet.

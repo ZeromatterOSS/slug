@@ -1,13 +1,12 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7B-module-extension-metadata-construction-and-capture-design-r2`
+Packet: `WP-6-7B-module-extension-metadata-construction-and-capture-implementation-r2`
 
 Milestone: M7A generic Starlark/ruleset closure; module-extension metadata
 construction, return capture and generated-repository validation.
 
-Status: R1 independent architecture review returned `REPLAN`. R2 corrects the
-three bounded semantic mismatches and awaits focused independent rereview.
-Rust is not yet authorized.
+Status: R1 independent architecture review returned `REPLAN`; focused R2
+rereview returns `ACCEPT`. Implement only the frozen R2 boundary.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -231,3 +230,9 @@ to one receipt value, and conditions generated-name/root-polarity validation
 on root-usage presence. All ownership, allowlists, caps and deferred lifecycle
 boundaries remain unchanged. Focused independent R2 rereview is required
 before Rust.
+
+Focused R2 rereview returns `ACCEPT`: the empty-list-only `"all"` companion,
+default-normalized receipt value and root-presence-conditioned validation are
+exact and discriminating. The shared owner, lifetime, allowlist, caps and
+deferred boundaries remain coherent. Rust implementation is authorized only
+within R2.
