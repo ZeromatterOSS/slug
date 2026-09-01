@@ -291,14 +291,14 @@ pub(crate) enum AttributeKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) struct Facts {
+pub struct Facts {
     /// Facts always have an object root and every dictionary is recursively
     /// normalized into key order.
     pub(crate) values: SortedMap<CompactString, FactValue>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) enum FactValue {
+pub enum FactValue {
     Null,
     Bool(bool),
     Number(FactNumber),
@@ -308,7 +308,7 @@ pub(crate) enum FactValue {
 }
 
 #[derive(Debug, Clone, Allocative)]
-pub(crate) enum FactNumber {
+pub enum FactNumber {
     /// Canonical arbitrary-size signed decimal spelling.
     Integer(CompactString),
     /// Construction rejects NaN and infinities. Equality must treat negative
@@ -330,6 +330,38 @@ impl PartialEq for FactNumber {
 }
 
 impl Eq for FactNumber {}
+
+impl Default for Facts {
+    fn default() -> Self {
+        Self {
+            values: SortedMap::new(),
+        }
+    }
+}
+
+impl Facts {
+    pub fn new(values: SortedMap<CompactString, FactValue>) -> Self {
+        Self { values }
+    }
+
+    pub fn values(&self) -> &SortedMap<CompactString, FactValue> {
+        &self.values
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+}
+
+impl FactNumber {
+    pub fn integer(value: CompactString) -> Self {
+        Self::Integer(value)
+    }
+
+    pub fn finite_float(value: f64) -> Option<Self> {
+        value.is_finite().then_some(Self::FiniteFloat(value))
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
 pub(crate) enum UnsupportedVersionPolicy {

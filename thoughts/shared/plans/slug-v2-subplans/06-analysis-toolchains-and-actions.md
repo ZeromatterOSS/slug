@@ -22881,3 +22881,14 @@ invocations. The frozen owners, allowlist, caps and deferred effects do not
 change. Focused R2 rereview is required before Rust.
 
 Focused R2 rereview returns `ACCEPT`; implement only this corrected boundary.
+
+Implementation is terminally `ACCEPTED` at 584 production/356 proof/940 total
+gross Rust lines. The terminal R1 review corrected two Bazel 9.2 ordering
+rules: metadata precedes import/override validation, and missing generated dev
+names precede missing regular names while polarity remains regular then dev.
+Focused rereview accepts the dual-invalid proofs, shared lockfile-facts owner,
+detached default-normalized receipt and root-presence boundary. Authentic
+rules_rust 0.73 replay clears `extension_metadata(reproducible=True)` and now
+stops at rules_shell's generic attribute flag `SKIP_CONSTRAINTS_OVERRIDE`.
+Audit the complete Bazel 9.2 attribute-flag category next; do not add a
+rules_shell, C++, `cc_common`, `cc_internal` or rules_rust special case.

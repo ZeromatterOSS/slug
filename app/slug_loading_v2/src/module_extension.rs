@@ -21,6 +21,9 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use slug_bzlmod_v2::FactNumber;
+use slug_bzlmod_v2::FactValue;
+use slug_bzlmod_v2::Facts;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequest;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionSource;
 use slug_bzlmod_v2::HostSelectedExtensionOwner;
@@ -29,6 +32,9 @@ use slug_bzlmod_v2::HostSelectedExtensionOwnerInputsError;
 use slug_bzlmod_v2::HostSelectedExtensionOwnerInputsKey;
 use slug_bzlmod_v2::HostSelectedExtensionOwnerInputsObservationError;
 use slug_bzlmod_v2::HostSelectedExtensionOwnerInputsObservationKey;
+use slug_bzlmod_v2::ModuleExtensionMetadata;
+use slug_bzlmod_v2::ModuleExtensionRepositorySelection;
+use slug_bzlmod_v2::RootModuleExtensionUsage;
 use slug_bzlmod_v2::RootPackageBzlTarget;
 use slug_bzlmod_v2::RootRepositoryRoute;
 use slug_bzlmod_v2::SourcePreparationOutcome;
@@ -56,9 +62,16 @@ use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::ValueLike;
 use starlark::values::dict::AllocDict;
+use starlark::values::dict::DictRef;
+use starlark::values::float::StarlarkFloat;
 use starlark::values::list::AllocList;
+use starlark::values::list::ListRef;
 use starlark::values::starlark_value;
+use starlark::values::tuple::TupleRef;
+use starlark_map::small_set::SmallSet;
+use starlark_map::sorted_map::SortedMap;
 
 use crate::attrs::CoercedAttributeValue;
 use crate::bzl_module::ExternalBzlModuleEvalKey;
@@ -94,6 +107,8 @@ pub(crate) struct HostPureModuleExtensionInvocations {
 pub(crate) struct HostPureModuleExtensionInvocationReceipt {
     pub(crate) request: HostSelectedExtensionDefinitionLoadRequest,
     pub(crate) repository_rule_calls: Arc<[RepositoryRuleCallRecord]>,
+    pub(crate) metadata: ModuleExtensionMetadata,
+    pub(crate) root_usage: Option<RootModuleExtensionUsage>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -469,6 +484,9 @@ fn invoke_pure_preflight(prepared: Arc<HostPreparedModuleExtensionInputs>, prefl
                 &owner,
                 invocation_module.frozen_heap(),
             ));
+        let root_usage = InvocationContext::from_value(context)
+            .expect("invocation context was just allocated")
+            .root_usage;
         let capture = capture_events.then(InvocationPrintCapture::default);
         let repository_rules = RepositoryRuleInvocationState::new();
         let returned = {
@@ -499,12 +517,16 @@ fn invoke_pure_preflight(prepared: Arc<HostPreparedModuleExtensionInputs>, prefl
                 return pure_complete(Err(after(Some(input.input.parts().0), &invoked, repository_rule_calls, HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()))), observations);
             }
         };
-        if !returned.is_none() {
-            return pure_complete(Err(after(Some(input.input.parts().0), &invoked, repository_rule_calls, HostPureModuleExtensionInvocationError::Result(format!("module extension must return None, got {}", returned.get_type()).into()))), observations);
-        }
+        let metadata = match returned_metadata(returned) {
+            Ok(metadata) if metadata.facts().is_empty() => metadata,
+            Ok(_) => return pure_complete(Err(after(Some(input.input.parts().0), &invoked, repository_rule_calls, HostPureModuleExtensionInvocationError::Result("nonempty module extension facts require the deferred lockfile lifecycle".into()))), observations),
+            Err(error) => return pure_complete(Err(after(Some(input.input.parts().0), &invoked, repository_rule_calls, HostPureModuleExtensionInvocationError::Result(error.to_string().into()))), observations),
+        };
         invoked.push(HostPureModuleExtensionInvocationReceipt {
             request: input.input.parts().0.clone(),
             repository_rule_calls,
+            metadata,
+            root_usage,
         });
     }
     pure_complete(Ok(HostPureModuleExtensionInvocations { prepared, invoked: invoked.into() }), observations)
@@ -757,7 +779,11 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         .map(|module| module.materialize(invocation_module.frozen_heap()))
         .collect::<Vec<_>>()
         .into();
-    let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner));
+    let root_usage = inputs.root_proxies().map(|proxies| RootModuleExtensionUsage::new(
+        proxies.iter().any(|proxy| !proxy.dev_dependency),
+        proxies.iter().any(|proxy| proxy.dev_dependency),
+    ));
+    let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner, root_usage));
     let capture = ctx.per_transaction_data().data.get::<CaptureEvaluationEvents>().is_ok().then(InvocationPrintCapture::default);
     let repository_rules = RepositoryRuleInvocationState::new();
     let returned = {
@@ -772,11 +798,14 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
     let request = inputs.request().clone();
     let result = match returned {
         Err(error) => Err(owner_after(&inputs, calls, error.to_string())),
-        Ok(value) if !value.is_none() => Err(owner_after(&inputs, calls, format!("module extension must return None, got {}", value.get_type()))),
-        Ok(_) => Ok(HostSelectedExtensionOwnerPureResult {
-            inputs,
-            receipt: HostPureModuleExtensionInvocationReceipt { request, repository_rule_calls: calls },
-        }),
+        Ok(value) => match returned_metadata(value) {
+            Ok(metadata) if metadata.facts().is_empty() => Ok(HostSelectedExtensionOwnerPureResult {
+                inputs,
+                receipt: HostPureModuleExtensionInvocationReceipt { request, repository_rule_calls: calls, metadata, root_usage },
+            }),
+            Ok(_) => Err(owner_after(&inputs, calls, "nonempty module extension facts require the deferred lockfile lifecycle")),
+            Err(error) => Err(owner_after(&inputs, calls, error.to_string())),
+        },
     };
     if let Some(capture) = capture {
         ctx.store_evaluation_data(capture.into_batch()).expect("selected owner invocation stores one local Complete event batch");
@@ -803,8 +832,225 @@ impl Key for HostSelectedExtensionOwnerPureObservationKey {
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct StarlarkModuleExtensionMetadata(ModuleExtensionMetadata);
+
+impl fmt::Display for StarlarkModuleExtensionMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<extension_metadata>")
+    }
+}
+starlark::starlark_simple_value!(StarlarkModuleExtensionMetadata);
+
+#[starlark_value(type = "extension_metadata")]
+impl<'v> StarlarkValue<'v> for StarlarkModuleExtensionMetadata {}
+
+fn metadata_selection(
+    regular: Option<Value<'_>>,
+    dev: Option<Value<'_>>,
+) -> anyhow::Result<(
+    ModuleExtensionRepositorySelection,
+    ModuleExtensionRepositorySelection,
+)> {
+    let regular = regular.filter(|value| !value.is_none());
+    let dev = dev.filter(|value| !value.is_none());
+    let is_all = |value: Option<Value<'_>>| value.and_then(Value::unpack_str) == Some("all");
+    let is_empty_list = |value: Option<Value<'_>>| {
+        value
+            .and_then(ListRef::from_value)
+            .is_some_and(|value| value.is_empty())
+    };
+    if regular.is_none() && dev.is_none() {
+        return Ok((
+            ModuleExtensionRepositorySelection::Unspecified,
+            ModuleExtensionRepositorySelection::Unspecified,
+        ));
+    }
+    if is_all(regular) && is_empty_list(dev) {
+        return Ok((
+            ModuleExtensionRepositorySelection::All,
+            ModuleExtensionRepositorySelection::explicit([]),
+        ));
+    }
+    if is_all(dev) && is_empty_list(regular) {
+        return Ok((
+            ModuleExtensionRepositorySelection::explicit([]),
+            ModuleExtensionRepositorySelection::All,
+        ));
+    }
+    if is_all(regular) || is_all(dev) {
+        anyhow::bail!(
+            "if one of root_module_direct_deps and root_module_direct_dev_deps is \"all\", the other must be an empty list"
+        );
+    }
+    if regular.is_some_and(|value| value.unpack_str().is_some())
+        || dev.is_some_and(|value| value.unpack_str().is_some())
+    {
+        anyhow::bail!(
+            "root_module_direct_deps and root_module_direct_dev_deps must be None, \"all\", or a list of strings"
+        );
+    }
+    if regular.is_none() != dev.is_none() {
+        anyhow::bail!(
+            "root_module_direct_deps and root_module_direct_dev_deps must both be specified or both be unspecified"
+        );
+    }
+    let sequence = |name: &str, value: Value<'_>| -> anyhow::Result<Vec<CompactString>> {
+        let values: Vec<Value<'_>> = if let Some(values) = ListRef::from_value(value) {
+            values.iter().collect()
+        } else if let Some(values) = TupleRef::from_value(value) {
+            values.iter().collect()
+        } else {
+            anyhow::bail!("{name} must be a sequence of strings")
+        };
+        let mut unique = SmallSet::with_capacity(values.len());
+        for value in values {
+            let value = value
+                .unpack_str()
+                .ok_or_else(|| anyhow::anyhow!("{name} must be a sequence of strings"))?;
+            let mut bytes = value.bytes();
+            let valid = bytes
+                .next()
+                .is_some_and(|byte| byte.is_ascii_alphanumeric())
+                && bytes
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'));
+            if !valid {
+                anyhow::bail!(
+                    "in {name}: invalid user-provided repo name '{value}': valid names may contain only A-Z, a-z, 0-9, '-', '_', '.', and must start with a letter or a number"
+                )
+            }
+            if !unique.insert(value.into()) {
+                anyhow::bail!("in {name}: duplicate entry '{value}'")
+            }
+        }
+        Ok(unique.into_iter().collect())
+    };
+    let regular = sequence("root_module_direct_deps", regular.unwrap())?;
+    let dev = sequence("root_module_direct_dev_deps", dev.unwrap())?;
+    for value in &dev {
+        if regular.iter().any(|regular| regular == value) {
+            anyhow::bail!(
+                "in root_module_direct_dev_deps: entry '{value}' is also in root_module_direct_deps"
+            )
+        }
+    }
+    Ok((
+        ModuleExtensionRepositorySelection::explicit(regular),
+        ModuleExtensionRepositorySelection::explicit(dev),
+    ))
+}
+
+fn metadata_facts(value: Option<Value<'_>>) -> anyhow::Result<Facts> {
+    let Some(value) = value else {
+        return Ok(Facts::default());
+    };
+    let values = DictRef::from_value(value)
+        .ok_or_else(|| anyhow::anyhow!("facts must be a dict with string keys"))?;
+    let mut active = SmallSet::new();
+    let values = values
+        .iter()
+        .map(|(key, value)| {
+            let key = key
+                .unpack_str()
+                .ok_or_else(|| anyhow::anyhow!("Facts keys must be strings"))?;
+            Ok((key.into(), metadata_fact_value(value, 6, &mut active)?))
+        })
+        .collect::<anyhow::Result<SortedMap<_, _>>>()?;
+    Ok(Facts::new(values))
+}
+
+fn metadata_fact_value<'v>(
+    value: Value<'v>,
+    remaining_depth: i8,
+    active: &mut SmallSet<starlark::values::ValueIdentity<'v>>,
+) -> anyhow::Result<FactValue> {
+    if remaining_depth < 0 {
+        anyhow::bail!("Facts cannot be nested more than 7 levels deep")
+    }
+    if value.is_none() {
+        return Ok(FactValue::Null);
+    }
+    if let Some(value) = value.unpack_bool() {
+        return Ok(FactValue::Bool(value));
+    }
+    if value.get_type() == "int" {
+        return Ok(FactValue::Number(FactNumber::integer(
+            value.to_string().into(),
+        )));
+    }
+    if let Some(value) = value.downcast_ref::<StarlarkFloat>() {
+        return FactNumber::finite_float(value.0)
+            .map(FactValue::Number)
+            .ok_or_else(|| anyhow::anyhow!("Facts floats must be finite"));
+    }
+    if let Some(value) = value.unpack_str() {
+        return Ok(FactValue::String(value.into()));
+    }
+    let identity = value.identity();
+    if let Some(values) = ListRef::from_value(value) {
+        if !active.insert(identity) {
+            anyhow::bail!("Facts must not contain cyclic values")
+        }
+        let result = values
+            .iter()
+            .map(|value| metadata_fact_value(value, remaining_depth - 1, active))
+            .collect::<anyhow::Result<Arc<_>>>()
+            .map(FactValue::List);
+        active.shift_remove(&identity);
+        return result;
+    }
+    if let Some(values) = TupleRef::from_value(value) {
+        let result = values
+            .iter()
+            .map(|value| metadata_fact_value(value, remaining_depth - 1, active))
+            .collect::<anyhow::Result<Arc<_>>>()
+            .map(FactValue::List);
+        return result;
+    }
+    if let Some(values) = DictRef::from_value(value) {
+        if !active.insert(identity) {
+            anyhow::bail!("Facts must not contain cyclic values")
+        }
+        let result = values
+            .iter()
+            .map(|(key, value)| {
+                let key = key
+                    .unpack_str()
+                    .ok_or_else(|| anyhow::anyhow!("Facts keys must be strings"))?;
+                Ok((
+                    key.into(),
+                    metadata_fact_value(value, remaining_depth - 1, active)?,
+                ))
+            })
+            .collect::<anyhow::Result<SortedMap<_, _>>>()
+            .map(FactValue::Dict);
+        active.shift_remove(&identity);
+        return result;
+    }
+    anyhow::bail!(
+        "'{}' ({}) is not supported in facts",
+        value.to_repr(),
+        value.get_type()
+    )
+}
+
+fn returned_metadata(value: Value<'_>) -> anyhow::Result<ModuleExtensionMetadata> {
+    if value.is_none() {
+        return Ok(ModuleExtensionMetadata::default());
+    }
+    StarlarkModuleExtensionMetadata::from_value(value)
+        .map(|value| value.0.clone())
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "module extension must return None or extension_metadata, got {}",
+                value.get_type()
+            )
+        })
+}
+
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct InvocationContext {
     modules: Arc<[InvocationModule]>,
+    root_usage: Option<RootModuleExtensionUsage>,
     #[allocative(skip)]
     owner: Arc<()>,
 }
@@ -832,12 +1078,29 @@ impl InvocationContext {
                     .into(),
             }]),
             owner,
+            Some(RootModuleExtensionUsage::new(
+                input
+                    .input
+                    .root_proxies()
+                    .iter()
+                    .any(|proxy| !proxy.dev_dependency),
+                input
+                    .input
+                    .root_proxies()
+                    .iter()
+                    .any(|proxy| proxy.dev_dependency),
+            )),
         )
     }
 
-    fn new_modules(modules: Arc<[InvocationModule]>, owner: &Arc<()>) -> Self {
+    fn new_modules(
+        modules: Arc<[InvocationModule]>,
+        owner: &Arc<()>,
+        root_usage: Option<RootModuleExtensionUsage>,
+    ) -> Self {
         Self {
             modules,
+            root_usage,
             owner: owner.clone(),
         }
     }
@@ -853,7 +1116,16 @@ starlark::starlark_simple_value!(InvocationContext);
 #[starlark_value(type = "module_ctx")]
 impl<'v> StarlarkValue<'v> for InvocationContext {
     fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        (name == "modules").then(|| heap.alloc_simple(InvocationModuleList(self.modules.clone())))
+        match name {
+            "modules" => Some(heap.alloc_simple(InvocationModuleList(self.modules.clone()))),
+            "root_module_has_non_dev_dependency" => Some(
+                heap.alloc(
+                    self.root_usage
+                        .is_some_and(RootModuleExtensionUsage::has_non_dev_dependency),
+                ),
+            ),
+            _ => None,
+        }
     }
     fn get_methods() -> Option<&'static Methods> {
         static METHODS: MethodsStatic = MethodsStatic::new();
@@ -863,6 +1135,22 @@ impl<'v> StarlarkValue<'v> for InvocationContext {
 
 #[starlark_module]
 fn invocation_context_methods(builder: &mut MethodsBuilder) {
+    fn extension_metadata<'v>(
+        this: Value<'v>,
+        #[starlark(require = named)] root_module_direct_deps: Option<Value<'v>>,
+        #[starlark(require = named)] root_module_direct_dev_deps: Option<Value<'v>>,
+        #[starlark(require = named, default = false)] reproducible: bool,
+        #[starlark(require = named)] facts: Option<Value<'v>>,
+    ) -> anyhow::Result<StarlarkModuleExtensionMetadata> {
+        InvocationContext::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
+        let facts = metadata_facts(facts)?;
+        let (regular, dev) =
+            metadata_selection(root_module_direct_deps, root_module_direct_dev_deps)?;
+        Ok(StarlarkModuleExtensionMetadata(
+            ModuleExtensionMetadata::new(regular, dev, reproducible, facts),
+        ))
+    }
     fn is_dev_dependency(this: Value, tag: Value) -> anyhow::Result<bool> {
         let this = InvocationContext::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
@@ -1446,11 +1734,30 @@ mod tests {
             .map_err(|error| error.to_string())
     }
 
+    fn metadata_call(
+        source: &str,
+        context: InvocationContext,
+    ) -> Result<ModuleExtensionMetadata, String> {
+        let module = Module::new();
+        let ast = AstModule::parse("test.bzl", source.to_owned(), &Dialect::Standard).unwrap();
+        let mut evaluator = Evaluator::new(&module);
+        evaluator
+            .eval_module(ast, &Globals::standard())
+            .map_err(|error| error.to_string())?;
+        let function = module.get("f").unwrap();
+        let context = module.heap().alloc_simple(context);
+        let value = evaluator
+            .eval_function(function, &[context], &[])
+            .map_err(|error| error.to_string())?;
+        returned_metadata(value).map_err(|error| error.to_string())
+    }
+
     #[test]
     fn immutable_lists_and_foreign_tags_fail_closed() {
         let owner = Arc::new(());
         let context = InvocationContext {
             modules: Arc::from([empty_module(&owner)]),
+            root_usage: None,
             owner: owner.clone(),
         };
         let modules = call("def f(ctx):\n  ctx.modules.append(1)\n", |module| {
@@ -1498,6 +1805,7 @@ mod tests {
                 tags,
                 ..empty_module(&owner)
             }]),
+            root_usage: None,
             owner: owner.clone(),
         };
         let foreign_heap = FrozenHeap::new();
@@ -1556,6 +1864,7 @@ mod tests {
                 ]),
                 ..empty_module(&owner)
             }]),
+            root_usage: None,
             owner: owner.clone(),
         };
         let value = call(
@@ -1575,13 +1884,12 @@ mod tests {
                 tags: Arc::from([tag(&owner, 0, false, &frozen_heap)]),
                 ..empty_module(&owner)
             }]),
+            root_usage: None,
             owner,
         };
         for name in [
             "facts",
             "is_isolated",
-            "root_module_has_non_dev_dependency",
-            "extension_metadata",
             "wait",
             "download",
             "download_and_extract",
@@ -1626,6 +1934,7 @@ mod tests {
                 tags: Arc::from([tag(&other_owner, 0, true, &other_frozen_heap)]),
                 ..empty_module(&other_owner)
             }]),
+            root_usage: None,
             owner: other_owner,
         };
         for method in ["is_dev_dependency", "tag_sort_key"] {
@@ -1649,6 +1958,147 @@ mod tests {
                     module.heap().alloc_simple(label.clone())
                 ])
                 .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn extension_metadata_complete_constructor_and_default_return_are_retained() {
+        let owner = Arc::new(());
+        let context = InvocationContext {
+            modules: Arc::from([empty_module(&owner)]),
+            root_usage: Some(RootModuleExtensionUsage::new(true, true)),
+            owner,
+        };
+        let none = metadata_call("def f(ctx):\n  return None\n", context.clone()).unwrap();
+        let default = metadata_call(
+            "def f(ctx):\n  return ctx.extension_metadata()\n",
+            context.clone(),
+        )
+        .unwrap();
+        assert_eq!(none, default);
+
+        let metadata = metadata_call(
+            "def f(ctx):\n  return ctx.extension_metadata(root_module_direct_deps=('regular',), root_module_direct_dev_deps=['dev'], reproducible=True, facts={'z': (1, 2.5), 'a': {'n': None, 'b': True}})\n",
+            context.clone(),
+        )
+        .unwrap();
+        assert!(metadata.reproducible());
+        assert!(metadata.root_module_direct_deps().contains("regular"));
+        assert!(metadata.root_module_direct_dev_deps().contains("dev"));
+        assert_eq!(
+            metadata
+                .facts()
+                .values()
+                .keys()
+                .map(|value| value.as_str())
+                .collect::<Vec<_>>(),
+            ["a", "z"]
+        );
+        assert!(matches!(
+            metadata.facts().values().get("z"),
+            Some(FactValue::List(values)) if values.len() == 2
+        ));
+        let arbitrary = metadata_call(
+            "def f(ctx):\n  return ctx.extension_metadata(facts={'n': 123456789012345678901234567890})\n",
+            context.clone(),
+        )
+        .unwrap();
+        assert!(matches!(
+            arbitrary.facts().values().get("n"),
+            Some(FactValue::Number(FactNumber::Integer(value)))
+                if value == "123456789012345678901234567890"
+        ));
+        for source in [
+            "def f(ctx):\n  return ctx.extension_metadata(facts={1: 'bad'})\n",
+            "def f(ctx):\n  return ctx.extension_metadata(facts={'x': set()})\n",
+            "def f(ctx):\n  return ctx.extension_metadata(facts={'x': [[[[[[[0]]]]]]]})\n",
+        ] {
+            assert!(metadata_call(source, context.clone()).is_err());
+        }
+        let error = metadata_call(
+            "def f(ctx):\n  return ctx.extension_metadata(root_module_direct_deps='all', root_module_direct_dev_deps=(), facts={1: 'bad'})\n",
+            context.clone(),
+        )
+        .unwrap_err();
+        assert!(error.contains("Facts keys must be strings"), "{error}");
+        let float_module = Module::new();
+        let non_finite = float_module.heap().alloc(StarlarkFloat(f64::INFINITY));
+        assert!(
+            metadata_fact_value(non_finite, 6, &mut SmallSet::new())
+                .unwrap_err()
+                .to_string()
+                .contains("finite")
+        );
+
+        for source in [
+            "def f(ctx):\n  return ctx.extension_metadata(root_module_direct_deps='all', root_module_direct_dev_deps=())\n",
+            "def f(ctx):\n  return ctx.extension_metadata(root_module_direct_deps='all', root_module_direct_dev_deps=None)\n",
+        ] {
+            assert!(
+                metadata_call(source, context.clone())
+                    .unwrap_err()
+                    .contains("empty list")
+            );
+        }
+        assert!(matches!(
+            metadata_call(
+                "def f(ctx):\n  return ctx.extension_metadata(root_module_direct_deps='all', root_module_direct_dev_deps=[])\n",
+                context.clone(),
+            )
+            .unwrap()
+            .root_module_direct_deps(),
+            ModuleExtensionRepositorySelection::All
+        ));
+        assert!(metadata_call(
+            "def f(ctx):\n  return ctx.extension_metadata(root_module_direct_deps=['same'], root_module_direct_dev_deps=['same'])\n",
+            context.clone(),
+        )
+        .unwrap_err()
+        .contains("also in root_module_direct_deps"));
+        assert!(metadata_call(
+            "def f(ctx):\n  return ctx.extension_metadata(root_module_direct_deps=['dup', 'dup'], root_module_direct_dev_deps=[])\n",
+            context.clone(),
+        )
+        .unwrap_err()
+        .contains("duplicate entry"));
+        for invalid in ["+canonical", ".leading", "under+plus"] {
+            let source = format!(
+                "def f(ctx):\n  return ctx.extension_metadata(root_module_direct_deps=['{invalid}'], root_module_direct_dev_deps=[])\n"
+            );
+            assert!(
+                metadata_call(&source, context.clone())
+                    .unwrap_err()
+                    .contains("invalid user-provided repo name")
+            );
+        }
+        assert!(
+            metadata_call("def f(ctx):\n  return 1\n", context)
+                .unwrap_err()
+                .contains("must return None or extension_metadata")
+        );
+    }
+
+    #[test]
+    fn module_context_root_non_dev_field_uses_retained_root_proxies() {
+        let owner = Arc::new(());
+        for (usage, expected) in [
+            (None, "False"),
+            (Some(RootModuleExtensionUsage::new(false, true)), "False"),
+            (Some(RootModuleExtensionUsage::new(true, false)), "True"),
+        ] {
+            let context = InvocationContext {
+                modules: Arc::from([empty_module(&owner)]),
+                root_usage: usage,
+                owner: owner.clone(),
+            };
+            assert_eq!(
+                call(
+                    "def f(ctx):\n  return ctx.root_module_has_non_dev_dependency\n",
+                    |module| vec![module.heap().alloc_simple(context)],
+                )
+                .unwrap(),
+                expected
             );
         }
     }
@@ -1690,6 +2140,7 @@ mod tests {
                 tag_classes: Arc::from([CompactString::from("tag")]),
                 tags: Arc::from([]),
             }]),
+            root_usage: Some(RootModuleExtensionUsage::new(true, false)),
             owner,
         };
         let value = call("def f(ctx, tag):\n  label=tag.target\n  return [len(ctx.modules), ctx.modules[0].name, ctx.modules[0].version, ctx.modules[0].is_root, ctx.is_dev_dependency(tag), label.name, label.package, label.repo_name, label.workspace_name, str(label), repr(label), '%s' % label, '%r' % label, '{}'.format(label), '{!s}'.format(label), '{!r}'.format(label), label.same_package_label('other').name, {label: 1}[label], label == label]\n", |module| vec![module.heap().alloc_simple(context), module.heap().alloc_simple(tag)]).unwrap();

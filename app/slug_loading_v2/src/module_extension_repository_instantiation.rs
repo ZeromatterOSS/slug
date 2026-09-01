@@ -2564,6 +2564,8 @@ second_ext=module_extension(implementation=second_impl)
             invoked: Arc::from([HostPureModuleExtensionInvocationReceipt {
                 request: predecessor.invoked[0].request.clone(),
                 repository_rule_calls: Arc::from([bad_call]),
+                metadata: predecessor.invoked[0].metadata.clone(),
+                root_usage: predecessor.invoked[0].root_usage,
             }]),
         });
         assert!(matches!(
@@ -2730,6 +2732,8 @@ second_ext=module_extension(implementation=second_impl)
             invoked: Arc::from([HostPureModuleExtensionInvocationReceipt {
                 request: predecessor.invoked[0].request.clone(),
                 repository_rule_calls: Arc::from([bad_call]),
+                metadata: predecessor.invoked[0].metadata.clone(),
+                root_usage: predecessor.invoked[0].root_usage,
             }]),
         });
         assert!(matches!(

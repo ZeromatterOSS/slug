@@ -5,8 +5,9 @@ Packet: `WP-6-7B-module-extension-metadata-construction-and-capture-implementati
 Milestone: M7A generic Starlark/ruleset closure; module-extension metadata
 construction, return capture and generated-repository validation.
 
-Status: R1 independent architecture review returned `REPLAN`; focused R2
-rereview returns `ACCEPT`. Implement only the frozen R2 boundary.
+Status: terminally `ACCEPTED`. Architecture R1 returned `REPLAN`, focused R2
+rereview accepted the corrected design, and terminal implementation review
+accepted the bounded failure-order correction.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -173,6 +174,10 @@ Production allowlist:
 - `app/slug_loading_v2/src/module_extension.rs`; and
 - `app/slug_loading_v2/src/module_extension_repository_validation.rs`.
 
+Proof allowlist additionally admits only the two mechanical receipt-literal
+field additions in
+`app/slug_loading_v2/src/module_extension_repository_instantiation.rs`.
+
 Focused proof may use colocated tests, the existing lockfile-v28 facts tests,
 the selected-owner input corridor and the selected module-extension invocation
 tests. The authentic rules_rust fixture remains external replay evidence; do
@@ -236,3 +241,14 @@ default-normalized receipt value and root-presence-conditioned validation are
 exact and discriminating. The shared owner, lifetime, allowlist, caps and
 deferred boundaries remain coherent. Rust implementation is authorized only
 within R2.
+
+Terminal implementation review first returned `REPLAN` because metadata
+validation followed import/override validation and resolved regular generated
+names before dev names. The correction validates metadata first, resolves dev
+then regular, retains regular-then-dev polarity checks, and adds both
+dual-invalid precedence proofs. Focused terminal rereview returns `ACCEPT`.
+The implementation is accepted at 584 production, 356 proof and 940 total
+gross Rust lines. Full owner/dependent suites and the rebuilt CLI pass apart
+from recorded out-of-packet core/server baselines. Authentic rules_rust 0.73
+replay clears `extension_metadata(reproducible=True)` and stops at the next
+generic host gap: attribute flag `SKIP_CONSTRAINTS_OVERRIDE` in rules_shell.

@@ -7240,3 +7240,11 @@ Rust.
 
 Focused R2 rereview returns `ACCEPT`; implementation is authorized only within
 the corrected packet.
+
+R2 implementation is terminally `ACCEPTED` at 584 production/356 proof/940
+total gross Rust lines after focused correction of Bazel's metadata-before-
+imports and dev-generated-name-before-regular failure order. The compact
+Bzlmod owner, reused lockfile facts, detached normalized receipt and root-only
+validation remain intact. Authentic rules_rust 0.73 replay clears the metadata
+category and selects generic attribute flag `SKIP_CONSTRAINTS_OVERRIDE` as the
+next docs-first complete-category audit; no consumer special case is allowed.

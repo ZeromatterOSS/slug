@@ -91,6 +91,7 @@ pub struct HostSelectedExtensionOwnerInputs {
     owner: Arc<HostSelectedExtensionOwner>,
     request: HostSelectedExtensionDefinitionLoadRequest,
     modules: Arc<[HostSelectedExtensionOwnerModuleInput]>,
+    root_proxies: Option<Arc<[crate::NonrootExtensionProxy]>>,
 }
 
 impl HostSelectedExtensionOwnerInputs {
@@ -102,6 +103,9 @@ impl HostSelectedExtensionOwnerInputs {
     }
     pub fn modules(&self) -> &[HostSelectedExtensionOwnerModuleInput] {
         &self.modules
+    }
+    pub fn root_proxies(&self) -> Option<&[crate::NonrootExtensionProxy]> {
+        self.root_proxies.as_deref()
     }
 }
 
@@ -606,6 +610,7 @@ fn owner_inputs(
         overrides,
     };
     let mut modules = Vec::new();
+    let mut root_proxies = None;
     for (route_index, route) in mappings.routes.entries.iter().enumerate() {
         let matching = uses.iter().any(|usage| usage.owner == route.entry.key);
         if !matching {
@@ -618,7 +623,7 @@ fn owner_inputs(
                         owner: owner.dupe(),
                     })
                 })?;
-                let tags = mappings
+                let matching_usages = mappings
                     .root_usages
                     .iter()
                     .filter(|usage| {
@@ -631,8 +636,17 @@ fn owner_inputs(
                             )
                             .is_ok_and(|label| label == owner.id.bzl_file)
                     })
+                    .collect::<Vec<_>>();
+                let tags = matching_usages
+                    .iter()
                     .flat_map(|usage| usage.tags.iter().cloned())
                     .collect();
+                root_proxies = Some(
+                    matching_usages
+                        .iter()
+                        .flat_map(|usage| usage.proxies.iter().cloned())
+                        .collect(),
+                );
                 let mapping = mappings.mappings.get(route_index).ok_or_else(|| {
                     HostSelectedExtensionOwnerInputsError(OwnerInputsError::Missing {
                         owner: owner.dupe(),
@@ -701,6 +715,7 @@ fn owner_inputs(
         owner,
         request,
         modules: modules.into(),
+        root_proxies,
     })
 }
 
@@ -1405,6 +1420,7 @@ mod tests {
             "+final"
         );
         let rows = inputs.modules();
+        assert!(inputs.root_proxies().unwrap().is_empty());
         assert_eq!(rows.len(), 2);
         let first = rows[0].parts();
         let second = rows[1].parts();
@@ -1443,6 +1459,7 @@ mod tests {
         ));
         assert_eq!(nonroot_only.modules().len(), 1);
         assert!(!nonroot_only.modules()[0].parts().3);
+        assert!(nonroot_only.root_proxies().is_none());
 
         let mut missing_host = mappings.clone();
         missing_host.routes = Arc::new(HostSelectedModuleRoutes {

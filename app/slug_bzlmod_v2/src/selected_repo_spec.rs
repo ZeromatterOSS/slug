@@ -4904,9 +4904,13 @@ pub struct HostSelectedExtensionEvaluationInput {
     name: CompactString,
     version: CompactString,
     tags: Arc<[crate::NonrootExtensionTag]>,
+    root_proxies: Arc<[crate::NonrootExtensionProxy]>,
 }
 
 impl HostSelectedExtensionEvaluationInput {
+    pub fn root_proxies(&self) -> &[crate::NonrootExtensionProxy] {
+        &self.root_proxies
+    }
     pub fn parts(
         &self,
     ) -> (
@@ -4966,12 +4970,16 @@ pub enum HostSelectedExtensionEvaluationInputError {
     Invalid(CompactString),
 }
 
-fn matching_root_extension_tags(
+fn matching_root_extension_values(
     usages: &[crate::module_eval::RootExtensionUsage],
     request: &HostSelectedExtensionDefinitionLoadRequest,
-) -> Option<Arc<[crate::NonrootExtensionTag]>> {
+) -> Option<(
+    Arc<[crate::NonrootExtensionTag]>,
+    Arc<[crate::NonrootExtensionProxy]>,
+)> {
     let mut matched = false;
     let mut tags = Vec::new();
+    let mut proxies = Vec::new();
     for usage in usages {
         if usage.isolation.is_none()
             && usage.extension_name == request.extension_name
@@ -4984,9 +4992,10 @@ fn matching_root_extension_tags(
         {
             matched = true;
             tags.extend(usage.tags.iter().cloned());
+            proxies.extend(usage.proxies.iter().cloned());
         }
     }
-    matched.then(|| tags.into())
+    matched.then(|| (tags.into(), proxies.into()))
 }
 
 fn selected_extension_evaluation_input_requests(
@@ -5026,19 +5035,22 @@ fn selected_extension_evaluation_input_requests(
         .requests
         .iter()
         .map(|request| {
-            let tags = matching_root_extension_tags(&root_files.extension_usages, request)
-                .ok_or_else(|| {
-                    invalid(
-                        Some(request),
-                        "definition request has no matching root usage".into(),
-                    )
-                })?;
+            let (tags, root_proxies) =
+                matching_root_extension_values(&root_files.extension_usages, request).ok_or_else(
+                    || {
+                        invalid(
+                            Some(request),
+                            "definition request has no matching root usage".into(),
+                        )
+                    },
+                )?;
             Ok(HostSelectedExtensionEvaluationInput {
                 load_request: request.clone(),
                 canonical_repo: root_route.canonical_repo.clone(),
                 name: header.name.clone(),
                 version: version.normalized().into(),
                 tags,
+                root_proxies,
             })
         })
         .collect::<Result<Arc<_>, _>>()?;
@@ -9637,7 +9649,8 @@ mod tests {
         let empty = root_usage("//:ext.bzl", "ext", test_proxy("empty", []), false, []);
         let mut last = root_usage("//:ext.bzl", "ext", test_proxy("b", []), false, []);
         last.tags = Arc::from([tag("three", crate::NonrootAttributeValue::Bool(true))]);
-        let tags = matching_root_extension_tags(&[first, empty.clone(), last], &request).unwrap();
+        let (tags, proxies) =
+            matching_root_extension_values(&[first, empty.clone(), last], &request).unwrap();
         assert_eq!(
             tags.iter()
                 .map(|tag| tag.tag_class.as_str())
@@ -9648,12 +9661,14 @@ mod tests {
             matches!(tags[1].attributes.get("raw"), Some(crate::NonrootAttributeValue::String(value)) if value == "raw")
         );
         assert!(
-            matching_root_extension_tags(&[empty], &request)
+            matching_root_extension_values(&[empty], &request)
                 .unwrap()
+                .0
                 .is_empty()
         );
+        assert_eq!(proxies.len(), 3);
         assert!(
-            matching_root_extension_tags(
+            matching_root_extension_values(
                 &[
                     root_usage("//:other.bzl", "ext", test_proxy("other", []), false, []),
                     root_usage("//:ext.bzl", "other", test_proxy("name", []), false, []),
