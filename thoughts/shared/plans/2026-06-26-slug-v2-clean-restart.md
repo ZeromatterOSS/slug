@@ -7139,3 +7139,20 @@ and select one bounded private successor or `REPLAN`. Authorize no Rust,
 partial frontier, loading/core/public activation, reverse dependency, new
 retained container/graph/store, repository/materializer activation,
 historical Host read, watcher, oracle, or JVM.
+
+### M7A module-extension ordinary tag-schema category selected (2026-09-01)
+
+Commit `cfe83834d` closes recursive BUILD glob loading and authentic rules_rust
+replay now stops at generic `auth: StringDict` tag-schema conversion. The
+docs-first successor is
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r1`.
+It covers all fourteen default-enabled ordinary Bazel 9.2 tag attribute kinds,
+including the missing shared `attr.int_list`, rather than special-casing
+rules_rust, toolchains, C++, `cc_common` or `cc_internal`.
+
+The design reuses one shared `AttributeKind`/`CoercedAttributeValue` graph and
+the invocation module's existing starlark-rust `FrozenHeap`. It adds no tag-only
+value model, parser, DICE key, cache, interner, custom collection or retained
+evaluator value. Bazel 9.2 source and a disposable pinned oracle own semantics;
+Zabel's schema-ordered slots and invocation freezing are peer guidance only.
+Rust is gated on independent architecture review.

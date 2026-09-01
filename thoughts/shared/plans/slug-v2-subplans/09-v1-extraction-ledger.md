@@ -2303,3 +2303,21 @@ their immutable arcs live only with the existing package/Host DICE values and
 release on ordinary invalidation/eviction/shutdown. Deferred invalid-exclude
 diagnostics exist only in a failing evaluation. Match state is evaluator/phase
 scratch. No service-retained cache or asynchronous transfer memory is added.
+
+### Stage 6 module-extension tag schema utility decision (2026-09-01)
+
+Status: docs-first R1 design awaiting independent review in
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r1`.
+
+Decision: no V1 extraction and no second tag-only value family. Extend the
+existing V2 `AttributeKind`/`CoercedAttributeValue` once with compact
+`IntegerList(Arc<[i32]>)`, retain schema policy beside the existing descriptor,
+and reuse those values through rule, macro, repository-rule and tag paths.
+Invocation-only immutable Starlark collections belong to the already-live
+starlark-rust `FrozenHeap`; DICE values remain heap-independent.
+
+Zabel `0795445f...` schema-ordered tag slots, compact typed tag values and
+invocation freezing are peer optimization guidance only. Copy no Zig type,
+allocator, evaluator, scheduler, cache, diagnostic or behavior. Bazel 9.2 is
+the sole authority for the fourteen ordinary kinds, conversion/default/error
+order and label semantics.

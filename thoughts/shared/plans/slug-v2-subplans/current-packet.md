@@ -1,12 +1,12 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-recursive-build-glob-category-implementation-r4`
+Packet: `WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r1`
 
-Milestone: M7A generic Starlark/ruleset closure; BUILD glob loading semantics.
+Milestone: M7A generic Starlark/ruleset closure; module-extension tag schema
+conversion and invocation values.
 
-Status: implementation terminally `ACCEPTED`. The recursive BUILD glob category
-is closed at R4; the authentic replay selects a separate module-extension
-attribute-schema successor.
+Status: docs-first architecture audit complete; independent review required
+before Rust.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -16,249 +16,165 @@ do not edit or stage it.
 
 ## Objective and compatibility boundary
 
-Implement the complete Bazel 9.2 recursive BUILD `glob()` category across the
-retained flat `PackageListing` and observed Host traversal paths. This is not a
-literal `"**"` workaround. `@platforms//host:BUILD`, rules_rust, `cc_common`
-and `cc_internal` are downstream discriminators only. Change no parser, BCR
-rule body, rule family, configured analysis, provider or action semantics.
-Bazel 9 BCR Starlark continues to own all rules.
+Implement the complete ordinary Bazel 9.2 module-extension tag attribute-kind
+category, rather than the replay's literal `auth: StringDict` row. The admitted
+kind matrix is `bool`, `int`, `int_list`, `string`, `string_list`,
+`string_dict`, `string_list_dict`, `label`, `label_list`,
+`string_keyed_label_dict`, `label_keyed_string_dict`, `label_list_dict`,
+`output`, and `output_list`. This packet also adds the missing general
+`attr.int_list` descriptor and carries that kind through the already-shared
+rule, macro and repository-rule attribute model so the public constructor does
+not create a tag-only special case.
 
-Admit as **exact** for valid Rust-Unicode patterns/results on the Unix Host:
+Admit as **exact** for Bazel 9.2's default-enabled ordinary descriptor surface:
 
-- literal and ordinary `*` segments, standalone leading/middle/trailing,
-  consecutive and multiple `**`, zero-directory matches, hidden-name and
-  wildcard-parenthesis behavior, and literal regex punctuation;
-- include union, Bazel's literal/shortcut/validated exclude split, per-include
-  empty checks before exclude filtering, final all-excluded checking, explicit
-  `allow_empty` and the Bazel 9.2 default false;
-- arbitrary-size integer `exclude_directories`, where zero includes directories
-  and every positive or negative nonzero value excludes them;
-- file/directory selection, package-root omission, leading-`@` projection,
-  Java UTF-16 result order and duplicate removal;
-- package and ignored-directory stops, deleted-package continuation, dangling
-  symlink omission and source-spelled resolvable symlinks; and
-- semantic failure for matched literal/wildcard/recursive symlink cycles and
-  recursive unbounded symlink expansion, while unmatched cycles remain inert.
+- supplied non-`None` values are converted in MODULE call order; explicit
+  `None` is skipped; then mandatory/default/visibility checks run in schema
+  order and every runtime tag exposes one value per schema entry;
+- signed i32 scalar and integer-list members, list or tuple input for list
+  kinds, ordered Starlark dictionary conversion, all scalar/list/dictionary
+  type failures, intrinsic defaults, declared defaults, `mandatory`, scalar
+  `values`, collection `allow_empty`, unknown attributes, and failure order;
+- apparent label conversion in the consuming module's repository mapping,
+  definition-owned canonical label defaults, recursive visibility checks,
+  same-package output conversion, and duplicate canonical
+  `label_keyed_string_dict` key rejection;
+- schema-order field lookup and `dir`, Starlark insertion order within
+  collections, immutable invocation-local list/dictionary values, Label ABI,
+  and no retained evaluator borrow; and
+- the same `IntegerList` kind/value in rules, symbolic macros, repository-rule
+  declaration/instantiation/context projection, query candidates and explicit
+  unsupported output-template diagnostics.
 
-Keep as **Slug-native** Rust Host observations and deterministic DICE
-Need/error scheduling, typed Rust filesystem/cycle diagnostics,
-starlark-rust argument diagnostic decoration, non-UTF-8 matched-output
-fail-closed behavior, and the injected flat path's eager immutable snapshot and
-symlink/special-entry failure boundary.
+Keep as **Slug-native** Rust valid-Unicode strings and diagnostics, compact
+retained Rust values, starlark-rust exception decoration, and DICE scheduling,
+cancellation, memory accounting and eviction. Exact Java exception text,
+HotSpot identity and Java UTF-16-only invalid strings are not claimed.
 
-Keep **unsupported/deferred** non-Unix traversal, NUL and Java unpaired-UTF-16
-edges, historical filesystem snapshots,
-`--incompatible_disallow_empty_glob=false`, `subpackages()`, exact Skyframe
-node/prefetch topology, and ignore/deleted-package policy on the legacy flat
-scaffold. No successful path may fall back to an unobserved scan.
+Keep **unsupported/deferred** experimental dormant-label descriptors,
+the disabled legacy `attr.license`, computed/late-bound defaults, selectors in
+MODULE values, dormant dependencies, descriptor policies not consumed by
+`AttributeUtils.typeCheckAttrValues`, and exact documentation-only descriptor
+metadata. This packet changes no MODULE parser, BCR rule body, rules_rust,
+toolchain, C++, `cc_common`, `cc_internal`, provider, configured-analysis or
+action semantics. Those names remain downstream discriminators only.
 
-## Bazel 9.2 authority
+## Bazel 9.2 authority and oracle evidence
 
 Bazel tag `9.2.0` commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` is the sole behavior authority.
+`8220c6198837d5c13d53fea211cf3282aa12408a` is the sole semantic authority.
 Pinned sources are:
 
-- `StarlarkNativeModuleApi.java`
-  `0451254c4e4f587a90d919c99a63bb469a49d80898deb1187dcf5ebd46866273`;
-- `StarlarkNativeModule.java`
-  `600541da8362b71249e093552b84ee009da5e112d1c942a95eeb9c783fd16204`;
-- `UnixGlob.java`
-  `f86ca1900a2d4668233771a85814bc8aaf5139808b7e27ef9d47714e125ea460`;
-- `GlobCache.java`
-  `cf79d5a4a64924990936dfa1ae186aec94ea4ea9b0b7d7192c4ac30329558236`;
-- `GlobValue.java`
-  `b4ace32f5b31b2057a50d81bf0c47eec36c53aeb648acfb9cf068c9c14879c27`;
-- `GlobsValue.java`
-  `4dc7dc58d3c53fc81598f27cf9b2d5527c561489816371964e3a7dd52dd9af43`;
-- `PackageFunctionWithMultipleGlobDeps.java`
-  `6c1c6bfdf88fa008dce55ceaf31751ab9993266a537d04c3e327e2c644f84ddc`;
-- `GlobberUtils.java`
-  `0942ec734eca33c22df6d5576773458e48e6ae6408c952c5ffceedf482ec2adf`;
+- `StarlarkAttrModuleApi.java`
+  `af70c851882fa049034184dbb6f6580731cfa738d79dfb8abcf61af176257670`;
+- `StarlarkAttrModule.java`
+  `388421c44c623c1c6625fd9f2b059d2a7d1e13b8d45e7c96173f24866a917967`;
+- `StarlarkRepositoryModule.java`
+  `c6adf0f521e56419ec22e7980def6b27778bab4d5c5294b3556c2286f5b6bcea`;
+- `TagClass.java`
+  `8b6359f485d473482162bceabf0375c69b770ab1d14ab712d7cfd98e2d620571`;
+- `TypeCheckedTag.java`
+  `402ed1072a6364191cee513e4669d2f676f27a19168e629186e512b0f1b0c642`;
+- `AttributeUtils.java`
+  `d1db963ecf54b3c921112d1bfd15876c525921187ba4b6fc6cee16426b5f2c3f`;
+- `Attribute.java`
+  `fbe208c37ad4ed88030f874fa6cd8bd5cf2f4aac63f9a01a4ff24ca499c9a6a4`;
   and
-- `BuildLanguageOptions.java`
-  `b01e106ef0ff7af458766248bce7799b49c0f54fc14d023a8297aeb7dbfb44e5`.
+- `ModuleExtensionResolutionTest.java`
+  `d8602fd385d34ab5387cb0ef3891ef9acc0ca62cd8f67324e09fd33ea7a3e769`.
 
-Pinned regression owners are `GlobTestBase.java`
-`4d6769e18428e2540fcf2b022fd1dc52748fcbabd5abd3ae3c9c02bb95cc57e2`,
-`GlobCacheTest.java`
-`874d8e4c7c09d257270a4da238de06c4afeed22ff18d19380bfc3aab67486d0a`,
-`GlobTest.java`
-`d37947c41d912ece50bb4b3980b974befc0d8997a79145de6de88248935135b2`
-and `PackageFunctionTest.java`
-`62c104416003600ec390b795c07f7b3e62d46aaf61b707f746eb94623c014d06`.
-Reuse them; add no Java helper, checked-in oracle or copied fixture.
+A disposable pinned-Bazel oracle exercised one tag containing all fourteen
+kinds. Bazel exposed
+`True`, `7`, `[1, -2, 3]`, scalar/list/nested-dictionary `Label` values,
+same-package output labels, strings and ordered dictionaries. A second omitted
+tag exposed intrinsic defaults
+`False`, `0`, `[]`, `None`, empty label collections, `None`, `[]`, `""`, and
+empty string collections/dictionaries in the same schema order. The fixture,
+output base and Bazel server were removed after capture; no Java helper,
+checked-in oracle or probe artifact enters Slug.
 
 ## Frozen architecture
 
-One V2-owned immutable `GlobPattern` serves `GlobSpec`, flat matching,
-`HostGlobLoadingRequest`, Host traversal and segment candidate keys. Retain one
-`Arc<str>` raw spelling and one compact immutable fragment slice. Ordinary
-fragments retain checked byte ranges plus a literal/wildcard discriminator;
-recursive fragments are a unit enum. `GlobSegmentPattern` is a cheap
-pattern-Arc/index view whose manual equality/hash uses only the segment bytes
-and discriminator, preserving cross-pattern segment-key sharing.
+Extend the existing shared `AttributeKind` with `IntegerList` and
+`CoercedAttributeValue` with `IntegerList(Arc<[i32]>)`. Reuse that value through
+ordinary rule/macro/repository projections. Do not add a parallel
+module-extension-only type graph. The existing heap-independent
+`NonrootAttributeValue` already owns raw list/tuple/dictionary and arbitrary
+integer syntax; conversion validates i32 only at the typed schema boundary.
 
-Derive or preserve `Allocative` and `Dupe`. Add no owned `String`/`Vec` graph
-field, interner, regex cache, second parser, semantic side store, DICE key,
-cache, task or lock. Use phase-local linear-space dynamic matching for multiple
-`**`; never add exponential backtracking or an eager repository walk.
+Retain `allow_empty` and existing allowed scalar values in the shared
+definition/schema projection. `prepare_module_extension_tag_attributes` owns
+the Bazel `AttributeUtils` two-phase order: initialize schema slots, convert
+every supplied non-`None` value in source order, then fill/check slots in
+schema order. It recursively converts labels and checks visibility. Collection
+conversion returns existing immutable `Arc` slices; dictionary equality stays
+structural while source order remains available for Starlark iteration.
 
-`GlobSpec::new` parses includes in source order. Excludes retain one of exact
-literal removal, Bazel's raw prefix/suffix `**/*` shortcut, a validated shared
-pattern, or a deferred parse error. Complete all includes and per-include empty
-checks before surfacing an exclude error or filtering. Excludes never activate
-Host traversal.
+At extension invocation, materialize the already-prepared values into the
+invocation module's existing starlark-rust `FrozenHeap`. Lists and dictionaries
+are therefore immutable without a custom collection implementation or a
+DICE-retained evaluator value. The invocation module owns and releases those
+frozen values with the existing evaluator lifetime. Add no evaluator borrow to
+a DICE value, new key, graph, cache, interner, global table, lock, task or
+semantic side store.
 
-Host segment matching remains byte-wise. Callable-facing matching uses valid
-Rust Unicode; only validated complex excludes admit `?`, consuming one Unicode
-scalar. Parentheses are literal for literal segments and ignored only in a
-wildcard segment. `PackageRecorder::glob` owns final raw-path exclusion,
-non-UTF-8 rejection, leading-`@` projection, UTF-16 sorting and deduplication.
+Buck2/starlark-rust supplies the already-retained `Arc`, compact collection,
+`Allocative`, `FrozenHeap`, `AllocList` and `AllocDict` utilities. Zabel commit
+`0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance only:
+`module_extension_tag_value.zig`
+`4e2dfc4148b7ef12d02e48d5d59d0067832d27cac61957a313cc2270822e2741`,
+`module_extension_declaration_host.zig`
+`7474d1ddb37d2ffaa0006b4ce3b19df3917bb6dce055c4db87363fcf50067600`,
+and `module_extension_execution_capture.zig`
+`8f03505b2302f79443d3ab95f12cbca2b65eec8a417ff94e739fb9fafcd06fc0`
+motivate one typed value family, schema-ordered slots and invocation-local
+freezing. Copy no Zig representation, allocator, evaluator, diagnostic,
+scheduler, cache, policy or behavior.
 
-Both global and `native.glob` bindings use one private typed unpacker in
-`package.rs` for `exclude_directories`. It admits only runtime type `int`, uses
-`Value::to_bool()` transiently, and retains only the boolean in `GlobSpec`; add
-no bigint dependency or graph state.
-
-Preserve existing ownership: `PackageListingKey` owns flat candidate/boundary
-facts; Host traversal, segment and package-boundary observation keys own Host
-discovery; `PackageLoadKey` retains the successful package and glob identity.
-No evaluator borrow enters DICE and no lock crosses a compute.
-
-Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance only.
-Its explicit recursive states, route pruning and proof themes may guide shape;
-copy no Zig representation, behavior, allocator, key, scheduler, cache,
-ordering, diagnostic or limit. Bazel 9.2 alone fixes semantics. Buck2/
-starlark-rust supplies only already-retained `Arc`, `Dupe`, compact collection
-and `Allocative` utilities.
-
-## Closed ownership and caps
+## Closed ownership, caps and stop conditions
 
 Production allowlist:
 
-- `app/slug_loading_v2/src/glob.rs`;
+- `app/slug_loading_v2/src/attrs.rs`;
 - `app/slug_loading_v2/src/package.rs`;
-- `app/slug_loading_v2/src/host_glob/mod.rs`;
-- `app/slug_loading_v2/src/host_glob/adapter.rs`; and
-- `app/slug_loading_v2/src/host_glob/traversal.rs`; and
-- `app/slug_loading_v2/src/bzl_module.rs`, limited to the repository-package
-  glob retry, selected Host source-root derivation and observation-union
-  corridor.
+- `app/slug_loading_v2/src/module_extension.rs`;
+- `app/slug_loading_v2/src/module_extension_repository_instantiation.rs`;
+- `app/slug_loading_v2/src/repository_rule_context.rs`; and
+- `app/slug_loading_v2/src/rule_outputs.rs`.
 
-Proof allowlist:
-
-- `app/slug_loading_v2/tests/glob_boundaries.rs`;
-- `app/slug_loading_v2/tests/glob_invalidation.rs`;
-- `app/slug_loading_v2/src/host_glob/tests.rs`;
-- `app/slug_loading_v2/src/host_glob/adapter_tests.rs`;
-- `app/slug_loading_v2/src/host_glob/traversal_tests.rs`;
-- `app/slug_loading_v2/src/host_package_attempt_tests.rs`; and
-- `app/slug_loading_v2/src/host_package_load_tests.rs`, limited to the accepted
-  no-exclude dependency correction and focused materialized external glob
-  driver/boundary/lifecycle proofs.
-
-Do not touch the parked proof, any unrelated `host_package_load_tests.rs` line,
-fixtures, generated files or another crate. Gross caps are 1,300 production,
-1,100 proof and 2,200 total Rust lines; deletions and moves count. In
-`package.rs`, change only the existing glob/binding corridor; `glob.rs` remains
-the shared semantic owner.
-
-R1 ended `REPLAN` at its measured 987 production/624 proof/1,611 total gross
-candidate. The 720 production estimate counted the replacement architecture
-but undercounted more than 300 gross deleted lines from removing two
-superseded Host pattern implementations and their adapter plumbing. R2 changes
-only the production cap to 1,000; it adds no file, semantic row, proof exception, DICE
-owner, cache, lock or eager walk. The unchanged 1,720 total cap still bounds
-the complete packet. Independent review recomputed exactly 987 production, 624
-proof and 1,611 total gross lines and returned `ACCEPT`.
-
-R2 ended `REPLAN` when the required full loading suite proved that the named
-protected test still required an observed Host traversal dependency for the
-exclude `sub/no.txt`. The accepted architecture intentionally filters excludes
-after the include union and forbids that dependency. R3 adds only the exact
-proof assertion above; changing its three expected traversal keys to the two
-include keys adds two gross proof lines, for 987 production/626 proof/1,613
-total. It does not authorize another change in the 37,117-line file.
-Independent review confirmed this is the exact stale assertion, strengthens
-the no-exclude-traversal invariant and returned `ACCEPT`.
-
-R3 then ended `REPLAN` at its authentic rebuilt rules_rust replay. Recursive
-pattern parsing clears, but `RepositoryPackageInventoryKey` converts the first
-pending Host glob request into `GlobUnsupported`, so `@@platforms//host` still
-cannot load. The stop is generic external-package routing, not platforms,
-rules_rust, `cc_common` or `cc_internal` behavior. Direct dependent compilation
-and the full 578-test loading suite are green. A wider core runtime test failure
-was reproduced unchanged at pre-implementation commit `aa3b00cb1` and is not a
-glob regression.
-
-R4 extends the existing traversal key with a Root/materialized-External
-boundary scope. Root identity and behavior stay unchanged. External scope
-retains the already-authenticated `HostRepositorySourceRoute`, uses
-`HostExternalPackageBoundaryKey` or its observed sibling for package/ignore/
-deleted decisions, and keeps ordinary segment-key equality byte/discriminator
-only. The selected Host BUILD address derives the materialized repository root
-by removing the BUILD basename and checked package components; malformed or
-non-Host sources fail closed. `RepositoryPackageInventoryKey` reuses the
-existing package-attempt retry driver, merges glob observations after source
-and loaded-module observations, and retains terminal events only. It adds no
-new DICE key, cache, lock, eager walk, parser or semantic side store. Excludes
-remain in-memory and create no traversal dependency. Built-in catalog globs,
-which have no Host source root, remain explicitly unsupported/deferred.
-
-R4's measured starting point is 987 production/626 proof/1,613 total gross.
-The 1,300/1,100/2,200 caps cover only this route-aware extension and its focused
-proof. Stop with `REPLAN` if another crate/file, a new DICE key, or a copied
-repository tree/listing owner is required.
-
-Independent review confirms the route plus selected Host BUILD address is
-complete source identity, the inventory-to-traversal-to-external-boundary edge
-is acyclic, evaluator state is released before DICE work, observed epoch order
-is preserved, and built-in catalog deferral is honest. It returns `ACCEPT`.
-
-## Terminal result
-
-The implementation measures 1,272 production/833 proof/2,105 total gross
-lines. It proves checked non-root source-root derivation, recursive external
-membership, subpackage stopping, observed external-boundary dependencies,
-semantic empty-glob failure and same-DICE A/B/A restoration. The full
-`slug_loading_v2` suite passes 579 tests with one documented ignore; direct
-analysis/query/core/server checks, formatting, diff, exact Bazel/Zabel hashes,
-clean reference trees, parked-proof hash, expected archive exceptions and the
-rebuilt V2 CLI pass.
-
-The authentic rules_rust replay clears the former
-`external repository BUILD globs are deferred: @@platforms//host` terminal and
-advances to `unsupported module-extension attribute schema 'auth': StringDict`
-while resolving `rules_rust++rust+rust_toolchains`. Independent terminal review
-returns `ACCEPT`. This is the next generic schema category, not glob,
-rules_rust, toolchain, `cc_common`, `cc_internal` or C++ behavior.
+Focused proof may use tests colocated in those files and the selected-graph
+module-extension corridor in
+`app/slug_loading_v2/src/host_package_load_tests.rs`. Do not touch the parked
+proof, fixtures, generated files, another crate, parser code, C++ modules or a
+consumer-specific file. Gross caps are 900 production Rust lines, 1,100 proof
+Rust lines and 2,000 total; deletions and moves count. Stop with `REPLAN` if a
+new crate/file, DICE key, retained evaluator value, custom Starlark collection,
+second attribute value graph, cache, interner or broader parser change is
+required.
 
 ## Required proof and validation
 
-Cover the complete validation/matcher/order table: multiple and zero-directory
-`**`, literal/special/wildcard/hidden/parenthesis cases, include-`?` rejection,
-complex exclude-`?`, literal/shortcut exclude quirks, deferred complex-exclude
-error precedence, package-root omission, directories, leading `@`, UTF-16 order
-and flat/Host agreement.
+Add one table-driven fourteen-kind conversion/default/runtime projection proof
+covering list and tuple inputs, ordered nested dictionaries, local and mapped
+labels, outputs and immutable collection mutation failures. Add discriminating
+rows for every wrong shape, i32 scalar/member overflow, unknown attributes,
+explicit `None`, mandatory/default order, scalar `values`, collection
+`allow_empty`, invisible nested/default labels, same-package outputs and
+canonicalized duplicate label keys. Prove the shared `IntegerList` value through
+ordinary rule, macro, repository-rule and query/output-template boundaries.
 
-Both bindings must prove default, zero, small and arbitrarily large positive
-and negative `exclude_directories`, plus boolean/string/`None` rejection before
-glob evaluation. Host proofs must show no exclude traversal, dangling and
-resolvable symlinks, literal and wildcard matched cycles, recursive cycle/
-unbounded expansion, an unmatched inert cycle, boundary behavior, non-UTF-8
-failure, Need/error precedence, cancellation and complete-only equality.
-
-Same-DICE proof covers recursive create/delete/recreate, nested membership,
-BUILD/BUILD.bazel markers, ignore and deleted-package A/B/A, warm reuse and
-equal restoration. Run formatting, `git diff --check`, focused glob/Host tests,
-the full `slug_loading_v2` suite, named direct loading/query dependents, source
-hashes and `scripts/v2_archive_status.sh`. Rebuild `slug_cli_v2`, clean `slugd`
-before and after, and rerun the authentic BCR replay. It must clear
-`@platforms//host:BUILD` without a special case; the next genuine generic
-failure selects the next packet.
+Run formatting and diff checks, focused package/module-extension/repository
+tests, the full `slug_loading_v2` suite, direct analysis/query/core/server
+checks, pinned source hashes, clean Bazel/Buck2/Zabel trees, parked-proof hash
+and `scripts/v2_archive_status.sh`. Rebuild `slug_cli_v2`, clean `slugd` before
+and after, then replay the authentic rules_rust fixture. It must clear
+`auth: StringDict` without a rules_rust/toolchain/C++ special case; the next
+genuine generic failure selects the following packet. Independent architecture
+review is required before Rust and independent terminal review before
+acceptance.
 
 ## Immediate predecessor
 
-Commit `6b1a27c29` terminally accepts repository declaration documentation
-binding. The accepted glob design was independently reviewed, corrected once
-for arbitrary integer and cycle coverage, and accepted before this Rust packet.
+Commit `cfe83834d` terminally accepts the complete recursive BUILD glob
+category and advances authentic replay from external `@@platforms//host` glob
+loading to this generic module-extension schema frontier.

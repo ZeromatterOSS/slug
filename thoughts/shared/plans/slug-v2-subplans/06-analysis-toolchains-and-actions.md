@@ -22779,3 +22779,24 @@ StringDict` for `rules_rust++rust+rust_toolchains`. Independent terminal review
 returns `ACCEPT`. Schedule only a docs-first complete module-extension
 attribute-schema category audit; add no rules_rust, toolchain or C++ special
 case.
+
+### WP-6-7A module-extension tag attribute-schema category (2026-09-01)
+
+The authentic replay-selected successor is
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r1`.
+This is the complete default-enabled ordinary tag-schema kind category, not a
+literal `auth: StringDict` repair. Pinned Bazel 9.2 source plus a disposable
+fourteen-kind oracle establish `bool`, `int`, `int_list`, every ordinary
+string/label list and dictionary family, `output`, and `output_list`, including
+intrinsic defaults, two-phase supplied/schema ordering, label mapping and
+visibility, same-package outputs, allowed/empty constraints, and immutable
+runtime collections.
+
+Use the existing shared attribute kind/value model. Add the missing compact
+`IntegerList(Arc<[i32]>)` once and carry it through rule, macro,
+repository-rule and query projections; materialize prepared tag values only in
+the existing invocation module's `FrozenHeap`. Add no tag-only value graph,
+custom collection, DICE key, cache, interner, lock or parser change. Zabel's
+schema-slot and invocation-freeze shape is peer guidance only; Bazel 9.2 owns
+semantics. Rust remains gated on independent review of the current-packet
+allowlist, caps and stop conditions.
