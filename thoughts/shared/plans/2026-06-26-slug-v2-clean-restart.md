@@ -30,31 +30,44 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, FDO command configuration, selected-toolchain context, configured hidden dependencies, direct subrule calls, generic fragment projection, the coverage and complete C++ configuration-field categories, cross-module attribute-descriptor identity, complete transition declaration-setting identity, dense retained depsets, configured action environments, scalar/vector Args, param-file/write, common non-callback Spawn, typed FilesToRun/runfiles/complete DefaultInfo, symlink declaration, complete runfiles-package ownership, four runfiles-support actions, FilesToRun Spawn expansion, Bzlmod declaration selection, attribute documentation signatures, direct-compile-input attribute flags, and label file-admissibility accepted** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; generic selected-toolchain context in `ebd19e3b1`; configured hidden dependencies in `2bf86bfa8`; direct invocation/value materialization in `da6865a3b`; real starlark-rust `set` in `cb71a302d`; generic fragment projection in `683538254`; dense depset/action-input owner in `7b0db03e1`; configured-action-environment owner in `71d34affa`; scalar generic actions in `78b94789c`; vector Args and parameter files in `a01a23fe7`; complete default-context non-callback Spawn envelope in `bfe6f2690`; terminally accepted typed FilesToRun provider core in `8e7234b82`; typed runfiles and complete DefaultInfo in `f346c209a`; complete loading/package metadata in `80a6bfd3a`; configured transitive-package closure in `2483dd7e2`; four support actions in `f46a009a0`; complete FilesToRun Spawn expansion in `21db5d7b8`; exact Bzlmod declaration-call signatures in `817d017b6`; exact assigned-global selector/producer identity in `18b2549bd`; exact documentation binding/validation in `1e583e9d0`; compact flag ownership/direct-compile-input binding, complete file-admissibility, coverage, the eleven-member C++ field catalog, imported descriptor identity, and transition declaration-setting identity terminally accepted | remaining public attribute-policy categories, other standard-provider breadth, named exec groups/callbacks, transition execution, and execution projection remain | materialize generic rule-level transition attachment, then replay the bootstrap frontier |
+| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, FDO command configuration, selected-toolchain context, configured hidden dependencies, direct subrule calls, generic fragment projection, the coverage and complete C++ configuration-field categories, cross-module attribute-descriptor identity, complete transition declaration-setting identity and rule attachment, dense retained depsets, configured action environments, scalar/vector Args, param-file/write, common non-callback Spawn, typed FilesToRun/runfiles/complete DefaultInfo, symlink declaration, complete runfiles-package ownership, four runfiles-support actions, FilesToRun Spawn expansion, Bzlmod declaration selection, attribute documentation signatures, direct-compile-input attribute flags, and label file-admissibility accepted** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; generic selected-toolchain context in `ebd19e3b1`; configured hidden dependencies in `2bf86bfa8`; direct invocation/value materialization in `da6865a3b`; real starlark-rust `set` in `cb71a302d`; generic fragment projection in `683538254`; dense depset/action-input owner in `7b0db03e1`; configured-action-environment owner in `71d34affa`; scalar generic actions in `78b94789c`; vector Args and parameter files in `a01a23fe7`; complete default-context non-callback Spawn envelope in `bfe6f2690`; terminally accepted typed FilesToRun provider core in `8e7234b82`; typed runfiles and complete DefaultInfo in `f346c209a`; complete loading/package metadata in `80a6bfd3a`; configured transitive-package closure in `2483dd7e2`; four support actions in `f46a009a0`; complete FilesToRun Spawn expansion in `21db5d7b8`; exact Bzlmod declaration-call signatures in `817d017b6`; exact assigned-global selector/producer identity in `18b2549bd`; exact documentation binding/validation in `1e583e9d0`; compact flag ownership/direct-compile-input binding, complete file-admissibility, coverage, the eleven-member C++ field catalog, imported descriptor identity, transition declaration-setting identity, and generic rule transition attachment terminally accepted through `6cb5ab55b` | remaining public attribute-policy categories, other standard-provider breadth, named exec groups/callbacks, transition execution, and execution projection remain | materialize the complete generic rule predeclared-output category, then replay the bootstrap frontier |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[Complete generic rule-level transition attachment](./slug-v2-subplans/current-packet.md).
+[Complete generic rule predeclared outputs](./slug-v2-subplans/current-packet.md).
 
-Materialize and review `WP-6-7A-rule-level-transition-attachment-r1`. Reuse the
-accepted regular-transition object for generic named-only `rule(cfg = ...)`,
-preserve it through live/frozen/imported rule definitions and final package
-targets, and generate the existing hidden function-transition allowlist when
-either a rule or attribute consumer requires it. Structural package equality
-owns invalidation. Configured analysis remains explicitly unsupported and
-must reject before selector, dependency, toolchain, or implementation work.
-No rules_rust, parser, `set`, rule-body, `cc_common`, `cc_internal`, native
-transition, composition, or C++ special case is admitted. Bazel 9.2 is sole
-semantic authority; Buck2 and Zabel are representation guidance only. Obtain
-independent design pre-review before implementation because the packet extends
-retained public cross-crate identity. R1 review returned `REVISE` because
-Slug's existing untyped `build_setting` binding does not normalize explicit
-`None`. R2 corrects omitted/`None` equivalence for both optional arguments and
-requires a real build setting plus invalid `cfg` to prove conflict precedence;
-focused correction rereview returned `ACCEPT`. Implement only the frozen R2
-contract.
+Materialize and review `WP-6-7A-rule-predeclared-outputs-complete-r1`. Implement
+the complete default-enabled Bazel 9.2 `rule(outputs=...)` category: ordered
+static templates and callbacks, generated package targets, final compact
+key/label identity, `ctx.outputs`, synthesized `DefaultInfo.files`, and the
+adjacent `output_to_genfiles` placement bit. Keep implicit outputs separate
+from attributes and resolve callbacks only during package loading. The default
+merged-genfiles mode is admitted; nonmerged genfiles fails closed before rule
+implementation and exact split-root bytes remain M9. No rules_rust, parser,
+`set`, rule-body, `cc_common`, `cc_internal`, native rule, BCR, command, or C++
+special case is admitted. Bazel 9.2 is sole semantic authority. Buck2-derived
+compact strings, immutable slices and memory accounting are reused; Zabel is
+peer architecture/optimization guidance only. Obtain independent design
+pre-review before implementation because this adds retained cross-crate output
+identity and a callback lifetime boundary.
+
+R1 architecture review returned `REVISE`, not `REPLAN`: list cardinality must
+count distinct projected values, callback binding/lifetime needs its direct
+pinned helper source and broader proofs, surrounding output-prefix/input and
+own-rule collision cases must be explicitly deferred, and generated-target
+query ownership needs a query proof and full-suite gate. Corrected R2 makes
+only those bounded contract/allowlist changes; focused rereview returned
+`ACCEPT`. Implement only the frozen R2 contract.
+
+Commit `6cb5ab55b` terminally accepts generic named-only rule-level regular
+transition attachment. The sole transition object now survives live, frozen,
+imported and final rule ownership, participates in structural package equality,
+and drives the shared hidden transition allowlist. Complete loading and
+analysis suites pass, terminal correction rereview returns `ACCEPT`, and the
+rebuilt authentic rules_rust replay clears `rule(cfg=transition)` and stops at
+generic `rule(outputs={...})` binding.
 
 Commit `1e65972a6` terminally accepts one compact retained property-bit owner
 and admits

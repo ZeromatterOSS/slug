@@ -22092,3 +22092,33 @@ allowlist and cap decisions remain unchanged.
 Focused independent R2 rereview returns `ACCEPT`. Commit the corrected design,
 then implement only its closed typed coverage-field/command/resolver/facade
 category and unchanged explicit deferrals.
+
+#### Rule transition attachment accepted; predeclared outputs active (2026-09-01)
+
+Commit `6cb5ab55b` terminally accepts the complete generic named-only regular
+transition attachment category. The existing transition object is the sole
+live/frozen/imported/final representation, structural package identity owns
+invalidation, and the existing hidden allowlist is generated for either rule
+or attribute consumers. Configured execution remains deliberately unsupported
+and rejects before selector, dependency, toolchain or implementation work.
+Complete loading passes 560 tests plus one ignored, analysis passes 122,
+terminal correction rereview returns `ACCEPT`, and rebuilt rules_rust replay
+advances to generic `rule(outputs={...})` binding.
+
+Activate `WP-6-7A-rule-predeclared-outputs-complete-r1`. This is the complete
+default-enabled Bazel 9.2 category, not a rules_rust or C++ patch: static and
+callback output declarations, template expansion, generated package targets,
+compact final key/label identity, `ctx.outputs`, default-file synthesis, and
+the adjacent `output_to_genfiles` bit. Implicit outputs remain a separate
+namespace from attributes. Exact default merged-genfiles behavior is admitted;
+nonmerged genfiles fails closed and its exact paths remain M9. Bazel 9.2 is
+sole semantic authority, retained Buck2-derived compact utilities are reused,
+and Zabel is peer architecture/optimization guidance only. Independent
+architecture review is required before implementation.
+
+R1 architecture review returned `REVISE`: correct list cardinality to distinct
+projected values, pin the callback helper that owns binding/lifetime, expand
+callback proofs, explicitly defer surrounding collision categories that need a
+package-wide scan, and add generated-target query ownership proof plus the full
+query gate. Corrected R2 changes no retained representation or production
+allowlist. Focused rereview returned `ACCEPT`; implement only frozen R2.
