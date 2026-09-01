@@ -2351,6 +2351,13 @@ R5 review is pending.
 Independent R5 review returns `ACCEPT`; the corrected phase, proof boundary,
 shared representation and no-extraction decision are coherent.
 
+R5 implementation is terminally `ACCEPTED` at 592 production/777 proof/1,369
+total gross Rust lines. Independent terminal review confirms that the one
+shared compact `IntegerList` and invocation-local starlark-rust `FrozenHeap`
+need no V1 extraction or second tag representation. The authentic rules_rust
+configured-query replay clears the schema category and selects
+`module_ctx.extension_metadata(...)` as the next generic docs-first audit.
+
 Zabel `0795445f...` schema-ordered tag slots, compact typed tag values and
 invocation freezing are peer optimization guidance only. Copy no Zig type,
 allocator, evaluator, scheduler, cache, diagnostic or behavior. Bazel 9.2 is

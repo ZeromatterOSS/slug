@@ -2231,6 +2231,24 @@ where
         })?;
         validate_configured_dependency(dependency, result.result())?;
     }
+    for attribute in &resolved_attributes {
+        let schema = implementation
+            .schema()
+            .iter()
+            .find(|schema| schema.declaration_name() == attribute.declaration_name)
+            .ok_or_else(|| {
+                AnalysisError::message(format!(
+                    "configured rule attribute `{}` has no retained schema",
+                    attribute.declaration_name
+                ))
+            })?;
+        if !schema.allow_empty() && attribute.value.collection_is_empty() == Some(true) {
+            return Err(AnalysisError::message(format!(
+                "attribute `{}` must be non empty",
+                attribute.declaration_name
+            )));
+        }
+    }
     let configured_attributes =
         prepare_configured_attributes(configured_rows, declared_dependency_keys, computed)?;
     for dependency in declared_dependency_keys {

@@ -8927,7 +8927,7 @@ mod module_extension_definition_loading_tests {
                     })
                 )
         ));
-        let unused_deferred_schema = compute_prepared_case(
+        let unused_collection_schema = compute_prepared_case(
             &dice,
             "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n",
             "def implementation(ctx):\n    pass\n\
@@ -8937,15 +8937,9 @@ mod module_extension_definition_loading_tests {
         )
         .await;
         assert!(matches!(
-            unused_deferred_schema,
+            unused_collection_schema,
             SourcePreparationOutcome::Complete(value)
-                if matches!(
-                    value.as_ref(),
-                    Err(HostPreparedModuleExtensionInputsError::AfterInputs {
-                        error: HostPreparedModuleExtensionInputError::Attribute(_),
-                        ..
-                    })
-                )
+                if value.as_ref().is_ok()
         ));
     }
 

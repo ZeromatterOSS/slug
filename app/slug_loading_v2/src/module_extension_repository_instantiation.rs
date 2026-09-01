@@ -683,6 +683,7 @@ fn coerce_value(
         AttributeKind::String => string_value(raw),
         AttributeKind::Boolean => bool_value(raw),
         AttributeKind::Integer => int_value(raw),
+        AttributeKind::IntegerList => sequence_value(raw, int_value),
         AttributeKind::Label => label_value(raw, base, mapping, false),
         AttributeKind::Output => label_value(raw, base, mapping, true),
         AttributeKind::StringList => sequence_value(raw, |value| string_value(value)),
@@ -849,6 +850,9 @@ fn default_call_value(value: &CoercedAttributeValue) -> Option<RepositoryRuleCal
         CoercedAttributeValue::None => RepositoryRuleCallValue::None,
         CoercedAttributeValue::Boolean(value) => RepositoryRuleCallValue::Bool(*value),
         CoercedAttributeValue::Integer(value) => RepositoryRuleCallValue::Int(*value),
+        CoercedAttributeValue::IntegerList(values) => {
+            sequence_call(values.iter().copied().map(RepositoryRuleCallValue::Int))
+        }
         CoercedAttributeValue::String(value) => RepositoryRuleCallValue::String(value.clone()),
         CoercedAttributeValue::Label(value) | CoercedAttributeValue::Output(value) => {
             RepositoryRuleCallValue::Label(value.clone())
@@ -1153,7 +1157,7 @@ pub(crate) mod tests {
 
     #[test]
     fn complete_repository_attribute_family_coerces_recursively() {
-        let sequence = |values| RepositoryRuleCallValue::Sequence(Arc::from(values));
+        let sequence = |values: Vec<_>| RepositoryRuleCallValue::Sequence(values.into());
         let map = |values| RepositoryRuleCallValue::Map(Arc::from(values));
         let local = CanonicalLabel::parse("@@//defs:l").unwrap();
         let output = CanonicalLabel::parse("@@//defs:o").unwrap();
@@ -1162,6 +1166,7 @@ pub(crate) mod tests {
             [
                 schema("b", AttributeKind::Boolean, false, None),
                 schema("i", AttributeKind::Integer, false, None),
+                schema("il", AttributeKind::IntegerList, false, None),
                 schema("s", AttributeKind::String, false, None),
                 schema("l", AttributeKind::Label, false, None),
                 schema("o", AttributeKind::Output, false, None),
@@ -1178,20 +1183,27 @@ pub(crate) mod tests {
                 ("name", RepositoryRuleCallValue::String("generated".into())),
                 ("b", RepositoryRuleCallValue::Bool(true)),
                 ("i", RepositoryRuleCallValue::Int(7)),
+                (
+                    "il",
+                    sequence(vec![
+                        RepositoryRuleCallValue::Int(1),
+                        RepositoryRuleCallValue::Int(-2),
+                    ]),
+                ),
                 ("s", RepositoryRuleCallValue::String("s".into())),
                 ("l", RepositoryRuleCallValue::Label(dep.clone())),
                 ("o", RepositoryRuleCallValue::Label(output.clone())),
                 (
                     "sl",
-                    sequence([RepositoryRuleCallValue::String("s".into())]),
+                    sequence(vec![RepositoryRuleCallValue::String("s".into())]),
                 ),
                 (
                     "ll",
-                    sequence([RepositoryRuleCallValue::Label(local.clone())]),
+                    sequence(vec![RepositoryRuleCallValue::Label(local.clone())]),
                 ),
                 (
                     "ol",
-                    sequence([RepositoryRuleCallValue::Label(output.clone())]),
+                    sequence(vec![RepositoryRuleCallValue::Label(output.clone())]),
                 ),
                 (
                     "sd",
@@ -1204,7 +1216,7 @@ pub(crate) mod tests {
                     "sld",
                     map([(
                         RepositoryRuleCallKey::String("k".into()),
-                        sequence([RepositoryRuleCallValue::String("v".into())]),
+                        sequence(vec![RepositoryRuleCallValue::String("v".into())]),
                     )]),
                 ),
                 (
@@ -1225,13 +1237,13 @@ pub(crate) mod tests {
                     "lld",
                     map([(
                         RepositoryRuleCallKey::String("k".into()),
-                        sequence([RepositoryRuleCallValue::Label(local.clone())]),
+                        sequence(vec![RepositoryRuleCallValue::Label(local.clone())]),
                     )]),
                 ),
             ],
         );
         let spec = instantiate_call(&call, &mapping()).unwrap();
-        assert_eq!(spec.attributes.len(), 13);
+        assert_eq!(spec.attributes.len(), 14);
         assert_eq!(
             spec.attributes.get("b"),
             Some(&OverrideAttributeValue::Bool(true))
@@ -1239,6 +1251,13 @@ pub(crate) mod tests {
         assert_eq!(
             spec.attributes.get("i"),
             Some(&OverrideAttributeValue::Int(7))
+        );
+        assert_eq!(
+            spec.attributes.get("il"),
+            Some(&OverrideAttributeValue::Iterable(Arc::from([
+                OverrideAttributeValue::Int(1),
+                OverrideAttributeValue::Int(-2),
+            ])))
         );
         assert_eq!(
             spec.attributes.get("s"),

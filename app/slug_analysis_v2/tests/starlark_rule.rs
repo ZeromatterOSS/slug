@@ -9605,6 +9605,18 @@ list_map = rule(
     attrs = {"dep": attr.label_list_dict(allow_files = [".rs"], mandatory = True)},
 )
 
+def _nonempty(ctx):
+    if ctx.attr.values != [1, -2]: fail("integer-list projection changed")
+    return [DefaultInfo()]
+
+nonempty = rule(
+    implementation = _nonempty,
+    attrs = {
+        "dep": attr.label(allow_files = [".rs"], mandatory = True),
+        "values": attr.int_list(allow_empty = False),
+    },
+)
+
 def _shape(ctx):
     if ctx.attr.source.label.name != "source.rs": fail("scalar source shape changed")
     if ctx.attr.generated_file.label.name != "generated.rs": fail("generated-file shape changed")
@@ -9644,6 +9656,7 @@ load(
     "label_map",
     "list_map",
     "no_files",
+    "nonempty",
     "producer",
     "shape",
     "single",
@@ -9696,6 +9709,9 @@ single_false(name = "single_false_multi", dep = ":multi")
 string_map(name = "mapped_bad", dep = {"m": "source.bin"})
 label_map(name = "reverse_bad", dep = {"source.bin": "r"})
 list_map(name = "grouped_bad", dep = {"g": ["source.bin"]})
+nonempty(name = "nonempty_ok", dep = "source.rs", values = [1, -2])
+nonempty(name = "nonempty_empty", dep = "source.rs")
+nonempty(name = "nonempty_precedence", dep = "source.bin")
 "#;
 
 #[tokio::test]
@@ -9722,6 +9738,7 @@ async fn ordinary_file_admissibility_covers_sources_outputs_platforms_and_dictio
         "generated_rule_ok",
         "generated_rule_mixed",
         "no_files_rule",
+        "nonempty_ok",
         "any_upper",
         "one_single",
         "single_false_multi",
@@ -9753,6 +9770,11 @@ async fn ordinary_file_admissibility_covers_sources_outputs_platforms_and_dictio
         ("mapped_bad", "does not match its admitted file types"),
         ("reverse_bad", "does not match its admitted file types"),
         ("grouped_bad", "does not match its admitted file types"),
+        ("nonempty_empty", "attribute `values` must be non empty"),
+        (
+            "nonempty_precedence",
+            "does not match its admitted file types",
+        ),
     ] {
         let error = analyze_request(
             &dice,

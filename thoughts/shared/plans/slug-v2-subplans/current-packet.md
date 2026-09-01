@@ -10,7 +10,8 @@ review returned `ACCEPT`; implementation validation selected a proof-only R3
 allowlist correction; independent R3 review returned `ACCEPT`; dependent
 compilation selected an R4 shared-analysis projection correction for
 independent review; R4 review returned `REPLAN`; independent corrected R5
-review returned `ACCEPT`.
+review returned `ACCEPT`; implementation and independent terminal review
+returned `ACCEPT`.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -317,6 +318,25 @@ The dual-invalid file-admissibility/empty-list proof discriminates dependency
 precedence, while the valid signed integer-list row covers `ctx.attr` shape.
 The transition projection, complete list/map emptiness model, DICE ownership,
 lifecycle, allowlist and caps remain sound. Implementation may resume.
+
+## Terminal acceptance
+
+R5 is terminally `ACCEPTED` at 592 production, 777 proof and 1,369 total gross
+Rust lines. The complete `slug_loading_v2` and `slug_analysis_v2` suites pass;
+the named analysis/query/core/server checks, formatting, source hashes, clean
+reference trees, parked-proof hash, expected archive exceptions and rebuilt
+CLI pass. Independent terminal review confirms the shared compact
+`IntegerList`, invocation-local `FrozenHeap`, fourteen-kind conversion,
+tag-specific `allow_empty` behavior and ordinary dependency-before-nonempty
+phase.
+
+The authentic rules_rust configured-query replay clears the prior `auth:
+StringDict` failure without a ruleset, toolchain or C++ special case and now
+stops at the next generic boundary: `module_ctx.extension_metadata(...)`.
+Schedule only a docs-first complete Bazel 9.2 module-extension metadata
+category audit next. The stock fixture runner additionally encounters already
+unsupported query flags and expression/output forms; those CLI surfaces are
+not the semantic replay corridor and are not widened by this packet.
 
 ## Immediate predecessor
 

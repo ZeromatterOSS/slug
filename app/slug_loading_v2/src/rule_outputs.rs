@@ -128,6 +128,7 @@ fn projected_values(
         CoercedAttributeValue::None => return Ok(Vec::new()),
         CoercedAttributeValue::Boolean(_) => return unsupported(name, "boolean"),
         CoercedAttributeValue::Integer(_) => return unsupported(name, "integer"),
+        CoercedAttributeValue::IntegerList(_) => return unsupported(name, "integer list"),
         CoercedAttributeValue::StringListDict(_)
         | CoercedAttributeValue::StringDict(_)
         | CoercedAttributeValue::StringKeyedLabelDict(_)
@@ -216,6 +217,7 @@ mod tests {
             attribute("absent", CoercedAttributeValue::None),
             attribute("boolean", CoercedAttributeValue::Boolean(true)),
             attribute("integer", CoercedAttributeValue::Integer(1)),
+            attribute("integer_list", CoercedAttributeValue::IntegerList(Arc::from([1, 2]))),
             attribute("dictionary", CoercedAttributeValue::StringDict(Arc::from([]))),
             attribute("empty", CoercedAttributeValue::StringList(Arc::from([]))),
             attribute("multiple", CoercedAttributeValue::StringList(Arc::from(["one".into(), "two".into()]))),
@@ -226,6 +228,7 @@ mod tests {
             ("absent", "Invalid placeholder(s)"),
             ("boolean", "type boolean"),
             ("integer", "type integer"),
+            ("integer_list", "type integer list"),
             ("dictionary", "type dictionary"),
             ("empty", "Invalid placeholder(s)"),
             ("multiple", "Invalid placeholder(s)"),

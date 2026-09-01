@@ -50,10 +50,14 @@ use starlark::environment::MethodsStatic;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
+use starlark::values::FrozenHeap;
+use starlark::values::FrozenValue;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::dict::AllocDict;
+use starlark::values::list::AllocList;
 use starlark::values::starlark_value;
 
 use crate::attrs::CoercedAttributeValue;
@@ -459,7 +463,12 @@ fn invoke_pure_preflight(prepared: Arc<HostPreparedModuleExtensionInputs>, prefl
         let owner = Arc::new(());
         let context = invocation_module
             .heap()
-            .alloc_simple(InvocationContext::new(input, preflight.tag_classes, &owner));
+            .alloc_simple(InvocationContext::new(
+                input,
+                preflight.tag_classes,
+                &owner,
+                invocation_module.frozen_heap(),
+            ));
         let capture = capture_events.then(InvocationPrintCapture::default);
         let repository_rules = RepositoryRuleInvocationState::new();
         let returned = {
@@ -646,7 +655,7 @@ fn owner_projection(module: &FrozenBzlModule, request: &HostSelectedExtensionDef
 }
 
 #[rustfmt::skip]
-fn owner_invocation_modules(inputs: &HostSelectedExtensionOwnerInputs, projection: &OwnerProjection, owner: &Arc<()>) -> Result<Arc<[InvocationModule]>, CompactString> {
+fn owner_invocation_modules(inputs: &HostSelectedExtensionOwnerInputs, projection: &OwnerProjection, owner: &Arc<()>) -> Result<Arc<[PreparedInvocationModule]>, CompactString> {
     for (_, schema) in projection.definition.tag_classes.iter() {
         validate_module_extension_tag_schema(schema).map_err(|error| CompactString::from(error.to_string()))?;
     }
@@ -658,7 +667,7 @@ fn owner_invocation_modules(inputs: &HostSelectedExtensionOwnerInputs, projectio
             let attributes = prepare_module_extension_tag_attributes(schema, &tag.attributes, context_repo, mapping).map_err(|error| CompactString::from(error.to_string()))?;
             Ok(PreparedModuleExtensionTag { tag_class: tag.tag_class.clone(), attributes, dev_dependency: tag.dev_dependency, location: tag.location.clone(), module_index, tag_index })
         }).collect::<Result<Vec<_>, CompactString>>()?;
-        Ok(InvocationModule { name: name.into(), version: version.into(), is_root, tag_classes: classes.clone(), tags: tags.into(), owner: owner.clone() })
+        Ok(PreparedInvocationModule { name: name.into(), version: version.into(), is_root, tag_classes: classes.clone(), tags: tags.into(), owner: owner.clone() })
     }).collect::<Result<Vec<_>, CompactString>>().map(Into::into)
 }
 
@@ -742,6 +751,12 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
     }
     let definition = module.module.get_assigned(inputs.request().parts().1).expect("projection authenticated export").0.downcast::<FrozenModuleExtensionDefinition>().expect("projection authenticated kind");
     let invocation_module = Module::new();
+    let modules = modules
+        .iter()
+        .cloned()
+        .map(|module| module.materialize(invocation_module.frozen_heap()))
+        .collect::<Vec<_>>()
+        .into();
     let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner));
     let capture = ctx.per_transaction_data().data.get::<CaptureEvaluationEvents>().is_ok().then(InvocationPrintCapture::default);
     let repository_rules = RepositoryRuleInvocationState::new();
@@ -799,6 +814,7 @@ impl InvocationContext {
         input: &PreparedModuleExtensionInput,
         tag_classes: Arc<[CompactString]>,
         owner: &Arc<()>,
+        frozen_heap: &FrozenHeap,
     ) -> Self {
         let (_, _, name, version, is_root, _) = input.input.parts();
         Self::new_modules(
@@ -807,8 +823,13 @@ impl InvocationContext {
                 version: version.into(),
                 is_root,
                 tag_classes,
-                tags: input.tags.clone(),
-                owner: owner.clone(),
+                tags: input
+                    .tags
+                    .iter()
+                    .cloned()
+                    .map(|tag| InvocationTag::new(tag, owner, frozen_heap))
+                    .collect::<Vec<_>>()
+                    .into(),
             }]),
             owner,
         )
@@ -864,8 +885,8 @@ fn invocation_context_methods(builder: &mut MethodsBuilder) {
     }
 }
 
-#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct InvocationModule {
+#[derive(Debug, Clone, Allocative)]
+struct PreparedInvocationModule {
     name: CompactString,
     version: CompactString,
     is_root: bool,
@@ -873,6 +894,33 @@ struct InvocationModule {
     tags: Arc<[PreparedModuleExtensionTag]>,
     #[allocative(skip)]
     owner: Arc<()>,
+}
+
+impl PreparedInvocationModule {
+    fn materialize(self, frozen_heap: &FrozenHeap) -> InvocationModule {
+        InvocationModule {
+            name: self.name,
+            version: self.version,
+            is_root: self.is_root,
+            tag_classes: self.tag_classes,
+            tags: self
+                .tags
+                .iter()
+                .cloned()
+                .map(|tag| InvocationTag::new(tag, &self.owner, frozen_heap))
+                .collect::<Vec<_>>()
+                .into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct InvocationModule {
+    name: CompactString,
+    version: CompactString,
+    is_root: bool,
+    tag_classes: Arc<[CompactString]>,
+    tags: Arc<[InvocationTag]>,
 }
 impl fmt::Display for InvocationModule {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -890,7 +938,6 @@ impl<'v> StarlarkValue<'v> for InvocationModule {
             "tags" => Some(heap.alloc_simple(InvocationTags {
                 classes: self.tag_classes.clone(),
                 tags: self.tags.clone(),
-                owner: self.owner.clone(),
             })),
             _ => None,
         }
@@ -900,9 +947,7 @@ impl<'v> StarlarkValue<'v> for InvocationModule {
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct InvocationTags {
     classes: Arc<[CompactString]>,
-    tags: Arc<[PreparedModuleExtensionTag]>,
-    #[allocative(skip)]
-    owner: Arc<()>,
+    tags: Arc<[InvocationTag]>,
 }
 impl fmt::Display for InvocationTags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -917,13 +962,8 @@ impl<'v> StarlarkValue<'v> for InvocationTags {
             heap.alloc_simple(InvocationTagList(
                 self.tags
                     .iter()
-                    .filter(|tag| tag.tag_class == name)
+                    .filter(|tag| tag.class == name)
                     .cloned()
-                    .map(InvocationTag::from)
-                    .map(|mut tag| {
-                        tag.owner = self.owner.clone();
-                        tag
-                    })
                     .collect::<Vec<_>>()
                     .into(),
             ))
@@ -934,7 +974,8 @@ impl<'v> StarlarkValue<'v> for InvocationTags {
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct InvocationTag {
     class: CompactString,
-    attributes: Arc<[(CompactString, CoercedAttributeValue)]>,
+    #[allocative(skip)]
+    attributes: Arc<[(CompactString, FrozenValue)]>,
     dev_dependency: bool,
     location: slug_bzlmod_v2::LogicalSpan,
     module_index: usize,
@@ -942,16 +983,21 @@ struct InvocationTag {
     #[allocative(skip)]
     owner: Arc<()>,
 }
-impl From<PreparedModuleExtensionTag> for InvocationTag {
-    fn from(tag: PreparedModuleExtensionTag) -> Self {
+impl InvocationTag {
+    fn new(tag: PreparedModuleExtensionTag, owner: &Arc<()>, frozen_heap: &FrozenHeap) -> Self {
         Self {
             class: tag.tag_class,
-            attributes: tag.attributes,
+            attributes: tag
+                .attributes
+                .iter()
+                .map(|(name, value)| (name.clone(), allocate_frozen_attribute(value, frozen_heap)))
+                .collect::<Vec<_>>()
+                .into(),
             dev_dependency: tag.dev_dependency,
             location: tag.location,
             module_index: tag.module_index,
             tag_index: tag.tag_index,
-            owner: Arc::new(()),
+            owner: owner.clone(),
         }
     }
 }
@@ -968,20 +1014,82 @@ starlark::starlark_simple_value!(InvocationTag);
 #[starlark_value(type = "bazel_module_tag")]
 impl<'v> StarlarkValue<'v> for InvocationTag {
     fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        self.attributes.iter().find_map(|(attribute, value)| {
-            (attribute == name).then(|| allocate_attribute(value, heap))
-        })
+        let _ = heap;
+        self.attributes
+            .iter()
+            .find_map(|(attribute, value)| (attribute == name).then(|| value.to_value()))
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        self.attributes
+            .iter()
+            .map(|(name, _)| name.to_string())
+            .collect()
     }
 }
 
-fn allocate_attribute<'v>(value: &CoercedAttributeValue, heap: Heap<'v>) -> Value<'v> {
+fn allocate_frozen_attribute(value: &CoercedAttributeValue, heap: &FrozenHeap) -> FrozenValue {
+    let label = |value: &slug_identity_v2::CanonicalLabel| {
+        heap.alloc_simple(StarlarkLabel::new(value.clone()))
+    };
     match value {
-        CoercedAttributeValue::String(value) => heap.alloc_str(value).to_value(),
-        CoercedAttributeValue::Boolean(value) => Value::new_bool(*value),
+        CoercedAttributeValue::String(value) => heap.alloc_str(value).to_frozen_value(),
+        CoercedAttributeValue::Boolean(value) => FrozenValue::new_bool(*value),
         CoercedAttributeValue::Integer(value) => heap.alloc(*value),
-        CoercedAttributeValue::Label(value) => heap.alloc_simple(StarlarkLabel::new(value.clone())),
-        CoercedAttributeValue::None => Value::new_none(),
-        _ => unreachable!("preparation rejects non-scalar module-extension attributes"),
+        CoercedAttributeValue::IntegerList(values) => heap.alloc(AllocList(
+            values.iter().copied().map(|value| heap.alloc(value)),
+        )),
+        CoercedAttributeValue::Label(value) | CoercedAttributeValue::Output(value) => label(value),
+        CoercedAttributeValue::None => FrozenValue::new_none(),
+        CoercedAttributeValue::StringList(values) => heap.alloc(AllocList(
+            values
+                .iter()
+                .map(|value| heap.alloc_str(value).to_frozen_value()),
+        )),
+        CoercedAttributeValue::LabelList(values) | CoercedAttributeValue::OutputList(values) => {
+            heap.alloc(AllocList(values.iter().map(label)))
+        }
+        CoercedAttributeValue::StringDict(values) => {
+            heap.alloc(AllocDict(values.iter().map(|(key, value)| {
+                (
+                    heap.alloc_str(key).to_frozen_value(),
+                    heap.alloc_str(value).to_frozen_value(),
+                )
+            })))
+        }
+        CoercedAttributeValue::StringListDict(values) => {
+            heap.alloc(AllocDict(values.iter().map(|(key, values)| {
+                (
+                    heap.alloc_str(key).to_frozen_value(),
+                    heap.alloc(AllocList(
+                        values
+                            .iter()
+                            .map(|value| heap.alloc_str(value).to_frozen_value()),
+                    )),
+                )
+            })))
+        }
+        CoercedAttributeValue::StringKeyedLabelDict(values) => {
+            heap.alloc(AllocDict(values.iter().map(|(key, value)| {
+                (heap.alloc_str(key).to_frozen_value(), label(value))
+            })))
+        }
+        CoercedAttributeValue::LabelKeyedStringDict(values) => {
+            heap.alloc(AllocDict(values.iter().map(|(key, value)| {
+                (label(key), heap.alloc_str(value).to_frozen_value())
+            })))
+        }
+        CoercedAttributeValue::LabelListDict(values) => {
+            heap.alloc(AllocDict(values.iter().map(|(key, values)| {
+                (
+                    heap.alloc_str(key).to_frozen_value(),
+                    heap.alloc(AllocList(values.iter().map(label))),
+                )
+            })))
+        }
+        CoercedAttributeValue::Selector { .. } | CoercedAttributeValue::Concatenation(_, _) => {
+            unreachable!("module-extension tag values are non-configurable")
+        }
     }
 }
 
@@ -1281,36 +1389,23 @@ mod tests {
             );
     }
 
-    fn empty_module(owner: &Arc<()>) -> InvocationModule {
+    fn empty_module(_owner: &Arc<()>) -> InvocationModule {
         InvocationModule {
             name: "root".into(),
             version: "".into(),
             is_root: true,
             tag_classes: Arc::from([CompactString::from("tag")]),
             tags: Arc::from([]),
-            owner: owner.clone(),
         }
     }
 
-    fn tag(owner: &Arc<()>, index: usize, dev_dependency: bool) -> InvocationTag {
-        InvocationTag {
-            class: "tag".into(),
-            attributes: Arc::from([(
-                CompactString::from("value"),
-                CoercedAttributeValue::String(format!("v{index}").into()),
-            )]),
-            dev_dependency,
-            location: slug_bzlmod_v2::LogicalSpan {
-                file: slug_bzlmod_v2::LogicalModuleFileId::new("MODULE.bazel"),
-                start_line: index as u32 + 1,
-                start_column: 1,
-                end_line: index as u32 + 1,
-                end_column: 2,
-            },
-            module_index: 0,
-            tag_index: index,
-            owner: owner.clone(),
-        }
+    fn tag(
+        owner: &Arc<()>,
+        index: usize,
+        dev_dependency: bool,
+        frozen_heap: &FrozenHeap,
+    ) -> InvocationTag {
+        InvocationTag::new(prepared_tag(index, dev_dependency), owner, frozen_heap)
     }
 
     fn prepared_tag(index: usize, dev_dependency: bool) -> PreparedModuleExtensionTag {
@@ -1397,7 +1492,7 @@ mod tests {
         assert!(error.contains("another module_ctx"));
 
         let owner = Arc::new(());
-        let tags: Arc<[PreparedModuleExtensionTag]> = Arc::from([]);
+        let tags: Arc<[InvocationTag]> = Arc::from([]);
         let context = InvocationContext {
             modules: Arc::from([InvocationModule {
                 tags,
@@ -1405,7 +1500,8 @@ mod tests {
             }]),
             owner: owner.clone(),
         };
-        let foreign = tag(&Arc::new(()), 0, false);
+        let foreign_heap = FrozenHeap::new();
+        let foreign = tag(&Arc::new(()), 0, false, &foreign_heap);
         let error = call(
             "def f(ctx, tag):\n  return ctx.tag_sort_key(tag)\n",
             |module| {
@@ -1422,7 +1518,11 @@ mod tests {
     #[test]
     fn immutable_lists_support_exact_negative_indexing_and_tag_order() {
         let owner = Arc::new(());
-        let tags: Arc<[InvocationTag]> = Arc::from([tag(&owner, 0, false), tag(&owner, 1, true)]);
+        let frozen_heap = FrozenHeap::new();
+        let tags: Arc<[InvocationTag]> = Arc::from([
+            tag(&owner, 0, false, &frozen_heap),
+            tag(&owner, 1, true, &frozen_heap),
+        ]);
         let modules = InvocationModuleList(Arc::from([empty_module(&owner)]));
         let value = call(
             "def f(modules, tags):\n  return [modules[-1].name, tags[-1].value, tags[-2].value]\n",
@@ -1450,7 +1550,10 @@ mod tests {
         }
         let context = InvocationContext {
             modules: Arc::from([InvocationModule {
-                tags: Arc::from([prepared_tag(0, false), prepared_tag(1, true)]),
+                tags: Arc::from([
+                    tag(&owner, 0, false, &frozen_heap),
+                    tag(&owner, 1, true, &frozen_heap),
+                ]),
                 ..empty_module(&owner)
             }]),
             owner: owner.clone(),
@@ -1466,9 +1569,10 @@ mod tests {
     #[test]
     fn forbidden_abi_and_cross_context_captured_tags_fail_closed() {
         let owner = Arc::new(());
+        let frozen_heap = FrozenHeap::new();
         let context = InvocationContext {
             modules: Arc::from([InvocationModule {
-                tags: Arc::from([prepared_tag(0, false)]),
+                tags: Arc::from([tag(&owner, 0, false, &frozen_heap)]),
                 ..empty_module(&owner)
             }]),
             owner,
@@ -1516,9 +1620,10 @@ mod tests {
             );
         }
         let other_owner = Arc::new(());
+        let other_frozen_heap = FrozenHeap::new();
         let other = InvocationContext {
             modules: Arc::from([InvocationModule {
-                tags: Arc::from([prepared_tag(0, true)]),
+                tags: Arc::from([tag(&other_owner, 0, true, &other_frozen_heap)]),
                 ..empty_module(&other_owner)
             }]),
             owner: other_owner,
@@ -1551,27 +1656,32 @@ mod tests {
     #[test]
     fn scalar_none_label_and_exact_read_only_abi_are_visible() {
         let module = Module::new();
-        assert!(allocate_attribute(&CoercedAttributeValue::None, module.heap()).is_none());
+        assert!(
+            allocate_frozen_attribute(&CoercedAttributeValue::None, module.frozen_heap()).is_none()
+        );
         let owner = Arc::new(());
         let label = CanonicalLabel::parse("@@dep+//pkg:item").unwrap();
-        let tag = InvocationTag {
-            class: "tag".into(),
-            attributes: Arc::from([(
-                CompactString::from("target"),
-                CoercedAttributeValue::Label(label),
-            )]),
-            dev_dependency: true,
-            location: slug_bzlmod_v2::LogicalSpan {
-                file: slug_bzlmod_v2::LogicalModuleFileId::new("MODULE.bazel"),
-                start_line: 3,
-                start_column: 2,
-                end_line: 3,
-                end_column: 4,
+        let tag = InvocationTag::new(
+            PreparedModuleExtensionTag {
+                tag_class: "tag".into(),
+                attributes: Arc::from([(
+                    CompactString::from("target"),
+                    CoercedAttributeValue::Label(label),
+                )]),
+                dev_dependency: true,
+                location: slug_bzlmod_v2::LogicalSpan {
+                    file: slug_bzlmod_v2::LogicalModuleFileId::new("MODULE.bazel"),
+                    start_line: 3,
+                    start_column: 2,
+                    end_line: 3,
+                    end_column: 4,
+                },
+                module_index: 0,
+                tag_index: 0,
             },
-            module_index: 0,
-            tag_index: 0,
-            owner: owner.clone(),
-        };
+            &owner,
+            module.frozen_heap(),
+        );
         let context = InvocationContext {
             modules: Arc::from([InvocationModule {
                 name: "root".into(),
@@ -1579,7 +1689,6 @@ mod tests {
                 is_root: true,
                 tag_classes: Arc::from([CompactString::from("tag")]),
                 tags: Arc::from([]),
-                owner: owner.clone(),
             }]),
             owner,
         };
@@ -1588,6 +1697,117 @@ mod tests {
             value,
             "[1, \"root\", \"\", True, True, \"item\", \"pkg\", \"dep+\", \"dep+\", \"@@dep+//pkg:item\", \"Label(\\\"@@dep+//pkg:item\\\")\", \"@@dep+//pkg:item\", \"Label(\\\"@@dep+//pkg:item\\\")\", \"@@dep+//pkg:item\", \"@@dep+//pkg:item\", \"Label(\\\"@@dep+//pkg:item\\\")\", \"other\", 1, True]"
         );
+    }
+
+    #[test]
+    fn complete_tag_values_are_frozen_ordered_and_publicly_named() {
+        fn complete_tag() -> PreparedModuleExtensionTag {
+            let local = CanonicalLabel::parse("@@//:local").unwrap();
+            let dep = CanonicalLabel::parse("@@dep+//pkg:item").unwrap();
+            PreparedModuleExtensionTag {
+                tag_class: "tag".into(),
+                attributes: Arc::from([
+                    ("_private".into(), CoercedAttributeValue::Boolean(true)),
+                    ("count".into(), CoercedAttributeValue::Integer(7)),
+                    (
+                        "ints".into(),
+                        CoercedAttributeValue::IntegerList(Arc::from([1, -2])),
+                    ),
+                    ("text".into(), CoercedAttributeValue::String("value".into())),
+                    (
+                        "strings".into(),
+                        CoercedAttributeValue::StringList(Arc::from(["one".into(), "two".into()])),
+                    ),
+                    (
+                        "string_dict".into(),
+                        CoercedAttributeValue::StringDict(Arc::from([("a".into(), "one".into())])),
+                    ),
+                    (
+                        "string_lists".into(),
+                        CoercedAttributeValue::StringListDict(Arc::from([(
+                            "a".into(),
+                            Arc::from(["one".into(), "two".into()]),
+                        )])),
+                    ),
+                    ("label".into(), CoercedAttributeValue::Label(dep.clone())),
+                    (
+                        "labels".into(),
+                        CoercedAttributeValue::LabelList(Arc::from([local.clone(), dep.clone()])),
+                    ),
+                    (
+                        "labels_by_string".into(),
+                        CoercedAttributeValue::StringKeyedLabelDict(Arc::from([(
+                            "a".into(),
+                            dep.clone(),
+                        )])),
+                    ),
+                    (
+                        "strings_by_label".into(),
+                        CoercedAttributeValue::LabelKeyedStringDict(Arc::from([(
+                            dep.clone(),
+                            "value".into(),
+                        )])),
+                    ),
+                    (
+                        "label_lists".into(),
+                        CoercedAttributeValue::LabelListDict(Arc::from([(
+                            "a".into(),
+                            Arc::from([local.clone(), dep.clone()]),
+                        )])),
+                    ),
+                    (
+                        "output".into(),
+                        CoercedAttributeValue::Output(local.clone()),
+                    ),
+                    (
+                        "outputs".into(),
+                        CoercedAttributeValue::OutputList(Arc::from([local])),
+                    ),
+                ]),
+                dev_dependency: false,
+                location: slug_bzlmod_v2::LogicalSpan {
+                    file: slug_bzlmod_v2::LogicalModuleFileId::new("MODULE.bazel"),
+                    start_line: 1,
+                    start_column: 1,
+                    end_line: 1,
+                    end_column: 2,
+                },
+                module_index: 0,
+                tag_index: 0,
+            }
+        }
+
+        let owner = Arc::new(());
+        let value = call(
+            "def f(tag):\n  return [tag._private, tag.count, tag.ints, tag.strings, tag.string_dict, tag.string_lists, str(tag.label), [str(x) for x in tag.labels], {k: str(v) for k, v in tag.labels_by_string.items()}, {str(k): v for k, v in tag.strings_by_label.items()}, {k: [str(x) for x in v] for k, v in tag.label_lists.items()}, str(tag.output), [str(x) for x in tag.outputs], '_private' in dir(tag), dir(tag)[0]]\n",
+            |module| {
+                vec![module.heap().alloc_simple(InvocationTag::new(
+                    complete_tag(),
+                    &owner,
+                    module.frozen_heap(),
+                ))]
+            },
+        )
+        .unwrap();
+        assert!(value.contains("[1, -2]"), "{value}");
+        assert!(value.contains("@@dep+//pkg:item"), "{value}");
+        assert!(value.contains("True, \"_private\""), "{value}");
+
+        for source in [
+            "def f(tag):\n  tag.ints.append(3)\n",
+            "def f(tag):\n  tag.string_dict.clear()\n",
+            "def f(tag):\n  tag.string_lists['a'].append('three')\n",
+            "def f(tag):\n  tag.label_lists['a'].append(tag.label)\n",
+        ] {
+            let owner = owner.clone();
+            assert!(
+                call(source, |module| vec![module.heap().alloc_simple(
+                    InvocationTag::new(complete_tag(), &owner, module.frozen_heap())
+                )])
+                .is_err(),
+                "frozen tag collection accepted mutation: {source}"
+            );
+        }
     }
 
     const REPO_RULE_WORKSPACE: &str = "/module-extension-repository-rule";

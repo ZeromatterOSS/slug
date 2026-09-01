@@ -157,6 +157,7 @@ enum RepositoryAttributeValueRef<'a> {
 #[derive(Clone, Copy)]
 enum RepositoryAttributeIterableRef<'a> {
     Override(&'a [OverrideAttributeValue]),
+    Integers(&'a [i32]),
     Strings(&'a [CompactString]),
     Labels(&'a [slug_identity_v2::CanonicalLabel]),
     Empty,
@@ -164,6 +165,7 @@ enum RepositoryAttributeIterableRef<'a> {
 
 enum RepositoryAttributeIterableIter<'a> {
     Override(std::slice::Iter<'a, OverrideAttributeValue>),
+    Integers(std::slice::Iter<'a, i32>),
     Strings(std::slice::Iter<'a, CompactString>),
     Labels(std::slice::Iter<'a, slug_identity_v2::CanonicalLabel>),
     Empty,
@@ -176,6 +178,7 @@ impl<'a> IntoIterator for RepositoryAttributeIterableRef<'a> {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             Self::Override(values) => RepositoryAttributeIterableIter::Override(values.iter()),
+            Self::Integers(values) => RepositoryAttributeIterableIter::Integers(values.iter()),
             Self::Strings(values) => RepositoryAttributeIterableIter::Strings(values.iter()),
             Self::Labels(values) => RepositoryAttributeIterableIter::Labels(values.iter()),
             Self::Empty => RepositoryAttributeIterableIter::Empty,
@@ -191,6 +194,7 @@ impl<'a> Iterator for RepositoryAttributeIterableIter<'a> {
             Self::Override(values) => values
                 .next()
                 .map(RepositoryAttributeValueRef::from_override),
+            Self::Integers(values) => values.next().copied().map(RepositoryAttributeValueRef::Int),
             Self::Strings(values) => values
                 .next()
                 .map(|value| RepositoryAttributeValueRef::String(value)),
@@ -319,6 +323,9 @@ impl<'a> RepositoryAttributeValueRef<'a> {
             CoercedAttributeValue::None => Self::None,
             CoercedAttributeValue::Boolean(value) => Self::Bool(*value),
             CoercedAttributeValue::Integer(value) => Self::Int(*value),
+            CoercedAttributeValue::IntegerList(values) => {
+                Self::Iterable(RepositoryAttributeIterableRef::Integers(values))
+            }
             CoercedAttributeValue::String(value) => Self::String(value),
             CoercedAttributeValue::Label(value) | CoercedAttributeValue::Output(value) => {
                 Self::Label(value)
@@ -357,9 +364,10 @@ impl<'a> RepositoryAttributeValueRef<'a> {
             AttributeKind::Boolean => Self::Bool(false),
             AttributeKind::Integer => Self::Int(0),
             AttributeKind::Label | AttributeKind::Output => Self::None,
-            AttributeKind::LabelList | AttributeKind::StringList | AttributeKind::OutputList => {
-                Self::Iterable(RepositoryAttributeIterableRef::Empty)
-            }
+            AttributeKind::IntegerList
+            | AttributeKind::LabelList
+            | AttributeKind::StringList
+            | AttributeKind::OutputList => Self::Iterable(RepositoryAttributeIterableRef::Empty),
             AttributeKind::StringDict
             | AttributeKind::StringListDict
             | AttributeKind::StringKeyedLabelDict
@@ -372,13 +380,13 @@ impl<'a> RepositoryAttributeValueRef<'a> {
 #[rustfmt::skip]
 fn matches_override(kind: AttributeKind, value: &OverrideAttributeValue) -> bool { match kind {
     AttributeKind::String => matches!(value, OverrideAttributeValue::String(_)), AttributeKind::Boolean => matches!(value, OverrideAttributeValue::Bool(_)), AttributeKind::Integer => matches!(value, OverrideAttributeValue::Int(_)), AttributeKind::Label | AttributeKind::Output => matches!(value, OverrideAttributeValue::Label(_)),
-    AttributeKind::StringList => matches!(value, OverrideAttributeValue::Iterable(values) if values.iter().all(|value| matches_override(AttributeKind::String, value))), AttributeKind::LabelList | AttributeKind::OutputList => matches!(value, OverrideAttributeValue::Iterable(values) if values.iter().all(|value| matches_override(AttributeKind::Label, value))),
+    AttributeKind::IntegerList => matches!(value, OverrideAttributeValue::Iterable(values) if values.iter().all(|value| matches_override(AttributeKind::Integer, value))), AttributeKind::StringList => matches!(value, OverrideAttributeValue::Iterable(values) if values.iter().all(|value| matches_override(AttributeKind::String, value))), AttributeKind::LabelList | AttributeKind::OutputList => matches!(value, OverrideAttributeValue::Iterable(values) if values.iter().all(|value| matches_override(AttributeKind::Label, value))),
     AttributeKind::StringDict => matches!(value, OverrideAttributeValue::Map(values) if values.iter().all(|(key, value)| matches!(key, OverrideAttributeKey::String(_)) && matches_override(AttributeKind::String, value))), AttributeKind::StringListDict => matches!(value, OverrideAttributeValue::Map(values) if values.iter().all(|(key, value)| matches!(key, OverrideAttributeKey::String(_)) && matches_override(AttributeKind::StringList, value))), AttributeKind::StringKeyedLabelDict => matches!(value, OverrideAttributeValue::Map(values) if values.iter().all(|(key, value)| matches!(key, OverrideAttributeKey::String(_)) && matches_override(AttributeKind::Label, value))), AttributeKind::LabelKeyedStringDict => matches!(value, OverrideAttributeValue::Map(values) if values.iter().all(|(key, value)| matches!(key, OverrideAttributeKey::Label(_)) && matches_override(AttributeKind::String, value))), AttributeKind::LabelListDict => matches!(value, OverrideAttributeValue::Map(values) if values.iter().all(|(key, value)| matches!(key, OverrideAttributeKey::String(_)) && matches_override(AttributeKind::LabelList, value))),
 } }
 
 #[rustfmt::skip]
 fn matches_coerced(kind: AttributeKind, value: &CoercedAttributeValue) -> bool { matches!((kind, value),
-    (AttributeKind::String, CoercedAttributeValue::String(_)) | (AttributeKind::Boolean, CoercedAttributeValue::Boolean(_)) | (AttributeKind::Integer, CoercedAttributeValue::Integer(_)) | (AttributeKind::Label, CoercedAttributeValue::None | CoercedAttributeValue::Label(_)) | (AttributeKind::Output, CoercedAttributeValue::None | CoercedAttributeValue::Output(_)) | (AttributeKind::StringList, CoercedAttributeValue::StringList(_)) | (AttributeKind::LabelList, CoercedAttributeValue::LabelList(_)) | (AttributeKind::OutputList, CoercedAttributeValue::OutputList(_)) | (AttributeKind::StringDict, CoercedAttributeValue::StringDict(_)) | (AttributeKind::StringListDict, CoercedAttributeValue::StringListDict(_)) | (AttributeKind::StringKeyedLabelDict, CoercedAttributeValue::StringKeyedLabelDict(_)) | (AttributeKind::LabelKeyedStringDict, CoercedAttributeValue::LabelKeyedStringDict(_)) | (AttributeKind::LabelListDict, CoercedAttributeValue::LabelListDict(_))) }
+    (AttributeKind::String, CoercedAttributeValue::String(_)) | (AttributeKind::Boolean, CoercedAttributeValue::Boolean(_)) | (AttributeKind::Integer, CoercedAttributeValue::Integer(_)) | (AttributeKind::IntegerList, CoercedAttributeValue::IntegerList(_)) | (AttributeKind::Label, CoercedAttributeValue::None | CoercedAttributeValue::Label(_)) | (AttributeKind::Output, CoercedAttributeValue::None | CoercedAttributeValue::Output(_)) | (AttributeKind::StringList, CoercedAttributeValue::StringList(_)) | (AttributeKind::LabelList, CoercedAttributeValue::LabelList(_)) | (AttributeKind::OutputList, CoercedAttributeValue::OutputList(_)) | (AttributeKind::StringDict, CoercedAttributeValue::StringDict(_)) | (AttributeKind::StringListDict, CoercedAttributeValue::StringListDict(_)) | (AttributeKind::StringKeyedLabelDict, CoercedAttributeValue::StringKeyedLabelDict(_)) | (AttributeKind::LabelKeyedStringDict, CoercedAttributeValue::LabelKeyedStringDict(_)) | (AttributeKind::LabelListDict, CoercedAttributeValue::LabelListDict(_))) }
 #[doc(hidden)]
 #[rustfmt::skip]
 #[derive(Clone, PartialEq, Eq, Allocative)]
@@ -939,6 +947,36 @@ def implementation(ctx):
     if not ([str(v) for v in ctx.attr.lksd.keys()] == ["@@dep+//pkg:z", "@@dep+//pkg:a"] and ctx.attr.lksd.keys()[0] == ctx.attr.l): fail("default label keys")
     if not (ctx.attr.lld.keys() == ["z", "a"] and [str(v) for v in ctx.attr.lld["z"]] == ["@@dep+//pkg:z", "@@dep+//pkg:a"]): fail("default nested labels")
 "#,
+            input,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn repository_context_projects_integer_lists_for_explicit_default_and_implicit_values() {
+        let values = SmallMap::from_iter([(
+            CompactString::from("explicit"),
+            OverrideAttributeValue::Iterable(Arc::from([
+                OverrideAttributeValue::Int(1),
+                OverrideAttributeValue::Int(-2),
+            ])),
+        )]);
+        let declaration: Arc<[RepositoryRuleAttribute]> = [
+            schema("explicit", AttributeKind::IntegerList, false, None),
+            schema(
+                "defaulted",
+                AttributeKind::IntegerList,
+                false,
+                Some(CoercedAttributeValue::IntegerList(Arc::from([3, 4]))),
+            ),
+            schema("implicit", AttributeKind::IntegerList, false, None),
+        ]
+        .into();
+        let input =
+            RepositoryRuleInvocationInput::new("repo".into(), None, values.into(), declaration)
+                .unwrap();
+        invoke_input(
+            "def implementation(ctx):\n    if ctx.attr.explicit != [1, -2] or ctx.attr.defaulted != [3, 4] or ctx.attr.implicit != []: fail('integer lists')\n    ctx.file('ok')\n",
             input,
         )
         .unwrap();

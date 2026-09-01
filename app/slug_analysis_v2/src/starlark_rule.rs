@@ -628,6 +628,9 @@ fn allocate_analysis_attribute<'v>(
         )),
         CoercedAttributeValue::Boolean(value) => Value::new_bool(*value),
         CoercedAttributeValue::Integer(value) => heap.alloc(*value),
+        CoercedAttributeValue::IntegerList(values) => {
+            heap.alloc(values.iter().copied().collect::<Vec<_>>())
+        }
         CoercedAttributeValue::StringDict(values) => heap.alloc(AllocDict(
             values
                 .iter()
@@ -1917,4 +1920,22 @@ pub(crate) fn evaluate_loaded_rule(
         .with_action_specs(actions, action_contexts)
         .map_err(LoadedRuleError::from)?;
     Ok(result.with_declared_outputs(declared_outputs))
+}
+
+#[cfg(test)]
+mod integer_list_projection_tests {
+    use super::*;
+
+    #[test]
+    fn analysis_attribute_projects_signed_integer_list_in_order() {
+        let module = Module::new();
+        let attribute = ResolvedRuleAttribute {
+            declaration_name: "numbers".into(),
+            kind: AttributeKind::IntegerList,
+            sequence: false,
+            value: CoercedAttributeValue::IntegerList(Arc::from([1, -2, 3])),
+        };
+        let value = allocate_analysis_attribute(&attribute, &[], module.heap()).unwrap();
+        assert_eq!(value.to_repr(), "[1, -2, 3]");
+    }
 }

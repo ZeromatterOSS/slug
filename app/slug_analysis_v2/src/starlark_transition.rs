@@ -93,6 +93,9 @@ fn alloc_raw_attribute<'v>(
         }
         CoercedAttributeValue::Boolean(value) => Value::new_bool(*value),
         CoercedAttributeValue::Integer(value) => heap.alloc(*value),
+        CoercedAttributeValue::IntegerList(values) => {
+            heap.alloc(values.iter().copied().collect::<Vec<_>>())
+        }
         CoercedAttributeValue::StringDict(values) => {
             heap.alloc(AllocDict(values.iter().map(|(key, value)| {
                 (
@@ -378,4 +381,22 @@ pub(crate) fn evaluate(
 
 pub(crate) fn is_platforms(setting: &TransitionSetting) -> bool {
     setting.is_native_option() && setting.canonical().target().as_str() == PLATFORMS
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+
+    #[test]
+    fn transition_attribute_projects_signed_integer_list_in_order() {
+        let module = Module::new();
+        let value = alloc_raw_attribute(
+            &CoercedAttributeValue::IntegerList(Arc::from([1, -2, 3])),
+            module.heap(),
+        )
+        .unwrap();
+        assert_eq!(value.to_repr(), "[1, -2, 3]");
+    }
 }

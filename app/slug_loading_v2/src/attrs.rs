@@ -41,6 +41,7 @@ pub enum AttributeKind {
     StringListDict,
     Boolean,
     Integer,
+    IntegerList,
     StringDict,
 }
 
@@ -172,6 +173,7 @@ impl AttributeKind {
                 | Self::StringListDict
                 | Self::Boolean
                 | Self::Integer
+                | Self::IntegerList
                 | Self::StringDict
         )
     }
@@ -202,6 +204,7 @@ pub struct AttributeSchema {
     file_admissibility: FileAdmissibility,
     flags: AttributeFlags,
     allowed_values: AllowedAttributeValues,
+    allow_empty: bool,
     required_providers: Arc<[Arc<[ProviderIdentity]>]>,
     default: Option<Arc<CoercedAttributeValue>>,
     dependency_configuration: AttributeDependencyConfiguration,
@@ -234,6 +237,7 @@ impl AttributeSchema {
             file_admissibility: FileAdmissibility::default(),
             flags: AttributeFlags::default(),
             allowed_values: AllowedAttributeValues::None,
+            allow_empty: true,
             required_providers: Arc::from([]),
             default: default.map(Arc::new),
             dependency_configuration: AttributeDependencyConfiguration::Target,
@@ -296,6 +300,10 @@ impl AttributeSchema {
     pub(crate) fn allowed_values(&self) -> &AllowedAttributeValues {
         &self.allowed_values
     }
+
+    pub fn allow_empty(&self) -> bool {
+        self.allow_empty
+    }
     pub fn required_providers(&self) -> &Arc<[Arc<[ProviderIdentity]>]> {
         &self.required_providers
     }
@@ -309,6 +317,11 @@ impl AttributeSchema {
     }
     pub(crate) fn with_allowed_values(mut self, values: AllowedAttributeValues) -> Self {
         self.allowed_values = values;
+        self
+    }
+
+    pub(crate) fn with_allow_empty(mut self, allow_empty: bool) -> Self {
+        self.allow_empty = allow_empty;
         self
     }
     pub(crate) fn with_required_providers(
@@ -809,6 +822,7 @@ pub enum CoercedAttributeValue {
     StringListDict(Arc<[(CompactString, Arc<[CompactString]>)]>),
     Boolean(bool),
     Integer(i32),
+    IntegerList(Arc<[i32]>),
     StringDict(Arc<[(CompactString, CompactString)]>),
     StringKeyedLabelDict(Arc<[(CompactString, CanonicalLabel)]>),
     LabelKeyedStringDict(Arc<[(CanonicalLabel, CompactString)]>),
@@ -873,6 +887,23 @@ impl CoercedAttributeValue {
         labels
     }
 
+    /// Reports emptiness for Bazel collection attribute values. Scalars and
+    /// unresolved expressions are not collection values.
+    pub fn collection_is_empty(&self) -> Option<bool> {
+        Some(match self {
+            Self::IntegerList(values) => values.is_empty(),
+            Self::StringList(values) => values.is_empty(),
+            Self::LabelList(values) => values.is_empty(),
+            Self::OutputList(values) => values.is_empty(),
+            Self::StringDict(values) => values.is_empty(),
+            Self::StringListDict(values) => values.is_empty(),
+            Self::StringKeyedLabelDict(values) => values.is_empty(),
+            Self::LabelKeyedStringDict(values) => values.is_empty(),
+            Self::LabelListDict(values) => values.is_empty(),
+            _ => return None,
+        })
+    }
+
     /// Concatenates two already-resolved values using the retained attribute
     /// type as the single owner of Bazel's typed `+` behavior.
     pub fn concatenate_resolved(&self, right: &Self) -> Result<Self, AttrCandidateError> {
@@ -894,7 +925,10 @@ impl CoercedAttributeValue {
 
         let shape = |value: &Self| match value {
             Self::String(_) => "string",
-            Self::LabelList(_) | Self::StringList(_) | Self::OutputList(_) => "list",
+            Self::LabelList(_)
+            | Self::StringList(_)
+            | Self::IntegerList(_)
+            | Self::OutputList(_) => "list",
             Self::StringListDict(_)
             | Self::StringDict(_)
             | Self::StringKeyedLabelDict(_)
@@ -928,6 +962,13 @@ impl CoercedAttributeValue {
                 left.iter()
                     .chain(right.iter())
                     .cloned()
+                    .collect::<Vec<_>>()
+                    .into(),
+            ),
+            (Self::IntegerList(left), Self::IntegerList(right)) => Self::IntegerList(
+                left.iter()
+                    .chain(right.iter())
+                    .copied()
                     .collect::<Vec<_>>()
                     .into(),
             ),
@@ -1046,6 +1087,7 @@ impl CoercedAttributeValue {
             Self::StringListDict(values) => Self::StringListDict(values.clone()),
             Self::Boolean(value) => Self::Boolean(*value),
             Self::Integer(value) => Self::Integer(*value),
+            Self::IntegerList(values) => Self::IntegerList(values.clone()),
             Self::StringDict(values) => Self::StringDict(values.clone()),
         })
     }
@@ -1098,6 +1140,7 @@ impl CoercedAttributeValue {
             | Self::StringListDict(_)
             | Self::Boolean(_)
             | Self::Integer(_)
+            | Self::IntegerList(_)
             | Self::StringDict(_)
             | Self::None => {}
         }
@@ -1264,6 +1307,11 @@ fn expand_attr_candidates(
         CoercedAttributeValue::Integer(value) => {
             scalar_string_candidate(CompactString::new(value.to_string()))
         }
+        CoercedAttributeValue::IntegerList(values) => list_candidate(
+            values
+                .iter()
+                .map(|value| AttrCandidateAtom::String(CompactString::new(value.to_string()))),
+        ),
         CoercedAttributeValue::LabelList(values) | CoercedAttributeValue::OutputList(values) => {
             list_candidate(values.iter().map(AttrCandidateAtom::Label))
         }
@@ -1770,9 +1818,42 @@ mod tests {
     }
 
     #[test]
+    fn collection_emptiness_covers_every_list_and_dictionary_kind() {
+        let empty = [
+            CoercedAttributeValue::IntegerList(Arc::from([])),
+            CoercedAttributeValue::StringList(Arc::from([])),
+            CoercedAttributeValue::LabelList(Arc::from([])),
+            CoercedAttributeValue::OutputList(Arc::from([])),
+            CoercedAttributeValue::StringDict(Arc::from([])),
+            CoercedAttributeValue::StringListDict(Arc::from([])),
+            CoercedAttributeValue::StringKeyedLabelDict(Arc::from([])),
+            CoercedAttributeValue::LabelKeyedStringDict(Arc::from([])),
+            CoercedAttributeValue::LabelListDict(Arc::from([])),
+        ];
+        assert!(
+            empty
+                .iter()
+                .all(|value| value.collection_is_empty() == Some(true))
+        );
+        assert_eq!(
+            CoercedAttributeValue::IntegerList(Arc::from([1])).collection_is_empty(),
+            Some(false)
+        );
+        for scalar in [
+            CoercedAttributeValue::None,
+            CoercedAttributeValue::Boolean(false),
+            CoercedAttributeValue::Integer(0),
+            CoercedAttributeValue::String(CompactString::new("")),
+        ] {
+            assert_eq!(scalar.collection_is_empty(), None);
+        }
+    }
+
+    #[test]
     fn attr_candidates_render_ordered_lists_and_dictionaries_with_canonical_labels() {
         let scalar_label = CoercedAttributeValue::Label(label("@@//pkg:scalar"));
         let scalar_string = CoercedAttributeValue::String(CompactString::new("literal"));
+        let integers = CoercedAttributeValue::IntegerList(Arc::from([1, -2, 1]));
         let labels = CoercedAttributeValue::LabelList(Arc::from([
             label("@@//pkg:first"),
             label("@@//pkg:second"),
@@ -1810,6 +1891,12 @@ mod tests {
         assert_eq!(
             labels.attr_visible_candidates(render_bazel_label).unwrap(),
             ["[//pkg:first, //pkg:second, //pkg:second]"]
+        );
+        assert_eq!(
+            integers
+                .attr_visible_candidates(render_bazel_label)
+                .unwrap(),
+            ["[1, -2, 1]"]
         );
         assert_eq!(
             keyed_labels

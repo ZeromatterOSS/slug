@@ -24,6 +24,7 @@ use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::RunfilesPackageMetadata;
 use slug_build_api_v2::RunfilesRepositoryMapping;
 use slug_bzlmod_v2::BuiltinBazelToolsSnapshot;
+use slug_bzlmod_v2::NonrootAttributeKey;
 use slug_bzlmod_v2::NonrootAttributeValue;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
@@ -2282,6 +2283,7 @@ fn native_default(schema: NativeAttributeSchema) -> NativeAttributeValue {
         AttributeKind::StringListDict => CoercedAttributeValue::StringListDict(Arc::from([])),
         AttributeKind::Boolean => CoercedAttributeValue::Boolean(false),
         AttributeKind::Integer => CoercedAttributeValue::Integer(0),
+        AttributeKind::IntegerList => CoercedAttributeValue::IntegerList(Arc::from([])),
         AttributeKind::StringDict => CoercedAttributeValue::StringDict(Arc::from([])),
         AttributeKind::StringKeyedLabelDict => {
             CoercedAttributeValue::StringKeyedLabelDict(Arc::from([]))
@@ -3326,6 +3328,7 @@ fn intrinsic_default(kind: AttributeKind) -> CoercedAttributeValue {
         AttributeKind::StringListDict => CoercedAttributeValue::StringListDict(Arc::from([])),
         AttributeKind::Boolean => CoercedAttributeValue::Boolean(false),
         AttributeKind::Integer => CoercedAttributeValue::Integer(0),
+        AttributeKind::IntegerList => CoercedAttributeValue::IntegerList(Arc::from([])),
         AttributeKind::StringDict => CoercedAttributeValue::StringDict(Arc::from([])),
         AttributeKind::StringKeyedLabelDict => {
             CoercedAttributeValue::StringKeyedLabelDict(Arc::from([]))
@@ -3401,6 +3404,19 @@ fn coerce_raw_value(
             RawAttributeValue::Integer(value) => Ok(CoercedAttributeValue::Integer(*value)),
             _ => anyhow::bail!("attribute must be an integer"),
         },
+        AttributeKind::IntegerList => {
+            let RawAttributeValue::List(values) = raw else {
+                anyhow::bail!("attribute must be a list of integers");
+            };
+            let values = values
+                .iter()
+                .map(|value| match value {
+                    RawAttributeValue::Integer(value) => Ok(*value),
+                    _ => anyhow::bail!("attribute must be a list of integers"),
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            Ok(CoercedAttributeValue::IntegerList(values.into()))
+        }
         AttributeKind::StringDict => {
             let RawAttributeValue::Dict(values) = raw else {
                 anyhow::bail!("attribute must be a string dictionary");
@@ -3733,6 +3749,7 @@ struct MacroAttributeSchema {
     default_to_none: bool,
     file_admissibility: FileAdmissibility,
     allowed_values: AllowedAttributeValues,
+    allow_empty: bool,
 }
 
 impl MacroAttributeSchema {
@@ -3755,6 +3772,7 @@ impl MacroAttributeSchema {
             default_to_none: false,
             file_admissibility: definition.file_admissibility.clone(),
             allowed_values: definition.allowed_values.clone(),
+            allow_empty: definition.allow_empty,
         })
     }
 
@@ -3780,6 +3798,7 @@ impl MacroAttributeSchema {
             default_to_none: !schema.mandatory,
             file_admissibility: schema.file_admissibility.clone(),
             allowed_values: schema.allowed_values.clone(),
+            allow_empty: schema.allow_empty,
         })
     }
 
@@ -3805,6 +3824,7 @@ impl MacroAttributeSchema {
             default_to_none: !schema.mandatory,
             file_admissibility: schema.file_admissibility.clone(),
             allowed_values: schema.allowed_values.clone(),
+            allow_empty: schema.allow_empty,
         })
     }
 
@@ -4762,6 +4782,8 @@ pub(crate) struct RuleAttributeSchemaGen<V> {
     #[trace(unsafe_ignore)]
     pub(crate) allowed_values: AllowedAttributeValues,
     #[trace(unsafe_ignore)]
+    pub(crate) allow_empty: bool,
+    #[trace(unsafe_ignore)]
     pub(crate) executable: bool,
     #[trace(unsafe_ignore)]
     pub(crate) exec_configuration: bool,
@@ -4788,6 +4810,7 @@ fn declared_attribute_schema<'v>(
         file_admissibility: definition.file_admissibility.clone(),
         flags: definition.flags,
         allowed_values: definition.allowed_values.clone(),
+        allow_empty: definition.allow_empty,
         executable: definition.executable,
         exec_configuration: definition.exec_configuration,
         required_providers: definition.required_providers.clone(),
@@ -4819,6 +4842,7 @@ fn starlark_builtin_schema<V>(
             file_admissibility: FileAdmissibility::default(),
             flags: AttributeFlags::default(),
             allowed_values: AllowedAttributeValues::None,
+            allow_empty: true,
             executable: false,
             exec_configuration: false,
             required_providers: Arc::from([]),
@@ -5327,6 +5351,8 @@ struct AttributeDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     allowed_values: AllowedAttributeValues,
     #[trace(unsafe_ignore)]
+    allow_empty: bool,
+    #[trace(unsafe_ignore)]
     default: Option<CoercedAttributeValue>,
     #[trace(unsafe_ignore)]
     late_bound_default: Option<slug_configuration_v2::ConfigurationFieldIdentity>,
@@ -5356,6 +5382,7 @@ fn attribute_definition_from_value<'v>(value: Value<'v>) -> Option<AttributeDefi
             file_admissibility: value.file_admissibility.clone(),
             flags: value.flags,
             allowed_values: value.allowed_values.clone(),
+            allow_empty: value.allow_empty,
             default: value.default.clone(),
             late_bound_default: value.late_bound_default.clone(),
             computed_default: value.computed_default,
@@ -5476,6 +5503,7 @@ impl<'v> Freeze for AttributeDefinition<'v> {
             file_admissibility: self.file_admissibility,
             flags: self.flags,
             allowed_values: self.allowed_values,
+            allow_empty: self.allow_empty,
             default: self.default,
             late_bound_default: self.late_bound_default,
             computed_default: self.computed_default,
@@ -5505,6 +5533,7 @@ impl<'v> Freeze for RuleAttributeSchema<'v> {
             file_admissibility: self.file_admissibility,
             flags: self.flags,
             allowed_values: self.allowed_values,
+            allow_empty: self.allow_empty,
             default: self.default,
             executable: self.executable,
             exec_configuration: self.exec_configuration,
@@ -5530,6 +5559,8 @@ pub(crate) struct ModuleExtensionTagAttribute {
     pub(crate) configurable: bool,
     pub(crate) default: Option<CoercedAttributeValue>,
     pub(crate) file_admissibility: FileAdmissibility,
+    pub(crate) allowed_values: AllowedAttributeValues,
+    pub(crate) allow_empty: bool,
 }
 
 pub(crate) type ModuleExtensionTagCoercionError = CompactString;
@@ -5539,7 +5570,14 @@ fn module_extension_label(
     context_repo: &CanonicalRepoName,
     mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
 ) -> Result<CanonicalLabel, ModuleExtensionTagCoercionError> {
-    let apparent = ApparentLabel::parse(raw).map_err(CompactString::from)?;
+    let spelling = if raw.starts_with('@') || raw.starts_with("//") {
+        raw.to_owned()
+    } else if raw.starts_with(':') {
+        format!("//{raw}")
+    } else {
+        format!("//:{raw}")
+    };
+    let apparent = ApparentLabel::parse(&spelling).map_err(CompactString::from)?;
     let repository = if apparent.repo().is_root() {
         context_repo
     } else {
@@ -5563,12 +5601,70 @@ fn module_extension_label(
     CanonicalLabel::parse(&canonical).map_err(CompactString::from)
 }
 
-fn coerce_module_extension_scalar(
+fn module_extension_sequence(
+    raw: &NonrootAttributeValue,
+) -> Result<&[NonrootAttributeValue], ModuleExtensionTagCoercionError> {
+    match raw {
+        NonrootAttributeValue::List(values) | NonrootAttributeValue::Tuple(values) => {
+            Ok(values.as_ref())
+        }
+        _ => Err("module-extension attribute value must be a list or tuple".into()),
+    }
+}
+
+fn module_extension_dict(
+    raw: &NonrootAttributeValue,
+) -> Result<&SmallMap<NonrootAttributeKey, NonrootAttributeValue>, ModuleExtensionTagCoercionError>
+{
+    match raw {
+        NonrootAttributeValue::Dict(values) => Ok(values.as_ref()),
+        _ => Err("module-extension attribute value must be a dictionary".into()),
+    }
+}
+
+fn coerce_module_extension_value(
     kind: AttributeKind,
     raw: &NonrootAttributeValue,
     context_repo: &CanonicalRepoName,
     mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
 ) -> Result<CoercedAttributeValue, ModuleExtensionTagCoercionError> {
+    let string = |raw: &NonrootAttributeValue| match raw {
+        NonrootAttributeValue::String(value) => Ok(value.clone()),
+        _ => Err(CompactString::from(
+            "module-extension attribute value must be a string",
+        )),
+    };
+    let label = |raw: &NonrootAttributeValue| match raw {
+        NonrootAttributeValue::String(value) | NonrootAttributeValue::Label(value) => {
+            module_extension_label(value, context_repo, mapping)
+        }
+        _ => Err(CompactString::from(
+            "module-extension attribute value must be a label",
+        )),
+    };
+    let output = |raw: &NonrootAttributeValue| {
+        let value = label(raw)?;
+        if !value.package().package().as_str().is_empty() {
+            return Err(CompactString::from(format!(
+                "output label '{value}' is not in the current package"
+            )));
+        }
+        Ok(value)
+    };
+    let string_key = |key: &NonrootAttributeKey| match key {
+        NonrootAttributeKey::String(value) => Ok(value.clone()),
+        _ => Err(CompactString::from(
+            "module-extension dictionary key must be a string",
+        )),
+    };
+    let label_key = |key: &NonrootAttributeKey| match key {
+        NonrootAttributeKey::String(value) | NonrootAttributeKey::Label(value) => {
+            module_extension_label(value, context_repo, mapping)
+        }
+        _ => Err(CompactString::from(
+            "module-extension dictionary key must be a label",
+        )),
+    };
     match (kind, raw) {
         (AttributeKind::String, NonrootAttributeValue::String(value)) => {
             Ok(CoercedAttributeValue::String(value.clone()))
@@ -5584,18 +5680,96 @@ fn coerce_module_extension_scalar(
             AttributeKind::Label,
             NonrootAttributeValue::String(value) | NonrootAttributeValue::Label(value),
         ) => module_extension_label(value, context_repo, mapping).map(CoercedAttributeValue::Label),
+        (AttributeKind::Output, _) => output(raw).map(CoercedAttributeValue::Output),
+        (AttributeKind::IntegerList, _) => module_extension_sequence(raw)?
+            .iter()
+            .map(|value| match value {
+                NonrootAttributeValue::Int(value) => value
+                    .as_i32()
+                    .ok_or_else(|| CompactString::from("integer-list member is outside i32")),
+                _ => Err(CompactString::from(
+                    "module-extension integer-list member must be an integer",
+                )),
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|values| CoercedAttributeValue::IntegerList(values.into())),
+        (AttributeKind::StringList, _) => module_extension_sequence(raw)?
+            .iter()
+            .map(string)
+            .collect::<Result<Vec<_>, _>>()
+            .map(|values| CoercedAttributeValue::StringList(values.into())),
+        (AttributeKind::LabelList, _) => module_extension_sequence(raw)?
+            .iter()
+            .map(label)
+            .collect::<Result<Vec<_>, _>>()
+            .map(|values| CoercedAttributeValue::LabelList(values.into())),
+        (AttributeKind::OutputList, _) => module_extension_sequence(raw)?
+            .iter()
+            .map(output)
+            .collect::<Result<Vec<_>, _>>()
+            .map(|values| CoercedAttributeValue::OutputList(values.into())),
+        (AttributeKind::StringDict, _) => module_extension_dict(raw)?
+            .iter()
+            .map(|(key, value)| Ok((string_key(key)?, string(value)?)))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Into::into)
+            .map(CoercedAttributeValue::StringDict),
+        (AttributeKind::StringListDict, _) => module_extension_dict(raw)?
+            .iter()
+            .map(|(key, value)| {
+                Ok((
+                    string_key(key)?,
+                    module_extension_sequence(value)?
+                        .iter()
+                        .map(string)
+                        .collect::<Result<Vec<_>, _>>()?
+                        .into(),
+                ))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Into::into)
+            .map(CoercedAttributeValue::StringListDict),
+        (AttributeKind::StringKeyedLabelDict, _) => module_extension_dict(raw)?
+            .iter()
+            .map(|(key, value)| Ok((string_key(key)?, label(value)?)))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Into::into)
+            .map(CoercedAttributeValue::StringKeyedLabelDict),
+        (AttributeKind::LabelKeyedStringDict, _) => {
+            let mut values = Vec::new();
+            for (key, value) in module_extension_dict(raw)? {
+                let key = label_key(key)?;
+                if values
+                    .iter()
+                    .any(|(existing, _): &(CanonicalLabel, CompactString)| existing == &key)
+                {
+                    return Err(format!("duplicate canonical label dictionary key '{key}'").into());
+                }
+                values.push((key, string(value)?));
+            }
+            Ok(CoercedAttributeValue::LabelKeyedStringDict(values.into()))
+        }
+        (AttributeKind::LabelListDict, _) => module_extension_dict(raw)?
+            .iter()
+            .map(|(key, value)| {
+                Ok((
+                    string_key(key)?,
+                    module_extension_sequence(value)?
+                        .iter()
+                        .map(label)
+                        .collect::<Result<Vec<_>, _>>()?
+                        .into(),
+                ))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Into::into)
+            .map(CoercedAttributeValue::LabelListDict),
         _ => Err(format!("unsupported value for module-extension {kind:?} attribute").into()),
     }
 }
 
 fn module_extension_intrinsic_default(kind: AttributeKind) -> CoercedAttributeValue {
-    match kind {
-        AttributeKind::String => CoercedAttributeValue::String(CompactString::new("")),
-        AttributeKind::Boolean => CoercedAttributeValue::Boolean(false),
-        AttributeKind::Integer => CoercedAttributeValue::Integer(0),
-        AttributeKind::Label => CoercedAttributeValue::None,
-        _ => unreachable!("caller validates the admitted scalar kind"),
-    }
+    intrinsic_default(kind)
 }
 
 fn module_extension_default_matches(kind: AttributeKind, value: &CoercedAttributeValue) -> bool {
@@ -5605,8 +5779,48 @@ fn module_extension_default_matches(kind: AttributeKind, value: &CoercedAttribut
             | (AttributeKind::Boolean, CoercedAttributeValue::Boolean(_))
             | (AttributeKind::Integer, CoercedAttributeValue::Integer(_))
             | (
+                AttributeKind::IntegerList,
+                CoercedAttributeValue::IntegerList(_)
+            )
+            | (
                 AttributeKind::Label,
                 CoercedAttributeValue::Label(_) | CoercedAttributeValue::None
+            )
+            | (
+                AttributeKind::Output,
+                CoercedAttributeValue::Output(_) | CoercedAttributeValue::None
+            )
+            | (
+                AttributeKind::StringList,
+                CoercedAttributeValue::StringList(_)
+            )
+            | (
+                AttributeKind::LabelList,
+                CoercedAttributeValue::LabelList(_)
+            )
+            | (
+                AttributeKind::OutputList,
+                CoercedAttributeValue::OutputList(_)
+            )
+            | (
+                AttributeKind::StringDict,
+                CoercedAttributeValue::StringDict(_)
+            )
+            | (
+                AttributeKind::StringListDict,
+                CoercedAttributeValue::StringListDict(_)
+            )
+            | (
+                AttributeKind::StringKeyedLabelDict,
+                CoercedAttributeValue::StringKeyedLabelDict(_)
+            )
+            | (
+                AttributeKind::LabelKeyedStringDict,
+                CoercedAttributeValue::LabelKeyedStringDict(_)
+            )
+            | (
+                AttributeKind::LabelListDict,
+                CoercedAttributeValue::LabelListDict(_)
             )
     )
 }
@@ -5629,7 +5843,7 @@ pub(crate) fn prepare_module_extension_tag_attributes(
             .ok_or_else(|| CompactString::from(format!("unknown attribute '{name}'")))?;
         supplied.insert(
             name.clone(),
-            coerce_module_extension_scalar(attribute.kind, raw, context_repo, mapping)?,
+            coerce_module_extension_value(attribute.kind, raw, context_repo, mapping)?,
         );
     }
     schema
@@ -5649,7 +5863,9 @@ pub(crate) fn prepare_module_extension_tag_attributes(
                     .clone()
                     .unwrap_or_else(|| module_extension_intrinsic_default(attribute.kind))
             };
-            if let CoercedAttributeValue::Label(label) = &value {
+            let mut labels = Vec::new();
+            value.labels(&mut labels);
+            for label in labels {
                 let repo = label.package().repo();
                 if repo != context_repo && !mapping.values().any(|visible| visible == repo) {
                     return Err(
@@ -5657,6 +5873,8 @@ pub(crate) fn prepare_module_extension_tag_attributes(
                     );
                 }
             }
+            validate_allowed_value(&attribute.name, &value, &attribute.allowed_values)
+                .map_err(|error| CompactString::from(error.to_string()))?;
             Ok((attribute.name.clone(), value))
         })
         .collect::<Result<Arc<_>, _>>()
@@ -5666,13 +5884,7 @@ pub(crate) fn validate_module_extension_tag_schema(
     schema: &[ModuleExtensionTagAttribute],
 ) -> Result<(), ModuleExtensionTagCoercionError> {
     for attribute in schema {
-        if !matches!(
-            attribute.kind,
-            AttributeKind::String
-                | AttributeKind::Boolean
-                | AttributeKind::Integer
-                | AttributeKind::Label
-        ) || attribute
+        if attribute
             .default
             .as_ref()
             .is_some_and(|value| !module_extension_default_matches(attribute.kind, value))
@@ -6024,6 +6236,7 @@ fn attribute_definition<'v>(
         file_admissibility,
         flags: AttributeFlags::default(),
         allowed_values: AllowedAttributeValues::None,
+        allow_empty: true,
         default,
         late_bound_default,
         computed_default,
@@ -6216,6 +6429,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] allow_empty: Option<bool>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
@@ -6238,6 +6452,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         definition.required_providers = required_providers;
         definition.attached_aspect = label_list_attached_aspect(aspects)?;
         definition.flags = unpack_attribute_flags(flags)?;
+        definition.allow_empty = allow_empty.unwrap_or(true);
         Ok(definition)
     }
     fn string_keyed_label_dict<'v>(
@@ -6246,6 +6461,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] allow_empty: Option<bool>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
@@ -6266,6 +6482,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         definition.required_providers =
             declaration_required_providers(providers, "attribute providers")?;
         definition.flags = unpack_attribute_flags(flags)?;
+        definition.allow_empty = allow_empty.unwrap_or(true);
         Ok(definition)
     }
     fn label_keyed_string_dict<'v>(
@@ -6274,6 +6491,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] allow_empty: Option<bool>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
@@ -6294,6 +6512,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         definition.required_providers =
             declaration_required_providers(providers, "attribute providers")?;
         definition.flags = unpack_attribute_flags(flags)?;
+        definition.allow_empty = allow_empty.unwrap_or(true);
         Ok(definition)
     }
     fn bool<'v>(
@@ -6344,12 +6563,36 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         };
         Ok(definition)
     }
+    fn int_list<'v>(
+        #[starlark(this)] _attr: Value<'v>,
+        #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] configurable: Option<bool>,
+        #[starlark(require = named)] default: Option<Value<'v>>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] allow_empty: Option<bool>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
+        discard_attribute_doc(doc)?;
+        let mut definition = attribute_definition(
+            AttributeKind::IntegerList,
+            mandatory.unwrap_or(false),
+            configurable,
+            FileAdmissibility::default(),
+            false,
+            default,
+            None,
+            eval,
+        )?;
+        definition.allow_empty = allow_empty.unwrap_or(true);
+        Ok(definition)
+    }
     fn label_list_dict<'v>(
         #[starlark(this)] _attr: Value<'v>,
         #[starlark(require = named)] mandatory: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] allow_empty: Option<bool>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
@@ -6370,6 +6613,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         definition.required_providers =
             declaration_required_providers(providers, "attribute providers")?;
         definition.flags = unpack_attribute_flags(flags)?;
+        definition.allow_empty = allow_empty.unwrap_or(true);
         Ok(definition)
     }
     fn output<'v>(
@@ -6394,10 +6638,11 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] _attr: Value<'v>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] allow_empty: Option<bool>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
-        attribute_definition(
+        let mut definition = attribute_definition(
             AttributeKind::OutputList,
             mandatory.unwrap_or(false),
             None,
@@ -6406,7 +6651,9 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             None,
             None,
             eval,
-        )
+        )?;
+        definition.allow_empty = allow_empty.unwrap_or(true);
+        Ok(definition)
     }
     fn string<'v>(
         #[starlark(this)] _attr: Value<'v>,
@@ -6437,10 +6684,11 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] allow_empty: Option<bool>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
-        attribute_definition(
+        let mut definition = attribute_definition(
             AttributeKind::StringList,
             mandatory.unwrap_or(false),
             configurable,
@@ -6449,7 +6697,9 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             default,
             None,
             eval,
-        )
+        )?;
+        definition.allow_empty = allow_empty.unwrap_or(true);
+        Ok(definition)
     }
     fn string_dict<'v>(
         #[starlark(this)] _attr: Value<'v>,
@@ -6457,10 +6707,11 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] allow_empty: Option<bool>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
-        attribute_definition(
+        let mut definition = attribute_definition(
             AttributeKind::StringDict,
             mandatory.unwrap_or(false),
             configurable,
@@ -6469,7 +6720,9 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             default,
             None,
             eval,
-        )
+        )?;
+        definition.allow_empty = allow_empty.unwrap_or(true);
+        Ok(definition)
     }
     fn string_list_dict<'v>(
         #[starlark(this)] _attr: Value<'v>,
@@ -6477,10 +6730,11 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] allow_empty: Option<bool>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
-        attribute_definition(
+        let mut definition = attribute_definition(
             AttributeKind::StringListDict,
             mandatory.unwrap_or(false),
             configurable,
@@ -6489,7 +6743,9 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             default,
             None,
             eval,
-        )
+        )?;
+        definition.allow_empty = allow_empty.unwrap_or(true);
+        Ok(definition)
     }
 }
 
@@ -6871,6 +7127,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                         .with_file_admissibility(declaration.file_admissibility.clone())
                         .with_flags(declaration.flags)
                         .with_allowed_values(declaration.allowed_values.clone())
+                        .with_allow_empty(declaration.allow_empty)
                         .with_required_providers(declaration.required_providers.clone())
                     };
                     // Keep the full declaration schema even for an omitted
@@ -7074,6 +7331,7 @@ fn allocate_macro_attribute<'v>(
         CoercedAttributeValue::None => Value::new_none(),
         CoercedAttributeValue::Boolean(value) => Value::new_bool(*value),
         CoercedAttributeValue::Integer(value) => heap.alloc(*value),
+        CoercedAttributeValue::IntegerList(values) => heap.alloc(AllocList(values.iter().copied())),
         CoercedAttributeValue::String(value) => heap.alloc_str(value).to_value(),
         CoercedAttributeValue::Label(value) | CoercedAttributeValue::Output(value) => label(value),
         CoercedAttributeValue::StringList(values) => {
@@ -7514,6 +7772,10 @@ fn repository_rule_default_matches(kind: AttributeKind, value: &CoercedAttribute
             | (AttributeKind::Boolean, CoercedAttributeValue::Boolean(_))
             | (AttributeKind::Integer, CoercedAttributeValue::Integer(_))
             | (
+                AttributeKind::IntegerList,
+                CoercedAttributeValue::IntegerList(_)
+            )
+            | (
                 AttributeKind::Label,
                 CoercedAttributeValue::Label(_) | CoercedAttributeValue::None
             )
@@ -7826,20 +8088,15 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             if !definition.required_providers.is_empty() {
                 anyhow::bail!("tag attribute `{name}` does not support providers");
             }
-            if !matches!(definition.allowed_values, AllowedAttributeValues::None) {
-                anyhow::bail!("tag attribute `{name}` does not support allowed values");
-            }
-            let name = name
-                .strip_prefix('_')
-                .map(|name| CompactString::from(format!("${name}")))
-                .unwrap_or_else(|| name.into());
             attributes.push(ModuleExtensionTagAttribute {
-                name,
+                name: name.into(),
                 kind: definition.kind,
                 mandatory: definition.mandatory,
                 configurable: definition.configurable,
                 default: definition.default.clone(),
                 file_admissibility: definition.file_admissibility.clone(),
+                allowed_values: definition.allowed_values.clone(),
+                allow_empty: definition.allow_empty,
             });
         }
         Ok(TagClassDefinition {
@@ -8919,10 +9176,13 @@ mod module_extension_definition_tests {
     }
 
     #[test]
-    fn symbolic_macro_preserves_ordered_suffix_file_policy() {
+    fn symbolic_macro_preserves_ordered_suffix_and_integer_list_policy() {
         let module = evaluate(
-            "def _impl(name, visibility, dep): pass\n\
-             M = macro(implementation = _impl, attrs = {'dep': attr.label(allow_files = ['.rs', '.src', '.rs'])})\n",
+            "def _impl(name, visibility, dep, nums): pass\n\
+             M = macro(implementation = _impl, attrs = {\n\
+               'dep': attr.label(allow_files = ['.rs', '.src', '.rs']),\n\
+               'nums': attr.int_list(default = [1, -2], allow_empty = False),\n\
+             })\n",
         )
         .unwrap();
         let definition = module
@@ -8930,7 +9190,7 @@ mod module_extension_definition_tests {
             .unwrap()
             .downcast::<FrozenSymbolicMacroDefinition>()
             .unwrap();
-        assert_eq!(definition.attributes.len(), 1);
+        assert_eq!(definition.attributes.len(), 2);
         assert_eq!(
             definition.attributes[0].file_admissibility.suffixes(),
             Some([".rs".into(), ".src".into(), ".rs".into()].as_slice())
@@ -8940,6 +9200,69 @@ mod module_extension_definition_tests {
                 .file_admissibility
                 .single_artifact()
         );
+        assert_eq!(definition.attributes[1].kind, AttributeKind::IntegerList);
+        assert_eq!(
+            definition.attributes[1].default,
+            Some(CoercedAttributeValue::IntegerList(Arc::from([1, -2])))
+        );
+        assert!(!definition.attributes[1].allow_empty);
+    }
+
+    #[test]
+    fn rule_schema_retains_integer_list_and_allow_empty_policy() {
+        let module = evaluate(
+            "def _impl(ctx): pass\n\
+             R = rule(implementation = _impl, attrs = {\n\
+               'nums': attr.int_list(default = [1, -2], allow_empty = False),\n\
+             })\n",
+        )
+        .unwrap();
+        let definition = module
+            .get("R")
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        let attribute = definition
+            .schema
+            .iter()
+            .find(|attribute| attribute.name == "nums")
+            .unwrap();
+        assert_eq!(attribute.kind, AttributeKind::IntegerList);
+        assert_eq!(
+            attribute.default,
+            Some(CoercedAttributeValue::IntegerList(Arc::from([1, -2])))
+        );
+        assert!(!attribute.allow_empty);
+    }
+
+    #[test]
+    fn complete_collection_constructor_category_retains_allow_empty() {
+        for constructor in [
+            "int_list",
+            "string_list",
+            "label_list",
+            "output_list",
+            "string_dict",
+            "string_list_dict",
+            "string_keyed_label_dict",
+            "label_keyed_string_dict",
+            "label_list_dict",
+        ] {
+            let module = evaluate(&format!("X = attr.{constructor}(allow_empty = False)\n"))
+                .unwrap_or_else(|error| panic!("{constructor}: {error}"));
+            let definition = module
+                .get("X")
+                .unwrap()
+                .downcast::<FrozenAttributeDefinition>()
+                .unwrap();
+            assert!(!definition.allow_empty, "{constructor}");
+        }
+        for constructor in ["bool", "int", "string", "label", "output"] {
+            assert!(
+                evaluate(&format!("X = attr.{constructor}(allow_empty = False)\n")).is_err(),
+                "{constructor} exposed allow_empty"
+            );
+        }
     }
 
     #[test]
@@ -9260,6 +9583,8 @@ mod module_extension_definition_tests {
             configurable: true,
             default,
             file_admissibility: FileAdmissibility::default(),
+            allowed_values: AllowedAttributeValues::None,
+            allow_empty: true,
         }
     }
 
@@ -9436,33 +9761,175 @@ mod module_extension_definition_tests {
             .unwrap_err()
             .contains("missing+")
         );
+        assert!(
+            prepare_module_extension_tag_attributes(
+                &[tag_attribute(
+                    "targets",
+                    AttributeKind::LabelListDict,
+                    false,
+                    Some(CoercedAttributeValue::LabelListDict(Arc::from([(
+                        "group".into(),
+                        Arc::from([CanonicalLabel::parse("@@missing+//:nested").unwrap(),]),
+                    )]))),
+                )],
+                &SmallMap::new(),
+                &context,
+                &mapping,
+            )
+            .unwrap_err()
+            .contains("missing+")
+        );
     }
 
     #[test]
-    fn prepared_tag_fails_closed_on_every_deferred_family() {
+    fn prepared_tag_complete_collection_matrix_defaults_and_failures() {
         let (context, mapping) = root_context();
-        for kind in [
-            AttributeKind::LabelList,
-            AttributeKind::StringKeyedLabelDict,
-            AttributeKind::LabelKeyedStringDict,
-            AttributeKind::LabelListDict,
-            AttributeKind::Output,
-            AttributeKind::OutputList,
-            AttributeKind::StringList,
-            AttributeKind::StringListDict,
-            AttributeKind::StringDict,
-        ] {
-            assert!(
-                prepare_module_extension_tag_attributes(
-                    &[tag_attribute("value", kind, false, None)],
-                    &SmallMap::new(),
-                    &context,
-                    &mapping,
-                )
-                .is_err(),
-                "unexpected admitted kind: {kind:?}"
-            );
+        let int =
+            |value| NonrootAttributeValue::Int(NonrootAttributeInt::from_decimal(value).unwrap());
+        let string = |value: &str| NonrootAttributeValue::String(value.into());
+        let sequence =
+            |values: Vec<NonrootAttributeValue>| NonrootAttributeValue::List(values.into());
+        let dict = |values| NonrootAttributeValue::Dict(Arc::new(SmallMap::from_iter(values)));
+        let schema = [
+            tag_attribute("ints", AttributeKind::IntegerList, false, None),
+            tag_attribute("strings", AttributeKind::StringList, false, None),
+            tag_attribute("labels", AttributeKind::LabelList, false, None),
+            tag_attribute("output", AttributeKind::Output, false, None),
+            tag_attribute("outputs", AttributeKind::OutputList, false, None),
+            tag_attribute("strings_by_key", AttributeKind::StringDict, false, None),
+            tag_attribute("lists_by_key", AttributeKind::StringListDict, false, None),
+            tag_attribute(
+                "labels_by_key",
+                AttributeKind::StringKeyedLabelDict,
+                false,
+                None,
+            ),
+            tag_attribute(
+                "strings_by_label",
+                AttributeKind::LabelKeyedStringDict,
+                false,
+                None,
+            ),
+            tag_attribute("label_lists", AttributeKind::LabelListDict, false, None),
+        ];
+        let raw = SmallMap::from_iter([
+            (
+                CompactString::from("ints"),
+                NonrootAttributeValue::Tuple(Arc::from([int("1"), int("-2")])),
+            ),
+            (
+                CompactString::from("strings"),
+                sequence(vec![string("one"), string("two")]),
+            ),
+            (
+                CompactString::from("labels"),
+                NonrootAttributeValue::Tuple(Arc::from([
+                    string("//:local"),
+                    string("@dep//pkg:item"),
+                ])),
+            ),
+            (CompactString::from("output"), string("//:out")),
+            (
+                CompactString::from("outputs"),
+                sequence(vec![string(":a"), string(":b")]),
+            ),
+            (
+                CompactString::from("strings_by_key"),
+                dict([(NonrootAttributeKey::String("key".into()), string("value"))]),
+            ),
+            (
+                CompactString::from("lists_by_key"),
+                dict([(
+                    NonrootAttributeKey::String("key".into()),
+                    NonrootAttributeValue::Tuple(Arc::from([string("one"), string("two")])),
+                )]),
+            ),
+            (
+                CompactString::from("labels_by_key"),
+                dict([(
+                    NonrootAttributeKey::String("key".into()),
+                    string("@dep//pkg:item"),
+                )]),
+            ),
+            (
+                CompactString::from("strings_by_label"),
+                dict([(
+                    NonrootAttributeKey::Label("@dep//pkg:item".into()),
+                    string("value"),
+                )]),
+            ),
+            (
+                CompactString::from("label_lists"),
+                dict([(
+                    NonrootAttributeKey::String("key".into()),
+                    sequence(vec![string("//:local"), string("@dep//pkg:item")]),
+                )]),
+            ),
+        ]);
+        let prepared =
+            prepare_module_extension_tag_attributes(&schema, &raw, &context, &mapping).unwrap();
+        assert_eq!(
+            prepared[0].1,
+            CoercedAttributeValue::IntegerList(Arc::from([1, -2]))
+        );
+        assert!(matches!(
+            prepared[1].1,
+            CoercedAttributeValue::StringList(_)
+        ));
+        assert!(matches!(prepared[2].1, CoercedAttributeValue::LabelList(_)));
+        assert_eq!(
+            prepared[3].1,
+            CoercedAttributeValue::Output(CanonicalLabel::parse("@@//:out").unwrap())
+        );
+        assert!(matches!(
+            prepared[4].1,
+            CoercedAttributeValue::OutputList(_)
+        ));
+        assert!(matches!(
+            prepared[5].1,
+            CoercedAttributeValue::StringDict(_)
+        ));
+        assert!(matches!(
+            prepared[6].1,
+            CoercedAttributeValue::StringListDict(_)
+        ));
+        assert!(matches!(
+            prepared[7].1,
+            CoercedAttributeValue::StringKeyedLabelDict(_)
+        ));
+        assert!(matches!(
+            prepared[8].1,
+            CoercedAttributeValue::LabelKeyedStringDict(_)
+        ));
+        assert!(matches!(
+            prepared[9].1,
+            CoercedAttributeValue::LabelListDict(_)
+        ));
+
+        let defaults =
+            prepare_module_extension_tag_attributes(&schema, &SmallMap::new(), &context, &mapping)
+                .unwrap();
+        for (attribute, (_, value)) in schema.iter().zip(defaults.iter()) {
+            assert_eq!(*value, module_extension_intrinsic_default(attribute.kind));
         }
+
+        let mut ignores_allow_empty =
+            tag_attribute("strings", AttributeKind::StringList, false, None);
+        ignores_allow_empty.allow_empty = false;
+        assert_eq!(
+            prepare_module_extension_tag_attributes(
+                &[ignores_allow_empty],
+                &SmallMap::from_iter([(
+                    CompactString::from("strings"),
+                    NonrootAttributeValue::List(Arc::from([])),
+                )]),
+                &context,
+                &mapping,
+            )
+            .unwrap()[0]
+                .1,
+            CoercedAttributeValue::StringList(Arc::from([]))
+        );
         let deferred = [
             NonrootAttributeValue::List(Arc::from([])),
             NonrootAttributeValue::Tuple(Arc::from([])),
@@ -9484,6 +9951,68 @@ mod module_extension_definition_tests {
                 .is_err()
             );
         }
+        assert!(
+            prepare_module_extension_tag_attributes(
+                &[tag_attribute(
+                    "value",
+                    AttributeKind::IntegerList,
+                    false,
+                    None
+                )],
+                &SmallMap::from_iter([(
+                    CompactString::from("value"),
+                    sequence(vec![NonrootAttributeValue::Int(
+                        NonrootAttributeInt::from_decimal("2147483648").unwrap(),
+                    )]),
+                )]),
+                &context,
+                &mapping,
+            )
+            .unwrap_err()
+            .contains("outside i32")
+        );
+        assert!(
+            prepare_module_extension_tag_attributes(
+                &[tag_attribute("value", AttributeKind::Output, false, None)],
+                &SmallMap::from_iter([(CompactString::from("value"), string("//pkg:out"),)]),
+                &context,
+                &mapping,
+            )
+            .unwrap_err()
+            .contains("current package")
+        );
+        let mut duplicate_mapping = mapping.clone();
+        duplicate_mapping.insert(
+            ApparentRepoName::new("alias").unwrap(),
+            CanonicalRepoName::new("dep+").unwrap(),
+        );
+        assert!(
+            prepare_module_extension_tag_attributes(
+                &[tag_attribute(
+                    "value",
+                    AttributeKind::LabelKeyedStringDict,
+                    false,
+                    None,
+                )],
+                &SmallMap::from_iter([(
+                    CompactString::from("value"),
+                    NonrootAttributeValue::Dict(Arc::new(SmallMap::from_iter([
+                        (
+                            NonrootAttributeKey::String("@dep//pkg:item".into()),
+                            string("one"),
+                        ),
+                        (
+                            NonrootAttributeKey::String("@alias//pkg:item".into()),
+                            string("two"),
+                        ),
+                    ]))),
+                )]),
+                &context,
+                &duplicate_mapping,
+            )
+            .unwrap_err()
+            .contains("duplicate canonical")
+        );
         assert!(
             prepare_module_extension_tag_attributes(
                 &[tag_attribute(
@@ -9555,11 +10084,64 @@ ext = module_extension(
     }
 
     #[test]
+    fn tag_schema_retains_allowed_empty_and_public_private_fields() {
+        let value = projection(
+            "def _impl(ctx):\n    pass\n\
+             tag = tag_class(attrs = {\n\
+               '_private': attr.int(default = 2, values = [2, 3]),\n\
+               'items': attr.string_list(default = [], allow_empty = False),\n\
+               'numbers': attr.int_list(default = (1, -2), allow_empty = False),\n\
+             })\n\
+             ext = module_extension(implementation = _impl, tag_classes = {'tag': tag})\n",
+        );
+        let attributes = &value.tag_classes[0].1;
+        assert_eq!(attributes[0].name, "_private");
+        assert!(matches!(
+            attributes[0].allowed_values,
+            AllowedAttributeValues::Integer(ref values) if values.as_ref() == [2, 3]
+        ));
+        assert!(!attributes[1].allow_empty);
+        assert!(!attributes[2].allow_empty);
+        assert_eq!(
+            attributes[2].default,
+            Some(CoercedAttributeValue::IntegerList(Arc::from([1, -2])))
+        );
+
+        let (context, mapping) = root_context();
+        let prepared = prepare_module_extension_tag_attributes(
+            attributes,
+            &SmallMap::from_iter([(
+                CompactString::from("items"),
+                NonrootAttributeValue::List(Arc::from([])),
+            )]),
+            &context,
+            &mapping,
+        )
+        .unwrap();
+        assert_eq!(prepared[0].0, "_private");
+        assert_eq!(
+            prepared[1].1,
+            CoercedAttributeValue::StringList(Arc::from([]))
+        );
+
+        let error = prepare_module_extension_tag_attributes(
+            attributes,
+            &SmallMap::from_iter([(
+                CompactString::from("_private"),
+                NonrootAttributeValue::Int(NonrootAttributeInt::from_decimal("4").unwrap()),
+            )]),
+            &context,
+            &mapping,
+        )
+        .unwrap_err();
+        assert!(error.contains("not allowed"), "{error}");
+    }
+
+    #[test]
     fn definition_failures_are_closed_before_publication() {
         let cases = [
             "ext = module_extension(implementation = 1)",
             "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.string(configurable = False)})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
-            "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.string(values = ['x'])})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
             "P = provider()\ndef _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.label(providers = [P])})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
             "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.label(executable = True)})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
             "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.string(allow_empty = False)})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",

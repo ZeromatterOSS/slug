@@ -7209,3 +7209,12 @@ implementation, with a dual-invalid precedence discriminator. Tag, macro and
 repository behavior is unchanged; independent R5 review is pending.
 Independent R5 review returns `ACCEPT`; implementation may resume only within
 the corrected boundary.
+R5 is terminally `ACCEPTED` at 592 production/777 proof/1,369 total gross
+Rust lines. Full loading and analysis suites, dependent checks, formatting,
+reference/source integrity, archive baselines and rebuilt CLI pass;
+independent terminal review accepts the shared representation, frozen
+invocation lifetime and dependency-before-nonempty phase. The authentic
+rules_rust configured-query replay clears `auth: StringDict` and now stops at
+the generic `module_ctx.extension_metadata(...)` boundary. Schedule only a
+docs-first complete Bazel 9.2 module-extension metadata category audit; add no
+rules_rust, toolchain, C++ or CLI special case.

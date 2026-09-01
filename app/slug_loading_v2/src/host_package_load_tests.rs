@@ -32876,21 +32876,17 @@ rust_toolchain = rule(implementation = _impl, attrs = {
         )
         .is_err()
     );
-    assert!(
-        eval_bzl_with_identity(
-            "X = tag_class(attrs = {'x': attr.int(values = [1])})",
-            owner.clone()
-        )
-        .is_err()
-    );
+    eval_bzl_with_identity(
+        "X = tag_class(attrs = {'x': attr.int(values = [1])})",
+        owner.clone(),
+    )
+    .unwrap();
     assert!(eval_bzl_with_identity("def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.string(values = ['cc'])})", owner.clone()).is_err());
-    assert!(
-        eval_bzl_with_identity(
-            "X = tag_class(attrs = {'x': attr.string(values = ['cc'])})",
-            owner.clone()
-        )
-        .is_err()
-    );
+    eval_bzl_with_identity(
+        "X = tag_class(attrs = {'x': attr.string(values = ['cc'])})",
+        owner.clone(),
+    )
+    .unwrap();
     assert!(eval_bzl_with_identity("def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.label(allow_files = True)})", owner.clone()).is_err());
     assert!(eval_bzl_with_identity("def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.label(allow_files = ['.rs'])})", owner.clone()).is_err());
     assert!(eval_bzl_with_identity("def impl(target, ctx): return []\nX = aspect(implementation = impl, attrs = {'_x': attr.label(allow_files = ['.rs'])})", owner.clone()).is_err());
