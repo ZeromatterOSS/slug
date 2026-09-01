@@ -22783,7 +22783,7 @@ case.
 ### WP-6-7A module-extension tag attribute-schema category (2026-09-01)
 
 The authentic replay-selected successor is
-`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r2`.
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r3`.
 This is the complete default-enabled ordinary tag-schema kind category, not a
 literal `auth: StringDict` repair. Pinned Bazel 9.2 source plus a disposable
 fourteen-kind oracle establish `bool`, `int`, `int_list`, every ordinary
@@ -22810,6 +22810,13 @@ the rule-attribute `allow_empty` policy to tag conversion and exposed Bazel's
 internal `$private` name. R2 accepts empty tag collections and preserves the
 public `_private` spelling across supplied/default/runtime/`dir` behavior.
 The kind inventory, shared `IntegerList`, frozen invocation representation,
-allowlist and caps are unchanged. Independent R2 architecture review returns
-`ACCEPT`; Rust implementation is authorized. Its only residual risk is the
-explicitly deferred precise ordering/diagnostics for non-visible labels.
+production allowlist and caps are unchanged. Independent R2 architecture
+review returns `ACCEPT`; Rust implementation is authorized. Its only residual
+risk is the explicitly deferred precise ordering/diagnostics for non-visible
+labels.
+The first full implementation suite exposed one stale prepared-input proof in
+`bzl_module.rs` that expected `attr.string_list()` tag schemas to remain
+unsupported. R3 permits changing only that named test to successful
+preparation. This is a proof-only allowlist correction; production ownership,
+compatibility, architecture and caps are unchanged, and independent review is
+required before terminal validation continues.

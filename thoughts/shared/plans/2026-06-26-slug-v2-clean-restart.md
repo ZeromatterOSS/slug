@@ -91,7 +91,7 @@ before Rust: its exact non-visible-label ordering claim cannot be represented
 without a forbidden second graph, it incorrectly applies `allow_empty` to tag
 conversion, and it uses Bazel's internal `$private` spelling instead of the
 public `_private` tag field. Activate only corrected
-`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r2`.
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r3`.
 R2 preserves exact conversion for all valid/visible values, makes invisible
 labels fail closed while deferring their precise diagnostic precedence,
 accepts empty tag collections regardless of `allow_empty`, and preserves
@@ -99,6 +99,11 @@ public private-field spelling. All other architecture, allowlists and caps are
 unchanged. Independent R2 architecture review returns `ACCEPT`; implement only
 the admitted complete category. The only residual risk is the explicitly
 deferred precise ordering/diagnostics for non-visible labels.
+R3 changes only the proof allowlist for one stale prepared-input assertion
+that expected `attr.string_list()` tag schemas to remain unsupported. It
+permits that named assertion to require successful preparation; production,
+semantics, caps and every other boundary are unchanged. Independent R3 review
+is required before terminal validation resumes.
 Structured `starlark_doc_extract` output and experimental remote repository
 execution remain separate deferred categories. Bazel 9.2 is sole behavior
 authority; Zabel remains peer architecture and optimization guidance only.
@@ -7159,7 +7164,7 @@ historical Host read, watcher, oracle, or JVM.
 Commit `cfe83834d` closes recursive BUILD glob loading and authentic rules_rust
 replay now stops at generic `auth: StringDict` tag-schema conversion. The
 docs-first successor is
-`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r2`.
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r3`.
 It covers all fourteen default-enabled ordinary Bazel 9.2 tag attribute kinds,
 including the missing shared `attr.int_list`, rather than special-casing
 rules_rust, toolchains, C++, `cc_common` or `cc_internal`.
@@ -7176,3 +7181,8 @@ visible values, defers only precise invisible-label failure precedence while
 failing closed, ignores `allow_empty` for tags, and preserves `_private`.
 Independent R2 architecture review returns `ACCEPT`; Rust implementation is
 authorized under the frozen allowlist and caps.
+Implementation validation found one stale string-list-schema rejection in the
+existing prepared-input test module outside R2's proof allowlist. R3 changes
+only that proof boundary: the named test may assert successful preparation.
+Production ownership, semantics, caps and every other boundary remain
+unchanged; independent review is required before terminal validation resumes.

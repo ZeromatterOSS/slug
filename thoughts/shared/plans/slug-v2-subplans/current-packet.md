@@ -1,12 +1,13 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r2`
+Packet: `WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r3`
 
 Milestone: M7A generic Starlark/ruleset closure; module-extension tag schema
 conversion and invocation values.
 
 Status: R1 architecture review returned `REPLAN`; independent R2 architecture
-review returned `ACCEPT`; Rust implementation is authorized.
+review returned `ACCEPT`; implementation validation selected a proof-only R3
+allowlist correction for independent review.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -161,11 +162,16 @@ Production allowlist:
 
 Focused proof may use tests colocated in those files and the selected-graph
 module-extension corridor in
-`app/slug_loading_v2/src/host_package_load_tests.rs`. Do not touch the parked
-proof, fixtures, generated files, another crate, parser code, C++ modules or a
+`app/slug_loading_v2/src/host_package_load_tests.rs`. R3 additionally permits
+only the existing
+`module_extension_definition_loading_tests::real_prepared_inputs_preserve_raw_first_and_contextual_errors`
+proof in `app/slug_loading_v2/src/bzl_module.rs` to replace its stale
+string-list-schema rejection with successful preparation. No production line
+or other test in that file is authorized. Do not touch the parked proof,
+fixtures, generated files, another crate, parser code, C++ modules or a
 consumer-specific file. Gross caps are 900 production Rust lines, 1,100 proof
-Rust lines and 2,000 total; deletions and moves count. Stop with `REPLAN` if a
-new crate/file, DICE key, retained evaluator value, custom Starlark collection,
+Rust lines and 2,000 total; deletions and moves count. Stop with `REPLAN` if
+another file, DICE key, retained evaluator value, custom Starlark collection,
 second attribute value graph, cache, interner or broader parser change is
 required.
 
@@ -216,6 +222,23 @@ the shared compact `IntegerList`, invocation-local `FrozenHeap`, allowlist,
 caps and proof matrix are coherent and implementation-ready. The only residual
 risk is the explicitly deferred precise ordering/diagnostics for non-visible
 labels.
+
+## R3 proof-only allowlist correction
+
+The first full `slug_loading_v2` run passed the new implementation proofs but
+correctly invalidated two historical rejection assertions. The selected
+`host_package_load_tests.rs` corridor already owns the scalar allowed-values
+expectation. The second assertion is colocated in `bzl_module.rs` and expected
+an unused `attr.string_list()` tag schema to fail during prepared-input
+validation. That behavior is exactly what this packet removes, so leaving the
+assertion unchanged cannot produce a green full suite without contradicting
+the admitted category.
+
+R3 changes only the proof allowlist to permit that one assertion to require a
+successful prepared input. It changes no production file, compatibility
+claim, value representation, lifetime, cap, test fixture or downstream
+consumer. Independent review must accept this bounded correction before
+terminal validation resumes.
 
 ## Immediate predecessor
 
