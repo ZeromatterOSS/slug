@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[C++ configuration-field catalog completion architecture](./slug-v2-subplans/current-packet.md).
+[Cross-module attribute-descriptor identity architecture](./slug-v2-subplans/current-packet.md).
 
 Commit `1e65972a6` terminally accepts one compact retained property-bit owner
 and admits
@@ -93,7 +93,8 @@ retains only its three documented thought-path failures. Fresh rebuilt
 `configuration_field(fragment = "cpp", name = "custom_malloc")`. Terminal
 implementation review returned `ACCEPT`; commit `cb477b7ab` records the result.
 
-The active `WP-6-7A-cpp-configuration-field-catalog-completion-r1` closes the
+Commit `300b724e7` terminally accepts
+`WP-6-7A-cpp-configuration-field-catalog-completion-r1`. It closes the
 finite C++ catalog rather than patching the rules_rust declaration. Pinned
 Bazel 9.2 proves `custom_malloc` is the sole member missing from Slug's ten
 typed fields, the nullable option and late-bound dependency are public, and
@@ -126,8 +127,23 @@ rules_rust 0.73.0 cquery clears `cpp.custom_malloc` and advances to
 `RUSTC_ALLOCATOR_LIBRARIES_ATTRS["allocator_libraries"]` loses its attr
 descriptor identity across module export/dictionary union and is rejected by
 `rule()` before any implementation, `cc_common`, `cc_internal`, or C++ builtin
-semantics. Independent terminal implementation review returned `ACCEPT`; the
-cross-module imported attribute-descriptor identity boundary is next.
+semantics. Independent terminal implementation review returned `ACCEPT`.
+
+The active `WP-6-7A-cross-module-attribute-descriptor-identity-r1` preserves
+the complete already-retained `attr.*()` descriptor across direct and
+transitive `.bzl` imports, re-export, dictionary union, and lookup. Bazel 9.2
+proves descriptor consumption is independent of the defining module; a fresh
+two-hop oracle retains a producer-relative default plus provider predicate,
+dependency aspect, and user transition. Slug's existing live/frozen descriptor
+pair already owns every field, but one partial conversion deliberately rejects
+frozen provider/aspect/transition values. The packet replaces it with a single
+consumer-neutral transient projection while preserving the original frozen
+pointers and every consumer-specific validation. No parser, `set`, rule body,
+ruleset, provider invocation, aspect application, transition execution,
+`cc_common`, `cc_internal`, or C++ special case is admitted. Bazel 9.2 remains
+authority; Buck2/starlark-rust supplies frozen-heap lifetime mechanics and
+clean Zabel supplies declaration-owner guidance only. Independent design
+pre-review returned `ACCEPT`; implement only the frozen packet.
 
 Commit `683538254` terminally accepts generic configured fragment projection.
 The successor audit found that authentic rules_cc 0.2.17 forwards a nonempty
