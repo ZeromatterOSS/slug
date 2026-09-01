@@ -22105,7 +22105,7 @@ Complete loading passes 560 tests plus one ignored, analysis passes 122,
 terminal correction rereview returns `ACCEPT`, and rebuilt rules_rust replay
 advances to generic `rule(outputs={...})` binding.
 
-Activate `WP-6-7A-rule-predeclared-outputs-complete-r1`. This is the complete
+R1 activated `WP-6-7A-rule-predeclared-outputs-complete-r1` as the complete
 default-enabled Bazel 9.2 category, not a rules_rust or C++ patch: static and
 callback output declarations, template expansion, generated package targets,
 compact final key/label identity, `ctx.outputs`, default-file synthesis, and
@@ -22121,4 +22121,40 @@ projected values, pin the callback helper that owns binding/lifetime, expand
 callback proofs, explicitly defer surrounding collision categories that need a
 package-wide scan, and add generated-target query ownership proof plus the full
 query gate. Corrected R2 changes no retained representation or production
-allowlist. Focused rereview returned `ACCEPT`; implement only frozen R2.
+allowlist. Focused rereview returned `ACCEPT`; the first implementation used
+only that frozen R2 contract.
+
+#### Rule predeclared outputs R2 REPLAN; corrected R3 accepted (2026-09-01)
+
+The R2 candidate reaches the complete owner/downstream gates and authentic
+rules_rust replay, but independent terminal review finds four contract gaps.
+Bazel's raw callback parameter list includes residual `*args` and `**kwargs`
+after ordinary and keyword-only names and supplies every matched attribute as a
+positional argument. An implementation returning no `DefaultInfo` still gets
+implicit-before-explicit rule outputs in its synthesized provider. Executable
+and test rules reserve `ctx.outputs.executable` even while lazy executable-
+output creation remains deferred. Finally, R2's nonmerged-genfiles stop is
+unreachable because the corresponding command option is not admitted.
+
+Corrected `WP-6-7A-rule-predeclared-outputs-complete-r3` keeps the same compact
+static-or-callback definition, final `Arc<[PredeclaredOutput]>`, generated-
+target owner, and package/analysis handoff. It adds exact residual-parameter,
+absent-provider and reserved-key semantics. It removes the typed merge-genfiles
+accessor and unreachable analysis branch, admits only Bazel 9.2's default
+merged mode, and explicitly leaves construction plus exact handling of split
+bin/genfiles roots to the future command/M9 category. The same 360/520
+production, 420/650 proof and 1,170 total-gross caps remain sufficient after
+that removal. Obtain focused architecture rereview before changing Rust.
+
+Focused R3 architecture rereview and terminal implementation correction
+rereview return `ACCEPT`. The retained result is one compact static-or-callback
+definition plus one final `Arc<[PredeclaredOutput]>`; no evaluator borrow,
+second registry, interner, cache or DICE key survives package loading. The
+terminal proof correction combines ordinary, keyword-only, `*args` and
+`**kwargs` in one callback and proves Bazel's raw order plus positional call
+shape. Production is 360 net / 472 gross Rust lines, proof is 416 net / 452
+gross, and total gross is 924. Complete loading passes 473 units plus one
+ignored, 44 BUILD integrations, 28 invalidation integrations and the remaining
+loading integrations; analysis and query each pass 123 tests. Rebuilt authentic
+replay clears the output category and stops at non-fixed generic aspect
+attributes in rules_rust `rust/private/unpretty.bzl:237`.

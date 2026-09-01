@@ -1584,7 +1584,7 @@ async fn output_targets_are_generated_files_with_only_generator_edges() {
     write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
     write(
         workspace.join("pkg/defs.bzl"),
-        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"out\": attr.output(mandatory = True), \"outs\": attr.output_list(mandatory = True)})\n",
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"out\": attr.output(mandatory = True), \"outs\": attr.output_list(mandatory = True)}, outputs = {\"implicit\": \"%{name}.implicit\"})\n",
     );
     write(
         workspace.join("pkg/BUILD.bazel"),
@@ -1612,6 +1612,7 @@ async fn output_targets_are_generated_files_with_only_generator_edges() {
             "//pkg:BUILD.bazel",
             "//pkg:dir/one.out",
             "//pkg:rule",
+            "//pkg:rule.implicit",
             "//pkg:three.out",
             "//pkg:two.out",
         ]
@@ -1622,7 +1623,12 @@ async fn output_targets_are_generated_files_with_only_generator_edges() {
         .find(|node| node.label.to_string() == "//pkg:rule")
         .unwrap();
     assert!(rule.edges.is_empty());
-    for output in ["//pkg:dir/one.out", "//pkg:two.out", "//pkg:three.out"] {
+    for output in [
+        "//pkg:rule.implicit",
+        "//pkg:dir/one.out",
+        "//pkg:two.out",
+        "//pkg:three.out",
+    ] {
         let output = graph
             .nodes
             .values()

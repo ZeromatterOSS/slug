@@ -34,6 +34,8 @@ use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
 use slug_starlark_v2::populate_universe;
 use starlark::any::ProvidesStaticType;
+use starlark::docs::DocItem;
+use starlark::docs::DocMember;
 use starlark::environment::Globals;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::LibraryExtension;
@@ -112,6 +114,9 @@ use crate::provider::RunEnvironmentInfo;
 use crate::provider::UserProviderCallable;
 use crate::provider::starlark_provider_identity;
 use crate::provider::user_provider_from_arguments;
+use crate::rule_outputs::PredeclaredOutput;
+use crate::rule_outputs::RuleOutputsDefinitionGen;
+use crate::rule_outputs::resolve_output_names;
 use crate::starlark_label::StarlarkLabel;
 use crate::starlark_label::label_globals;
 use crate::starlark_label::resolve_label;
@@ -812,6 +817,8 @@ pub struct StarlarkRuleImplementation {
     capability: Arc<RuleCapability>,
     build_setting_definition: Option<BuildSettingDefinition>,
     incoming_transition: Option<LoadingTransitionDefinition>,
+    pub predeclared_outputs: Arc<[PredeclaredOutput]>,
+    pub output_to_genfiles: bool,
 }
 
 impl PartialEq for StarlarkRuleImplementation {
@@ -831,6 +838,8 @@ impl PartialEq for StarlarkRuleImplementation {
             && self.capability == other.capability
             && self.build_setting_definition == other.build_setting_definition
             && self.incoming_transition == other.incoming_transition
+            && self.predeclared_outputs == other.predeclared_outputs
+            && self.output_to_genfiles == other.output_to_genfiles
     }
 }
 
@@ -1655,6 +1664,8 @@ impl PackageRecorder {
         values: Arc<[AttributeValue]>,
         build_setting_definition: Option<BuildSettingDefinition>,
         incoming_transition: Option<LoadingTransitionDefinition>,
+        predeclared_outputs: Arc<[PredeclaredOutput]>,
+        output_to_genfiles: bool,
         visibility: Option<RuleVisibility>,
     ) -> anyhow::Result<()> {
         let mut dependencies = Vec::new();
@@ -1693,6 +1704,8 @@ impl PackageRecorder {
                 capability,
                 build_setting_definition,
                 incoming_transition,
+                predeclared_outputs,
+                output_to_genfiles,
             }),
             visibility.map_or(VisibilitySource::PackageDefault, VisibilitySource::Declared),
         )
@@ -3630,6 +3643,8 @@ struct RuleDefinitionGen<V> {
     test: bool,
     build_setting_definition: Option<BuildSettingDefinition>,
     incoming_transition: Option<TransitionDefinitionGen<V>>,
+    outputs: RuleOutputsDefinitionGen<V>,
+    output_to_genfiles: bool,
     #[trace(unsafe_ignore)]
     rule_class: OnceCell<CompactString>,
 }
@@ -3652,6 +3667,8 @@ pub(crate) struct FrozenRuleDefinition {
     capability: Arc<RuleCapability>,
     pub(crate) build_setting_definition: Option<BuildSettingDefinition>,
     incoming_transition: Option<FrozenTransitionDefinition>,
+    outputs: RuleOutputsDefinitionGen<FrozenValue>,
+    output_to_genfiles: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -3971,6 +3988,8 @@ impl<'v> Freeze for RuleDefinition<'v> {
                 .incoming_transition
                 .map(|transition| transition.freeze(freezer))
                 .transpose()?,
+            outputs: self.outputs.freeze(freezer)?,
+            output_to_genfiles: self.output_to_genfiles,
         })
     }
 }
@@ -4182,6 +4201,68 @@ fn required_configuration_fragments(
         })
         .collect::<Vec<_>>()
         .into()
+}
+
+fn rule_outputs_definition<'v>(
+    value: Option<Value<'v>>,
+) -> anyhow::Result<RuleOutputsDefinitionGen<Value<'v>>> {
+    let Some(value) = value.filter(|value| !value.is_none()) else {
+        return Ok(RuleOutputsDefinitionGen::Static(Arc::from([])));
+    };
+    if value.parameters_spec().is_some() {
+        return Ok(RuleOutputsDefinitionGen::Callback(value));
+    }
+    let values = DictRef::from_value(value).ok_or_else(|| {
+        anyhow::anyhow!("rule outputs must be a dict, Starlark function, or None")
+    })?;
+    let entries = output_string_pairs(values, "implicit outputs of the rule class")?;
+    Ok(RuleOutputsDefinitionGen::Static(entries.into()))
+}
+
+fn output_string_pairs(
+    values: DictRef<'_>,
+    context: &str,
+) -> anyhow::Result<Vec<(CompactString, CompactString)>> {
+    let string = |value: Value<'_>, member: &str| {
+        value
+            .unpack_str()
+            .map(CompactString::new)
+            .ok_or_else(|| anyhow::anyhow!("{context} {member} must be strings"))
+    };
+    values
+        .iter()
+        .map(|(key, value)| Ok((string(key, "keys")?, string(value, "values")?)))
+        .collect()
+}
+
+fn rule_build_setting(value: Option<Value<'_>>) -> anyhow::Result<Option<BuildSettingDefinition>> {
+    const ERROR: &str = "rule build_setting must use config.int(), config.string(), config.bool(), config.string_list(), or config.string_set()";
+    let Some(value) = value.filter(|value| !value.is_none()) else {
+        return Ok(None);
+    };
+    let definition = if let Some(setting) = RootIntBuildSetting::from_value(value) {
+        Some(BuildSettingDefinition::Integer { flag: setting.flag })
+    } else if let Some(setting) = RootStringBuildSetting::from_value(value) {
+        Some(BuildSettingDefinition::String {
+            flag: setting.flag,
+            allow_multiple: setting.allow_multiple,
+        })
+    } else if let Some(setting) = RootBoolBuildSetting::from_value(value) {
+        Some(BuildSettingDefinition::Boolean { flag: setting.flag })
+    } else if let Some(setting) = RootStringListBuildSetting::from_value(value) {
+        Some(BuildSettingDefinition::StringList {
+            flag: setting.flag,
+            repeatable: setting.repeatable,
+        })
+    } else if let Some(setting) = RootStringSetBuildSetting::from_value(value) {
+        Some(BuildSettingDefinition::StringSet {
+            flag: setting.flag,
+            repeatable: setting.repeatable,
+        })
+    } else {
+        None
+    };
+    definition.map(Some).ok_or_else(|| anyhow::anyhow!(ERROR))
 }
 
 fn aspect_required_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>> {
@@ -6695,6 +6776,41 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 }
                 let schema: Arc<[AttributeSchema]> = schema.into();
                 let values: Arc<[AttributeValue]> = values.into();
+                let resolved_outputs = match &self.outputs {
+                    RuleOutputsDefinitionGen::Static(entries) => {
+                        resolve_output_names(entries, name, &values)
+                    }
+                    RuleOutputsDefinitionGen::Callback(callback) => {
+                        let entries =
+                            invoke_rule_outputs_callback(*callback, &values, recorder, self)?;
+                        resolve_output_names(&entries, name, &values)
+                    }
+                }?;
+                let predeclared_outputs: Arc<[PredeclaredOutput]> = resolved_outputs.into_iter()
+                .map(|(key, output_name)| {
+                    recorder
+                        .output_label(&output_name)
+                        .map(|label| PredeclaredOutput { key, label })
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?
+                .into();
+                if let Some(output) = predeclared_outputs.iter().find(|output| {
+                    values.iter().any(|attribute| {
+                        attribute.declaration_name == output.key
+                            && match attribute.value.as_ref() {
+                            CoercedAttributeValue::Output(_) => true,
+                            CoercedAttributeValue::OutputList(labels) => !labels.is_empty(),
+                            _ => false,
+                        }
+                    })
+                }) {
+                    anyhow::bail!("multiple outputs with the same key: {}", output.key);
+                }
+                let generated = predeclared_outputs
+                    .iter()
+                    .map(|output| output.label.clone())
+                    .chain(generated)
+                    .collect::<Vec<_>>();
                 recorder.starlark_rule(
                     name.to_owned(),
                     implementation,
@@ -6711,6 +6827,8 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     values,
                     self.build_setting_definition,
                     incoming_transition,
+                    predeclared_outputs,
+                    self.output_to_genfiles,
                     visibility,
                 )?;
                 for output in generated {
@@ -6825,6 +6943,62 @@ fn allocate_macro_attribute<'v>(
             }
         }
     })
+}
+
+fn invoke_rule_outputs_callback(
+    callback: FrozenValue,
+    attributes: &[AttributeValue],
+    recorder: &PackageRecorder,
+    definition: &FrozenRuleDefinition,
+) -> anyhow::Result<Vec<(CompactString, CompactString)>> {
+    let DocItem::Member(DocMember::Function(documentation)) = callback.to_value().documentation()
+    else {
+        anyhow::bail!("rule outputs callback must be a Starlark function");
+    };
+    let module = starlark::environment::Module::new();
+    let unavailable = |name: &str| {
+        anyhow::anyhow!(
+            "Attribute '{name}' either doesn't exist or uses a select() (i.e. could have multiple values)"
+        )
+    };
+    let arguments = documentation
+        .params
+        .regular_params()
+        .chain(documentation.params.args.iter())
+        .chain(documentation.params.kwargs.iter())
+        .map(|parameter| {
+            use CoercedAttributeValue::Concatenation;
+            use CoercedAttributeValue::Selector;
+            let attribute = attributes
+                .iter()
+                .find(|attribute| attribute.declaration_name == parameter.name)
+                .filter(|attribute| {
+                    !matches!(
+                        attribute.value.as_ref(),
+                        Selector { .. } | Concatenation(_, _)
+                    )
+                })
+                .ok_or_else(|| unavailable(&parameter.name))?;
+            allocate_macro_attribute(attribute.value.as_ref(), module.heap())
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    let bzl = BzlEvaluationContext::macro_runtime_context(
+        (*definition.definition_source).clone(),
+        definition.source_identities_by_filename.clone(),
+    );
+    let context = MacroEvaluationContext { recorder, bzl };
+    let result = {
+        let mut evaluator = Evaluator::new(&module);
+        evaluator.extra = Some(&context);
+        if let Some(capture) = recorder.print_capture() {
+            evaluator.set_print_handler(capture);
+        }
+        evaluator.eval_function(callback.to_value(), &arguments, &[])
+    }
+    .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    let result = DictRef::from_value(result)
+        .ok_or_else(|| anyhow::anyhow!("implicit outputs function return value must be a dict"))?;
+    output_string_pairs(result, "implicit outputs function return value")
 }
 
 fn allocate_configurable_macro_attribute<'v>(
@@ -7737,6 +7911,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] subrules: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] provides: Option<Value<'v>>,
+        #[starlark(require = named)] outputs: Option<Value<'v>>,
+        #[starlark(require = named, default = false)] output_to_genfiles: bool,
         #[starlark(default = false)] executable: bool,
         #[starlark(default = false)] test: bool,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -7744,37 +7920,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         if doc.is_some_and(|value| !value.is_none() && value.unpack_str().is_none()) {
             anyhow::bail!("rule doc must be a string or None");
         }
-        let build_setting = build_setting.filter(|value| !value.is_none());
         let cfg = cfg.filter(|value| !value.is_none());
-        let build_setting_definition = build_setting.and_then(|value| {
-            if let Some(setting) = RootIntBuildSetting::from_value(value) {
-                Some(BuildSettingDefinition::Integer { flag: setting.flag })
-            } else if let Some(setting) = RootStringBuildSetting::from_value(value) {
-                Some(BuildSettingDefinition::String {
-                    flag: setting.flag,
-                    allow_multiple: setting.allow_multiple,
-                })
-            } else if let Some(setting) = RootBoolBuildSetting::from_value(value) {
-                Some(BuildSettingDefinition::Boolean { flag: setting.flag })
-            } else if let Some(setting) = RootStringListBuildSetting::from_value(value) {
-                Some(BuildSettingDefinition::StringList {
-                    flag: setting.flag,
-                    repeatable: setting.repeatable,
-                })
-            } else if let Some(setting) = RootStringSetBuildSetting::from_value(value) {
-                Some(BuildSettingDefinition::StringSet {
-                    flag: setting.flag,
-                    repeatable: setting.repeatable,
-                })
-            } else {
-                None
-            }
-        });
-        if build_setting.is_some() && build_setting_definition.is_none() {
-            anyhow::bail!(
-                "rule build_setting must use config.int(), config.string(), config.bool(), config.string_list(), or config.string_set()"
-            )
-        }
+        let build_setting_definition = rule_build_setting(build_setting)?;
         if build_setting_definition.is_some() && cfg.is_some() {
             anyhow::bail!(
                 "Build setting rules cannot use the `cfg` param to apply transitions to themselves."
@@ -7847,6 +7994,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             )
             .collect::<Vec<_>>();
         let (attached_subrules, subrule_callables) = attached_subrules(subrules)?;
+        let outputs = rule_outputs_definition(outputs)?;
         let context = BzlEvaluationContext::from_evaluator(eval)?;
         Ok(RuleDefinition {
             implementation,
@@ -7863,6 +8011,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             test,
             build_setting_definition,
             incoming_transition,
+            outputs,
+            output_to_genfiles,
             rule_class: OnceCell::new(),
         })
     }

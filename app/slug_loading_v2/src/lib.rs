@@ -49,6 +49,7 @@ mod registration_expansion_tests;
 #[doc(hidden)]
 pub mod repository_rule_context;
 mod root_subtree_package_set;
+pub mod rule_outputs;
 mod starlark_label;
 mod subrule;
 #[doc(hidden)]

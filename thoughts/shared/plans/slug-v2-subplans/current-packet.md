@@ -1,16 +1,26 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-rule-predeclared-outputs-complete-r1`
+Packet: `WP-6-7A-rule-predeclared-outputs-complete-r3`
 
 Milestone: M7A generic Starlark/ruleset closure; Stage 4 package output facts
 and Stage 6 rule-context output projection.
 
 Status: R1 architecture pre-review returned `REVISE`; focused correction
-rereview accepts R2 for implementation. Base commit `6cb5ab55b` terminally
-accepts generic
-rule-level regular-transition attachment. Authentic rebuilt rules_rust 0.73.0
-replay clears that category and stops at the generic named-only
-`rule(outputs = {"rust_doc_zip": "%{name}.zip"})` declaration in
+rereview accepted R2 for implementation. Terminal R2 implementation review
+returned `REPLAN`: residual callback parameters were omitted, an absent
+`DefaultInfo` lost rule outputs, the reserved executable output key was not
+rejected, and the nonmerged-genfiles branch had no lawful admitted producer.
+Corrected R3 changes only those behaviors and removes the unreachable command-
+configuration branch from this packet. Focused R3 architecture rereview and
+terminal implementation correction rereview return `ACCEPT`; the latter
+required one mixed ordinary/keyword-only/`*args`/`**kwargs` ordering proof.
+Complete loading, analysis and query validation passes within every unchanged
+cap. The rebuilt authentic replay clears this category and stops at the next
+generic frontier, non-fixed aspect declaration attributes in rules_rust
+`rust/private/unpretty.bzl:237`. Base commit `6cb5ab55b` terminally
+accepts generic rule-level regular-transition attachment. Its predecessor
+replay clears that category and stops at the generic named-
+only `rule(outputs = {"rust_doc_zip": "%{name}.zip"})` declaration in
 `rust/private/rustdoc.bzl:319-436`.
 
 The unrelated dirty
@@ -38,10 +48,13 @@ Exact admitted behavior:
   templates. A callback must be a Starlark function, is frozen/importable with
   the rule definition, and is invoked once for each target during package
   loading;
-- callback positional arguments follow the function's declared parameter-name
-  order and are populated from target attributes. Defaults do not excuse an
-  absent matching attribute. A named attribute containing `select()` fails
-  before the callback body, while unrelated configurable attributes are simply
+- callback positional arguments follow Bazel's raw parameter-name order:
+  ordinary, keyword-only, residual `*args`, then residual `**kwargs`. Every
+  name is populated from the target's attributes and passed positionally, so
+  defaults do not excuse an absent match; `*args` receives its matched value
+  inside the residual tuple, while a lone `**kwargs` match reaches Bazel's
+  positional-argument rejection. A named attribute containing `select()`
+  fails before the callback body, while unrelated configurable attributes are
   omitted and do not reject the call. The return value must be an ordered
   string-to-string dictionary;
 - each dictionary result produces exactly one key/name pair. Templates retain
@@ -70,9 +83,14 @@ Exact admitted behavior:
   then implicit output keys in dictionary/callback order. Implicit outputs are
   real derived Files for the current configured owner and may be registered as
   action outputs; and
-- an omitted `DefaultInfo.files` contains implicit predeclared outputs before
+- an omitted `DefaultInfo.files`, and a synthesized `DefaultInfo` when the
+  implementation returns none, contains implicit predeclared outputs before
   explicit output-attribute files, followed by the existing executable
-  handling. Generated target query/owner behavior uses the same loading facts.
+  handling. Generated target query/owner behavior uses the same loading facts;
+  and
+- an executable or test rule rejects implicit output key `executable` before
+  rule implementation. Executable-output lazy creation remains deferred, but
+  its Bazel-reserved namespace cannot be exposed as an ordinary implicit key.
 
 Slug-native behavior:
 
@@ -92,10 +110,11 @@ Unsupported/deferred behavior:
 
 - `--incompatible_no_rule_outputs_param=true` remains outside the admitted
   command-wide build-language-option surface;
-- `output_to_genfiles=True` with
-  `--incompatible_merge_genfiles_directory=false` fails closed before rule
-  implementation evaluation. Exact separate bin/genfiles output-root bytes
-  remain M9 work;
+- `--incompatible_merge_genfiles_directory=false` is not an admitted command
+  configuration and cannot be constructed by this packet. No unreachable
+  analysis branch is retained as a parity claim. The future command-category
+  owner must fail closed or implement exact separate bin/genfiles roots before
+  admitting that option; those bytes remain M9 work;
 - parent/rule-extension output inheritance, native implicit-output functions,
   computed-default callbacks, executable-output lazy creation, aspects,
   output groups beyond already admitted `OutputGroupInfo`, and action families
@@ -222,10 +241,8 @@ Production allowlist:
 - `app/slug_loading_v2/src/lib.rs`;
 - `app/slug_loading_v2/src/package.rs` only for binding/freeze/invocation and
   final target handoff;
-- `app/slug_configuration_v2/src/native/configuration.rs` only for a typed
-  merge-genfiles Boolean projection; and
 - `app/slug_analysis_v2/src/starlark_rule.rs` only for `ctx.outputs`, default
-  files and the nonmerged-genfiles stop.
+  files and reserved-key validation.
 
 Proof allowlist:
 
@@ -233,14 +250,14 @@ Proof allowlist:
 - `app/slug_loading_v2/tests/build_file_loading.rs`;
 - `app/slug_loading_v2/tests/bzl_invalidation.rs`;
 - `app/slug_loading_v2/src/host_package_load_tests.rs`;
-- `app/slug_configuration_v2/src/native/tests.rs`; and
 - `app/slug_analysis_v2/tests/starlark_rule.rs`; and
 - `app/slug_query_v2/tests/loading_query.rs` only for implicit-generated-target
   lookup, kind and generating-rule ownership over the existing query graph.
 
-Plan/status allowlist is this manifest, the canonical plan, Stage 6 and the
-Stage 9 ledger. Caps are 360 net / 520 gross production Rust lines, 420 net /
-650 gross proof Rust lines, and 1,170 total gross Rust lines. No new function
+Plan/status allowlist is this manifest, the canonical plan, Stage 6, the Stage
+9 ledger and the required orchestration routing log. Caps are 360 net / 520
+gross production Rust lines, 420 net / 650 gross proof Rust lines, and 1,170
+total gross Rust lines. No new function
 may exceed 140 lines.
 
 `package.rs` exceeds the complexity trigger, so template semantics and retained
@@ -258,27 +275,30 @@ Focused proofs must cover:
    label/output extension treatment, singleton lists, duplicate-equal versus
    distinct-multiple list projections, repeated placeholders,
    unknown/absent/unsupported/configurable/empty values, and exact error phase;
-3. direct and transitive imported callbacks, callback parameter ordering,
-   every currently admitted attribute value carrier, defaulted parameters,
-   named configurable rejection, unrelated configurable success, print capture,
-   once-per-target execution and ordered returned dictionaries;
+3. direct and transitive imported callbacks, complete ordinary/keyword-only/
+   `*args`/`**kwargs` raw parameter ordering and errors, every currently
+   admitted attribute value carrier, defaulted parameters, named configurable
+   rejection, unrelated configurable success, print capture, once-per-target
+   execution and ordered returned dictionaries;
 4. final key/canonical-label order and equality, template/key/placement
    discrimination, equivalent-result convergence, and same-DICE A/B/A;
 5. generated target ownership/visibility/order, invalid or duplicate names,
    ordinary target collisions, and nonempty versus empty explicit-output-key
    collision phases;
 6. `ctx.outputs` explicit-then-implicit access including `getattr` for a
-   nonidentifier key, action registration with an implicit File, and synthesized
-   `DefaultInfo.files` implicit-before-explicit order;
+   nonidentifier key, action registration with an implicit File, omitted-files
+   and absent-provider `DefaultInfo.files` implicit-before-explicit order, and
+   pre-implementation executable/test rejection of implicit key `executable`;
 7. loading-query implicit generated-target lookup, generated-file kind and
    generating-rule ownership over the same package facts;
-8. false/true `output_to_genfiles` structural identity under merged genfiles and
-   pre-implementation failure for the nonmerged configuration; and
+8. false/true `output_to_genfiles` structural identity under Bazel 9.2's
+   admitted default merged-genfiles configuration, plus an inventory proof
+   that the nonmerged command option remains unconstructible and unclaimed;
 9. rebuilt authentic rules_rust replay clears the complete generic output
    declaration category and stops at the next independent generic frontier,
    never at parser, `set`, `cc_common`, `cc_internal`, or a ruleset branch.
 
-Validation is serial: focused and complete loading/configuration/analysis/query
+Validation is serial: focused and complete loading/analysis/query
 tests, `cargo fmt --check`, Cargo metadata, `git diff --check`, archive status,
 pinned source-object hashes, clean Buck2/Zabel, parked-file hash,
 `cargo build -p slug_cli_v2`, stale-`slugd` cleanup, and authentic replay.
@@ -290,14 +310,16 @@ retained evaluator borrow, if generated targets cannot be recorded atomically,
 if exact callback parameter projection requires a starlark-rust fork, if
 implicit outputs must masquerade as attributes, or if a new DICE key/global
 registry is required. `REPLAN` during implementation if package equality cannot
-own every key/label/placement input, nonmerged genfiles cannot fail before rule
-execution, the production cap is exceeded, or replay contradicts pinned Bazel
-9.2 evidence.
+own every key/label/placement input, residual callback names cannot be
+projected without a starlark-rust fork, synthesized defaults need a second
+output owner, the production cap is exceeded, or replay contradicts pinned
+Bazel 9.2 evidence.
 
 Residual risk is explicit: the deprecated API is needed by current BCR rule
-sets, but disabling it and exact split bin/genfiles path bytes remain deferred
-command/configuration categories. Bazel's prefix/input/output and own-rule
-collision cases are also deferred package-validation categories.
+sets, but disabling it and any construction plus exact handling of split bin/
+genfiles roots remain deferred command/configuration categories. Bazel's
+prefix/input/output and own-rule collision cases are also deferred package-
+validation categories.
 
 ## Immediate predecessor
 

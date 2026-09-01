@@ -2020,7 +2020,7 @@ probe = rule(
 }
 
 #[test]
-fn same_dice_attribute_metadata_edits_are_semantic_and_recreate_cleanly() {
+fn same_dice_attribute_and_rule_output_edits_are_semantic_and_recreate_cleanly() {
     let workspace = scratch("attribute-metadata-transitions");
     let package = workspace.join("pkg");
     let build = package.join("BUILD.bazel");
@@ -2037,40 +2037,75 @@ probe = rule(implementation = _impl, attrs = {
     "_implicit": attr.label(default = ":implicit"),
     "chosen": attr.label_list(),
     "out": attr.output(mandatory = True),
-})
+}, outputs = {"implicit": "%{name}.generated"}, output_to_genfiles = False)
 "#;
     write(&defs, schema_v1);
     let explicit = "load(\":defs.bzl\", \"probe\")\nprobe(name = \"metadata\", many = [\":explicit\"], out = \"one.out\")\n";
     write(&build, explicit);
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let initial = load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    let load = || {
+        load_package(
+            &dice,
+            &runtime,
+            &workspace,
+            &package,
+            std::slice::from_ref(&defs),
+        )
+    };
+    let initial = load().unwrap();
 
     write(
         &build,
         "# formatting only\nload(\":defs.bzl\", \"probe\")\nprobe( name = \"metadata\", many = [\":explicit\"], out = \"one.out\" )\n",
     );
-    let formatted = load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    let formatted = load().unwrap();
     assert_eq!(initial, formatted);
+
+    for changed in [
+        schema_v1.replace("\"implicit\":", "\"renamed\":"),
+        schema_v1.replace("%{name}.generated", "%{name}.changed"),
+        schema_v1.replace("output_to_genfiles = False", "output_to_genfiles = True"),
+    ] {
+        write(&defs, &changed);
+        assert_ne!(initial, load().unwrap());
+        write(&defs, schema_v1);
+        assert_eq!(initial, load().unwrap());
+    }
+
+    write(&defs, &schema_v1.replace(
+        "probe = rule(implementation = _impl, attrs = {",
+        "def _outputs(): return {\"implicit\": \"%{name}.generated\"}\nprobe = rule(implementation = _impl, attrs = {",
+    ).replace(
+        "}, outputs = {\"implicit\": \"%{name}.generated\"}, output_to_genfiles = False)",
+        "}, outputs = _outputs, output_to_genfiles = False)",
+    ));
+    let equivalent = load().unwrap();
+    let (
+        PackageTargetKind::StarlarkRule(initial_rule),
+        PackageTargetKind::StarlarkRule(equivalent_rule),
+    ) = (&initial.targets[0].kind, &equivalent.targets[0].kind)
+    else {
+        panic!("expected Starlark rules")
+    };
+    assert_eq!(initial_rule, equivalent_rule);
+    write(&defs, schema_v1);
 
     write(
         &build,
         "load(\":defs.bzl\", \"probe\")\nprobe(name = \"metadata\", many = [\":changed\"], out = \"one.out\")\n",
     );
-    let build_value_changed =
-        load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    let build_value_changed = load().unwrap();
     assert_ne!(formatted, build_value_changed);
 
     let schema_default_changed = schema_v1.replace(":default", ":other_default");
     write(&defs, &schema_default_changed);
-    let default_changed =
-        load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    let default_changed = load().unwrap();
     assert_ne!(build_value_changed, default_changed);
 
     let schema_implicit_changed = schema_default_changed.replace(":implicit", ":other_implicit");
     write(&defs, &schema_implicit_changed);
-    let implicit_changed =
-        load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    let implicit_changed = load().unwrap();
     assert_ne!(default_changed, implicit_changed);
 
     let schema_select_type_name_changed = schema_implicit_changed.replace(
@@ -2082,16 +2117,14 @@ probe = rule(implementation = _impl, attrs = {
         &build,
         "load(\":defs.bzl\", \"probe\")\nprobe(name = \"metadata\", renamed = select({\":condition\": \":branch\", \"//conditions:default\": \":fallback\"}), out = \"one.out\")\n",
     );
-    let selector_changed =
-        load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    let selector_changed = load().unwrap();
     assert_ne!(implicit_changed, selector_changed);
 
     write(
         &build,
         "load(\":defs.bzl\", \"probe\")\nprobe(name = \"metadata\", renamed = select({\":condition\": \":branch\", \"//conditions:default\": \":fallback\"}), out = \"two.out\")\n",
     );
-    let output_changed =
-        load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    let output_changed = load().unwrap();
     assert_ne!(selector_changed, output_changed);
     assert!(
         output_changed
@@ -2101,9 +2134,9 @@ probe = rule(implementation = _impl, attrs = {
     );
 
     fs::remove_file(&defs).unwrap();
-    assert!(load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).is_err());
+    assert!(load().is_err());
     write(&defs, &schema_select_type_name_changed);
-    let recreated = load_package(&dice, &runtime, &workspace, &package, &[defs]).unwrap();
+    let recreated = load().unwrap();
     assert_eq!(output_changed, recreated);
 }
 

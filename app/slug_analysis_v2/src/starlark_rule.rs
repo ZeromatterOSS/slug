@@ -69,6 +69,7 @@ use slug_loading_v2::package::resolve_rule_definition_label;
 use slug_loading_v2::provider::StarlarkDefaultInfo;
 use slug_loading_v2::provider::StarlarkDefaultInfoFields;
 use slug_loading_v2::provider::starlark_label;
+use slug_loading_v2::rule_outputs::PredeclaredOutput;
 use slug_loading_v2::subrule_invocation::AnalysisActionCallScope;
 use slug_loading_v2::subrule_invocation::AnalysisActionSink;
 use slug_loading_v2::subrule_invocation::AnalysisActions;
@@ -171,6 +172,8 @@ struct AnalysisContextGen<V> {
     #[trace(unsafe_ignore)]
     dependencies: Arc<[AnalysisDependency]>,
     resolved_attributes: Arc<[ResolvedRuleAttribute]>,
+    #[trace(unsafe_ignore)]
+    predeclared_outputs: Arc<[PredeclaredOutput]>,
     build_setting_value: Option<V>,
     fragments: V,
     #[trace(unsafe_ignore)]
@@ -193,6 +196,7 @@ impl<'v> Freeze for AnalysisContext<'v> {
             package_path: self.package_path,
             dependencies: self.dependencies,
             resolved_attributes: self.resolved_attributes,
+            predeclared_outputs: self.predeclared_outputs,
             build_setting_value: self
                 .build_setting_value
                 .map(|value| value.freeze(freezer))
@@ -235,6 +239,7 @@ where
             "outputs" => Some(heap.alloc_simple(AnalysisOutputs {
                 token: self.token.clone(),
                 attributes: self.resolved_attributes.clone(),
+                predeclared_outputs: self.predeclared_outputs.clone(),
                 package_path: self.package_path.clone(),
                 owner: self.retained_owner.clone(),
             })),
@@ -451,6 +456,7 @@ struct AnalysisOutputs {
     #[allocative(skip)]
     token: AnalysisCallToken,
     attributes: Arc<[ResolvedRuleAttribute]>,
+    predeclared_outputs: Arc<[PredeclaredOutput]>,
     package_path: String,
     owner: AnalysisConfiguredTargetKey,
 }
@@ -469,31 +475,40 @@ impl<'v> StarlarkValue<'v> for AnalysisOutputs {
         self.token
             .require_active(attribute, "rule context outputs")
             .ok()?;
-        let attribute = self
-            .attributes
-            .iter()
-            .find(|candidate| candidate.declaration_name == attribute)?;
-        match &attribute.value {
-            CoercedAttributeValue::None if attribute.kind == AttributeKind::Output => {
-                Some(Value::new_none())
-            }
-            CoercedAttributeValue::Output(label) if attribute.kind == AttributeKind::Output => {
-                Some(heap.alloc_simple(predeclared_file(label, &self.package_path, &self.owner)))
-            }
-            CoercedAttributeValue::OutputList(labels)
-                if attribute.kind == AttributeKind::OutputList =>
-            {
-                Some(
+        let explicit = self.attributes.iter().find(|candidate| {
+            candidate.declaration_name == attribute
+                && matches!(
+                    candidate.kind,
+                    AttributeKind::Output | AttributeKind::OutputList
+                )
+        });
+        if let Some(attribute) = explicit {
+            return match (&attribute.kind, &attribute.value) {
+                (AttributeKind::Output, CoercedAttributeValue::None) => Some(Value::new_none()),
+                (AttributeKind::Output, CoercedAttributeValue::Output(label)) => Some(
+                    heap.alloc_simple(predeclared_file(label, &self.package_path, &self.owner)),
+                ),
+                (AttributeKind::OutputList, CoercedAttributeValue::OutputList(labels)) => Some(
                     heap.alloc(
                         labels
                             .iter()
                             .map(|label| predeclared_file(label, &self.package_path, &self.owner))
                             .collect::<Vec<_>>(),
                     ),
-                )
-            }
-            _ => None,
+                ),
+                _ => None,
+            };
         }
+        self.predeclared_outputs
+            .iter()
+            .find(|output| output.key == attribute)
+            .map(|output| {
+                heap.alloc_simple(predeclared_file(
+                    &output.label,
+                    &self.package_path,
+                    &self.owner,
+                ))
+            })
     }
 }
 
@@ -1391,19 +1406,26 @@ fn default_info_executable(
 }
 
 fn predeclared_output_artifacts(
+    predeclared_outputs: &[PredeclaredOutput],
     attributes: &[ResolvedRuleAttribute],
     package_path: &str,
     owner: &AnalysisConfiguredTargetKey,
 ) -> Vec<AnalysisArtifact> {
-    attributes
+    let mut outputs = predeclared_outputs
         .iter()
-        .flat_map(|attribute| match (&attribute.kind, &attribute.value) {
-            (AttributeKind::Output, CoercedAttributeValue::Output(label)) => vec![label],
+        .map(|output| &output.label)
+        .collect::<Vec<_>>();
+    for attribute in attributes {
+        match (&attribute.kind, &attribute.value) {
+            (AttributeKind::Output, CoercedAttributeValue::Output(label)) => outputs.push(label),
             (AttributeKind::OutputList, CoercedAttributeValue::OutputList(labels)) => {
-                labels.iter().collect()
+                outputs.extend(labels.iter())
             }
-            _ => Vec::new(),
-        })
+            _ => {}
+        }
+    }
+    outputs
+        .into_iter()
         .map(|label| {
             predeclared_file(label, package_path, owner)
                 .artifact()
@@ -1416,6 +1438,7 @@ fn lower_default_info<'v>(
     fields: StarlarkDefaultInfoFields<'v>,
     index: usize,
     attributes: &[ResolvedRuleAttribute],
+    predeclared_outputs: &[PredeclaredOutput],
     package_path: &str,
     owner: &AnalysisConfiguredTargetKey,
     test_rule: bool,
@@ -1439,7 +1462,8 @@ fn lower_default_info<'v>(
         .transpose()?
         .map(Ok)
         .unwrap_or_else(|| {
-            let mut artifacts = predeclared_output_artifacts(attributes, package_path, owner);
+            let mut artifacts =
+                predeclared_output_artifacts(predeclared_outputs, attributes, package_path, owner);
             artifacts.extend(executable.iter().cloned());
             AnalysisDepset::new(
                 DepsetOrder::Default,
@@ -1514,6 +1538,19 @@ pub(crate) fn evaluate_loaded_rule(
     let PackageTargetKind::StarlarkRule(implementation) = &target.kind else {
         return Err(format!("target `{target_name}` is not a Starlark rule").into());
     };
+    let reserves_executable = rule_capability.as_ref().is_some_and(|cap| cap.executable);
+    if let Some(output) = implementation.predeclared_outputs.iter().find(|output| {
+        (reserves_executable && output.key == "executable")
+            || resolved_attributes.iter().any(|attribute| {
+                attribute.declaration_name == output.key
+                    && matches!(
+                        attribute.kind,
+                        AttributeKind::Output | AttributeKind::OutputList
+                    )
+            })
+    }) {
+        return Err(format!("multiple outputs with the same key: {}", output.key).into());
+    }
     let build_setting_value = match implementation
         .build_setting_declaration()
         .map_err(|error| error.to_string())?
@@ -1606,6 +1643,7 @@ pub(crate) fn evaluate_loaded_rule(
     ));
     let execution_tags = target_execution_tags(&resolved_attributes);
     let resolved_attributes: Arc<[ResolvedRuleAttribute]> = resolved_attributes.into();
+    let predeclared_outputs = implementation.predeclared_outputs.clone();
     let action_sink: Arc<dyn AnalysisActionSink> = Arc::new(SynchronousAnalysisActionSink {
         actions: actions.clone(),
         package_path: package_path.to_owned(),
@@ -1705,6 +1743,7 @@ pub(crate) fn evaluate_loaded_rule(
             package_path: package_path.to_owned(),
             dependencies,
             resolved_attributes: resolved_attributes.clone(),
+            predeclared_outputs: predeclared_outputs.clone(),
             build_setting_value,
             fragments,
             toolchain,
@@ -1729,6 +1768,7 @@ pub(crate) fn evaluate_loaded_rule(
                 fields,
                 index,
                 &resolved_attributes,
+                &predeclared_outputs,
                 package_path,
                 &retained_owner,
                 test_rule,
@@ -1750,8 +1790,26 @@ pub(crate) fn evaluate_loaded_rule(
         .iter()
         .any(|provider| matches!(provider, ProviderValue::DefaultInfo(_)))
     {
+        let artifacts = predeclared_output_artifacts(
+            &predeclared_outputs,
+            &resolved_attributes,
+            package_path,
+            &retained_owner,
+        );
+        let files = AnalysisDepset::new(
+            DepsetOrder::Default,
+            artifacts.into_iter().map(AnalysisValue::artifact).collect(),
+            Vec::new(),
+        )
+        .map_err(|error| error.to_string())?;
         provider_values.push(ProviderValue::DefaultInfo(
-            slug_build_api_v2::DefaultInfo::empty(),
+            DefaultInfo::from_effective(
+                files,
+                RetainedRunfiles::empty(),
+                RetainedRunfiles::empty(),
+                None,
+            )
+            .map_err(|error| error.to_string())?,
         ));
     }
     let providers = ProviderCollection::new(provider_values).map_err(|error| error.to_string())?;

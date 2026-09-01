@@ -2279,6 +2279,213 @@ fn package_load_registers_a_generic_starlark_rule_without_executing_it() {
 }
 
 #[test]
+fn rule_predeclared_outputs_resolve_static_and_callback_declarations() {
+    let workspace = scratch("rule-predeclared-outputs");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"def _impl(ctx): return [DefaultInfo()]
+def _outputs(text, src = None): return {"callback": "%{text}-%{src}.out"}
+static = rule(implementation = _impl, attrs = {"src": attr.label(), "words": attr.string_list(), "explicit": attr.output()}, outputs = {"zip": "%{name}.zip", "parts": "%{dirname}%{basename}-%{src}-%{words}.out"}, output_to_genfiles = True)
+callback = rule(implementation = _impl, attrs = {"text": attr.string(), "src": attr.label(), "unused": attr.string()}, outputs = _outputs)
+omitted = rule(implementation = _impl)
+none = rule(implementation = _impl, outputs = None)
+empty = rule(implementation = _impl, outputs = {})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        r#"load(":defs.bzl", "callback", "empty", "none", "omitted", "static")
+static(name = "dir/probe", src = ":input.rs", words = ["same", "same"], explicit = "explicit.bin", visibility = ["//visibility:public"])
+callback(name = "called", text = "value", src = ":source.rs", unused = select({"//conditions:default": "ignored"}))
+omitted(name = "omitted")
+none(name = "none")
+empty(name = "empty")
+"#,
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let rule = loaded
+        .targets
+        .iter()
+        .find_map(|target| match &target.kind {
+            PackageTargetKind::StarlarkRule(rule) if target.name == "dir/probe" => Some(rule),
+            _ => None,
+        })
+        .unwrap();
+    assert!(rule.output_to_genfiles);
+    assert_eq!(
+        rule.predeclared_outputs
+            .iter()
+            .map(|output| (output.key.as_str(), output.label.target().as_str()))
+            .collect::<Vec<_>>(),
+        [
+            ("zip", "dir/probe.zip"),
+            ("parts", "dir/probe-input-same.out")
+        ]
+    );
+    assert_eq!(
+        loaded
+            .targets
+            .iter()
+            .filter_map(|target| match &target.kind {
+                PackageTargetKind::GeneratedFile {
+                    generating_rule, ..
+                } if generating_rule == "dir/probe" => Some(target.name.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>(),
+        ["dir/probe.zip", "dir/probe-input-same.out", "explicit.bin"]
+    );
+    let generated = loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "dir/probe.zip")
+        .unwrap();
+    assert_eq!(
+        loaded.effective_visibility(generated),
+        Some(RuleVisibility::Public)
+    );
+    let callback = loaded
+        .targets
+        .iter()
+        .find_map(|target| match &target.kind {
+            PackageTargetKind::StarlarkRule(rule) if target.name == "called" => Some(rule),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(callback.predeclared_outputs[0].key, "callback");
+    assert_eq!(
+        callback.predeclared_outputs[0].label.target().as_str(),
+        "value-source.out"
+    );
+    for name in ["omitted", "none", "empty"] {
+        let rule = loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap();
+        let PackageTargetKind::StarlarkRule(rule) = &rule.kind else {
+            unreachable!()
+        };
+        assert!(rule.predeclared_outputs.is_empty() && !rule.output_to_genfiles);
+    }
+}
+
+#[test]
+fn imported_output_callbacks_receive_every_attribute_carrier_once_in_parameter_order() {
+    let workspace = scratch("imported-rule-output-callbacks");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    let write = |name: &str, source: &str| fs::write(package.join(name), source).unwrap();
+    write(
+        "leaf.bzl",
+        r#"def direct_outputs(text): return {"direct": "%{text}.direct"}
+def residual_outputs(first, *args, named = "default", **kwargs):
+    if first != "first-value" or named != "default" or args != ("named-value", "args-value", "kwargs-value") or kwargs != {}: fail("mixed residual carrier mismatch")
+    return {"residual": "%{name}.residual"}
+def all_outputs(none, boolean, integer, text, label, output, strings, labels, outputs, string_dict, string_lists, string_labels, label_strings, label_lists):
+    if none != None or boolean != True or integer != 7 or label.name != "input.rs" or output.name != text + ".out": fail("scalar carrier mismatch")
+    if strings != ["a", "b"] or labels[0].name != "input.rs" or outputs[0].name != text + ".list": fail("list carrier mismatch")
+    if string_dict["k"] != "v" or string_lists["k"] != ["v"] or string_labels["k"].name != "input.rs" or label_strings[label] != "v" or label_lists["k"][0].name != "input.rs": fail("dictionary carrier mismatch")
+    print("callback-" + text)
+    return {"first": "%{text}.first", "second": "%{name}.second"}
+"#,
+    );
+    write(
+        "middle.bzl",
+        "load(\":leaf.bzl\", \"all_outputs\")\ntransitive_outputs = all_outputs\n",
+    );
+    write(
+        "defs.bzl",
+        r#"load(":leaf.bzl", "direct_outputs", "residual_outputs")
+load(":middle.bzl", "transitive_outputs")
+def _impl(ctx): return [DefaultInfo()]
+direct = rule(implementation = _impl, attrs = {"text": attr.string()}, outputs = direct_outputs)
+residual = rule(implementation = _impl, attrs = {"first": attr.string(), "named": attr.string(), "args": attr.string(), "kwargs": attr.string()}, outputs = residual_outputs)
+all_carriers = rule(implementation = _impl, attrs = {"none": attr.label(), "boolean": attr.bool(), "integer": attr.int(), "text": attr.string(), "label": attr.label(), "output": attr.output(), "strings": attr.string_list(), "labels": attr.label_list(), "outputs": attr.output_list(), "string_dict": attr.string_dict(), "string_lists": attr.string_list_dict(), "string_labels": attr.string_keyed_label_dict(), "label_strings": attr.label_keyed_string_dict(), "label_lists": attr.label_list_dict()}, outputs = transitive_outputs)
+"#,
+    );
+    write(
+        BUILD_FILE_PRIMARY,
+        r#"load(":defs.bzl", "all_carriers", "direct", "residual")
+all_carriers(name = "one", boolean = True, integer = 7, text = "one", label = ":input.rs", output = "one.out", strings = ["a", "b"], labels = [":input.rs"], outputs = ["one.list"], string_dict = {"k": "v"}, string_lists = {"k": ["v"]}, string_labels = {"k": ":input.rs"}, label_strings = {":input.rs": "v"}, label_lists = {"k": [":input.rs"]})
+all_carriers(name = "two", boolean = True, integer = 7, text = "two", label = ":input.rs", output = "two.out", strings = ["a", "b"], labels = [":input.rs"], outputs = ["two.list"], string_dict = {"k": "v"}, string_lists = {"k": ["v"]}, string_labels = {"k": ":input.rs"}, label_strings = {":input.rs": "v"}, label_lists = {"k": [":input.rs"]})
+direct(name = "direct", text = "direct")
+residual(name = "residual", first = "first-value", named = "named-value", args = "args-value", kwargs = "kwargs-value")
+"#,
+    );
+    let tracker = Arc::new(PackageEventTracker::default());
+    let loaded =
+        try_load_package_with_event_capture(&workspace, &package, &[], Some(tracker.clone()), true)
+            .unwrap();
+    let one = loaded
+        .targets
+        .iter()
+        .position(|target| target.name == "one")
+        .unwrap();
+    assert_eq!(
+        loaded.targets[one + 1..one + 3]
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        ["one.first", "one.second"]
+    );
+    let has_target = |name| loaded.targets.iter().any(|target| target.name == name);
+    assert!(has_target("direct.direct"));
+    assert!(has_target("residual.residual"));
+    assert_eq!(
+        package_event_texts(&tracker.take(), &package),
+        Some(vec!["callback-one", "callback-two"])
+    );
+}
+
+#[test]
+fn rule_predeclared_outputs_reject_invalid_bindings_templates_callbacks_and_collisions() {
+    let workspace = scratch("rule-predeclared-output-errors");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    #[rustfmt::skip]
+    let cases = [
+        ("def _impl(ctx): return [DefaultInfo()]\nbad = rule(implementation = _impl, outputs = len)\n", "bad(name = \"bad\")\n", "rule outputs must be a dict, Starlark function, or None"),
+        ("def _impl(ctx): return [DefaultInfo()]\nbad = rule(_impl, None, None, None, None, None)\n", "bad(name = \"bad\")\n", "positional"),
+        ("def _impl(ctx): return [DefaultInfo()]\nbad = rule(implementation = _impl, outputs = {1: '%{name}'})\n", "bad(name = \"bad\")\n", "keys must be strings"),
+        ("def _impl(ctx): return [DefaultInfo()]\nbad = rule(implementation = _impl, outputs = {'out': 1})\n", "bad(name = \"bad\")\n", "values must be strings"),
+        ("def _impl(ctx): return [DefaultInfo()]\nbad = rule(implementation = _impl, attrs = {'words': attr.string_list()}, outputs = {'out': '%{words}'})\n", "bad(name = \"bad\", words = [\"one\", \"two\"])\n", "Invalid placeholder(s) in template"),
+        ("def _impl(ctx): return [DefaultInfo()]\nbad = rule(implementation = _impl, attrs = {'text': attr.string()}, outputs = {'out': '%{text}'})\n", "bad(name = \"bad\", text = select({\"//conditions:default\": \"value\"}))\n", "is configurable and cannot be used in outputs"),
+        ("def _impl(ctx): return [DefaultInfo()]\ndef _out(missing = 'default'): return {'out': '%{name}.out'}\nbad = rule(implementation = _impl, outputs = _out)\n", "bad(name = \"bad\")\n", "either doesn't exist or uses a select()"),
+        ("def _impl(ctx): return [DefaultInfo()]\ndef _out(text): return {'out': '%{name}.out'}\nbad = rule(implementation = _impl, attrs = {'text': attr.string()}, outputs = _out)\n", "bad(name = \"bad\", text = select({\"//conditions:default\": \"value\"}))\n", "either doesn't exist or uses a select()"),
+        ("def _impl(ctx): return [DefaultInfo()]\ndef _out(text): return []\nbad = rule(implementation = _impl, attrs = {'text': attr.string()}, outputs = _out)\n", "bad(name = \"bad\", text = \"value\")\n", "return value must be a dict"),
+        ("def _impl(ctx): return [DefaultInfo()]\ndef _out(*, named): return {'out': '%{name}.out'}\nbad = rule(implementation = _impl, attrs = {'named': attr.string()}, outputs = _out)\n", "bad(name = \"bad\", named = \"value\")\n", "named-only parameter `named`"),
+        ("def _impl(ctx): return [DefaultInfo()]\ndef _out(**kwargs): return {'out': '%{name}.out'}\nbad = rule(implementation = _impl, attrs = {'kwargs': attr.string()}, outputs = _out)\n", "bad(name = \"bad\", kwargs = \"value\")\n", "extra positional argument"),
+        ("def _impl(ctx): return [DefaultInfo()]\ndef _out(): return {1: '%{name}'}\nbad = rule(implementation = _impl, outputs = _out)\n", "bad(name = \"bad\")\n", "keys must be strings"),
+        ("def _impl(ctx): return [DefaultInfo()]\ndef _out(): return {'out': 1}\nbad = rule(implementation = _impl, outputs = _out)\n", "bad(name = \"bad\")\n", "values must be strings"),
+        ("def _impl(ctx): return [DefaultInfo()]\nbad = rule(implementation = _impl, attrs = {'out': attr.output()}, outputs = {'out': '%{name}.implicit'})\n", "bad(name = \"bad\", out = \"explicit.out\")\n", "multiple outputs with the same key: out"),
+        ("def _impl(ctx): return [DefaultInfo()]\nbad = rule(implementation = _impl, outputs = {'out': '//other:output'})\n", "bad(name = \"bad\")\n", "output label must name a valid target in this package"),
+        ("def _impl(ctx): return [DefaultInfo()]\nbad = rule(implementation = _impl, outputs = {'one': 'same', 'two': 'same'})\n", "bad(name = \"bad\")\n", "target 'same' declared more than once"),
+        ("def _impl(ctx): return [DefaultInfo()]\nbad = rule(implementation = _impl, outputs = {'out': '%{name}.generated'})\n", "filegroup(name = \"bad.generated\")\nbad(name = \"bad\")\n", "target 'bad.generated' declared more than once"),
+    ];
+    for (definitions, invocation, expected) in cases {
+        fs::write(package.join("defs.bzl"), definitions).unwrap();
+        fs::write(
+            package.join(BUILD_FILE_PRIMARY),
+            format!("load(\":defs.bzl\", \"bad\")\n{invocation}"),
+        )
+        .unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(expected), "{expected}: {error}");
+    }
+}
+
+#[test]
 fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
     let workspace = scratch("rule-deps");
     let package = workspace.join("parent");

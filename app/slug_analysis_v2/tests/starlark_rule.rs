@@ -7668,6 +7668,83 @@ predeclared = rule(implementation = _predeclared, attrs = {"out": attr.output()}
 }
 
 #[tokio::test]
+async fn implicit_rule_outputs_feed_ctx_outputs_actions_and_default_files_in_bazel_order() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _impl(ctx):
+    implicit = ctx.outputs.implicit
+    unusual = getattr(ctx.outputs, "not-an-identifier")
+    ctx.actions.write(implicit, unusual.path)
+    return [DefaultInfo()]
+
+def _collision(ctx):
+    fail("implementation must not run")
+
+def _no_default(ctx):
+    return []
+
+subject = rule(
+    implementation = _impl,
+    attrs = {"explicit": attr.output_list()},
+    outputs = {"implicit": "%{name}.gen", "not-an-identifier": "%{name}.odd"},
+    output_to_genfiles = True,
+)
+collision = rule(
+    implementation = _collision,
+    attrs = {"implicit": attr.output_list()},
+    outputs = {"implicit": "%{name}.gen"},
+)
+synthesized = rule(implementation = _no_default, attrs = {"explicit": attr.output_list()}, outputs = {"implicit": "%{name}.gen"})
+reserved_executable = rule(implementation = _collision, outputs = {"executable": "%{name}.bin"}, executable = True)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"collision\", \"reserved_executable\", \"subject\", \"synthesized\")\nsubject(name = \"subject\", explicit = [\"explicit.out\"])\ncollision(name = \"collision\", implicit = [])\nsynthesized(name = \"synthesized\", explicit = [\"synthesized.out\"])\nreserved_executable(name = \"reserved_executable\")\n",
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = |name: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{name}")).unwrap(),
+            typed_action_test_configuration(),
+        )
+    };
+
+    let result = analyze_request(&dice, &workspace, &key("subject"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        default_file_paths(result.providers().default_info().unwrap()),
+        ["subject.gen", "subject.odd", "explicit.out"]
+    );
+    assert_eq!(result.actions().len(), 1);
+    assert_eq!(result.actions()[0].outputs()[0].path(), "subject.gen");
+    let error = analyze_request(&dice, &workspace, &key("collision"), None, false)
+        .await
+        .unwrap_err();
+    let collision_error = "multiple outputs with the same key: implicit";
+    assert!(error.contains(collision_error), "{error}");
+    assert!(!error.contains("implementation must not run"), "{error}");
+    let synthesized = analyze_request(&dice, &workspace, &key("synthesized"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        default_file_paths(synthesized.providers().default_info().unwrap()),
+        ["synthesized.gen", "synthesized.out"]
+    );
+    let reserved_error = "multiple outputs with the same key: executable";
+    let error = analyze_request(&dice, &workspace, &key("reserved_executable"), None, false)
+        .await
+        .unwrap_err();
+    assert!(error.contains(reserved_error), "{error}");
+    assert!(!error.contains("implementation must not run"), "{error}");
+}
+
+#[tokio::test]
 async fn executable_default_info_recomputes_and_restores_structural_results() {
     let workspace = scratch();
     fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();

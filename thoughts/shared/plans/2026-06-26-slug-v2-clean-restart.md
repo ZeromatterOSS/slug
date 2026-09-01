@@ -38,14 +38,14 @@ and must name the same packet.
 
 [Complete generic rule predeclared outputs](./slug-v2-subplans/current-packet.md).
 
-Materialize and review `WP-6-7A-rule-predeclared-outputs-complete-r1`. Implement
+Materialize and review `WP-6-7A-rule-predeclared-outputs-complete-r3`. Implement
 the complete default-enabled Bazel 9.2 `rule(outputs=...)` category: ordered
 static templates and callbacks, generated package targets, final compact
 key/label identity, `ctx.outputs`, synthesized `DefaultInfo.files`, and the
 adjacent `output_to_genfiles` placement bit. Keep implicit outputs separate
 from attributes and resolve callbacks only during package loading. The default
-merged-genfiles mode is admitted; nonmerged genfiles fails closed before rule
-implementation and exact split-root bytes remain M9. No rules_rust, parser,
+merged-genfiles mode is admitted; the nonmerged option is not constructible or
+admitted, and exact split-root bytes remain M9. No rules_rust, parser,
 `set`, rule-body, `cc_common`, `cc_internal`, native rule, BCR, command, or C++
 special case is admitted. Bazel 9.2 is sole semantic authority. Buck2-derived
 compact strings, immutable slices and memory accounting are reused; Zabel is
@@ -59,7 +59,22 @@ pinned helper source and broader proofs, surrounding output-prefix/input and
 own-rule collision cases must be explicitly deferred, and generated-target
 query ownership needs a query proof and full-suite gate. Corrected R2 makes
 only those bounded contract/allowlist changes; focused rereview returned
-`ACCEPT`. Implement only the frozen R2 contract.
+`ACCEPT`, and the first implementation followed that frozen R2 contract.
+
+Terminal R2 implementation review returned `REPLAN`. Bazel projects residual
+`*args`/`**kwargs` callback names as well as ordinary and keyword-only names;
+an implementation returning no `DefaultInfo` still receives all rule outputs
+in its synthesized default provider; and executable/test rules reserve output
+key `executable`. R2 also claimed a nonmerged-genfiles stop even though that
+command option has no lawful admitted producer. Corrected R3 adds the three
+exact semantic cases and narrows placement to Bazel 9.2's admitted default
+merged mode; construction and exact handling of split bin/genfiles roots stay
+with the future command/M9 category. Focused R3 architecture rereview returns
+`ACCEPT`. The implementation then passes the complete loading, analysis and
+query gates; terminal review's sole mixed-parameter proof correction passes
+focused rereview. Rebuilt authentic replay clears `rule(outputs=...)` and now
+stops at generic non-fixed aspect declaration attributes in rules_rust
+`rust/private/unpretty.bzl:237`.
 
 Commit `6cb5ab55b` terminally accepts generic named-only rule-level regular
 transition attachment. The sole transition object now survives live, frozen,
