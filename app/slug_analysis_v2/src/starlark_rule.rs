@@ -123,6 +123,7 @@ use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
 use crate::result::ConfiguredActionOwnerContext;
 use crate::result::ConfiguredNodeResult;
+use crate::runfiles_support::complete_runfiles_support;
 
 /// Errors produced while synchronously evaluating a loaded rule after DICE has
 /// prepared its inputs. The executable-rule case remains distinct so command
@@ -1767,6 +1768,15 @@ pub(crate) fn evaluate_loaded_rule(
             ))
         })
         .transpose();
+    let support_configuration =
+        typed_configuration
+            .as_ref()
+            .map_err(Clone::clone)
+            .and_then(|value| {
+                value.as_ref().cloned().ok_or_else(|| {
+                    "runfiles support requires structural action configuration".to_owned()
+                })
+            });
     let executable_provenance = Arc::new(executable_artifact_provenance(
         &dependencies,
         &configured_attributes,
@@ -1935,6 +1945,16 @@ pub(crate) fn evaluate_loaded_rule(
                 .clone(),
         });
     }
+    let mut actions = actions
+        .lock()
+        .map_err(|_| "ctx.actions state lock is poisoned".to_owned())?;
+    let providers = complete_runfiles_support(
+        providers,
+        &mut actions,
+        &retained_owner,
+        &runfiles_packages,
+        support_configuration,
+    )?;
     let declared_outputs = providers
         .default_info()
         .expect("ProviderCollection validated DefaultInfo")
@@ -1942,12 +1962,7 @@ pub(crate) fn evaluate_loaded_rule(
         .into_iter()
         .map(|artifact| artifact.path().into_owned())
         .collect();
-    let actions = actions
-        .lock()
-        .map_err(|_| "ctx.actions state lock is poisoned".to_owned())?
-        .registry()
-        .actions()
-        .to_vec();
+    let actions = actions.registry().actions().to_vec();
     let result = ConfiguredNodeResult::new_rule(key, providers, rule_capability, runfiles_packages)
         .with_action_specs(actions, action_contexts)
         .map_err(LoadedRuleError::from)?;

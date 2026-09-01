@@ -220,7 +220,10 @@ impl RetainedRunfiles {
 
 fn ensure_regular_artifact(artifact: &AnalysisArtifact) -> Result<(), RunfilesError> {
     if let AnalysisArtifact::Derived { output, .. } = artifact
-        && output.kind() != ActionOutputKind::File
+        && !matches!(
+            output.kind(),
+            ActionOutputKind::File | ActionOutputKind::Symlink
+        )
     {
         return Err(RunfilesError::InvalidArtifactKind(output.kind()));
     }

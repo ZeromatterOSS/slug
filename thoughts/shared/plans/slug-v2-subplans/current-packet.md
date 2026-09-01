@@ -5,17 +5,18 @@ Packet: `WP-6-7A-four-runfiles-support-actions-design-r4`
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 typed
 DefaultInfo/FilesToRun/runfiles support.
 
-Status: formal R4 `REPLAN`; Rust changes are paused pending focused independent
-review of the Host-path-flavor correction. The implementation candidate is
-based on design commit `2ac91f25c`. The loading/package-metadata owner
+Status: focused R4 architecture review returned `ACCEPT`; the implementation
+candidate is based on design commits `2ac91f25c` and `cfbf9a029`. The
+loading/package-metadata owner
 landed in `80a6bfd3a`, and the complete configured transitive-package collector
 landed with terminal review `ACCEPT` in `2483dd7e2`. R3 terminal implementation
 review returned `REPLAN`: its analysis seam discarded `HostPathFlavor` and
 could therefore publish the non-Windows graph for an explicitly unsupported
 Windows configuration. All other reviewed ownership, equality, atomicity,
-topology, isolation, and cap boundaries are retained. The candidate had passed
-the required serial build-API, loading, analysis, query, core/REAPI, format,
-metadata, cap, archive-status, and hygiene gates before this correction. Warm
+topology, isolation, and cap boundaries are retained. The corrected candidate
+passes the required serial build-API, loading, analysis, query, core/REAPI,
+format, metadata, cap, archive-status, and hygiene gates; terminal
+implementation review returned `ACCEPT`. Warm
 A/B/A validation found and corrected one raw runfiles-depset comparison by
 making the existing `RunfilesSupport` owner use graph-aware publication
 equality. The former three-action
@@ -317,9 +318,9 @@ covers all retained additions. No async transfer or shutdown owner is added.
 
 R2 design review and the focused R3 symlink-Artifact correction rereview
 returned `ACCEPT`. R3 terminal implementation review returned `REPLAN` only
-for the discarded Host path flavor. R4 is a docs-only correction until focused
-independent review returns `ACCEPT`; then land one independently reviewed
-implementation commit preserving every other accepted R3 boundary.
+for the discarded Host path flavor. Focused R4 architecture review returned
+`ACCEPT`; land one terminally reviewed implementation commit preserving every
+other accepted R3 boundary.
 
 Production allowlist:
 
@@ -403,3 +404,9 @@ atomic registry/provider publication, special output kind, natural owner,
 retained memory, downstream boundary, caps, and successor sufficiency, plus
 the implementation diff and all recorded proof. Any further material contract
 correction is `REPLAN` rather than another in-place expansion.
+
+Focused R4 architecture review and terminal implementation review both
+returned `ACCEPT`. The implementation preserves the full typed Host pair,
+fails closed before Windows support publication, keeps non-executable
+normalization lazy, and leaves every prior carrier, equality, topology,
+atomicity, isolation, cap, and successor boundary intact.

@@ -23,6 +23,7 @@ use slug_configuration_v2::NormalizedAbsoluteBazelPath;
 use slug_configuration_v2::NormalizedBazelPath;
 use slug_configuration_v2::RetainedActionEnvironment;
 
+use crate::actions::runfiles_support::RunfilesSupportActionSpec;
 use crate::analysis_value::AnalysisArtifact;
 use crate::analysis_value::AnalysisDepset;
 use crate::analysis_value::AnalysisValueKind;
@@ -34,6 +35,7 @@ pub enum ActionOutputKind {
     File,
     Directory,
     Symlink,
+    RunfilesTree,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
@@ -992,6 +994,10 @@ pub enum ActionKind {
     ArtifactSymlink,
     AbsoluteSymlink,
     ArgsWrite,
+    RepoMappingManifest,
+    SourceSymlinkManifest,
+    SymlinkTree,
+    RunfilesTree,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -1014,6 +1020,7 @@ enum ActionPayload {
     Spawn(SpawnSpec),
     Symlink(SymlinkSpec),
     ArgsWrite(ArgsWriteSpec),
+    RunfilesSupport(RunfilesSupportActionSpec),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -1027,6 +1034,10 @@ static SPAWN_KIND: ActionKind = ActionKind::Spawn;
 static ARTIFACT_SYMLINK_KIND: ActionKind = ActionKind::ArtifactSymlink;
 static ABSOLUTE_SYMLINK_KIND: ActionKind = ActionKind::AbsoluteSymlink;
 static ARGS_WRITE_KIND: ActionKind = ActionKind::ArgsWrite;
+static REPO_MAPPING_MANIFEST_KIND: ActionKind = ActionKind::RepoMappingManifest;
+static SOURCE_SYMLINK_MANIFEST_KIND: ActionKind = ActionKind::SourceSymlinkManifest;
+static SYMLINK_TREE_KIND: ActionKind = ActionKind::SymlinkTree;
+static RUNFILES_TREE_KIND: ActionKind = ActionKind::RunfilesTree;
 static EMPTY_STRING_MAP: std::sync::LazyLock<BTreeMap<String, String>> =
     std::sync::LazyLock::new(BTreeMap::new);
 
@@ -1062,6 +1073,10 @@ impl ActionSpec {
         Self::typed(ActionPayload::ArgsWrite(spec))
     }
 
+    pub fn runfiles_support(spec: RunfilesSupportActionSpec) -> Self {
+        Self::typed(ActionPayload::RunfilesSupport(spec))
+    }
+
     fn typed(payload: ActionPayload) -> Self {
         Self {
             payload,
@@ -1079,6 +1094,16 @@ impl ActionSpec {
                 SymlinkTarget::AbsolutePath { .. } => &ABSOLUTE_SYMLINK_KIND,
             },
             ActionPayload::ArgsWrite(_) => &ARGS_WRITE_KIND,
+            ActionPayload::RunfilesSupport(spec) => match spec {
+                RunfilesSupportActionSpec::RepoMappingManifest { .. } => {
+                    &REPO_MAPPING_MANIFEST_KIND
+                }
+                RunfilesSupportActionSpec::SourceSymlinkManifest { .. } => {
+                    &SOURCE_SYMLINK_MANIFEST_KIND
+                }
+                RunfilesSupportActionSpec::SymlinkTree { .. } => &SYMLINK_TREE_KIND,
+                RunfilesSupportActionSpec::RunfilesTree { .. } => &RUNFILES_TREE_KIND,
+            },
         }
     }
 
@@ -1088,6 +1113,7 @@ impl ActionSpec {
             ActionPayload::Spawn(spec) => spec.mnemonic(),
             ActionPayload::Symlink(_) => "Symlink",
             ActionPayload::ArgsWrite(_) => "FileWrite",
+            ActionPayload::RunfilesSupport(spec) => spec.mnemonic(),
         }
     }
 
@@ -1132,6 +1158,7 @@ impl ActionSpec {
             ActionPayload::Spawn(spec) => spec.outputs(),
             ActionPayload::Symlink(spec) => std::slice::from_ref(spec.output()),
             ActionPayload::ArgsWrite(spec) => std::slice::from_ref(spec.output()),
+            ActionPayload::RunfilesSupport(spec) => std::slice::from_ref(spec.output()),
         }
     }
 
@@ -1148,6 +1175,7 @@ impl ActionSpec {
             ActionPayload::Spawn(spec) => spec.progress_message(),
             ActionPayload::Symlink(spec) => spec.progress_message(),
             ActionPayload::ArgsWrite(_) => None,
+            ActionPayload::RunfilesSupport(_) => None,
         }
     }
 
@@ -1224,6 +1252,13 @@ impl ActionSpec {
     pub fn args_write_spec(&self) -> Option<&ArgsWriteSpec> {
         match &self.payload {
             ActionPayload::ArgsWrite(spec) => Some(spec),
+            _ => None,
+        }
+    }
+
+    pub fn runfiles_support_spec(&self) -> Option<&RunfilesSupportActionSpec> {
+        match &self.payload {
+            ActionPayload::RunfilesSupport(spec) => Some(spec),
             _ => None,
         }
     }

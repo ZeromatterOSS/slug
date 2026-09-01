@@ -20,6 +20,7 @@ use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::AnalysisArtifact;
+use slug_build_api_v2::AnalysisConfiguredTargetKey;
 use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::AnalysisDepsetGraphInput;
 use slug_build_api_v2::AnalysisDepsetGraphNode;
@@ -30,6 +31,7 @@ use slug_build_api_v2::ArgsWriteSpec;
 use slug_build_api_v2::ArtifactInputSource;
 use slug_build_api_v2::ArtifactInputs;
 use slug_build_api_v2::CtxActions;
+use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::ReapiCommandProjection;
 use slug_build_api_v2::RetainedArgCall;
@@ -39,6 +41,7 @@ use slug_build_api_v2::RetainedArtifactInputs;
 use slug_build_api_v2::RetainedCommandLine;
 use slug_build_api_v2::RetainedCommandLineSegment;
 use slug_build_api_v2::RetainedParamFileFormat;
+use slug_build_api_v2::RetainedRunfiles;
 use slug_build_api_v2::RetainedScalarArg;
 use slug_build_api_v2::RetainedScalarValue;
 use slug_build_api_v2::RetainedSpawnArgsSnapshot;
@@ -47,6 +50,13 @@ use slug_build_api_v2::RetainedSpawnParamFilePolicy;
 use slug_build_api_v2::RetainedVectorArg;
 use slug_build_api_v2::RetainedVectorOptions;
 use slug_build_api_v2::RetainedVectorSource;
+use slug_build_api_v2::RunfilesConflictPolicy;
+use slug_build_api_v2::RunfilesPackageDepset;
+use slug_build_api_v2::RunfilesPackageMetadata;
+use slug_build_api_v2::RunfilesRepositoryMapping;
+use slug_build_api_v2::RunfilesSupport;
+use slug_build_api_v2::RunfilesSupportActionSpec;
+use slug_build_api_v2::RunfilesSymlink;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SpawnSpec;
 use slug_build_api_v2::SymlinkSpec;
@@ -56,12 +66,101 @@ use slug_configuration_v2::HostPathFlavor;
 use slug_configuration_v2::NormalizedAbsoluteBazelPath;
 use slug_configuration_v2::NormalizedBazelPath;
 use slug_configuration_v2::RetainedActionEnvironment;
+use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
+use slug_identity_v2::PackageIdentifier;
+use slug_identity_v2::PackagePath;
 
 fn source_artifact(name: &str) -> AnalysisArtifact {
     AnalysisArtifact::Source(
         CanonicalLabel::parse(&format!("@@//pkg:{name}")).expect("source label"),
     )
+}
+
+fn derived_artifact(path: &str, kind: ActionOutputKind) -> AnalysisArtifact {
+    AnalysisArtifact::Derived {
+        owner: AnalysisConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//pkg:owner").unwrap(),
+            b"cfg".as_slice(),
+        ),
+        output: ActionOutput::new(path, kind),
+    }
+}
+
+fn runfiles_support_specs() -> [RunfilesSupportActionSpec; 4] {
+    let executable = derived_artifact("pkg/tool", ActionOutputKind::File);
+    let unresolved = derived_artifact("pkg/unresolved", ActionOutputKind::Symlink);
+    let symlink_target = source_artifact("data");
+    let runfiles = RetainedRunfiles::from_parts(
+        vec![executable, unresolved],
+        Vec::new(),
+        vec![RunfilesSymlink::new("logical/data", symlink_target)],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        RunfilesConflictPolicy::Warn,
+    )
+    .unwrap();
+    let support = Arc::new(RunfilesSupport {
+        runfiles,
+        tree: derived_artifact("pkg/tool.runfiles", ActionOutputKind::RunfilesTree),
+        input_manifest: derived_artifact("pkg/tool.runfiles_manifest", ActionOutputKind::File),
+        manifest: Some(derived_artifact(
+            "pkg/tool.runfiles/MANIFEST",
+            ActionOutputKind::File,
+        )),
+        repo_mapping_manifest: Some(derived_artifact(
+            "pkg/tool.repo_mapping",
+            ActionOutputKind::File,
+        )),
+    });
+    let packages = runfiles_packages("pkg", "dep+1");
+    RunfilesSupportActionSpec::default_actions(
+        support,
+        packages,
+        HostPathFlavor::Unix,
+        RetainedActionEnvironment::default().for_action(false, [("PATH", "/bin")]),
+    )
+    .unwrap()
+}
+
+fn changed_support(
+    spec: &RunfilesSupportActionSpec,
+    change: impl FnOnce(&mut RunfilesSupport),
+) -> RunfilesSupportActionSpec {
+    let mut changed = spec.clone();
+    let mut support = (**changed.support()).clone();
+    change(&mut support);
+    let replacement = Arc::new(support);
+    match &mut changed {
+        RunfilesSupportActionSpec::RepoMappingManifest { support, .. }
+        | RunfilesSupportActionSpec::SourceSymlinkManifest { support, .. }
+        | RunfilesSupportActionSpec::SymlinkTree { support, .. }
+        | RunfilesSupportActionSpec::RunfilesTree { support, .. } => *support = replacement,
+    }
+    changed
+}
+
+fn runfiles_packages(package: &str, mapped_repo: &str) -> RunfilesPackageDepset {
+    let mapping = Arc::new(RunfilesRepositoryMapping::new(
+        Arc::from([(
+            ApparentRepoName::new("dep").unwrap(),
+            CanonicalRepoName::new(mapped_repo).unwrap(),
+        )]),
+        None,
+    ));
+    RunfilesPackageDepset::from_direct(
+        DepsetOrder::Default,
+        vec![Arc::new(RunfilesPackageMetadata::new(
+            PackageIdentifier::new(
+                CanonicalRepoName::root(),
+                PackagePath::parse(package).unwrap(),
+            ),
+            mapping,
+        ))],
+    )
+    .unwrap()
 }
 
 fn artifact_depset(name: &str) -> AnalysisDepset {
@@ -834,6 +933,203 @@ fn registry_rejects_conflicting_outputs() {
             path: "pkg/out.txt".to_owned()
         }
     );
+}
+
+#[test]
+fn registry_batch_preflight_is_atomic_for_existing_and_internal_conflicts() {
+    let action = |path: &str| {
+        ActionSpec::new(
+            ActionKind::Write {
+                content: String::new(),
+                is_executable: false,
+            },
+            "FileWrite",
+            vec![ActionOutput::new(path, ActionOutputKind::File)],
+        )
+    };
+
+    let support_actions = runfiles_support_specs().map(ActionSpec::runfiles_support);
+    for conflicting_path in support_actions
+        .iter()
+        .map(|action| action.outputs()[0].path())
+    {
+        let mut registry = slug_build_api_v2::ActionRegistry::new();
+        registry.register(action(conflicting_path)).unwrap();
+        let baseline = registry.clone();
+        assert!(registry.register_batch(support_actions.clone()).is_err());
+        assert_eq!(registry, baseline);
+    }
+
+    let mut registry = slug_build_api_v2::ActionRegistry::new();
+    registry.register(action("pkg/existing")).unwrap();
+    let baseline = registry.clone();
+    assert!(
+        registry
+            .register_batch([action("pkg/same"), action("pkg/same")])
+            .is_err()
+    );
+    assert_eq!(registry, baseline);
+
+    let range = registry
+        .register_batch([action("pkg/one"), action("pkg/two")])
+        .unwrap();
+    assert_eq!(range, 1..3);
+    assert_eq!(registry.output_owner("pkg/one"), Some(1));
+    assert_eq!(registry.output_owner("pkg/two"), Some(2));
+}
+
+#[test]
+fn runfiles_support_actions_share_one_owner_and_match_the_bazel_input_graph() {
+    let specs = runfiles_support_specs();
+    let support = specs[0].support().clone();
+
+    assert_eq!(
+        specs
+            .iter()
+            .map(RunfilesSupportActionSpec::mnemonic)
+            .collect::<Vec<_>>(),
+        [
+            "RepoMappingManifest",
+            "SourceSymlinkManifest",
+            "SymlinkTree",
+            "RunfilesTree",
+        ]
+    );
+    assert!(
+        specs
+            .iter()
+            .all(|spec| Arc::ptr_eq(spec.support(), &support))
+    );
+    assert!(
+        RunfilesSupportActionSpec::default_actions(
+            support.clone(),
+            Depset::empty(),
+            HostPathFlavor::Unix,
+            RetainedActionEnvironment::default(),
+        )
+        .is_err()
+    );
+    assert_eq!(
+        RunfilesSupportActionSpec::default_actions(
+            support,
+            runfiles_packages("pkg", "dep+1"),
+            HostPathFlavor::Windows,
+            RetainedActionEnvironment::default(),
+        )
+        .unwrap_err(),
+        "runfiles support is unsupported on Windows"
+    );
+    assert!(matches!(
+        &specs[0],
+        RunfilesSupportActionSpec::RepoMappingManifest {
+            emit_compact_repo_mapping: true,
+            ..
+        }
+    ));
+    assert!(matches!(
+        &specs[1],
+        RunfilesSupportActionSpec::SourceSymlinkManifest {
+            remotable: false,
+            ..
+        }
+    ));
+    assert!(matches!(
+        &specs[2],
+        RunfilesSupportActionSpec::SymlinkTree {
+            environment,
+            mode: slug_build_api_v2::RunfilesSymlinkMode::Create,
+            ..
+        } if environment.fixed().get("PATH") == Some("/bin")
+    ));
+    assert_eq!(
+        specs
+            .iter()
+            .map(|spec| (spec.output().path(), spec.output().kind()))
+            .collect::<Vec<_>>(),
+        [
+            ("pkg/tool.repo_mapping", ActionOutputKind::File),
+            ("pkg/tool.runfiles_manifest", ActionOutputKind::File),
+            ("pkg/tool.runfiles/MANIFEST", ActionOutputKind::File),
+            ("pkg/tool.runfiles", ActionOutputKind::RunfilesTree),
+        ]
+    );
+    let inputs = specs
+        .iter()
+        .map(|spec| {
+            let mut paths = Vec::new();
+            spec.visit_declared_inputs(|artifact| paths.push(artifact.path().into_owned()));
+            paths
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(inputs[0], Vec::<String>::new());
+    assert_eq!(inputs[1], ["pkg/unresolved"]);
+    assert_eq!(inputs[2], ["pkg/tool.runfiles_manifest"]);
+    assert_eq!(
+        inputs[3],
+        [
+            "pkg/tool",
+            "pkg/unresolved",
+            "pkg/data",
+            "pkg/tool.runfiles/MANIFEST",
+            "pkg/tool.repo_mapping",
+        ]
+    );
+
+    let actions = specs.map(ActionSpec::runfiles_support);
+    assert_eq!(
+        actions
+            .iter()
+            .map(|action| action.kind().clone())
+            .collect::<Vec<_>>(),
+        [
+            ActionKind::RepoMappingManifest,
+            ActionKind::SourceSymlinkManifest,
+            ActionKind::SymlinkTree,
+            ActionKind::RunfilesTree,
+        ]
+    );
+    assert!(
+        actions
+            .iter()
+            .all(|action| ReapiCommandProjection::from_action(action).is_err())
+    );
+}
+
+#[test]
+fn runfiles_support_action_equality_covers_every_retained_semantic_input() {
+    let baseline = runfiles_support_specs();
+
+    let runfiles = changed_support(&baseline[3], |support| {
+        support.runfiles.conflict_policy = RunfilesConflictPolicy::Error;
+    });
+    let manifest = changed_support(&baseline[1], |support| {
+        support.input_manifest =
+            derived_artifact("pkg/changed.runfiles_manifest", ActionOutputKind::File);
+    });
+    assert_ne!(baseline[3], runfiles);
+    assert_ne!(baseline[1], manifest);
+
+    let mut mapping = baseline[0].clone();
+    let mut package = baseline[0].clone();
+    if let RunfilesSupportActionSpec::RepoMappingManifest { packages, .. } = &mut mapping {
+        *packages = runfiles_packages("pkg", "dep+2");
+    }
+    if let RunfilesSupportActionSpec::RepoMappingManifest { packages, .. } = &mut package {
+        *packages = runfiles_packages("other", "dep+1");
+    }
+    assert_ne!(baseline[0], mapping);
+    assert_ne!(baseline[0], package);
+
+    let mut environment = baseline[2].clone();
+    if let RunfilesSupportActionSpec::SymlinkTree { environment, .. } = &mut environment {
+        *environment = RetainedActionEnvironment::default();
+    }
+    let mut output = baseline[3].clone();
+    if let RunfilesSupportActionSpec::RunfilesTree { output, .. } = &mut output {
+        *output = ActionOutput::new("pkg/other.runfiles", ActionOutputKind::RunfilesTree);
+    }
+    assert_ne!(baseline[2], environment);
+    assert_ne!(baseline[3], output);
 }
 
 #[test]

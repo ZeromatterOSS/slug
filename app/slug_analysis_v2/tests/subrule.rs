@@ -38,6 +38,8 @@ use slug_configuration_v2::CommandConfigurationOccurrence;
 use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_configuration_v2::NativeCommandOption;
 use slug_configuration_v2::SlugConfiguration;
+use slug_configuration_v2::native::host::ActionEnvironmentHost;
+use slug_configuration_v2::native::host::ActionEnvironmentHostOs;
 use slug_configuration_v2::native::host::AutoCpuToken;
 use slug_configuration_v2::native::host::HostConversionInputs;
 use slug_configuration_v2::native::host::HostPathFlavor;
@@ -204,7 +206,10 @@ fn configuration(profile: Option<&str>) -> ConfigurationKey {
             Arc::from([]),
             Arc::from([]),
         )
-        .unwrap(),
+        .unwrap()
+        .with_action_environment_host(ActionEnvironmentHost::without_environment(
+            ActionEnvironmentHostOs::Linux,
+        )),
     )
     .unwrap()
     .with_host_platform_label(&CanonicalLabel::parse("@@//.slug_test_host:host").unwrap());

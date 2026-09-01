@@ -17,6 +17,7 @@ pub mod configured_target;
 pub mod dice;
 pub mod key;
 pub mod result;
+mod runfiles_support;
 pub mod starlark_rule;
 mod subrule;
 pub mod toolchains;

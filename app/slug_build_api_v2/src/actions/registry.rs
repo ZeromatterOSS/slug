@@ -11,6 +11,7 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
+use std::ops::Range;
 
 use crate::actions::spec::ActionOutput;
 use crate::actions::spec::ActionSpec;
@@ -70,6 +71,37 @@ impl ActionRegistry {
         }
         self.actions.push(action);
         Ok(index)
+    }
+
+    pub fn register_batch(
+        &mut self,
+        actions: impl IntoIterator<Item = ActionSpec>,
+    ) -> Result<Range<usize>, ActionError> {
+        let actions = actions.into_iter().collect::<Vec<_>>();
+        let mut pending = BTreeMap::new();
+        for action in &actions {
+            validate_action(action)?;
+            for output in action.outputs() {
+                validate_output(output)?;
+                if self.output_owners.contains_key(output.path())
+                    || pending.insert(output.path().to_owned(), ()).is_some()
+                {
+                    return Err(ActionError::ConflictingOutput {
+                        path: output.path().to_owned(),
+                    });
+                }
+            }
+        }
+
+        let start = self.actions.len();
+        for (offset, action) in actions.into_iter().enumerate() {
+            let index = start + offset;
+            for output in action.outputs() {
+                self.output_owners.insert(output.path().to_owned(), index);
+            }
+            self.actions.push(action);
+        }
+        Ok(start..self.actions.len())
     }
 
     pub fn actions(&self) -> &[ActionSpec] {

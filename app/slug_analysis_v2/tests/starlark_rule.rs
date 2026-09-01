@@ -68,6 +68,7 @@ use slug_analysis_v2::key::StarlarkOptionScope;
 use slug_analysis_v2::key::StarlarkOptionValue;
 use slug_analysis_v2::prepare_configured_node_analysis;
 use slug_build_api_v2::ActionKind;
+use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::AnalysisValueKind;
 use slug_build_api_v2::ArtifactInputSource;
@@ -813,17 +814,22 @@ fn test_configuration() -> ConfigurationKey {
 }
 
 fn typed_action_test_configuration() -> ConfigurationKey {
+    typed_action_test_configuration_for(HostPathFlavor::Unix, ActionEnvironmentHostOs::Linux)
+}
+
+fn typed_action_test_configuration_for(
+    path_flavor: HostPathFlavor,
+    host_os: ActionEnvironmentHostOs,
+) -> ConfigurationKey {
     let host = HostConversionInputs::new(
         Some(AutoCpuToken::K8),
-        Some(HostPathFlavor::Unix),
+        Some(path_flavor),
         None,
         Arc::from([]),
         Arc::from([]),
     )
     .unwrap()
-    .with_action_environment_host(ActionEnvironmentHost::without_environment(
-        ActionEnvironmentHostOs::Linux,
-    ));
+    .with_action_environment_host(ActionEnvironmentHost::without_environment(host_os));
     ConfigurationKey::from_slug(
         SlugConfiguration::default_target(&host)
             .unwrap()
@@ -7305,8 +7311,29 @@ def _consumer(ctx):
         fail("expected dedicated FilesToRunProvider")
     if files_to_run.executable.path != "implicit":
         fail("expected typed executable File")
-    if files_to_run.runfiles_manifest != None or files_to_run.repo_mapping_manifest != None:
-        fail("incomplete support must not fabricate manifests")
+    if files_to_run.runfiles_manifest.path != "implicit.runfiles/MANIFEST":
+        fail("expected public runfiles manifest")
+    if files_to_run.repo_mapping_manifest.path != "implicit.repo_mapping":
+        fail("expected repository mapping manifest")
+    return [DefaultInfo()]
+
+CarrierBox = provider(fields = {"nested": "nested FilesToRun value"})
+
+def _wrapper(ctx):
+    files_to_run = ctx.attr.dep[DefaultInfo].files_to_run
+    return [CarrierBox(nested = struct(values = [files_to_run]))]
+
+def _inspect(ctx, nested):
+    files_to_run = nested.values[0]
+    if files_to_run.executable.path != "implicit":
+        fail("nested carrier lost executable")
+    if files_to_run.runfiles_manifest.path != "implicit.runfiles/MANIFEST":
+        fail("nested carrier lost complete support")
+
+inspect = subrule(implementation = _inspect)
+
+def _nested_consumer(ctx):
+    inspect(ctx.attr.dep[CarrierBox].nested)
     return [DefaultInfo()]
 
 def _predeclared(ctx):
@@ -7320,13 +7347,19 @@ wrong_files = rule(implementation = _wrong_files)
 wrong_executable = rule(implementation = _wrong_executable)
 missing = rule(implementation = _missing, executable = True)
 consumer = rule(implementation = _consumer, attrs = {"dep": attr.label()})
+wrapper = rule(implementation = _wrapper, attrs = {"dep": attr.label()})
+nested_consumer = rule(
+    implementation = _nested_consumer,
+    attrs = {"dep": attr.label()},
+    subrules = [inspect],
+)
 predeclared = rule(implementation = _predeclared, attrs = {"out": attr.output()})
 "#,
     )
     .unwrap();
     fs::write(
         workspace.join("BUILD.bazel"),
-        "load(\":defs.bzl\", \"consumer\", \"explicit\", \"implicit\", \"missing\", \"none\", \"omitted\", \"predeclared\", \"wrong_executable\", \"wrong_files\")\nimplicit(name = \"implicit\")\nexplicit(name = \"explicit\")\nconsumer(name = \"consumer\", dep = \":implicit\")\nomitted(name = \"omitted\")\nnone(name = \"none\")\npredeclared(name = \"predeclared\", out = \"fallback.txt\")\nwrong_files(name = \"wrong_files\")\nwrong_executable(name = \"wrong_executable\")\nmissing(name = \"missing\")\n",
+        "load(\":defs.bzl\", \"consumer\", \"explicit\", \"implicit\", \"missing\", \"nested_consumer\", \"none\", \"omitted\", \"predeclared\", \"wrapper\", \"wrong_executable\", \"wrong_files\")\nimplicit(name = \"implicit\")\nexplicit(name = \"explicit\")\nconsumer(name = \"consumer\", dep = \":implicit\")\nwrapper(name = \"wrapper\", dep = \":implicit\")\nnested_consumer(name = \"nested_consumer\", dep = \":wrapper\")\nomitted(name = \"omitted\")\nnone(name = \"none\")\npredeclared(name = \"predeclared\", out = \"fallback.txt\")\nwrong_files(name = \"wrong_files\")\nwrong_executable(name = \"wrong_executable\")\nmissing(name = \"missing\")\n",
     )
     .unwrap();
 
@@ -7334,7 +7367,7 @@ predeclared = rule(implementation = _predeclared, attrs = {"out": attr.output()}
     let key = |name: &str| {
         ConfiguredTargetKey::new(
             CanonicalLabel::parse(&format!("@@//:{name}")).unwrap(),
-            test_configuration(),
+            typed_action_test_configuration(),
         )
     };
 
@@ -7348,13 +7381,34 @@ predeclared = rule(implementation = _predeclared, attrs = {"out": attr.output()}
         Some("implicit".into())
     );
     assert_eq!(implicit.files_to_run.executable, implicit.executable);
-    assert!(!implicit.files_to_run.is_complete());
+    assert!(implicit.files_to_run.is_complete());
+    let support = implicit.files_to_run.support.as_ref().unwrap();
+    assert_eq!(support.tree.path(), "implicit.runfiles");
+    assert!(matches!(
+        &support.tree,
+        slug_build_api_v2::AnalysisArtifact::Derived { output, .. }
+            if output.kind() == ActionOutputKind::RunfilesTree
+    ));
+    assert_eq!(support.input_manifest.path(), "implicit.runfiles_manifest");
+    assert_eq!(
+        support.manifest.as_ref().unwrap().path(),
+        "implicit.runfiles/MANIFEST"
+    );
+    assert_eq!(
+        support.repo_mapping_manifest.as_ref().unwrap().path(),
+        "implicit.repo_mapping"
+    );
     assert_eq!(runfiles_paths(&implicit.default_runfiles), ["implicit"]);
     assert_eq!(runfiles_paths(&implicit.data_runfiles), ["implicit"]);
 
-    analyze_request(&dice, &workspace, &key("consumer"), None, false)
+    let consumer = analyze_request(&dice, &workspace, &key("consumer"), None, false)
         .await
         .unwrap();
+    assert!(consumer.actions().is_empty());
+    let nested_consumer = analyze_request(&dice, &workspace, &key("nested_consumer"), None, false)
+        .await
+        .unwrap();
+    assert!(nested_consumer.actions().is_empty());
 
     let explicit = analyze_request(&dice, &workspace, &key("explicit"), None, false)
         .await
@@ -7368,12 +7422,42 @@ predeclared = rule(implementation = _predeclared, attrs = {"out": attr.output()}
     assert_eq!(runfiles_paths(&explicit.default_runfiles), ["explicit"]);
     assert_eq!(runfiles_paths(&explicit.data_runfiles), ["explicit"]);
 
+    let implicit_result = analyze_request(&dice, &workspace, &key("implicit"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        implicit_result
+            .actions()
+            .iter()
+            .map(|action| action.mnemonic())
+            .collect::<Vec<_>>(),
+        [
+            "FileWrite",
+            "RepoMappingManifest",
+            "SourceSymlinkManifest",
+            "SymlinkTree",
+            "RunfilesTree",
+        ]
+    );
+    let support = implicit_result
+        .providers()
+        .default_info()
+        .unwrap()
+        .files_to_run
+        .support
+        .as_ref()
+        .unwrap();
+    assert!(implicit_result.actions()[1..].iter().all(|action| {
+        std::sync::Arc::ptr_eq(action.runfiles_support_spec().unwrap().support(), support)
+    }));
+
     let omitted = analyze_request(&dice, &workspace, &key("omitted"), None, false)
         .await
         .unwrap();
     let none = analyze_request(&dice, &workspace, &key("none"), None, false)
         .await
         .unwrap();
+    assert!(omitted.actions().is_empty() && none.actions().is_empty());
     assert_eq!(
         omitted.providers().default_info(),
         none.providers().default_info()
@@ -7414,6 +7498,39 @@ predeclared = rule(implementation = _predeclared, attrs = {"out": attr.output()}
         error.to_string(),
         "The rule 'missing' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns."
     );
+
+    let windows = typed_action_test_configuration_for(
+        HostPathFlavor::Windows,
+        ActionEnvironmentHostOs::Windows,
+    );
+    let windows_key = |name: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{name}")).unwrap(),
+            windows.clone(),
+        )
+    };
+    let error = analyze_request_typed(&dice, &workspace, &windows_key("implicit"), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("runfiles support is unsupported on Windows"),
+        "{error}"
+    );
+    let omitted = analyze_request(&dice, &workspace, &windows_key("omitted"), None, false)
+        .await
+        .unwrap();
+    assert!(omitted.actions().is_empty());
+    assert!(
+        omitted
+            .providers()
+            .default_info()
+            .unwrap()
+            .files_to_run
+            .support
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -7440,7 +7557,7 @@ async fn executable_default_info_recomputes_and_restores_structural_results() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let key = ConfiguredTargetKey::new(
         CanonicalLabel::parse("@@//:probe").unwrap(),
-        test_configuration(),
+        typed_action_test_configuration(),
     );
 
     let initial = analyze_request(&dice, &workspace, &key, None, false)
@@ -7469,6 +7586,86 @@ async fn executable_default_info_recomputes_and_restores_structural_results() {
     );
     assert_ne!(initial, changed);
     assert_eq!(initial, restored);
+    assert_eq!(initial.actions().len(), 5);
+    assert_eq!(changed.actions().len(), 6);
+
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"renamed_root\")\n",
+    )
+    .unwrap();
+    let mapping_changed = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    let mapping_restored = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_ne!(initial, mapping_changed);
+    assert_eq!(initial, mapping_restored);
+    assert_eq!(initial.actions()[0], mapping_changed.actions()[0]);
+}
+
+#[tokio::test]
+async fn runfiles_support_output_conflicts_publish_no_configured_result() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name)
+    collision = ctx.actions.declare_file(ctx.label.name + ctx.attr.suffix)
+    ctx.actions.write(out, "tool\n")
+    ctx.actions.write(collision, "collision\n")
+    return [DefaultInfo(executable = out)]
+
+probe = rule(implementation = _impl, executable = True, attrs = {"suffix": attr.string()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "probe")
+probe(name = "repo", suffix = ".repo_mapping")
+probe(name = "source", suffix = ".runfiles_manifest")
+probe(name = "manifest", suffix = ".runfiles/MANIFEST")
+probe(name = "tree", suffix = ".runfiles")
+probe(name = "clear", suffix = ".unrelated")
+"#,
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = |name: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{name}")).unwrap(),
+            typed_action_test_configuration(),
+        )
+    };
+
+    for (name, path) in [
+        ("repo", "repo.repo_mapping"),
+        ("source", "source.runfiles_manifest"),
+        ("manifest", "manifest.runfiles/MANIFEST"),
+        ("tree", "tree.runfiles"),
+    ] {
+        let error = analyze_request(&dice, &workspace, &key(name), None, false)
+            .await
+            .unwrap_err();
+        assert!(error.contains(path), "{name}: {error}");
+    }
+
+    let clear = analyze_request(&dice, &workspace, &key("clear"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(clear.actions().len(), 6);
+    assert!(
+        clear
+            .providers()
+            .default_info()
+            .unwrap()
+            .files_to_run
+            .is_complete()
+    );
 }
 
 #[tokio::test]

@@ -2144,4 +2144,6 @@ non-Windows graph for Windows. R4 retains the existing typed
 flavor/environment pair and fails closed before provider/registry publication.
 The flavor is an eligibility gate, not a new retained recipe field; no new
 collection, clone, cache, interner, task, lock, key, graph, or memory owner is
-added. Focused R4 review is required before Rust resumes.
+added. Focused R4 review returned `ACCEPT`; the corrected candidate passes the
+full serial gates within the unchanged caps. Terminal implementation review
+also returned `ACCEPT`; no V1, Buck2, or Zabel semantic owner was introduced.

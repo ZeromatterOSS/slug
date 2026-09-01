@@ -33,6 +33,7 @@ use crate::depset::DepsetOrder;
 use crate::depset::DepsetStorageStats;
 use crate::depset::DepsetSuccessor;
 use crate::depset::MAX_DEPTH;
+use crate::providers::FilesToRunProvider;
 use crate::providers::ProviderCollection;
 use crate::providers::ProviderId;
 
@@ -395,6 +396,7 @@ impl ProviderIdentity {
 pub struct ProviderOccurrence {
     identity: ProviderIdentity,
     fields: SmallMap<CompactString, AnalysisValue>,
+    files_to_run: Option<Arc<FilesToRunProvider>>,
 }
 
 impl ProviderOccurrence {
@@ -407,7 +409,11 @@ impl ProviderOccurrence {
             .map(|(name, value)| (name.into(), value))
             .collect::<SmallMap<_, _>>();
         fields.sort_keys();
-        Self { identity, fields }
+        Self {
+            identity,
+            fields,
+            files_to_run: None,
+        }
     }
 
     pub fn empty(identity: ProviderIdentity) -> Self {
@@ -427,6 +433,15 @@ impl ProviderOccurrence {
 
     pub fn field(&self, name: &str) -> Option<&AnalysisValue> {
         self.fields.get(name)
+    }
+
+    pub(crate) fn with_files_to_run(mut self, value: Arc<FilesToRunProvider>) -> Self {
+        self.files_to_run = Some(value);
+        self
+    }
+
+    pub(crate) fn files_to_run(&self) -> Option<&Arc<FilesToRunProvider>> {
+        self.files_to_run.as_ref()
     }
 
     pub fn value_type(&self) -> AnalysisValueType {
@@ -456,6 +471,11 @@ impl ProviderOccurrence {
 
     pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         self.identity == other.identity
+            && match (&self.files_to_run, &other.files_to_run) {
+                (Some(left), Some(right)) => left.publication_eq_with(right, state),
+                (None, None) => true,
+                _ => false,
+            }
             && self.fields.len() == other.fields.len()
             && self.fields.iter().all(|(name, value)| {
                 other
@@ -468,7 +488,9 @@ impl ProviderOccurrence {
 
 impl PartialEq for ProviderOccurrence {
     fn eq(&self, other: &Self) -> bool {
-        self.identity == other.identity && self.fields == other.fields
+        self.identity == other.identity
+            && self.fields == other.fields
+            && self.files_to_run == other.files_to_run
     }
 }
 

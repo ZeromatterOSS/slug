@@ -9,6 +9,10 @@
  */
 
 use std::collections::BTreeMap;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::Hash;
+use std::hash::Hasher;
+use std::sync::Arc;
 
 use compact_str::CompactString;
 use slug_build_api_v2::ActionOutput;
@@ -34,6 +38,7 @@ use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::RetainedRunfiles;
 use slug_build_api_v2::RunEnvironmentInfo;
 use slug_build_api_v2::RunfilesConflictPolicy;
+use slug_build_api_v2::RunfilesError;
 use slug_build_api_v2::RunfilesSupport;
 use slug_build_api_v2::RunfilesSymlink;
 use slug_identity_v2::CanonicalLabel;
@@ -52,6 +57,16 @@ fn source_artifact(path: &str) -> AnalysisArtifact {
         CanonicalLabel::parse(&format!("@@//{package}:{target}"))
             .expect("test path forms a source label"),
     )
+}
+
+fn derived_artifact(path: &str, kind: ActionOutputKind) -> AnalysisArtifact {
+    AnalysisArtifact::Derived {
+        owner: AnalysisConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//pkg:owner").unwrap(),
+            b"cfg".as_slice(),
+        ),
+        output: ActionOutput::new(path, kind),
+    }
 }
 
 fn artifact_files(items: &[&str]) -> AnalysisDepset {
@@ -220,6 +235,7 @@ fn runfiles_support_reserves_the_complete_typed_category_shape() {
     let support = RunfilesSupport {
         runfiles,
         tree: source_artifact("pkg/tool.runfiles"),
+        input_manifest: source_artifact("pkg/tool.runfiles_manifest"),
         manifest: None,
         repo_mapping_manifest: None,
     };
@@ -228,6 +244,83 @@ fn runfiles_support_reserves_the_complete_typed_category_shape() {
     assert_eq!(support.runfiles.symlinks.to_list().len(), 1);
     assert_eq!(support.runfiles.repository_prefix, "repo");
     assert!(support.manifest.is_none());
+}
+
+#[test]
+fn files_to_run_private_carrier_preserves_complete_support_and_hash_law() {
+    let executable = derived_artifact("pkg/tool", ActionOutputKind::File);
+    let info = DefaultInfo::from_executable(executable.clone(), None).unwrap();
+    let incomplete = info.files_to_run.clone();
+    let incomplete_round_trip =
+        FilesToRunProvider::from_occurrence(&incomplete.to_occurrence()).unwrap();
+    assert_eq!(incomplete_round_trip, incomplete);
+    assert!(!incomplete_round_trip.is_complete());
+    let support = Arc::new(RunfilesSupport {
+        runfiles: info.default_runfiles.clone(),
+        tree: derived_artifact("pkg/tool.runfiles", ActionOutputKind::RunfilesTree),
+        input_manifest: derived_artifact("pkg/tool.runfiles_manifest", ActionOutputKind::File),
+        manifest: Some(derived_artifact(
+            "pkg/tool.runfiles/MANIFEST",
+            ActionOutputKind::File,
+        )),
+        repo_mapping_manifest: Some(derived_artifact(
+            "pkg/tool.repo_mapping",
+            ActionOutputKind::File,
+        )),
+    });
+    let provider = info
+        .with_runfiles_support(support.clone())
+        .unwrap()
+        .files_to_run;
+    let occurrence = provider.to_occurrence();
+    let round_trip = FilesToRunProvider::from_occurrence(&occurrence).unwrap();
+    assert!(round_trip.is_complete());
+    assert!(Arc::ptr_eq(round_trip.support.as_ref().unwrap(), &support));
+
+    let fabricated = ProviderOccurrence::new(
+        occurrence.identity().clone(),
+        occurrence
+            .fields()
+            .iter()
+            .map(|(name, value)| (name.clone(), value.clone())),
+    );
+    assert_ne!(occurrence, fabricated);
+    assert!(FilesToRunProvider::from_occurrence(&fabricated).is_none());
+    let hash = |value: &ProviderOccurrence| {
+        let mut state = DefaultHasher::new();
+        value.hash(&mut state);
+        state.finish()
+    };
+    assert_eq!(hash(&occurrence), hash(&fabricated));
+
+    let same_name = ProviderOccurrence::new(
+        ProviderIdentity::user(ProviderId::unqualified("FilesToRunProvider").unwrap()),
+        occurrence
+            .fields()
+            .iter()
+            .map(|(name, value)| (name.clone(), value.clone())),
+    );
+    assert!(FilesToRunProvider::from_occurrence(&same_name).is_none());
+}
+
+#[test]
+fn runfiles_admit_symlink_artifacts_but_reject_tree_shapes() {
+    let make = |kind| {
+        RetainedRunfiles::from_parts(
+            vec![derived_artifact("pkg/value", kind)],
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            RunfilesConflictPolicy::Warn,
+        )
+    };
+    assert!(make(ActionOutputKind::File).is_ok());
+    assert!(make(ActionOutputKind::Symlink).is_ok());
+    for kind in [ActionOutputKind::Directory, ActionOutputKind::RunfilesTree] {
+        assert_eq!(make(kind), Err(RunfilesError::InvalidArtifactKind(kind)));
+    }
 }
 
 #[test]

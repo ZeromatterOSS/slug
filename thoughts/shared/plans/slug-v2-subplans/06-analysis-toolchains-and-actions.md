@@ -21844,4 +21844,7 @@ the typed `(HostPathFlavor, RetainedActionEnvironment)` pair, rejects Windows
 before support/provider/registry construction, and keeps non-executable
 normalization lazy. It adds only forced-Windows failure evidence; no Windows
 topology, Host observation, cache, key, fallback, retained owner, or cap is
-admitted. Focused independent R4 review is required before Rust resumes.
+admitted. Focused independent R4 review returned `ACCEPT`; the corrected
+candidate passes the full serial owner/downstream, cap, format, archive-status,
+and hygiene gates. Terminal implementation review returned `ACCEPT`; Spawn
+expansion is the next packet.

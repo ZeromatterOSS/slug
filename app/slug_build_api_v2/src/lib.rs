@@ -48,6 +48,8 @@ pub use actions::RetainedSpawnParamFilePolicy;
 pub use actions::RetainedVectorArg;
 pub use actions::RetainedVectorOptions;
 pub use actions::RetainedVectorSource;
+pub use actions::RunfilesSupportActionSpec;
+pub use actions::RunfilesSymlinkMode;
 pub use actions::SpawnExecutable;
 pub use actions::SpawnSpec;
 pub use actions::SymlinkSpec;

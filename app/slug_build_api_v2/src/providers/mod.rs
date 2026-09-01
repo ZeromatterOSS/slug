@@ -71,6 +71,9 @@ pub enum ProviderError {
     MissingDefaultInfo,
     InvalidDefaultInfoFiles { element_type: AnalysisValueType },
     InvalidDefaultInfoArtifactKind { kind: ActionOutputKind },
+    MissingExecutable,
+    FilesToRunAlreadyComplete,
+    RunfilesMissingExecutable,
 }
 
 impl fmt::Display for ProviderError {
@@ -89,6 +92,15 @@ impl fmt::Display for ProviderError {
                 f,
                 "DefaultInfo.files contains unsupported {kind:?} artifact"
             ),
+            Self::MissingExecutable => {
+                f.write_str("runfiles support requires an executable FilesToRun provider")
+            }
+            Self::FilesToRunAlreadyComplete => {
+                f.write_str("runfiles support cannot replace a complete FilesToRun provider")
+            }
+            Self::RunfilesMissingExecutable => {
+                f.write_str("runfiles support must contain its owning executable")
+            }
         }
     }
 }
@@ -197,22 +209,32 @@ pub struct RetainedRunfiles {
     pub repository_prefix: CompactString,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+#[derive(Debug, Clone, Allocative)]
 pub struct RunfilesSupport {
     pub runfiles: RetainedRunfiles,
     pub tree: AnalysisArtifact,
+    pub input_manifest: AnalysisArtifact,
     pub manifest: Option<AnalysisArtifact>,
     pub repo_mapping_manifest: Option<AnalysisArtifact>,
 }
 
 impl RunfilesSupport {
-    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+    pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         self.runfiles.publication_eq_with(&other.runfiles, state)
             && self.tree == other.tree
+            && self.input_manifest == other.input_manifest
             && self.manifest == other.manifest
             && self.repo_mapping_manifest == other.repo_mapping_manifest
     }
 }
+
+impl PartialEq for RunfilesSupport {
+    fn eq(&self, other: &Self) -> bool {
+        self.publication_eq_with(other, &mut PublicationEqState::default())
+    }
+}
+
+impl Eq for RunfilesSupport {}
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct FilesToRunProvider {
@@ -281,47 +303,14 @@ impl FilesToRunProvider {
                 ),
             ],
         )
+        .with_files_to_run(Arc::new(self.clone()))
     }
 
     pub fn from_occurrence(value: &ProviderOccurrence) -> Option<Self> {
         if !value.identity().is_builtin("FilesToRunProvider") {
             return None;
         }
-        let field = |name: &str| {
-            value
-                .fields()
-                .iter()
-                .find(|(candidate, _)| candidate.as_str() == name)
-                .map(|(_, value)| value)
-        };
-        let executable = match field("executable")?.kind() {
-            crate::analysis_value::AnalysisValueKind::None => None,
-            crate::analysis_value::AnalysisValueKind::Artifact(value) => Some(value.clone()),
-            _ => return None,
-        };
-        let files = match field("_files_to_run")?.kind() {
-            crate::analysis_value::AnalysisValueKind::Depset(value) => value.clone(),
-            _ => return None,
-        };
-        let complete = match field("_complete")?.kind() {
-            crate::analysis_value::AnalysisValueKind::Boolean(value) => value,
-            _ => return None,
-        };
-        if !matches!(
-            field("runfiles_manifest")?.kind(),
-            crate::analysis_value::AnalysisValueKind::None
-        ) || !matches!(
-            field("repo_mapping_manifest")?.kind(),
-            crate::analysis_value::AnalysisValueKind::None
-        ) {
-            return None;
-        }
-        Some(Self {
-            files,
-            executable,
-            support: None,
-            complete,
-        })
+        value.files_to_run().map(|value| value.as_ref().clone())
     }
 
     fn from_files(files: AnalysisDepset) -> Self {
@@ -355,7 +344,7 @@ impl FilesToRunProvider {
         }
     }
 
-    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+    pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         self.files.publication_eq_with(&other.files, state)
             && self.executable == other.executable
             && match (&self.support, &other.support) {
@@ -364,6 +353,30 @@ impl FilesToRunProvider {
                 _ => false,
             }
             && self.complete == other.complete
+    }
+
+    pub fn with_support(&self, support: Arc<RunfilesSupport>) -> Result<Self, ProviderError> {
+        let Some(executable) = &self.executable else {
+            return Err(ProviderError::MissingExecutable);
+        };
+        if self.complete || self.support.is_some() {
+            return Err(ProviderError::FilesToRunAlreadyComplete);
+        }
+        if !support.runfiles.files.to_list().iter().any(|value| {
+            matches!(
+                value.kind(),
+                crate::analysis_value::AnalysisValueKind::Artifact(artifact)
+                    if artifact == executable
+            )
+        }) {
+            return Err(ProviderError::RunfilesMissingExecutable);
+        }
+        Ok(Self {
+            files: self.files.clone(),
+            executable: Some(executable.clone()),
+            support: Some(support),
+            complete: true,
+        })
     }
 }
 
@@ -408,6 +421,19 @@ impl DefaultInfo {
 
     pub fn files(&self) -> &AnalysisDepset {
         &self.files
+    }
+
+    pub fn with_runfiles_support(
+        &self,
+        support: Arc<RunfilesSupport>,
+    ) -> Result<Self, ProviderError> {
+        Ok(Self {
+            files: self.files.clone(),
+            default_runfiles: self.default_runfiles.clone(),
+            data_runfiles: self.data_runfiles.clone(),
+            executable: self.executable.clone(),
+            files_to_run: self.files_to_run.with_support(support)?,
+        })
     }
 
     pub fn file_artifacts(&self) -> Vec<AnalysisArtifact> {
@@ -699,6 +725,16 @@ impl ProviderCollection {
             Some(ProviderValue::DefaultInfo(info)) => Some(info),
             _ => None,
         }
+    }
+
+    pub fn with_default_info(&self, info: DefaultInfo) -> Self {
+        let mut providers = self.0.providers.clone();
+        let previous = providers.insert(
+            ProviderIdentity::builtin("DefaultInfo"),
+            ProviderValue::DefaultInfo(info),
+        );
+        debug_assert!(matches!(previous, Some(ProviderValue::DefaultInfo(_))));
+        Self(Arc::new(ProviderCollectionData { providers }))
     }
 
     /// Builtin-only lookup: user providers named `ToolchainInfo` never match.

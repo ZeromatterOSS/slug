@@ -9,6 +9,7 @@
  */
 
 use std::collections::BTreeMap;
+use std::ops::Range;
 
 use crate::actions::registry::ActionError;
 use crate::actions::registry::ActionRegistry;
@@ -158,6 +159,13 @@ impl CtxActions {
 
     pub fn register_symlink(&mut self, spec: SymlinkSpec) -> Result<usize, ActionError> {
         self.registry.register(ActionSpec::symlink(spec))
+    }
+
+    pub fn register_batch(
+        &mut self,
+        actions: impl IntoIterator<Item = ActionSpec>,
+    ) -> Result<Range<usize>, ActionError> {
+        self.registry.register_batch(actions)
     }
 
     pub fn registry(&self) -> &ActionRegistry {

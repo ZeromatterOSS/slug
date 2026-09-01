@@ -35,6 +35,9 @@ impl ReapiCommandProjection {
                     output_files.push(output.path().to_owned())
                 }
                 ActionOutputKind::Directory => output_directories.push(output.path().to_owned()),
+                ActionOutputKind::RunfilesTree => {
+                    return Err("runfiles tree REAPI projection is not admitted");
+                }
             }
         }
 

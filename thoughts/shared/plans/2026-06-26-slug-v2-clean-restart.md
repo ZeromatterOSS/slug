@@ -49,10 +49,11 @@ occurrence carrier. R2 architecture review and the focused R3 unresolved-
 symlink Artifact correction rereview returned `ACCEPT`. R3 terminal review
 returned `REPLAN` because the implementation discarded `HostPathFlavor` and
 could admit its non-Windows graph on Windows. R4 is a docs-only correction
-pending focused review: retain the existing typed flavor/environment pair,
-reject Windows before provider or registry publication, and prove the lazy
-non-executable path. After implementation and terminal acceptance, Spawn
-expansion follows. This remains generic graph/provider/action
+that received focused architecture `ACCEPT`: the corrected candidate retains
+the existing typed flavor/environment pair, rejects Windows before provider or
+registry publication, and proves the lazy non-executable path. It passes the
+full serial owner/downstream, cap, format, and hygiene gates; terminal review
+returned `ACCEPT`, and Spawn expansion follows. This remains generic graph/provider/action
 infrastructure, not a `cc_common`, `cc_internal`, rules_cc, parser, or C++
 rule packet. Bazel 9.2 is semantic authority; Zabel is peer architecture and
 optimization guidance only.
